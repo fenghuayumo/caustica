@@ -32,6 +32,197 @@ bool ContainsTime(const std::vector<float>& times, float time, float epsilon)
     return it != times.begin() && std::fabs(*std::prev(it) - time) <= epsilon;
 }
 
+enum class TimelineIcon
+{
+    JumpStart,
+    PreviousFrame,
+    Play,
+    Pause,
+    NextFrame,
+    JumpEnd,
+    InsertKey,
+    DeleteKey,
+};
+
+void DrawTimelineIcon(
+    ImDrawList* drawList,
+    ImVec2 min,
+    ImVec2 max,
+    TimelineIcon icon,
+    ImU32 color)
+{
+    const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    const float s = std::min(max.x - min.x, max.y - min.y) * 0.25f;
+    const float thickness = std::max(1.5f, s * 0.24f);
+
+    const auto drawChevron = [&](bool right) {
+        const float direction = right ? 1.f : -1.f;
+        drawList->AddLine(
+            ImVec2(center.x - direction * s * 0.45f, center.y - s * 0.72f),
+            ImVec2(center.x + direction * s * 0.30f, center.y),
+            color,
+            thickness);
+        drawList->AddLine(
+            ImVec2(center.x + direction * s * 0.30f, center.y),
+            ImVec2(center.x - direction * s * 0.45f, center.y + s * 0.72f),
+            color,
+            thickness);
+    };
+
+    switch (icon)
+    {
+    case TimelineIcon::JumpStart:
+        drawList->AddRectFilled(
+            ImVec2(center.x - s * 0.90f, center.y - s * 0.78f),
+            ImVec2(center.x - s * 0.66f, center.y + s * 0.78f),
+            color,
+            1.f);
+        drawList->AddTriangleFilled(
+            ImVec2(center.x - s * 0.48f, center.y),
+            ImVec2(center.x + s * 0.62f, center.y - s * 0.76f),
+            ImVec2(center.x + s * 0.62f, center.y + s * 0.76f),
+            color);
+        break;
+    case TimelineIcon::PreviousFrame:
+        drawChevron(false);
+        break;
+    case TimelineIcon::Play:
+        drawList->AddTriangleFilled(
+            ImVec2(center.x - s * 0.58f, center.y - s * 0.82f),
+            ImVec2(center.x + s * 0.78f, center.y),
+            ImVec2(center.x - s * 0.58f, center.y + s * 0.82f),
+            color);
+        break;
+    case TimelineIcon::Pause:
+        drawList->AddRectFilled(
+            ImVec2(center.x - s * 0.62f, center.y - s * 0.80f),
+            ImVec2(center.x - s * 0.16f, center.y + s * 0.80f),
+            color,
+            1.f);
+        drawList->AddRectFilled(
+            ImVec2(center.x + s * 0.16f, center.y - s * 0.80f),
+            ImVec2(center.x + s * 0.62f, center.y + s * 0.80f),
+            color,
+            1.f);
+        break;
+    case TimelineIcon::NextFrame:
+        drawChevron(true);
+        break;
+    case TimelineIcon::JumpEnd:
+        drawList->AddTriangleFilled(
+            ImVec2(center.x + s * 0.48f, center.y),
+            ImVec2(center.x - s * 0.62f, center.y - s * 0.76f),
+            ImVec2(center.x - s * 0.62f, center.y + s * 0.76f),
+            color);
+        drawList->AddRectFilled(
+            ImVec2(center.x + s * 0.66f, center.y - s * 0.78f),
+            ImVec2(center.x + s * 0.90f, center.y + s * 0.78f),
+            color,
+            1.f);
+        break;
+    case TimelineIcon::InsertKey:
+    case TimelineIcon::DeleteKey:
+    {
+        const ImVec2 diamond[] = {
+            ImVec2(center.x, center.y - s * 0.88f),
+            ImVec2(center.x + s * 0.88f, center.y),
+            ImVec2(center.x, center.y + s * 0.88f),
+            ImVec2(center.x - s * 0.88f, center.y),
+        };
+        if (icon == TimelineIcon::InsertKey)
+            drawList->AddConvexPolyFilled(diamond, IM_ARRAYSIZE(diamond), color);
+        else
+            drawList->AddPolyline(
+                diamond,
+                IM_ARRAYSIZE(diamond),
+                color,
+                ImDrawFlags_Closed,
+                thickness);
+
+        const ImU32 markColor =
+            icon == TimelineIcon::InsertKey ? IM_COL32(24, 27, 31, 255) : color;
+        drawList->AddLine(
+            ImVec2(center.x - s * 0.38f, center.y),
+            ImVec2(center.x + s * 0.38f, center.y),
+            markColor,
+            std::max(1.2f, thickness * 0.72f));
+        if (icon == TimelineIcon::InsertKey)
+        {
+            drawList->AddLine(
+                ImVec2(center.x, center.y - s * 0.38f),
+                ImVec2(center.x, center.y + s * 0.38f),
+                markColor,
+                std::max(1.2f, thickness * 0.72f));
+        }
+        break;
+    }
+    }
+}
+
+bool TimelineIconButton(
+    const char* id,
+    TimelineIcon icon,
+    bool selected,
+    bool enabled,
+    const char* tooltip)
+{
+    constexpr float width = 29.f;
+    constexpr float height = 27.f;
+    const ImVec2 min = ImGui::GetCursorScreenPos();
+    const ImVec2 max(min.x + width, min.y + height);
+
+    if (!enabled)
+        ImGui::BeginDisabled();
+    const bool pressed = ImGui::InvisibleButton(id, ImVec2(width, height));
+    const bool hovered =
+        ImGui::IsItemHovered(enabled ? ImGuiHoveredFlags_None : ImGuiHoveredFlags_AllowWhenDisabled);
+    if (!enabled)
+        ImGui::EndDisabled();
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const EditorColors& colors = GetEditorColors();
+    if (selected)
+    {
+        drawList->AddRectFilled(
+            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdleActive), 4.f);
+        drawList->AddRect(
+            min, max, ImGui::ColorConvertFloat4ToU32(colors.AccentHovered), 4.f, 0, 1.f);
+    }
+    else if (hovered && enabled)
+    {
+        drawList->AddRectFilled(
+            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdleHovered), 4.f);
+    }
+    else
+    {
+        drawList->AddRectFilled(
+            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdle), 4.f);
+    }
+
+    const ImU32 foreground = ImGui::ColorConvertFloat4ToU32(
+        !enabled
+            ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)
+            : (selected ? colors.AccentHovered : colors.Text));
+    DrawTimelineIcon(drawList, min, max, icon, foreground);
+
+    if (tooltip && hovered)
+        ImGui::SetTooltip("%s", tooltip);
+    return enabled && pressed;
+}
+
+void TimelineToolbarSeparator()
+{
+    ImGui::SameLine(0.f, 5.f);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(pos.x + 1.f, pos.y + 4.f),
+        ImVec2(pos.x + 1.f, pos.y + 23.f),
+        ImGui::GetColorU32(ImGuiCol_Border),
+        1.f);
+    ImGui::Dummy(ImVec2(3.f, 27.f));
+    ImGui::SameLine(0.f, 5.f);
+}
+
 } // namespace
 
 void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
@@ -68,75 +259,106 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         m_sceneEditor.evaluateAnimationsAt(frame * frameSeconds);
     };
 
-    if (ImGui::Button("|<"))
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(3.f, 4.f));
+    if (TimelineIconButton(
+            "##JumpStart",
+            TimelineIcon::JumpStart,
+            false,
+            true,
+            "Jump to start"))
         setFrame(m_editorUI.StartFrame);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Jump to start");
-    ImGui::SameLine();
-    if (ImGui::Button("<"))
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##PreviousFrame",
+            TimelineIcon::PreviousFrame,
+            false,
+            true,
+            "Previous frame"))
         setFrame(currentFrame - 1);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Previous frame");
-    ImGui::SameLine();
-
-    ImGui::BeginDisabled(!m_settings.RealtimeMode);
-    if (ImGui::Button(m_settings.EnableAnimations ? "Pause" : "Play"))
-        m_settings.EnableAnimations = !m_settings.EnableAnimations;
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip(
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##PlayPause",
+            m_settings.EnableAnimations ? TimelineIcon::Pause : TimelineIcon::Play,
+            m_settings.EnableAnimations,
+            m_settings.RealtimeMode,
             m_settings.RealtimeMode
-                ? "Play or pause animation (Space)"
-                : "Animation playback is unavailable in reference mode");
-
-    ImGui::SameLine();
-    if (ImGui::Button(">"))
+                ? (m_settings.EnableAnimations ? "Pause animation (Space)" : "Play animation (Space)")
+                : "Animation playback is unavailable in reference mode"))
+        m_settings.EnableAnimations = !m_settings.EnableAnimations;
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##NextFrame",
+            TimelineIcon::NextFrame,
+            false,
+            true,
+            "Next frame"))
         setFrame(currentFrame + 1);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Next frame");
-    ImGui::SameLine();
-    if (ImGui::Button(">|"))
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##JumpEnd",
+            TimelineIcon::JumpEnd,
+            false,
+            true,
+            "Jump to end"))
         setFrame(m_editorUI.EndFrame);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Jump to end");
-
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(90.f);
-    int editedFrame = currentFrame;
-    if (ImGui::InputInt("Frame", &editedFrame, 1, 10))
-        setFrame(editedFrame);
 
     const ecs::Entity selected = m_editorUI.SelectedEntity;
     const bool hasSelection = ecs::isValid(selected);
     const float keyTime = currentFrame * frameSeconds;
     const bool hasKey = hasSelection && m_sceneEditor.hasTransformKeyframe(selected, keyTime);
 
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!hasSelection);
-    if (ImGui::Button(hasKey ? "Update Key" : "Insert Key"))
+    TimelineToolbarSeparator();
+    if (TimelineIconButton(
+            "##InsertKey",
+            TimelineIcon::InsertKey,
+            hasKey,
+            hasSelection,
+            hasKey
+                ? "Update transform keyframe"
+                : "Insert Location, Rotation and Scale keyframe"))
     {
         m_settings.EnableAnimations = false;
         m_sceneEditor.insertTransformKeyframe(selected, keyTime);
     }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("Insert or update Location, Rotation and Scale at the current frame");
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!hasKey);
-    if (ImGui::Button("Delete Key"))
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##DeleteKey",
+            TimelineIcon::DeleteKey,
+            false,
+            hasKey,
+            "Delete transform keyframe"))
         m_sceneEditor.deleteTransformKeyframe(selected, keyTime);
-    ImGui::EndDisabled();
-    ImGui::EndDisabled();
 
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(60.f);
-    if (ImGui::DragInt("FPS", &m_editorUI.FramesPerSecond, 1.f, 1, 240))
+    TimelineToolbarSeparator();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Frame");
+    ImGui::SameLine(0.f, 5.f);
+    ImGui::SetNextItemWidth(72.f);
+    int editedFrame = currentFrame;
+    if (ImGui::DragInt("##CurrentFrame", &editedFrame, 0.25f, m_editorUI.StartFrame, m_editorUI.EndFrame))
+        setFrame(editedFrame);
+
+    ImGui::SameLine(0.f, 12.f);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Range");
+    ImGui::SameLine(0.f, 5.f);
+    ImGui::SetNextItemWidth(58.f);
+    ImGui::DragInt("##StartFrame", &m_editorUI.StartFrame, 1.f, 0, m_editorUI.EndFrame - 1);
+    ImGui::SameLine(0.f, 3.f);
+    ImGui::TextDisabled("-");
+    ImGui::SameLine(0.f, 3.f);
+    ImGui::SetNextItemWidth(58.f);
+    ImGui::DragInt(
+        "##EndFrame", &m_editorUI.EndFrame, 1.f, m_editorUI.StartFrame + 1, 1000000);
+
+    ImGui::SameLine(0.f, 12.f);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("FPS");
+    ImGui::SameLine(0.f, 5.f);
+    ImGui::SetNextItemWidth(52.f);
+    if (ImGui::DragInt("##TimelineFPS", &m_editorUI.FramesPerSecond, 1.f, 1, 240))
         m_editorUI.FramesPerSecond = std::clamp(m_editorUI.FramesPerSecond, 1, 240);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(70.f);
-    ImGui::DragInt("Start", &m_editorUI.StartFrame, 1.f, 0, m_editorUI.EndFrame - 1);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(70.f);
-    ImGui::DragInt("End", &m_editorUI.EndFrame, 1.f, m_editorUI.StartFrame + 1, 1000000);
+    ImGui::PopStyleVar();
 
     const ImVec2 canvasPos = ImGui::GetCursorScreenPos();
     const ImVec2 canvasSize(

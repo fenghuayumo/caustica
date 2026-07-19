@@ -27,7 +27,7 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, size);
 
-    // Default: Render Settings | Viewport + Timeline | Hierarchy / Inspector
+    // Default: Render Settings | Viewport + Timeline | Hierarchy / Inspector+Post Process
     ImGuiID dockMain = dockspaceId;
     ImGuiID dockLeft = 0;
     ImGuiID dockRight = 0;
@@ -46,6 +46,7 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderDockWindow("Hierarchy", dockRightTop);
     ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
     ImGui::DockBuilderDockWindow("Material Editor", dockRightBottom);
+    ImGui::DockBuilderDockWindow("Post Process", dockRightBottom);
 
     ImGui::DockBuilderFinish(dockspaceId);
 }
@@ -81,6 +82,7 @@ void EditorUI::BuildMainMenuBar()
         ImGui::MenuItem("Hierarchy", nullptr, &m_editorUI.Viewport.ShowHierarchy);
         ImGui::MenuItem("Inspector", nullptr, &m_editorUI.ShowInspector);
         ImGui::MenuItem("Material Editor", nullptr, &m_editorUI.ShowMaterialEditor);
+        ImGui::MenuItem("Post Process", nullptr, &m_editorUI.ShowPostProcess);
         ImGui::MenuItem("Timeline", nullptr, &m_editorUI.ShowTimeline);
         ImGui::MenuItem("Render Settings", nullptr, &m_editorUI.Viewport.ShowRenderSettings);
         ImGui::MenuItem("Status Bar", nullptr, &m_editorUI.Viewport.ShowStatusBar);
@@ -97,6 +99,7 @@ void EditorUI::BuildMainMenuBar()
             m_editorUI.Viewport.ShowHierarchy = true;
             m_editorUI.ShowInspector = true;
             m_editorUI.ShowMaterialEditor = true;
+            m_editorUI.ShowPostProcess = true;
             m_editorUI.ShowTimeline = true;
             m_editorUI.Viewport.ShowRenderSettings = true;
             m_editorUI.Viewport.RequestResetDockLayout = true;
@@ -134,7 +137,7 @@ void EditorUI::BuildDockSpace()
     ImGui::PopStyleVar(3);
 
     // Bump id when default dock window set changes so old ini layouts migrate.
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v5");
+    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v6");
     if (m_editorUI.Viewport.RequestResetDockLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
     {
         ApplyDefaultDockLayout(dockspaceId, ImGui::GetContentRegionAvail());

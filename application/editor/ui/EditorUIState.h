@@ -54,6 +54,7 @@ struct EditorWindowState
     bool ShowMaterialEditor = true;
     bool ShowInspector = true;
     bool ShowTimeline = true;
+    bool ShowPostProcess = true;
     EditorViewportState Viewport;
 };
 

@@ -193,13 +193,13 @@ void EditorUI::buildUI(void)
         BuildStandaloneDenoiserPanel(layout);
         BuildOpacityMicroMapsPanel(layout);
         BuildAccelerationStructurePanel(layout);
-        BuildPostProcessPanel(layout);
         BuildDebuggingPanel(layout);
         BuildQuickToneMappingBar(layout);
     }
 
     BuildInspectorPanel(layout);
     BuildMaterialEditorPanel(layout);
+    BuildPostProcessPanel(layout);
     BuildDeltaTreeExplorerPanel(layout);
     BuildSceneWidgetsPanel(layout);
     if (m_editorUI.Viewport.ShowHierarchy)
