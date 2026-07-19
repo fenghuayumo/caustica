@@ -126,7 +126,7 @@ void EditorUI::DLSSFGSelectorUI()
     const int itemCount = IM_ARRAYSIZE(items);
 
     static int currentItem = 0;
-    if (ImGui::BeginCombo("Frame Generation", items[currentItem]))
+    if (SettingsBeginCombo("Frame Generation", items[currentItem]))
     {
         for (int itemId = 0; itemId < itemCount; itemId++)
         {
@@ -138,7 +138,7 @@ void EditorUI::DLSSFGSelectorUI()
             if (isSelected)
                 ImGui::SetItemDefaultFocus();
         }
-        ImGui::EndCombo();
+        SettingsEndCombo();
     }
 
     m_settings.DLSSFGMode = (currentItem > 0)
@@ -156,12 +156,20 @@ void EditorUI::DLSSFGSelectorUI()
 
 void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("display and performance", ImGuiTreeNodeFlags_DefaultOpen))
+        RAII_SCOPE(ImGui::PushID("DisplayPerformancePanel");, ImGui::PopID(););
+        if (ImGui::CollapsingHeader("Display & Performance", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-            
+
+            SettingsCategoryHeader("Output");
             {
-                if (ImGui::Button(stringFormat("Resolution:  %dx%d (click to change)", caustica::displaySize(*m_sceneEditor.app()).x, caustica::displaySize(*m_sceneEditor.app()).y, caustica::renderSize(*m_sceneEditor.app()).x, caustica::renderSize(*m_sceneEditor.app()).y).c_str(), { -1, 0 }))
+                if (ImGui::Button(
+                        stringFormat(
+                            "Resolution  %d x %d",
+                            caustica::displaySize(*m_sceneEditor.app()).x,
+                            caustica::displaySize(*m_sceneEditor.app()).y)
+                            .c_str(),
+                        { -1, 0 }))
                     ImGui::OpenPopup("Resolution Picker");
                 BuildUIResolutionPicker();
             }
@@ -170,11 +178,14 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
                 const char* currentPresetName = "Custom";
                 for (const auto& preset : s_performancePresets)
                     if (MatchesPreset(m_ui, preset)) { currentPresetName = preset.Name; break; }
-                if (ImGui::Button(stringFormat("Perf. preset: %s (click to change)", currentPresetName).c_str(), { -1, 0 }))
+                if (ImGui::Button(
+                        stringFormat("Performance Preset  %s", currentPresetName).c_str(),
+                        { -1, 0 }))
                     ImGui::OpenPopup("Performance Preset");
                 BuildUIPerformancePresets();
             }
 
+            SettingsCategoryHeader("Frame Pacing");
             {
                 RAII_SCOPE(ImGui::PushID("DispAndPerf"); , ImGui::PopID(); );
                 DLSSFGSelectorUI();
@@ -184,16 +195,13 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
 #if CAUSTICA_WITH_STREAMLINE
                 UI_SCOPED_DISABLE(m_settings.actualDLSSFGMode() != SI::DLSSGMode::eOff);
 #endif
-                ImGui::Checkbox("VSync", &m_settings.EnableVsync);
-                bool fpsLimiter = m_settings.FPSLimiter != 0;
-                ImGui::SameLine();
-                ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-                ImGui::SameLine();
-                ImGui::Text("Cap fps to ");
-                ImGui::SameLine();
+                SettingsCheckbox("VSync", &m_settings.EnableVsync);
                 std::array<int, 8> fpsOptions{ 0, /*1,*/ 2, 5, 10, 15, 30, 60, 120 }; auto curr = std::find(fpsOptions.begin(), fpsOptions.end(), m_settings.FPSLimiter);
                 int fpsLimitIndex = (curr != fpsOptions.end()) ? (int(curr - fpsOptions.begin())) : (0);
-                if (ImGui::Combo("##FPSLIMITER", &fpsLimitIndex, "disabled\0" /* " 1 \0" */ " 2 \0 5 \0 10 \0 15 \0 30 \0 60 \0 120 \0\0"))
+                if (SettingsCombo(
+                        "Frame Rate Cap",
+                        &fpsLimitIndex,
+                        "Disabled\0" /* " 1 \0" */ "2 FPS\0 5 FPS\0 10 FPS\0 15 FPS\0 30 FPS\0 60 FPS\0 120 FPS\0\0"))
                     m_settings.FPSLimiter = fpsOptions[dm::clamp(fpsLimitIndex, 0, (int)fpsOptions.size() - 1)];
             }
 

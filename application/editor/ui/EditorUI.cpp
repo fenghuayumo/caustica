@@ -205,6 +205,7 @@ void EditorUI::buildUI(void)
     if (m_editorUI.Viewport.ShowHierarchy)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
+    BuildTimelinePanel(layout);
 
     // After all dock panels (same ordering as pre-DockSpace): ImGuizmo BeginFrame +
     // foreground draw list so the gizmo is never covered by the Viewport image.

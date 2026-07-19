@@ -48,7 +48,11 @@ namespace caustica::animation
         std::optional<dm::float4> evaluate(float time, bool extrapolateLastValues = false) const;
 
         [[nodiscard]] std::vector<Keyframe>& getKeyframes() { return m_Keyframes; }
+        [[nodiscard]] const std::vector<Keyframe>& getKeyframes() const { return m_Keyframes; }
         void addKeyframe(const Keyframe keyframe);
+        bool upsertKeyframe(const Keyframe& keyframe, float timeEpsilon = 1e-4f);
+        bool removeKeyframe(float time, float timeEpsilon = 1e-4f);
+        [[nodiscard]] bool hasKeyframe(float time, float timeEpsilon = 1e-4f) const;
 
         [[nodiscard]] InterpolationMode getMode() const { return m_Mode; }
         void setInterpolationMode(InterpolationMode mode) { m_Mode = mode; }

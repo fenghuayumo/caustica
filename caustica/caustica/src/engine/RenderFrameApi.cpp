@@ -328,11 +328,6 @@ void animate(App& app, float fElapsedTimeSeconds)
             }
         }
     }
-    else
-    {
-        vs->sceneTime = 0.0f;
-    }
-
 }
 
 void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)

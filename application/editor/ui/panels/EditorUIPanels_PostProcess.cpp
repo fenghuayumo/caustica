@@ -92,32 +92,34 @@ void EditorUI::BuildAccelerationStructurePanel(const PanelLayout& layout)
 
 void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
 {
-        if (ImGui::CollapsingHeader("Post-process", ImGuiTreeNodeFlags_DefaultOpen))
+        RAII_SCOPE(ImGui::PushID("PostProcessPanel");, ImGui::PopID(););
+        if (ImGui::CollapsingHeader("Post Processing", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
 
-            if (ImGui::CollapsingHeader("Early (HDR) post-process"))
+            if (ImGui::CollapsingHeader("Early (HDR)"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                ImGui::Checkbox("PostProcessTestPass", &m_settings.PostProcessTestPassHDR );
-                
-                ImGui::Separator();
+                SettingsCheckbox("Test Pass", &m_settings.PostProcessTestPassHDR);
 
                 if (ImGui::CollapsingHeader("Bloom"))
                 {
-                    ImGui::Checkbox("Enable Bloom", &m_settings.EnableBloom);
-                    ImGui::SliderFloat("Bloom Width (Pixels)", &m_settings.BloomRadius, 0.f, 64.f);
-                    ImGui::SliderFloat("Bloom Intensity", &m_settings.BloomIntensity, 0.f, 0.1f);
+                    RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
+                    SettingsCheckbox("Enabled##Bloom", &m_settings.EnableBloom);
+                    SettingsSliderFloat(
+                        "Width", &m_settings.BloomRadius, 0.f, 64.f, "%.1f px");
+                    SettingsSliderFloat(
+                        "Intensity", &m_settings.BloomIntensity, 0.f, 0.1f, "%.4f");
                 }
             }
 
             if (ImGui::CollapsingHeader("Tone Mapping"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                ImGui::Checkbox("Enable", &m_settings.EnableToneMapping);
+                SettingsCheckbox("Enabled##ToneMapping", &m_settings.EnableToneMapping);
 
                 const std::string currentOperator = tonemapOperatorToString.at(m_settings.ToneMappingParams.toneMapOperator);
-                if (ImGui::BeginCombo("Operator", currentOperator.c_str()))
+                if (SettingsBeginCombo("Operator", currentOperator.c_str()))
                 {
                     for (auto it = tonemapOperatorToString.begin(); it != tonemapOperatorToString.end(); it++)
                     {
@@ -125,21 +127,24 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
                         if (ImGui::Selectable(it->second.c_str(), is_selected))
                             m_settings.ToneMappingParams.toneMapOperator = it->first;
                     }
-                    ImGui::EndCombo();
+                    SettingsEndCombo();
                 }
 
-                ImGui::Checkbox("Auto Exposure", &m_settings.ToneMappingParams.autoExposure);
+                SettingsCategoryHeader("Exposure");
+                SettingsCheckbox("Auto Exposure", &m_settings.ToneMappingParams.autoExposure);
 
                 if (m_settings.ToneMappingParams.autoExposure)
                 {
-                    ImGui::InputFloat("Auto Exposure Min", &m_settings.ToneMappingParams.exposureValueMin);
+                    SettingsInputFloat(
+                        "Minimum EV", &m_settings.ToneMappingParams.exposureValueMin);
                     m_settings.ToneMappingParams.exposureValueMin = dm::min(m_settings.ToneMappingParams.exposureValueMax, m_settings.ToneMappingParams.exposureValueMin);
-                    ImGui::InputFloat("Auto Exposure Max", &m_settings.ToneMappingParams.exposureValueMax);
+                    SettingsInputFloat(
+                        "Maximum EV", &m_settings.ToneMappingParams.exposureValueMax);
                     m_settings.ToneMappingParams.exposureValueMax = dm::max(m_settings.ToneMappingParams.exposureValueMin, m_settings.ToneMappingParams.exposureValueMax);
                 }
 
                 const std::string currentMode = ExposureModeToString.at(m_settings.ToneMappingParams.exposureMode);
-                if (ImGui::BeginCombo("Exposure Mode", currentMode.c_str()))
+                if (SettingsBeginCombo("Exposure Mode", currentMode.c_str()))
                 {
                     for (auto it = ExposureModeToString.begin(); it != ExposureModeToString.end(); it++)
                     {
@@ -147,45 +152,53 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
                         if (ImGui::Selectable(it->second.c_str(), is_selected))
                             m_settings.ToneMappingParams.exposureMode = it->first;
                     }
-                    ImGui::EndCombo();
+                    SettingsEndCombo();
                 }
 
-                ImGui::InputFloat("Exposure Compensation", &m_settings.ToneMappingParams.exposureCompensation);
+                SettingsInputFloat(
+                    "Compensation", &m_settings.ToneMappingParams.exposureCompensation);
                 m_settings.ToneMappingParams.exposureCompensation = dm::clamp(m_settings.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
 
-                ImGui::InputFloat("Exposure Value", &m_settings.ToneMappingParams.exposureValue);
+                SettingsInputFloat(
+                    "Exposure Value", &m_settings.ToneMappingParams.exposureValue);
                 m_settings.ToneMappingParams.exposureValue = dm::clamp(m_settings.ToneMappingParams.exposureValue, dm::log2f(0.1f * 0.1f * 0.1f), dm::log2f(100000.f * 100.f * 100.f));
 
-                ImGui::InputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
+                SettingsInputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
                 m_settings.ToneMappingParams.filmSpeed = dm::clamp(m_settings.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
 
-                ImGui::InputFloat("fNumber", &m_settings.ToneMappingParams.fNumber);
+                SettingsInputFloat("F-Number", &m_settings.ToneMappingParams.fNumber);
                 m_settings.ToneMappingParams.fNumber = dm::clamp(m_settings.ToneMappingParams.fNumber, 0.1f, 100.0f);
 
-                ImGui::InputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
+                SettingsInputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
                 m_settings.ToneMappingParams.shutter = dm::clamp(m_settings.ToneMappingParams.shutter, 0.1f, 10000.0f);
 
-                ImGui::Checkbox("Enable White Balance", &m_settings.ToneMappingParams.whiteBalance);
+                SettingsCategoryHeader("White Balance");
+                SettingsCheckbox(
+                    "Enabled##WhiteBalance", &m_settings.ToneMappingParams.whiteBalance);
 
-                ImGui::InputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
+                SettingsInputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
                 m_settings.ToneMappingParams.whitePoint = dm::clamp(m_settings.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
 
-                ImGui::InputFloat("White Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
+                SettingsInputFloat(
+                    "Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
                 m_settings.ToneMappingParams.whiteMaxLuminance = dm::clamp(m_settings.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
 
-                ImGui::InputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
+                SettingsInputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
                 m_settings.ToneMappingParams.whiteScale = dm::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
 
-                ImGui::Checkbox("Enable Clamp", &m_settings.ToneMappingParams.clamped);
+                SettingsCheckbox("Clamp", &m_settings.ToneMappingParams.clamped);
             }
 
-            if (ImGui::CollapsingHeader("Late (LDR) post-process"))
+            if (ImGui::CollapsingHeader("Late (LDR)"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-                ImGui::Checkbox("EdgeDetection", &m_settings.PostProcessEdgeDetection);
-                ImGui::SliderFloat("EdgeDetectionThreshold", &m_settings.PostProcessEdgeDetectionThreshold, 0.0f, 1.0f );
-                ImGui::Separator();
+                SettingsCheckbox("Edge Detection", &m_settings.PostProcessEdgeDetection);
+                SettingsSliderFloat(
+                    "Edge Threshold",
+                    &m_settings.PostProcessEdgeDetectionThreshold,
+                    0.0f,
+                    1.0f);
             }
         }
 

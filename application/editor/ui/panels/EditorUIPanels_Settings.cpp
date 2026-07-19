@@ -43,13 +43,16 @@ namespace caustica::editor
 #include <backend/GpuDevice.h>
 void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 {
+        RAII_SCOPE(ImGui::PushID("SystemPanel");, ImGui::PopID(););
         if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-            if (ImGui::Button("Reload Shaders (requires VS .hlsl->.bin build)"))
+            if (ImGui::Button("Reload Shaders", ImVec2(-1.f, 0.f)))
                 m_runtime.Invalidation.ShaderReloadRequested = true;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Requires the Visual Studio .hlsl -> .bin build step.");
 
-            ImGui::Checkbox("render when out of focus", &m_editorUI.RenderWhenOutOfFocus);
+            SettingsCheckbox("Background Render", &m_editorUI.RenderWhenOutOfFocus);
             if (ImGui::IsItemHovered()) 
                 ImGui::SetTooltip("render loop will pause when app window is out of focus. Note: Reference mode will accumulate until all frames are done.");
         
@@ -57,7 +60,7 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
             {
                 //RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
 
-                if (ImGui::CollapsingHeader("capture scripts and tools"))
+                if (ImGui::CollapsingHeader("Capture Scripts & Tools"))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
@@ -65,7 +68,7 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
                 }
 
 #if CAUSTICA_WITH_PYTHON
-                if (ImGui::CollapsingHeader("Python scripting"))
+                if (ImGui::CollapsingHeader("Python Scripting"))
                 {
                     RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
                     BuildPythonScriptingUI(layout.indent);
@@ -98,6 +101,7 @@ void EditorUI::BuildSystemPanel(const PanelLayout& layout)
 
 void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 {
+        RAII_SCOPE(ImGui::PushID("ViewportCameraPanel");, ImGui::PopID(););
         // Viewport / session camera controls. Scene camera objects live in Hierarchy
         // and expose FOV/clip planes in the Inspector (Blender-style).
         if (ImGui::CollapsingHeader("Viewport Camera", ImGuiTreeNodeFlags_DefaultOpen))
@@ -122,7 +126,7 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
 
             uint& currentlySelected = caustica::selectedCameraIndex(*m_sceneEditor.app());
             currentlySelected = std::min(currentlySelected, (uint)options.size() - 1u);
-            if (ImGui::BeginCombo("Active Camera", options[currentlySelected].c_str()))
+            if (SettingsBeginCombo("Active Camera", options[currentlySelected].c_str()))
             {
                 for (uint i = 0; i < (uint)options.size(); i++)
                 {
@@ -140,23 +144,43 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
                     if (is_selected)
                         ImGui::SetItemDefaultFocus();
                 }
-                ImGui::EndCombo();
+                SettingsEndCombo();
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Free Flight = editor navigation camera.\nScene cameras are editable in Hierarchy / Inspector.");
 
             if (currentlySelected == 0)
             {
-                ImGui::Text("Free Flight pose:");
-                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                if (ImGui::Button("Save to file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::saveCurrentCamera(*m_sceneEditor.app()); ImGui::SameLine();
-                if (ImGui::Button("Load from file", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::loadCurrentCamera(*m_sceneEditor.app());
-                if (ImGui::Button("Save to clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) ImGui::SetClipboardText(caustica::currentCameraPosDirUp(*m_sceneEditor.app()).c_str()); ImGui::SameLine();
-                const char *cpbrdtxt = ImGui::GetClipboardText();
-                if (ImGui::Button("Load from clipboard", ImVec2(ImGui::GetFontSize() * 9.0f, ImGui::GetTextLineHeightWithSpacing()))) caustica::setCurrentCameraPosDirUp(*m_sceneEditor.app(), cpbrdtxt?cpbrdtxt:"");
+                SettingsCategoryHeader("Free Flight Pose");
+                if (ImGui::BeginTable(
+                        "##CameraPoseActions",
+                        2,
+                        ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings
+                            | ImGuiTableFlags_NoPadOuterX))
+                {
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("Save to File", ImVec2(-1.f, 0.f)))
+                        caustica::saveCurrentCamera(*m_sceneEditor.app());
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("Load from File", ImVec2(-1.f, 0.f)))
+                        caustica::loadCurrentCamera(*m_sceneEditor.app());
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("Copy Pose", ImVec2(-1.f, 0.f)))
+                        ImGui::SetClipboardText(
+                            caustica::currentCameraPosDirUp(*m_sceneEditor.app()).c_str());
+                    ImGui::TableNextColumn();
+                    const char* clipboardText = ImGui::GetClipboardText();
+                    if (ImGui::Button("Paste Pose", ImVec2(-1.f, 0.f)))
+                    {
+                        caustica::setCurrentCameraPosDirUp(
+                            *m_sceneEditor.app(),
+                            clipboardText ? clipboardText : "");
+                    }
+                    ImGui::EndTable();
+                }
 
                 float cameraFOV = 2.0f * dm::degrees(caustica::cameraVerticalFOV(*m_sceneEditor.app()));
-                if (ImGui::InputFloat("Vertical FOV", &cameraFOV, 0.1f))
+                if (SettingsInputFloat("Vertical FOV", &cameraFOV, 0.1f, 1.f, "%.1f°"))
                 {
                     cameraFOV = dm::clamp(cameraFOV, 1.0f, 360.0f);
                     m_settings.ResetAccumulation = true;
@@ -168,14 +192,19 @@ void EditorUI::BuildCameraPanel(const PanelLayout& layout)
                 ImGui::TextDisabled("Scene camera properties: select entity in Hierarchy / Inspector.");
             }
 
-            RESET_ON_CHANGE( ImGui::InputFloat("Aperture", &m_settings.CameraAperture, 0.001f, 0.01f, "%.4f") );
+            SettingsCategoryHeader("Lens & Navigation");
+            RESET_ON_CHANGE(SettingsInputFloat(
+                "Aperture", &m_settings.CameraAperture, 0.001f, 0.01f, "%.4f"));
             m_settings.CameraAperture = dm::clamp(m_settings.CameraAperture, 0.0f, 1.0f);
 
-            RESET_ON_CHANGE( ImGui::InputFloat("Focal Distance", &m_settings.CameraFocalDistance, 0.1f) );
+            RESET_ON_CHANGE(SettingsInputFloat(
+                "Focal Distance", &m_settings.CameraFocalDistance, 0.1f, 1.f, "%.3f"));
             m_settings.CameraFocalDistance = dm::clamp(m_settings.CameraFocalDistance, 0.001f, 1e16f);
-            ImGui::SliderFloat("Keyboard move speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f);
+            SettingsSliderFloat(
+                "Move Speed", &m_settings.CameraMoveSpeed, 0.1f, 10.0f, "%.2f");
 
-            RESET_ON_CHANGE( ImGui::InputFloat("CameraAntiRRSleepJitter", &m_settings.CameraAntiRRSleepJitter, 0.001f ) );
+            RESET_ON_CHANGE(SettingsInputFloat(
+                "Anti-RR Jitter", &m_settings.CameraAntiRRSleepJitter, 0.001f));
             m_settings.CameraAntiRRSleepJitter = clamp( m_settings.CameraAntiRRSleepJitter, 0.0f, 1.0f );
         }
 

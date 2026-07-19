@@ -18,12 +18,16 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
 #include <core/path_utils.h>
+#include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 
 #include "game/GameScene.h"
+
+#include <algorithm>
+#include <cmath>
 
 #if CAUSTICA_WITH_PYTHON
 #include "Python/PythonScripting.h"
@@ -37,6 +41,125 @@ extern const char* g_windowTitle;
 
 namespace caustica::editor
 {
+
+namespace
+{
+
+scene::AnimationChannelData* FindAnimationChannel(
+    scene::SceneEntityWorld& entityWorld,
+    ecs::Entity target,
+    AnimationAttribute attribute,
+    scene::AnimationComponent** owner = nullptr)
+{
+    scene::AnimationChannelData* result = nullptr;
+    entityWorld.world().each<scene::AnimationComponent>(
+        [&](ecs::Entity, scene::AnimationComponent& animation) {
+            if (result)
+                return;
+            for (auto& channel : animation.channels)
+            {
+                if (channel.targetEntity == target && channel.attribute == attribute)
+                {
+                    result = &channel;
+                    if (owner)
+                        *owner = &animation;
+                    return;
+                }
+            }
+        });
+    return result;
+}
+
+scene::AnimationComponent& FindOrCreateEditorAnimation(
+    scene::SceneEntityWorld& entityWorld,
+    ecs::Entity& cachedEntity)
+{
+    if (ecs::isValid(cachedEntity) && entityWorld.world().isAlive(cachedEntity))
+    {
+        if (auto* animation =
+                entityWorld.world().tryGet<scene::AnimationComponent>(cachedEntity))
+            return *animation;
+    }
+
+    cachedEntity = entityWorld.createEntity("Editor Keyframes", entityWorld.root());
+    entityWorld.setAnimation(cachedEntity, scene::AnimationComponent{});
+    return *entityWorld.world().get<scene::AnimationComponent>(cachedEntity);
+}
+
+void EnsureTransformChannel(
+    scene::SceneEntityWorld& entityWorld,
+    ecs::Entity target,
+    AnimationAttribute attribute,
+    ecs::Entity& editorAnimationEntity)
+{
+    if (FindAnimationChannel(entityWorld, target, attribute))
+        return;
+
+    auto sampler = std::make_shared<animation::Sampler>();
+    sampler->setInterpolationMode(
+        attribute == AnimationAttribute::Rotation
+            ? animation::InterpolationMode::Slerp
+            : animation::InterpolationMode::Linear);
+
+    scene::AnimationChannelData channel;
+    channel.sampler = std::move(sampler);
+    channel.targetEntity = target;
+    channel.attribute = attribute;
+
+    auto& animation =
+        FindOrCreateEditorAnimation(entityWorld, editorAnimationEntity);
+    scene::addAnimationChannel(animation, std::move(channel));
+}
+
+void EnsureUniqueSampler(scene::AnimationChannelData& channel)
+{
+    if (channel.sampler && channel.sampler.use_count() > 1)
+        channel.sampler = std::make_shared<animation::Sampler>(*channel.sampler);
+}
+
+animation::Keyframe MakeKeyframe(float time, const dm::double3& value)
+{
+    animation::Keyframe keyframe;
+    keyframe.time = time;
+    keyframe.value = dm::float4(
+        static_cast<float>(value.x),
+        static_cast<float>(value.y),
+        static_cast<float>(value.z),
+        0.f);
+    return keyframe;
+}
+
+animation::Keyframe MakeKeyframe(float time, const dm::dquat& value)
+{
+    animation::Keyframe keyframe;
+    keyframe.time = time;
+    keyframe.value = dm::float4(
+        static_cast<float>(value.x),
+        static_cast<float>(value.y),
+        static_cast<float>(value.z),
+        static_cast<float>(value.w));
+    return keyframe;
+}
+
+void RecalculateAnimationsForTarget(
+    scene::SceneEntityWorld& entityWorld,
+    ecs::Entity target)
+{
+    entityWorld.world().each<scene::AnimationComponent>(
+        [&](ecs::Entity, scene::AnimationComponent& animation) {
+            const bool targetsEntity =
+                std::any_of(
+                    animation.channels.begin(),
+                    animation.channels.end(),
+                    [target](const scene::AnimationChannelData& channel) {
+                        return channel.targetEntity == target;
+                    });
+            if (targetsEntity)
+                scene::recalculateAnimationDuration(animation);
+        });
+}
+
+} // namespace
 
 SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     caustica::render::RenderAppState& renderAppState,
@@ -190,6 +313,7 @@ void SceneEditor::prepareEditorFrame()
 
 void SceneEditor::onSceneUnloading()
 {
+    m_editorAnimationEntity = ecs::NullEntity;
     m_editor.TogglableNodes = nullptr;
     m_editor.SelectedMaterial = nullptr;
     m_editor.SelectedEntity = caustica::ecs::NullEntity;
@@ -344,6 +468,175 @@ double SceneEditor::sceneTime() const
     if (m_sampleGame && m_sampleGame->IsInitialized())
         return m_sampleGame->gameTime();
     return m_viewState.sceneTime;
+}
+
+bool SceneEditor::insertTransformKeyframe(ecs::Entity entity, float timeSeconds)
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+
+    const auto* transform =
+        entityWorld->world().tryGet<scene::LocalTransformComponent>(entity);
+    if (!transform)
+        return false;
+
+    EnsureTransformChannel(
+        *entityWorld,
+        entity,
+        AnimationAttribute::Translation,
+        m_editorAnimationEntity);
+    EnsureTransformChannel(
+        *entityWorld,
+        entity,
+        AnimationAttribute::Rotation,
+        m_editorAnimationEntity);
+    EnsureTransformChannel(
+        *entityWorld,
+        entity,
+        AnimationAttribute::Scaling,
+        m_editorAnimationEntity);
+
+    // Adding channels can reallocate the owning vector, so acquire stable pointers
+    // only after all three channels exist.
+    auto* translation =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Translation);
+    auto* rotation =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Rotation);
+    auto* scaling =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Scaling);
+    if (!translation || !rotation || !scaling)
+        return false;
+
+    EnsureUniqueSampler(*translation);
+    EnsureUniqueSampler(*rotation);
+    EnsureUniqueSampler(*scaling);
+
+    translation->sampler->upsertKeyframe(MakeKeyframe(timeSeconds, transform->translation));
+    rotation->sampler->upsertKeyframe(MakeKeyframe(timeSeconds, transform->rotation));
+    scaling->sampler->upsertKeyframe(MakeKeyframe(timeSeconds, transform->scaling));
+
+    RecalculateAnimationsForTarget(*entityWorld, entity);
+    m_settings.ResetAccumulation = true;
+    return true;
+}
+
+bool SceneEditor::deleteTransformKeyframe(ecs::Entity entity, float timeSeconds)
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+
+    bool removed = false;
+    for (AnimationAttribute attribute : {
+             AnimationAttribute::Translation,
+             AnimationAttribute::Rotation,
+             AnimationAttribute::Scaling })
+    {
+        if (auto* channel = FindAnimationChannel(*entityWorld, entity, attribute);
+            channel && channel->sampler)
+        {
+            EnsureUniqueSampler(*channel);
+            removed = channel->sampler->removeKeyframe(timeSeconds) || removed;
+        }
+    }
+
+    if (removed)
+    {
+        RecalculateAnimationsForTarget(*entityWorld, entity);
+        m_settings.ResetAccumulation = true;
+    }
+    return removed;
+}
+
+bool SceneEditor::hasTransformKeyframe(ecs::Entity entity, float timeSeconds) const
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+
+    for (AnimationAttribute attribute : {
+             AnimationAttribute::Translation,
+             AnimationAttribute::Rotation,
+             AnimationAttribute::Scaling })
+    {
+        const auto* channel = FindAnimationChannel(*entityWorld, entity, attribute);
+        if (channel && channel->sampler && channel->sampler->hasKeyframe(timeSeconds))
+            return true;
+    }
+    return false;
+}
+
+std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
+{
+    std::vector<float> result;
+    if (!m_app)
+        return result;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld)
+        return result;
+
+    entityWorld->world().each<scene::AnimationComponent>(
+        [&](ecs::Entity, scene::AnimationComponent& animation) {
+            for (const auto& channel : animation.channels)
+            {
+                if (ecs::isValid(entity) && channel.targetEntity != entity)
+                    continue;
+                if (!channel.sampler)
+                    continue;
+                for (const auto& keyframe : channel.sampler->getKeyframes())
+                    result.push_back(keyframe.time);
+            }
+        });
+
+    std::sort(result.begin(), result.end());
+    result.erase(
+        std::unique(result.begin(), result.end(), [](float a, float b) {
+            return std::fabs(a - b) <= 1e-4f;
+        }),
+        result.end());
+    return result;
+}
+
+float SceneEditor::animationDuration() const
+{
+    float duration = 0.f;
+    if (!m_app)
+        return duration;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld)
+        return duration;
+
+    entityWorld->world().each<scene::AnimationComponent>(
+        [&](ecs::Entity, scene::AnimationComponent& animation) {
+            duration = std::max(duration, scene::getAnimationDuration(animation));
+        });
+    return duration;
+}
+
+void SceneEditor::evaluateAnimationsAt(float timeSeconds)
+{
+    setSceneTime(std::max(0.f, timeSeconds));
+    if (m_app)
+    {
+        if (auto* entityWorld = caustica::entityWorld(*m_app))
+        {
+            entityWorld->applyAnimations(std::max(0.f, timeSeconds));
+            entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+        }
+    }
+    m_settings.ResetAccumulation = true;
 }
 
 void SceneEditor::handleDroppedFiles()

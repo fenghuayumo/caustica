@@ -27,19 +27,22 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, size);
 
-    // Default: Render Settings | Viewport | Hierarchy / Inspector(+Material Editor tabs)
+    // Default: Render Settings | Viewport + Timeline | Hierarchy / Inspector
     ImGuiID dockMain = dockspaceId;
     ImGuiID dockLeft = 0;
     ImGuiID dockRight = 0;
     ImGuiID dockRightTop = 0;
     ImGuiID dockRightBottom = 0;
+    ImGuiID dockTimeline = 0;
 
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.22f, &dockLeft, &dockMain);
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.24f, &dockRight, &dockMain);
     ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.55f, &dockRightBottom, &dockRightTop);
+    ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.24f, &dockTimeline, &dockMain);
 
     ImGui::DockBuilderDockWindow("Render Settings", dockLeft);
     ImGui::DockBuilderDockWindow("Viewport", dockMain);
+    ImGui::DockBuilderDockWindow("Timeline", dockTimeline);
     ImGui::DockBuilderDockWindow("Hierarchy", dockRightTop);
     ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
     ImGui::DockBuilderDockWindow("Material Editor", dockRightBottom);
@@ -78,6 +81,7 @@ void EditorUI::BuildMainMenuBar()
         ImGui::MenuItem("Hierarchy", nullptr, &m_editorUI.Viewport.ShowHierarchy);
         ImGui::MenuItem("Inspector", nullptr, &m_editorUI.ShowInspector);
         ImGui::MenuItem("Material Editor", nullptr, &m_editorUI.ShowMaterialEditor);
+        ImGui::MenuItem("Timeline", nullptr, &m_editorUI.ShowTimeline);
         ImGui::MenuItem("Render Settings", nullptr, &m_editorUI.Viewport.ShowRenderSettings);
         ImGui::MenuItem("Status Bar", nullptr, &m_editorUI.Viewport.ShowStatusBar);
         ImGui::Separator();
@@ -93,6 +97,7 @@ void EditorUI::BuildMainMenuBar()
             m_editorUI.Viewport.ShowHierarchy = true;
             m_editorUI.ShowInspector = true;
             m_editorUI.ShowMaterialEditor = true;
+            m_editorUI.ShowTimeline = true;
             m_editorUI.Viewport.ShowRenderSettings = true;
             m_editorUI.Viewport.RequestResetDockLayout = true;
         }
@@ -129,7 +134,7 @@ void EditorUI::BuildDockSpace()
     ImGui::PopStyleVar(3);
 
     // Bump id when default dock window set changes so old ini layouts migrate.
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v4");
+    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v5");
     if (m_editorUI.Viewport.RequestResetDockLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
     {
         ApplyDefaultDockLayout(dockspaceId, ImGui::GetContentRegionAvail());

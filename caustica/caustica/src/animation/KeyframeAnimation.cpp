@@ -2,7 +2,9 @@
 #include <core/json.h>
 #include <core/log.h>
 #include <json/json-forwards.h>
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -119,6 +121,58 @@ std::optional<dm::float4> Sampler::evaluate(float time, bool extrapolateLastValu
 void Sampler::addKeyframe(const Keyframe keyframe)
 {
     m_Keyframes.push_back(keyframe);
+}
+
+bool Sampler::upsertKeyframe(const Keyframe& keyframe, float timeEpsilon)
+{
+    auto it = std::lower_bound(
+        m_Keyframes.begin(),
+        m_Keyframes.end(),
+        keyframe.time,
+        [](const Keyframe& candidate, float time) { return candidate.time < time; });
+
+    if (it != m_Keyframes.end() && std::fabs(it->time - keyframe.time) <= timeEpsilon)
+    {
+        it->value = keyframe.value;
+        it->inTangent = keyframe.inTangent;
+        it->outTangent = keyframe.outTangent;
+        return false;
+    }
+    if (it != m_Keyframes.begin())
+    {
+        auto previous = std::prev(it);
+        if (std::fabs(previous->time - keyframe.time) <= timeEpsilon)
+        {
+            previous->value = keyframe.value;
+            previous->inTangent = keyframe.inTangent;
+            previous->outTangent = keyframe.outTangent;
+            return false;
+        }
+    }
+
+    m_Keyframes.insert(it, keyframe);
+    return true;
+}
+
+bool Sampler::removeKeyframe(float time, float timeEpsilon)
+{
+    const auto oldSize = m_Keyframes.size();
+    std::erase_if(m_Keyframes, [time, timeEpsilon](const Keyframe& keyframe) {
+        return std::fabs(keyframe.time - time) <= timeEpsilon;
+    });
+    return m_Keyframes.size() != oldSize;
+}
+
+bool Sampler::hasKeyframe(float time, float timeEpsilon) const
+{
+    const auto it = std::lower_bound(
+        m_Keyframes.begin(),
+        m_Keyframes.end(),
+        time,
+        [](const Keyframe& candidate, float candidateTime) { return candidate.time < candidateTime; });
+    if (it != m_Keyframes.end() && std::fabs(it->time - time) <= timeEpsilon)
+        return true;
+    return it != m_Keyframes.begin() && std::fabs(std::prev(it)->time - time) <= timeEpsilon;
 }
 
 float Sampler::getStartTime() const

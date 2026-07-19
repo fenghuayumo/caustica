@@ -53,7 +53,15 @@ struct EditorWindowState
     bool ShowDeltaTree = false;
     bool ShowMaterialEditor = true;
     bool ShowInspector = true;
+    bool ShowTimeline = true;
     EditorViewportState Viewport;
+};
+
+struct EditorAnimationState
+{
+    int FramesPerSecond = 30;
+    int StartFrame = 0;
+    int EndFrame = 250;
 };
 
 struct EditorSelectionState
@@ -87,7 +95,11 @@ struct EditorFileDropState
     std::vector<std::string> PendingDroppedFiles;
 };
 
-struct EditorUIState : EditorWindowState, EditorSelectionState, EditorFileDropState
+struct EditorUIState
+    : EditorWindowState
+    , EditorSelectionState
+    , EditorFileDropState
+    , EditorAnimationState
 {
     bool ExperimentalPhotoModeScreenshot = false;
 };

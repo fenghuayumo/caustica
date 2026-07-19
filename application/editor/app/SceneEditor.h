@@ -133,6 +133,12 @@ public:
 
     void setSceneTime(double sceneTime);
     double sceneTime() const;
+    bool insertTransformKeyframe(ecs::Entity entity, float timeSeconds);
+    bool deleteTransformKeyframe(ecs::Entity entity, float timeSeconds);
+    [[nodiscard]] bool hasTransformKeyframe(ecs::Entity entity, float timeSeconds) const;
+    [[nodiscard]] std::vector<float> keyframeTimes(ecs::Entity entity = ecs::NullEntity) const;
+    [[nodiscard]] float animationDuration() const;
+    void evaluateAnimationsAt(float timeSeconds);
 
     auto& uncompressedTextures() { return m_viewState.uncompressedTextures; }
     [[nodiscard]] ProgressBar& loadingProgress() { return m_viewState.progressLoading; }
@@ -174,6 +180,7 @@ private:
 
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;
+    ecs::Entity m_editorAnimationEntity = ecs::NullEntity;
 
     std::unique_ptr<::GameScene> m_sampleGame;
 

@@ -137,7 +137,10 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
     bool GaussianSplatModeCombo(EditorUIData& ui)
     {
         int renderingMode = ResolveGaussianSplatShadowMode(ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED ? 1 : 0;
-        if (!ImGui::Combo("Rendering Mode", &renderingMode, "Raster 3DGS (VS)\0Hybrid 3DGS + 3DGRT\0\0"))
+        if (!SettingsCombo(
+                "Rendering Mode",
+                &renderingMode,
+                "Raster 3DGS (VS)\0Hybrid 3DGS + 3DGRT\0\0"))
             return false;
 
         if (renderingMode == 1)
@@ -164,7 +167,10 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         ui.render.settings.GaussianSplatShadowsMode = shadowMode;
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
-        if (!ImGui::Combo("Shadows Mode", &shadowMode, "Shadows off\0Hard shadows\0Soft shadows\0\0"))
+        if (!SettingsCombo(
+                "Shadows Mode",
+                &shadowMode,
+                "Shadows off\0Hard shadows\0Soft shadows\0\0"))
             return false;
 
         shadowMode = dm::clamp(shadowMode, GAUSSIAN_SPLAT_SHADOWS_DISABLED, GAUSSIAN_SPLAT_SHADOWS_SOFT);
@@ -179,7 +185,10 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatSortingCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("Sorting Method", &ui.render.settings.GaussianSplatSortingMode, "GPU sort\0Stochastic Splats\0\0");
+        const bool changed = SettingsCombo(
+            "Sorting Method",
+            &ui.render.settings.GaussianSplatSortingMode,
+            "GPU sort\0Stochastic Splats\0\0");
         ui.render.settings.GaussianSplatSortingMode = dm::clamp(ui.render.settings.GaussianSplatSortingMode, 0, 1);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("GPU sort uses the existing radix-sort path. Stochastic splats uses stable randomized order plus stochastic opacity accept/reject.");
@@ -188,7 +197,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatFormatCombo(const char* label, int* value)
     {
-        const bool changed = ImGui::Combo(label, value, "Float32\0Float16\0Uint8\0\0");
+        const bool changed = SettingsCombo(label, value, "Float32\0Float16\0Uint8\0\0");
         *value = dm::clamp(*value, 0, 2);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Storage format used by the 3DGS raster color/alpha and SH buffers in VRAM.");
@@ -197,7 +206,10 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatFTBCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("FTB Sync Mode", &ui.render.settings.GaussianSplatFTBSyncMode, "Disabled (fast)\0Interlock\0\0");
+        const bool changed = SettingsCombo(
+            "FTB Sync Mode",
+            &ui.render.settings.GaussianSplatFTBSyncMode,
+            "Disabled (fast)\0Interlock\0\0");
         ui.render.settings.GaussianSplatFTBSyncMode = dm::clamp(ui.render.settings.GaussianSplatFTBSyncMode, 0, 1);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Front-to-back depth synchronization mode. The current RTXPT overlay path does not write a 3DGS depth iso buffer yet.");
@@ -206,7 +218,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui)
     {
-        const bool changed = ImGui::Combo("Kernel degree", &ui.render.settings.GaussianSplatRtxKernelDegree,
+        const bool changed = SettingsCombo("Kernel Degree", &ui.render.settings.GaussianSplatRtxKernelDegree,
             "0 (Linear)\0"
             "1 (Laplacian)\0"
             "2 (Quadratic)\0"
@@ -222,7 +234,10 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
     bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui)
     {
         int particleFormat = ui.render.settings.GaussianSplatUseAABBs ? 1 : 0;
-        const bool changed = ImGui::Combo("Particles format", &particleFormat, "Icosahedron\0AABB + parametric\0\0");
+        const bool changed = SettingsCombo(
+            "Particle Format",
+            &particleFormat,
+            "Icosahedron\0AABB + parametric\0\0");
         if (changed)
         {
             ui.render.settings.GaussianSplatUseAABBs = particleFormat == 1;
@@ -640,6 +655,172 @@ bool InspectorBeginCombo(const char* label, const char* preview)
     if (!open)
         ImGui::PopID();
     return open; // when true, caller must EndCombo() then PopID()
+}
+
+namespace
+{
+
+void SettingsBeginLabeledRow(const char* label)
+{
+    const float rowStartX = ImGui::GetCursorPosX();
+    const float availableWidth = ImGui::GetContentRegionAvail().x;
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
+    ImGui::TextUnformatted(label, ImGui::FindRenderedTextEnd(label));
+    ImGui::PopStyleColor();
+
+    // On narrow dock layouts, stack the value below its label instead of
+    // forcing two columns to overlap or spill outside the window.
+    if (availableWidth < 190.f)
+    {
+        ImGui::SetNextItemWidth(std::max(56.f, availableWidth));
+        return;
+    }
+
+    const float labelWidth =
+        std::clamp(availableWidth * 0.42f, 96.f, kRenderSettingsLabelWidth);
+    ImGui::SameLine(0.f, 0.f);
+    ImGui::SetCursorPosX(rowStartX + labelWidth);
+    ImGui::SetNextItemWidth(std::max(56.f, ImGui::GetContentRegionAvail().x));
+}
+
+} // namespace
+
+bool SettingsCheckbox(const char* label, bool* v)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed = ImGui::Checkbox("##value", v);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsInputFloat(
+    const char* label,
+    float* v,
+    float step,
+    float stepFast,
+    const char* format,
+    ImGuiInputTextFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed = ImGui::InputFloat("##value", v, step, stepFast, format, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsInputInt(
+    const char* label,
+    int* v,
+    int step,
+    int stepFast,
+    ImGuiInputTextFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed = ImGui::InputInt("##value", v, step, stepFast, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsDragFloat(
+    const char* label,
+    float* v,
+    float speed,
+    float vMin,
+    float vMax,
+    const char* format,
+    ImGuiSliderFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed =
+        ImGui::DragFloat("##value", v, speed, vMin, vMax, format, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsDragInt(
+    const char* label,
+    int* v,
+    float speed,
+    int vMin,
+    int vMax,
+    const char* format,
+    ImGuiSliderFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed =
+        ImGui::DragInt("##value", v, speed, vMin, vMax, format, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsSliderFloat(
+    const char* label,
+    float* v,
+    float vMin,
+    float vMax,
+    const char* format,
+    ImGuiSliderFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed =
+        ImGui::SliderFloat("##value", v, vMin, vMax, format, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsSliderInt(
+    const char* label,
+    int* v,
+    int vMin,
+    int vMax,
+    const char* format,
+    ImGuiSliderFlags flags)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed =
+        ImGui::SliderInt("##value", v, vMin, vMax, format, flags);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsCombo(const char* label, int* currentItem, const char* items)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool changed = ImGui::Combo("##value", currentItem, items);
+    ImGui::PopID();
+    return changed;
+}
+
+bool SettingsBeginCombo(const char* label, const char* preview)
+{
+    ImGui::PushID(label);
+    SettingsBeginLabeledRow(label);
+    const bool open = ImGui::BeginCombo("##value", preview);
+    if (!open)
+        ImGui::PopID();
+    return open;
+}
+
+void SettingsEndCombo()
+{
+    ImGui::EndCombo();
+    ImGui::PopID();
+}
+
+void SettingsCategoryHeader(const char* label)
+{
+    ImGui::Spacing();
+    ImGui::TextColored(categoryColor, "%s", label);
+    ImGui::Separator();
+    ImGui::Spacing();
 }
 
 const ::PerformancePreset s_performancePresets[kPerformancePresetCount] = {

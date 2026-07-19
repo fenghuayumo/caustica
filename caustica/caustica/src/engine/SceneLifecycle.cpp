@@ -212,6 +212,7 @@ void onSceneUnloading(App& app)
     assert(cfg && vs);
 
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
+    vs->sceneTime = 0.0;
     vs->uncompressedTextures.clear();
 
     // Scene::prepareForUnload mutates live ECS/resource ownership. Drain render

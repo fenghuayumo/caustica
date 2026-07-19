@@ -64,6 +64,58 @@ bool InspectorCheckbox(const char* label, bool* v);
 bool InspectorColorEdit3(const char* label, float color[3]);
 bool InspectorBeginCombo(const char* label, const char* preview);
 
+// Render Settings property rows: muted aligned label on the left, value control
+// stretching on the right; narrow docks automatically stack label over value.
+inline constexpr float kRenderSettingsLabelWidth = 126.f;
+bool SettingsCheckbox(const char* label, bool* v);
+bool SettingsInputFloat(
+    const char* label,
+    float* v,
+    float step = 0.f,
+    float stepFast = 0.f,
+    const char* format = "%.3f",
+    ImGuiInputTextFlags flags = 0);
+bool SettingsInputInt(
+    const char* label,
+    int* v,
+    int step = 1,
+    int stepFast = 100,
+    ImGuiInputTextFlags flags = 0);
+bool SettingsDragFloat(
+    const char* label,
+    float* v,
+    float speed,
+    float vMin,
+    float vMax,
+    const char* format = "%.3f",
+    ImGuiSliderFlags flags = 0);
+bool SettingsDragInt(
+    const char* label,
+    int* v,
+    float speed,
+    int vMin,
+    int vMax,
+    const char* format = "%d",
+    ImGuiSliderFlags flags = 0);
+bool SettingsSliderFloat(
+    const char* label,
+    float* v,
+    float vMin,
+    float vMax,
+    const char* format = "%.3f",
+    ImGuiSliderFlags flags = 0);
+bool SettingsSliderInt(
+    const char* label,
+    int* v,
+    int vMin,
+    int vMax,
+    const char* format = "%d",
+    ImGuiSliderFlags flags = 0);
+bool SettingsCombo(const char* label, int* currentItem, const char* items);
+bool SettingsBeginCombo(const char* label, const char* preview);
+void SettingsEndCombo();
+void SettingsCategoryHeader(const char* label);
+
 #if CAUSTICA_WITH_ANY_DLSS
 SI::DLSSMode DLSSModeUI(SI::DLSSMode dlssModeCurrent);
 #endif

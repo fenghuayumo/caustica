@@ -103,6 +103,7 @@ private:
     void BuildSceneWidgetsPanel(const PanelLayout& layout);
     void BuildHierarchyPanel(const PanelLayout& layout);
     void BuildGameStandalonePanel(const PanelLayout& layout);
+    void BuildTimelinePanel(const PanelLayout& layout);
     void BuildMainMenuBar();
     void BuildStatusBar();
     void BuildDockSpace();
