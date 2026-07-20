@@ -117,6 +117,28 @@ bool applyAnimationChannel(const AnimationChannelData& channel, float time, Scen
         MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         break;
 
+    case AnimationAttribute::Visibility: {
+        const bool enabled = value.x > 0.5f;
+        bool applied = false;
+        if (auto* meshComp = world.world().tryGet<MeshInstanceComponent>(channel.targetEntity))
+        {
+            meshComp->enabled = enabled;
+            applied = true;
+        }
+        if (auto* splatComp = world.world().tryGet<GaussianSplatComponent>(channel.targetEntity))
+        {
+            splatComp->splat.enabled = enabled;
+            applied = true;
+        }
+        if (!applied)
+        {
+            caustica::warning(
+                "Visibility animation target has no MeshInstance or GaussianSplat component.");
+            return false;
+        }
+        break;
+    }
+
     case AnimationAttribute::LeafProperty: {
         if (channel.targetMaterial)
         {

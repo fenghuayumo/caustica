@@ -154,7 +154,12 @@ public:
     bool insertTransformKeyframe(ecs::Entity entity, float timeSeconds);
     bool deleteTransformKeyframe(ecs::Entity entity, float timeSeconds);
     [[nodiscard]] bool hasTransformKeyframe(ecs::Entity entity, float timeSeconds) const;
+    bool insertVisibilityKeyframe(ecs::Entity entity, float timeSeconds);
+    bool deleteVisibilityKeyframe(ecs::Entity entity, float timeSeconds);
+    [[nodiscard]] bool hasVisibilityKeyframe(ecs::Entity entity, float timeSeconds) const;
+    [[nodiscard]] bool canAnimateVisibility(ecs::Entity entity) const;
     [[nodiscard]] std::vector<float> keyframeTimes(ecs::Entity entity = ecs::NullEntity) const;
+    [[nodiscard]] std::vector<float> visibilityKeyframeTimes(ecs::Entity entity = ecs::NullEntity) const;
     [[nodiscard]] float animationDuration() const;
     void evaluateAnimationsAt(float timeSeconds);
 

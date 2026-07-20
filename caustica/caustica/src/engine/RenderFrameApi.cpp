@@ -275,6 +275,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     ? float(fmod(vs->sceneTime, double(loopDuration)))
                     : float(vs->sceneTime);
 
+                bool touchedGaussianVisibility = false;
                 for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
@@ -285,6 +286,15 @@ void animate(App& app, float fElapsedTimeSeconds)
                         continue;
 
                     (void)scene::applyAnimation(*animation, animTime, *ew);
+                    for (const auto& channel : animation->channels)
+                    {
+                        if (channel.attribute != AnimationAttribute::Visibility)
+                            continue;
+                        if (!ecs::isValid(channel.targetEntity))
+                            continue;
+                        if (world.tryGet<scene::GaussianSplatComponent>(channel.targetEntity))
+                            touchedGaussianVisibility = true;
+                    }
                 }
 
                 if (enableAnimations)
@@ -297,6 +307,9 @@ void animate(App& app, float fElapsedTimeSeconds)
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
                     ew->syncPreviousTransformsFromCurrent();
                 }
+
+                if (touchedGaussianVisibility)
+                    runtime->Invalidation.AccelerationStructRebuildRequested = true;
 
                 // Fixed-topology USD / soft-body point caches.
                 if (GpuDevice* device = gpuDevice(app))

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include "EditorInputRouter.h"
 
 #include "SceneEditor.h"
@@ -7,6 +8,7 @@
 
 #include <backend/GpuDevice.h>
 #include <core/log.h>
+#include <ecs/Entity.h>
 #include <events/event.h>
 #include <events/key_event.h>
 #include <events/mouse_event.h>
@@ -116,6 +118,41 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
             sceneEditor.requestRedo();
             return true;
         }
+    }
+
+    // I / Shift+I: insert keyframe at current Timeline frame (Blender-style).
+    // Works while panels capture keyboard; skip when typing in a text field.
+    if (action == cGlfwPress && !ctrlDown && !altDown && !ImGui::GetIO().WantTextInput
+        && key == ToGlfwKey(caustica::Key::I))
+    {
+        auto& editor = sceneEditor.editorUIState();
+        const ecs::Entity selected = editor.SelectedEntity;
+        if (ecs::isValid(selected))
+        {
+            const int fps = std::max(1, editor.FramesPerSecond);
+            const float frameSeconds = 1.f / static_cast<float>(fps);
+            float displayTime = static_cast<float>(sceneEditor.sceneTime());
+            const float duration = sceneEditor.animationDuration();
+            if (duration > 0.f && displayTime > duration)
+                displayTime = std::fmod(displayTime, duration);
+            const int currentFrame = std::clamp(
+                static_cast<int>(std::lround(displayTime * fps)),
+                editor.StartFrame,
+                editor.EndFrame);
+            const float keyTime = static_cast<float>(currentFrame) * frameSeconds;
+
+            sceneEditor.renderAppState().settings.EnableAnimations = false;
+            if (shiftDown)
+            {
+                if (sceneEditor.canAnimateVisibility(selected))
+                    sceneEditor.insertVisibilityKeyframe(selected, keyTime);
+            }
+            else
+            {
+                sceneEditor.insertTransformKeyframe(selected, keyTime);
+            }
+        }
+        return true;
     }
 
     if (ImGui::GetIO().WantCaptureKeyboard)

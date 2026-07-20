@@ -18,7 +18,9 @@ namespace caustica
         Scaling,
         Rotation,
         Translation,
-        LeafProperty
+        LeafProperty,
+        // MeshInstance / GaussianSplat visibility (Step; value.x > 0.5 => visible).
+        Visibility
     };
 
     class SceneAnimationChannel

@@ -1086,6 +1086,9 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                         attribute = AnimationAttribute::Rotation;
                     else if (attributeNode.asString() == "scaling")
                         attribute = AnimationAttribute::Scaling;
+                    else if (attributeNode.asString() == "visibility"
+                        || attributeNode.asString() == "visible")
+                        attribute = AnimationAttribute::Visibility;
                     else
                         attribute = AnimationAttribute::LeafProperty;
                 }

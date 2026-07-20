@@ -308,17 +308,22 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     const ecs::Entity selected = m_editorUI.SelectedEntity;
     const bool hasSelection = ecs::isValid(selected);
     const float keyTime = currentFrame * frameSeconds;
-    const bool hasKey = hasSelection && m_sceneEditor.hasTransformKeyframe(selected, keyTime);
+    const bool hasTransformKey =
+        hasSelection && m_sceneEditor.hasTransformKeyframe(selected, keyTime);
+    const bool canVisibility =
+        hasSelection && m_sceneEditor.canAnimateVisibility(selected);
+    const bool hasVisibilityKey =
+        canVisibility && m_sceneEditor.hasVisibilityKeyframe(selected, keyTime);
 
     TimelineToolbarSeparator();
     if (TimelineIconButton(
             "##InsertKey",
             TimelineIcon::InsertKey,
-            hasKey,
+            hasTransformKey,
             hasSelection,
-            hasKey
-                ? "Update transform keyframe"
-                : "Insert Location, Rotation and Scale keyframe"))
+            hasTransformKey
+                ? "Update Location / Rotation / Scale keyframe (I)"
+                : "Insert Location, Rotation and Scale keyframe (I)"))
     {
         m_settings.EnableAnimations = false;
         m_sceneEditor.insertTransformKeyframe(selected, keyTime);
@@ -328,9 +333,33 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
             "##DeleteKey",
             TimelineIcon::DeleteKey,
             false,
-            hasKey,
-            "Delete transform keyframe"))
+            hasTransformKey,
+            "Delete Location / Rotation / Scale keyframe"))
         m_sceneEditor.deleteTransformKeyframe(selected, keyTime);
+
+    TimelineToolbarSeparator();
+    if (TimelineIconButton(
+            "##InsertVisibilityKey",
+            TimelineIcon::InsertKey,
+            hasVisibilityKey,
+            canVisibility,
+            !canVisibility
+                ? "Select a Mesh or 3DGS to keyframe visibility"
+                : (hasVisibilityKey
+                    ? "Update visibility keyframe (from Hierarchy eye / Inspector Visible) (Shift+I)"
+                    : "Insert visibility keyframe (current Visible state) (Shift+I)")))
+    {
+        m_settings.EnableAnimations = false;
+        m_sceneEditor.insertVisibilityKeyframe(selected, keyTime);
+    }
+    ImGui::SameLine(0.f, 2.f);
+    if (TimelineIconButton(
+            "##DeleteVisibilityKey",
+            TimelineIcon::DeleteKey,
+            false,
+            hasVisibilityKey,
+            "Delete visibility keyframe"))
+        m_sceneEditor.deleteVisibilityKeyframe(selected, keyTime);
 
     TimelineToolbarSeparator();
     ImGui::AlignTextToFramePadding();
@@ -415,24 +444,44 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         }
     }
 
-    const std::vector<float> allTimes = m_sceneEditor.keyframeTimes();
-    const std::vector<float> selectedTimes =
+    const std::vector<float> transformTimes = m_sceneEditor.keyframeTimes();
+    const std::vector<float> selectedTransformTimes =
         hasSelection ? m_sceneEditor.keyframeTimes(selected) : std::vector<float>{};
-    const float keyY = canvasPos.y + canvasSize.y * 0.62f;
-    for (float time : allTimes)
+    const std::vector<float> visibilityTimes = m_sceneEditor.visibilityKeyframeTimes();
+    const std::vector<float> selectedVisibilityTimes =
+        hasSelection ? m_sceneEditor.visibilityKeyframeTimes(selected) : std::vector<float>{};
+
+    const float transformKeyY = canvasPos.y + canvasSize.y * 0.52f;
+    const float visibilityKeyY = canvasPos.y + canvasSize.y * 0.78f;
+    for (float time : transformTimes)
     {
         const float frame = time * fps;
         if (frame < startFrame || frame > endFrame)
             continue;
         const float x = frameToX(frame);
-        const bool selectedKey = ContainsTime(selectedTimes, time, 1e-4f);
+        const bool selectedKey = ContainsTime(selectedTransformTimes, time, 1e-4f);
         DrawDiamond(
             drawList,
-            ImVec2(x, keyY),
+            ImVec2(x, transformKeyY),
             selectedKey ? 5.f : 3.5f,
             selectedKey
                 ? ImGui::GetColorU32(GetEditorColors().Accent)
                 : ImGui::GetColorU32(ImGuiCol_TextDisabled));
+    }
+    for (float time : visibilityTimes)
+    {
+        const float frame = time * fps;
+        if (frame < startFrame || frame > endFrame)
+            continue;
+        const float x = frameToX(frame);
+        const bool selectedKey = ContainsTime(selectedVisibilityTimes, time, 1e-4f);
+        DrawDiamond(
+            drawList,
+            ImVec2(x, visibilityKeyY),
+            selectedKey ? 5.f : 3.5f,
+            selectedKey
+                ? IM_COL32(230, 160, 70, 255)
+                : IM_COL32(140, 110, 70, 220));
     }
 
     const float playheadX = frameToX(static_cast<float>(currentFrame));
@@ -450,12 +499,23 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
         setFrame(xToFrame(ImGui::GetIO().MousePos.x));
 
-    if (allTimes.empty())
+    if (transformTimes.empty() && visibilityTimes.empty())
     {
         drawList->AddText(
             ImVec2(canvasPos.x + 12.f, canvasMax.y - ImGui::GetTextLineHeight() - 8.f),
             ImGui::GetColorU32(ImGuiCol_TextDisabled),
-            "Select an entity, set a frame, then Insert Key.");
+            "Select an entity, set a frame, then Insert Transform or Visibility key.");
+    }
+    else
+    {
+        drawList->AddText(
+            ImVec2(canvasPos.x + 8.f, transformKeyY - 14.f),
+            ImGui::GetColorU32(ImGuiCol_TextDisabled),
+            "TRS");
+        drawList->AddText(
+            ImVec2(canvasPos.x + 8.f, visibilityKeyY - 14.f),
+            IM_COL32(180, 140, 80, 220),
+            "Vis");
     }
 
     ImGui::End();

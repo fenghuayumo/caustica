@@ -87,7 +87,7 @@ scene::AnimationComponent& FindOrCreateEditorAnimation(
     return *entityWorld.world().get<scene::AnimationComponent>(cachedEntity);
 }
 
-void EnsureTransformChannel(
+void EnsureAnimationChannel(
     scene::SceneEntityWorld& entityWorld,
     ecs::Entity target,
     AnimationAttribute attribute,
@@ -97,10 +97,12 @@ void EnsureTransformChannel(
         return;
 
     auto sampler = std::make_shared<animation::Sampler>();
-    sampler->setInterpolationMode(
-        attribute == AnimationAttribute::Rotation
-            ? animation::InterpolationMode::Slerp
-            : animation::InterpolationMode::Linear);
+    if (attribute == AnimationAttribute::Rotation)
+        sampler->setInterpolationMode(animation::InterpolationMode::Slerp);
+    else if (attribute == AnimationAttribute::Visibility)
+        sampler->setInterpolationMode(animation::InterpolationMode::Step);
+    else
+        sampler->setInterpolationMode(animation::InterpolationMode::Linear);
 
     scene::AnimationChannelData channel;
     channel.sampler = std::move(sampler);
@@ -110,6 +112,60 @@ void EnsureTransformChannel(
     auto& animation =
         FindOrCreateEditorAnimation(entityWorld, editorAnimationEntity);
     scene::addAnimationChannel(animation, std::move(channel));
+}
+
+bool EntitySupportsVisibility(const scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
+{
+    return entityWorld.world().tryGet<scene::MeshInstanceComponent>(entity) != nullptr
+        || entityWorld.world().tryGet<scene::GaussianSplatComponent>(entity) != nullptr;
+}
+
+bool GetEntityVisibility(const scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
+{
+    if (const auto* mesh = entityWorld.world().tryGet<scene::MeshInstanceComponent>(entity))
+        return mesh->enabled;
+    if (const auto* splat = entityWorld.world().tryGet<scene::GaussianSplatComponent>(entity))
+        return splat->splat.enabled;
+    return true;
+}
+
+animation::Keyframe MakeVisibilityKeyframe(float time, bool visible)
+{
+    animation::Keyframe keyframe;
+    keyframe.time = time;
+    keyframe.value = dm::float4(visible ? 1.f : 0.f, 0.f, 0.f, 0.f);
+    return keyframe;
+}
+
+std::vector<float> CollectKeyframeTimes(
+    scene::SceneEntityWorld& entityWorld,
+    ecs::Entity entity,
+    AnimationAttribute attributeFilter,
+    bool filterByAttribute)
+{
+    std::vector<float> result;
+    entityWorld.world().each<scene::AnimationComponent>(
+        [&](ecs::Entity, scene::AnimationComponent& animation) {
+            for (const auto& channel : animation.channels)
+            {
+                if (ecs::isValid(entity) && channel.targetEntity != entity)
+                    continue;
+                if (filterByAttribute && channel.attribute != attributeFilter)
+                    continue;
+                if (!channel.sampler)
+                    continue;
+                for (const auto& keyframe : channel.sampler->getKeyframes())
+                    result.push_back(keyframe.time);
+            }
+        });
+
+    std::sort(result.begin(), result.end());
+    result.erase(
+        std::unique(result.begin(), result.end(), [](float a, float b) {
+            return std::fabs(a - b) <= 1e-4f;
+        }),
+        result.end());
+    return result;
 }
 
 void EnsureUniqueSampler(scene::AnimationChannelData& channel)
@@ -561,17 +617,17 @@ bool SceneEditor::insertTransformKeyframe(ecs::Entity entity, float timeSeconds)
     if (!transform)
         return false;
 
-    EnsureTransformChannel(
+    EnsureAnimationChannel(
         *entityWorld,
         entity,
         AnimationAttribute::Translation,
         m_editorAnimationEntity);
-    EnsureTransformChannel(
+    EnsureAnimationChannel(
         *entityWorld,
         entity,
         AnimationAttribute::Rotation,
         m_editorAnimationEntity);
-    EnsureTransformChannel(
+    EnsureAnimationChannel(
         *entityWorld,
         entity,
         AnimationAttribute::Scaling,
@@ -653,21 +709,103 @@ bool SceneEditor::hasTransformKeyframe(ecs::Entity entity, float timeSeconds) co
     return false;
 }
 
-std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
+bool SceneEditor::canAnimateVisibility(ecs::Entity entity) const
 {
-    std::vector<float> result;
-    if (!m_app)
-        return result;
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+    return EntitySupportsVisibility(*entityWorld, entity);
+}
+
+bool SceneEditor::insertVisibilityKeyframe(ecs::Entity entity, float timeSeconds)
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
 
     auto* entityWorld = caustica::entityWorld(*m_app);
-    if (!entityWorld)
-        return result;
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+    if (!EntitySupportsVisibility(*entityWorld, entity))
+        return false;
 
+    EnsureAnimationChannel(
+        *entityWorld,
+        entity,
+        AnimationAttribute::Visibility,
+        m_editorAnimationEntity);
+
+    auto* channel =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Visibility);
+    if (!channel || !channel->sampler)
+        return false;
+
+    EnsureUniqueSampler(*channel);
+    channel->sampler->upsertKeyframe(
+        MakeVisibilityKeyframe(timeSeconds, GetEntityVisibility(*entityWorld, entity)));
+
+    RecalculateAnimationsForTarget(*entityWorld, entity);
+    m_settings.ResetAccumulation = true;
+    if (entityWorld->world().tryGet<scene::GaussianSplatComponent>(entity))
+        m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
+    return true;
+}
+
+bool SceneEditor::deleteVisibilityKeyframe(ecs::Entity entity, float timeSeconds)
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+
+    auto* channel =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Visibility);
+    if (!channel || !channel->sampler)
+        return false;
+
+    EnsureUniqueSampler(*channel);
+    if (!channel->sampler->removeKeyframe(timeSeconds))
+        return false;
+
+    RecalculateAnimationsForTarget(*entityWorld, entity);
+    m_settings.ResetAccumulation = true;
+    return true;
+}
+
+bool SceneEditor::hasVisibilityKeyframe(ecs::Entity entity, float timeSeconds) const
+{
+    if (!m_app || !ecs::isValid(entity))
+        return false;
+
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld || !entityWorld->world().isAlive(entity))
+        return false;
+
+    const auto* channel =
+        FindAnimationChannel(*entityWorld, entity, AnimationAttribute::Visibility);
+    return channel && channel->sampler && channel->sampler->hasKeyframe(timeSeconds);
+}
+
+std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
+{
+    if (!m_app)
+        return {};
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld)
+        return {};
+
+    // Transform diamonds: exclude visibility (drawn on its own row).
+    std::vector<float> result;
     entityWorld->world().each<scene::AnimationComponent>(
         [&](ecs::Entity, scene::AnimationComponent& animation) {
             for (const auto& channel : animation.channels)
             {
                 if (ecs::isValid(entity) && channel.targetEntity != entity)
+                    continue;
+                if (channel.attribute == AnimationAttribute::Visibility)
                     continue;
                 if (!channel.sampler)
                     continue;
@@ -675,7 +813,6 @@ std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
                     result.push_back(keyframe.time);
             }
         });
-
     std::sort(result.begin(), result.end());
     result.erase(
         std::unique(result.begin(), result.end(), [](float a, float b) {
@@ -683,6 +820,17 @@ std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
         }),
         result.end());
     return result;
+}
+
+std::vector<float> SceneEditor::visibilityKeyframeTimes(ecs::Entity entity) const
+{
+    if (!m_app)
+        return {};
+    auto* entityWorld = caustica::entityWorld(*m_app);
+    if (!entityWorld)
+        return {};
+    return CollectKeyframeTimes(
+        *entityWorld, entity, AnimationAttribute::Visibility, true);
 }
 
 float SceneEditor::animationDuration() const
@@ -705,6 +853,7 @@ float SceneEditor::animationDuration() const
 void SceneEditor::evaluateAnimationsAt(float timeSeconds)
 {
     setSceneTime(std::max(0.f, timeSeconds));
+    bool touchedGaussianVisibility = false;
     if (m_app)
     {
         if (auto* entityWorld = caustica::entityWorld(*m_app))
@@ -714,12 +863,28 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds)
             // vectors / TAA / NRD do not treat the seek as high-speed motion.
             entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
             entityWorld->syncPreviousTransformsFromCurrent();
+
+            entityWorld->world().each<scene::AnimationComponent>(
+                [&](ecs::Entity, scene::AnimationComponent& animation) {
+                    for (const auto& channel : animation.channels)
+                    {
+                        if (channel.attribute != AnimationAttribute::Visibility)
+                            continue;
+                        if (!ecs::isValid(channel.targetEntity))
+                            continue;
+                        if (entityWorld->world().tryGet<scene::GaussianSplatComponent>(
+                                channel.targetEntity))
+                            touchedGaussianVisibility = true;
+                    }
+                });
         }
     }
     // Accumulation alone is not enough — realtime temporal history (TAA/NRD/DLSS)
     // must also drop, otherwise scrubbing reads as whole-scene jitter/ghosting.
     m_settings.ResetAccumulation = true;
     m_settings.ResetRealtimeCaches = true;
+    if (touchedGaussianVisibility)
+        m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
 }
 
 void SceneEditor::handleDroppedFiles()
