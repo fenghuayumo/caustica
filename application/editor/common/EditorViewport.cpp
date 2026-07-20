@@ -8,13 +8,33 @@
 namespace caustica::editor
 {
 
+void EditorViewport::clearRetired()
+{
+    m_retiredFramebuffer = nullptr;
+    m_retiredColor = nullptr;
+    m_retiredDepth = nullptr;
+}
+
 void EditorViewport::release()
 {
+    clearRetired();
     m_framebuffer = nullptr;
     m_color = nullptr;
     m_depth = nullptr;
     m_width = 0;
     m_height = 0;
+}
+
+void EditorViewport::flushRetired(caustica::GpuDevice& device)
+{
+    if (!m_retiredFramebuffer && !m_retiredColor && !m_retiredDepth)
+        return;
+
+    // Prior path-trace / ImGui frames may still reference the retired color on the GPU.
+    if (nvrhi::IDevice* nvrhiDevice = device.getDevice())
+        nvrhiDevice->waitForIdle();
+
+    clearRetired();
 }
 
 void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uint32_t height)
@@ -29,7 +49,22 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     if (!nvrhiDevice)
         return;
 
-    release();
+    // Drop any already-retired buffers (from a previous resize) before retiring the current ones.
+    if (m_retiredFramebuffer || m_retiredColor || m_retiredDepth)
+    {
+        nvrhiDevice->waitForIdle();
+        clearRetired();
+    }
+
+    // Defer destruction: update-thread ImGui capture still points at the old color this frame.
+    m_retiredFramebuffer = m_framebuffer;
+    m_retiredColor = m_color;
+    m_retiredDepth = m_depth;
+    m_framebuffer = nullptr;
+    m_color = nullptr;
+    m_depth = nullptr;
+    m_width = 0;
+    m_height = 0;
 
     // Match typical swapchain LDR target (sRGB) so tone-mapped blit looks correct in ImGui.
     nvrhi::TextureDesc colorDesc = nvrhi::TextureDesc()
@@ -61,7 +96,7 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     if (!m_depth)
     {
         caustica::error("EditorViewport: failed to create depth texture %ux%u", width, height);
-        release();
+        m_color = nullptr;
         return;
     }
 
@@ -73,7 +108,8 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     if (!m_framebuffer)
     {
         caustica::error("EditorViewport: failed to create framebuffer %ux%u", width, height);
-        release();
+        m_color = nullptr;
+        m_depth = nullptr;
         return;
     }
 

@@ -316,6 +316,10 @@ bool ImGui_NVRHI::updateGeometry(nvrhi::ICommandList* commandList, const Capture
 
 bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
 {
+    // Swapchain FBs are cleared during backBufferResizing(); never assert-crash here.
+    if (!framebuffer)
+        return false;
+
     const int slot = m_readSlot.load(std::memory_order_acquire);
     if (slot < 0 || slot > 1)
         return false;
@@ -337,7 +341,6 @@ bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
 
     nvrhi::GraphicsState drawState;
     drawState.framebuffer = framebuffer;
-    assert(drawState.framebuffer);
 
     drawState.pipeline = getPSO(framebuffer->getFramebufferInfo());
 

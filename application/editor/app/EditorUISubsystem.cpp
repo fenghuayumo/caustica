@@ -63,7 +63,12 @@ void EditorUISubsystem::shutdown()
     if (auto* overrideFb = m_config.app.tryResource<caustica::RenderFramebufferOverride>())
         overrideFb->framebuffer = nullptr;
     if (m_viewport)
+    {
+        // Ensure GPU is done with viewport / retired textures before dropping handles.
+        if (caustica::GpuDevice* gpu = m_config.app.getGpuDevice())
+            m_viewport->flushRetired(*gpu);
         m_viewport->release();
+    }
     m_viewport.reset();
     m_ui.reset();
 }
@@ -132,9 +137,16 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
         return;
 
     nvrhi::IFramebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
+    // Swapchain FB vectors are cleared during backBufferResizing(); skip UI GPU submit.
+    if (!swapchainFb)
+    {
+        if (m_viewport)
+            m_viewport->flushRetired(gpuDevice);
+        return;
+    }
 
     // Clear the window back buffer to editor chrome background; scene lives in the viewport texture.
-    if (swapchainFb && m_viewport && m_viewport->isValid())
+    if (m_viewport && m_viewport->isValid())
     {
         nvrhi::CommandListHandle cmd = gpuDevice.getDevice()->createCommandList();
         cmd->open();
@@ -149,7 +161,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
         {
             nvrhi::ITexture* color = (m_viewport && m_viewport->isValid())
                 ? m_viewport->colorTexture()
-                : (swapchainFb ? swapchainFb->getDesc().colorAttachments[0].texture : nullptr);
+                : swapchainFb->getDesc().colorAttachments[0].texture;
             if (color)
             {
                 nvrhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
@@ -162,6 +174,10 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     }
 
     m_ui->render(swapchainFb);
+
+    // ImGui draw cmds from this frame may still reference the pre-resize color texture.
+    if (m_viewport)
+        m_viewport->flushRetired(gpuDevice);
 }
 
 void EditorUISubsystem::onBackBufferResizing()
