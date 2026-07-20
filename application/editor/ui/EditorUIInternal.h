@@ -43,6 +43,14 @@ bool SameRotation(const dm::dquat& a, const dm::dquat& b);
 // Colored XYZ transform row (reset / lock / label / axis fields), matching DCC-style inspectors.
 // When lockUniform is non-null and true, editing any axis copies that value to all three (Scale).
 // When lockUniform is null, locked disables editing.
+// editInfo (optional): activated / deactivatedAfterEdit aggregated across reset + XYZ fields.
+struct TransformVec3RowEditInfo
+{
+    bool activated = false;
+    bool deactivated = false;
+    bool deactivatedAfterEdit = false;
+};
+
 bool TransformVec3Row(
     const char* id,
     const char* label,
@@ -53,7 +61,8 @@ bool TransformVec3Row(
     const char* format,
     const float resetValues[3],
     bool* locked,
-    bool lockUniform = false);
+    bool lockUniform = false,
+    TransformVec3RowEditInfo* editInfo = nullptr);
 
 // Inspector property rows: fixed label column on the left, control fills the right.
 inline constexpr float kInspectorLabelWidth = 148.f;

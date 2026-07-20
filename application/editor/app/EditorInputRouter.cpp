@@ -96,6 +96,28 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     const int action = e.isRepeat() ? cGlfwRepeat : cGlfwPress;
 
     imGuiForwardKeyboard(key, action, e.getScancode());
+
+    const bool ctrlDown = (mods & ToGlfwMods(caustica::ModifierKey::Control)) != 0;
+    const bool shiftDown = (mods & ToGlfwMods(caustica::ModifierKey::Shift)) != 0;
+    const bool altDown = (mods & ToGlfwMods(caustica::ModifierKey::Alt)) != 0;
+
+    // Editor undo/redo: queue for after EditorUI/gizmo commit (see processPendingEditActions).
+    // Handle even when ImGui wants keyboard, but never steal text-field undo.
+    if (action == cGlfwPress && ctrlDown && !altDown && !ImGui::GetIO().WantTextInput)
+    {
+        if (key == ToGlfwKey(caustica::Key::Z) && !shiftDown)
+        {
+            sceneEditor.requestUndo();
+            return true;
+        }
+        if ((key == ToGlfwKey(caustica::Key::Y) && !shiftDown)
+            || (key == ToGlfwKey(caustica::Key::Z) && shiftDown))
+        {
+            sceneEditor.requestRedo();
+            return true;
+        }
+    }
+
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
@@ -119,8 +141,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     auto& editor = sceneEditor.editorUIState();
 
     if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress
-        && mods != ToGlfwMods(caustica::ModifierKey::Control)
-        && mods != ToGlfwMods(caustica::ModifierKey::Alt))
+        && !ctrlDown && !altDown)
     {
         session.settings.EnableAnimations = !session.settings.EnableAnimations;
         return true;
@@ -133,8 +154,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     }
     if (key == ToGlfwKey(caustica::Key::F2) && action == cGlfwPress)
         editor.ShowUI = !editor.ShowUI;
-    if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress
-        && mods == ToGlfwMods(caustica::ModifierKey::Control))
+    if (key == ToGlfwKey(caustica::Key::R) && action == cGlfwPress && ctrlDown && !shiftDown && !altDown)
         session.runtime.Invalidation.ShaderReloadRequested = true;
 #if CAUSTICA_WITH_STREAMLINE
     if (key == ToGlfwKey(caustica::Key::F13) && action == cGlfwPress)

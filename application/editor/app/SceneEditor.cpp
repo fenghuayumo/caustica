@@ -3,6 +3,7 @@
 #include "SceneContentEditor.h"
 #include "common/LocalConfig.h"
 #include "common/CaptureScriptManager.h"
+#include "common/TransformGizmo.h"
 
 #include <render/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
@@ -313,6 +314,9 @@ void SceneEditor::prepareEditorFrame()
 
 void SceneEditor::onSceneUnloading()
 {
+    m_pendingEditAction = PendingEditAction::None;
+    m_undoStack.clear();
+    ResetTransformGizmoInteraction();
     m_editorAnimationEntity = ecs::NullEntity;
     m_editor.TogglableNodes = nullptr;
     m_editor.SelectedMaterial = nullptr;
@@ -324,6 +328,79 @@ void SceneEditor::onSceneUnloading()
 
     if (m_sampleGame != nullptr)
         m_sampleGame->sceneUnloading();
+}
+
+void SceneEditor::requestUndo()
+{
+    m_pendingEditAction = PendingEditAction::Undo;
+}
+
+void SceneEditor::requestRedo()
+{
+    m_pendingEditAction = PendingEditAction::Redo;
+}
+
+void SceneEditor::processPendingEditActions()
+{
+    const PendingEditAction action = m_pendingEditAction;
+    m_pendingEditAction = PendingEditAction::None;
+
+    if (action == PendingEditAction::None || !m_app)
+        return;
+
+    // Transform undo reverses a change that may still be referenced by one of the
+    // two pipelined render frames. Drain both the render thread and GPU queue before
+    // publishing the reverse transform; otherwise the shared TLAS can be rebuilt
+    // while an older frame is still using it.
+    m_app->waitForRenderThreadIdle();
+    GpuDevice* gpuDevice = m_app->getGpuDevice();
+    if (!gpuDevice || gpuDevice->isShuttingDown())
+        return;
+
+    if (!gpuDevice->getDevice()->waitForIdle())
+    {
+        gpuDevice->setShuttingDown(true);
+        return;
+    }
+
+    if (action == PendingEditAction::Undo)
+        undo();
+    else if (action == PendingEditAction::Redo)
+        redo();
+}
+
+bool SceneEditor::undo()
+{
+    // Mid-drag Ctrl+Z cancels the in-progress gizmo edit instead of popping the stack.
+    if (CancelTransformGizmoEdit(*this))
+        return true;
+
+    if (!m_undoStack.undo())
+        return false;
+
+    ResetTransformGizmoInteraction();
+    return true;
+}
+
+bool SceneEditor::redo()
+{
+    if (IsTransformGizmoEditing())
+        return false;
+
+    if (!m_undoStack.redo())
+        return false;
+
+    ResetTransformGizmoInteraction();
+    return true;
+}
+
+void SceneEditor::commitTransformEdit(
+    ecs::Entity entity,
+    const LocalTransformSnapshot& before,
+    const LocalTransformSnapshot& after)
+{
+    if (auto command = makeTransformUndoCommand(*this, entity, before, after))
+        m_undoStack.push(std::move(command));
 }
 
 void SceneEditor::onSceneLoadedEarly()

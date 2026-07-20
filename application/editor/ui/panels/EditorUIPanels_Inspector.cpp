@@ -2,6 +2,7 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
+#include "EditorUndoCommands.h"
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
@@ -51,8 +52,19 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     ImGui::Begin("Inspector", &m_editorUI.ShowInspector);
     (void)layout;
 
+    // Function-static edit session for Transform undo grouping (see Transform section).
+    struct InspectorTransformUndoState
+    {
+        bool tracking = false;
+        bool dirty = false;
+        ecs::Entity entity = ecs::NullEntity;
+        LocalTransformSnapshot before;
+    };
+    static InspectorTransformUndoState s_transformUndo;
+
     if (!ew || m_editorUI.SelectedEntity == ecs::NullEntity)
     {
+        s_transformUndo = {};
         ImGui::TextDisabled("No selection");
         ImGui::End();
         return;
@@ -130,19 +142,55 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         dm::double3 translation = ltc ? ltc->translation : dm::double3(0.0);
         dm::dquat rotation = ltc ? ltc->rotation : dm::dquat::identity();
         dm::double3 scaling = ltc ? ltc->scaling : dm::double3(1.0);
+        const LocalTransformSnapshot frameBefore = ltc
+            ? captureLocalTransform(*ltc)
+            : LocalTransformSnapshot{};
 
         static bool lockPos = false;
         static bool lockRot = false;
         static bool lockScl = false;
 
+        auto beginTransformEdit = [&](const TransformVec3RowEditInfo& edit)
+        {
+            if (!edit.activated || s_transformUndo.tracking)
+                return;
+            s_transformUndo.tracking = true;
+            s_transformUndo.dirty = false;
+            s_transformUndo.entity = entity;
+            s_transformUndo.before = frameBefore;
+        };
+        auto markTransformDirty = [&]()
+        {
+            if (s_transformUndo.tracking)
+                s_transformUndo.dirty = true;
+        };
+        auto endTransformEdit = [&](const TransformVec3RowEditInfo& edit)
+        {
+            if (!edit.deactivated || !s_transformUndo.tracking)
+                return;
+            if (s_transformUndo.dirty || edit.deactivatedAfterEdit)
+            {
+                const LocalTransformSnapshot after = captureLocalTransform(*ew, s_transformUndo.entity);
+                m_sceneEditor.commitTransformEdit(s_transformUndo.entity, s_transformUndo.before, after);
+            }
+            s_transformUndo = {};
+        };
+        if (s_transformUndo.tracking && s_transformUndo.entity != entity)
+            s_transformUndo = {};
+
         float pos[3] = { float(translation.x), float(translation.y), float(translation.z) };
         constexpr float kResetPos[3] = { 0.f, 0.f, 0.f };
-        if (TransformVec3Row("pos", "Position", pos, 0.01f, 0.f, 0.f, "%.3f", kResetPos, &lockPos, false))
+        TransformVec3RowEditInfo posEdit;
+        if (TransformVec3Row("pos", "Position", pos, 0.01f, 0.f, 0.f, "%.3f", kResetPos, &lockPos, false, &posEdit))
         {
+            beginTransformEdit(posEdit);
             ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
+            markTransformDirty();
             m_settings.ResetAccumulation = true;
         }
+        beginTransformEdit(posEdit);
+        endTransformEdit(posEdit);
 
         constexpr double deg2rad = 3.14159265358979323846 / 180.0;
 
@@ -161,24 +209,34 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             m_editorUI.InspectorRotationEulerDeg.z
         };
         constexpr float kResetRot[3] = { 0.f, 0.f, 0.f };
-        if (TransformVec3Row("rot", "Rotation", euler, 0.5f, 0.f, 0.f, "%.2f", kResetRot, &lockRot, false))
+        TransformVec3RowEditInfo rotEdit;
+        if (TransformVec3Row("rot", "Rotation", euler, 0.5f, 0.f, 0.f, "%.2f", kResetRot, &lockRot, false, &rotEdit))
         {
+            beginTransformEdit(rotEdit);
             m_editorUI.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
             const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
             m_editorUI.InspectorRotationQuat = newRotation;
             ew->setRotation(entity, newRotation);
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
+            markTransformDirty();
             m_settings.ResetAccumulation = true;
         }
+        beginTransformEdit(rotEdit);
+        endTransformEdit(rotEdit);
 
         float scl[3] = { float(scaling.x), float(scaling.y), float(scaling.z) };
         constexpr float kResetScl[3] = { 1.f, 1.f, 1.f };
-        if (TransformVec3Row("scl", "Scale", scl, 0.01f, 0.001f, 1000.0f, "%.3f", kResetScl, &lockScl, true))
+        TransformVec3RowEditInfo sclEdit;
+        if (TransformVec3Row("scl", "Scale", scl, 0.01f, 0.001f, 1000.0f, "%.3f", kResetScl, &lockScl, true, &sclEdit))
         {
+            beginTransformEdit(sclEdit);
             ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
+            markTransformDirty();
             m_settings.ResetAccumulation = true;
         }
+        beginTransformEdit(sclEdit);
+        endTransformEdit(sclEdit);
     }
 
     if (gaussianSplat)

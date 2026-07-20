@@ -10,8 +10,11 @@
 #include "ui/EditorUIData.h"
 #include "EditorInputRouter.h"
 #include "EditorResources.h"
+#include "EditorUndoStack.h"
+#include "EditorUndoCommands.h"
 #include "SceneContentEditor.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -131,6 +134,21 @@ public:
 
     void onEvent(caustica::Event& event);
 
+    [[nodiscard]] EditorUndoStack& undoStack() { return m_undoStack; }
+    [[nodiscard]] const EditorUndoStack& undoStack() const { return m_undoStack; }
+
+    // Queue undo/redo so it runs after EditorUI/gizmo commit (same-frame safe).
+    void requestUndo();
+    void requestRedo();
+    void processPendingEditActions();
+
+    bool undo();
+    bool redo();
+    void commitTransformEdit(
+        ecs::Entity entity,
+        const LocalTransformSnapshot& before,
+        const LocalTransformSnapshot& after);
+
     void setSceneTime(double sceneTime);
     double sceneTime() const;
     bool insertTransformKeyframe(ecs::Entity entity, float timeSeconds);
@@ -180,6 +198,14 @@ private:
 
     EditorInputRouter m_inputRouter;
     SceneContentEditor m_contentEditor;
+    EditorUndoStack m_undoStack;
+    enum class PendingEditAction : uint8_t
+    {
+        None,
+        Undo,
+        Redo
+    };
+    PendingEditAction m_pendingEditAction = PendingEditAction::None;
     ecs::Entity m_editorAnimationEntity = ecs::NullEntity;
 
     std::unique_ptr<::GameScene> m_sampleGame;

@@ -2,6 +2,7 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
+#include "EditorUndoCommands.h"
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include "ui/EditorUIInternal.h"
@@ -32,9 +33,30 @@ struct GizmoDragState
     ecs::Entity entity = ecs::NullEntity;
     float matrix[16] = {};
     bool active = false;
+    // After CancelTransformGizmoEdit, ignore writeback until ImGuizmo releases.
+    bool suppressUntilRelease = false;
+};
+
+struct GizmoUndoState
+{
+    bool tracking = false;
+    bool changed = false;
+    ecs::Entity entity = ecs::NullEntity;
+    LocalTransformSnapshot before;
 };
 
 GizmoDragState g_drag;
+GizmoUndoState g_undo;
+
+void ResetGizmoUndoState()
+{
+    g_undo = {};
+}
+
+void ResetGizmoDragState()
+{
+    g_drag = {};
+}
 
 // Match the layout that worked before DockSpace: caustica/ImGuizmo both consume
 // this buffer as the same row-major affine dump (see commit 5240cfa9).
@@ -222,13 +244,54 @@ void DrawNoSelectionHint(const EditorUIState& editorUI)
 
 } // namespace
 
+bool caustica::editor::IsTransformGizmoEditing()
+{
+    return g_undo.tracking || g_drag.active || g_drag.suppressUntilRelease || ImGuizmo::IsUsing();
+}
+
+void caustica::editor::ResetTransformGizmoInteraction()
+{
+    ResetGizmoUndoState();
+    ResetGizmoDragState();
+}
+
+bool caustica::editor::CancelTransformGizmoEdit(SceneEditor& sceneEditor)
+{
+    if (!g_undo.tracking && !g_drag.active && !g_drag.suppressUntilRelease && !ImGuizmo::IsUsing())
+        return false;
+
+    if (g_undo.tracking && ecs::isValid(g_undo.entity))
+        applyLocalTransform(sceneEditor, g_undo.entity, g_undo.before);
+
+    ResetGizmoUndoState();
+    g_drag.active = false;
+    g_drag.suppressUntilRelease = ImGuizmo::IsUsing();
+    if (!g_drag.suppressUntilRelease)
+        ResetGizmoDragState();
+    return true;
+}
+
 bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 {
     ctx.editorUI.GizmoCapturingInput = false;
 
     if (!ctx.editorUI.ShowTransformGizmo || !ctx.editorUI.ShowUI)
     {
-        g_drag = {};
+        if (g_undo.tracking && g_undo.changed)
+        {
+            if (App* app = ctx.sceneEditor.app())
+            {
+                if (auto* ew = caustica::entityWorld(*app))
+                {
+                    ctx.sceneEditor.commitTransformEdit(
+                        g_undo.entity,
+                        g_undo.before,
+                        captureLocalTransform(*ew, g_undo.entity));
+                }
+            }
+        }
+        ResetGizmoUndoState();
+        ResetGizmoDragState();
         return false;
     }
 
@@ -238,7 +301,8 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     const ecs::Entity entity = ctx.editorUI.SelectedEntity;
     if (!entityWorld || entity == ecs::NullEntity)
     {
-        g_drag = {};
+        ResetGizmoUndoState();
+        ResetGizmoDragState();
         DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
@@ -247,7 +311,8 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     auto* globalTransform = entityWorld->world().tryGet<caustica::scene::GlobalTransformComponent>(entity);
     if (!localTransform || !globalTransform)
     {
-        g_drag = {};
+        ResetGizmoUndoState();
+        ResetGizmoDragState();
         DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
@@ -255,15 +320,27 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     const auto& view = caustica::currentView(*ctx.sceneEditor.app());
     if (!view)
     {
-        g_drag = {};
+        ResetGizmoUndoState();
+        ResetGizmoDragState();
         return false;
     }
 
     // Select tool: do not draw the inactive gray gizmo at all.
     if (!ctx.editorUI.GizmoEnabled)
+    {
+        if (g_undo.tracking && g_undo.changed)
+        {
+            ctx.sceneEditor.commitTransformEdit(
+                g_undo.entity,
+                g_undo.before,
+                captureLocalTransform(*entityWorld, g_undo.entity));
+        }
+        ResetGizmoUndoState();
         return false;
+    }
 
     const bool editingUi = IsEditingInspectorUi();
+    const bool wasTracking = g_undo.tracking;
 
     ImGuizmo::BeginFrame();
     {
@@ -306,9 +383,19 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     Affine3ToImGuizmoMatrix(view->getViewMatrix(), viewMatrix);
     BuildGizmoProjectionMatrix(ctx, *view, projectionMatrix);
 
+    if (g_drag.suppressUntilRelease)
+    {
+        // Keep the gizmo visual locked to ECS (post-cancel / post-undo) until the
+        // mouse button that started the drag is released.
+        Affine3ToImGuizmoMatrix(globalTransform->transformFloat, g_drag.matrix);
+        g_drag.entity = entity;
+        g_drag.active = false;
+    }
+
     // Sync from ECS only when not actively dragging the gizmo. During a drag, keep the
     // working matrix so decompose/recompose round-trips cannot jitter the object.
-    if (!ImGuizmo::IsUsing() || !g_drag.active || g_drag.entity != entity || editingUi)
+    if (!g_drag.suppressUntilRelease
+        && (!ImGuizmo::IsUsing() || !g_drag.active || g_drag.entity != entity || editingUi))
     {
         Affine3ToImGuizmoMatrix(globalTransform->transformFloat, g_drag.matrix);
         g_drag.entity = entity;
@@ -326,23 +413,58 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         nullptr,
         GetSnapValues(ctx.editorUI));
 
-    const bool usingGizmo = ImGuizmo::IsUsing();
-    g_drag.active = usingGizmo && !editingUi;
+    const bool usingGizmo = ImGuizmo::IsUsing() && !editingUi && !g_drag.suppressUntilRelease;
+    g_drag.active = usingGizmo;
+
+    if (g_drag.suppressUntilRelease && !ImGuizmo::IsUsing())
+    {
+        g_drag.suppressUntilRelease = false;
+        ResetGizmoDragState();
+    }
 
     // Capture while dragging, or while hovering a handle so the first click does not
     // fall through to camera orbit / instance picking.
     const bool overGizmo = ImGuizmo::IsOver();
-    ctx.editorUI.GizmoCapturingInput = (usingGizmo || overGizmo) && !editingUi;
+    ctx.editorUI.GizmoCapturingInput =
+        (usingGizmo || overGizmo || g_drag.suppressUntilRelease) && !editingUi;
     if (ctx.editorUI.GizmoCapturingInput)
         io.WantCaptureMouse = true;
 
-    if (!manipulated || editingUi)
-        return false;
+    if (usingGizmo && !wasTracking)
+    {
+        g_undo.tracking = true;
+        g_undo.changed = false;
+        g_undo.entity = entity;
+        g_undo.before = captureLocalTransform(*localTransform);
+    }
 
-    ApplyWorldMatrixToLocalTransform(*entityWorld, entity, g_drag.matrix);
+    if (manipulated && !editingUi && !g_drag.suppressUntilRelease)
+    {
+        ApplyWorldMatrixToLocalTransform(*entityWorld, entity, g_drag.matrix);
+        if (g_undo.tracking && g_undo.entity == entity)
+            g_undo.changed = true;
 
-    ctx.editorUI.InspectorRotationEntity = entity;
-    ctx.editorUI.InspectorRotationEulerValid = false;
-    ctx.settings.ResetAccumulation = true;
-    return true;
+        ctx.editorUI.InspectorRotationEntity = entity;
+        ctx.editorUI.InspectorRotationEulerValid = false;
+        ctx.settings.ResetAccumulation = true;
+    }
+
+    if (!usingGizmo && wasTracking && !g_drag.suppressUntilRelease)
+    {
+        if (g_undo.changed)
+        {
+            ctx.sceneEditor.commitTransformEdit(
+                g_undo.entity,
+                g_undo.before,
+                captureLocalTransform(*entityWorld, g_undo.entity));
+        }
+        ResetGizmoUndoState();
+    }
+    else if (g_undo.tracking && g_undo.entity != entity)
+    {
+        // Selection changed mid-drag — drop the incomplete edit session.
+        ResetGizmoUndoState();
+    }
+
+    return manipulated && !editingUi && !g_drag.suppressUntilRelease;
 }

@@ -514,7 +514,8 @@ bool TransformVec3Row(
     const char* format,
     const float resetValues[3],
     bool* locked,
-    bool lockUniform)
+    bool lockUniform,
+    TransformVec3RowEditInfo* editInfo)
 {
     ImGui::PushID(id);
 
@@ -522,12 +523,33 @@ bool TransformVec3Row(
     const float gap = 3.f;
     constexpr float kLabelColW = 70.f;
 
+    auto noteItemEdit = [&]()
+    {
+        if (!editInfo)
+            return;
+        if (ImGui::IsItemActivated())
+            editInfo->activated = true;
+        if (ImGui::IsItemDeactivated())
+            editInfo->deactivated = true;
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            editInfo->deactivatedAfterEdit = true;
+    };
+
     if (IconButton("##reset", Icon::Refresh, false, "Reset"))
     {
         values[0] = resetValues[0];
         values[1] = resetValues[1];
         values[2] = resetValues[2];
         changed = true;
+    }
+    noteItemEdit();
+    // Reset is a discrete click — treat as a complete edit even if ImGui does not
+    // report DeactivatedAfterEdit for the icon button widget.
+    if (changed && editInfo)
+    {
+        editInfo->activated = true;
+        editInfo->deactivated = true;
+        editInfo->deactivatedAfterEdit = true;
     }
     ImGui::SameLine(0.f, gap);
 
@@ -575,6 +597,7 @@ bool TransformVec3Row(
             if (uniform)
                 values[0] = values[1] = values[2] = values[i];
         }
+        noteItemEdit();
     }
 
     ImGui::PopID();

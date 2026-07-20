@@ -648,11 +648,19 @@ bool GpuDevice_DX12::present()
         presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
 
     HRESULT result = m_SwapChain->Present(m_DeviceParams.vsyncEnabled ? 1 : 0, presentFlags);
+    if (FAILED(result))
+        return false;
 
-    m_FrameFence->SetEventOnCompletion(m_FrameCount, m_FrameFenceEvents[bufferIndex]);
-    m_GraphicsQueue->Signal(m_FrameFence, m_FrameCount);
+    result = m_FrameFence->SetEventOnCompletion(m_FrameCount, m_FrameFenceEvents[bufferIndex]);
+    if (FAILED(result))
+        return false;
+
+    result = m_GraphicsQueue->Signal(m_FrameFence, m_FrameCount);
+    if (FAILED(result))
+        return false;
+
     m_FrameCount++;
-    return SUCCEEDED(result);
+    return true;
 }
 
 void GpuDevice_DX12::prepareShutdown()

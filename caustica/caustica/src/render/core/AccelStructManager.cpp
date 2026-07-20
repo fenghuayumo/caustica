@@ -10,6 +10,7 @@
 #include <rhi/utils.h>
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
 namespace caustica
@@ -381,11 +382,22 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         }
         const uint32_t compactedGeometryInstanceIndex = subInstanceCount;
 
+        const dm::affine3& transform = proxy.transformFloat;
+        const bool finiteTransform =
+            dm::all(dm::isfinite(transform.m_linear[0]))
+            && dm::all(dm::isfinite(transform.m_linear[1]))
+            && dm::all(dm::isfinite(transform.m_linear[2]))
+            && dm::all(dm::isfinite(transform.m_translation));
+        const bool validTransform =
+            finiteTransform && std::abs(dm::determinant(transform.m_linear)) > 1e-12f;
+
         nvrhi::rt::InstanceDesc instanceDesc;
         instanceDesc.instanceID = compactedGeometryInstanceIndex;
         instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
         instanceDesc.flags = nvrhi::rt::InstanceFlags::None;
-        dm::affineToColumnMajor(proxy.transformFloat, instanceDesc.transform);
+        dm::affineToColumnMajor(
+            validTransform ? transform : dm::affine3::identity(),
+            instanceDesc.transform);
 
         const scene::MeshRenderResourceSnapshot* mesh = renderData.findMesh(proxy.meshId);
         if (!mesh)
@@ -397,6 +409,22 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         }
 
         const uint32_t meshSubInstanceCount = (uint32_t)mesh->geometries.size();
+        if (!validTransform)
+        {
+            static bool warnedInvalidTransform = false;
+            if (!warnedInvalidTransform)
+            {
+                warning("BuildTLAS: non-finite or degenerate instance transform; "
+                    "inserting an empty TLAS slot to avoid a D3D12 device removal.");
+                warnedInvalidTransform = true;
+            }
+            instanceDesc.bottomLevelAS = nullptr;
+            instanceDesc.instanceMask = 0;
+            subInstanceCount += meshSubInstanceCount;
+            instances.push_back(instanceDesc);
+            continue;
+        }
+
         // Hierarchy-hidden instances keep their slot but contribute no hits.
         if (!proxy.enabled)
         {

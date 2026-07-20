@@ -621,6 +621,13 @@ bool App::dispatchScheduledRender(SystemContext& context)
             StreamlineIntegration::RenderFrameTokenScope slFrameScope(slFrameToken);
 #endif
             const bool ok = executeRenderPhase(gpuDevice, elapsedTime, curTime, renderFrameIndex);
+            if (!ok)
+            {
+                // A second frame may already be queued. Stop it before it tries to
+                // create command lists on a removed device; the logic thread will
+                // consume the failed completion and terminate the frame loop.
+                gpuDevice->setShuttingDown(true);
+            }
             m_renderThread.notifyFrameCompleted({ ok, elapsedTime, curTime });
         });
         return true;

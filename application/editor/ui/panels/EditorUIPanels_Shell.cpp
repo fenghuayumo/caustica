@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -72,6 +73,22 @@ void EditorUI::BuildMainMenuBar()
 
     if (ImGui::BeginMenu("Edit"))
     {
+        const bool canUndo = m_sceneEditor.undoStack().canUndo();
+        const bool canRedo = m_sceneEditor.undoStack().canRedo();
+        const char* undoLabel = m_sceneEditor.undoStack().undoLabel();
+        const char* redoLabel = m_sceneEditor.undoStack().redoLabel();
+
+        char undoText[64];
+        char redoText[64];
+        std::snprintf(undoText, sizeof(undoText), undoLabel ? "Undo %s" : "Undo", undoLabel);
+        std::snprintf(redoText, sizeof(redoText), redoLabel ? "Redo %s" : "Redo", redoLabel);
+
+        // Menu runs before DrawTransformGizmo in buildUI; queue like the shortcut path.
+        if (ImGui::MenuItem(undoText, "Ctrl+Z", false, canUndo || IsTransformGizmoEditing()))
+            m_sceneEditor.requestUndo();
+        if (ImGui::MenuItem(redoText, "Ctrl+Y", false, canRedo))
+            m_sceneEditor.requestRedo();
+        ImGui::Separator();
         ImGui::MenuItem("Transform Gizmo", nullptr, &m_editorUI.ShowTransformGizmo);
         ImGui::EndMenu();
     }

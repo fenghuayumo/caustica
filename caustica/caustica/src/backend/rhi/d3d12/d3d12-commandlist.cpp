@@ -77,8 +77,32 @@ namespace nvrhi::d3d12
             return nullptr;
         }
 
-        m_Context.device->CreateCommandAllocator(d3dCommandListType, IID_PPV_ARGS(&commandList->allocator));
-        m_Context.device->CreateCommandList(0, d3dCommandListType, commandList->allocator, nullptr, IID_PPV_ARGS(&commandList->commandList));
+        HRESULT hr = m_Context.device->CreateCommandAllocator(
+            d3dCommandListType,
+            IID_PPV_ARGS(&commandList->allocator));
+        if (FAILED(hr))
+        {
+            std::ostringstream ss;
+            ss << "CreateCommandAllocator failed, HRESULT=0x" << std::hex << hr
+                << ", deviceRemovedReason=0x" << m_Context.device->GetDeviceRemovedReason();
+            m_Context.messageCallback->message(MessageSeverity::Fatal, ss.str().c_str());
+            return nullptr;
+        }
+
+        hr = m_Context.device->CreateCommandList(
+            0,
+            d3dCommandListType,
+            commandList->allocator,
+            nullptr,
+            IID_PPV_ARGS(&commandList->commandList));
+        if (FAILED(hr) || !commandList->commandList)
+        {
+            std::ostringstream ss;
+            ss << "CreateCommandList failed, HRESULT=0x" << std::hex << hr
+                << ", deviceRemovedReason=0x" << m_Context.device->GetDeviceRemovedReason();
+            m_Context.messageCallback->message(MessageSeverity::Fatal, ss.str().c_str());
+            return nullptr;
+        }
 
         commandList->commandList->QueryInterface(IID_PPV_ARGS(&commandList->commandList4));
         commandList->commandList->QueryInterface(IID_PPV_ARGS(&commandList->commandList6));
@@ -222,8 +246,20 @@ namespace nvrhi::d3d12
 
             if (chunk->lastSubmittedInstance <= completedInstance)
             {
-                chunk->allocator->Reset();
-                chunk->commandList->Reset(chunk->allocator, nullptr);
+                const HRESULT allocatorHr = chunk->allocator->Reset();
+                const HRESULT commandListHr = SUCCEEDED(allocatorHr)
+                    ? chunk->commandList->Reset(chunk->allocator, nullptr)
+                    : allocatorHr;
+                if (FAILED(allocatorHr) || FAILED(commandListHr))
+                {
+                    std::ostringstream ss;
+                    ss << "Failed to reset D3D12 command list, allocatorHRESULT=0x"
+                        << std::hex << allocatorHr
+                        << ", commandListHRESULT=0x" << commandListHr
+                        << ", deviceRemovedReason=0x" << m_Context.device->GetDeviceRemovedReason();
+                    m_Context.messageCallback->message(MessageSeverity::Fatal, ss.str().c_str());
+                    return;
+                }
                 m_CommandListPool.pop_front();
             }
             else
@@ -236,6 +272,9 @@ namespace nvrhi::d3d12
         {
             chunk = createInternalCommandList();
         }
+
+        if (!chunk)
+            return;
 
         m_ActiveCommandList = chunk;
 

@@ -163,6 +163,15 @@ void EditorPlugin::configureLateSchedules(App& app)
             uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
         });
 
+    // Undo/Redo must run after gizmo/inspector commit so same-frame Ctrl+Z undoes
+    // the edit that just finished, instead of racing an in-progress drag.
+    app.addSystemAfter<system_label::EditorSceneProcessPendingEditActions, system_label::EditorUIAnimate>(
+        AppSchedule::update,
+        [this](SystemContext& ctx) {
+            (void)ctx;
+            m_sceneEditor.processPendingEditActions();
+        });
+
     app.addSystem<system_label::EditorUIPrepareViewport>(
         AppSchedule::render,
         [](SystemContext& ctx) {
