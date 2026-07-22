@@ -27,6 +27,7 @@ static const int StandardMaterialFlags_IgnoreMeshTangentSpace         = (1 << 12
 static const int StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB0     = (1 << 13);
 static const int StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB1     = (1 << 14);
 static const int StandardMaterialFlags_UseOpenPBRMaterialModel        = (1 << 15);
+static const int StandardMaterialFlags_UnlitReceiveShadows            = (1 << 16);
 static const int StandardMaterialFlags_NestedPriorityMask             = 0xF0000000;
 static const int StandardMaterialFlags_NestedPriorityShift            = 28;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F000000;
@@ -98,7 +99,7 @@ struct StandardMaterialData
     float       TransmissionDispersionAbbeNumber;
 
     float       TransmissionScatterAnisotropy;
-    float       _padOpenPBR0;
+    float       UnlitShadowStrength;
     float       _padOpenPBR1;
     float       _padOpenPBR2;
 

@@ -911,6 +911,12 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("exclude_from_nee",
             [](StandardMaterial& self) { return self.excludeFromNEE; },
             [](StandardMaterial& self, bool v) { self.excludeFromNEE = v; self.gpuDataDirty = true; })
+        .def_prop_rw("unlit_receive_shadows",
+            [](StandardMaterial& self) { return self.unlitReceiveShadows; },
+            [](StandardMaterial& self, bool v) { self.unlitReceiveShadows = v; self.gpuDataDirty = true; })
+        .def_prop_rw("unlit_shadow_strength",
+            [](StandardMaterial& self) { return self.unlitShadowStrength; },
+            [](StandardMaterial& self, float v) { self.unlitShadowStrength = std::clamp(v, 0.0f, 1.0f); self.gpuDataDirty = true; })
         .def_prop_rw("enable_as_analytic_light_proxy",
             [](StandardMaterial& self) { return self.enableAsAnalyticLightProxy; },
             [](StandardMaterial& self, bool v) { self.enableAsAnalyticLightProxy = v; self.gpuDataDirty = true; })

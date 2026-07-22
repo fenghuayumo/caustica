@@ -743,6 +743,14 @@ namespace PathTracer
             AccumulatePathRadiance( workingContext, path, radiance, specRadianceAvg, false, ShouldCollectGISecondaryRadiance(preScatterPath) );
         }
 #endif // PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+
+        if (shadingData.mtl.isUnlitReceiveShadows())
+        {
+            // This is an artistic terminal surface: it receives a visibility mask
+            // but does not scatter direct or indirect illumination.
+            path.terminate();
+            return;
+        }
         
         if (!scatterValid)
         {   // this is very suboptimal from performance perspective, and should only happen very, very rarely (as in, almost never)

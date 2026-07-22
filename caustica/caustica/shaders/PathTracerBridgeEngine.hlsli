@@ -379,6 +379,7 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     result.ior = lpfloat( material.IoR );
     
     result.shadowNoLFadeout = lpfloat( material.ShadowNoLFadeout );
+    result.unlitShadowStrength = lpfloat(saturate(material.UnlitShadowStrength));
 
     result.coatWeight = lpfloat(saturate(material.CoatWeight));
     result.coatColor = lpfloat3(saturate(material.CoatColor));
@@ -739,6 +740,11 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.mtl.setThinSurface( bridgeMaterialThinSurface );
     ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & StandardMaterialFlags_PSDExclude) != 0 );
     ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & StandardMaterialFlags_PSDDominantDeltaLobeP1Mask) >> StandardMaterialFlags_PSDDominantDeltaLobeP1Shift );
+    const bool unlitReceiveShadows = (bridgeMaterial.flags & StandardMaterialFlags_UnlitReceiveShadows) != 0;
+    ptShadingData.mtl.setUnlitReceiveShadows(unlitReceiveShadows);
+    ptShadingData.mtl.setUnlitShadowStrength(bridgeMaterial.unlitShadowStrength);
+    ptShadingData.unlitColor = bridgeMaterial.baseColor;
+    ptShadingData.unlitShadowStrength = bridgeMaterial.unlitShadowStrength;
 
 
     // stopping motion vectors from being calculated behind/beyond this surface
@@ -821,6 +827,15 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     bsdfDataRoughness = bridgeMaterial.roughness;
     bsdfDataMetallic = bridgeMaterial.metalness;
 
+    if (unlitReceiveShadows)
+    {
+        // Preserve the texture-modulated base color in exported surface data. The
+        // ReSTIR DI final pass uses this as an artistic, lighting-independent color.
+        bsdfDataDiffuse = bridgeMaterial.baseColor;
+        bsdfDataSpecular = 0;
+        bsdfDataMetallic = 0;
+    }
+
     // Assume the default IoR for vacuum on the front-facing side.
     // The renderer may override this for nested dielectrics (see 'handleNestedDielectrics' calling Bridge::updateOutsideIoR)
     ptShadingData.IoR = 1.f;
@@ -836,7 +851,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     uint neeAnalyticLightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
 
 #if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
-    if (ptShadingData.frontFacing && any(bridgeMaterial.emissiveColor>0))
+    if (!unlitReceiveShadows && ptShadingData.frontFacing && any(bridgeMaterial.emissiveColor>0))
     {
         ptShadingData.emission = bridgeMaterial.emissiveColor;
 

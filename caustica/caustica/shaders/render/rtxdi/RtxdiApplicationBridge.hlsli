@@ -581,6 +581,16 @@ float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Sur
         return 0;
 #endif
 
+    if (surface.IsUnlitReceiveShadows())
+    {
+        // Use the geometric receiver side only for shadow projection. This is
+        // not an NdotL shading term: it prevents back-side rays from entering
+        // a closed unlit mesh and reporting the mesh itself as an occluder.
+        if (dot(toLight, surface.GetFaceNCorrected()) <= 0.0)
+            return 0.0;
+        return Luminance(lightSample.radiance) / lightSample.solidAnglePdf;
+    }
+
     float3 fullBRDF = surface.Eval(toLight).rgb;
     return Luminance(fullBRDF * lightSample.radiance) / lightSample.solidAnglePdf;
 

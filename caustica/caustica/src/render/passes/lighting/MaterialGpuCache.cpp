@@ -259,6 +259,8 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(volumeAttenuationColor);
 
     STORE_FIELD(shadowNoLFadeout);
+    STORE_FIELD(unlitReceiveShadows);
+    STORE_FIELD(unlitShadowStrength);
 
     STORE_FIELD(enableAsAnalyticLightProxy);
 
@@ -445,6 +447,8 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(volumeAttenuationColor, "VolumeAttenuationColor");
 
     LOAD_FIELD_EITHER(shadowNoLFadeout, "ShadowNoLFadeout");
+    LOAD_FIELD_EITHER(unlitReceiveShadows, "UnlitReceiveShadows");
+    LOAD_FIELD_EITHER(unlitShadowStrength, "UnlitShadowStrength");
 
     LOAD_FIELD_EITHER(enableAsAnalyticLightProxy, "EnableAsAnalyticLightProxy");
 
@@ -682,6 +686,18 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
             "This causes shading vs shadow discrepancy that exposes triangle edges. One way to mitigate this (other than \n"
             "having more detailed mesh) is to add additional shadowing falloff to hide the seam. This setting is not \n"
             "physically correct and adds bias. Setting of 0 means no fadeout (default).");
+
+        update |= ImGui::Checkbox("Unlit, receive shadows", &unlitReceiveShadows);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+            "Display the material's base color without BRDF, direct, or indirect lighting,\n"
+            "but keep shadows from sampled lights.");
+        {
+            UI_SCOPED_DISABLE(!unlitReceiveShadows);
+            update |= ImGui::SliderFloat("Unlit shadow strength", &unlitShadowStrength, 0.0f, 1.0f);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+                "Artistic control for how strongly sampled-light visibility darkens the unlit color.\n"
+                "0 keeps the base color fully visible; 1 applies the full shadow mask.");
+        }
 
         update |= ImGui::Checkbox("Enable as analytic light proxy", &enableAsAnalyticLightProxy);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip(
@@ -929,6 +945,8 @@ static void GetBindlessTextureIndex(const Handle<ImageAsset>& texture, uint& out
 
 bool StandardMaterial::isEmissive() const
 {
+    if (unlitReceiveShadows)
+        return false;
     return (emissiveIntensity > 0) && (caustica::math::any(emissiveColor>0.0f)) || useEngineEmissiveIntensity;  // useEngineEmissiveIntensity can animate on/off so just assume we're emissive and pay the cost
 }
 
@@ -980,6 +998,9 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     if (IsOpenPBRMaterialModel(materialModel))
         data.Flags |= StandardMaterialFlags_UseOpenPBRMaterialModel;
 
+    if (unlitReceiveShadows)
+        data.Flags |= StandardMaterialFlags_UnlitReceiveShadows;
+
     // free parameters
 
     data.BaseOrDiffuseColor = baseOrDiffuseColor;
@@ -1025,7 +1046,8 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.TransmissionScatterAnisotropy = std::clamp(transmissionScatterAnisotropy, -1.0f, 1.0f);
     data.TransmissionDispersionScale = std::clamp(transmissionDispersionScale, 0.0f, 1.0f);
     data.TransmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
-    data._padOpenPBR0 = data._padOpenPBR1 = data._padOpenPBR2 = 0.f;
+    data.UnlitShadowStrength = std::clamp(unlitShadowStrength, 0.0f, 1.0f);
+    data._padOpenPBR1 = data._padOpenPBR2 = 0.f;
 
     // bindless textures
 

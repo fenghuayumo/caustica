@@ -245,6 +245,10 @@ struct StandardMaterial : public StandardMaterialBase
     // This setting is not physically correct and adds bias. Setting of 0 means no fadeout (default).
     float                   shadowNoLFadeout                    = 0.0f;
 
+    // Display the sampled base color without BRDF/lighting, but modulate it by light visibility.
+    bool                    unlitReceiveShadows                 = false;
+    float                   unlitShadowStrength                 = 1.0f;
+
     bool                    gpuDataDirty                        = true;         // params changed, GPU data needs update
     uint                    gpuDataIndex                        = 0xFFFFFFFF;   // 0xFFFFFFFF if no GPU buffer slot allocated
 

@@ -10,7 +10,7 @@
 //RWTexture2D<float4>                     u_DebugVizOutput    : register(u50);
 
 // Get the final sample for the given pixel computed using RTXDI.
-bool getFinalSample(const uint2 reservoirPos, const RAB_Surface surface, out float3 Li, out float3 dir, out float distance)
+bool getFinalSample(const uint2 reservoirPos, const RAB_Surface surface, out float3 Li, out float3 dir, out float distance, out bool visible)
 {
     RAB_LightSample lightSample = RAB_EmptyLightSample();
     
@@ -23,6 +23,7 @@ bool getFinalSample(const uint2 reservoirPos, const RAB_Surface surface, out flo
     Li = 0.0.xxx;
     dir = 0.0.xxx;
     distance = 0.0;
+    visible = true;
 
     // Abort if we don't have a valid surface
     if (!RAB_IsSurfaceValid(surface) || !RTXDI_IsValidDIReservoir(reservoir)) return false;
@@ -33,16 +34,23 @@ bool getFinalSample(const uint2 reservoirPos, const RAB_Surface surface, out flo
     RAB_LightInfo lightInfo = RAB_LoadLightInfo(lightIdx, false);
     lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, lightUV);
 
+    float3 toLight;
+    float lightDistance;
+    RAB_GetLightDirDistance(surface, lightSample, toLight, lightDistance);
+    const bool unlitBackSideLight = surface.IsUnlitReceiveShadows()
+        && dot(toLight, surface.GetFaceNCorrected()) <= 0.0;
+
     // Check the light is visible to the surface 
-    if (g_RtxdiBridgeConst.restirDI.shadingParams.enableFinalVisibility)
+    if (g_RtxdiBridgeConst.restirDI.shadingParams.enableFinalVisibility && !unlitBackSideLight)
     {
         const RayDesc ray = setupVisibilityRay(surface, lightSample, g_RtxdiBridgeConst.rayEpsilon);
 
         if (!GetFinalVisibility(SceneBVH, ray))
         {
+            visible = false;
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
             RTXDI_StoreDIReservoir(reservoir, g_RtxdiBridgeConst.restirDI.reservoirBufferParams, reservoirPos, g_RtxdiBridgeConst.restirDI.bufferIndices.shadingInputBufferIndex);
-            return false;
+            return true;
         }
     }
 
@@ -60,14 +68,25 @@ bool ReSTIRDIFinalContribution(const uint2 reservoirPos, const uint2 pixelPos, c
     newSpecHitT = 0.0;
 
     LightSample ls = LightSample::make();
+    const bool unlitReceiveShadows = surface.IsUnlitReceiveShadows();
+    const float3 pathThp = Unpack_R11G11B10_FLOAT(u_Throughput[pixelPos]);
+    bool visible = true;
 
-    if (getFinalSample(reservoirPos, surface, ls.Li, ls.Direction, ls.Distance))
+    const bool hasLightSample = getFinalSample(reservoirPos, surface, ls.Li, ls.Direction, ls.Distance, visible);
+    if (unlitReceiveShadows)
+    {
+        // No valid light means there is nothing that can cast a selected shadow.
+        // For a valid light, its binary visibility is the entire shading result.
+        const float sampledVisibility = hasLightSample ? (visible ? 1.0 : 0.0) : 1.0;
+        const float shadowVisibility = lerp(1.0, sampledVisibility, surface.GetUnlitShadowStrength());
+        newRadianceAndSpecAvg.rgb = surface.GetDiffuse() * pathThp * shadowVisibility;
+        newRadianceAndSpecAvg.a = 0.0;
+    }
+    else if (hasLightSample && visible)
     {
         // Apply sample shading
 
         float4 bsdfThpComb = surface.Eval(ls.Direction);
-
-        float3 pathThp = Unpack_R11G11B10_FLOAT(u_Throughput[pixelPos]);
 
         // Compute final radiance reaching the camera (there's no firefly filter for ReSTIR here unfortunately)
         newRadianceAndSpecAvg.rgb = bsdfThpComb.rgb * ls.Li * pathThp;

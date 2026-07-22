@@ -25,8 +25,11 @@ struct MaterialHeader
     static const uint kPSDExcludeFlagOffset = kThinSurfaceFlagOffset + 1;
     static const uint kPSDBlockMotionVectorsAtSurfaceFlagOffset = kPSDExcludeFlagOffset + 1;
     static const uint kPSDDominantDeltaLobeP1Offset = kPSDBlockMotionVectorsAtSurfaceFlagOffset + 1;
+    static const uint kUnlitReceiveShadowsFlagOffset = kPSDDominantDeltaLobeP1Offset + kPSDDominantDeltaLobeP1Bits;
+    static const uint kUnlitShadowStrengthBits = 8;
+    static const uint kUnlitShadowStrengthOffset = kUnlitReceiveShadowsFlagOffset + 1;
 
-    static const uint kTotalHeaderBitsX = kPSDDominantDeltaLobeP1Offset + kPSDDominantDeltaLobeP1Bits;
+    static const uint kTotalHeaderBitsX = kUnlitShadowStrengthOffset + kUnlitShadowStrengthBits;
 
     /** Set the nested priority used for nested dielectrics.
     */
@@ -71,6 +74,12 @@ struct MaterialHeader
 
     void setPSDDominantDeltaLobeP1(uint psdDominantDeltaLobeP1) { packedData.x = PACK_BITS(kPSDDominantDeltaLobeP1Bits, kPSDDominantDeltaLobeP1Offset, packedData.x, (uint)psdDominantDeltaLobeP1); }
     uint getPSDDominantDeltaLobeP1()             { return EXTRACT_BITS(kPSDDominantDeltaLobeP1Bits, kPSDDominantDeltaLobeP1Offset, packedData.x); }
+
+    void setUnlitReceiveShadows(bool enabled) { packedData.x = PACK_BITS(1, kUnlitReceiveShadowsFlagOffset, packedData.x, enabled ? 1 : 0); }
+    bool isUnlitReceiveShadows() { return packedData.x & (1u << kUnlitReceiveShadowsFlagOffset); }
+
+    void setUnlitShadowStrength(float strength) { packedData.x = PACK_BITS(kUnlitShadowStrengthBits, kUnlitShadowStrengthOffset, packedData.x, (uint)(saturate(strength) * 255.0 + 0.5)); }
+    float getUnlitShadowStrength() { return EXTRACT_BITS(kUnlitShadowStrengthBits, kUnlitShadowStrengthOffset, packedData.x) / 255.0; }
 
     static MaterialHeader make( ) { MaterialHeader header; header.packedData = 0; return header; }
 };

@@ -30,6 +30,14 @@ namespace PathTracer
 
     inline float EvalSampleWeight( const LightSample lightSample, const ShadingData shadingData, const ActiveBSDF bsdf )
     {
+        if (shadingData.mtl.isUnlitReceiveShadows())
+        {
+            // A shadow can only be projected onto the outward side of this
+            // surface. Back-side lights must not turn an unlit surface black.
+            const bool lightOnReceiverSide = dot(shadingData.faceNCorrected, lightSample.Direction) > 0.0;
+            return lightOnReceiverSide ? max3(lightSample.Li) : 0.0;
+        }
+
     #if 0 // more costly version, does full BSDF - not really worth it unless special case colourful materials with colourful lights
         float3 bsdfThp = bsdf.eval(shadingData, lightSample.Direction, bsdfThpDiff, bsdfThpSpec);
         float weight = max3(bsdfThp*lightSample.Li); // used to be luminance
@@ -158,7 +166,9 @@ namespace PathTracer
         float3 surfaceShadingNormal = shadingData.N;
 
         // We must use **shading** normal to correctly figure out whether we're solving for BRDF or BTDF lobe (whether we want to cast the ray above or under the triangle).
-        float faceSide = dot(surfaceShadingNormal, lightSample.Direction) >= 0 ? 1 : -1;
+        float faceSide = shadingData.mtl.isUnlitReceiveShadows()
+            ? 1.0
+            : (dot(surfaceShadingNormal, lightSample.Direction) >= 0 ? 1.0 : -1.0);
 
         float3 surfaceFaceNormal = shadingData.faceNCorrected * faceSide;
         float3 surfaceWorldPos = ComputeRayOrigin(shadingData.posW, surfaceFaceNormal);
@@ -180,10 +190,32 @@ namespace PathTracer
 
         /*[branch]*/ if (lightSample.Valid())   // if sample's bad, skip; we tried casting the ray anyway but ignoring the results - didn't yield better perf
         {
-            RayDesc ray = ComputeVisibilityRay(lightSample, shadingData);
-            visibility = Bridge::traceVisibilityRay(ray, preScatterPath.rayCone, preScatterPath.getVertexIndex(), workingContext.Debug);
+            const bool unlitBackSideLight = shadingData.mtl.isUnlitReceiveShadows()
+                && dot(shadingData.faceNCorrected, lightSample.Direction) <= 0.0;
+            if (unlitBackSideLight)
+            {
+                visibility = 1.0;
+            }
+            else
+            {
+                RayDesc ray = ComputeVisibilityRay(lightSample, shadingData);
+                visibility = Bridge::traceVisibilityRay(ray, preScatterPath.rayCone, preScatterPath.getVertexIndex(), workingContext.Debug);
+            }
         }
         bool visible = any(visibility > 0.0);
+
+        if (shadingData.mtl.isUnlitReceiveShadows())
+        {
+            // The light sampler selects which shadow matters, but its radiance and
+            // the BSDF do not scale the displayed color. An invalid sample means
+            // that there is no effective scene light, so the unlit color stays visible.
+            const float sampledVisibility = lightSample.Valid() ? Average(visibility) : 1.0;
+            const float shadowVisibility = lerp(1.0, sampledVisibility, shadingData.unlitShadowStrength);
+            const float3 radiance = preScatterPath.GetThp() * shadingData.unlitColor
+                * (shadowVisibility / max((float)fullSamples, 1.0));
+            accum.AccumulateRadiance(radiance, 0.0);
+            return;
+        }
 
         // if( workingContext.Debug.IsDebugPixel() )
         //     DebugLine( shadingData.posW, shadingData.posW+lightSample.Direction*lightSample.Distance, float4(!visible,visible,0,1.0) );
@@ -310,13 +342,6 @@ namespace PathTracer
         const bool onDominantBranch = preScatterPath.hasFlag(PathFlags::stablePlaneOnDominantBranch);
         const bool onStablePlane = preScatterPath.hasFlag(PathFlags::stablePlaneOnPlane);
 
-        // Check if we should apply NEE.
-        bool applyNEE = hasNonDeltaLobes;
-        applyNEE &= !lightSampler.IsEmpty() && fullSamples > 0;
-
-        if (!applyNEE)
-            return NEEResult::empty();
-
         // Check if sample from RTXDI should be applied instead of NEE.
 #if PATH_TRACER_MODE==PATH_TRACER_MODE_FILL_STABLE_PLANES && PT_USE_RESTIR_DI
         // When ReSTIR DI is handling lighting, we skip NEE; at the moment RTXDI handles only reflection; in the case of first bounce transmission we still don't attemp to use
@@ -328,6 +353,20 @@ namespace PathTracer
             return result;
         }
 #endif
+
+        if (shadingData.mtl.isUnlitReceiveShadows() && (lightSampler.IsEmpty() || fullSamples == 0))
+        {
+            NEEResult result = NEEResult::empty();
+            result.AccumulateRadiance(preScatterPath.GetThp() * shadingData.unlitColor, 0.0);
+            return result;
+        }
+
+        // Check if we should apply NEE.
+        bool applyNEE = hasNonDeltaLobes;
+        applyNEE &= !lightSampler.IsEmpty() && fullSamples > 0;
+
+        if (!applyNEE)
+            return NEEResult::empty();
 
         // in theory, using quasi-random sampling should help with picking light candidates; in practice it doesn't seem to help enough to justify the cost - even when we need to include picking sample on the light as well (see GenerateLightSample)
         // this code used to work for LD sampling in the past, leaving as a reference - you probably want to use the same stream for global and local samples this time, will make it easier
@@ -341,7 +380,10 @@ namespace PathTracer
 inline NEEResult HandleNEE(const PathState preScatterPath, 
                                 const ShadingData shadingData, const ActiveBSDF bsdf, const SampleGeneratorVertexBase sgBase, const WorkingContext workingContext)
 {
-    return NEEResult::empty();
+    NEEResult result = NEEResult::empty();
+    if (shadingData.mtl.isUnlitReceiveShadows())
+        result.AccumulateRadiance(preScatterPath.GetThp() * shadingData.unlitColor, 0.0);
+    return result;
 }
 #endif
  

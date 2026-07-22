@@ -44,6 +44,8 @@ struct ShadingData
     // lpfloat     opacity;                ///< Opacity value in [0,1]. This is used for alpha testing. Can be optimized to fp16 without any issues.
     lpfloat     IoR;                    ///<move to fp16 and combine with interiorIoR           < Index of refraction for the medium on the front-facing side (i.e. "outside" the material at the hit). Can be optimized to fp16 without any issues.
     lpfloat     shadowNoLFadeout;       ///<move to ShadingFlags if possible           < See corresponding material setting. Can be optimized to fp16 without any issues.
+    lpfloat3    unlitColor;             ///< Base color used by the unlit shadow-receiver path.
+    lpfloat     unlitShadowStrength;    ///< Artistic shadow opacity for the unlit receiver.
 
 #if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
     lpfloat3    emission;               /// move to SurfaceData and compress
@@ -68,6 +70,8 @@ struct ShadingData
         // shadingData.opacity = 0;
         shadingData.IoR = 0;
         shadingData.shadowNoLFadeout = 0;
+        shadingData.unlitColor = 0;
+        shadingData.unlitShadowStrength = 1;
 #if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
         shadingData.emission = 0;
 #endif

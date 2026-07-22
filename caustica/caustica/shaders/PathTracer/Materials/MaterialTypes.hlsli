@@ -28,6 +28,7 @@ struct MaterialProperties
 #endif
     lpfloat ior;
     lpfloat shadowNoLFadeout;
+    lpfloat unlitShadowStrength;
     uint flags;
 
     // OpenPBR coat / subsurface / thin-film / transmission extras
@@ -81,6 +82,7 @@ struct MaterialProperties
         result.ior = 1.5;
         result.flags = 0;
         result.shadowNoLFadeout = 0;
+        result.unlitShadowStrength = 1;
 
         result.coatWeight = 0;
         result.coatColor = 1;
