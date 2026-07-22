@@ -15,34 +15,19 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 
-#include "SceneEditor.h"
 #include <engine/AppResources.h>
 #include <engine/SceneQuery.h>
+#include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
-#include <engine/GpuSharedCaches.h>
-#include <engine/AppResources.h>
-#include <backend/GpuDevice.h>
-#include <rhi/nvrhi.h>
-
-#include <assets/RuntimeMeshLoadTypes.h>
-#include <assets/loader/TextureLoader.h>
-#include <render/core/RenderSceneTypeFactory.h>
-#include <render/core/SceneGpuUpdater.h>
-#include <render/SceneLightingPasses.h>
 #include <render/WorldRenderer.h>
-#include <scene/Scene.h>
-#include <scene/SceneRuntimeMutation.h>
-#include <scene/loader/RuntimeMeshLoader.h>
 #include <math/box.h>
 #include <math/math.h>
 
-#include <filesystem>
 #include <stdexcept>
 
 namespace nb = nanobind;
 using caustica::App;
-using caustica::editor::SceneEditor;
 
 namespace
 {
@@ -169,62 +154,8 @@ public:
     bool loadMeshFile(const std::string& fileName) {
         if (!m_session || !m_session->GetApp())
             return false;
-        if (auto* editor = m_session->GetApp()->tryResource<SceneEditor>())
-            return editor->loadMeshFile(fileName);
-
-        // Headless / DefaultPlugins sessions have no SceneEditor; graft via active scene.
-        caustica::App& app = *m_session->GetApp();
-        auto* caches = caustica::gpuSharedCaches(app);
-        auto* worldRenderer = caustica::worldRenderer(app);
-        const auto scene = caustica::activeScene(app);
-        if (!caches || !caches->textureLoader || !worldRenderer || !scene)
-            return false;
-
-        const std::filesystem::path meshPath(fileName);
-        const caustica::RuntimeMeshLoadParams params{
-            .TextureCache = caches->textureLoader.get(),
-            .SceneTypes = std::make_shared<caustica::render::RenderSceneTypeFactory>(),
-            .TextureSearchDirectory = meshPath.parent_path(),
-        };
-        const auto loadResult = caustica::loadRuntimeMeshFile(params, meshPath);
-        if (!loadResult || !loadResult.ImportResult)
-            return false;
-
-        const uint32_t frameIndex = m_session->GetEngine()
-            ? m_session->GetEngine()->frameIndex()
-            : 0u;
-
-        // Attach mutates ECS only; the regular Extract schedule publishes the snapshot.
-        app.waitForDedicatedRenderThreadIdle();
-        const auto importedRoot = caustica::attachRuntimeSceneImport(
-            scene, *loadResult.ImportResult);
-        if (importedRoot == caustica::ecs::NullEntity)
-            return false;
-
-        const caustica::scene::SceneRenderData& gpuSetupData =
-            scene->extractAndPublishForGpuSetup(frameIndex);
-        app.runGpuWorkOnRenderThread([&app, caches, worldRenderer, scene, frameIndex, &gpuSetupData]() {
-            if (auto* device = app.getGpuDevice())
-            {
-                if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
-                    nvrhiDevice->waitForIdle();
-            }
-            if (caches->textureLoader && caches->renderDevice)
-            {
-                caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
-                caches->textureLoader->loadingFinished();
-            }
-            worldRenderer->lightingPasses().ensureMaterialsFromScene(gpuSetupData);
-            caustica::render::SceneGpuUpdater::refreshAfterLoad(
-                *scene,
-                gpuSetupData,
-                worldRenderer->sceneGpuResources(),
-                caches->descriptorTable.get(),
-                frameIndex);
-        });
-
-        worldRenderer->rayTracingResources().requestAccelerationStructureRebuild();
-        return true;
+        // Same engine path as Sample.load_mesh_file / SceneContentEditor.
+        return caustica::spawnFromFile(*m_session->GetApp(), fileName) != caustica::ecs::NullEntity;
     }
 
     void SetCameraFOV(float fov) {

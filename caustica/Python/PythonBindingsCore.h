@@ -17,7 +17,8 @@ namespace caustica::editor { class SceneEditor; }
 
 namespace caustica_py
 {
-    // Registers Material / SceneNode light props / settings / Sample type bindings into `m`.
+    // Registers Material / SceneNode / Scene / settings / Sample / ScenePrefab bindings.
+    // Sample wraps engine CameraApi / SceneSpawn / SceneMeshEditing / RenderSessionApi.
     // Module-level free functions like `app()` / `settings()` are added by
     // the embed/extension entry points themselves.
     void RegisterCoreBindings(nanobind::module_& m);

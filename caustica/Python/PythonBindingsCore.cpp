@@ -12,11 +12,18 @@
 #include "SceneEditor.h"
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/SceneMeshEditing.h>
+#include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
+#include <backend/GpuDevice.h>
 #include <render/RenderAppState.h>
+#include <render/WorldRenderer.h>
+#include <assets/Handle.h>
+#include <assets/TypedAssets.h>
 #include <EditorUI.h>
 #include <scene/Scene.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -78,6 +85,13 @@ namespace py_enums
     enum class GaussianSplatFrustumCulling : int { Disabled = 0, AtDistanceStage = 1, AtRasterStage = 2 };
     enum class GaussianSplatShadowMode : int { Disabled = 0, Hard = 1, Soft = 2 };
     enum class GaussianSplatFTBSyncMode : int { Disabled = 0, Interlock = 1 };
+    enum class LightType : int {
+        None = LightType_None,
+        Directional = LightType_Directional,
+        Spot = LightType_Spot,
+        Point = LightType_Point,
+        Environment = LightType_Environment,
+    };
 }
 
 namespace
@@ -309,6 +323,17 @@ namespace
         return result;
     }
 
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneCameras(Scene* scene)
+    {
+        std::vector<std::shared_ptr<PySceneEntity>> result;
+        if (!scene)
+            return result;
+
+        for (ecs::Entity entity : scene->getCameraEntities())
+            result.push_back(std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity }));
+        return result;
+    }
+
     std::shared_ptr<PySceneEntity> FindSceneLight(Scene* scene, const std::string& name)
     {
         if (!scene)
@@ -324,6 +349,50 @@ namespace
                 return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
         }
         return nullptr;
+    }
+
+    std::string MakeUniqueLightName(Scene* scene, const std::string& requested, const char* prefix)
+    {
+        if (!requested.empty())
+            return requested;
+
+        for (int i = 0; ; ++i)
+        {
+            const std::string candidate = i == 0
+                ? std::string(prefix)
+                : std::string(prefix) + "_" + std::to_string(i);
+            if (!FindSceneLight(scene, candidate))
+                return candidate;
+        }
+    }
+
+    std::shared_ptr<PySceneEntity> PyNodeFromEntity(Scene* scene, ecs::Entity entity)
+    {
+        if (!scene || !ecs::isValid(entity))
+            return nullptr;
+        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
+    }
+
+    SetSceneMeshVerticesParams MakeMeshEditParams(App& app)
+    {
+        GpuSharedCaches* caches = gpuSharedCaches(app);
+        render::WorldRenderer* wr = worldRenderer(app);
+        GpuDevice* device = gpuDevice(app);
+        PathTracerSettings* pathSettings = settings(app);
+        if (!wr || !device || !device->getDevice())
+            throw std::runtime_error("Mesh edit requires an initialized GPU device and world renderer");
+
+        return SetSceneMeshVerticesParams{
+            .device = device->getDevice(),
+            .descriptorTable = caches ? caches->descriptorTable.get() : nullptr,
+            .gpuResources = &wr->sceneGpuResources(),
+            .scene = activeScene(app),
+            .frameIndex = device->getFrameIndex(),
+            .resetAccumulation = pathSettings ? &pathSettings->ResetAccumulation : nullptr,
+            .requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& dirtyMesh) {
+                requestMeshAccelRebuild(app, dirtyMesh);
+            },
+        };
     }
 
     void WalkEntitiesByName(const scene::SceneEntityWorld& entityWorld, ecs::Entity root, const std::string& name, ecs::Entity& outEntity)
@@ -705,6 +774,26 @@ void RegisterCoreBindings(nb::module_& m)
         .value("Emissive", StandardMaterialTextureSlot::Emissive)
         .value("Transmission", StandardMaterialTextureSlot::Transmission)
         .export_values();
+
+    nb::enum_<LightType>(m, "LightType",
+        "Light entity kind. Matches SceneNode.light_type and shaders/light_types.h.",
+        nb::is_arithmetic())
+        .value("None_", LightType::None, "Not a light (LightType_None / 0).")
+        .value("Directional", LightType::Directional)
+        .value("Spot", LightType::Spot)
+        .value("Point", LightType::Point)
+        .value("Environment", LightType::Environment);
+
+    nb::class_<Handle<ScenePrefabAsset>>(m, "ScenePrefab",
+        "CPU-side prefab handle from Sample.load() / assets.load. Pass to Sample.spawn().")
+        .def("__bool__", [](const Handle<ScenePrefabAsset>& self) { return bool(self); })
+        .def_prop_ro("valid", [](const Handle<ScenePrefabAsset>& self) { return self.isValid(); })
+        .def_prop_ro("name", [](const Handle<ScenePrefabAsset>& self) -> std::string {
+                return self ? self->name : std::string{};
+            })
+        .def_prop_ro("source_path", [](const Handle<ScenePrefabAsset>& self) -> std::string {
+                return self ? self->sourcePath.string() : std::string{};
+            });
 
     // --- StandardMaterial -------------------------------------------------------
     nb::class_<StandardMaterial>(m, "Material",
@@ -1314,6 +1403,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def("find_light", [](Scene& self, const std::string& name) {
                 return FindSceneLight(&self, name);
             }, nb::arg("name"), "Look up a light entity by name; returns SceneNode or None.")
+        .def("get_cameras", [](Scene& self) {
+                return GetSceneCameras(&self);
+            }, "Return every camera entity as SceneNode.")
         .def("find_node", [](Scene& self, const std::string& path) {
                 return FindSceneEntity(&self, path);
             }, nb::arg("path"), "Look up a scene entity by name or path.")
@@ -1324,6 +1416,76 @@ void RegisterCoreBindings(nb::module_& m)
                 return FindSceneMesh(&self, name);
             }, nb::arg("name"), "Look up a mesh by mesh name.")
 
+        .def("create_directional_light",
+            [](Scene& self, nb::object color, float irradiance, float angularSize, const std::string& name) {
+                const std::string lightName = MakeUniqueLightName(&self, name, "DirectionalLight");
+                scene::DirectionalLightComponent component;
+                component.color = ToFloat3(color);
+                component.irradiance = irradiance;
+                component.angularSize = angularSize;
+                self.attachDirectionalLightToRoot(std::move(component), lightName);
+                return FindSceneLight(&self, lightName);
+            },
+            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+            nb::arg("irradiance") = 1.f,
+            nb::arg("angular_size") = 0.f,
+            nb::arg("name") = std::string(),
+            "Create a directional light under the scene root and return its SceneNode.")
+        .def("create_point_light",
+            [](Scene& self, nb::object color, float intensity, float radius, float range, const std::string& name) {
+                const std::string lightName = MakeUniqueLightName(&self, name, "PointLight");
+                scene::PointLightComponent component;
+                component.color = ToFloat3(color);
+                component.intensity = intensity;
+                component.radius = radius;
+                component.range = range;
+                self.attachPointLightToRoot(std::move(component), lightName);
+                return FindSceneLight(&self, lightName);
+            },
+            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+            nb::arg("intensity") = 1.f,
+            nb::arg("radius") = 0.f,
+            nb::arg("range") = 0.f,
+            nb::arg("name") = std::string(),
+            "Create a point light under the scene root and return its SceneNode.")
+        .def("create_spot_light",
+            [](Scene& self, nb::object color, float intensity, float radius, float range,
+               float innerAngle, float outerAngle, const std::string& name) {
+                const std::string lightName = MakeUniqueLightName(&self, name, "SpotLight");
+                scene::SpotLightComponent component;
+                component.color = ToFloat3(color);
+                component.intensity = intensity;
+                component.radius = radius;
+                component.range = range;
+                component.innerAngle = innerAngle;
+                component.outerAngle = outerAngle;
+                self.attachSpotLightToRoot(std::move(component), lightName);
+                return FindSceneLight(&self, lightName);
+            },
+            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+            nb::arg("intensity") = 1.f,
+            nb::arg("radius") = 0.f,
+            nb::arg("range") = 0.f,
+            nb::arg("inner_angle") = 180.f,
+            nb::arg("outer_angle") = 180.f,
+            nb::arg("name") = std::string(),
+            "Create a spot light under the scene root and return its SceneNode.")
+        .def("create_environment_light",
+            [](Scene& self, nb::object color, const std::string& path, float rotation, const std::string& name) {
+                const std::string lightName = MakeUniqueLightName(&self, name, "EnvironmentLight");
+                scene::EnvironmentLightComponent component;
+                component.color = ToFloat3(color);
+                component.path = path;
+                component.rotation = rotation;
+                self.attachEnvironmentLightToRoot(std::move(component), lightName);
+                return FindSceneLight(&self, lightName);
+            },
+            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+            nb::arg("path") = std::string(),
+            nb::arg("rotation") = 0.f,
+            nb::arg("name") = std::string(),
+            "Create an environment light under the scene root and return its SceneNode.")
+
         .def_prop_ro("material_count", [](Scene& self) {
                 return GetSceneMaterials(&self).size();
             }, "Number of StandardMaterial instances in this scene.")
@@ -1333,6 +1495,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_ro("light_count", [](Scene& self) {
                 return self.getLightEntities().size();
             }, "Number of lights in this scene.")
+        .def_prop_ro("camera_count", [](Scene& self) {
+                return self.getCameraEntities().size();
+            }, "Number of camera entities in this scene.")
 
         .def("get_bounds", [](Scene& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(&self));
@@ -1600,6 +1765,9 @@ void RegisterCoreBindings(nb::module_& m)
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
 
+    // Docs / examples historically used `caustica.Settings`; keep both names.
+    m.attr("Settings") = nb::type<PathTracerSettings>();
+
     nb::class_<EditorUIData>(m, "EditorSettings",
         "Desktop-editor settings that extend `settings` with ImGui view state.")
         .def_prop_rw("show_ui",
@@ -1713,10 +1881,161 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
 
+        .def("clear_camera_intrinsics", [](App& self) {
+                caustica::clearCameraIntrinsics(self);
+            }, "Clear pixel-space intrinsics and restore the FOV-based projection.")
+
         .def("get_camera_fov", [](App& self) { return caustica::cameraVerticalFOV(self); })
+
+        .def_prop_ro("scene_camera_count", [](App& self) {
+                return caustica::sceneCameraCount(self);
+            }, "Number of scene cameras available for selection.")
+        .def_prop_rw("selected_camera_index",
+            [](App& self) -> unsigned int { return caustica::selectedCameraIndex(self); },
+            [](App& self, unsigned int index) { caustica::selectedCameraIndex(self) = index; },
+            "Active scene-camera index (0 .. scene_camera_count-1).")
+        .def("get_cameras", [](App& self) {
+                return GetSceneCameras(caustica::activeScene(self).get());
+            }, "Compatibility alias for `sample.scene.get_cameras()`.")
 
         .def("save_current_camera",  [](App& self) { caustica::saveCurrentCamera(self); })
         .def("load_current_camera",  [](App& self) { caustica::loadCurrentCamera(self); })
+
+        .def("load", [](App& self, const std::string& path) {
+                return caustica::load(self, path);
+            },
+            nb::arg("path"),
+            "assets.load: import a mesh/prefab file into a ScenePrefab handle (no spawn).")
+        .def("spawn", [](App& self, const Handle<ScenePrefabAsset>& prefab) {
+                auto scene = caustica::activeScene(self);
+                return PyNodeFromEntity(scene.get(), caustica::spawn(self, prefab));
+            },
+            nb::arg("prefab"),
+            "Spawn a previously loaded ScenePrefab into the active scene. Returns root SceneNode.")
+        .def("spawn_from_file", [](App& self, const std::string& path) {
+                auto scene = caustica::activeScene(self);
+                return PyNodeFromEntity(scene.get(), caustica::spawnFromFile(self, path));
+            },
+            nb::arg("path"),
+            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*). Returns root SceneNode.")
+        .def("load_mesh_file", [](App& self, const std::string& fileName) {
+                return caustica::spawnFromFile(self, fileName) != ecs::NullEntity;
+            },
+            nb::arg("file_name"),
+            "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc) to the current scene.")
+        .def("despawn", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
+                return caustica::despawn(self, EntityHandleFromPyNode(node));
+            },
+            nb::arg("node"),
+            "Remove a scene entity (and children) via the engine despawn path.")
+
+        .def("get_mesh_vertices", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
+                (void)self;
+                return Float3VectorToList(caustica::getMeshVertices(mesh));
+            }, nb::arg("mesh"),
+            "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
+        .def("set_mesh_vertices",
+            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVertices(mesh, ToFloat3Vector(vertices), params);
+            },
+            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true,
+            "Replace all unique object-space positions for a mesh and refresh GPU buffers.")
+        .def("deform_mesh",
+            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                std::vector<float3> vertices = caustica::getMeshVertices(mesh);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVertices(mesh, vertices, params);
+                return vertices.size();
+            },
+            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true,
+            "Apply a Python callback(i, (x,y,z)) to each unique object-space vertex.")
+        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
+                GpuDevice* device = gpuDevice(self);
+                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
+                return Float3VectorToList(caustica::getMeshVerticesWorld(activeScene(self), mesh, frameIndex));
+            }, nb::arg("mesh"))
+        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
+                GpuDevice* device = gpuDevice(self);
+                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
+                return Float3VectorToList(caustica::getMeshVerticesWorld(
+                    activeScene(self), EntityHandleFromPyNode(node), frameIndex));
+            }, nb::arg("node"))
+        .def("set_mesh_vertices_world",
+            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVerticesWorld(mesh, ToFloat3Vector(vertices), params);
+            },
+            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("set_mesh_vertices_world",
+            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), params);
+            },
+            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("deform_mesh_world",
+            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                GpuDevice* device = gpuDevice(self);
+                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
+                std::vector<float3> vertices = caustica::getMeshVerticesWorld(activeScene(self), mesh, frameIndex);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVerticesWorld(mesh, vertices, params);
+                return vertices.size();
+            },
+            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
+        .def("deform_mesh_world",
+            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
+               bool recomputeNormals, bool rebuildAccelerationStructure) {
+                const ecs::Entity entity = EntityHandleFromPyNode(node);
+                GpuDevice* device = gpuDevice(self);
+                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
+                std::vector<float3> vertices = caustica::getMeshVerticesWorld(activeScene(self), entity, frameIndex);
+                for (size_t i = 0; i < vertices.size(); ++i)
+                {
+                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                    if (!updated.is_none())
+                        vertices[i] = ToFloat3(updated);
+                }
+                auto params = MakeMeshEditParams(self);
+                params.recomputeNormals = recomputeNormals;
+                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                caustica::setMeshVerticesWorld(entity, vertices, params);
+                return vertices.size();
+            },
+            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
 
         .def("request_shader_reload",  [](App& self) {
                 self.resource<RenderAppState>().runtime.Invalidation.ShaderReloadRequested = true;
@@ -1800,16 +2119,29 @@ void RegisterCoreBindings(nb::module_& m)
             [](App& self) { return caustica::accumulationCompleted(self); })
         .def_prop_ro("accumulation_sample_index",
             [](App& self) { return caustica::accumulationSampleIndex(self); })
+        .def_prop_ro("fps_info",
+            [](App& self) { return caustica::fpsInfo(self); })
+        .def_prop_ro("resolution_info",
+            [](App& self) { return caustica::resolutionInfo(self); })
+        .def_prop_ro("avg_time_per_frame",
+            [](App& self) { return caustica::avgTimePerFrame(self); })
+        .def_prop_ro("render_size",
+            [](App& self) {
+                const auto size = caustica::renderSize(self);
+                return nb::make_tuple(size.x, size.y);
+            },
+            "Current path-tracer render resolution as (width, height).")
         ;
 
     nb::class_<SceneEditor>(m, "EditorSample",
-        "Editor-only Sample extensions (mesh import and vertex deformation).")
+        "Editor host extensions. Prefer Sample.* APIs (load_mesh_file / deform_mesh / spawn);\n"
+        "these methods remain for embed-mode scripts that already hold an EditorSample.")
         .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
             {
                 return self.loadMeshFile(fileName);
             },
             nb::arg("file_name"),
-            "Append a mesh file (.gltf, .glb, or .obj) to the current scene.")
+            "Append a mesh file (.gltf/.glb/.obj/.urdf/.usd*) to the current scene.")
         .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
                 return Float3VectorToList(self.getMeshVertices(mesh));
             }, nb::arg("mesh"),
