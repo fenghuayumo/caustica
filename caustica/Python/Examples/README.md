@@ -64,11 +64,19 @@ Or interactively:
 
 ```python
 import caustica
+import numpy as np
+
 r = caustica.Renderer(width=1280, height=720, headless=True,
                    scene="builtin:plane_cube")
+r.settings.realtime_mode = False
 r.settings.accumulation_target = 64
 r.step_until_accumulated()
-r.save_screenshot("frame.png")
+
+# CPU image buffer (LDR RGBA8) — same source as save_screenshot
+img = r.get_pixels()                 # numpy (H, W, 4) uint8
+# fb = r.get_framebuffer()           # .pixels is raw bytes
+# r.save_screenshot("frame.png")    # optional file write
+
 r.close()
 ```
 
@@ -106,7 +114,10 @@ entries may use `builtin:plane`, `builtin:cube`, `builtin:sphere`, or
 | `Settings.bounce_count` etc.    | Path tracer / NEE / RTXDI knobs               |
 | `Renderer.step()/step_n(n)`     | (extension) drive the loop one frame at a time|
 | `Renderer.step_until_accumulated()` | (extension) render to SPP target          |
-| `Renderer.save_screenshot(path)`| (extension) write back buffer to PNG/JPG/BMP  |
+| `Renderer.save_screenshot(path)`| (extension) write LDR final color to PNG/JPG/BMP |
+| `Renderer.get_framebuffer()`    | (extension) LDR RGBA8 CPU buffer (`Framebuffer`) |
+| `Renderer.get_pixels()`         | (extension) LDR `(H,W,4) uint8` NumPy array   |
+| `caustica.Framebuffer`          | width/height/pixels/shape for get_framebuffer |
 
 ### Enums
 

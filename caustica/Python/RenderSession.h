@@ -8,8 +8,10 @@
 #include <engine/EngineApp.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <cstdint>
+#include <vector>
 
 #include <math/math.h>
 
@@ -56,6 +58,17 @@ public:
     bool StepN(int frames);
     int  StepUntilAccumulated(int maxFrames = 0);
     bool SaveScreenshot(const std::string& outputPath);
+
+    // CPU readback of the current LDR final color (same source as save_screenshot).
+    // pixels: tightly packed RGBA8, row-major, top-left origin, size = width*height*4.
+    struct FramebufferLdr
+    {
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t channels = 4;
+        std::vector<uint8_t> pixels;
+    };
+    [[nodiscard]] std::optional<FramebufferLdr> GetFramebufferLdr();
 
     bool SetCamera(const caustica::math::float3& pos,
                    const caustica::math::float3& dir,

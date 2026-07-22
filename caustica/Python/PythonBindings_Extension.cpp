@@ -11,6 +11,7 @@
 
 #include <engine/EntryPoint.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
@@ -25,6 +26,7 @@
 #include <math/math.h>
 
 #include <stdexcept>
+#include <vector>
 
 namespace nb = nanobind;
 using caustica::App;
@@ -146,6 +148,10 @@ public:
         return m_session ? m_session->SaveScreenshot(path) : false;
     }
 
+    std::optional<RenderSession::FramebufferLdr> GetFramebufferLdr() {
+        return m_session ? m_session->GetFramebufferLdr() : std::nullopt;
+    }
+
     bool SetCamera(nb::object pos, nb::object dir, nb::object up) {
         if (!m_session) return false;
         return m_session->SetCamera(ToFloat3(pos), ToFloat3(dir), ToFloat3(up));
@@ -198,6 +204,29 @@ NB_MODULE(caustica, m)
 
     caustica_py::RegisterCoreBindings(m);
 
+    nb::class_<RenderSession::FramebufferLdr>(m, "Framebuffer",
+        "CPU-side LDR framebuffer from Renderer.get_framebuffer().\n"
+        "pixels are tightly packed RGBA8 bytes (row-major, top-left origin).")
+        .def_ro("width", &RenderSession::FramebufferLdr::width)
+        .def_ro("height", &RenderSession::FramebufferLdr::height)
+        .def_ro("channels", &RenderSession::FramebufferLdr::channels)
+        .def_prop_ro("format", [](const RenderSession::FramebufferLdr&) { return "RGBA8"; })
+        .def_prop_ro("dtype", [](const RenderSession::FramebufferLdr&) { return "uint8"; })
+        .def_prop_ro("pixels", [](const RenderSession::FramebufferLdr& self) {
+                return nb::bytes(self.pixels.data(), self.pixels.size());
+            },
+            "Raw tightly packed RGBA8 bytes; len == width * height * 4.")
+        .def_prop_ro("shape", [](const RenderSession::FramebufferLdr& self) {
+                return nb::make_tuple(self.height, self.width, self.channels);
+            },
+            "(H, W, C) shape matching NumPy image layout.")
+        .def("__len__", [](const RenderSession::FramebufferLdr& self) { return self.pixels.size(); })
+        .def("__repr__", [](const RenderSession::FramebufferLdr& self) {
+                return std::string("<caustica.Framebuffer ")
+                    + std::to_string(self.width) + "x" + std::to_string(self.height)
+                    + " RGBA8, " + std::to_string(self.pixels.size()) + " bytes>";
+            });
+
     nb::class_<PyRenderer>(m, "Renderer",
         "Standalone path-tracer renderer.  Each instance owns its own GPU\n"
         "device (DX12 / Vulkan), shaders, scene, and back buffer.  In headless\n"
@@ -208,6 +237,8 @@ NB_MODULE(caustica, m)
         "                       scene='builtin:plane_cube')\n"
         "    r.settings.accumulation_target = 256\n"
         "    r.step_until_accumulated()\n"
+        "    fb = r.get_framebuffer()          # RGBA8 bytes\n"
+        "    arr = r.get_pixels()              # numpy (H,W,4) uint8\n"
         "    r.save_screenshot('frame.png')\n"
         "    r.close()")
         .def(nb::init<int, int, bool, bool, int, bool, const std::string&, bool, int>(),
@@ -264,6 +295,41 @@ NB_MODULE(caustica, m)
         .def("save_screenshot", &PyRenderer::SaveScreenshot,
              nb::arg("output_path"),
              "Save the current back buffer to PNG/JPG/BMP/TGA.")
+
+        .def("get_framebuffer",
+             [](PyRenderer& self, bool hdr) -> RenderSession::FramebufferLdr {
+                 if (hdr)
+                     throw std::runtime_error("get_framebuffer(hdr=True) is not implemented yet; use hdr=False for LDR RGBA8");
+                 auto fb = self.GetFramebufferLdr();
+                 if (!fb)
+                     throw std::runtime_error("get_framebuffer failed: no rendered LDR texture (call step() first)");
+                 return std::move(*fb);
+             },
+             nb::arg("hdr") = false,
+             "Read back the current LDR final color as a Framebuffer.\n"
+             "pixels are tightly packed RGBA8 (uint8), row-major, top-left origin.\n"
+             "hdr=True is reserved for a future HDR path.")
+
+        .def("get_pixels",
+             [](PyRenderer& self, bool hdr) {
+                 if (hdr)
+                     throw std::runtime_error("get_pixels(hdr=True) is not implemented yet; use hdr=False for LDR RGBA8");
+                 auto fb = self.GetFramebufferLdr();
+                 if (!fb)
+                     throw std::runtime_error("get_pixels failed: no rendered LDR texture (call step() first)");
+
+                 auto* data = new std::vector<uint8_t>(std::move(fb->pixels));
+                 const size_t height = fb->height;
+                 const size_t width = fb->width;
+                 nb::capsule owner(data, [](void* p) noexcept {
+                     delete static_cast<std::vector<uint8_t>*>(p);
+                 });
+                 return nb::ndarray<nb::numpy, uint8_t, nb::shape<-1, -1, 4>, nb::c_contig, nb::device::cpu>(
+                     data->data(), { height, width, 4 }, owner);
+             },
+             nb::arg("hdr") = false,
+             "Read back the current LDR final color as a NumPy array of shape (H, W, 4), dtype=uint8 RGBA.\n"
+             "Requires NumPy. Prefer get_framebuffer() if you only need raw bytes.")
 
         .def("set_camera", &PyRenderer::SetCamera,
              nb::arg("position"), nb::arg("direction"),

@@ -6,6 +6,7 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <assets/loader/TextureLoader.h>
+#include <render/core/RenderDevice.h>
 #include <core/file_utils.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -491,8 +492,6 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     if (!device)
         return false;
 
-    // Prefer the renderer-owned final LDR target. It is the source of the
-    // frame blit, so it does not depend on headless backbuffer rotation.
     nvrhi::ITexture* tex = m_engine->ldrColorTexture();
     nvrhi::ResourceStates state = nvrhi::ResourceStates::ShaderResource;
 
@@ -514,8 +513,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         return false;
     }
 
-    auto* host = m_engine.get();
-    auto* infra = host ? caustica::gpuSharedCaches(host->app()) : nullptr;
+    auto* infra = caustica::gpuSharedCaches(m_engine->app());
     auto* renderDevice = (infra && infra->renderDevice) ? infra->renderDevice.get() : nullptr;
     if (!renderDevice)
     {
@@ -541,6 +539,136 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
         tex,
         state,
         outputPath.c_str());
+}
+
+std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
+{
+    if (!m_initialized || !m_engine)
+        return std::nullopt;
+
+    auto* gpuDevice = m_engine->device();
+    if (!gpuDevice)
+        return std::nullopt;
+
+    nvrhi::IDevice* device = gpuDevice->getDevice();
+    if (!device)
+        return std::nullopt;
+
+    nvrhi::ITexture* texture = m_engine->ldrColorTexture();
+    nvrhi::ResourceStates textureState = nvrhi::ResourceStates::ShaderResource;
+
+    if (!texture)
+    {
+        uint32_t backBufferIndex = m_lastRenderedBackBufferIndex;
+        if (backBufferIndex == UINT32_MAX)
+            backBufferIndex = gpuDevice->getCurrentBackBufferIndex();
+
+        texture = gpuDevice->getBackBuffer(backBufferIndex);
+        textureState = m_config.headless
+            ? nvrhi::ResourceStates::RenderTarget
+            : nvrhi::ResourceStates::Present;
+    }
+
+    if (!texture)
+    {
+        caustica::error("RenderSession: no current output texture for framebuffer readback");
+        return std::nullopt;
+    }
+
+    auto* infra = caustica::gpuSharedCaches(m_engine->app());
+    auto* renderDevice = (infra && infra->renderDevice) ? infra->renderDevice.get() : nullptr;
+    if (!renderDevice)
+    {
+        caustica::error("RenderSession: render device not initialized yet");
+        return std::nullopt;
+    }
+
+    if (!device->waitForIdle())
+    {
+        caustica::error("RenderSession: GPU device lost or removed before framebuffer readback");
+        return std::nullopt;
+    }
+
+    // Mirror saveTextureToFile: blit non-RGBA8 targets to SRGBA8, then staging copy.
+    nvrhi::TextureDesc desc = texture->getDesc();
+    nvrhi::TextureHandle tempTexture;
+    nvrhi::FramebufferHandle tempFramebuffer;
+
+    nvrhi::CommandListHandle commandList = device->createCommandList();
+    commandList->open();
+
+    if (textureState != nvrhi::ResourceStates::Unknown)
+        commandList->beginTrackingTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+
+    switch (desc.format)
+    {
+    case nvrhi::Format::RGBA8_UNORM:
+    case nvrhi::Format::SRGBA8_UNORM:
+        tempTexture = texture;
+        break;
+    default:
+        desc.format = nvrhi::Format::SRGBA8_UNORM;
+        desc.isRenderTarget = true;
+        desc.initialState = nvrhi::ResourceStates::RenderTarget;
+        desc.keepInitialState = true;
+        tempTexture = device->createTexture(desc);
+        tempFramebuffer = device->createFramebuffer(nvrhi::FramebufferDesc().addColorAttachment(tempTexture));
+        renderDevice->blit().blitTexture(commandList, tempFramebuffer, texture);
+        break;
+    }
+
+    nvrhi::TextureDesc stagingDesc = desc;
+    stagingDesc.isRenderTarget = false;
+    stagingDesc.isUAV = false;
+    stagingDesc.isTypeless = false;
+    stagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
+    stagingDesc.keepInitialState = true;
+    stagingDesc.debugName = "GetFramebufferLdr Staging";
+
+    nvrhi::StagingTextureHandle stagingTexture = device->createStagingTexture(stagingDesc, nvrhi::CpuAccessMode::Read);
+    if (!stagingTexture)
+    {
+        commandList->close();
+        return std::nullopt;
+    }
+
+    commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), tempTexture, nvrhi::TextureSlice());
+
+    if (textureState != nvrhi::ResourceStates::Unknown)
+    {
+        commandList->setTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+        commandList->commitBarriers();
+    }
+
+    commandList->close();
+    device->executeCommandList(commandList);
+
+    if (!device->waitForIdle())
+        return std::nullopt;
+
+    size_t rowPitch = 0;
+    const uint8_t* mapped = static_cast<const uint8_t*>(device->mapStagingTexture(
+        stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+    if (!mapped)
+        return std::nullopt;
+
+    FramebufferLdr result;
+    result.width = desc.width;
+    result.height = desc.height;
+    result.channels = 4;
+    result.pixels.resize(size_t(desc.width) * size_t(desc.height) * 4u);
+
+    const size_t dstStride = size_t(desc.width) * 4u;
+    for (uint32_t row = 0; row < desc.height; ++row)
+    {
+        std::memcpy(
+            result.pixels.data() + size_t(row) * dstStride,
+            mapped + size_t(row) * rowPitch,
+            dstStride);
+    }
+
+    device->unmapStagingTexture(stagingTexture);
+    return result;
 }
 
 bool RenderSession::SetCamera(const caustica::math::float3& pos,

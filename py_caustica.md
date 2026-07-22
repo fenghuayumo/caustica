@@ -116,6 +116,47 @@ with caustica.Renderer(
     r.save_screenshot("frame.png")
 ```
 
+### Accumulate then Read Framebuffer (CPU / NumPy)
+
+After reference accumulation finishes, read the same LDR final color used by
+`save_screenshot` without writing a file:
+
+```python
+import caustica
+import numpy as np
+
+r = caustica.Renderer(
+    width=1280,
+    height=720,
+    headless=True,
+    scene="builtin:plane_cube",
+    realtime=False,
+    accumulation_target=64,
+)
+r.settings.realtime_mode = False
+r.settings.accumulation_target = 64
+r.settings.realtime_aa = 0
+
+r.step_until_accumulated()              # wait until 64 spp
+
+# Option A: NumPy array (H, W, 4) uint8 RGBA — requires NumPy
+img = r.get_pixels()
+rgb = img[..., :3]
+
+# Option B: raw bytes via Framebuffer
+fb = r.get_framebuffer()                # caustica.Framebuffer
+raw = fb.pixels                         # bytes, len == width * height * 4
+arr = np.frombuffer(raw, dtype=np.uint8).reshape(fb.height, fb.width, 4).copy()
+
+r.close()
+```
+
+Layout notes:
+
+- Format is tightly packed **RGBA8**, row-major, **top-left** origin.
+- Source is the engine LDR final color (same as `save_screenshot`).
+- `hdr=True` is reserved and not implemented yet.
+
 ### Windowed Interactive Loop
 
 ```python
@@ -529,12 +570,29 @@ caustica.Renderer(
 | `step(dt=-1.0)` | `bool` | Render one frame. Returns `False` on failure or when window close is requested. |
 | `step_n(frames)` | `bool` | Render exactly N frames unless `step()` fails. |
 | `step_until_accumulated(max_frames=0)` | `int` | Reset accumulation and step until accumulation completes, or until `max_frames` if positive. |
-| `save_screenshot(output_path)` | `bool` | Save current backbuffer to PNG/JPG/BMP/TGA. |
+| `save_screenshot(output_path)` | `bool` | Save current LDR final color to PNG/JPG/BMP/TGA. |
+| `get_framebuffer(hdr=False)` | `Framebuffer` | CPU readback of current LDR final color. See `Framebuffer` below. `hdr=True` is not implemented yet. |
+| `get_pixels(hdr=False)` | `numpy.ndarray` | Same LDR readback as `(H, W, 4)` `uint8` RGBA. Requires NumPy. `hdr=True` is not implemented yet. |
 | `set_camera(position, direction, up=(0, 1, 0))` | `bool` | Triples can be lists/tuples of 3 floats. |
 | `set_camera_fov(vertical_fov_degrees)` | `None` | Set vertical FOV in degrees. |
 | `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` is called. |
 | `app` | `Sample` | Underlying renderer instance. |
 | `settings` | `Settings` | Live UI/settings state. |
+
+### `Framebuffer`
+
+Returned by `Renderer.get_framebuffer()`. Holds a CPU copy of the current LDR
+image after at least one successful `step()` / `step_until_accumulated()`.
+
+| Field / property | Type | Notes |
+| --- | --- | --- |
+| `width` | `int` | Image width in pixels. |
+| `height` | `int` | Image height in pixels. |
+| `channels` | `int` | Always `4` (RGBA). |
+| `format` | `str` | `"RGBA8"`. |
+| `dtype` | `str` | `"uint8"`. |
+| `pixels` | `bytes` | Tightly packed RGBA8, row-major, top-left origin. `len == width * height * 4`. |
+| `shape` | `tuple` | `(height, width, channels)` — NumPy image layout. |
 
 `Renderer` supports context manager syntax:
 
