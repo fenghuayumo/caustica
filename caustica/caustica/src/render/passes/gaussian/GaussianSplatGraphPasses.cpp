@@ -209,7 +209,7 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
     if (needsPathTraceLightingEndPass(*ctx.settings))
         passOptions.executeAfter = "PathTraceLightingEnd";
     else
-        passOptions.executeAfter = ctx.settings->RealtimeMode ? "VBufferExport" : "FrameClear";
+        passOptions.executeAfter = ctx.settings->RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
 
     ctx.graph->addPass(
         "GaussianSplatsAccelBuild",

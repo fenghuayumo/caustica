@@ -130,6 +130,9 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .renderTargets = m_renderTargets.get(),
         .settings = &m_context->activeSettings(),
         .sampleConstants = &m_currentConstants,
+        .gaussianSplatEmissionProxies = m_gaussianSplatEmissionProxies.empty()
+            ? nullptr
+            : &m_gaussianSplatEmissionProxies,
         .targetFramebuffer = ctx.frame.framebuffer,
         .extractedView = &ctx.view,
         .bindingCache = &m_context->bindingCache,
@@ -762,17 +765,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         m_context->activeSettings().ReblurSettings.hitDistanceParameters.D
     };
 
+    // EnvMap + LightSampling updateBegin / subInstance upload run in the
+    // LightingUpdateBegin graph pass after ClearFrameTargets.
     buildGaussianSplatEmissionProxies();
-    updateLightingFrame(
-        *m_context,
-        m_commandList,
-        m_frameIndex,
-        m_gaussianSplatEmissionProxies.empty() ? nullptr : &m_gaussianSplatEmissionProxies);
-    m_context->scenePasses.rayTracing.uploadSubInstanceData(m_commandList);
-    abortIfSubmitFailed(ctx, "updateLighting");
-    if (ctx.aborted)
-        return;
-
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
@@ -905,6 +900,7 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
     registerClearFrameTargetsPass(ctx);
+    registerLightingUpdateBeginPass(ctx);
     registerRtxdiBeginFramePass(ctx);
     registerPathTracePrePass(ctx);
     registerVBufferExportPass(ctx);

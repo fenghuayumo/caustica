@@ -169,16 +169,22 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 #endif
 }
 
-void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
+void DenoisePass::denoiseSpecHitT(nvrhi::ICommandList* commandList)
+{
+    assert(commandList);
+    assert(m_denoisingGuidesPass);
+    assert(m_bindingSet);
+
+    m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindingSet);
+}
+
+void DenoisePass::computeAvgLayerRadiance(nvrhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
     assert(m_context);
     assert(m_bindingSet);
 
-    RAII_SCOPE(commandList->beginMarker("Denoising Guides Bake"); , commandList->endMarker(); );
-
-    m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindingSet);
     m_denoisingGuidesPass->computeAvgLayerRadiance(commandList, m_bindingSet);
 
     if (m_context->activeSettings().DebugView != DebugViewType::Disabled)
@@ -186,6 +192,16 @@ void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
             commandList,
             m_context->activeSettings().DebugView,
             m_bindingSet);
+}
+
+void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
+{
+    assert(commandList);
+
+    RAII_SCOPE(commandList->beginMarker("Denoising Guides Bake"); , commandList->endMarker(); );
+
+    denoiseSpecHitT(commandList);
+    computeAvgLayerRadiance(commandList);
 }
 
 void DenoisePass::stablePlanesDebugViz(nvrhi::ICommandList* commandList)

@@ -275,7 +275,9 @@ void registerPathTracePrePass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = ctx.settings->actualUseRTXDIPasses() ? "RtxdiBeginFrame" : "FrameClear";
+    passOptions.executeAfter = ctx.settings->actualUseRTXDIPasses()
+        ? "RtxdiBeginFrame"
+        : "LightingUpdateBegin";
 
     ctx.graph->addPass(
         "PathTracePrePass",

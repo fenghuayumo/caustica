@@ -45,18 +45,45 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     extractPathTraceGraphOutputs(*ctx.graph, handles);
 
-    rg::PassOptions denoiserPassOptions{};
-    denoiserPassOptions.executeAfter = ctx.settings->actualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+    const char* afterPathTrace = ctx.settings->actualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+
+    rg::PassOptions specHitPassOptions{};
+    specHitPassOptions.executeAfter = afterPathTrace;
 
     ctx.graph->addPass(
-        "DenoiserPrepare",
+        "DenoiseSpecHitT",
+        [handles](rg::PassBuilder& setup) {
+            setup.write(handles.depth, rg::TextureAccess::UnorderedAccess);
+            setup.write(handles.specularHitT, rg::TextureAccess::UnorderedAccess);
+            setup.write(handles.scratchFloat1, rg::TextureAccess::UnorderedAccess);
+        },
+        [ctx](rg::RenderPassContext& passCtx) {
+            ctx.denoise->denoiseSpecHitT(passCtx.commandList());
+        },
+        specHitPassOptions);
+
+    rg::PassOptions avgLayerPassOptions{};
+    avgLayerPassOptions.executeAfter = "DenoiseSpecHitT";
+
+    ctx.graph->addPass(
+        "AvgLayerRadiance",
         [handles](rg::PassBuilder& setup) {
             declareDenoiserPrepareAccess(setup, handles);
         },
         [ctx](rg::RenderPassContext& passCtx) {
-            ctx.denoise->prepareGuides(passCtx.commandList());
+            ctx.denoise->computeAvgLayerRadiance(passCtx.commandList());
         },
-        denoiserPassOptions);
+        avgLayerPassOptions);
+
+    // Fence name kept for any external executeAfter("DenoiserPrepare") dependents.
+    rg::PassOptions fenceOptions{};
+    fenceOptions.sideEffect = true;
+    fenceOptions.executeAfter = "AvgLayerRadiance";
+    ctx.graph->addPass(
+        "DenoiserPrepare",
+        [](rg::PassBuilder&) {},
+        [](rg::RenderPassContext&) {},
+        fenceOptions);
 
     if (needsStablePlanesDebugViz(*ctx.settings))
     {

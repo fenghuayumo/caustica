@@ -35,10 +35,34 @@ void declareRtxdiBeginFrameAccess(
     const RtxdiGraphResources& rtxdiResources,
     const PathTraceGraphTargets& /*pathTraceTargets*/)
 {
-    setup.write(rtxdiResources.risBuffer, rg::BufferAccess::UnorderedAccess);
-    setup.write(rtxdiResources.risLightDataBuffer, rg::BufferAccess::UnorderedAccess);
+    declareRtxdiPrepareLightsAccess(setup, rtxdiResources);
+    declareRtxdiGeneratePdfMipsAccess(setup, rtxdiResources);
+    declareRtxdiPresampleAccess(setup, rtxdiResources);
+}
+
+void declareRtxdiPrepareLightsAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources)
+{
     setup.write(rtxdiResources.lightDataBuffer, rg::BufferAccess::UnorderedAccess);
+    setup.write(rtxdiResources.risLightDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(rtxdiResources.localLightPdf, rg::TextureAccess::UnorderedAccess);
+}
+
+void declareRtxdiGeneratePdfMipsAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources)
+{
+    setup.write(rtxdiResources.localLightPdf, rg::TextureAccess::UnorderedAccess);
+}
+
+void declareRtxdiPresampleAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources)
+{
+    setup.read(rtxdiResources.lightDataBuffer, rg::BufferAccess::ShaderResource);
+    setup.read(rtxdiResources.localLightPdf, rg::TextureAccess::ShaderResource);
+    setup.write(rtxdiResources.risBuffer, rg::BufferAccess::UnorderedAccess);
 }
 
 void declareRtxdiExecuteAccess(

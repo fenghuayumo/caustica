@@ -116,6 +116,15 @@ public:
 		const RenderTargets& renderTargets,
 		const nvrhi::BindingLayoutHandle extraBindingLayout,
 		nvrhi::BindingSetHandle extraBindingSet);
+
+	// Fine-grained begin-frame stages (also composed by beginFrame).
+	void prepareLights(nvrhi::CommandListHandle commandList);
+	void writeBridgeConstants(nvrhi::CommandListHandle commandList);
+	void generatePdfMips(nvrhi::CommandListHandle commandList);
+	void presampleLights(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
+	void presampleEnvMap(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
+	void presampleReGIR(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
+
 	void execute(
 		nvrhi::CommandListHandle commandList,
 		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);

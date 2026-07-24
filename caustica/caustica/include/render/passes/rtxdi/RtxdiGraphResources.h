@@ -31,6 +31,18 @@ void declareRtxdiBeginFrameAccess(
     const RtxdiGraphResources& rtxdiResources,
     const PathTraceGraphTargets& pathTraceTargets);
 
+void declareRtxdiPrepareLightsAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources);
+
+void declareRtxdiGeneratePdfMipsAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources);
+
+void declareRtxdiPresampleAccess(
+    rg::PassBuilder& setup,
+    const RtxdiGraphResources& rtxdiResources);
+
 void declareRtxdiExecuteAccess(
     rg::PassBuilder& setup,
     const RtxdiGraphResources& rtxdiResources,

@@ -26,6 +26,7 @@ class PTPipelineVariant;
 class RenderTargets;
 class RtxdiPass;
 class ToneMappingPass;
+struct GaussianSplatEmissionProxy;
 
 namespace caustica
 {
@@ -66,7 +67,8 @@ struct FrameGraphContext
     PathTracingFrameContext* frame = nullptr;
     RenderTargets* renderTargets = nullptr;
     PathTracerSettings* settings = nullptr;
-    const SampleConstants* sampleConstants = nullptr;
+    SampleConstants* sampleConstants = nullptr;
+    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
     nvrhi::IFramebuffer* targetFramebuffer = nullptr;
     const ExtractedFrameView* extractedView = nullptr;
 

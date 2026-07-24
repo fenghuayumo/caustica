@@ -125,7 +125,7 @@ bool needsPathTraceLightingEndPass(const PathTracerSettings& settings)
 
 const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings)
 {
-    return settings.RealtimeMode ? "VBufferExport" : "FrameClear";
+    return settings.RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
 }
 
 const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
@@ -136,7 +136,7 @@ const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
     if (needsPathTraceLightingEndPass(settings))
         return "PathTraceLightingEnd";
 
-    return settings.RealtimeMode ? "VBufferExport" : "FrameClear";
+    return settings.RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
 }
 
 void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings)
@@ -153,6 +153,7 @@ void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTr
         assert(!graph.isPassRegistered("Rtxdi"));
     }
 
+    assert(graph.isPassActive("LightingUpdateBegin"));
     assert(graph.isPassActive("MainPathTrace"));
 
     if (needsPathTraceLightingEndPass(settings))

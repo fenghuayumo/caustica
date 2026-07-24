@@ -57,6 +57,8 @@ public:
     void bindFrame(const FrameGraphContext& ctx);
 
     void prepareGuides(nvrhi::ICommandList* commandList);
+    void denoiseSpecHitT(nvrhi::ICommandList* commandList);
+    void computeAvgLayerRadiance(nvrhi::ICommandList* commandList);
     void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
     void ensureNrdIntegrations();
     void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);

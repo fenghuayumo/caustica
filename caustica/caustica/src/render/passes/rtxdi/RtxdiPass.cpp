@@ -23,6 +23,7 @@
 #include <render/core/RenderTargets.h>
 
 #include <cassert>
+#include <utility>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -369,27 +370,26 @@ void RtxdiPass::prepareResources(
     }
 }
 
-void RtxdiPass::beginFrame(
-    nvrhi::CommandListHandle commandList,
-    const RenderTargets & renderTargets,
-    const nvrhi::BindingLayoutHandle extraBindingLayout,
-    nvrhi::BindingSetHandle extraBindingSet )
+void RtxdiPass::prepareLights(nvrhi::CommandListHandle commandList)
 {
-	// Light preparation is only needed for ReStirDI and ReGIR
-	if (m_BridgeParameters.usingLightSampling)
-	{
-		//This pass needs to happen before we fill the constant buffers 
-		commandList->beginMarker("Prepare Light");
-		RTXDI_LightBufferParameters lightBufferParams = m_PrepareLightsPass->process(commandList);
-		commandList->endMarker();
+	if (!m_BridgeParameters.usingLightSampling || !m_PrepareLightsPass || !m_ImportanceSamplingContext)
+		return;
 
-		m_ImportanceSamplingContext->SetLightBufferParams(lightBufferParams);
-	}
+	commandList->beginMarker("Prepare Light");
+	RTXDI_LightBufferParameters lightBufferParams = m_PrepareLightsPass->process(commandList);
+	commandList->endMarker();
 
+	m_ImportanceSamplingContext->SetLightBufferParams(lightBufferParams);
+}
+
+void RtxdiPass::writeBridgeConstants(nvrhi::CommandListHandle commandList)
+{
 	fillConstants(commandList);
+}
 
-	// In cases where the RTXDI context is only needed for ReSTIR GI we can skip pdf, presampling and ReGir passes
-	if (!m_BridgeParameters.usingLightSampling)
+void RtxdiPass::generatePdfMips(nvrhi::CommandListHandle commandList)
+{
+	if (!m_BridgeParameters.usingLightSampling || !m_rtxdiResources)
 		return;
 
 	if (!m_LocalLightPdfMipmapPass)
@@ -402,48 +402,85 @@ void RtxdiPass::beginFrame(
 	}
 
 	commandList->beginMarker("GeneratePDFTextures");
-
 	m_LocalLightPdfMipmapPass->process(commandList);
-
 	commandList->endMarker();
+}
 
-	// Pre-sample lights
+void RtxdiPass::presampleLights(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+{
+	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext || !m_rtxdiResources)
+		return;
+
 	const auto lightBufferParams = m_ImportanceSamplingContext->GetLightBufferParameters();
-	if (m_ImportanceSamplingContext->IsLocalLightPowerRISEnabled() && lightBufferParams.localLightBufferRegion.numLights > 0)
-	{
-		dm::int3 presampleDispatchSize = {
-			dm::div_ceil(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-			int(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileCount),
-			1
-		};
+	if (!m_ImportanceSamplingContext->IsLocalLightPowerRISEnabled()
+		|| lightBufferParams.localLightBufferRegion.numLights == 0)
+		return;
 
-		nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	dm::int3 presampleDispatchSize = {
+		dm::div_ceil(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+		int(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileCount),
+		1
+	};
 
-		executeComputePass(commandList, m_PresampleLightsPass, "Pre-sample Lights", presampleDispatchSize, extraBindingSet);
-	}
+	nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	executeComputePass(commandList, m_PresampleLightsPass, "Pre-sample Lights", presampleDispatchSize, extraBindingSet);
+}
 
-	if (lightBufferParams.environmentLightParams.lightPresent)
-	{
-		dm::int3 presampleDispatchSize = {
-			dm::div_ceil(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-			int(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileCount),
-			1
-		};
+void RtxdiPass::presampleEnvMap(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+{
+	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext || !m_rtxdiResources)
+		return;
 
-		nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	const auto lightBufferParams = m_ImportanceSamplingContext->GetLightBufferParameters();
+	if (!lightBufferParams.environmentLightParams.lightPresent)
+		return;
 
-		executeComputePass(commandList, m_PresampleEnvMapPass, "Pre-sample Envmap", presampleDispatchSize, extraBindingSet);
-	}
+	dm::int3 presampleDispatchSize = {
+		dm::div_ceil(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+		int(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileCount),
+		1
+	};
 
-	//Build ReGIR structure 
+	nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	executeComputePass(commandList, m_PresampleEnvMapPass, "Pre-sample Envmap", presampleDispatchSize, extraBindingSet);
+}
+
+void RtxdiPass::presampleReGIR(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+{
+	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext)
+		return;
+
 	const auto& reGIRContext = m_ImportanceSamplingContext->GetReGIRContext();
-	if (m_ImportanceSamplingContext->IsReGIREnabled()
-		&& m_BridgeParameters.usingReGIR
-		&& reGIRContext.GetReGIRStaticParameters().Mode != rtxdi::ReGIRMode::Disabled)
-	{
-		dm::int3 worldGridDispatchSize = { dm::div_ceil(reGIRContext.GetReGIRLightSlotCount(), RTXDI_GRID_BUILD_GROUP_SIZE), 1, 1 };
-		executeComputePass(commandList, m_PresampleReGIRPass, "Pre-sample ReGir", worldGridDispatchSize, extraBindingSet);
-	}
+	if (!m_ImportanceSamplingContext->IsReGIREnabled()
+		|| !m_BridgeParameters.usingReGIR
+		|| reGIRContext.GetReGIRStaticParameters().Mode == rtxdi::ReGIRMode::Disabled)
+		return;
+
+	dm::int3 worldGridDispatchSize = {
+		dm::div_ceil(reGIRContext.GetReGIRLightSlotCount(), RTXDI_GRID_BUILD_GROUP_SIZE),
+		1,
+		1
+	};
+	executeComputePass(commandList, m_PresampleReGIRPass, "Pre-sample ReGir", worldGridDispatchSize, extraBindingSet);
+}
+
+void RtxdiPass::beginFrame(
+    nvrhi::CommandListHandle commandList,
+    const RenderTargets & /*renderTargets*/,
+    const nvrhi::BindingLayoutHandle /*extraBindingLayout*/,
+    nvrhi::BindingSetHandle extraBindingSet )
+{
+	prepareLights(commandList);
+	writeBridgeConstants(commandList);
+
+	// In cases where the RTXDI context is only needed for ReSTIR GI we can skip pdf, presampling and ReGir passes
+	if (!m_BridgeParameters.usingLightSampling)
+		return;
+
+	generatePdfMips(commandList);
+	presampleLights(commandList, extraBindingSet);
+	presampleEnvMap(commandList, extraBindingSet);
+	presampleReGIR(commandList, extraBindingSet);
 }
 
 void RtxdiPass::execute(
@@ -732,27 +769,92 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
 		return;
 
-	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
+	const char* prevPass = "LightingUpdateBegin";
 
-	rg::PassOptions passOptions{};
-	passOptions.executeAfter = "FrameClear";
+	auto addRtxdiBeginStage = [&](const char* name, auto declareAccess, auto execute)
+	{
+		rg::PassOptions passOptions{};
+		passOptions.sideEffect = true;
+		passOptions.executeAfter = prevPass;
 
-	ctx.graph->addPass(
+		ctx.graph->addPass(
+			name,
+			std::move(declareAccess),
+			std::move(execute),
+			passOptions);
+		prevPass = name;
+	};
+
+	if (usingLightSampling)
+	{
+		addRtxdiBeginStage(
+			"RtxdiPrepareLights",
+			[rtxdiResources](rg::PassBuilder& setup) {
+				declareRtxdiPrepareLightsAccess(setup, rtxdiResources);
+			},
+			[rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->prepareLights(passCtx.commandList());
+			});
+	}
+
+	addRtxdiBeginStage(
+		"RtxdiFillConstants",
+		[](rg::PassBuilder&) {},
+		[rtxdiPass](rg::RenderPassContext& passCtx) {
+			if (rtxdiPass)
+				rtxdiPass->writeBridgeConstants(passCtx.commandList());
+		});
+
+	if (usingLightSampling)
+	{
+		addRtxdiBeginStage(
+			"RtxdiGeneratePdfMips",
+			[rtxdiResources](rg::PassBuilder& setup) {
+				declareRtxdiGeneratePdfMipsAccess(setup, rtxdiResources);
+			},
+			[rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->generatePdfMips(passCtx.commandList());
+			});
+
+		addRtxdiBeginStage(
+			"RtxdiPresampleLights",
+			[rtxdiResources](rg::PassBuilder& setup) {
+				declareRtxdiPresampleAccess(setup, rtxdiResources);
+			},
+			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->presampleLights(passCtx.commandList(), ctx.bindingSet);
+			});
+
+		addRtxdiBeginStage(
+			"RtxdiPresampleEnvMap",
+			[rtxdiResources](rg::PassBuilder& setup) {
+				declareRtxdiPresampleAccess(setup, rtxdiResources);
+			},
+			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->presampleEnvMap(passCtx.commandList(), ctx.bindingSet);
+			});
+
+		addRtxdiBeginStage(
+			"RtxdiPresampleReGIR",
+			[rtxdiResources](rg::PassBuilder& setup) {
+				declareRtxdiPresampleAccess(setup, rtxdiResources);
+			},
+			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->presampleReGIR(passCtx.commandList(), ctx.bindingSet);
+			});
+	}
+
+	// Fence pass kept for PathTracePrePass / validation dependency names.
+	addRtxdiBeginStage(
 		"RtxdiBeginFrame",
-		[rtxdiResources, pathTraceTargets](rg::PassBuilder& setup) {
-			declareRtxdiBeginFrameAccess(setup, rtxdiResources, pathTraceTargets);
-		},
-		[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
-			if (rtxdiPass == nullptr)
-				return;
-
-			rtxdiPass->beginFrame(
-				passCtx.commandList(),
-				*ctx.renderTargets,
-				ctx.bindingLayout,
-				ctx.bindingSet);
-		},
-		passOptions);
+		[](rg::PassBuilder&) {},
+		[](rg::RenderPassContext&) {});
 }
 
 void registerRtxdiExecutePass(FrameGraphContext ctx)
@@ -770,21 +872,86 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 		return;
 
 	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+	const PathTracerSettings settings = *ctx.settings;
 
-	rg::PassOptions passOptions{};
-	passOptions.executeAfter = "MainPathTrace";
+	const bool useDI = settings.actualUseReSTIRDI();
+	const bool useGI = settings.actualUseReSTIRGI();
+	const bool usePT = settings.actualUseReSTIRPT();
+	// Keep parity with RtxdiPass::executeFrame (fused DI+GI final shading).
+	static constexpr bool enableFusedDIGIFinal = true;
+	const bool useFusedDIGIFinal = useDI && useGI && enableFusedDIGIFinal;
 
-	ctx.graph->addPass(
-		"Rtxdi",
-		[rtxdiResources, pathTraceTargets, settings = *ctx.settings](rg::PassBuilder& setup) {
+	const char* prevPass = "MainPathTrace";
+
+	auto addRtxdiExecuteStage = [&](const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
+	{
+		rg::PassOptions passOptions{};
+		passOptions.sideEffect = true;
+		passOptions.executeAfter = prevPass;
+
+		ctx.graph->addPass(
+			name,
+			std::move(declareAccess),
+			std::move(execute),
+			passOptions);
+		prevPass = name;
+	};
+
+	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, settings]() {
+		return [rtxdiResources, pathTraceTargets, settings](rg::PassBuilder& setup) {
 			declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, settings);
-		},
-		[ctx](rg::RenderPassContext& passCtx) {
-			assert(ctx.rtxdi);
-			assert(ctx.settings);
-			ctx.rtxdi->executeFrame(passCtx.commandList(), ctx.bindingSet, *ctx.settings);
-		},
-		passOptions);
+		};
+	};
+
+	if (useDI)
+	{
+		addRtxdiExecuteStage(
+			"RtxdiDI",
+			makeExecuteAccess(),
+			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->execute(passCtx.commandList(), ctx.bindingSet, useFusedDIGIFinal);
+			});
+	}
+
+	if (useGI)
+	{
+		addRtxdiExecuteStage(
+			"RtxdiGI",
+			makeExecuteAccess(),
+			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->executeGI(passCtx.commandList(), ctx.bindingSet, useFusedDIGIFinal);
+			});
+	}
+
+	if (useFusedDIGIFinal)
+	{
+		addRtxdiExecuteStage(
+			"RtxdiFusedDIGIFinal",
+			makeExecuteAccess(),
+			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->executeFusedDIGIFinal(passCtx.commandList(), ctx.bindingSet);
+			});
+	}
+
+	if (usePT)
+	{
+		addRtxdiExecuteStage(
+			"RtxdiPT",
+			makeExecuteAccess(),
+			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+				if (rtxdiPass)
+					rtxdiPass->executePT(passCtx.commandList(), ctx.bindingSet);
+			});
+	}
+
+	// Fence kept for DenoiserPrepare / validation dependency names.
+	addRtxdiExecuteStage(
+		"Rtxdi",
+		[](rg::PassBuilder&) {},
+		[](rg::RenderPassContext&) {});
 }
 
 void registerRtxdiGraphPasses(FrameGraphContext ctx)
