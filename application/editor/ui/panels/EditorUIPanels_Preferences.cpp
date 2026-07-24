@@ -38,6 +38,31 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
         ImGui::Separator();
     }
 
+    if (ImGui::CollapsingHeader("Appearance", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
+
+        const EditorThemeId currentTheme = GetEditorThemeId();
+        if (SettingsBeginCombo("Theme", GetEditorThemeName(currentTheme)))
+        {
+            for (int i = 0; i < GetEditorThemeCount(); ++i)
+            {
+                const auto themeId = static_cast<EditorThemeId>(i);
+                const bool selected = (themeId == currentTheme);
+                if (ImGui::Selectable(GetEditorThemeName(themeId), selected))
+                {
+                    ApplyEditorTheme(themeId, m_currentScale);
+                    SaveEditorThemePreference();
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            SettingsEndCombo();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Editor color theme. Choice is saved for next launch.");
+    }
+
     BuildDisplayPerformancePanel(layout);
     BuildSystemPanel(layout);
 

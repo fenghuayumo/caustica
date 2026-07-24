@@ -86,6 +86,7 @@ ImGuiManager::ImGuiManager(EditorUIData&           uiData,
     if (!std::filesystem::exists(iniPath))
         m_uiData.editor.Viewport.RequestResetDockLayout = true;
 
+    LoadEditorThemePreference();
     applyTheme(1.0f);
 }
 
