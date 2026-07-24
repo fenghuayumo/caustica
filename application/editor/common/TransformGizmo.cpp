@@ -129,7 +129,9 @@ void ApplyWorldMatrixToLocalTransform(
     dm::double3 scaling;
     dm::decomposeAffine(newLocal, &translation, &rotation, &scaling);
     entityWorld.setLocalTransform(entity, &translation, &rotation, &scaling);
-    entityWorld.refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
+    // CaptureCurrent: per-frame motion vectors. PreserveExisting (drag-start previous)
+    // makes temporal denoise / accumulation flicker while dragging.
+    entityWorld.refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
 }
 
 void HandleTransformGizmoShortcuts(EditorUIState& editorUI)
@@ -446,6 +448,8 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 
         ctx.editorUI.InspectorRotationEntity = entity;
         ctx.editorUI.InspectorRotationEulerValid = false;
+        // PT must drop history while the pose changes. CaptureCurrent keeps motion
+        // vectors on the per-frame delta so temporal denoise does not thrash.
         ctx.settings.ResetAccumulation = true;
     }
 

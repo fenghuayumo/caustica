@@ -362,6 +362,10 @@ public:
     [[nodiscard]] bool hasPendingStructureChanges();
     [[nodiscard]] bool hasPendingTransformChanges();
 
+    // Advance ChangeDetection after all Changed<> readers for this logic frame
+    // (Extract). refresh()/finalizeRefreshFrame() must NOT end the tick.
+    void endChangeDetectionFrame();
+
     // ChangeDetection is the write path for ECS mutations; m_*Dirty is the
     // scene-level read path (hydrated lazily inside hasPending*).
 

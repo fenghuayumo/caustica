@@ -158,8 +158,9 @@ void ExtractMeshInstancesFull(ecs::World& world, SceneRenderData& out)
 
 bool ExtractMeshInstancesTransforms(ecs::World& world, SceneRenderData& inout)
 {
-    // Fast path: patch only entities with Changed global transforms. Falls back to a
-    // full refill when the cached entity order no longer matches the live set.
+    // Patch only entities whose global pose changed this ChangeDetection tick.
+    // Requires: hierarchy refresh marks GlobalTransformComponent, and
+    // endChangeDetectionFrame() runs AFTER extract (see Scene::extractAndPublish*).
     if (inout.meshInstances.size() != inout.meshInstanceEntities.size())
         return false;
 

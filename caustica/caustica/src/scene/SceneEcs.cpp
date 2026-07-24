@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <vector>
+#include <cstring>
 
 namespace caustica::scene
 {
@@ -168,7 +169,12 @@ void RefreshEntityHierarchy(
         global->transform = local->transform;
     }
 
+    const dm::affine3 previousFloat = global->transformFloat;
     global->transformFloat = dm::affine3(global->transform);
+    // Extract patches mesh proxies via Changed<GlobalTransformComponent>. Mutating
+    // fields in-place does not mark the component; notify when the global pose moves.
+    if (std::memcmp(&previousFloat, &global->transformFloat, sizeof(previousFloat)) != 0)
+        world.notifyComponentChanged<GlobalTransformComponent>(entity);
 
     dm::box3 subgraphBounds = GetLeafBounds(world, entity, global->transformFloat);
     SceneContentFlags leafContent = GetLeafContent(world, entity);
@@ -469,9 +475,16 @@ void SceneEntityWorld::assignGlobalResourceIndicesIfNeeded()
 
 void SceneEntityWorld::finalizeRefreshFrame()
 {
+    // Keep ChangeDetection tick open for Extract / other Changed<> readers.
+    // Sticky scene dirty bits can clear; the ECS change tick ends in
+    // endChangeDetectionFrame() after extractAndPublishRenderSnapshot.
     m_previousTransformDirty = m_frameStructureDirty || m_frameTransformDirty;
     m_structureDirty = false;
     m_transformDirty = false;
+}
+
+void SceneEntityWorld::endChangeDetectionFrame()
+{
     m_world.endChangeFrame();
     if (auto* changeDetection = m_world.getResource<ecs::ChangeDetection>())
         changeDetection->clearWorldStructureChange();

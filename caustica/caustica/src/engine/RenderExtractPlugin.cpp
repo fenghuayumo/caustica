@@ -30,10 +30,23 @@ void prepareRenderFrame(App& app)
     if (diag)
         diag->asyncLoadingInProgress = false;
 
-    if (!device || !worldRendererResource || !sessionCam)
-        return;
-
     const std::shared_ptr<Scene> scene = activeScene(app);
+    auto endChangeDetection = [&]() {
+        if (scene)
+        {
+            if (scene::SceneEntityWorld* ew = scene->getEntityWorld())
+                ew->endChangeDetectionFrame();
+        }
+    };
+
+    // PostUpdate may have refreshed with the change tick still open. Always close it
+    // after the Extract system — even when we cannot publish a snapshot this frame.
+    if (!device || !worldRendererResource || !sessionCam)
+    {
+        endChangeDetection();
+        return;
+    }
+
     if (!scene)
         return;
 

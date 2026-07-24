@@ -1328,6 +1328,10 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
         scene::extractSessionRenderState(*session, writeBuffer);
 
     m_RenderSnapshot.publish(frameIndex);
+
+    // ChangeDetection contract: mutate -> hierarchy refresh -> Extract(Changed<>) -> end tick.
+    // Ending the tick inside refresh() made incremental Extract always see an empty Changed set.
+    m_EntityWorld->endChangeDetectionFrame();
 }
 
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
