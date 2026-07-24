@@ -104,60 +104,126 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
 
 namespace
 {
-    void declareNrdPlaneAccess(
-        rg::PassBuilder& setup,
+    struct NrdPlaneGraphHandles
+    {
+        rg::TextureHandle denoiserViewspaceZ;
+        rg::TextureHandle denoiserMotionVectors;
+        rg::TextureHandle denoiserNormalRoughness;
+        rg::TextureHandle denoiserDiffRadianceHitDist;
+        rg::TextureHandle denoiserSpecRadianceHitDist;
+        rg::TextureHandle denoiserDisocclusionThresholdMix;
+        rg::TextureHandle historyClampRelax;
+        rg::TextureHandle outputColor;
+        rg::TextureHandle outDiff;
+        rg::TextureHandle outSpec;
+        rg::TextureHandle validation;
+        rg::TextureHandle stableRadiance;
+        rg::TextureHandle stablePlanesHeader;
+        rg::BufferHandle stablePlanesBuffer;
+        rg::TextureHandle specularHitT;
+    };
+
+    NrdPlaneGraphHandles importNrdPlaneHandles(
         rg::GraphBuilder& graph,
         RenderTargets& targets,
-        int planeIndex,
-        bool readsOutputColor)
+        int planeIndex)
     {
-        const rg::TextureHandle denoiserViewspaceZ = graph.importTexture(
-            targets.denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle denoiserMotionVectors = graph.importTexture(
-            targets.denoiserMotionVectors, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle denoiserNormalRoughness = graph.importTexture(
-            targets.denoiserNormalRoughness, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle denoiserDiffRadianceHitDist = graph.importTexture(
-            targets.denoiserDiffRadianceHitDist, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle denoiserSpecRadianceHitDist = graph.importTexture(
-            targets.denoiserSpecRadianceHitDist, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle denoiserDisocclusionThresholdMix = graph.importTexture(
-            targets.denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
-        const rg::TextureHandle outputColor = graph.importTexture(
+        NrdPlaneGraphHandles handles{};
+        handles.denoiserViewspaceZ = graph.importTexture(
+            targets.denoiserViewspaceZ, rg::TextureAccess::UnorderedAccess);
+        handles.denoiserMotionVectors = graph.importTexture(
+            targets.denoiserMotionVectors, rg::TextureAccess::UnorderedAccess);
+        handles.denoiserNormalRoughness = graph.importTexture(
+            targets.denoiserNormalRoughness, rg::TextureAccess::UnorderedAccess);
+        handles.denoiserDiffRadianceHitDist = graph.importTexture(
+            targets.denoiserDiffRadianceHitDist, rg::TextureAccess::UnorderedAccess);
+        handles.denoiserSpecRadianceHitDist = graph.importTexture(
+            targets.denoiserSpecRadianceHitDist, rg::TextureAccess::UnorderedAccess);
+        handles.denoiserDisocclusionThresholdMix = graph.importTexture(
+            targets.denoiserDisocclusionThresholdMix, rg::TextureAccess::UnorderedAccess);
+        handles.historyClampRelax = graph.importTexture(
+            targets.combinedHistoryClampRelax, rg::TextureAccess::UnorderedAccess);
+        handles.outputColor = graph.importTexture(
             targets.outputColor, rg::TextureAccess::UnorderedAccess);
-        const rg::TextureHandle outDiff = graph.importTexture(
+        handles.outDiff = graph.importTexture(
             targets.denoiserOutDiffRadianceHitDist[planeIndex], rg::TextureAccess::UnorderedAccess);
-        const rg::TextureHandle outSpec = graph.importTexture(
+        handles.outSpec = graph.importTexture(
             targets.denoiserOutSpecRadianceHitDist[planeIndex], rg::TextureAccess::UnorderedAccess);
-
-        graph.extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(outDiff, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(outSpec, rg::TextureAccess::UnorderedAccess);
-
-        setup.read(denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
-        setup.read(denoiserMotionVectors, rg::TextureAccess::ShaderResource);
-        setup.read(denoiserNormalRoughness, rg::TextureAccess::ShaderResource);
-        setup.read(denoiserDiffRadianceHitDist, rg::TextureAccess::ShaderResource);
-        setup.read(denoiserSpecRadianceHitDist, rg::TextureAccess::ShaderResource);
-        setup.read(denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
-        if (readsOutputColor)
-            setup.read(outputColor, rg::TextureAccess::ShaderResource);
-        setup.write(outDiff, rg::TextureAccess::UnorderedAccess);
-        setup.write(outSpec, rg::TextureAccess::UnorderedAccess);
-        setup.write(outputColor, rg::TextureAccess::UnorderedAccess);
-
         if (targets.denoiserOutValidation != nullptr)
         {
-            const rg::TextureHandle validation = graph.importTexture(
+            handles.validation = graph.importTexture(
                 targets.denoiserOutValidation, rg::TextureAccess::UnorderedAccess);
-            setup.write(validation, rg::TextureAccess::UnorderedAccess);
         }
+        handles.stableRadiance = graph.importTexture(
+            targets.stableRadiance, rg::TextureAccess::ShaderResource);
+        handles.stablePlanesHeader = graph.importTexture(
+            targets.stablePlanesHeader, rg::TextureAccess::ShaderResource);
+        handles.stablePlanesBuffer = graph.importBuffer(
+            targets.stablePlanesBuffer, rg::BufferAccess::ShaderResource);
+        handles.specularHitT = graph.importTexture(
+            targets.specularHitT, rg::TextureAccess::ShaderResource);
+
+        graph.extractTexture(handles.outputColor, rg::TextureAccess::UnorderedAccess);
+        graph.extractTexture(handles.outDiff, rg::TextureAccess::UnorderedAccess);
+        graph.extractTexture(handles.outSpec, rg::TextureAccess::UnorderedAccess);
+        return handles;
+    }
+
+    void declareNrdPrepareAccess(
+        rg::PassBuilder& setup,
+        const NrdPlaneGraphHandles& handles,
+        bool initWithStableRadiance)
+    {
+        setup.read(handles.stableRadiance, rg::TextureAccess::ShaderResource);
+        setup.read(handles.stablePlanesHeader, rg::TextureAccess::ShaderResource);
+        setup.read(handles.stablePlanesBuffer, rg::BufferAccess::ShaderResource);
+        setup.read(handles.specularHitT, rg::TextureAccess::ShaderResource);
+
+        setup.write(handles.denoiserViewspaceZ, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.denoiserMotionVectors, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.denoiserNormalRoughness, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.denoiserDiffRadianceHitDist, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.denoiserSpecRadianceHitDist, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.denoiserDisocclusionThresholdMix, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.historyClampRelax, rg::TextureAccess::UnorderedAccess);
+        if (initWithStableRadiance)
+            setup.write(handles.outputColor, rg::TextureAccess::UnorderedAccess);
+    }
+
+    void declareNrdRunAccess(rg::PassBuilder& setup, const NrdPlaneGraphHandles& handles)
+    {
+        setup.read(handles.denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserMotionVectors, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserNormalRoughness, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserDiffRadianceHitDist, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserSpecRadianceHitDist, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
+        setup.write(handles.outDiff, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.outSpec, rg::TextureAccess::UnorderedAccess);
+        if (handles.validation.isValid())
+            setup.write(handles.validation, rg::TextureAccess::UnorderedAccess);
+    }
+
+    void declareNrdMergeAccess(
+        rg::PassBuilder& setup,
+        const NrdPlaneGraphHandles& handles,
+        bool readsExistingOutputColor)
+    {
+        setup.read(handles.outDiff, rg::TextureAccess::ShaderResource);
+        setup.read(handles.outSpec, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserViewspaceZ, rg::TextureAccess::ShaderResource);
+        setup.read(handles.denoiserDisocclusionThresholdMix, rg::TextureAccess::ShaderResource);
+        setup.read(handles.stablePlanesBuffer, rg::BufferAccess::ShaderResource);
+        if (handles.validation.isValid())
+            setup.read(handles.validation, rg::TextureAccess::ShaderResource);
+        if (readsExistingOutputColor)
+            setup.read(handles.outputColor, rg::TextureAccess::UnorderedAccess);
+        setup.write(handles.outputColor, rg::TextureAccess::UnorderedAccess);
     }
 }
 
 void registerNrdPass(FrameGraphContext ctx)
 {
-    assert(ctx.targetFramebuffer);
     assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
@@ -168,25 +234,92 @@ void registerNrdPass(FrameGraphContext ctx)
 
     ctx.denoise->ensureNrdIntegrations();
 
+    // Stable string literals for executeAfter (PassOptions keeps const char* through compile).
+    static constexpr const char* kNrdPrepareNames[] = {
+        "NRD Prepare 0", "NRD Prepare 1", "NRD Prepare 2"
+    };
+    static constexpr const char* kNrdRunNames[] = {
+        "NRD Run 0", "NRD Run 1", "NRD Run 2"
+    };
+    static constexpr const char* kNrdMergeNames[] = {
+        "NRD Merge 0", "NRD Merge 1", "NRD Merge 2"
+    };
+    static constexpr const char* kNrdPlaneFenceNames[] = {
+        "NRD Plane 0", "NRD Plane 1", "NRD Plane 2"
+    };
+    static_assert(std::size(kNrdPrepareNames) == cStablePlaneCount);
+
     const int maxPassCount = std::min(
         ctx.settings->StablePlanesActiveCount,
         static_cast<int>(cStablePlaneCount));
 
+    // Highest plane first (initializes outputColor from stable radiance), then lower planes accumulate.
+    const char* prevPass = needsStablePlanesDebugViz(*ctx.settings)
+        ? "StablePlanesDebugViz"
+        : "DenoiserPrepare";
+
     for (int pass = maxPassCount - 1; pass >= 0; --pass)
     {
         const int planeIndex = pass;
-        const bool readsOutputColor = planeIndex < (maxPassCount - 1);
+        assert(planeIndex >= 0 && planeIndex < static_cast<int>(cStablePlaneCount));
+
+        const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
+        const bool readsExistingOutputColor = planeIndex < (maxPassCount - 1);
+        const NrdPlaneGraphHandles handles = importNrdPlaneHandles(
+            *ctx.graph,
+            *ctx.renderTargets,
+            planeIndex);
+
+        rg::PassOptions prepareOptions{};
+        prepareOptions.sideEffect = true;
+        prepareOptions.executeAfter = prevPass;
         ctx.graph->addPass(
-            std::format("NRD Plane {}", planeIndex),
-            [ctx, planeIndex, readsOutputColor](rg::PassBuilder& setup) {
-                declareNrdPlaneAccess(setup, *ctx.graph, *ctx.renderTargets, planeIndex, readsOutputColor);
+            kNrdPrepareNames[planeIndex],
+            [handles, initWithStableRadiance](rg::PassBuilder& setup) {
+                declareNrdPrepareAccess(setup, handles, initWithStableRadiance);
             },
             [ctx, planeIndex](rg::RenderPassContext& passCtx) {
-                ctx.denoise->denoiseStablePlane(
-                    passCtx.commandList(),
-                    ctx.targetFramebuffer,
-                    planeIndex);
-            });
+                ctx.denoise->prepareNrdInputs(passCtx.commandList(), planeIndex);
+            },
+            prepareOptions);
+
+        rg::PassOptions runOptions{};
+        runOptions.sideEffect = true;
+        runOptions.executeAfter = kNrdPrepareNames[planeIndex];
+        ctx.graph->addPass(
+            kNrdRunNames[planeIndex],
+            [handles](rg::PassBuilder& setup) {
+                declareNrdRunAccess(setup, handles);
+            },
+            [ctx, planeIndex](rg::RenderPassContext& passCtx) {
+                ctx.denoise->runNrd(passCtx.commandList(), planeIndex);
+            },
+            runOptions);
+
+        rg::PassOptions mergeOptions{};
+        mergeOptions.sideEffect = true;
+        mergeOptions.executeAfter = kNrdRunNames[planeIndex];
+        ctx.graph->addPass(
+            kNrdMergeNames[planeIndex],
+            [handles, readsExistingOutputColor](rg::PassBuilder& setup) {
+                declareNrdMergeAccess(setup, handles, readsExistingOutputColor);
+            },
+            [ctx, planeIndex](rg::RenderPassContext& passCtx) {
+                ctx.denoise->mergeNrdOutputs(passCtx.commandList(), planeIndex);
+            },
+            mergeOptions);
+
+        // Fence kept for any external executeAfter("NRD Plane N") dependents.
+        rg::PassOptions fenceOptions{};
+        fenceOptions.sideEffect = true;
+        fenceOptions.executeAfter = kNrdMergeNames[planeIndex];
+        ctx.graph->addPass(
+            kNrdPlaneFenceNames[planeIndex],
+            [](rg::PassBuilder&) {},
+            [](rg::RenderPassContext&) {},
+            fenceOptions);
+
+        prevPass = kNrdPlaneFenceNames[planeIndex];
     }
 }
 

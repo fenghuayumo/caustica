@@ -248,44 +248,39 @@ void DenoisePass::ensureNrdIntegrations()
     }
 }
 
-void DenoisePass::denoiseStablePlane(
-    nvrhi::ICommandList* commandList,
-    nvrhi::IFramebuffer* framebuffer,
-    int planeIndex)
+namespace
 {
-    (void)framebuffer;
 
+SampleMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings, int planeIndex)
+{
+    const int maxPassCount = std::min(
+        settings.StablePlanesActiveCount,
+        static_cast<int>(cStablePlaneCount));
+    const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
+    return { uint4(static_cast<uint>(planeIndex), initWithStableRadiance ? 1u : 0u, 0, 0) };
+}
+
+} // namespace
+
+void DenoisePass::prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIndex)
+{
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
     assert(m_postProcess);
+    assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
 
     if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
-
-    const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" };
-    assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
-    assert(planeIndex < static_cast<int>(std::size(passNames)));
 
     const bool nrdUseRelax = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
     const PostProcess::ComputePassType preparePassType = nrdUseRelax
         ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs
         : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
-    const PostProcess::ComputePassType mergePassType = nrdUseRelax
-        ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge
-        : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    const bool resetHistory = m_context->activeSettings().ResetRealtimeCaches;
-    const int maxPassCount = std::min(
-        m_context->activeSettings().StablePlanesActiveCount,
-        static_cast<int>(std::size(m_nrd)));
-    const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
-
-    commandList->beginMarker(passNames[planeIndex]);
-
-    SampleMiniConstants miniConstants = { uint4(static_cast<uint>(planeIndex), initWithStableRadiance ? 1u : 0u, 0, 0) };
-
+    SampleMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
     nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+
     commandList->beginMarker("PrepareInputs");
     m_postProcess->apply(
         commandList,
@@ -297,10 +292,26 @@ void DenoisePass::denoiseStablePlane(
         tdesc.width,
         tdesc.height);
     commandList->endMarker();
+}
 
+void DenoisePass::runNrd(nvrhi::ICommandList* commandList, int planeIndex)
+{
+    assert(commandList);
+    assert(m_context);
+    assert(m_renderTargets);
+    assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
+    assert(m_nrd[planeIndex] != nullptr);
+
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
+        return;
+
+    const bool nrdUseRelax = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    const bool resetHistory = m_context->activeSettings().ResetRealtimeCaches;
     const float timeDeltaBetweenFrames = m_context->gpuDevice.isHeadless() ? 1.f / 60.f : -1.f;
     const bool enableValidation =
         m_context->activeSettings().DebugView == DebugViewType::StablePlane_DenoiserValidation;
+
+    commandList->beginMarker("NRD");
     if (nrdUseRelax)
     {
         m_nrd[planeIndex]->runDenoiserPasses(
@@ -335,6 +346,26 @@ void DenoisePass::denoiseStablePlane(
             resetHistory,
             &m_context->activeSettings().ReblurSettings);
     }
+    commandList->endMarker();
+}
+
+void DenoisePass::mergeNrdOutputs(nvrhi::ICommandList* commandList, int planeIndex)
+{
+    assert(commandList);
+    assert(m_context);
+    assert(m_renderTargets);
+    assert(m_postProcess);
+    assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(m_nrd)));
+
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
+        return;
+
+    const bool nrdUseRelax = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::RELAX;
+    const PostProcess::ComputePassType mergePassType = nrdUseRelax
+        ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge
+        : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
+
+    SampleMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
 
     commandList->beginMarker("MergeOutputs");
     m_postProcess->apply(
@@ -347,7 +378,28 @@ void DenoisePass::denoiseStablePlane(
         *m_renderTargets,
         nullptr);
     commandList->endMarker();
+}
 
+void DenoisePass::denoiseStablePlane(
+    nvrhi::ICommandList* commandList,
+    nvrhi::IFramebuffer* framebuffer,
+    int planeIndex)
+{
+    (void)framebuffer;
+
+    assert(commandList);
+    assert(m_context);
+
+    if (!m_context->activeSettings().actualUseStandaloneDenoiser())
+        return;
+
+    const char* passNames[] = { "Denoising plane 0", "Denoising plane 1", "Denoising plane 2", "Denoising plane 3" };
+    assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(passNames)));
+
+    commandList->beginMarker(passNames[planeIndex]);
+    prepareNrdInputs(commandList, planeIndex);
+    runNrd(commandList, planeIndex);
+    mergeNrdOutputs(commandList, planeIndex);
     commandList->endMarker();
 }
 

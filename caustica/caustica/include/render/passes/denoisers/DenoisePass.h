@@ -61,6 +61,9 @@ public:
     void computeAvgLayerRadiance(nvrhi::ICommandList* commandList);
     void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
     void ensureNrdIntegrations();
+    void prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIndex);
+    void runNrd(nvrhi::ICommandList* commandList, int planeIndex);
+    void mergeNrdOutputs(nvrhi::ICommandList* commandList, int planeIndex);
     void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);
     void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);
     void runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList);
