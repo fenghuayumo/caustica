@@ -161,7 +161,17 @@ public:
     [[nodiscard]] std::vector<float> keyframeTimes(ecs::Entity entity = ecs::NullEntity) const;
     [[nodiscard]] std::vector<float> visibilityKeyframeTimes(ecs::Entity entity = ecs::NullEntity) const;
     [[nodiscard]] float animationDuration() const;
-    void evaluateAnimationsAt(float timeSeconds);
+
+    // DiscontinuousSeek: click/jump — zero MVs and reset TAA/NRD/DLSS history.
+    // ContinuousScrub: playhead drag / ±1 step — same as playback (keep temporal history).
+    enum class AnimationEvaluateMode
+    {
+        DiscontinuousSeek,
+        ContinuousScrub,
+    };
+    void evaluateAnimationsAt(
+        float timeSeconds,
+        AnimationEvaluateMode mode = AnimationEvaluateMode::DiscontinuousSeek);
 
     auto& uncompressedTextures() { return m_viewState.uncompressedTextures; }
     [[nodiscard]] ProgressBar& loadingProgress() { return m_viewState.progressLoading; }

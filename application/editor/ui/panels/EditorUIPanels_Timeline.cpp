@@ -253,12 +253,22 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         m_editorUI.StartFrame,
         m_editorUI.EndFrame);
 
-    const auto setFrame = [&](int frame) {
+    const auto setFrame = [&](int frame, bool continuousScrub = false) {
         frame = std::clamp(frame, m_editorUI.StartFrame, m_editorUI.EndFrame);
         if (frame == currentFrame && !m_settings.EnableAnimations)
             return;
+
+        // Adjacent steps (±1) and active playhead/frame drags should behave like
+        // playback. Large jumps (start/end / click far away) keep a hard temporal reset.
+        const int delta = std::abs(frame - currentFrame);
+        const bool continuous = continuousScrub || delta <= 1;
+
         m_settings.EnableAnimations = false;
-        m_sceneEditor.evaluateAnimationsAt(static_cast<float>(frame) * frameSeconds);
+        m_sceneEditor.evaluateAnimationsAt(
+            static_cast<float>(frame) * frameSeconds,
+            continuous
+                ? SceneEditor::AnimationEvaluateMode::ContinuousScrub
+                : SceneEditor::AnimationEvaluateMode::DiscontinuousSeek);
         currentFrame = frame;
     };
 
@@ -368,7 +378,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     ImGui::SetNextItemWidth(72.f);
     int editedFrame = currentFrame;
     if (ImGui::DragInt("##CurrentFrame", &editedFrame, 0.25f, m_editorUI.StartFrame, m_editorUI.EndFrame))
-        setFrame(editedFrame);
+        setFrame(editedFrame, /*continuousScrub=*/ImGui::IsItemActive());
 
     ImGui::SameLine(0.f, 12.f);
     ImGui::AlignTextToFramePadding();
@@ -497,7 +507,12 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         ImGui::GetColorU32(GetEditorColors().TextWarning));
 
     if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
-        setFrame(xToFrame(ImGui::GetIO().MousePos.x));
+    {
+        // First click on a distant frame: hard seek (drop temporal history).
+        // Continued playhead drag: scrub like playback so TAA/NRD do not reset every tick.
+        const int targetFrame = xToFrame(ImGui::GetIO().MousePos.x);
+        setFrame(targetFrame, /*continuousScrub=*/!ImGui::IsItemActivated());
+    }
 
     if (transformTimes.empty() && visibilityTimes.empty())
     {

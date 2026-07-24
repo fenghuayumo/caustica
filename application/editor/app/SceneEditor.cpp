@@ -850,7 +850,7 @@ float SceneEditor::animationDuration() const
     return duration;
 }
 
-void SceneEditor::evaluateAnimationsAt(float timeSeconds)
+void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode mode)
 {
     setSceneTime(std::max(0.f, timeSeconds));
     bool touchedGaussianVisibility = false;
@@ -859,10 +859,20 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds)
         if (auto* entityWorld = caustica::entityWorld(*m_app))
         {
             entityWorld->applyAnimations(std::max(0.f, timeSeconds));
-            // Scrub jumps are discontinuous: keep previous==current so motion
-            // vectors / TAA / NRD do not treat the seek as high-speed motion.
-            entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
-            entityWorld->syncPreviousTransformsFromCurrent();
+
+            if (mode == AnimationEvaluateMode::ContinuousScrub)
+            {
+                // Same as EnableAnimations playback: capture previous transforms so
+                // MVs/TAA/NRD see a smooth step instead of wiping history every drag tick.
+                entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+            }
+            else
+            {
+                // Discontinuous seek: keep previous==current so filters do not treat the
+                // jump as high-speed motion, then drop temporal history once.
+                entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+                entityWorld->syncPreviousTransformsFromCurrent();
+            }
 
             entityWorld->world().each<scene::AnimationComponent>(
                 [&](ecs::Entity, scene::AnimationComponent& animation) {
@@ -879,10 +889,15 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds)
                 });
         }
     }
-    // Accumulation alone is not enough — realtime temporal history (TAA/NRD/DLSS)
-    // must also drop, otherwise scrubbing reads as whole-scene jitter/ghosting.
-    m_settings.ResetAccumulation = true;
-    m_settings.ResetRealtimeCaches = true;
+
+    if (mode == AnimationEvaluateMode::DiscontinuousSeek)
+    {
+        // Accumulation alone is not enough — realtime temporal history (TAA/NRD/DLSS)
+        // must also drop on large seeks, otherwise the jump ghosts for many frames.
+        m_settings.ResetAccumulation = true;
+        m_settings.ResetRealtimeCaches = true;
+    }
+
     if (touchedGaussianVisibility)
         m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
 }
