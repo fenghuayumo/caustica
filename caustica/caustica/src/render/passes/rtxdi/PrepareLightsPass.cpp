@@ -29,13 +29,13 @@ using namespace caustica;
 
 
 PrepareLightsPass::PrepareLightsPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<MaterialGpuCache> materialGpuCache,
     std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,
     caustica::rhi::BufferHandle subInstanceData,
-    caustica::rhi::IBindingLayout* bindlessLayout,
+    caustica::rhi::BindingLayout* bindlessLayout,
     std::shared_ptr<ShaderDebug> shaderDebug)
     : m_device(device)
     , m_bindlessLayout(bindlessLayout)
@@ -86,7 +86,7 @@ PrepareLightsPass::PrepareLightsPass(
 void PrepareLightsPass::setFrameInputs(
     const scene::SceneRenderData* renderData,
     size_t geometryInstanceCount,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::DescriptorTable* descriptorTable,
     const caustica::render::SceneGpuFrameHandles& gpuHandles,
     EnvMapProcessor* environmentMap,
     EnvMapSceneParams envMapSceneParams)
@@ -395,7 +395,7 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 }
 
 
-RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::ICommandList* commandList)
+RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandList* commandList)
 {
     RTXDI_LightBufferParameters lightBufferParams = {};
 

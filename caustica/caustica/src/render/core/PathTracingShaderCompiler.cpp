@@ -516,7 +516,7 @@ void PTPipelineVariant::updateFinalize()
 }
 
 
-PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::IDevice* device, std::shared_ptr<MaterialGpuCache>& materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout)
+PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::Device* device, std::shared_ptr<MaterialGpuCache>& materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout)
     : m_device(device)
     , m_materialGpuCache(materialGpuCache)
     , m_bindingLayout(bindingLayout)

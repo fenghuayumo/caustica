@@ -28,7 +28,7 @@ static const std::string c_ComputeShaderPackMount = "/" + c_ComputeShaderBinarie
 // ComputePipelineRegistry implementation
 //////////////////////////////////////////////////////////////////////////
 
-ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
+ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::Device* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
     : m_device(device)
 {
     if (!m_compilerConfig.initialize(device, c_ComputeShaderBinariesRoot))

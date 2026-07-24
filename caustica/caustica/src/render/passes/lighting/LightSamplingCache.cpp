@@ -43,7 +43,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-LightSamplingCache::LightSamplingCache(caustica::rhi::IDevice* device)
+LightSamplingCache::LightSamplingCache(caustica::rhi::Device* device)
     : m_device(device)
 {
     sceneReloaded();
@@ -88,7 +88,7 @@ LightSamplingCache::~LightSamplingCache()
 {
 }
 
-void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
+void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution)
 {
     m_renderDevice = &renderDevice;
     m_shaderDebug = shaderDebug;
@@ -973,7 +973,7 @@ void LightSamplingCache::updateLocalJitter()
     }
 }
 
-void LightSamplingCache::updateBegin(caustica::rhi::ICommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, caustica::rhi::IDescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
+void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, caustica::BindingCache & bindingCache, const UpdateSettings& _settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, caustica::rhi::DescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, 
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData>& subInstanceData, caustica::rhi::TextureHandle envMapProcessed)
 {
     RAII_SCOPE( commandList->beginMarker("LightingUpdateBegin");, commandList->endMarker(); );
@@ -1343,7 +1343,7 @@ void LightSamplingCache::updateBegin(caustica::rhi::ICommandList* commandList, c
 
 #define UAV_BARRIER_m_NEE_AT_LocalSamplingBuffer() { commandList->setBufferState(m_NEE_AT_LocalSamplingBuffer, caustica::rhi::ResourceStates::UnorderedAccess); }
 
-void LightSamplingCache::updateEnd(caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors)
+void LightSamplingCache::updateEnd(caustica::rhi::CommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors)
 {
     RAII_SCOPE(commandList->beginMarker("LightingUpdateEnd");, commandList->endMarker(); );
 

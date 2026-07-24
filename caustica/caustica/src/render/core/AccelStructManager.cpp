@@ -16,12 +16,12 @@
 namespace caustica
 {
 
-AccelStructManager::AccelStructManager(caustica::rhi::IDevice* device)
+AccelStructManager::AccelStructManager(caustica::rhi::Device* device)
     : m_device(device)
 {
 }
 
-void AccelStructManager::createBlases(caustica::rhi::ICommandList* commandList,
+void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
                                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                                       const AccelStructBuildSettings& settings)
 {
@@ -86,7 +86,7 @@ void AccelStructManager::createBlases(caustica::rhi::ICommandList* commandList,
         maxMeshName.c_str());
 }
 
-void AccelStructManager::createTlas(caustica::rhi::ICommandList* commandList, const scene::SceneRenderData& renderData)
+void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData)
 {
     (void)commandList;
 
@@ -124,7 +124,7 @@ void AccelStructManager::createTlas(caustica::rhi::ICommandList* commandList, co
     m_subInstanceData.assign(m_subInstanceCount, SubInstanceData{});
 }
 
-void AccelStructManager::uploadSubInstanceData(caustica::rhi::ICommandList* commandList) const
+void AccelStructManager::uploadSubInstanceData(caustica::rhi::CommandList* commandList) const
 {
     assert(m_subInstanceCount == m_subInstanceData.size());
     if (m_subInstanceData.empty())
@@ -168,7 +168,7 @@ void AccelStructManager::requestMeshRebuild(scene::MeshRenderResourceId meshId)
         m_meshesPendingAccelRebuild.push_back(meshId);
 }
 
-void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::ICommandList*            commandList,
+void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::CommandList*            commandList,
                                             const scene::SceneRenderData&   renderData,
                                             const AccelStructBuildSettings& settings,
                                             bool&                           fullRebuildRequested)
@@ -259,7 +259,7 @@ void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::ICommandList*        
     }
 }
 
-void AccelStructManager::updateSkinnedBlases(caustica::rhi::ICommandList*            commandList,
+void AccelStructManager::updateSkinnedBlases(caustica::rhi::CommandList*            commandList,
                                              const scene::SceneRenderData&   renderData,
                                              const AccelStructBuildSettings& settings,
                                              uint32_t                        /*frameIndex*/) const
@@ -348,7 +348,7 @@ void AccelStructManager::updateSkinnedBlases(caustica::rhi::ICommandList*       
     commandList->endMarker();
 }
 
-void AccelStructManager::buildTlas(caustica::rhi::ICommandList*            commandList,
+void AccelStructManager::buildTlas(caustica::rhi::CommandList*            commandList,
                                    const scene::SceneRenderData&   renderData,
                                    const AccelStructBuildSettings& settings,
                                    const OmmAccelStructState&      ommState,

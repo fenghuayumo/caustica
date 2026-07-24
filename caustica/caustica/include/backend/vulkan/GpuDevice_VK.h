@@ -18,7 +18,7 @@
 class GpuDevice_VK : public caustica::GpuDevice
 {
 public:
-    [[nodiscard]] caustica::rhi::IDevice* getDevice() const override
+    [[nodiscard]] caustica::rhi::Device* getDevice() const override
     {
         if (m_ValidationLayer)
             return m_ValidationLayer;
@@ -52,14 +52,14 @@ protected:
         }
     }
 
-    caustica::rhi::ITexture* getCurrentBackBuffer() override
+    caustica::rhi::Texture* getCurrentBackBuffer() override
     {
         if (m_DeviceParams.headlessDevice)
             return getHeadlessBackBuffer(getCurrentHeadlessBackBufferIndex());
 
         return m_SwapChainImages[m_SwapChainIndex].rhiHandle;
     }
-    caustica::rhi::ITexture* getBackBuffer(uint32_t index) override
+    caustica::rhi::Texture* getBackBuffer(uint32_t index) override
     {
         if (m_DeviceParams.headlessDevice)
             return getHeadlessBackBuffer(index);

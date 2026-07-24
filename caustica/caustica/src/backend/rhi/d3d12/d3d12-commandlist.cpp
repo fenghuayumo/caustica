@@ -152,7 +152,7 @@ namespace caustica::rhi::d3d12
             m_RecordingVersion, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
     }
 
-    D3D12_GPU_VIRTUAL_ADDRESS CommandList::getBufferGpuVA(IBuffer* _buffer)
+    D3D12_GPU_VIRTUAL_ADDRESS CommandList::getBufferGpuVA(rhi::Buffer* _buffer)
     {
         if (!_buffer)
             return 0;
@@ -167,7 +167,7 @@ namespace caustica::rhi::d3d12
         return buffer->gpuVA;
     }
 
-    caustica::rhi::IDevice* CommandList::getDevice()
+    caustica::rhi::Device* CommandList::getDevice()
     {
         return m_Device;
     }

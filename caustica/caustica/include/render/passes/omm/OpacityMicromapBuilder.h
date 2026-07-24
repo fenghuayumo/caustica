@@ -95,7 +95,7 @@ public:
     void                            createRenderPasses(caustica::rhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
     void                            setMaterialGpuCache(MaterialGpuCache* materials);
 
-    bool                            update(caustica::rhi::ICommandList& commandList,
+    bool                            update(caustica::rhi::CommandList& commandList,
                                            const caustica::scene::SceneRenderData& renderData);
 
     OpacityMicroMapUIData &         uiData()    { return m_uiData; }
@@ -105,16 +105,16 @@ public:
     void                            sceneUnloading();
 
     void                            createOpacityMicromaps(const caustica::scene::SceneRenderData& renderData);
-    void                            destroyOpacityMicromaps(caustica::rhi::ICommandList& commandList,
+    void                            destroyOpacityMicromaps(caustica::rhi::CommandList& commandList,
                                                             const caustica::scene::SceneRenderData& renderData);
-    void                            buildOpacityMicromaps(caustica::rhi::ICommandList& commandList,
+    void                            buildOpacityMicromaps(caustica::rhi::CommandList& commandList,
                                                           const caustica::scene::SceneRenderData& renderData);
-    void                            writeGeometryDebugBuffer(caustica::rhi::ICommandList& commandList);
+    void                            writeGeometryDebugBuffer(caustica::rhi::CommandList& commandList);
     void                            updateDebugGeometry(
                                         const caustica::scene::MeshRenderResourceSnapshot& mesh,
                                         const caustica::render::MeshGpuRecord& meshGpu);
 
-    [[nodiscard]] caustica::rhi::IBuffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
+    [[nodiscard]] caustica::rhi::Buffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
     [[nodiscard]] bool              shouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
 
     void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);

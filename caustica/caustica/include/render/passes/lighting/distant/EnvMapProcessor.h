@@ -83,15 +83,15 @@ public:
     
 
 public:
-    EnvMapProcessor( caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
+    EnvMapProcessor( caustica::rhi::Device* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
     ~EnvMapProcessor();
 
     void                            sceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
 
     void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
-    void                            preUpdate( caustica::rhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
-    bool                            update( caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    void                            preUpdate( caustica::rhi::CommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
+    bool                            update( caustica::rhi::CommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
     caustica::rhi::TextureHandle            getEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
     caustica::rhi::SamplerHandle            getEnvMapCubeSampler() const    { return m_linearSampler; }
@@ -117,21 +117,21 @@ public:
     // process an external cubemap with the specified options
     // This allows reusing the mip generation, GGX filtering, and SH projection for external cubemaps (e.g., local RT cubemap)
     void                            processCubemap(
-                                        caustica::rhi::ICommandList* commandList,
+                                        caustica::rhi::CommandList* commandList,
                                         caustica::BindingCache& bindingCache,
                                         caustica::rhi::TextureHandle sourceCubemap,
                                         const CubemapProcessingOptions& options,
                                         const CubemapProcessingResults& results);
     
     // Generate the BRDF integration LUT (should be called once during initialization)
-    bool                            generateBRDFLUT(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
+    bool                            generateBRDFLUT(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache);
     
 private:
-    void                            ggxPrefilterCubemap(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    void                            ggxPrefilterCubemap(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache, 
                                         caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap);
-    void                            convolveDiffuseIrradiance(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+    void                            convolveDiffuseIrradiance(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache,
                                         caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap);
-    void                            generateCubemapMips(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    void                            generateCubemapMips(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache, 
                                         caustica::rhi::TextureHandle cubemap);
 
     void                            initBuffers(uint cubeDim);

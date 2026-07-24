@@ -24,7 +24,7 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
 void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params)
 {
     auto& settings = params.settings;
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     RenderTargets* renderTargets = params.renderTargets;
 
     if (!settings.RealtimeMode)

@@ -60,7 +60,7 @@ PathTraceLightingEndTargets importPathTraceLightingEndTargets(
     rg::GraphBuilder& graph,
     RenderTargets& targets,
     LightSamplingCache* lightSampling,
-    caustica::rhi::IBuffer* subInstanceDataBuffer);
+    caustica::rhi::Buffer* subInstanceDataBuffer);
 
 void extractPathTraceGraphOutputs(rg::GraphBuilder& graph, const PathTraceGraphTargets& handles);
 

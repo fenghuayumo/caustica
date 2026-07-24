@@ -13,17 +13,17 @@ class ComputePass
 {
 public:
     bool init(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry, 
         const std::vector<caustica::ShaderMacro>& macros,
-        caustica::rhi::IBindingLayout* bindingLayout,
-        caustica::rhi::IBindingLayout* extraBindingLayout = nullptr,
-        caustica::rhi::IBindingLayout* bindlessLayout = nullptr);
+        caustica::rhi::BindingLayout* bindingLayout,
+        caustica::rhi::BindingLayout* extraBindingLayout = nullptr,
+        caustica::rhi::BindingLayout* bindlessLayout = nullptr);
 
     bool init(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry,
@@ -31,18 +31,18 @@ public:
         caustica::rhi::BindingLayoutVector & bindingLayouts );
 
     void execute(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         int width,
         int height,
         int depth,
-        caustica::rhi::IBindingSet* bindingSet,
-        caustica::rhi::IBindingSet* extraBindingSet = nullptr,
-        caustica::rhi::IDescriptorTable* descriptorTable = nullptr,
+        caustica::rhi::BindingSet* bindingSet,
+        caustica::rhi::BindingSet* extraBindingSet = nullptr,
+        caustica::rhi::DescriptorTable* descriptorTable = nullptr,
         const void* pushConstants = nullptr,
         size_t pushConstantSize = 0);
 
     void execute(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         int width,
         int height,
         int depth,

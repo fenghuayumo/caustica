@@ -195,7 +195,7 @@ void renderScene(App& app, GpuDevice& gpuDevice)
     if (!wr)
         return;
 
-    caustica::rhi::IFramebuffer* target = gpuDevice.getCurrentFramebuffer(true);
+    caustica::rhi::Framebuffer* target = gpuDevice.getCurrentFramebuffer(true);
     if (auto* overrideFb = app.tryResource<RenderFramebufferOverride>();
         overrideFb && overrideFb->framebuffer)
     {

@@ -121,7 +121,7 @@ namespace caustica::rhi::d3d11
         return BufferHandle::Create(buffer);
     }
 
-    void CommandList::writeBuffer(IBuffer* _buffer, const void* data, size_t dataSize, uint64_t destOffsetBytes)
+    void CommandList::writeBuffer(rhi::Buffer* _buffer, const void* data, size_t dataSize, uint64_t destOffsetBytes)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -157,7 +157,7 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void CommandList::clearBufferUInt(IBuffer* buffer, uint32_t clearValue)
+    void CommandList::clearBufferUInt(rhi::Buffer* buffer, uint32_t clearValue)
     {
         const BufferDesc& bufferDesc = buffer->getDesc();
         ResourceType viewType = bufferDesc.structStride != 0
@@ -171,7 +171,7 @@ namespace caustica::rhi::d3d11
         m_Context.immediateContext->ClearUnorderedAccessViewUint(uav, clearValues);
     }
 
-    void CommandList::copyBuffer(IBuffer* _dest, uint64_t destOffsetBytes, IBuffer* _src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
+    void CommandList::copyBuffer(rhi::Buffer* _dest, uint64_t destOffsetBytes, rhi::Buffer* _src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
     {
         Buffer* dest = checked_cast<Buffer*>(_dest);
         Buffer* src = checked_cast<Buffer*>(_src);
@@ -190,7 +190,7 @@ namespace caustica::rhi::d3d11
         m_Context.immediateContext->CopySubresourceRegion(dest->resource, 0, (UINT)destOffsetBytes, 0, 0, src->resource, 0, &srcBox);
     }
     
-    void *Device::mapBuffer(IBuffer* _buffer, CpuAccessMode flags)
+    void *Device::mapBuffer(Buffer* _buffer, CpuAccessMode flags)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -221,20 +221,20 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void Device::unmapBuffer(IBuffer* _buffer)
+    void Device::unmapBuffer(rhi::Buffer* _buffer)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
         m_Context.immediateContext->Unmap(buffer->resource, 0);
     }
 
-    MemoryRequirements Device::getBufferMemoryRequirements(IBuffer*)
+    MemoryRequirements Device::getBufferMemoryRequirements(rhi::Buffer*)
     {
         utils::NotSupported();
         return MemoryRequirements();
     }
 
-    bool Device::bindBufferMemory(IBuffer*, IHeap*, uint64_t)
+    bool Device::bindBufferMemory(rhi::Buffer*, rhi::Heap*, uint64_t)
     {
         utils::NotSupported();
         return false;

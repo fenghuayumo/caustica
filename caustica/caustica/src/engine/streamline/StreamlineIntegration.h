@@ -21,18 +21,18 @@ public:
     virtual void setDLSSOptions(const DLSSOptions& options) override;
     virtual bool isDLSSAvailable() const override { return m_dlssAvailable; }
     virtual void queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) override;
-    virtual void evaluateDLSS(caustica::rhi::ICommandList* commandList) override;
+    virtual void evaluateDLSS(caustica::rhi::CommandList* commandList) override;
     virtual void cleanupDLSS(bool wfi) override;
 
     virtual void setNISOptions(const NISOptions& options) override;
     virtual bool isNISAvailable() const override { return m_nisAvailable; }
-    virtual void evaluateNIS(caustica::rhi::ICommandList* commandList) override;
+    virtual void evaluateNIS(caustica::rhi::CommandList* commandList) override;
     virtual void cleanupNIS(bool wfi) override;
 
     virtual void setDeepDVCOptions(const DeepDVCOptions& options) override;
     virtual bool isDeepDVCAvailable() const override { return m_deepdvcAvailable; }
     virtual void queryDeepDVCState(uint64_t& estimatedVRamUsage) override;
-    virtual void evaluateDeepDVC(caustica::rhi::ICommandList* commandList) override;
+    virtual void evaluateDeepDVC(caustica::rhi::CommandList* commandList) override;
     virtual void cleanupDeepDVC() override;
 
     virtual bool isReflexAvailable() const override { return m_reflexAvailable; }
@@ -50,31 +50,31 @@ public:
     virtual void setDLSSRROptions(const DLSSRROptions& options) override;
     virtual bool isDLSSRRAvailable() const override { return m_dlssrrAvailable; }
     virtual void queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) override;
-    virtual void evaluateDLSSRR(caustica::rhi::ICommandList* commandList) override;
+    virtual void evaluateDLSSRR(caustica::rhi::CommandList* commandList) override;
     virtual void cleanupDLSSRR(bool wfi) override;
 
     virtual void tagResourcesGeneral(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const caustica::IView* view,
-        caustica::rhi::ITexture* motionVectors,
-        caustica::rhi::ITexture* depth,
-        caustica::rhi::ITexture* finalColorHudless) override;
+        caustica::rhi::Texture* motionVectors,
+        caustica::rhi::Texture* depth,
+        caustica::rhi::Texture* finalColorHudless) override;
 
     virtual void tagResourcesDLSSNIS(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const caustica::IView* view,
-        caustica::rhi::ITexture* output,
-        caustica::rhi::ITexture* input) override;
+        caustica::rhi::Texture* output,
+        caustica::rhi::Texture* input) override;
 
     virtual void tagResourcesDLSSFG(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         bool validViewportExtent = false,
         const Extent &backBufferExtent = {}) override;
 
     virtual void tagResourcesDeepDVC(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const caustica::IView* view,
-        caustica::rhi::ITexture* output) override;
+        caustica::rhi::Texture* output) override;
 
     virtual void unTagResourcesDeepDVC() override;
 
@@ -84,30 +84,30 @@ public:
     // * Either specHitDist or specMotionVectors should be provided but not both nor neither. Refer to DLSS-RR 
     //   documentation for more detail.
     virtual void tagResourcesDLSSRR(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const caustica::IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
-        caustica::rhi::ITexture* inputColor,
-        caustica::rhi::ITexture* diffuseAlbedo,
-        caustica::rhi::ITexture* specAlbedo,
-        caustica::rhi::ITexture* normalsAndOptionalRoughness,
-        caustica::rhi::ITexture* roughness,
-        caustica::rhi::ITexture* specHitDist,
-        caustica::rhi::ITexture* specMotionVectors,
-        caustica::rhi::ITexture* outputColor
+        caustica::rhi::Texture* inputColor,
+        caustica::rhi::Texture* diffuseAlbedo,
+        caustica::rhi::Texture* specAlbedo,
+        caustica::rhi::Texture* normalsAndOptionalRoughness,
+        caustica::rhi::Texture* roughness,
+        caustica::rhi::Texture* specHitDist,
+        caustica::rhi::Texture* specMotionVectors,
+        caustica::rhi::Texture* outputColor
     ) override;
 private:
     StreamlineIntegration() {}
     void updateFeatureAvailable();
     uint32_t checkNumSupportedFeatures(const sl::AdapterInfo& adapterInfo);
 
-    caustica::rhi::Object getNativeCommandList(caustica::rhi::ICommandList* commandList);
+    caustica::rhi::Object getNativeCommandList(caustica::rhi::CommandList* commandList);
     void waitForDLSSGInputsProcessing();
 
     bool m_slInitialized = false;
     caustica::rhi::GraphicsAPI m_api = caustica::rhi::GraphicsAPI::D3D12;
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
 
 #ifdef CAUSTICA_WITH_DX11
     LUID m_d3d11Luid = {};
@@ -164,7 +164,7 @@ public:
     bool initializePreDevice(caustica::rhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
     bool setD3DDevice(IUnknown* nativeDevice);
-    bool initializeDeviceDX(caustica::rhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
+    bool initializeDeviceDX(caustica::rhi::Device *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
     // In-place slUpgradeInterface of a raw pointer
     template<typename T>
     static inline bool upgradeInterface(T*& interfacePointer)
@@ -206,7 +206,7 @@ public:
         uint32_t graphicsQueueCreateFlags{};
         uint32_t opticalFlowQueueCreateFlags{};
     };
-    bool initializeDeviceVK(caustica::rhi::IDevice* device, const VulkanInfo& vulkanInfo);
+    bool initializeDeviceVK(caustica::rhi::Device* device, const VulkanInfo& vulkanInfo);
 #endif
 
     void shutdown();

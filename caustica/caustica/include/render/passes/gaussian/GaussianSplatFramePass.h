@@ -39,14 +39,14 @@ public:
     GaussianSplatFramePass& operator=(const GaussianSplatFramePass&) = delete;
 
     void createTemporalResources(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         RenderTargets* renderTargets);
 
     // Bind stable context + scene pass pointers once at create/prepare.
     void bindStable(
         PathTracingContext* context,
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::AccelStructManager* accelStructs,
         SceneGaussianSplatPasses* scenePasses);
 
@@ -62,21 +62,21 @@ public:
     [[nodiscard]] bool hasActiveSplats() const;
     [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGraphResources(bool renderToOutputColor);
 
-    void executeAccelBuild(caustica::rhi::ICommandList* commandList);
-    void executeUpload(caustica::rhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeSort(caustica::rhi::ICommandList* commandList);
-    void executeRaster(caustica::rhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeAccumulate(caustica::rhi::ICommandList* commandList);
+    void executeAccelBuild(caustica::rhi::CommandList* commandList);
+    void executeUpload(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
+    void executeSort(caustica::rhi::CommandList* commandList);
+    void executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
+    void executeAccumulate(caustica::rhi::CommandList* commandList);
 
-    [[nodiscard]] caustica::rhi::ITexture* currentColor() const { return m_currentColor.Get(); }
-    [[nodiscard]] caustica::rhi::ITexture* accumulatedColor() const { return m_accumulatedColor.Get(); }
+    [[nodiscard]] caustica::rhi::Texture* currentColor() const { return m_currentColor.Get(); }
+    [[nodiscard]] caustica::rhi::Texture* accumulatedColor() const { return m_accumulatedColor.Get(); }
 
     [[nodiscard]] std::shared_ptr<GPUSort>& gpuSort() { return m_gpuSort; }
     [[nodiscard]] const std::shared_ptr<GPUSort>& gpuSort() const { return m_gpuSort; }
 
 private:
     PathTracingContext* m_context = nullptr;
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
     RenderTargets* m_renderTargets = nullptr;
     caustica::AccelStructManager* m_accelStructs = nullptr;
     SceneGaussianSplatPasses* m_scenePasses = nullptr;

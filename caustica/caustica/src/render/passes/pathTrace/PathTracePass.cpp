@@ -30,7 +30,7 @@ namespace caustica::render
 {
 
 bool PathTracePass::createExportPipeline(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     caustica::ShaderFactory* shaderFactory,
     caustica::rhi::BindingLayoutHandle bindingLayout,
     caustica::rhi::BindingLayoutHandle bindlessLayout)
@@ -173,9 +173,9 @@ void PathTracePass::fillConstants(
 }
 
 void PathTracePass::prePass(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::rhi::BindingSetHandle bindingSet,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::DescriptorTable* descriptorTable,
     dm::uint2 viewSize,
     PTPipelineVariant* pipeline)
 {
@@ -201,11 +201,11 @@ void PathTracePass::prePass(
 }
 
 void PathTracePass::exportVBuffer(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::rhi::BindingSetHandle bindingSet,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::DescriptorTable* descriptorTable,
     dm::uint2 viewSize,
-    caustica::rhi::IComputePipeline* pipeline)
+    caustica::rhi::ComputePipeline* pipeline)
 {
     assert(commandList);
     assert(pipeline);
@@ -229,9 +229,9 @@ void PathTracePass::exportVBuffer(
 }
 
 void PathTracePass::mainPass(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::rhi::BindingSetHandle bindingSet,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::DescriptorTable* descriptorTable,
     dm::uint2 viewSize,
     PTPipelineVariant* pipeline,
     uint32_t samplesPerPixel)

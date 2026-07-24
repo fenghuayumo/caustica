@@ -11,7 +11,7 @@ using namespace caustica::math;
 using namespace caustica;
 
 
-AccumulationPass::AccumulationPass(caustica::rhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
+AccumulationPass::AccumulationPass(caustica::rhi::Device* device, std::shared_ptr<ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(shaderFactory)
 {
@@ -42,7 +42,7 @@ void AccumulationPass::createPipeline()
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void AccumulationPass::createBindingSet(caustica::rhi::ITexture* inputTexture, caustica::rhi::ITexture* outputTexture, caustica::rhi::ITexture* renderOutputTexture)
+void AccumulationPass::createBindingSet(caustica::rhi::Texture* inputTexture, caustica::rhi::Texture* outputTexture, caustica::rhi::Texture* renderOutputTexture)
 {
     caustica::rhi::BindingSetDesc bindingSetDesc;
 
@@ -60,7 +60,7 @@ void AccumulationPass::createBindingSet(caustica::rhi::ITexture* inputTexture, c
 }
 
 void AccumulationPass::render(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView& sourceView,
     const caustica::IView& upscaledView,
     float accumulationWeight)

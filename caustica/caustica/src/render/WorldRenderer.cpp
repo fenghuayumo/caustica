@@ -169,7 +169,7 @@ void caustica::render::WorldRenderer::destroy()
     m_scenePasses = {};
 }
 
-caustica::rhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindlessLayout(caustica::rhi::IDevice* device)
+caustica::rhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindlessLayout(caustica::rhi::Device* device)
 {
     caustica::rhi::BindlessLayoutDesc bindlessLayoutDesc;
     bindlessLayoutDesc.visibility = caustica::rhi::ShaderType::All;
@@ -182,9 +182,9 @@ caustica::rhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindle
     return device->createBindlessLayout(bindlessLayoutDesc);
 }
 
-void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::IBindingLayout* precreatedBindless)
+void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::BindingLayout* precreatedBindless)
 {
-    caustica::rhi::IDevice* const gpuDevice = device();
+    caustica::rhi::Device* const gpuDevice = device();
     m_bindlessLayout = precreatedBindless
         ? caustica::rhi::BindingLayoutHandle(precreatedBindless)
         : createBindlessLayout(gpuDevice);
@@ -279,7 +279,7 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::IBindi
 
 void caustica::render::WorldRenderer::createDeviceResources()
 {
-    caustica::rhi::IDevice* device = this->device();
+    caustica::rhi::Device* device = this->device();
 
     m_renderTargetPool.setDevice(device);
     m_renderBufferPool.setDevice(device);
@@ -648,7 +648,7 @@ void caustica::render::WorldRenderer::preRender()
 }
 
 
-void caustica::render::WorldRenderer::render(caustica::rhi::IFramebuffer* framebuffer)
+void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebuffer)
 {
     m_displaySize = m_renderSize = uint2(
         framebuffer->getFramebufferInfo().width,
@@ -740,8 +740,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     if (!gpuHandles.valid())
         return;
 
-    caustica::rhi::rt::IAccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
-    caustica::rhi::IBuffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
+    caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
+    caustica::rhi::Buffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
@@ -868,7 +868,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     }
 }
 
-void caustica::render::WorldRenderer::denoisedScreenshot(caustica::rhi::ITexture* framebufferTexture) const
+void caustica::render::WorldRenderer::denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const
 {
     std::string noisyImagePath = (caustica::getDirectoryWithExecutable() / "photo.bmp").string();
 

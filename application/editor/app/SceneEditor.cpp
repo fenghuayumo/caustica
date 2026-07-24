@@ -892,7 +892,7 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode 
 
     if (mode == AnimationEvaluateMode::DiscontinuousSeek)
     {
-        // Accumulation alone is not enough — realtime temporal history (TAA/NRD/DLSS)
+        // Accumulation alone is not enough  - realtime temporal history (TAA/NRD/DLSS)
         // must also drop on large seeks, otherwise the jump ghosts for many frames.
         m_settings.ResetAccumulation = true;
         m_settings.ResetRealtimeCaches = true;
@@ -1037,11 +1037,11 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         m_renderState.Picking.InstanceRequested = false;
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
-        caustica::rhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
+        caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
         if (!framebuffer || !infra || !infra->renderDevice)
             return false;
-        caustica::rhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
+        caustica::rhi::Texture* texture = framebuffer->getDesc().colorAttachments[0].texture;
         auto* renderDevice = infra->renderDevice.get();
         return saveTextureToFile(
             gpuDevice.getDevice(), *renderDevice, texture, caustica::rhi::ResourceStates::Common, fileName);
@@ -1050,7 +1050,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
     if (consumeExperimentalPhotoScreenshot())
     {
-        caustica::rhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
+        caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (framebuffer)
             wr->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
     }

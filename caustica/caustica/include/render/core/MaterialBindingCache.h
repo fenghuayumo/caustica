@@ -34,18 +34,18 @@ class MaterialBindingCache
 {
 public:
     MaterialBindingCache(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::rhi::ShaderType shaderType,
         uint32_t registerSpace,
         bool registerSpaceIsDescriptorSet,
         const std::vector<MaterialResourceBinding>& bindings,
-        caustica::rhi::ISampler* sampler,
-        caustica::rhi::ITexture* fallbackTexture,
+        caustica::rhi::Sampler* sampler,
+        caustica::rhi::Texture* fallbackTexture,
         render::SceneGpuResources* sceneGpuResources,
         bool trackLiveness = true);
 
-    caustica::rhi::IBindingLayout* getLayout() const;
-    caustica::rhi::IBindingSet* getMaterialBindingSet(const Material* material);
+    caustica::rhi::BindingLayout* getLayout() const;
+    caustica::rhi::BindingSet* getMaterialBindingSet(const Material* material);
     void clear();
 
 private:

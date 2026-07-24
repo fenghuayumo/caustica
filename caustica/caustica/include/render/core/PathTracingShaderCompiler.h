@@ -112,7 +112,7 @@ struct HitGroupInfo
 class PathTracingShaderCompiler : public std::enable_shared_from_this<PathTracingShaderCompiler>
 {
 public:
-    PathTracingShaderCompiler(caustica::rhi::IDevice* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout);
+    PathTracingShaderCompiler(caustica::rhi::Device* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout);
     ~PathTracingShaderCompiler();
     
     void                                update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);

@@ -6,7 +6,7 @@
 
 namespace caustica::rhi
 {
-    bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, IMessageCallback* messageCallback)
+    bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, MessageCallback* messageCallback)
     {
         if ((permanentState & requiredState) != requiredState)
         {
@@ -340,6 +340,8 @@ namespace caustica::rhi
 
     void CommandListResourceStateTracker::commandListSubmitted()
     {
+        // Called from Device::executeCommandLists under the backend submit lock so
+        // permanentState writeback is serialized across command lists.
         for (auto [texture, state] : m_PermanentTextureStates)
         {
             if (texture->permanentState != 0 && texture->permanentState != state)

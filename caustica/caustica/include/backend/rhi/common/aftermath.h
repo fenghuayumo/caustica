@@ -42,10 +42,10 @@ namespace caustica::rhi
         std::unordered_map<size_t, std::string> m_EventStrings;
     };
 
-    // AftermathCrashDumpHelper tracks all caustica::rhi::IDevice-level constructs that we need when generating a crash dump
+    // AftermathCrashDumpHelper tracks all caustica::rhi::Device-level constructs that we need when generating a crash dump
     // It provides two services: resolving a marker hash to the original string, and getting the specific shader bytecode
     // of a requested shader hash
-    // There should be one AftermathCrashDumpHelper per caustica::rhi::IDevice
+    // There should be one AftermathCrashDumpHelper per caustica::rhi::Device
     // All command lists will register their AftermathMarkerTrackers with the AftermathCrashDumpHelper
     // Any shader bytecode loading and management code (e.g. caustica's ShaderFactory) should register a shader binary lookup callback
     class AftermathCrashDumpHelper

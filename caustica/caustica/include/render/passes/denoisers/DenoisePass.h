@@ -47,7 +47,7 @@ public:
 
     void createGuides(
         PathTracingContext* context,
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         const std::unique_ptr<RenderTargets>& renderTargets,
         const std::shared_ptr<ShaderDebug>& shaderDebug,
@@ -56,31 +56,31 @@ public:
     // Sync per-frame handles from the graph context (replaces mega FrameBindings copy).
     void bindFrame(const FrameGraphContext& ctx);
 
-    void prepareGuides(caustica::rhi::ICommandList* commandList);
-    void denoiseSpecHitT(caustica::rhi::ICommandList* commandList);
-    void computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList);
-    void stablePlanesDebugViz(caustica::rhi::ICommandList* commandList);
+    void prepareGuides(caustica::rhi::CommandList* commandList);
+    void denoiseSpecHitT(caustica::rhi::CommandList* commandList);
+    void computeAvgLayerRadiance(caustica::rhi::CommandList* commandList);
+    void stablePlanesDebugViz(caustica::rhi::CommandList* commandList);
     void ensureNrdIntegrations();
-    void prepareNrdInputs(caustica::rhi::ICommandList* commandList, int planeIndex);
-    void runNrd(caustica::rhi::ICommandList* commandList, int planeIndex);
-    void mergeNrdOutputs(caustica::rhi::ICommandList* commandList, int planeIndex);
-    void denoiseStablePlane(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer, int planeIndex);
-    void denoise(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer);
-    void runNoDenoiserFinalMerge(caustica::rhi::ICommandList* commandList);
-    void runDlssUpscale(caustica::rhi::ICommandList* commandList, bool reset);
+    void prepareNrdInputs(caustica::rhi::CommandList* commandList, int planeIndex);
+    void runNrd(caustica::rhi::CommandList* commandList, int planeIndex);
+    void mergeNrdOutputs(caustica::rhi::CommandList* commandList, int planeIndex);
+    void denoiseStablePlane(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* framebuffer, int planeIndex);
+    void denoise(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* framebuffer);
+    void runNoDenoiserFinalMerge(caustica::rhi::CommandList* commandList);
+    void runDlssUpscale(caustica::rhi::CommandList* commandList, bool reset);
 
     void resetReferenceOIDN();
-    void applyReferenceOIDN(caustica::rhi::ICommandList* commandList);
+    void applyReferenceOIDN(caustica::rhi::CommandList* commandList);
     void invalidateNrdIntegrations();
     void invalidateOidnOutput();
 
 private:
 #if CAUSTICA_WITH_NATIVE_DLSS
-    bool evaluateNativeDLSS(caustica::rhi::ICommandList* commandList, bool reset);
+    bool evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bool reset);
 #endif
 
     PathTracingContext* m_context = nullptr;
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
 
     // Per-frame snapshot filled by bindFrame from FrameGraphContext.
     RenderTargets* m_renderTargets = nullptr;
@@ -88,7 +88,7 @@ private:
     caustica::rhi::BindingSetHandle m_bindingSet;
     caustica::rhi::BindingLayoutHandle m_bindingLayout;
     caustica::rhi::BufferHandle m_constantBuffer;
-    caustica::rhi::ICommandList* m_commandList = nullptr;
+    caustica::rhi::CommandList* m_commandList = nullptr;
     dm::uint2 m_renderSize{};
     dm::uint2 m_displaySize{};
     float m_displayAspectRatio = 1.f;

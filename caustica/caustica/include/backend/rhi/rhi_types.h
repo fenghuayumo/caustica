@@ -285,13 +285,13 @@ namespace caustica::rhi
                   HeapDesc& setDebugName(const std::string& value) { debugName = value; return *this; }
     };
 
-    class IHeap : public IResource
+    class Heap : public Resource
     {
     public:
         virtual const HeapDesc& getDesc() = 0;
     };
 
-    typedef RefCountPtr<IHeap> HeapHandle;
+    typedef RefCountPtr<Heap> HeapHandle;
 
     struct MemoryRequirements
     {
@@ -516,7 +516,7 @@ namespace caustica::rhi
 
     static const TextureSubresourceSet AllSubresources = TextureSubresourceSet(0, TextureSubresourceSet::AllMipLevels, 0, TextureSubresourceSet::AllArraySlices);
 
-    class ITexture : public IResource
+    class Texture : public Resource
     {
     public:
         [[nodiscard]] virtual const TextureDesc& getDesc() const = 0;
@@ -525,14 +525,14 @@ namespace caustica::rhi
         // TODO: on D3D12, the views might become invalid later if the view heap is grown/reallocated, we should do something about that.
         virtual Object getNativeView(ObjectType objectType, Format format = Format::UNKNOWN, TextureSubresourceSet subresources = AllSubresources, TextureDimension dimension = TextureDimension::Unknown, bool isReadOnlyDSV = false) = 0;
     };
-    typedef RefCountPtr<ITexture> TextureHandle;
+    typedef RefCountPtr<Texture> TextureHandle;
 
-    class IStagingTexture : public IResource
+    class StagingTexture : public Resource
     {
     public:
         [[nodiscard]] virtual const TextureDesc& getDesc() const = 0;
     };
-    typedef RefCountPtr<IStagingTexture> StagingTextureHandle;
+    typedef RefCountPtr<StagingTexture> StagingTextureHandle;
 
     struct TiledTextureCoordinate
     {
@@ -557,7 +557,7 @@ namespace caustica::rhi
         TiledTextureRegion* tiledTextureRegions = nullptr;
         uint64_t* byteOffsets = nullptr;
         uint32_t numTextureRegions = 0;
-        IHeap* heap = nullptr;
+        Heap* heap = nullptr;
     };
 
     struct PackedMipDesc
@@ -599,13 +599,13 @@ namespace caustica::rhi
         bool keepInitialState = false;
     };
 
-    class ISamplerFeedbackTexture : public IResource
+    class SamplerFeedbackTexture : public Resource
     {
     public:
         [[nodiscard]] virtual const SamplerFeedbackTextureDesc& getDesc() const = 0;
         virtual TextureHandle getPairedTexture() = 0;
     };
-    typedef RefCountPtr<ISamplerFeedbackTexture> SamplerFeedbackTextureHandle;
+    typedef RefCountPtr<SamplerFeedbackTexture> SamplerFeedbackTextureHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Input Layout
@@ -631,14 +631,14 @@ namespace caustica::rhi
         constexpr VertexAttributeDesc& setIsInstanced(bool value) { isInstanced = value; return *this; }
     };
 
-    class IInputLayout : public IResource
+    class InputLayout : public Resource
     {
     public:
         [[nodiscard]] virtual uint32_t getNumAttributes() const = 0;
         [[nodiscard]] virtual const VertexAttributeDesc* getAttributeDesc(uint32_t index) const = 0;
     };
 
-    typedef RefCountPtr<IInputLayout> InputLayoutHandle;
+    typedef RefCountPtr<InputLayout> InputLayoutHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Buffer
@@ -731,14 +731,14 @@ namespace caustica::rhi
 
     static const BufferRange EntireBuffer = BufferRange(0, ~0ull);
 
-    class IBuffer : public IResource
+    class Buffer : public Resource
     {
     public:
         [[nodiscard]] virtual const BufferDesc& getDesc() const = 0;
         [[nodiscard]] virtual GpuVirtualAddress getGpuVirtualAddress() const = 0;
     };
 
-    typedef RefCountPtr<IBuffer> BufferHandle;
+    typedef RefCountPtr<Buffer> BufferHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Shader
@@ -860,27 +860,27 @@ namespace caustica::rhi
         }
     };
 
-    class IShader : public IResource
+    class Shader : public Resource
     {
     public:
         [[nodiscard]] virtual const ShaderDesc& getDesc() const = 0;
         virtual void getBytecode(const void** ppBytecode, size_t* pSize) const = 0;
     };
 
-    typedef RefCountPtr<IShader> ShaderHandle;
+    typedef RefCountPtr<Shader> ShaderHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Shader Library
     //////////////////////////////////////////////////////////////////////////
 
-    class IShaderLibrary : public IResource
+    class ShaderLibrary : public Resource
     {
     public:
         virtual void getBytecode(const void** ppBytecode, size_t* pSize) const = 0;
         virtual ShaderHandle getShader(const char* entryName, ShaderType shaderType) = 0;
     };
 
-    typedef RefCountPtr<IShaderLibrary> ShaderLibraryHandle;
+    typedef RefCountPtr<ShaderLibrary> ShaderLibraryHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Blend State
@@ -1238,13 +1238,13 @@ namespace caustica::rhi
         SamplerDesc& setReductionType(SamplerReductionType type) { reductionType = type; return *this; }
     };
 
-    class ISampler : public IResource
+    class Sampler : public Resource
     {
     public:
         [[nodiscard]] virtual const SamplerDesc& getDesc() const = 0;
     };
 
-    typedef RefCountPtr<ISampler> SamplerHandle;
+    typedef RefCountPtr<Sampler> SamplerHandle;
     
     //////////////////////////////////////////////////////////////////////////
     // Framebuffer
@@ -1252,12 +1252,12 @@ namespace caustica::rhi
 
     struct FramebufferAttachment
     {
-        ITexture* texture = nullptr;
+        Texture* texture = nullptr;
         TextureSubresourceSet subresources = TextureSubresourceSet(0, 1, 0, 1);
         Format format = Format::UNKNOWN;
         bool isReadOnly = false;
         
-        constexpr FramebufferAttachment& setTexture(ITexture* t) { texture = t; return *this; }
+        constexpr FramebufferAttachment& setTexture(Texture* t) { texture = t; return *this; }
         constexpr FramebufferAttachment& setSubresources(TextureSubresourceSet value) { subresources = value; return *this; }
         constexpr FramebufferAttachment& setArraySlice(ArraySlice index) { subresources.baseArraySlice = index; subresources.numArraySlices = 1; return *this; }
         constexpr FramebufferAttachment& setArraySliceRange(ArraySlice index, ArraySlice count) { subresources.baseArraySlice = index; subresources.numArraySlices = count; return *this; }
@@ -1275,14 +1275,14 @@ namespace caustica::rhi
         FramebufferAttachment shadingRateAttachment;
 
         FramebufferDesc& addColorAttachment(const FramebufferAttachment& a) { colorAttachments.push_back(a); return *this; }
-        FramebufferDesc& addColorAttachment(ITexture* texture) { colorAttachments.push_back(FramebufferAttachment().setTexture(texture)); return *this; }
-        FramebufferDesc& addColorAttachment(ITexture* texture, TextureSubresourceSet subresources) { colorAttachments.push_back(FramebufferAttachment().setTexture(texture).setSubresources(subresources)); return *this; }
+        FramebufferDesc& addColorAttachment(Texture* texture) { colorAttachments.push_back(FramebufferAttachment().setTexture(texture)); return *this; }
+        FramebufferDesc& addColorAttachment(Texture* texture, TextureSubresourceSet subresources) { colorAttachments.push_back(FramebufferAttachment().setTexture(texture).setSubresources(subresources)); return *this; }
         FramebufferDesc& setDepthAttachment(const FramebufferAttachment& d) { depthAttachment = d; return *this; }
-        FramebufferDesc& setDepthAttachment(ITexture* texture) { depthAttachment = FramebufferAttachment().setTexture(texture); return *this; }
-        FramebufferDesc& setDepthAttachment(ITexture* texture, TextureSubresourceSet subresources) { depthAttachment = FramebufferAttachment().setTexture(texture).setSubresources(subresources); return *this; }
+        FramebufferDesc& setDepthAttachment(Texture* texture) { depthAttachment = FramebufferAttachment().setTexture(texture); return *this; }
+        FramebufferDesc& setDepthAttachment(Texture* texture, TextureSubresourceSet subresources) { depthAttachment = FramebufferAttachment().setTexture(texture).setSubresources(subresources); return *this; }
         FramebufferDesc& setShadingRateAttachment(const FramebufferAttachment& d) { shadingRateAttachment = d; return *this; }
-        FramebufferDesc& setShadingRateAttachment(ITexture* texture) { shadingRateAttachment = FramebufferAttachment().setTexture(texture); return *this; }
-        FramebufferDesc& setShadingRateAttachment(ITexture* texture, TextureSubresourceSet subresources) { shadingRateAttachment = FramebufferAttachment().setTexture(texture).setSubresources(subresources); return *this; }
+        FramebufferDesc& setShadingRateAttachment(Texture* texture) { shadingRateAttachment = FramebufferAttachment().setTexture(texture); return *this; }
+        FramebufferDesc& setShadingRateAttachment(Texture* texture, TextureSubresourceSet subresources) { shadingRateAttachment = FramebufferAttachment().setTexture(texture).setSubresources(subresources); return *this; }
     };
 
     // Describes the parameters of a framebuffer that can be used to determine if a given framebuffer
@@ -1341,14 +1341,14 @@ namespace caustica::rhi
         }
     };
 
-    class IFramebuffer : public IResource 
+    class Framebuffer : public Resource 
     {
     public:
         [[nodiscard]] virtual const FramebufferDesc& getDesc() const = 0;
         [[nodiscard]] virtual const FramebufferInfoEx& getFramebufferInfo() const = 0;
     };
 
-    typedef RefCountPtr<IFramebuffer> FramebufferHandle;
+    typedef RefCountPtr<Framebuffer> FramebufferHandle;
 
     namespace rt
     {
@@ -1395,24 +1395,24 @@ namespace caustica::rhi
             // Base pointer for raw OMM input data.
             // Individual OMMs must be 1B aligned, though natural alignment is recommended.
             // It's also recommended to try to organize OMMs together that are expected to be used spatially close together.
-            IBuffer* inputBuffer = nullptr;
+            Buffer* inputBuffer = nullptr;
             uint64_t inputBufferOffset = 0;
 
             // One NVAPI_D3D12_RAYTRACING_OPACITY_MICROMAP_DESC entry per OMM.
-            IBuffer* perOmmDescs = nullptr;
+            Buffer* perOmmDescs = nullptr;
             uint64_t perOmmDescsOffset = 0;
 
             OpacityMicromapDesc& setDebugName(const std::string& value) { debugName = value; return *this; }
             OpacityMicromapDesc& setTrackLiveness(bool value) { trackLiveness = value; return *this; }
             OpacityMicromapDesc& setFlags(OpacityMicromapBuildFlags value) { flags = value; return *this; }
             OpacityMicromapDesc& setCounts(const std::vector<OpacityMicromapUsageCount>& value) { counts = value; return *this; }
-            OpacityMicromapDesc& setInputBuffer(IBuffer* value) { inputBuffer = value; return *this; }
+            OpacityMicromapDesc& setInputBuffer(Buffer* value) { inputBuffer = value; return *this; }
             OpacityMicromapDesc& setInputBufferOffset(uint64_t value) { inputBufferOffset = value; return *this; }
-            OpacityMicromapDesc& setPerOmmDescs(IBuffer* value) { perOmmDescs = value; return *this; }
+            OpacityMicromapDesc& setPerOmmDescs(Buffer* value) { perOmmDescs = value; return *this; }
             OpacityMicromapDesc& setPerOmmDescsOffset(uint64_t value) { perOmmDescsOffset = value; return *this; }
         };
 
-        class IOpacityMicromap : public IResource
+        class OpacityMicromap : public Resource
         {
         public:
             [[nodiscard]] virtual const OpacityMicromapDesc& getDesc() const = 0;
@@ -1420,13 +1420,13 @@ namespace caustica::rhi
             [[nodiscard]] virtual uint64_t getDeviceAddress() const = 0;
         };
 
-        typedef RefCountPtr<IOpacityMicromap> OpacityMicromapHandle;
+        typedef RefCountPtr<OpacityMicromap> OpacityMicromapHandle;
 
         //////////////////////////////////////////////////////////////////////////
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
 
-        class IAccelStruct;
+        class AccelStruct;
 
         typedef float AffineTransform[12];
 
@@ -1469,8 +1469,8 @@ namespace caustica::rhi
 
         struct GeometryTriangles
         {
-            IBuffer* indexBuffer = nullptr;   // make sure the first 2 fields in all Geometry 
-            IBuffer* vertexBuffer = nullptr;  // structs are IBuffer* for easier debugging
+            Buffer* indexBuffer = nullptr;   // make sure the first 2 fields in all Geometry 
+            Buffer* vertexBuffer = nullptr;  // structs are Buffer* for easier debugging
             Format indexFormat = Format::UNKNOWN;
             Format vertexFormat = Format::UNKNOWN; // See D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC for accepted formats and how they are interpreted
             uint64_t indexOffset = 0;
@@ -1479,15 +1479,15 @@ namespace caustica::rhi
             uint32_t vertexCount = 0;
             uint32_t vertexStride = 0;
 
-            IOpacityMicromap* opacityMicromap = nullptr;
-            IBuffer* ommIndexBuffer = nullptr;
+            OpacityMicromap* opacityMicromap = nullptr;
+            Buffer* ommIndexBuffer = nullptr;
             uint64_t ommIndexBufferOffset = 0;
             Format ommIndexFormat = Format::UNKNOWN;
             const OpacityMicromapUsageCount* pOmmUsageCounts = nullptr;
             uint32_t numOmmUsageCounts = 0;
 
-            GeometryTriangles& setIndexBuffer(IBuffer* value) { indexBuffer = value; return *this; }
-            GeometryTriangles& setVertexBuffer(IBuffer* value) { vertexBuffer = value; return *this; }
+            GeometryTriangles& setIndexBuffer(Buffer* value) { indexBuffer = value; return *this; }
+            GeometryTriangles& setVertexBuffer(Buffer* value) { vertexBuffer = value; return *this; }
             GeometryTriangles& setIndexFormat(Format value) { indexFormat = value; return *this; }
             GeometryTriangles& setVertexFormat(Format value) { vertexFormat = value; return *this; }
             GeometryTriangles& setIndexOffset(uint64_t value) { indexOffset = value; return *this; }
@@ -1495,8 +1495,8 @@ namespace caustica::rhi
             GeometryTriangles& setIndexCount(uint32_t value) { indexCount = value; return *this; }
             GeometryTriangles& setVertexCount(uint32_t value) { vertexCount = value; return *this; }
             GeometryTriangles& setVertexStride(uint32_t value) { vertexStride = value; return *this; }
-            GeometryTriangles& setOpacityMicromap(IOpacityMicromap* value) { opacityMicromap = value; return *this; }
-            GeometryTriangles& setOmmIndexBuffer(IBuffer* value) { ommIndexBuffer = value; return *this; }
+            GeometryTriangles& setOpacityMicromap(OpacityMicromap* value) { opacityMicromap = value; return *this; }
+            GeometryTriangles& setOmmIndexBuffer(Buffer* value) { ommIndexBuffer = value; return *this; }
             GeometryTriangles& setOmmIndexBufferOffset(uint64_t value) { ommIndexBufferOffset = value; return *this; }
             GeometryTriangles& setOmmIndexFormat(Format value) { ommIndexFormat = value; return *this; }
             GeometryTriangles& setPOmmUsageCounts(const OpacityMicromapUsageCount* value) { pOmmUsageCounts = value; return *this; }
@@ -1505,13 +1505,13 @@ namespace caustica::rhi
 
         struct GeometryAABBs
         {
-            IBuffer* buffer = nullptr;
-            IBuffer* unused = nullptr;
+            Buffer* buffer = nullptr;
+            Buffer* unused = nullptr;
             uint64_t offset = 0;
             uint32_t count = 0;
             uint32_t stride = 0;
 
-            GeometryAABBs& setBuffer(IBuffer* value) { buffer = value; return *this; }
+            GeometryAABBs& setBuffer(Buffer* value) { buffer = value; return *this; }
             GeometryAABBs& setOffset(uint64_t value) { offset = value; return *this; }
             GeometryAABBs& setCount(uint32_t value) { count = value; return *this; }
             GeometryAABBs& setStride(uint32_t value) { stride = value; return *this; }
@@ -1519,8 +1519,8 @@ namespace caustica::rhi
 
         struct GeometrySpheres
         {
-            IBuffer* indexBuffer = nullptr;
-            IBuffer* vertexBuffer = nullptr;
+            Buffer* indexBuffer = nullptr;
+            Buffer* vertexBuffer = nullptr;
             Format indexFormat = Format::UNKNOWN;
             Format vertexPositionFormat = Format::UNKNOWN;
             Format vertexRadiusFormat = Format::UNKNOWN;
@@ -1533,8 +1533,8 @@ namespace caustica::rhi
             uint32_t vertexPositionStride = 0;
             uint32_t vertexRadiusStride = 0;
 
-            GeometrySpheres& setIndexBuffer(IBuffer* value) { indexBuffer = value; return *this; }
-            GeometrySpheres& setVertexBuffer(IBuffer* value) { vertexBuffer = value; return *this; }
+            GeometrySpheres& setIndexBuffer(Buffer* value) { indexBuffer = value; return *this; }
+            GeometrySpheres& setVertexBuffer(Buffer* value) { vertexBuffer = value; return *this; }
             GeometrySpheres& setIndexFormat(Format value) { indexFormat = value; return *this; }
             GeometrySpheres& setVertexPositionFormat(Format value) { vertexPositionFormat = value; return *this; }
             GeometrySpheres& setVertexRadiusFormat(Format value) { vertexRadiusFormat = value; return *this; }
@@ -1562,8 +1562,8 @@ namespace caustica::rhi
 
         struct GeometryLss
         {
-            IBuffer* indexBuffer = nullptr;
-            IBuffer* vertexBuffer = nullptr;
+            Buffer* indexBuffer = nullptr;
+            Buffer* vertexBuffer = nullptr;
             Format indexFormat = Format::UNKNOWN;
             Format vertexPositionFormat = Format::UNKNOWN;
             Format vertexRadiusFormat = Format::UNKNOWN;
@@ -1579,8 +1579,8 @@ namespace caustica::rhi
             GeometryLssPrimitiveFormat primitiveFormat = GeometryLssPrimitiveFormat::List;
             GeometryLssEndcapMode endcapMode = GeometryLssEndcapMode::None;
 
-            GeometryLss& setIndexBuffer(IBuffer* value) { indexBuffer = value; return *this; }
-            GeometryLss& setVertexBuffer(IBuffer* value) { vertexBuffer = value; return *this; }
+            GeometryLss& setIndexBuffer(Buffer* value) { indexBuffer = value; return *this; }
+            GeometryLss& setVertexBuffer(Buffer* value) { vertexBuffer = value; return *this; }
             GeometryLss& setIndexFormat(Format value) { indexFormat = value; return *this; }
             GeometryLss& setVertexPositionFormat(Format value) { vertexPositionFormat = value; return *this; }
             GeometryLss& setVertexRadiusFormat(Format value) { vertexRadiusFormat = value; return *this; }
@@ -1644,8 +1644,8 @@ namespace caustica::rhi
             InstanceFlags flags : 8;
             union
             {
-                IAccelStruct* bottomLevelAS; // for buildTopLevelAccelStruct
-                uint64_t blasDeviceAddress;  // for buildTopLevelAccelStructFromBuffer - use IAccelStruct::getDeviceAddress()
+                AccelStruct* bottomLevelAS; // for buildTopLevelAccelStruct
+                uint64_t blasDeviceAddress;  // for buildTopLevelAccelStructFromBuffer - use AccelStruct::getDeviceAddress()
             };
 
             InstanceDesc()  // NOLINT(cppcoreguidelines-pro-type-member-init)
@@ -1663,7 +1663,7 @@ namespace caustica::rhi
             InstanceDesc& setInstanceMask(uint32_t value) { instanceMask = value; return *this; }
             InstanceDesc& setTransform(const AffineTransform& value) { memcpy(&transform, &value, sizeof(AffineTransform)); return *this; }
             InstanceDesc& setFlags(InstanceFlags value) { flags = value; return *this; }
-            InstanceDesc& setBLAS(IAccelStruct* value) { bottomLevelAS = value; return *this; }
+            InstanceDesc& setBLAS(AccelStruct* value) { bottomLevelAS = value; return *this; }
         };
 
         static_assert(sizeof(InstanceDesc) == 64, "sizeof(InstanceDesc) is supposed to be 64 bytes");
@@ -1710,7 +1710,7 @@ namespace caustica::rhi
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
 
-        class IAccelStruct : public IResource
+        class AccelStruct : public Resource
         {
         public:
             [[nodiscard]] virtual const AccelStructDesc& getDesc() const = 0;
@@ -1718,7 +1718,7 @@ namespace caustica::rhi
             [[nodiscard]] virtual uint64_t getDeviceAddress() const = 0;
         };
 
-        typedef RefCountPtr<IAccelStruct> AccelStructHandle;
+        typedef RefCountPtr<AccelStruct> AccelStructHandle;
 
 
         //////////////////////////////////////////////////////////////////////////
@@ -1836,19 +1836,19 @@ namespace caustica::rhi
                 uint64_t scratchSizeInBytes = 0;                        // Size of scratch resource returned by getClusterOperationSizeInfo() scratchSizeInBytes 
 
                 // Input Resources
-                IBuffer* inIndirectArgCountBuffer = nullptr;            // Buffer containing the number of AS to build, instantiate, or move
+                Buffer* inIndirectArgCountBuffer = nullptr;            // Buffer containing the number of AS to build, instantiate, or move
                 uint64_t inIndirectArgCountOffsetInBytes = 0;           // Offset (in bytes) to where the count is in the inIndirectArgCountBuffer 
-                IBuffer* inIndirectArgsBuffer = nullptr;                // Buffer of descriptor array of format IndirectTriangleClasArgs, IndirectTriangleTemplateArgs, IndirectInstantiateTemplateArgs
+                Buffer* inIndirectArgsBuffer = nullptr;                // Buffer of descriptor array of format IndirectTriangleClasArgs, IndirectTriangleTemplateArgs, IndirectInstantiateTemplateArgs
                 uint64_t inIndirectArgsOffsetInBytes = 0;               // Offset (in bytes) to where the descriptor array starts inIndirectArgsBuffer
 
                 // In/Out Resources
-                IBuffer* inOutAddressesBuffer = nullptr;                // Array of addresses of CLAS, CLAS Templates, or BLAS
+                Buffer* inOutAddressesBuffer = nullptr;                // Array of addresses of CLAS, CLAS Templates, or BLAS
                 uint64_t inOutAddressesOffsetInBytes = 0;               // Offset (in bytes) to where the addresses array starts in inOutAddressesBuffer
 
                 // Output Resources
-                IBuffer* outSizesBuffer = nullptr;                      // Sizes (in bytes) of CLAS, CLAS Templates, or BLAS
+                Buffer* outSizesBuffer = nullptr;                      // Sizes (in bytes) of CLAS, CLAS Templates, or BLAS
                 uint64_t outSizesOffsetInBytes = 0;                     // Offset (in bytes) to where the output sizes array starts in outSizesBuffer
-                IBuffer* outAccelerationStructuresBuffer = nullptr;     // Destination buffer for CLAS, CLAS Template, or BLAS data. Size must be calculated with getOperationSizeInfo or with the outSizesBuffer result of OperationMode::GetSizes
+                Buffer* outAccelerationStructuresBuffer = nullptr;     // Destination buffer for CLAS, CLAS Template, or BLAS data. Size must be calculated with getOperationSizeInfo or with the outSizesBuffer result of OperationMode::GetSizes
                 uint64_t outAccelerationStructuresOffsetInBytes = 0;    // Offset (in bytes) to where the output acceleration structures starts in outAccelerationStructuresBuffer
             };
         } // namespace cluster
@@ -2039,14 +2039,14 @@ namespace caustica::rhi
         BindlessLayoutDesc& setLayoutType(LayoutType value) { layoutType = value; return *this; }
     };
 
-    class IBindingLayout : public IResource
+    class BindingLayout : public Resource
     {
     public:
         [[nodiscard]] virtual const BindingLayoutDesc* getDesc() const = 0;           // returns nullptr for bindless layouts
         [[nodiscard]] virtual const BindlessLayoutDesc* getBindlessDesc() const = 0;  // returns nullptr for regular layouts
     };
 
-    typedef RefCountPtr<IBindingLayout> BindingLayoutHandle;
+    typedef RefCountPtr<BindingLayout> BindingLayoutHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Binding Sets
@@ -2054,7 +2054,7 @@ namespace caustica::rhi
 
     struct BindingSetItem
     {
-        IResource* resourceHandle;
+        Resource* resourceHandle;
 
         uint32_t slot;
 
@@ -2121,7 +2121,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem Texture_SRV(uint32_t slot, ITexture* texture, Format format = Format::UNKNOWN,
+        static BindingSetItem Texture_SRV(uint32_t slot, Texture* texture, Format format = Format::UNKNOWN,
             TextureSubresourceSet subresources = AllSubresources, TextureDimension dimension = TextureDimension::Unknown)
         {
             BindingSetItem result;
@@ -2137,7 +2137,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem Texture_UAV(uint32_t slot, ITexture* texture, Format format = Format::UNKNOWN,
+        static BindingSetItem Texture_UAV(uint32_t slot, Texture* texture, Format format = Format::UNKNOWN,
             TextureSubresourceSet subresources = TextureSubresourceSet(0, 1, 0, TextureSubresourceSet::AllArraySlices),
             TextureDimension dimension = TextureDimension::Unknown)
         {
@@ -2154,7 +2154,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem TypedBuffer_SRV(uint32_t slot, IBuffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
+        static BindingSetItem TypedBuffer_SRV(uint32_t slot, Buffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2169,7 +2169,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem TypedBuffer_UAV(uint32_t slot, IBuffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
+        static BindingSetItem TypedBuffer_UAV(uint32_t slot, Buffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2184,7 +2184,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem ConstantBuffer(uint32_t slot, IBuffer* buffer, BufferRange range = EntireBuffer)
+        static BindingSetItem ConstantBuffer(uint32_t slot, Buffer* buffer, BufferRange range = EntireBuffer)
         {
             bool isVolatile = buffer && buffer->getDesc().isVolatile;
 
@@ -2201,7 +2201,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem Sampler(uint32_t slot, ISampler* sampler)
+        static BindingSetItem Sampler(uint32_t slot, Sampler* sampler)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2217,7 +2217,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem RayTracingAccelStruct(uint32_t slot, rt::IAccelStruct* as)
+        static BindingSetItem RayTracingAccelStruct(uint32_t slot, rt::AccelStruct* as)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2233,7 +2233,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem StructuredBuffer_SRV(uint32_t slot, IBuffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
+        static BindingSetItem StructuredBuffer_SRV(uint32_t slot, Buffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2248,7 +2248,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem StructuredBuffer_UAV(uint32_t slot, IBuffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
+        static BindingSetItem StructuredBuffer_UAV(uint32_t slot, Buffer* buffer, Format format = Format::UNKNOWN, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2263,7 +2263,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem RawBuffer_SRV(uint32_t slot, IBuffer* buffer, BufferRange range = EntireBuffer)
+        static BindingSetItem RawBuffer_SRV(uint32_t slot, Buffer* buffer, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2278,7 +2278,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem RawBuffer_UAV(uint32_t slot, IBuffer* buffer, BufferRange range = EntireBuffer)
+        static BindingSetItem RawBuffer_UAV(uint32_t slot, Buffer* buffer, BufferRange range = EntireBuffer)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2309,7 +2309,7 @@ namespace caustica::rhi
             return result;
         }
 
-        static BindingSetItem SamplerFeedbackTexture_UAV(uint32_t slot, ISamplerFeedbackTexture* texture)
+        static BindingSetItem SamplerFeedbackTexture_UAV(uint32_t slot, SamplerFeedbackTexture* texture)
         {
             BindingSetItem result;
             result.slot = slot;
@@ -2367,28 +2367,28 @@ namespace caustica::rhi
         BindingSetDesc& setTrackLiveness(bool value) { trackLiveness = value; return *this; }
     };
 
-    class IBindingSet : public IResource
+    class BindingSet : public Resource
     {
     public:
         [[nodiscard]] virtual const BindingSetDesc* getDesc() const = 0;  // returns nullptr for descriptor tables
-        [[nodiscard]] virtual IBindingLayout* getLayout() const = 0;
+        [[nodiscard]] virtual BindingLayout* getLayout() const = 0;
     };
 
-    typedef RefCountPtr<IBindingSet> BindingSetHandle;
+    typedef RefCountPtr<BindingSet> BindingSetHandle;
 
     // Descriptor tables are bare, without extra mappings, state, or liveness tracking.
     // Unlike binding sets, descriptor tables are mutable - moreover, modification is the only way to populate them.
     // They can be grown or shrunk, and they are not tied to any binding layout.
     // All tracking is off, so applications should use descriptor tables with great care.
-    // IDescriptorTable is derived from IBindingSet to allow mixing them in the binding arrays.
-    class IDescriptorTable : public IBindingSet
+    // DescriptorTable is derived from BindingSet to allow mixing them in the binding arrays.
+    class DescriptorTable : public BindingSet
     {
     public:
         [[nodiscard]] virtual uint32_t getCapacity() const = 0;
         [[nodiscard]] virtual uint32_t getFirstDescriptorIndexInHeap() const = 0;
     };
 
-    typedef RefCountPtr<IDescriptorTable> DescriptorTableHandle;
+    typedef RefCountPtr<DescriptorTable> DescriptorTableHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Draw State
@@ -2504,28 +2504,28 @@ namespace caustica::rhi
         
         GraphicsPipelineDesc& setPrimType(PrimitiveType value) { primType = value; return *this; }
         GraphicsPipelineDesc& setPatchControlPoints(uint32_t value) { patchControlPoints = value; return *this; }
-        GraphicsPipelineDesc& setInputLayout(IInputLayout* value) { inputLayout = value; return *this; }
-        GraphicsPipelineDesc& setVertexShader(IShader* value) { VS = value; return *this; }
-        GraphicsPipelineDesc& setHullShader(IShader* value) { HS = value; return *this; }
-        GraphicsPipelineDesc& setTessellationControlShader(IShader* value) { HS = value; return *this; }
-        GraphicsPipelineDesc& setDomainShader(IShader* value) { DS = value; return *this; }
-        GraphicsPipelineDesc& setTessellationEvaluationShader(IShader* value) { DS = value; return *this; }
-        GraphicsPipelineDesc& setGeometryShader(IShader* value) { GS = value; return *this; }
-        GraphicsPipelineDesc& setPixelShader(IShader* value) { PS = value; return *this; }
-        GraphicsPipelineDesc& setFragmentShader(IShader* value) { PS = value; return *this; }
+        GraphicsPipelineDesc& setInputLayout(InputLayout* value) { inputLayout = value; return *this; }
+        GraphicsPipelineDesc& setVertexShader(Shader* value) { VS = value; return *this; }
+        GraphicsPipelineDesc& setHullShader(Shader* value) { HS = value; return *this; }
+        GraphicsPipelineDesc& setTessellationControlShader(Shader* value) { HS = value; return *this; }
+        GraphicsPipelineDesc& setDomainShader(Shader* value) { DS = value; return *this; }
+        GraphicsPipelineDesc& setTessellationEvaluationShader(Shader* value) { DS = value; return *this; }
+        GraphicsPipelineDesc& setGeometryShader(Shader* value) { GS = value; return *this; }
+        GraphicsPipelineDesc& setPixelShader(Shader* value) { PS = value; return *this; }
+        GraphicsPipelineDesc& setFragmentShader(Shader* value) { PS = value; return *this; }
         GraphicsPipelineDesc& setRenderState(const RenderState& value) { renderState = value; return *this; }
         GraphicsPipelineDesc& setVariableRateShadingState(const VariableRateShadingState& value) { shadingRateState = value; return *this; }
-        GraphicsPipelineDesc& addBindingLayout(IBindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
+        GraphicsPipelineDesc& addBindingLayout(BindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
     };
 
-    class IGraphicsPipeline : public IResource
+    class GraphicsPipeline : public Resource
     {
     public:
         [[nodiscard]] virtual const GraphicsPipelineDesc& getDesc() const = 0;
         [[nodiscard]] virtual const FramebufferInfo& getFramebufferInfo() const = 0;
     };
 
-    typedef RefCountPtr<IGraphicsPipeline> GraphicsPipelineHandle;
+    typedef RefCountPtr<GraphicsPipeline> GraphicsPipelineHandle;
 
     struct ComputePipelineDesc
     {
@@ -2533,17 +2533,17 @@ namespace caustica::rhi
 
         BindingLayoutVector bindingLayouts;
 
-        ComputePipelineDesc& setComputeShader(IShader* value) { CS = value; return *this; }
-        ComputePipelineDesc& addBindingLayout(IBindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
+        ComputePipelineDesc& setComputeShader(Shader* value) { CS = value; return *this; }
+        ComputePipelineDesc& addBindingLayout(BindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
     };
 
-    class IComputePipeline : public IResource
+    class ComputePipeline : public Resource
     {
     public:
         [[nodiscard]] virtual const ComputePipelineDesc& getDesc() const = 0;
     };
 
-    typedef RefCountPtr<IComputePipeline> ComputePipelineHandle;
+    typedef RefCountPtr<ComputePipeline> ComputePipelineHandle;
 
     struct MeshletPipelineDesc
     {
@@ -2558,37 +2558,37 @@ namespace caustica::rhi
         BindingLayoutVector bindingLayouts;
         
         MeshletPipelineDesc& setPrimType(PrimitiveType value) { primType = value; return *this; }
-        MeshletPipelineDesc& setTaskShader(IShader* value) { AS = value; return *this; }
-        MeshletPipelineDesc& setAmplificationShader(IShader* value) { AS = value; return *this; }
-        MeshletPipelineDesc& setMeshShader(IShader* value) { MS = value; return *this; }
-        MeshletPipelineDesc& setPixelShader(IShader* value) { PS = value; return *this; }
-        MeshletPipelineDesc& setFragmentShader(IShader* value) { PS = value; return *this; }
+        MeshletPipelineDesc& setTaskShader(Shader* value) { AS = value; return *this; }
+        MeshletPipelineDesc& setAmplificationShader(Shader* value) { AS = value; return *this; }
+        MeshletPipelineDesc& setMeshShader(Shader* value) { MS = value; return *this; }
+        MeshletPipelineDesc& setPixelShader(Shader* value) { PS = value; return *this; }
+        MeshletPipelineDesc& setFragmentShader(Shader* value) { PS = value; return *this; }
         MeshletPipelineDesc& setRenderState(const RenderState& value) { renderState = value; return *this; }
-        MeshletPipelineDesc& addBindingLayout(IBindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
+        MeshletPipelineDesc& addBindingLayout(BindingLayout* layout) { bindingLayouts.push_back(layout); return *this; }
     };
 
-    class IMeshletPipeline : public IResource
+    class MeshletPipeline : public Resource
     {
     public:
         [[nodiscard]] virtual const MeshletPipelineDesc& getDesc() const = 0;
         [[nodiscard]] virtual const FramebufferInfo& getFramebufferInfo() const = 0;
     };
 
-    typedef RefCountPtr<IMeshletPipeline> MeshletPipelineHandle;
+    typedef RefCountPtr<MeshletPipeline> MeshletPipelineHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // Draw and Dispatch
     //////////////////////////////////////////////////////////////////////////
 
-    class IEventQuery : public IResource { };
-    typedef RefCountPtr<IEventQuery> EventQueryHandle;
+    class EventQuery : public Resource { };
+    typedef RefCountPtr<EventQuery> EventQueryHandle;
 
-    class ITimerQuery : public IResource { };
-    typedef RefCountPtr<ITimerQuery> TimerQueryHandle;
+    class TimerQuery : public Resource { };
+    typedef RefCountPtr<TimerQuery> TimerQueryHandle;
 
     struct VertexBufferBinding
     {
-        IBuffer* buffer = nullptr;
+        Buffer* buffer = nullptr;
         uint32_t slot;
         uint64_t offset;
 
@@ -2600,14 +2600,14 @@ namespace caustica::rhi
         }
         bool operator !=(const VertexBufferBinding& b) const { return !(*this == b); }
 
-        VertexBufferBinding& setBuffer(IBuffer* value) { buffer = value; return *this; }
+        VertexBufferBinding& setBuffer(Buffer* value) { buffer = value; return *this; }
         VertexBufferBinding& setSlot(uint32_t value) { slot = value; return *this; }
         VertexBufferBinding& setOffset(uint64_t value) { offset = value; return *this; }
     };
 
     struct IndexBufferBinding
     {
-        IBuffer* buffer = nullptr;
+        Buffer* buffer = nullptr;
         Format format;
         uint32_t offset;
 
@@ -2619,18 +2619,18 @@ namespace caustica::rhi
         }
         bool operator !=(const IndexBufferBinding& b) const { return !(*this == b); }
 
-        IndexBufferBinding& setBuffer(IBuffer* value) { buffer = value; return *this; }
+        IndexBufferBinding& setBuffer(Buffer* value) { buffer = value; return *this; }
         IndexBufferBinding& setFormat(Format value) { format = value; return *this; }
         IndexBufferBinding& setOffset(uint32_t value) { offset = value; return *this; }
     };
 
-    typedef static_vector<IBindingSet*, c_MaxBindingLayouts> BindingSetVector;
+    typedef static_vector<BindingSet*, c_MaxBindingLayouts> BindingSetVector;
 
 
     struct GraphicsState
     {
-        IGraphicsPipeline* pipeline = nullptr;
-        IFramebuffer* framebuffer = nullptr;
+        GraphicsPipeline* pipeline = nullptr;
+        Framebuffer* framebuffer = nullptr;
         ViewportState viewport;
         VariableRateShadingState shadingRateState;
         Color blendConstantColor{};
@@ -2641,20 +2641,20 @@ namespace caustica::rhi
         static_vector<VertexBufferBinding, c_MaxVertexAttributes> vertexBuffers;
         IndexBufferBinding indexBuffer;
 
-        IBuffer* indirectParams = nullptr;
-        IBuffer* indirectCountBuffer = nullptr;
+        Buffer* indirectParams = nullptr;
+        Buffer* indirectCountBuffer = nullptr;
 
-        GraphicsState& setPipeline(IGraphicsPipeline* value) { pipeline = value; return *this; }
-        GraphicsState& setFramebuffer(IFramebuffer* value) { framebuffer = value; return *this; }
+        GraphicsState& setPipeline(GraphicsPipeline* value) { pipeline = value; return *this; }
+        GraphicsState& setFramebuffer(Framebuffer* value) { framebuffer = value; return *this; }
         GraphicsState& setViewport(const ViewportState& value) { viewport = value; return *this; }
         GraphicsState& setShadingRateState(const VariableRateShadingState& value) { shadingRateState = value; return *this; }
         GraphicsState& setBlendColor(const Color& value) { blendConstantColor = value; return *this; }
         GraphicsState& setDynamicStencilRefValue(uint8_t value) { dynamicStencilRefValue = value; return *this; }
-        GraphicsState& addBindingSet(IBindingSet* value) { bindings.push_back(value); return *this; }
+        GraphicsState& addBindingSet(BindingSet* value) { bindings.push_back(value); return *this; }
         GraphicsState& addVertexBuffer(const VertexBufferBinding& value) { vertexBuffers.push_back(value); return *this; }
         GraphicsState& setIndexBuffer(const IndexBufferBinding& value) { indexBuffer = value; return *this; }
-        GraphicsState& setIndirectParams(IBuffer* value) { indirectParams = value; return *this; }
-        GraphicsState& setIndirectCountBuffer(IBuffer* value) { indirectCountBuffer = value; return *this; }
+        GraphicsState& setIndirectParams(Buffer* value) { indirectParams = value; return *this; }
+        GraphicsState& setIndirectCountBuffer(Buffer* value) { indirectCountBuffer = value; return *this; }
     };
 
     struct DrawArguments
@@ -2702,15 +2702,15 @@ namespace caustica::rhi
 
     struct ComputeState
     {
-        IComputePipeline* pipeline = nullptr;
+        ComputePipeline* pipeline = nullptr;
 
         BindingSetVector bindings;
 
-        IBuffer* indirectParams = nullptr;
+        Buffer* indirectParams = nullptr;
 
-        ComputeState& setPipeline(IComputePipeline* value) { pipeline = value; return *this; }
-        ComputeState& addBindingSet(IBindingSet* value) { bindings.push_back(value); return *this; }
-        ComputeState& setIndirectParams(IBuffer* value) { indirectParams = value; return *this; }
+        ComputeState& setPipeline(ComputePipeline* value) { pipeline = value; return *this; }
+        ComputeState& addBindingSet(BindingSet* value) { bindings.push_back(value); return *this; }
+        ComputeState& setIndirectParams(Buffer* value) { indirectParams = value; return *this; }
     };
     
     struct DispatchIndirectArguments
@@ -2728,22 +2728,22 @@ namespace caustica::rhi
 
     struct MeshletState
     {
-        IMeshletPipeline* pipeline = nullptr;
-        IFramebuffer* framebuffer = nullptr;
+        MeshletPipeline* pipeline = nullptr;
+        Framebuffer* framebuffer = nullptr;
         ViewportState viewport;
         Color blendConstantColor{};
         uint8_t dynamicStencilRefValue = 0;
 
         BindingSetVector bindings;
 
-        IBuffer* indirectParams = nullptr;
+        Buffer* indirectParams = nullptr;
 
-        MeshletState& setPipeline(IMeshletPipeline* value) { pipeline = value; return *this; }
-        MeshletState& setFramebuffer(IFramebuffer* value) { framebuffer = value; return *this; }
+        MeshletState& setPipeline(MeshletPipeline* value) { pipeline = value; return *this; }
+        MeshletState& setFramebuffer(Framebuffer* value) { framebuffer = value; return *this; }
         MeshletState& setViewport(const ViewportState& value) { viewport = value; return *this; }
         MeshletState& setBlendColor(const Color& value) { blendConstantColor = value; return *this; }
-        MeshletState& addBindingSet(IBindingSet* value) { bindings.push_back(value); return *this; }
-        MeshletState& setIndirectParams(IBuffer* value) { indirectParams = value; return *this; }
+        MeshletState& addBindingSet(BindingSet* value) { bindings.push_back(value); return *this; }
+        MeshletState& setIndirectParams(Buffer* value) { indirectParams = value; return *this; }
         MeshletState& setDynamicStencilRefValue(uint8_t value) { dynamicStencilRefValue = value; return *this; }
     };
 
@@ -2760,8 +2760,8 @@ namespace caustica::rhi
             BindingLayoutHandle bindingLayout;
 
             PipelineShaderDesc& setExportName(const std::string& value) { exportName = value; return *this; }
-            PipelineShaderDesc& setShader(IShader* value) { shader = value; return *this; }
-            PipelineShaderDesc& setBindingLayout(IBindingLayout* value) { bindingLayout = value; return *this; }
+            PipelineShaderDesc& setShader(Shader* value) { shader = value; return *this; }
+            PipelineShaderDesc& setBindingLayout(BindingLayout* value) { bindingLayout = value; return *this; }
         };
 
         struct PipelineHitGroupDesc
@@ -2774,10 +2774,10 @@ namespace caustica::rhi
             bool isProceduralPrimitive = false;
 
             PipelineHitGroupDesc& setExportName(const std::string& value) { exportName = value; return *this; }
-            PipelineHitGroupDesc& setClosestHitShader(IShader* value) { closestHitShader = value; return *this; }
-            PipelineHitGroupDesc& setAnyHitShader(IShader* value) { anyHitShader = value; return *this; }
-            PipelineHitGroupDesc& setIntersectionShader(IShader* value) { intersectionShader = value; return *this; }
-            PipelineHitGroupDesc& setBindingLayout(IBindingLayout* value) { bindingLayout = value; return *this; }
+            PipelineHitGroupDesc& setClosestHitShader(Shader* value) { closestHitShader = value; return *this; }
+            PipelineHitGroupDesc& setAnyHitShader(Shader* value) { anyHitShader = value; return *this; }
+            PipelineHitGroupDesc& setIntersectionShader(Shader* value) { intersectionShader = value; return *this; }
+            PipelineHitGroupDesc& setBindingLayout(BindingLayout* value) { bindingLayout = value; return *this; }
             PipelineHitGroupDesc& setIsProceduralPrimitive(bool value) { isProceduralPrimitive = value; return *this; }
         };
 
@@ -2794,7 +2794,7 @@ namespace caustica::rhi
 
             PipelineDesc& addShader(const PipelineShaderDesc& value) { shaders.push_back(value); return *this; }
             PipelineDesc& addHitGroup(const PipelineHitGroupDesc& value) { hitGroups.push_back(value); return *this; }
-            PipelineDesc& addBindingLayout(IBindingLayout* value) { globalBindingLayouts.push_back(value); return *this; }
+            PipelineDesc& addBindingLayout(BindingLayout* value) { globalBindingLayouts.push_back(value); return *this; }
             PipelineDesc& setMaxPayloadSize(uint32_t value) { maxPayloadSize = value; return *this; }
             PipelineDesc& setMaxAttributeSize(uint32_t value) { maxAttributeSize = value; return *this; }
             PipelineDesc& setMaxRecursionDepth(uint32_t value) { maxRecursionDepth = value; return *this; }
@@ -2802,7 +2802,7 @@ namespace caustica::rhi
             PipelineDesc& setAllowOpacityMicromaps(bool value) { allowOpacityMicromaps = value; return *this; }
         };
 
-        class IPipeline;
+        class Pipeline;
 
         struct ShaderTableDesc
         {
@@ -2831,40 +2831,40 @@ namespace caustica::rhi
             ShaderTableDesc& enableCaching(uint32_t _maxEntries) { isCached = true; maxEntries = _maxEntries; return *this; }
         };
 
-        class IShaderTable : public IResource
+        class ShaderTable : public Resource
         {
         public:
             virtual ShaderTableDesc const& getDesc() const = 0;
             virtual uint32_t getNumEntries() const = 0;
-            virtual IPipeline* getPipeline() const = 0;
-            virtual void setRayGenerationShader(const char* exportName, IBindingSet* bindings = nullptr) = 0;
-            virtual int addMissShader(const char* exportName, IBindingSet* bindings = nullptr) = 0;
-            virtual int addHitGroup(const char* exportName, IBindingSet* bindings = nullptr) = 0;
-            virtual int addCallableShader(const char* exportName, IBindingSet* bindings = nullptr) = 0;
+            virtual Pipeline* getPipeline() const = 0;
+            virtual void setRayGenerationShader(const char* exportName, BindingSet* bindings = nullptr) = 0;
+            virtual int addMissShader(const char* exportName, BindingSet* bindings = nullptr) = 0;
+            virtual int addHitGroup(const char* exportName, BindingSet* bindings = nullptr) = 0;
+            virtual int addCallableShader(const char* exportName, BindingSet* bindings = nullptr) = 0;
             virtual void clearMissShaders() = 0;
             virtual void clearHitShaders() = 0;
             virtual void clearCallableShaders() = 0;
         };
 
-        typedef RefCountPtr<IShaderTable> ShaderTableHandle;
+        typedef RefCountPtr<ShaderTable> ShaderTableHandle;
 
-        class IPipeline : public IResource
+        class Pipeline : public Resource
         {
         public:
             [[nodiscard]] virtual const rt::PipelineDesc& getDesc() const = 0;
             virtual ShaderTableHandle createShaderTable(ShaderTableDesc const& desc = ShaderTableDesc()) = 0;
         };
 
-        typedef RefCountPtr<IPipeline> PipelineHandle;
+        typedef RefCountPtr<Pipeline> PipelineHandle;
 
         struct State
         {
-            IShaderTable* shaderTable = nullptr;
+            ShaderTable* shaderTable = nullptr;
 
             BindingSetVector bindings;
 
-            State& setShaderTable(IShaderTable* value) { shaderTable = value; return *this; }
-            State& addBindingSet(IBindingSet* value) { bindings.push_back(value); return *this; }
+            State& setShaderTable(ShaderTable* value) { shaderTable = value; return *this; }
+            State& addBindingSet(BindingSet* value) { bindings.push_back(value); return *this; }
         };
 
         struct DispatchRaysArguments
@@ -2946,7 +2946,7 @@ namespace caustica::rhi
         struct MatrixLayoutDesc
         {
             // Buffer where the matrix is stored.
-            caustica::rhi::IBuffer* buffer = nullptr;
+            caustica::rhi::Buffer* buffer = nullptr;
 
             // Offset in bytes from the start of the buffer where the matrix starts.
             uint64_t offset = 0;
@@ -2967,7 +2967,7 @@ namespace caustica::rhi
         };
 
         // Describes a single matrix layout conversion operation.
-        // Used by ICommandList::convertCoopVecMatrices(...)
+        // Used by CommandList::convertCoopVecMatrices(...)
         struct ConvertMatrixLayoutDesc
         {
             MatrixLayoutDesc src;
@@ -3046,31 +3046,32 @@ namespace caustica::rhi
         uint32_t maxWaveLaneCount;
     };
 
-    // IMessageCallback should be implemented by the application.
-    class IMessageCallback
+    // MessageCallback should be implemented by the application.
+    class MessageCallback
     {
     protected:
-        IMessageCallback() = default;
-        virtual ~IMessageCallback() = default;
+        MessageCallback() = default;
+        virtual ~MessageCallback() = default;
 
     public:
         // Caustica RHI will call message(...) whenever it needs to signal something.
         // The application is free to ignore the messages, show message boxes, or terminate.
         virtual void message(MessageSeverity severity, const char* messageText) = 0;
 
-        IMessageCallback(const IMessageCallback&) = delete;
-        IMessageCallback(const IMessageCallback&&) = delete;
-        IMessageCallback& operator=(const IMessageCallback&) = delete;
-        IMessageCallback& operator=(const IMessageCallback&&) = delete;
+        MessageCallback(const MessageCallback&) = delete;
+        MessageCallback(const MessageCallback&&) = delete;
+        MessageCallback& operator=(const MessageCallback&) = delete;
+        MessageCallback& operator=(const MessageCallback&&) = delete;
     };
     
-    class IDevice;
+    class Device;
 
     struct CommandListParameters
     {
-        // A command list with enableImmediateExecution = true maps to the immediate context on DX11.
-        // Two immediate command lists cannot be open at the same time, which is checked by the validation layer.
-        bool enableImmediateExecution = true;
+        // false (default): deferred recording - preferred for DX12/Vulkan and required for parallel CL recording.
+        // true: maps to the immediate context on DX11. Two immediate command lists cannot be open at the
+        // same time (checked by the validation layer). The D3D11 backend upgrades deferred requests to immediate.
+        bool enableImmediateExecution = false;
 
         // Minimum size of memory chunks created to upload data to the device on DX12.
         size_t uploadChunkSize = 64 * 1024;
@@ -3093,12 +3094,12 @@ namespace caustica::rhi
     };
     
     //////////////////////////////////////////////////////////////////////////
-    // ICommandList
+    // CommandList
     //////////////////////////////////////////////////////////////////////////
 
     // Represents a sequence of GPU operations.
     // - DX11: All command list objects map to the single immediate context. Only one command list may be in the open
-    //   state at any given time, and all command lists must have CommandListParameters::enableImmediateExecution = true.
+    //   state at any given time (immediate execution). The D3D11 backend ignores enableImmediateExecution=false.
     // - DX12: One command list object may contain multiple instances of ID3D12GraphicsCommandList* and
     //   ID3D12CommandAllocator objects, reusing older ones as they finish executing on the GPU. A command list object
     //   also contains the upload manager (for suballocating memory from the upload heap on operations such as
@@ -3108,11 +3109,11 @@ namespace caustica::rhi
     //   amounts of data and to destroy it when uploading is finished.
     // - Vulkan: The command list objects don't own the VkCommandBuffer-s but request available ones from the queue
     //   instead. The upload and scratch buffers behave the same way they do on DX12.
-    class ICommandList : public IResource
+    class CommandList : public Resource
     {
     public:
         // Prepares the command list for recording a new sequence of commands.
-        // All other methods of ICommandList must only be used when the command list is open.
+        // All other methods of CommandList must only be used when the command list is open.
         // - DX11: The immediate command list may always stay in the open state, although that prohibits other
         //   command lists from opening.
         // - DX12, Vulkan: Creates or reuses the command list or buffer object and the command allocator (DX12),
@@ -3120,7 +3121,7 @@ namespace caustica::rhi
         virtual void open() = 0;
 
         // Finalizes the command list and prepares it for execution.
-        // Use IDevice::executeCommandLists(...) to execute it.
+        // Use Device::executeCommandLists(...) to execute it.
         // Re-opening the command list without execution is allowed but not well-tested.
         virtual void close() = 0;
 
@@ -3135,11 +3136,11 @@ namespace caustica::rhi
         // - Vulkan: vkCmdClearColorImage is always used with the Float32 color fields set.
         // At least one of the 'isRenderTarget' and 'isUAV' flags must be set, and the format of the texture
         // must be of a color type.
-        virtual void clearTextureFloat(ITexture* t, TextureSubresourceSet subresources, const Color& clearColor) = 0;
+        virtual void clearTextureFloat(Texture* t, TextureSubresourceSet subresources, const Color& clearColor) = 0;
 
         // Clears some or all subresources of the given depth-stencil texture using the provided depth and/or stencil
         // values. The texture must have the isRenderTarget flag set, and its format must be of a depth-stencil type.
-        virtual void clearDepthStencilTexture(ITexture* t, TextureSubresourceSet subresources, bool clearDepth,
+        virtual void clearDepthStencilTexture(Texture* t, TextureSubresourceSet subresources, bool clearDepth,
             float depth, bool clearStencil, uint8_t stencil) = 0;
 
         // Clears some or all subresources of the given color texture using the provided integer value.
@@ -3147,22 +3148,22 @@ namespace caustica::rhi
         //   Otherwise, the clear value is converted to a float, and the texture is cleared as an RTV with all 4
         //   color components using the same value.
         // - Vulkan: vkCmdClearColorImage is always used with the UInt32 and Int32 color fields set.
-        virtual void clearTextureUInt(ITexture* t, TextureSubresourceSet subresources, uint32_t clearColor) = 0;
+        virtual void clearTextureUInt(Texture* t, TextureSubresourceSet subresources, uint32_t clearColor) = 0;
 
         // Copies a single 2D or 3D region of texture data from texture 'src' into texture 'dst'.
         // The region's dimensions must be compatible between the two textures, meaning that for simple color textures
         // they must be equal, and for reinterpret copies between compressed and uncompressed textures, they must differ
         // by a factor equal to the block size. The function does not resize textures, only 1:1 pixel copies are
         // supported.
-        virtual void copyTexture(ITexture* dest, const TextureSlice& destSlice, ITexture* src,
+        virtual void copyTexture(Texture* dest, const TextureSlice& destSlice, Texture* src,
             const TextureSlice& srcSlice) = 0;
 
         // Copies a single 2D or 3D region of texture data from regular texture 'src' into staging texture 'dst'.
-        virtual void copyTexture(IStagingTexture* dest, const TextureSlice& destSlice, ITexture* src,
+        virtual void copyTexture(StagingTexture* dest, const TextureSlice& destSlice, Texture* src,
             const TextureSlice& srcSlice) = 0;
 
         // Copies a single 2D or 3D region of texture data from staging texture 'src' into regular texture 'dst'.
-        virtual void copyTexture(ITexture* dest, const TextureSlice& destSlice, IStagingTexture* src,
+        virtual void copyTexture(Texture* dest, const TextureSlice& destSlice, StagingTexture* src,
             const TextureSlice& srcSlice) = 0;
 
         // Uploads the contents of an entire 2D or 3D mip level of a single array slice of the texture from CPU memory.
@@ -3175,14 +3176,14 @@ namespace caustica::rhi
         //   The upload buffer region can only be reused when this command list instance finishes executing on the GPU.
         // For more advanced uploading operations, such as updating only a region in the texture, use staging texture
         // objects and copyTexture(...).
-        virtual void writeTexture(ITexture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data,
+        virtual void writeTexture(Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data,
             size_t rowPitch, size_t depthPitch = 0) = 0;
 
         // Performs a resolve operation to combine samples from some or all subresources of a multisample texture 'src'
         // into matching subresources of a non-multisample texture 'dest'. Both textures' formats must be of color type.
         // - DX11/12: Maps to a sequence of ResolveSubresource calls, one per subresource.
         // - Vulkan: Maps to a single vkCmdResolveImage call.
-        virtual void resolveTexture(ITexture* dest, const TextureSubresourceSet& dstSubresources, ITexture* src,
+        virtual void resolveTexture(Texture* dest, const TextureSubresourceSet& dstSubresources, Texture* src,
             const TextureSubresourceSet& srcSubresources) = 0;
 
         // Uploads 'dataSize' bytes of data from CPU memory into the GPU buffer 'b' at offset 'destOffsetBytes'.
@@ -3201,32 +3202,32 @@ namespace caustica::rhi
         //   For non-volatile buffers, writes of 64 kB or smaller use vkCmdUpdateBuffer. Larger writes suballocate
         //   a portion of the automatic upload buffer and copy the data to the real GPU buffer through that and 
         //   vkCmdCopyBuffer.
-        virtual void writeBuffer(IBuffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) = 0;
+        virtual void writeBuffer(Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) = 0;
 
         // Fills the entire buffer using the provided uint32 value.
         // - DX11/12: Maps to ClearUnorderedAccessViewUint.
         // - Vulkan: Maps to vkCmdFillBuffer.
-        virtual void clearBufferUInt(IBuffer* b, uint32_t clearValue) = 0;
+        virtual void clearBufferUInt(Buffer* b, uint32_t clearValue) = 0;
 
         // Copies 'dataSizeBytes' of data from buffer 'src' at offset 'srcOffsetBytes' into buffer 'dest' at offset
         // 'destOffsetBytes'. The source and destination regions must be within the sizes of the respective buffers.
         // - DX11: Maps to CopySubresourceRegion.
         // - DX12: Maps to CopyBufferRegion.
         // - Vulkan: Maps to vkCmdCopyBuffer.
-        virtual void copyBuffer(IBuffer* dest, uint64_t destOffsetBytes, IBuffer* src, uint64_t srcOffsetBytes,
+        virtual void copyBuffer(Buffer* dest, uint64_t destOffsetBytes, Buffer* src, uint64_t srcOffsetBytes,
             uint64_t dataSizeBytes) = 0;
 
         // Clears the entire sampler feedback texture.
         // - DX12: Maps to ClearUnorderedAccessViewUint.
         // - DX11, Vulkan: Unsupported.
-        virtual void clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture) = 0;
+        virtual void clearSamplerFeedbackTexture(SamplerFeedbackTexture* texture) = 0;
 
         // Decodes the sampler feedback texture into an application-usable format, storing data into the provided buffer.
         // The 'format' parameter should be Format::R8_UINT.
         // - DX12: Maps to ResolveSubresourceRegion.
         //   See https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html
         // - DX11, Vulkan: Unsupported.
-        virtual void decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture,
+        virtual void decodeSamplerFeedbackTexture(Buffer* buffer, SamplerFeedbackTexture* texture,
             caustica::rhi::Format format) = 0;
 
         // Transitions the sampler feedback texture into the requested state, placing a barrier if necessary.
@@ -3234,7 +3235,7 @@ namespace caustica::rhi
         // instead waiting for any rendering, compute or transfer operation.
         // Use commitBarriers() to issue the barriers explicitly.
         // Like the other sampler feedback functions, only supported on DX12.
-        virtual void setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits) = 0;
+        virtual void setSamplerFeedbackTextureState(SamplerFeedbackTexture* texture, ResourceStates stateBits) = 0;
 
         // Writes the provided data into the push constants block for the currently set pipeline.
         // A graphics, compute, ray tracing or meshlet state must be set using the corresponding call
@@ -3330,7 +3331,7 @@ namespace caustica::rhi
         // Sets the specified meshlet rendering state on the command list.
         // The state includes the pipeline and all resources bound to it.
         // Not supported on DX11.
-        // Meshlet support on DX12 and Vulkan can be queried using IDevice::queryFeatureSupport(Feature::Meshlets).
+        // Meshlet support on DX12 and Vulkan can be queried using Device::queryFeatureSupport(Feature::Meshlets).
         // See the members of MeshletState for more information.
         // See the comment to setGraphicsState(...) for information on state caching.
         virtual void setMeshletState(const MeshletState& state) = 0;
@@ -3366,7 +3367,7 @@ namespace caustica::rhi
         // - DX11: Not supported.
         // - DX12: Maps to NvAPI_D3D12_BuildRaytracingOpacityMicromapArray and requires NVAPI.
         // - Vulkan: Maps to vkCmdBuildMicromapsEXT.
-        virtual void buildOpacityMicromap(rt::IOpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) = 0;
+        virtual void buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) = 0;
         
         // Builds or updates a bottom-level ray tracing acceleration structure (BLAS).
         // A temporary memory region for the build is suballocated using the scratch buffer manager attached to the
@@ -3374,7 +3375,7 @@ namespace caustica::rhi
         // The type of operation to perform is specified by the buildFlags parameter.
         // When building a new BLAS, the amount of memory allocated for it must be sufficient to build the BLAS
         // for the provided geometry. Usually this is achieved by passing the same geometry descriptors to this function
-        // and to IDevice::createAccelStruct(...).
+        // and to Device::createAccelStruct(...).
         // When updating a BLAS, the geometries and primitive counts must match the BLAS that was previously built,
         // and the BLAS must have been built with the AllowUpdate flag.
         // If compaction is enabled when building the BLAS, the BLAS cannot be rebuilt or updated later, it can only
@@ -3385,7 +3386,7 @@ namespace caustica::rhi
         // - Vulkan: Maps to vkCmdBuildAccelerationStructuresKHR.
         // If Caustica RHI is built with RTXMU enabled, all BLAS builds, updates and compactions are handled by RTXMU.
         // Note that RTXMU currently doesn't support OMM or LSS.
-        virtual void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries,
+        virtual void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries,
             size_t numGeometries, rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) = 0;
         
         // Compacts all bottom-level ray tracing acceleration structures (BLASes) that are currently available
@@ -3399,13 +3400,13 @@ namespace caustica::rhi
         // The type of operation to perform is specified by the buildFlags parameter.
         // When building a new TLAS, the amount of memory allocated for it must be sufficient to build the TLAS
         // for the provided geometry. Usually this is achieved by making sure that the instance count does not exceed
-        // that provided to IDevice::createAccelStruct(...).
+        // that provided to Device::createAccelStruct(...).
         // When updating a TLAS, the instance counts and types must match the TLAS that was previously built,
         // and the TLAS must have been built with the AllowUpdate flag.
         // - DX11: Not supported.
         // - DX12: Maps to BuildRaytracingAccelerationStructure.
         // - Vulkan: Maps to vkCmdBuildAccelerationStructuresKHR.
-        virtual void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances,
+        virtual void buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances,
             size_t numInstances, rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) = 0;
 
         // Performs one of the supported operations on clustered ray tracing acceleration structures (CLAS).
@@ -3423,7 +3424,7 @@ namespace caustica::rhi
         // - DX11: Not supported.
         // - DX12: Maps to BuildRaytracingAccelerationStructure.
         // - Vulkan: Maps to vkCmdBuildAccelerationStructuresKHR.
-        virtual void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer,
+        virtual void buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer,
             uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) = 0;
 
@@ -3435,20 +3436,20 @@ namespace caustica::rhi
         virtual void convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs) = 0;
 
         // Starts measuring GPU execution time using the provided timer query at this point in the command list.
-        // Use endTimerQuery(...) to stop measuring time, and IDevice::getTimerQueryTime(...) to get the results later.
+        // Use endTimerQuery(...) to stop measuring time, and Device::getTimerQueryTime(...) to get the results later.
         // The same timer query cannot be used multiple times within the same command list, or in different
         // command lists until it is resolved.
         // - DX11: Maps to Begin and End calls on two ID3D11Query objects.
         // - DX12: Maps to EndQuery.
         // - Vulkan: Maps to vkCmdResetQueryPool and vkCmdWriteTimestamp.
-        virtual void beginTimerQuery(ITimerQuery* query) = 0;
+        virtual void beginTimerQuery(TimerQuery* query) = 0;
 
         // Stops measuring GPU execution time using the provided timer query at this point in the command list.
         // beginTimerQuery(...) must have been used on the same timer query in this command list previously.
         // - DX11: Maps to End calls on two ID3D11Query objects.
         // - DX12: Maps to EndQuery and ResolveQueryData.
         // - Vulkan: Maps to vkCmdWriteTimestamp.
-        virtual void endTimerQuery(ITimerQuery* query) = 0;
+        virtual void endTimerQuery(TimerQuery* query) = 0;
 
         // Places a debug marker denoting the beginning of a range of commands in the command list.
         // Use endMarker() to denote the end of the range. Ranges may be nested, i.e. calling beginMarker(...)
@@ -3472,10 +3473,10 @@ namespace caustica::rhi
         virtual void setEnableAutomaticBarriers(bool enable) = 0;
 
         // Sets the necessary resource states for all non-permanent resources used in the binding set.
-        virtual void setResourceStatesForBindingSet(IBindingSet* bindingSet) = 0;
+        virtual void setResourceStatesForBindingSet(BindingSet* bindingSet) = 0;
         
         // Sets the necessary resource states for all targets of the framebuffer.
-        CAUSTICA_RHI_API void setResourceStatesForFramebuffer(IFramebuffer* framebuffer);
+        CAUSTICA_RHI_API void setResourceStatesForFramebuffer(Framebuffer* framebuffer);
 
         // Enables or disables the placement of UAV barriers for the given texture (DX12/VK) or all resources (DX11)
         // between draw or dispatch calls. Disabling UAV barriers may improve performance in cases when the same
@@ -3484,23 +3485,23 @@ namespace caustica::rhi
         // transition barrier when the texture is first used as a UAV will still be placed.
         // - DX11: Maps to NvAPI_D3D11_BeginUAVOverlap (once - see source code) and requires NVAPI.
         // - DX12, Vulkan: Does not map to any specific API calls, affects Caustica RHI automatic barriers.
-        virtual void setEnableUavBarriersForTexture(ITexture* texture, bool enableBarriers) = 0;
+        virtual void setEnableUavBarriersForTexture(Texture* texture, bool enableBarriers) = 0;
 
         // Enables or disables the placement of UAV barriers for the given buffer (DX12/VK) or all resources (DX11)
         // between draw or dispatch calls.
         // See the comment to setEnableUavBarriersForTexture(...) for more information.
-        virtual void setEnableUavBarriersForBuffer(IBuffer* buffer, bool enableBarriers) = 0;
+        virtual void setEnableUavBarriersForBuffer(Buffer* buffer, bool enableBarriers) = 0;
 
         // Informs the command list state tracker of the current state of a texture or some of its subresources.
         // This function must be called after opening the command list and before the first use of any textures 
         // that do not have the keepInitialState flag set, and that were not transitioned to a permanent state
         // previously using setPermanentTextureState(...).
-        virtual void beginTrackingTextureState(ITexture* texture, TextureSubresourceSet subresources,
+        virtual void beginTrackingTextureState(Texture* texture, TextureSubresourceSet subresources,
             ResourceStates stateBits) = 0;
 
         // Informs the command list state tracker of the current state of a buffer.
         // See the comment to beginTrackingTextureState(...) for more information.
-        virtual void beginTrackingBufferState(IBuffer* buffer, ResourceStates stateBits) = 0;
+        virtual void beginTrackingBufferState(Buffer* buffer, ResourceStates stateBits) = 0;
 
         // Places the necessary barriers to make sure that the texture or some of its subresources are in the given
         // state. If the texture or subresources are already in that state, no action is performed.
@@ -3510,26 +3511,26 @@ namespace caustica::rhi
         // list instead. Call commitBarriers() to submit them to the graphics API explicitly or set graphics
         // or other type of state.
         // Has no effect on DX11.
-        virtual void setTextureState(ITexture* texture, TextureSubresourceSet subresources,
+        virtual void setTextureState(Texture* texture, TextureSubresourceSet subresources,
             ResourceStates stateBits) = 0;
 
         // Places the necessary barriers to make sure that the buffer is in the given state.
         // See the comment to setTextureState(...) for more information.
         // Has no effect on DX11.
-        virtual void setBufferState(IBuffer* buffer, ResourceStates stateBits) = 0;
+        virtual void setBufferState(Buffer* buffer, ResourceStates stateBits) = 0;
 
         // Places a memory aliasing barrier between two placed textures that can share the same heap range.
         // The "before" resource can be null if the prior occupant is unknown. Has no effect on DX11.
-        virtual void textureAliasingBarrier(ITexture* before, ITexture* after) = 0;
+        virtual void textureAliasingBarrier(Texture* before, Texture* after) = 0;
 
         // Places a memory aliasing barrier between two placed buffers that can share the same heap range.
         // The "before" resource can be null if the prior occupant is unknown. Has no effect on DX11.
-        virtual void bufferAliasingBarrier(IBuffer* before, IBuffer* after) = 0;
+        virtual void bufferAliasingBarrier(Buffer* before, Buffer* after) = 0;
 
         // Places the necessary barriers to make sure that the underlying buffer for the acceleration structure is
         // in the given state. See the comment to setTextureState(...) for more information.
         // Has no effect on DX11.
-        virtual void setAccelStructState(rt::IAccelStruct* as, ResourceStates stateBits) = 0;
+        virtual void setAccelStructState(rt::AccelStruct* as, ResourceStates stateBits) = 0;
 
         // Places the necessary barriers to make sure that the entire texture is in the given state, and marks that
         // state as the texture's permanent state. Once a texture is transitioned into a permanent state, its state
@@ -3542,12 +3543,12 @@ namespace caustica::rhi
         // list that sets them is executed. If the command list is closed but not executed, the permanent states
         // will be abandoned.
         // Has no effect on DX11.
-        virtual void setPermanentTextureState(ITexture* texture, ResourceStates stateBits) = 0;
+        virtual void setPermanentTextureState(Texture* texture, ResourceStates stateBits) = 0;
 
         // Places the necessary barriers to make sure that the buffer is in the given state, and marks that state
         // as the buffer's permanent state. See the comment to setPermanentTextureState(...) for more information.
         // Has no effect on DX11.
-        virtual void setPermanentBufferState(IBuffer* buffer, ResourceStates stateBits) = 0;
+        virtual void setPermanentBufferState(Buffer* buffer, ResourceStates stateBits) = 0;
 
         // Flushes the barriers from the pending list into the graphics API command list.
         // Has no effect on DX11.
@@ -3557,79 +3558,79 @@ namespace caustica::rhi
         // If the state is not known to the command list, returns ResourceStates::Unknown. Using the texture in this
         // state is not allowed.
         // On DX11, always returns ResourceStates::Common.
-        virtual ResourceStates getTextureSubresourceState(ITexture* texture, ArraySlice arraySlice,
+        virtual ResourceStates getTextureSubresourceState(Texture* texture, ArraySlice arraySlice,
             MipLevel mipLevel) = 0;
         
         // Returns the current tracked state of a buffer.
         // See the comment to getTextureSubresourceState(...) for more information.
-        virtual ResourceStates getBufferState(IBuffer* buffer) = 0;
+        virtual ResourceStates getBufferState(Buffer* buffer) = 0;
 
         // Returns the owning device, does NOT call AddRef on it.
-        virtual IDevice* getDevice() = 0;
+        virtual Device* getDevice() = 0;
 
         // Returns the CommandListParameters structure that was used to create the command list. 
         virtual const CommandListParameters& getDesc() = 0;
     };
 
-    typedef RefCountPtr<ICommandList> CommandListHandle;
+    typedef RefCountPtr<CommandList> CommandListHandle;
 
     //////////////////////////////////////////////////////////////////////////
-    // IDevice
+    // Device
     //////////////////////////////////////////////////////////////////////////
 
     class AftermathCrashDumpHelper;
 
-    class IDevice : public IResource
+    class Device : public Resource
     {
     public:
         virtual HeapHandle createHeap(const HeapDesc& d) = 0;
 
         virtual TextureHandle createTexture(const TextureDesc& d) = 0;
-        virtual MemoryRequirements getTextureMemoryRequirements(ITexture* texture) = 0;
-        virtual bool bindTextureMemory(ITexture* texture, IHeap* heap, uint64_t offset) = 0;
+        virtual MemoryRequirements getTextureMemoryRequirements(Texture* texture) = 0;
+        virtual bool bindTextureMemory(Texture* texture, Heap* heap, uint64_t offset) = 0;
 
         virtual TextureHandle createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc) = 0;
 
         virtual StagingTextureHandle createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess) = 0;
-        virtual void* mapStagingTexture(IStagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t* outRowPitch) = 0;
-        virtual void unmapStagingTexture(IStagingTexture* tex) = 0;
+        virtual void* mapStagingTexture(StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t* outRowPitch) = 0;
+        virtual void unmapStagingTexture(StagingTexture* tex) = 0;
 
-        virtual void getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) = 0;
-        virtual void updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
+        virtual void getTextureTiling(Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) = 0;
+        virtual void updateTextureTileMappings(Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
 
-        virtual SamplerFeedbackTextureHandle createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc) = 0;
-        virtual SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture) = 0;
+        virtual SamplerFeedbackTextureHandle createSamplerFeedbackTexture(Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc) = 0;
+        virtual SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, Texture* pairedTexture) = 0;
 
         virtual BufferHandle createBuffer(const BufferDesc& d) = 0;
-        virtual void* mapBuffer(IBuffer* buffer, CpuAccessMode cpuAccess) = 0;
-        virtual void unmapBuffer(IBuffer* buffer) = 0;
-        virtual MemoryRequirements getBufferMemoryRequirements(IBuffer* buffer) = 0;
-        virtual bool bindBufferMemory(IBuffer* buffer, IHeap* heap, uint64_t offset) = 0;
+        virtual void* mapBuffer(Buffer* buffer, CpuAccessMode cpuAccess) = 0;
+        virtual void unmapBuffer(Buffer* buffer) = 0;
+        virtual MemoryRequirements getBufferMemoryRequirements(Buffer* buffer) = 0;
+        virtual bool bindBufferMemory(Buffer* buffer, Heap* heap, uint64_t offset) = 0;
 
         virtual BufferHandle createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc) = 0;
 
         virtual ShaderHandle createShader(const ShaderDesc& d, const void* binary, size_t binarySize) = 0;
-        virtual ShaderHandle createShaderSpecialization(IShader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) = 0;
+        virtual ShaderHandle createShaderSpecialization(Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) = 0;
         virtual ShaderLibraryHandle createShaderLibrary(const void* binary, size_t binarySize) = 0;
         
         virtual SamplerHandle createSampler(const SamplerDesc& d) = 0;
 
         // Note: vertexShader is only necessary on D3D11, otherwise it may be null
-        virtual InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, IShader* vertexShader) = 0;
+        virtual InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, Shader* vertexShader) = 0;
         
         // Event queries
         virtual EventQueryHandle createEventQuery() = 0;
-        virtual void setEventQuery(IEventQuery* query, CommandQueue queue) = 0;
-        virtual bool pollEventQuery(IEventQuery* query) = 0;
-        virtual void waitEventQuery(IEventQuery* query) = 0;
-        virtual void resetEventQuery(IEventQuery* query) = 0;
+        virtual void setEventQuery(EventQuery* query, CommandQueue queue) = 0;
+        virtual bool pollEventQuery(EventQuery* query) = 0;
+        virtual void waitEventQuery(EventQuery* query) = 0;
+        virtual void resetEventQuery(EventQuery* query) = 0;
 
-        // Timer queries - see also begin/endTimerQuery in ICommandList
+        // Timer queries - see also begin/endTimerQuery in CommandList
         virtual TimerQueryHandle createTimerQuery() = 0;
-        virtual bool pollTimerQuery(ITimerQuery* query) = 0;
+        virtual bool pollTimerQuery(TimerQuery* query) = 0;
         // returns time in seconds
-        virtual float getTimerQueryTime(ITimerQuery* query) = 0;
-        virtual void resetTimerQuery(ITimerQuery* query) = 0;
+        virtual float getTimerQueryTime(TimerQuery* query) = 0;
+        virtual void resetTimerQuery(TimerQuery* query) = 0;
 
         // Returns the API kind that the RHI backend is running on top of.
         virtual GraphicsAPI getGraphicsAPI() = 0;
@@ -3639,34 +3640,34 @@ namespace caustica::rhi
         virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, FramebufferInfo const& fbinfo) = 0;
 
         [[deprecated("Use createGraphicsPipeline with FramebufferInfo instead")]]
-        virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb) = 0;
+        virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, Framebuffer* fb) = 0;
         
         virtual ComputePipelineHandle createComputePipeline(const ComputePipelineDesc& desc) = 0;
 
         virtual MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo) = 0;
 
         [[deprecated("Use createMeshletPipeline with FramebufferInfo instead")]]
-        virtual MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, IFramebuffer* fb) = 0;
+        virtual MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, Framebuffer* fb) = 0;
 
         virtual rt::PipelineHandle createRayTracingPipeline(const rt::PipelineDesc& desc) = 0;
         
         virtual BindingLayoutHandle createBindingLayout(const BindingLayoutDesc& desc) = 0;
         virtual BindingLayoutHandle createBindlessLayout(const BindlessLayoutDesc& desc) = 0;
 
-        virtual BindingSetHandle createBindingSet(const BindingSetDesc& desc, IBindingLayout* layout) = 0;
-        virtual DescriptorTableHandle createDescriptorTable(IBindingLayout* layout) = 0;
+        virtual BindingSetHandle createBindingSet(const BindingSetDesc& desc, BindingLayout* layout) = 0;
+        virtual DescriptorTableHandle createDescriptorTable(BindingLayout* layout) = 0;
 
-        virtual void resizeDescriptorTable(IDescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) = 0;
-        virtual bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) = 0;
+        virtual void resizeDescriptorTable(DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) = 0;
+        virtual bool writeDescriptorTable(DescriptorTable* descriptorTable, const BindingSetItem& item) = 0;
 
         virtual rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) = 0;
         virtual rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) = 0;
-        virtual MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) = 0;
+        virtual MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) = 0;
         virtual rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) = 0;
-        virtual bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) = 0;
+        virtual bool bindAccelStructMemory(rt::AccelStruct* as, Heap* heap, uint64_t offset) = 0;
         
         virtual CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) = 0;
-        virtual uint64_t executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
+        virtual uint64_t executeCommandLists(CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) = 0;
         virtual void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) = 0;
         // returns true if the wait completes successfully, false if detecting a problem (e.g. device removal)
         virtual bool waitForIdle() = 0;
@@ -3687,19 +3688,19 @@ namespace caustica::rhi
 
         virtual Object getNativeQueue(ObjectType objectType, CommandQueue queue) = 0;
 
-        virtual IMessageCallback* getMessageCallback() = 0;
+        virtual MessageCallback* getMessageCallback() = 0;
 
         virtual bool isAftermathEnabled() = 0;
         virtual AftermathCrashDumpHelper& getAftermathCrashDumpHelper() = 0;
 
         // Front-end for executeCommandLists(..., 1) for compatibility and convenience
-        uint64_t executeCommandList(ICommandList* commandList, CommandQueue executionQueue = CommandQueue::Graphics)
+        uint64_t executeCommandList(CommandList* commandList, CommandQueue executionQueue = CommandQueue::Graphics)
         {
             return executeCommandLists(&commandList, 1, executionQueue);
         }
     };
 
-    typedef RefCountPtr<IDevice> DeviceHandle;
+    typedef RefCountPtr<Device> DeviceHandle;
 
     template <class T>
     void hash_combine(size_t& seed, const T& v)

@@ -33,7 +33,7 @@ uint32_t GetMipLevelsNum(uint32_t width, uint32_t height)
 void TextureLoader::finalizeTexture(
     std::shared_ptr<ImageAsset> texture,
     render::RenderDevice* renderDevice,
-    caustica::rhi::ICommandList* commandList)
+    caustica::rhi::CommandList* commandList)
 {
     assert(texture->data);
     assert(commandList);
@@ -221,9 +221,9 @@ void TextureLoader::loadingFinished()
 }
 
 bool saveTextureToFile(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     render::RenderDevice& renderDevice,
-    caustica::rhi::ITexture* texture,
+    caustica::rhi::Texture* texture,
     caustica::rhi::ResourceStates textureState,
     const char* fileName,
     bool saveAlphaChannel)

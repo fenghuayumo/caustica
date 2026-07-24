@@ -30,21 +30,21 @@ namespace caustica::render
 
         // note : 'texture' must have been allocated with some mip levels
         MipMapGenPass(
-            caustica::rhi::IDevice* device,
+            caustica::rhi::Device* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             caustica::rhi::TextureHandle texture,
             Mode mode = Mode::MODE_MAX);
 
         // Dispatches reduction kernel : reads LOD 0 and populates
         // LOD 1 and up
-        void dispatch(caustica::rhi::ICommandList* commandList, int maxLOD=-1);
+        void dispatch(caustica::rhi::CommandList* commandList, int maxLOD=-1);
 
         // debug : blits mip-map levels in spiral pattern to 'target'
         // (assumes 'target' texture resolution is high enough...)
         void display(
             caustica::render::RenderDevice& renderDevice,
-            caustica::rhi::ICommandList* commandList, 
-            caustica::rhi::IFramebuffer* target);
+            caustica::rhi::CommandList* commandList, 
+            caustica::rhi::Framebuffer* target);
 
     private:
 

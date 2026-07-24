@@ -49,7 +49,7 @@ public:
 };
 
 TextureLoader::TextureLoader(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<IDescriptorTableManager> descriptorTable,
     AssetRegistry& registry,
@@ -286,7 +286,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    caustica::rhi::ICommandList* commandList)
+    caustica::rhi::CommandList* commandList)
 {
     std::shared_ptr<ImageAsset> texture;
 
@@ -409,7 +409,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemory(
     const std::string& mimeType,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    caustica::rhi::ICommandList* commandList)
+    caustica::rhi::CommandList* commandList)
 {
     std::shared_ptr<ImageAsset> texture = createTextureData();
 

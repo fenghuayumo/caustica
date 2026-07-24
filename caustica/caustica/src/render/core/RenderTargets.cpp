@@ -22,7 +22,7 @@ using namespace dm;
 using namespace caustica::math;
 
 void RenderTargets::init(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         dm::uint2 renderSize, 
         dm::uint2 displaySize,
         bool enableMotionVectors,
@@ -247,7 +247,7 @@ void RenderTargets::init(
     if (desc.isVirtual)
     {
         uint64_t heapSize = 0;
-        caustica::rhi::ITexture* const textures[] = {
+        caustica::rhi::Texture* const textures[] = {
             //HdrColor,
             //ResolvedColor,
             //temporalFeedback1,
@@ -364,7 +364,7 @@ void RenderTargets::init(
     return false;
 }
 
-void RenderTargets::clear(caustica::rhi::ICommandList* commandList) 
+void RenderTargets::clear(caustica::rhi::CommandList* commandList) 
 {
     const caustica::rhi::FormatInfo& depthFormatInfo = caustica::rhi::getFormatInfo(depth->getDesc().format);
 

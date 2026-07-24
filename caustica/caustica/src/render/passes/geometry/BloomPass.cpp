@@ -60,14 +60,14 @@ namespace
         const ICompositeView& compositeView)
     {
         const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
-        const caustica::rhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+        const caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
         const caustica::rhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
         return rg::fromNativeFormat(nativeFormat);
     }
 }
 
 BloomPass::BloomPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     const std::shared_ptr<ShaderFactory>& shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
@@ -100,7 +100,7 @@ BloomPass::BloomPass(
     m_PerViewData.resize(compositeView.getNumChildViews(ViewType::PLANAR));
 }
 
-void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::IFramebuffer* framebuffer)
+void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::Framebuffer* framebuffer)
 {
     PerViewData& perViewData = m_PerViewData[viewIndex];
     const caustica::rhi::Format colorFormat = framebuffer->getFramebufferInfo().colorFormats[0];
@@ -120,14 +120,14 @@ void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::IFramebuffer* f
 }
 
 void BloomPass::renderInternal(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,
-    caustica::rhi::ITexture* sourceDestTexture,
-    caustica::rhi::ITexture* textureDownscale1,
-    caustica::rhi::ITexture* textureDownscale2,
-    caustica::rhi::ITexture* texturePass1Blur,
-    caustica::rhi::ITexture* texturePass2Blur,
+    caustica::rhi::Texture* sourceDestTexture,
+    caustica::rhi::Texture* textureDownscale1,
+    caustica::rhi::Texture* textureDownscale2,
+    caustica::rhi::Texture* texturePass1Blur,
+    caustica::rhi::Texture* texturePass2Blur,
     float sigmaInPixels,
     float blendFactor)
 {
@@ -151,7 +151,7 @@ void BloomPass::renderInternal(
     for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
         const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-        caustica::rhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+        caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
         ensureBlurPso(viewIndex, framebufferPass1Blur);
 
         caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
@@ -264,10 +264,10 @@ void BloomPass::renderInternal(
 }
 
 void BloomPass::render(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,
-    caustica::rhi::ITexture* sourceDestTexture,
+    caustica::rhi::Texture* sourceDestTexture,
     float sigmaInPixels,
     float blendFactor)
 {

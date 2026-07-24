@@ -176,7 +176,7 @@ namespace caustica::rhi::vulkan
         return MeshletPipelineHandle::Create(pso);
     }
 
-    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc& desc, IFramebuffer* fb)
+    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb)
     {
         if (!fb)
             return nullptr;

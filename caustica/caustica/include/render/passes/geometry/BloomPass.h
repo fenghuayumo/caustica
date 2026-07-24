@@ -37,33 +37,33 @@ namespace caustica::render
         caustica::rhi::BindingLayoutHandle m_BloomBlurBindingLayout;
         caustica::rhi::BindingLayoutHandle m_BloomApplyBindingLayout;
 
-        void ensureBlurPso(uint32_t viewIndex, caustica::rhi::IFramebuffer* framebuffer);
+        void ensureBlurPso(uint32_t viewIndex, caustica::rhi::Framebuffer* framebuffer);
 
         void renderInternal(
-            caustica::rhi::ICommandList* commandList,
+            caustica::rhi::CommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView,
-            caustica::rhi::ITexture* sourceDestTexture,
-            caustica::rhi::ITexture* textureDownscale1,
-            caustica::rhi::ITexture* textureDownscale2,
-            caustica::rhi::ITexture* texturePass1Blur,
-            caustica::rhi::ITexture* texturePass2Blur,
+            caustica::rhi::Texture* sourceDestTexture,
+            caustica::rhi::Texture* textureDownscale1,
+            caustica::rhi::Texture* textureDownscale2,
+            caustica::rhi::Texture* texturePass1Blur,
+            caustica::rhi::Texture* texturePass2Blur,
             float sigmaInPixels,
             float blendFactor);
 
     public:
         BloomPass(
-            caustica::rhi::IDevice* device,
+            caustica::rhi::Device* device,
             const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
             caustica::render::RenderDevice& renderDevice,
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
             const caustica::ICompositeView& compositeView);
 
         void render(
-            caustica::rhi::ICommandList* commandList,
+            caustica::rhi::CommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView,
-            caustica::rhi::ITexture* sourceDestTexture,
+            caustica::rhi::Texture* sourceDestTexture,
             float sigmaInPixels,
             float blendFactor);
 

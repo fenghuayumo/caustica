@@ -40,7 +40,7 @@ using namespace caustica;
 
 static const int    c_BlockCompressionBlockSize = 4;
 
-EnvMapProcessor::EnvMapProcessor( caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
+EnvMapProcessor::EnvMapProcessor( caustica::rhi::Device* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
     : m_device(device)
     , m_textureCache(textureCache)
 {
@@ -350,7 +350,7 @@ int EnvMapProcessor::getTargetCubeResolution() const
     return m_targetResolution; 
 }
 
-void EnvMapProcessor::preUpdate(caustica::rhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::preUpdate(caustica::rhi::CommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
     if( m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
@@ -415,7 +415,7 @@ void EnvMapProcessor::preUpdate(caustica::rhi::ICommandList* commandList, causti
     }
 }
 
-bool EnvMapProcessor::update(caustica::rhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     UpdateSettings settings = _settings;
 
@@ -712,7 +712,7 @@ bool EnvMapProcessor::debugGUI(float indent)
     return resetAccumulation;
 }
 
-bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
+bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache)
 {
     if (!m_enableRasterPrecompute || m_brdfLUTGenerated)
         return false;
@@ -746,7 +746,7 @@ bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::ICommandList* commandList, 
     return true;
 }
 
-void EnvMapProcessor::ggxPrefilterCubemap(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::ggxPrefilterCubemap(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache, 
     caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -803,7 +803,7 @@ void EnvMapProcessor::ggxPrefilterCubemap(caustica::rhi::ICommandList* commandLi
     }
 }
 
-void EnvMapProcessor::convolveDiffuseIrradiance(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+void EnvMapProcessor::convolveDiffuseIrradiance(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache,
     caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
@@ -841,7 +841,7 @@ void EnvMapProcessor::convolveDiffuseIrradiance(caustica::rhi::ICommandList* com
     commandList->dispatch(1, 1, 6);
 }
 
-void EnvMapProcessor::generateCubemapMips(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+void EnvMapProcessor::generateCubemapMips(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache, 
     caustica::rhi::TextureHandle cubemap)
 {
     // Reuse the existing MIPReduceCS for solid-angle weighted mip generation
@@ -883,7 +883,7 @@ void EnvMapProcessor::generateCubemapMips(caustica::rhi::ICommandList* commandLi
 }
 
 void EnvMapProcessor::processCubemap(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::BindingCache& bindingCache,
     caustica::rhi::TextureHandle sourceCubemap,
     const CubemapProcessingOptions& options,

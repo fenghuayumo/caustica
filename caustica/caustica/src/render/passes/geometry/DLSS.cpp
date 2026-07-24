@@ -17,7 +17,7 @@
 
 using namespace caustica::render;
 
-DLSS::DLSS(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
+DLSS::DLSS(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory)
     : m_device(device)
 {
     m_exposureShader = shaderFactory.createAutoShader("engine/passes/dlss_exposure_cs.hlsl", "main",
@@ -72,7 +72,7 @@ bool DLSS::isRayReconstructionInitialized() const
     return m_rayReconstructionInitialized;
 }
 
-void DLSS::computeExposure(caustica::rhi::ICommandList* commandList, caustica::rhi::IBuffer* toneMapperExposureBuffer, float exposureScale)
+void DLSS::computeExposure(caustica::rhi::CommandList* commandList, caustica::rhi::Buffer* toneMapperExposureBuffer, float exposureScale)
 {
     if (m_exposureSourceBuffer != toneMapperExposureBuffer)
     {
@@ -99,7 +99,7 @@ void DLSS::computeExposure(caustica::rhi::ICommandList* commandList, caustica::r
     commandList->dispatch(1);
 }
 
- std::unique_ptr<DLSS> DLSS::create(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+ std::unique_ptr<DLSS> DLSS::create(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     switch(device->getGraphicsAPI())

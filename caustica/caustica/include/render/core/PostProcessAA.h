@@ -25,7 +25,7 @@ class TemporalAntiAliasingPass;
 struct PostProcessAAParams
 {
     PathTracerSettings&                     settings;
-    caustica::rhi::ICommandList*                    commandList = nullptr;
+    caustica::rhi::CommandList*                    commandList = nullptr;
     RenderTargets*                          renderTargets = nullptr;
     GpuDevice*                              gpuDevice = nullptr;
 

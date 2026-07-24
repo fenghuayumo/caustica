@@ -94,7 +94,7 @@ void caustica::render::WorldRenderer::populateFrameView(ExtractedFrameView& view
 }
 
 void caustica::render::WorldRenderer::populateRenderFrameContext(
-    caustica::rhi::IFramebuffer* framebuffer,
+    caustica::rhi::Framebuffer* framebuffer,
     RenderFrameContext& ctx)
 {
     ctx = {};
@@ -114,7 +114,7 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderFrameContext& ctx)
 {
     const bool aaReset = ctx.frame.needNewPasses || m_context->activeSettings().ResetRealtimeCaches;
-    caustica::rhi::IDescriptorTable* descriptorTable = m_context->descriptorTable
+    caustica::rhi::DescriptorTable* descriptorTable = m_context->descriptorTable
         ? m_context->descriptorTable->getDescriptorTable()
         : nullptr;
 
@@ -245,7 +245,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     ctx.commandListWasClosed = false;
     ctx.graphBuilt = true;
 
-    caustica::rhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
+    caustica::rhi::Framebuffer* framebuffer = ctx.frame.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
 
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
@@ -332,6 +332,7 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
 {
     if (m_renderTargets == nullptr || m_renderTargets->isUpdateRequired(m_renderSize, m_displaySize))
     {
+        // THREADING: sync-point, RT-only (resize / recreate render targets).
         device()->waitForIdle();
         device()->runGarbageCollection();
         if (m_denoisePass)
@@ -433,6 +434,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     {
         if (m_context->diagnostics.progressInitializingRenderer.Active())
             m_context->diagnostics.progressInitializingRenderer.Set(40);
+        // THREADING: sync-point, RT-only.
         const bool preCreatePassesWaitOk = device()->waitForIdle();
         if (!preCreatePassesWaitOk)
         {
@@ -526,7 +528,7 @@ void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrame
 
 void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameContext& ctx)
 {
-    caustica::rhi::IFramebuffer* framebuffer = ctx.framebuffer;
+    caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
 
     syncCameraViews();
     {
@@ -808,8 +810,8 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
 
 void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext& ctx)
 {
-    caustica::rhi::IFramebuffer* framebuffer = ctx.framebuffer;
-    caustica::rhi::ITexture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
+    caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
+    caustica::rhi::Texture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
 
     m_commandList->close();
     device()->executeCommandList(m_commandList);

@@ -56,7 +56,7 @@ private:
     caustica::render::RenderDevice& m_renderDevice;
     const caustica::scene::SceneRenderData* m_renderData = nullptr;
     size_t m_geometryInstanceCount = 0;
-    caustica::rhi::IDescriptorTable* m_descriptorTable = nullptr;
+    caustica::rhi::DescriptorTable* m_descriptorTable = nullptr;
     caustica::render::SceneGpuFrameHandles m_gpuHandles{};
     std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
     std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
@@ -72,20 +72,20 @@ private:
 
 public:
     PrepareLightsPass(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
         caustica::rhi::BufferHandle subInstanceData,
-        caustica::rhi::IBindingLayout* bindlessLayout,
+        caustica::rhi::BindingLayout* bindlessLayout,
         std::shared_ptr<ShaderDebug> shaderDebug
     );
 
     void setFrameInputs(
         const caustica::scene::SceneRenderData* renderData,
         size_t geometryInstanceCount,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::DescriptorTable* descriptorTable,
         const caustica::render::SceneGpuFrameHandles& gpuHandles,
         EnvMapProcessor* environmentMap = nullptr,
         EnvMapSceneParams envMapSceneParams = {});
@@ -94,7 +94,7 @@ public:
     void createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
     void countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);
 
-    RTXDI_LightBufferParameters process(caustica::rhi::ICommandList* commandList);
+    RTXDI_LightBufferParameters process(caustica::rhi::CommandList* commandList);
 
     caustica::rhi::TextureHandle getEnvironmentMapTexture();
 };

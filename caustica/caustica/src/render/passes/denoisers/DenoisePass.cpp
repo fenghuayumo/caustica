@@ -63,8 +63,8 @@ namespace
     }
 
     void readR11G11B10Float3Staging(
-        caustica::rhi::IDevice* device,
-        caustica::rhi::IStagingTexture* stagingTexture,
+        caustica::rhi::Device* device,
+        caustica::rhi::StagingTexture* stagingTexture,
         uint32_t width,
         uint32_t height,
         std::vector<float>& output)
@@ -93,8 +93,8 @@ namespace
     }
 
     void readRGBA16Float3Staging(
-        caustica::rhi::IDevice* device,
-        caustica::rhi::IStagingTexture* stagingTexture,
+        caustica::rhi::Device* device,
+        caustica::rhi::StagingTexture* stagingTexture,
         uint32_t width,
         uint32_t height,
         std::vector<float>& output)
@@ -126,7 +126,7 @@ namespace
 
 void DenoisePass::createGuides(
     PathTracingContext* context,
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     const std::unique_ptr<RenderTargets>& renderTargets,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
@@ -169,7 +169,7 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 #endif
 }
 
-void DenoisePass::denoiseSpecHitT(caustica::rhi::ICommandList* commandList)
+void DenoisePass::denoiseSpecHitT(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
@@ -178,7 +178,7 @@ void DenoisePass::denoiseSpecHitT(caustica::rhi::ICommandList* commandList)
     m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindingSet);
 }
 
-void DenoisePass::computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList)
+void DenoisePass::computeAvgLayerRadiance(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
@@ -194,7 +194,7 @@ void DenoisePass::computeAvgLayerRadiance(caustica::rhi::ICommandList* commandLi
             m_bindingSet);
 }
 
-void DenoisePass::prepareGuides(caustica::rhi::ICommandList* commandList)
+void DenoisePass::prepareGuides(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
 
@@ -204,7 +204,7 @@ void DenoisePass::prepareGuides(caustica::rhi::ICommandList* commandList)
     computeAvgLayerRadiance(commandList);
 }
 
-void DenoisePass::stablePlanesDebugViz(caustica::rhi::ICommandList* commandList)
+void DenoisePass::stablePlanesDebugViz(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
     assert(m_postProcess);
@@ -262,7 +262,7 @@ SampleMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings
 
 } // namespace
 
-void DenoisePass::prepareNrdInputs(caustica::rhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::prepareNrdInputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -294,7 +294,7 @@ void DenoisePass::prepareNrdInputs(caustica::rhi::ICommandList* commandList, int
     commandList->endMarker();
 }
 
-void DenoisePass::runNrd(caustica::rhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::runNrd(caustica::rhi::CommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -349,7 +349,7 @@ void DenoisePass::runNrd(caustica::rhi::ICommandList* commandList, int planeInde
     commandList->endMarker();
 }
 
-void DenoisePass::mergeNrdOutputs(caustica::rhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::mergeNrdOutputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -381,8 +381,8 @@ void DenoisePass::mergeNrdOutputs(caustica::rhi::ICommandList* commandList, int 
 }
 
 void DenoisePass::denoiseStablePlane(
-    caustica::rhi::ICommandList* commandList,
-    caustica::rhi::IFramebuffer* framebuffer,
+    caustica::rhi::CommandList* commandList,
+    caustica::rhi::Framebuffer* framebuffer,
     int planeIndex)
 {
     (void)framebuffer;
@@ -403,7 +403,7 @@ void DenoisePass::denoiseStablePlane(
     commandList->endMarker();
 }
 
-void DenoisePass::denoise(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer)
+void DenoisePass::denoise(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* framebuffer)
 {
     assert(m_context);
 
@@ -419,7 +419,7 @@ void DenoisePass::denoise(caustica::rhi::ICommandList* commandList, caustica::rh
         denoiseStablePlane(commandList, framebuffer, pass);
 }
 
-void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::ICommandList* commandList)
+void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
     assert(m_context);
@@ -450,7 +450,7 @@ void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::ICommandList* commandLi
 }
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-bool DenoisePass::evaluateNativeDLSS(caustica::rhi::ICommandList* commandList, bool reset)
+bool DenoisePass::evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bool reset)
 {
     assert(commandList);
     assert(m_context);
@@ -536,7 +536,7 @@ bool DenoisePass::evaluateNativeDLSS(caustica::rhi::ICommandList* commandList, b
 }
 #endif
 
-void DenoisePass::runDlssUpscale(caustica::rhi::ICommandList* commandList, bool reset)
+void DenoisePass::runDlssUpscale(caustica::rhi::CommandList* commandList, bool reset)
 {
     assert(commandList);
     assert(m_context);
@@ -640,7 +640,7 @@ void DenoisePass::resetReferenceOIDN()
         m_oidnDenoiser->reset();
 }
 
-void DenoisePass::applyReferenceOIDN(caustica::rhi::ICommandList* commandList)
+void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
 {
     assert(m_context);
     assert(commandList);
@@ -651,7 +651,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::ICommandList* commandList)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    caustica::rhi::IDevice* device = m_device;
+    caustica::rhi::Device* device = m_device;
     assert(device);
 
     const bool accumulationReady = m_accumulationCompleted
@@ -684,7 +684,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::ICommandList* commandList)
         return;
     }
 
-    caustica::rhi::ITexture* sourceTexture = m_renderTargets->accumulatedRadiance;
+    caustica::rhi::Texture* sourceTexture = m_renderTargets->accumulatedRadiance;
     caustica::rhi::TextureDesc sourceDesc = sourceTexture->getDesc();
     if (sourceDesc.format != caustica::rhi::Format::RGBA32_FLOAT)
     {

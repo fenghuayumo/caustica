@@ -13,8 +13,8 @@ namespace caustica::rg
 class RenderTargetPool
 {
 public:
-    void setDevice(caustica::rhi::IDevice* device) { m_device = device; }
-    [[nodiscard]] caustica::rhi::IDevice* device() const { return m_device; }
+    void setDevice(caustica::rhi::Device* device) { m_device = device; }
+    [[nodiscard]] caustica::rhi::Device* device() const { return m_device; }
 
     [[nodiscard]] caustica::rhi::TextureHandle acquireTexture(const TextureDesc& desc);
     [[nodiscard]] caustica::rhi::TextureHandle tryAcquireTexture(const TextureDesc& desc);
@@ -34,7 +34,7 @@ private:
     [[nodiscard]] int findFreeSlot(const TextureDesc& desc) const;
     [[nodiscard]] caustica::rhi::TextureHandle createPooledTexture(const TextureDesc& desc);
 
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
     uint64_t m_frameIndex = 0;
     std::vector<PooledTexture> m_textures;
 };

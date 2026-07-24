@@ -69,7 +69,7 @@ struct FrameGraphContext
     PathTracerSettings* settings = nullptr;
     SampleConstants* sampleConstants = nullptr;
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
-    caustica::rhi::IFramebuffer* targetFramebuffer = nullptr;
+    caustica::rhi::Framebuffer* targetFramebuffer = nullptr;
     const ExtractedFrameView* extractedView = nullptr;
 
     caustica::BindingCache* bindingCache = nullptr;
@@ -86,7 +86,7 @@ struct FrameGraphContext
 
     caustica::rhi::BindingLayoutHandle bindingLayout;
     caustica::rhi::BindingSetHandle bindingSet;
-    caustica::rhi::IDescriptorTable* descriptorTable = nullptr;
+    caustica::rhi::DescriptorTable* descriptorTable = nullptr;
     caustica::rhi::BufferHandle constantBuffer;
 
     PTPipelineVariant* ptBuildStablePlanes = nullptr;
@@ -110,8 +110,8 @@ struct FrameGraphContext
     caustica::rhi::BufferHandle subInstanceDataBuffer;
 
     PathTracingContext* pathTracingContext = nullptr;
-    caustica::rhi::IDevice* device = nullptr;
-    caustica::rhi::ICommandList* commandList = nullptr;
+    caustica::rhi::Device* device = nullptr;
+    caustica::rhi::CommandList* commandList = nullptr;
     caustica::AccelStructManager* accelStructs = nullptr;
     SceneGaussianSplatPasses* gaussianScenePasses = nullptr;
     caustica::CameraController* camera = nullptr;

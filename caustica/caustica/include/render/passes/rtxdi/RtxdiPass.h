@@ -56,7 +56,7 @@ class RtxdiPass
 {
 public:
 	RtxdiPass(
-		caustica::rhi::IDevice* device,
+		caustica::rhi::Device* device,
 		std::shared_ptr<caustica::ShaderFactory> shaderFactory,
 		caustica::render::RenderDevice& renderDevice,
 		caustica::rhi::BindingLayoutHandle bindlessLayout);
@@ -72,7 +72,7 @@ public:
 		EnvMapProcessor* environment = nullptr;
 		EnvMapSceneParams envMapSceneParams{};
 		const caustica::scene::SceneRenderData* renderData = nullptr;
-		caustica::rhi::IDescriptorTable* descriptorTable = nullptr;
+		caustica::rhi::DescriptorTable* descriptorTable = nullptr;
 		caustica::render::SceneGpuFrameHandles gpuHandles{};
 		std::shared_ptr<class MaterialGpuCache> materials;
 		std::shared_ptr<class OpacityMicromapBuilder> opacityMaps;
@@ -103,7 +103,7 @@ public:
         EnvMapSceneParams envMapSceneParams,
         const caustica::scene::SceneRenderData* renderData,
         size_t geometryInstanceCount,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::DescriptorTable* descriptorTable,
         const caustica::render::SceneGpuFrameHandles& gpuHandles,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
@@ -136,7 +136,7 @@ public:
         caustica::rhi::BindingSetHandle extraBindingSet);
 	// Fused DIGI / GI / PT sequence for one frame. No WorldRenderer command-list swap.
 	void executeFrame(
-		caustica::rhi::ICommandList* commandList,
+		caustica::rhi::CommandList* commandList,
 		caustica::rhi::BindingSetHandle globalBindingSet,
 		const PathTracerSettings& settings);
 	void endFrame();
@@ -159,7 +159,7 @@ private:
 	caustica::rhi::DeviceHandle m_device;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	caustica::render::RenderDevice& m_renderDevice;
-	caustica::rhi::IDescriptorTable* m_descriptorTable = nullptr;
+	caustica::rhi::DescriptorTable* m_descriptorTable = nullptr;
 	caustica::rhi::BindingLayoutHandle m_bindingLayout;
 	caustica::rhi::BindingLayoutHandle m_bindlessLayout;
 	caustica::rhi::BindingSetHandle m_bindingSet;
@@ -196,7 +196,7 @@ private:
 		RayTracingPass& pass,
 		const char* passName,
 		dm::int2 dispatchSize, 
-		caustica::rhi::IBindingSet* extraBindingSet = nullptr
+		caustica::rhi::BindingSet* extraBindingSet = nullptr
 	);
 
 	caustica::ShaderMacro getReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);

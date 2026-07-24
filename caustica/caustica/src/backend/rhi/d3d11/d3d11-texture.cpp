@@ -208,13 +208,13 @@ namespace caustica::rhi::d3d11
         return createTexture(d, CpuAccessMode::None);
     }
 
-    MemoryRequirements Device::getTextureMemoryRequirements(ITexture*)
+    MemoryRequirements Device::getTextureMemoryRequirements(rhi::Texture*)
     {
         utils::NotSupported();
         return MemoryRequirements();
     }
 
-    bool Device::bindTextureMemory(ITexture*, IHeap*, uint64_t)
+    bool Device::bindTextureMemory(rhi::Texture*, rhi::Heap*, uint64_t)
     {
         utils::NotSupported();
         return false;
@@ -245,7 +245,7 @@ namespace caustica::rhi::d3d11
         return StagingTextureHandle::Create(ret);
     }
 
-    void CommandList::clearTextureFloat(ITexture* _texture, TextureSubresourceSet subresources, const Color& clearColor)
+    void CommandList::clearTextureFloat(rhi::Texture* _texture, TextureSubresourceSet subresources, const Color& clearColor)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -280,7 +280,7 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void CommandList::clearDepthStencilTexture(ITexture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
+    void CommandList::clearDepthStencilTexture(rhi::Texture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
     {
         if (!clearDepth && !clearStencil)
         {
@@ -313,7 +313,7 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void CommandList::clearTextureUInt(ITexture* _texture, TextureSubresourceSet subresources, uint32_t clearColor)
+    void CommandList::clearTextureUInt(rhi::Texture* _texture, TextureSubresourceSet subresources, uint32_t clearColor)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -350,14 +350,14 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void CommandList::clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture)
+    void CommandList::clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture)
     {
         (void)texture;
 
         utils::NotSupported();
     }
 
-    void CommandList::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format)
+    void CommandList::decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
         (void)buffer;
         (void)texture;
@@ -366,7 +366,7 @@ namespace caustica::rhi::d3d11
         utils::NotSupported();
     }
 
-    void CommandList::setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits)
+    void CommandList::setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits)
     {
         (void)texture;
         (void)stateBits;
@@ -402,7 +402,7 @@ namespace caustica::rhi::d3d11
                                        &srcBox);
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice, ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice, rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* src = checked_cast<Texture*>(_src);
         Texture* dst = checked_cast<Texture*>(_dst);
@@ -411,7 +411,7 @@ namespace caustica::rhi::d3d11
                     src->resource, src->desc, srcSlice);
     }
 
-    void CommandList::copyTexture(IStagingTexture* _dst, const TextureSlice& dstSlice, ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::StagingTexture* _dst, const TextureSlice& dstSlice, rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* src = checked_cast<Texture*>(_src);
         StagingTexture* dst = checked_cast<StagingTexture*>(_dst);
@@ -420,7 +420,7 @@ namespace caustica::rhi::d3d11
                     src->resource, src->desc, srcSlice);
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice, IStagingTexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice, rhi::StagingTexture* _src, const TextureSlice& srcSlice)
     {
         StagingTexture* src = checked_cast<StagingTexture*>(_src);
         Texture* dst = checked_cast<Texture*>(_dst);
@@ -429,7 +429,7 @@ namespace caustica::rhi::d3d11
                     src->texture->resource, src->texture->desc, srcSlice);
     }
 
-    void CommandList::writeTexture(ITexture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
+    void CommandList::writeTexture(rhi::Texture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
     {
         Texture* dest = checked_cast<Texture*>(_dest);
 
@@ -438,7 +438,7 @@ namespace caustica::rhi::d3d11
         m_Context.immediateContext->UpdateSubresource(dest->resource, subresource, nullptr, data, UINT(rowPitch), UINT(depthPitch));
     }
 
-    void CommandList::resolveTexture(ITexture* _dest, const TextureSubresourceSet& dstSubresources, ITexture* _src, const TextureSubresourceSet& srcSubresources)
+    void CommandList::resolveTexture(rhi::Texture* _dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* _src, const TextureSubresourceSet& srcSubresources)
     {
         Texture* dest = checked_cast<Texture*>(_dest);
         Texture* src = checked_cast<Texture*>(_src);
@@ -463,7 +463,7 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void *Device::mapStagingTexture(IStagingTexture* _stagingTexture, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
+    void *Device::mapStagingTexture(rhi::StagingTexture* _stagingTexture, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
     {
         StagingTexture* stagingTexture = checked_cast<StagingTexture*>(_stagingTexture);
 
@@ -505,7 +505,7 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void Device::unmapStagingTexture(IStagingTexture* _t)
+    void Device::unmapStagingTexture(rhi::StagingTexture* _t)
     {
         StagingTexture* t = checked_cast<StagingTexture*>(_t);
 

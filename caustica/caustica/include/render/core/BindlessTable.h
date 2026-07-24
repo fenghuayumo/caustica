@@ -68,7 +68,7 @@ using BindlessSamplerH  = BindlessHandle<BindlessSamplerTag>;
 class BindlessTable
 {
 public:
-    BindlessTable(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout);
+    BindlessTable(caustica::rhi::Device* device, caustica::rhi::BindingLayout* layout);
     ~BindlessTable();
 
     // --- New API: O(1) freelist allocation with generation tracking ---
@@ -85,7 +85,7 @@ public:
     [[nodiscard]] caustica::rhi::BindingSetItem getDescriptor(DescriptorIndex index) const;
 
     // --- Accessors ---
-    [[nodiscard]] caustica::rhi::IDescriptorTable* getDescriptorTable() const;
+    [[nodiscard]] caustica::rhi::DescriptorTable* getDescriptorTable() const;
     [[nodiscard]] std::shared_ptr<DescriptorTableManager> getDescriptorTableManager() const { return m_manager; }
     [[nodiscard]] uint32_t getCapacity() const;
     [[nodiscard]] uint32_t getAllocatedCount() const;

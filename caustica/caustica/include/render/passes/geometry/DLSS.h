@@ -55,7 +55,7 @@ namespace caustica::render
             bool resetHistory = false;
         };
 
-        DLSS(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory);
+        DLSS(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory);
 
         [[nodiscard]] bool isDlssSupported() const;
         [[nodiscard]] bool isDlssInitialized() const;
@@ -66,13 +66,13 @@ namespace caustica::render
         virtual void init(const InitParameters& params) = 0;
 
         virtual bool evaluate(
-            caustica::rhi::ICommandList* commandList,
+            caustica::rhi::CommandList* commandList,
             const EvaluateParameters& params,
             const caustica::PlanarView& view) = 0;
 
         virtual ~DLSS() = default;
 
-        static std::unique_ptr<DLSS> create(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> create(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID = DefaultApplicationID);
 
         static void getRequiredVulkanExtensions(std::vector<std::string>& instanceExtensions, std::vector<std::string>& deviceExtensions);
@@ -100,18 +100,18 @@ namespace caustica::render
         caustica::rhi::BindingSetHandle m_exposureBindingSet;
         caustica::rhi::CommandListHandle m_featureCommandList;
 
-        void computeExposure(caustica::rhi::ICommandList* commandList, caustica::rhi::IBuffer* toneMapperExposureBuffer, float exposureScale);
+        void computeExposure(caustica::rhi::CommandList* commandList, caustica::rhi::Buffer* toneMapperExposureBuffer, float exposureScale);
         
     #if CAUSTICA_WITH_DX11
-        static std::unique_ptr<DLSS> createDX11(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createDX11(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if CAUSTICA_WITH_DX12
-        static std::unique_ptr<DLSS> createDX12(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createDX12(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     #if CAUSTICA_WITH_VULKAN
-        static std::unique_ptr<DLSS> createVK(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+        static std::unique_ptr<DLSS> createVK(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);
     #endif
     };

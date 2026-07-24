@@ -17,7 +17,7 @@ namespace caustica::rhi::d3d11
 {
     struct DeviceDesc
     {
-        IMessageCallback* messageCallback = nullptr;
+        MessageCallback* messageCallback = nullptr;
         ID3D11DeviceContext* context = nullptr;
         bool aftermathEnabled = false;
     };

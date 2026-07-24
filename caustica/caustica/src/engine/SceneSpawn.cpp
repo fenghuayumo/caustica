@@ -45,7 +45,7 @@ void flushPendingStructureGpu(App& app)
     assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
     const scene::SceneRenderData& gpuSetupData = scenePtr->getRenderDataForFrame(frameIndex);
     runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, &gpuSetupData]() {
-        if (caustica::rhi::IDevice* rhiDevice = device->getDevice())
+        if (caustica::rhi::Device* rhiDevice = device->getDevice())
             rhiDevice->waitForIdle();
 
         if (caches->textureLoader && caches->renderDevice)

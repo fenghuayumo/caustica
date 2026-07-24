@@ -200,8 +200,8 @@ namespace caustica::rhi::vulkan
         return BufferHandle::Create(buffer);
     }
 
-    void CommandList::copyBuffer(IBuffer* _dest, uint64_t destOffsetBytes,
-                                             IBuffer* _src, uint64_t srcOffsetBytes,
+    void CommandList::copyBuffer(rhi::Buffer* _dest, uint64_t destOffsetBytes,
+                                             rhi::Buffer* _src, uint64_t srcOffsetBytes,
                                              uint64_t dataSizeBytes)
     {
         Buffer* dest = checked_cast<Buffer*>(_dest);
@@ -246,7 +246,7 @@ namespace caustica::rhi::vulkan
         return 0;
     }
 
-    void CommandList::writeVolatileBuffer(Buffer* buffer, const void* data, size_t dataSize)
+    void CommandList::writeVolatileBuffer(rhi::Buffer* buffer, const void* data, size_t dataSize)
     {
         VolatileBufferState& state = m_VolatileBufferStates[buffer];
 
@@ -419,7 +419,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void CommandList::writeBuffer(IBuffer* _buffer, const void *data, size_t dataSize, uint64_t destOffsetBytes)
+    void CommandList::writeBuffer(rhi::Buffer* _buffer, const void *data, size_t dataSize, uint64_t destOffsetBytes)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -482,7 +482,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void CommandList::clearBufferUInt(IBuffer* b, uint32_t clearValue)
+    void CommandList::clearBufferUInt(rhi::Buffer* b, uint32_t clearValue)
     {
         Buffer* buffer = checked_cast<Buffer*>(b);
 
@@ -499,6 +499,20 @@ namespace caustica::rhi::vulkan
 
         m_CurrentCmdBuf->cmdBuf.fillBuffer(buffer->buffer, 0, buffer->desc.byteSize, clearValue);
         m_CurrentCmdBuf->referencedResources.push_back(b);
+    }
+
+    struct VulkanLastUsePoll
+    {
+        Device* device = nullptr;
+        CommandQueue queue = CommandQueue::Graphics;
+    };
+
+    static bool isVulkanSubmissionComplete(void* context, uint64_t submissionID)
+    {
+        auto* poll = static_cast<VulkanLastUsePoll*>(context);
+        if (!poll || !poll->device)
+            return true;
+        return poll->device->isQueueSubmissionComplete(poll->queue, submissionID);
     }
 
     Buffer::~Buffer()
@@ -523,19 +537,39 @@ namespace caustica::rhi::vulkan
 
         viewCache.clear();
 
-        if (managed)
+        if (!managed || buffer == vk::Buffer())
+            return;
+
+        vk::Buffer buf = buffer;
+        vk::DeviceMemory mem = memory;
+        buffer = vk::Buffer();
+        memory = vk::DeviceMemory();
+
+        const auto destroyNative = [device = m_Context.device, callbacks = m_Context.allocationCallbacks, buf, mem]()
         {
-            assert(buffer != vk::Buffer());
+            if (buf)
+                device.destroyBuffer(buf, callbacks);
+            if (mem)
+                device.freeMemory(mem, callbacks);
+        };
 
-            m_Context.device.destroyBuffer(buffer, m_Context.allocationCallbacks);
-            buffer = vk::Buffer();
-
-            if (memory)
-            {
-                m_Allocator.freeBufferMemory(this);
-                memory = vk::DeviceMemory();
-            }
+        // Staging buffers track last-use; defer native destroy so workers never CPU-wait.
+        if (lastUseCommandListID != 0 && m_Context.deferredDeletion && m_Context.parentDevice)
+        {
+            auto* poll = new VulkanLastUsePoll{ m_Context.parentDevice, lastUseQueue };
+            m_Context.deferredDeletion->enqueue(
+                poll,
+                lastUseCommandListID,
+                &isVulkanSubmissionComplete,
+                [poll, destroyNative]()
+                {
+                    destroyNative();
+                    delete poll;
+                });
+            return;
         }
+
+        destroyNative();
     }
 
     Object Buffer::getNativeObject(ObjectType objectType)
@@ -553,7 +587,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void *Device::mapBuffer(IBuffer* _buffer, CpuAccessMode flags, uint64_t offset, size_t size) const
+    void *Device::mapBuffer(Buffer* _buffer, CpuAccessMode flags, uint64_t offset, size_t size) const
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -594,14 +628,14 @@ namespace caustica::rhi::vulkan
         return ptr;
     }
 
-    void *Device::mapBuffer(IBuffer* _buffer, CpuAccessMode flags)
+    void *Device::mapBuffer(Buffer* _buffer, CpuAccessMode flags)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
         return mapBuffer(buffer, flags, 0, buffer->desc.byteSize);
     }
 
-    void Device::unmapBuffer(IBuffer* _buffer)
+    void Device::unmapBuffer(rhi::Buffer* _buffer)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -611,7 +645,7 @@ namespace caustica::rhi::vulkan
         // buffer->barrier(cmd, vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferRead);
     }
 
-    MemoryRequirements Device::getBufferMemoryRequirements(IBuffer* _buffer)
+    MemoryRequirements Device::getBufferMemoryRequirements(rhi::Buffer* _buffer)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -624,7 +658,7 @@ namespace caustica::rhi::vulkan
         return memReq;
     }
 
-    bool Device::bindBufferMemory(IBuffer* _buffer, IHeap* _heap, uint64_t offset)
+    bool Device::bindBufferMemory(rhi::Buffer* _buffer, rhi::Heap* _heap, uint64_t offset)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
         Heap* heap = checked_cast<Heap*>(_heap);

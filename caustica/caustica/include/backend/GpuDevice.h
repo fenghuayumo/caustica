@@ -46,7 +46,7 @@ namespace caustica
     class Window; // Platform layer: window abstraction
     class App; // Engine layer: frame driver (friend - accesses protected state)
 
-    struct DefaultMessageCallback : public caustica::rhi::IMessageCallback
+    struct DefaultMessageCallback : public caustica::rhi::MessageCallback
     {
         static DefaultMessageCallback& getInstance();
 
@@ -147,7 +147,7 @@ namespace caustica
         // the initial window size will be larger than specified in 'backBufferWidth' and 'backBufferHeight' parameters.
         bool resizeWindowWithDisplayScale = false;
 
-        caustica::rhi::IMessageCallback *messageCallback = nullptr;
+        caustica::rhi::MessageCallback *messageCallback = nullptr;
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
         DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -334,7 +334,7 @@ namespace caustica
         void releaseHeadlessBackBuffers();
         bool beginHeadlessFrame();
         bool presentHeadlessFrame();
-        caustica::rhi::ITexture* getHeadlessBackBuffer(uint32_t index);
+        caustica::rhi::Texture* getHeadlessBackBuffer(uint32_t index);
         uint32_t getCurrentHeadlessBackBufferIndex() const;
         uint32_t getHeadlessBackBufferCount() const;
 
@@ -351,7 +351,7 @@ namespace caustica
         virtual void prepareShutdown() {}
 
     public:
-        [[nodiscard]] virtual caustica::rhi::IDevice *getDevice() const = 0;
+        [[nodiscard]] virtual caustica::rhi::Device *getDevice() const = 0;
         [[nodiscard]] virtual const char *getRendererString() const = 0;
         [[nodiscard]] virtual caustica::rhi::GraphicsAPI getGraphicsAPI() const = 0;
 
@@ -383,13 +383,13 @@ namespace caustica
         [[nodiscard]] uint32_t getPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
         void setPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
 
-        virtual caustica::rhi::ITexture* getCurrentBackBuffer() = 0;
-        virtual caustica::rhi::ITexture* getBackBuffer(uint32_t index) = 0;
+        virtual caustica::rhi::Texture* getCurrentBackBuffer() = 0;
+        virtual caustica::rhi::Texture* getBackBuffer(uint32_t index) = 0;
         virtual uint32_t getCurrentBackBufferIndex() = 0;
         virtual uint32_t getBackBufferCount() = 0;
-        caustica::rhi::IFramebuffer* getCurrentFramebuffer(bool withDepth = true);
-        caustica::rhi::IFramebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
-        caustica::rhi::ITexture* getDepthBuffer() const { return m_SwapChain.depthBuffer; }
+        caustica::rhi::Framebuffer* getCurrentFramebuffer(bool withDepth = true);
+        caustica::rhi::Framebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
+        caustica::rhi::Texture* getDepthBuffer() const { return m_SwapChain.depthBuffer; }
 
         virtual void shutdown();
         virtual ~GpuDevice() = default;

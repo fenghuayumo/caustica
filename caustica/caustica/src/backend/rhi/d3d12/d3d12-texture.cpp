@@ -376,7 +376,7 @@ namespace caustica::rhi::d3d12
         return TextureHandle::Create(texture);
     }
 
-    MemoryRequirements Device::getTextureMemoryRequirements(ITexture* _texture)
+    MemoryRequirements Device::getTextureMemoryRequirements(rhi::Texture* _texture)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
         
@@ -388,7 +388,7 @@ namespace caustica::rhi::d3d12
         return memReq;
     }
 
-    bool Device::bindTextureMemory(ITexture* _texture, IHeap* _heap, uint64_t offset)
+    bool Device::bindTextureMemory(rhi::Texture* _texture, rhi::Heap* _heap, uint64_t offset)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
         Heap* heap = checked_cast<Heap*>(_heap);
@@ -786,7 +786,7 @@ namespace caustica::rhi::d3d12
         m_Context.device->CreateDepthStencilView(resource, &viewDesc, { descriptor });
     }
 
-    void *Device::mapStagingTexture(IStagingTexture* _tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
+    void *Device::mapStagingTexture(rhi::StagingTexture* _tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
     {
         StagingTexture* tex = checked_cast<StagingTexture*>(_tex);
 
@@ -834,7 +834,7 @@ namespace caustica::rhi::d3d12
         return ret + tex->mappedRegion.offset;
     }
 
-    void Device::unmapStagingTexture(IStagingTexture* _tex)
+    void Device::unmapStagingTexture(rhi::StagingTexture* _tex)
     {
         StagingTexture* tex = checked_cast<StagingTexture*>(_tex);
 
@@ -856,7 +856,7 @@ namespace caustica::rhi::d3d12
         tex->mappedAccess = CpuAccessMode::None;
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
         Texture* texPair = checked_cast<Texture*>(pairedTexture);
         TextureDesc descPair = texPair->desc;
@@ -913,7 +913,7 @@ namespace caustica::rhi::d3d12
         return SamplerFeedbackTextureHandle::Create(texture);
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object _texture, ITexture* pairedTexture)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object _texture, rhi::Texture* pairedTexture)
     {
         if (_texture.pointer == nullptr)
             return nullptr;
@@ -947,7 +947,7 @@ namespace caustica::rhi::d3d12
         m_Context.device8->CreateSamplerFeedbackUnorderedAccessView(pairedResource, resource, { descriptor });
     }
 
-    void CommandList::clearTextureFloat(ITexture* _t, TextureSubresourceSet subresources, const Color & clearColor)
+    void CommandList::clearTextureFloat(rhi::Texture* _t, TextureSubresourceSet subresources, const Color & clearColor)
     {
         Texture* t = checked_cast<Texture*>(_t);
 
@@ -1005,7 +1005,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void CommandList::clearDepthStencilTexture(ITexture* _t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
+    void CommandList::clearDepthStencilTexture(rhi::Texture* _t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
     {
         if (!clearDepth && !clearStencil)
         {
@@ -1053,7 +1053,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void CommandList::clearTextureUInt(ITexture* _t, TextureSubresourceSet subresources, uint32_t clearColor)
+    void CommandList::clearTextureUInt(rhi::Texture* _t, TextureSubresourceSet subresources, uint32_t clearColor)
     {
         Texture* t = checked_cast<Texture*>(_t);
 
@@ -1110,7 +1110,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void CommandList::clearSamplerFeedbackTexture(ISamplerFeedbackTexture* _texture)
+    void CommandList::clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* _texture)
     {
         SamplerFeedbackTexture* texture = checked_cast<SamplerFeedbackTexture*>(_texture);
 
@@ -1131,7 +1131,7 @@ namespace caustica::rhi::d3d12
             texture->resource, clearValue, 0, nullptr);
     }
 
-    void CommandList::decodeSamplerFeedbackTexture(IBuffer* _buffer, ISamplerFeedbackTexture* _texture, caustica::rhi::Format format)
+    void CommandList::decodeSamplerFeedbackTexture(rhi::Buffer* _buffer, rhi::SamplerFeedbackTexture* _texture, caustica::rhi::Format format)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
         SamplerFeedbackTexture* texture = checked_cast<SamplerFeedbackTexture*>(_texture);
@@ -1149,13 +1149,13 @@ namespace caustica::rhi::d3d12
         m_ActiveCommandList->commandList4->ResolveSubresourceRegion(buffer->resource, 0, 0, 0, texture->resource, 0, nullptr, formatMapping.srvFormat, D3D12_RESOLVE_MODE_DECODE_SAMPLER_FEEDBACK);
     }
 
-    void CommandList::setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits)
+    void CommandList::setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits)
     {
         requireSamplerFeedbackTextureState(texture, stateBits);
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice,
-        ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice,
+        rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* dst = checked_cast<Texture*>(_dst);
         Texture* src = checked_cast<Texture*>(_src);
@@ -1203,7 +1203,7 @@ namespace caustica::rhi::d3d12
             &srcBox);
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice, IStagingTexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice, rhi::StagingTexture* _src, const TextureSlice& srcSlice)
     {
         StagingTexture* src = checked_cast<StagingTexture*>(_src);
         Texture* dst = checked_cast<Texture*>(_dst);
@@ -1248,7 +1248,7 @@ namespace caustica::rhi::d3d12
             &srcLocation, &srcBox);
     }
 
-    void CommandList::copyTexture(IStagingTexture* _dst, const TextureSlice& dstSlice, ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::StagingTexture* _dst, const TextureSlice& dstSlice, rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* src = checked_cast<Texture*>(_src);
         StagingTexture* dst = checked_cast<StagingTexture*>(_dst);
@@ -1293,7 +1293,7 @@ namespace caustica::rhi::d3d12
             &srcLocation, &srcBox);
     }
 
-    void CommandList::writeTexture(ITexture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
+    void CommandList::writeTexture(rhi::Texture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
     {
         Texture* dest = checked_cast<Texture*>(_dest);
 
@@ -1358,7 +1358,7 @@ namespace caustica::rhi::d3d12
         m_ActiveCommandList->commandList->CopyTextureRegion(&destCopyLocation, 0, 0, 0, &srcCopyLocation, nullptr);
     }
 
-    void CommandList::resolveTexture(ITexture* _dest, const TextureSubresourceSet& dstSubresources, ITexture* _src, const TextureSubresourceSet& srcSubresources)
+    void CommandList::resolveTexture(rhi::Texture* _dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* _src, const TextureSubresourceSet& srcSubresources)
     {
         Texture* dest = checked_cast<Texture*>(_dest);
         Texture* src = checked_cast<Texture*>(_src);

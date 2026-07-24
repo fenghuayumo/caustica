@@ -136,7 +136,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     if (!m_ui)
         return;
 
-    caustica::rhi::IFramebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
+    caustica::rhi::Framebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
     // Swapchain FB vectors are cleared during backBufferResizing(); skip UI GPU submit.
     if (!swapchainFb)
     {
@@ -159,7 +159,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     {
         if (zoom->enabled())
         {
-            caustica::rhi::ITexture* color = (m_viewport && m_viewport->isValid())
+            caustica::rhi::Texture* color = (m_viewport && m_viewport->isValid())
                 ? m_viewport->colorTexture()
                 : swapchainFb->getDesc().colorAttachments[0].texture;
             if (color)

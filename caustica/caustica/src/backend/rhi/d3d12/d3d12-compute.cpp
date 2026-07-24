@@ -110,7 +110,7 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(pso);
         }
 
-        setComputeBindings(state.bindings, bindingUpdateMask, state.indirectParams, updateIndirectParams, pso->rootSignature);
+        setComputeBindings(state.bindings, bindingUpdateMask, checked_cast<Buffer*>(state.indirectParams), updateIndirectParams, pso->rootSignature);
 
         unbindShadingRateState();
         

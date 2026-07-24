@@ -17,7 +17,7 @@ static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Lev
 class DLSS_DX11 : public DLSS
 {
 public:
-    DLSS_DX11(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+    DLSS_DX11(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
@@ -105,7 +105,7 @@ public:
     }
     
     bool evaluate(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
     {
@@ -182,7 +182,7 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::createDX11(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createDX11(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_DX11>(device, shaderFactory, directoryWithExecutable, applicationID);

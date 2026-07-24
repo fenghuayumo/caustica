@@ -31,7 +31,7 @@ void EditorViewport::flushRetired(caustica::GpuDevice& device)
         return;
 
     // Prior path-trace / ImGui frames may still reference the retired color on the GPU.
-    if (caustica::rhi::IDevice* rhiDevice = device.getDevice())
+    if (caustica::rhi::Device* rhiDevice = device.getDevice())
         rhiDevice->waitForIdle();
 
     clearRetired();
@@ -45,7 +45,7 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     if (m_framebuffer && m_width == width && m_height == height)
         return;
 
-    caustica::rhi::IDevice* rhiDevice = device.getDevice();
+    caustica::rhi::Device* rhiDevice = device.getDevice();
     if (!rhiDevice)
         return;
 

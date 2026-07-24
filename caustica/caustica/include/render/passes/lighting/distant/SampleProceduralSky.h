@@ -20,14 +20,14 @@ class SampleProceduralSky
 {
 public:
     SampleProceduralSky(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~SampleProceduralSky() = default;
 
     caustica::rhi::TextureHandle getTransmittanceTexture() const { return m_transmittanceLut; }
     caustica::rhi::TextureHandle getSkyViewTexture() const { return m_skyViewLut; }
     bool update(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         double sceneTime,
         ProceduralSkyConstants& outConstants,
         const std::string& presetType,
@@ -39,9 +39,9 @@ public:
 
     bool isAerialPerspectiveEnabled() const { return m_aerialPerspectiveEnabled; }
     void applyAerialPerspective(
-        caustica::rhi::ICommandList* commandList,
-        caustica::rhi::ITexture* color,
-        caustica::rhi::ITexture* depth,
+        caustica::rhi::CommandList* commandList,
+        caustica::rhi::Texture* color,
+        caustica::rhi::Texture* depth,
         const caustica::IView& view,
         uint width,
         uint height,
@@ -52,7 +52,7 @@ public:
 private:
     void createLutResources();
     void fillEarthAtmosphere(AtmosphereParameters& atm) const;
-    void dispatchLutPasses(caustica::rhi::ICommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
+    void dispatchLutPasses(caustica::rhi::CommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
     float3 computeSunDirection(float elevationDeg, float azimuthDeg) const;
     void applySunPreset(float elevationDeg, float azimuthDeg);
 

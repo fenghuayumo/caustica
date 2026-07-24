@@ -276,13 +276,13 @@ namespace caustica::rhi::d3d11
         return shader;  // NOLINT(clang-diagnostic-return-std-move-in-c++11)
     }
     
-    ShaderHandle Device::createShaderSpecialization(IShader*, const ShaderSpecialization*, uint32_t)
+    ShaderHandle Device::createShaderSpecialization(rhi::Shader*, const ShaderSpecialization*, uint32_t)
     {
         utils::NotSupported();
         return nullptr;
     }
 
-    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, IShader* _vertexShader)
+    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* _vertexShader)
     {
         Shader* vertexShader = checked_cast<Shader*>(_vertexShader);
 

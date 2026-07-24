@@ -121,11 +121,11 @@ void buildGaussianSplatEmissionProxies(
 }
 
 bool uploadGaussianSplatScene(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView,
-    caustica::rhi::rt::IAccelStruct* meshTopLevelAS,
+    caustica::rhi::rt::AccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
@@ -149,7 +149,7 @@ bool uploadGaussianSplatScene(
 }
 
 void sortGaussianSplatScene(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses)
 {
@@ -164,7 +164,7 @@ void sortGaussianSplatScene(
 }
 
 bool rasterGaussianSplatScene(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView)
@@ -182,7 +182,7 @@ bool rasterGaussianSplatScene(
 }
 
 void buildGaussianSplatSceneAccelStructs(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const PathTracerSettings& settings)

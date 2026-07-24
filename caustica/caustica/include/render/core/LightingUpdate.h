@@ -27,7 +27,7 @@ namespace scene { class SceneRenderData; }
 
 struct PreUpdateLightingParams
 {
-    caustica::rhi::ICommandList*                         commandList = nullptr;
+    caustica::rhi::CommandList*                         commandList = nullptr;
     bool&                                          needNewBindings;
 
     EnvMapProcessor*                             environment = nullptr;
@@ -41,7 +41,7 @@ struct UpdateLightingParams
 {
     PathTracerSettings&                            settings;
 
-    caustica::rhi::ICommandList*                           commandList = nullptr;
+    caustica::rhi::CommandList*                           commandList = nullptr;
     EnvMapProcessor*                             environment = nullptr;
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
@@ -49,7 +49,7 @@ struct UpdateLightingParams
 
     const scene::SceneRenderData*                  sceneData = nullptr;
     render::SceneGpuFrameHandles                   gpuHandles{};
-    caustica::rhi::IDescriptorTable*                       bindlessDescriptorTable = nullptr;
+    caustica::rhi::DescriptorTable*                       bindlessDescriptorTable = nullptr;
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
@@ -64,7 +64,7 @@ struct UpdateLightingParams
 
 struct UpdateLightingEndParams
 {
-    caustica::rhi::ICommandList*                           commandList = nullptr;
+    caustica::rhi::CommandList*                           commandList = nullptr;
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
 

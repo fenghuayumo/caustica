@@ -648,7 +648,13 @@ bool App::dispatchScheduledRender(SystemContext& context)
 void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
-    gpuDevice.getDevice()->runGarbageCollection();
+    // When the dedicated render thread is active, GC already ran at the end of executeRenderPhase.
+    // Only GC here for the single-threaded (no dedicated RT) path.
+    if (!m_useDedicatedRenderThread || !m_renderThread.isRunning())
+    {
+        if (caustica::rhi::Device* rhiDevice = gpuDevice.getDevice())
+            rhiDevice->runGarbageCollection();
+    }
     gpuDevice.updateAverageFrameTime(elapsedTime);
     gpuDevice.m_PreviousFrameTimestamp = curTime;
     ++gpuDevice.m_FrameIndex;
@@ -698,6 +704,13 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (!gpuDevice->m_DeviceParams.headlessDevice)
         StreamlineIntegration::Get().presentEnd(*gpuDevice);
 #endif
+    // RHI GC is render-thread-owned when the dedicated RT is active
+    // (see docs/architecture-rhi-threading.md). Single-threaded mode GCs in finalizeFrameTiming.
+    if (m_useDedicatedRenderThread && m_renderThread.isRunning())
+    {
+        if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice())
+            rhiDevice->runGarbageCollection();
+    }
     return ok;
 }
 

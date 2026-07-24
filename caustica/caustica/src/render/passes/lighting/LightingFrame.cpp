@@ -55,7 +55,7 @@ namespace
 
 void caustica::render::createLightingRenderPasses(
     PathTracingContext& context,
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
     caustica::rhi::BindingLayoutHandle bindlessLayout,
     caustica::rhi::CommandListHandle initializeCommandList,

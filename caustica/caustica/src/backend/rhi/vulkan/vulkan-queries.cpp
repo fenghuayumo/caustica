@@ -10,7 +10,7 @@ namespace caustica::rhi::vulkan
         return EventQueryHandle::Create(query);
     }
 
-    void Device::setEventQuery(IEventQuery* _query, CommandQueue queue)
+    void Device::setEventQuery(rhi::EventQuery* _query, CommandQueue queue)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -20,7 +20,7 @@ namespace caustica::rhi::vulkan
         query->commandListID = m_Queues[uint32_t(queue)]->getLastSubmittedID();
     }
 
-    bool Device::pollEventQuery(IEventQuery* _query)
+    bool Device::pollEventQuery(rhi::EventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
         
@@ -29,7 +29,7 @@ namespace caustica::rhi::vulkan
         return queue.pollCommandList(query->commandListID);
     }
 
-    void Device::waitEventQuery(IEventQuery* _query)
+    void Device::waitEventQuery(rhi::EventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -43,7 +43,7 @@ namespace caustica::rhi::vulkan
         (void)success;
     }
 
-    void Device::resetEventQuery(IEventQuery* _query)
+    void Device::resetEventQuery(rhi::EventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -91,7 +91,7 @@ namespace caustica::rhi::vulkan
         endQueryIndex = -1;
     }
 
-    void CommandList::beginTimerQuery(ITimerQuery* _query)
+    void CommandList::beginTimerQuery(rhi::TimerQuery* _query)
     {
         endRenderPass();
 
@@ -107,7 +107,7 @@ namespace caustica::rhi::vulkan
         m_CurrentCmdBuf->cmdBuf.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, m_Device->getTimerQueryPool(), query->beginQueryIndex);
     }
 
-    void CommandList::endTimerQuery(ITimerQuery* _query)
+    void CommandList::endTimerQuery(rhi::TimerQuery* _query)
     {
         endRenderPass();
 
@@ -123,7 +123,7 @@ namespace caustica::rhi::vulkan
         query->started = true;
     }
 
-    bool Device::pollTimerQuery(ITimerQuery* _query)
+    bool Device::pollTimerQuery(rhi::TimerQuery* _query)
     {
         TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -159,7 +159,7 @@ namespace caustica::rhi::vulkan
         return true;
     }
 
-    float Device::getTimerQueryTime(ITimerQuery* _query)
+    float Device::getTimerQueryTime(rhi::TimerQuery* _query)
     {
         TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -178,7 +178,7 @@ namespace caustica::rhi::vulkan
         return query->time;
     }
 
-    void Device::resetTimerQuery(ITimerQuery* _query)
+    void Device::resetTimerQuery(rhi::TimerQuery* _query)
     {
         TimerQuery* query = checked_cast<TimerQuery*>(_query);
 

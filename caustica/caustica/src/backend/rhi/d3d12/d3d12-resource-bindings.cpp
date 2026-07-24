@@ -49,7 +49,7 @@ namespace caustica::rhi::d3d12
         // Process the volatile constant buffers: they occupy one root parameter each
         for (const std::pair<RootParameterIndex, D3D12_ROOT_DESCRIPTOR1>& parameter : layout->rootParametersVolatileCB)
         {
-            IBuffer* foundBuffer = nullptr;
+            Buffer* foundBuffer = nullptr;
 
             RootParameterIndex rootParameterIndex = parameter.first;
             const D3D12_ROOT_DESCRIPTOR1& rootDescriptor = parameter.second;
@@ -128,7 +128,7 @@ namespace caustica::rhi::d3d12
                     D3D12_CPU_DESCRIPTOR_HANDLE descriptorHandle = m_Resources.shaderResourceViewHeap.getCpuHandle(
                         descriptorTableBaseIndex + range.OffsetInDescriptorsFromTableStart + itemInRange);
 
-                    IResource* pResource = nullptr;
+                    Resource* pResource = nullptr;
 
                     for (size_t bindingIndex = 0; bindingIndex < desc.bindings.size(); bindingIndex++)
                     {
@@ -330,7 +330,7 @@ namespace caustica::rhi::d3d12
         return BindingLayoutHandle::Create(ret);
     }
 
-    BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, IBindingLayout* _layout)
+    BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* _layout)
     {
         BindingSet *ret = new BindingSet(m_Context, m_Resources);
         ret->desc = desc;
@@ -343,7 +343,7 @@ namespace caustica::rhi::d3d12
         return BindingSetHandle::Create(ret);
     }
 
-    DescriptorTableHandle Device::createDescriptorTable(IBindingLayout* layout)
+    DescriptorTableHandle Device::createDescriptorTable(rhi::BindingLayout* layout)
     {
         (void)layout; // not necessary on DX12
 
@@ -771,7 +771,7 @@ namespace caustica::rhi::d3d12
         if (!rootsig)
         {
             // Does not exist - build a new one, take ownership
-            rootsig = checked_cast<RootSignature*>(buildRootSignature(pipelineLayouts, allowInputLayout, false).Get());
+            rootsig = buildRootSignature(pipelineLayouts, allowInputLayout, false);
             rootsig->hash = hash;
 
             m_Resources.rootsigCache[hash] = rootsig;
@@ -789,7 +789,7 @@ namespace caustica::rhi::d3d12
             m_Resources.rootsigCache.erase(it);
     }
 
-    bool Device::writeDescriptorTable(IDescriptorTable* _descriptorTable, const BindingSetItem& binding)
+    bool Device::writeDescriptorTable(rhi::DescriptorTable* _descriptorTable, const BindingSetItem& binding)
     {
         DescriptorTable* descriptorTable = checked_cast<DescriptorTable*>(_descriptorTable);
 
@@ -859,7 +859,7 @@ namespace caustica::rhi::d3d12
         return true;
     }
 
-    void Device::resizeDescriptorTable(IDescriptorTable* _descriptorTable, uint32_t newSize, bool keepContents)
+    void Device::resizeDescriptorTable(rhi::DescriptorTable* _descriptorTable, uint32_t newSize, bool keepContents)
     {
         DescriptorTable* descriptorTable = checked_cast<DescriptorTable*>(_descriptorTable);
 
@@ -901,7 +901,7 @@ namespace caustica::rhi::d3d12
 
     void CommandList::setComputeBindings(
         const BindingSetVector& bindings, uint32_t bindingUpdateMask,
-        IBuffer* indirectParams, bool updateIndirectParams,
+        Buffer* indirectParams, bool updateIndirectParams,
         const RootSignature* rootSignature)
     {
         if (bindingUpdateMask)
@@ -910,7 +910,7 @@ namespace caustica::rhi::d3d12
 
             for (uint32_t bindingSetIndex = 0; bindingSetIndex < uint32_t(bindings.size()); bindingSetIndex++)
             {
-                IBindingSet* _bindingSet = bindings[bindingSetIndex];
+                rhi::BindingSet* _bindingSet = bindings[bindingSetIndex];
 
                 if (!_bindingSet)
                     continue;
@@ -934,7 +934,7 @@ namespace caustica::rhi::d3d12
 
                         if (parameter.second)
                         {
-                            Buffer* buffer = checked_cast<Buffer*>(parameter.second);
+                            Buffer* buffer = parameter.second;
 
                             if (buffer->desc.isVolatile)
                             {
@@ -1027,8 +1027,8 @@ namespace caustica::rhi::d3d12
 
     void CommandList::setGraphicsBindings(
         const BindingSetVector& bindings, uint32_t bindingUpdateMask,
-        IBuffer* indirectParams, bool updateIndirectParams,
-        IBuffer* indirectCountBuffer, bool updateIndirectCountBuffer,
+        Buffer* indirectParams, bool updateIndirectParams,
+        Buffer* indirectCountBuffer, bool updateIndirectCountBuffer,
         const RootSignature* rootSignature)
     {
         if (bindingUpdateMask)
@@ -1037,7 +1037,7 @@ namespace caustica::rhi::d3d12
 
             for (uint32_t bindingSetIndex = 0; bindingSetIndex < uint32_t(bindings.size()); bindingSetIndex++)
             {
-                IBindingSet* _bindingSet = bindings[bindingSetIndex];
+                rhi::BindingSet* _bindingSet = bindings[bindingSetIndex];
 
                 if (!_bindingSet)
                     continue;
@@ -1061,7 +1061,7 @@ namespace caustica::rhi::d3d12
 
                         if (parameter.second)
                         {
-                            Buffer* buffer = checked_cast<Buffer*>(parameter.second);
+                            Buffer* buffer = parameter.second;
 
                             if (buffer->desc.isVolatile)
                             {

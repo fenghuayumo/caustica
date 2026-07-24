@@ -41,7 +41,7 @@ namespace caustica::rhi::d3d11
         RefCountPtr<ID3D11DeviceContext> immediateContext;
         RefCountPtr<ID3D11DeviceContext1> immediateContext1;
         RefCountPtr<ID3D11Buffer> pushConstantBuffer;
-        IMessageCallback* messageCallback = nullptr;
+        MessageCallback* messageCallback = nullptr;
         bool nvapiAvailable = false;
 #if CAUSTICA_RHI_WITH_AFTERMATH
         GFSDK_Aftermath_ContextHandle aftermathContext = nullptr;
@@ -50,7 +50,7 @@ namespace caustica::rhi::d3d11
         void error(const std::string& message) const;
     };
 
-    class Texture : public RefCounter<ITexture>
+    class Texture : public RefCounter<rhi::Texture>
     {
     public:
         TextureDesc desc;
@@ -75,7 +75,7 @@ namespace caustica::rhi::d3d11
         TextureBindingKey_HashMap<RefCountPtr<ID3D11UnorderedAccessView>> m_UnorderedAccessViews;
     };
 
-    class StagingTexture : public RefCounter<IStagingTexture>
+    class StagingTexture : public RefCounter<rhi::StagingTexture>
     {
     public:
         RefCountPtr<Texture> texture;
@@ -85,7 +85,7 @@ namespace caustica::rhi::d3d11
         const TextureDesc& getDesc() const override { return texture->getDesc(); }
     };
 
-    class Buffer : public RefCounter<IBuffer>
+    class Buffer : public RefCounter<rhi::Buffer>
     {
     public:
         BufferDesc desc;
@@ -106,7 +106,7 @@ namespace caustica::rhi::d3d11
         std::unordered_map<BufferBindingKey, RefCountPtr<ID3D11UnorderedAccessView>> m_UnorderedAccessViews;
     };
 
-    class Shader : public RefCounter<IShader>
+    class Shader : public RefCounter<rhi::Shader>
     {
     public:
         ShaderDesc desc;
@@ -123,7 +123,7 @@ namespace caustica::rhi::d3d11
         void getBytecode(const void** ppBytecode, size_t* pSize) const override;
     };
 
-    class Sampler : public RefCounter<ISampler>
+    class Sampler : public RefCounter<rhi::Sampler>
     {
     public:
         SamplerDesc desc;
@@ -132,14 +132,14 @@ namespace caustica::rhi::d3d11
         const SamplerDesc& getDesc() const override { return desc; }
     };
 
-    class EventQuery : public RefCounter<IEventQuery>
+    class EventQuery : public RefCounter<rhi::EventQuery>
     {
     public:
         RefCountPtr<ID3D11Query> query;
         bool resolved = false;
     };
 
-    class TimerQuery : public RefCounter<ITimerQuery>
+    class TimerQuery : public RefCounter<rhi::TimerQuery>
     {
     public:
         RefCountPtr<ID3D11Query> start;
@@ -150,7 +150,7 @@ namespace caustica::rhi::d3d11
         float time = 0.f;
     };
     
-    class InputLayout : public RefCounter<IInputLayout>
+    class InputLayout : public RefCounter<rhi::InputLayout>
     {
     public:
         RefCountPtr<ID3D11InputLayout> layout;
@@ -163,7 +163,7 @@ namespace caustica::rhi::d3d11
     };
 
 
-    class Framebuffer : public RefCounter<IFramebuffer>
+    class Framebuffer : public RefCounter<rhi::Framebuffer>
     {
     public:
         FramebufferDesc desc;
@@ -183,7 +183,7 @@ namespace caustica::rhi::d3d11
         D3D11_RECT scissorRects[D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX] = {};
     };
 
-    class GraphicsPipeline : public RefCounter<IGraphicsPipeline>
+    class GraphicsPipeline : public RefCounter<rhi::GraphicsPipeline>
     {
     public:
         GraphicsPipelineDesc desc;
@@ -210,7 +210,7 @@ namespace caustica::rhi::d3d11
         const FramebufferInfo& getFramebufferInfo() const override { return framebufferInfo; }
     };
 
-    class ComputePipeline : public RefCounter<IComputePipeline>
+    class ComputePipeline : public RefCounter<rhi::ComputePipeline>
     {
     public:
         ComputePipelineDesc desc;
@@ -220,7 +220,7 @@ namespace caustica::rhi::d3d11
         const ComputePipelineDesc& getDesc() const override { return desc; }
     };
 
-    class BindingLayout : public RefCounter<IBindingLayout>
+    class BindingLayout : public RefCounter<rhi::BindingLayout>
     {
     public:
         BindingLayoutDesc desc;
@@ -229,7 +229,7 @@ namespace caustica::rhi::d3d11
         const BindlessLayoutDesc* getBindlessDesc() const override { return nullptr; }
     };
 
-    class BindingSet : public RefCounter<IBindingSet>
+    class BindingSet : public RefCounter<rhi::BindingSet>
     {
     public:
         BindingSetDesc desc;
@@ -254,45 +254,45 @@ namespace caustica::rhi::d3d11
         uint32_t minUAVSlot = D3D11_1_UAV_SLOT_COUNT;
         uint32_t maxUAVSlot = 0;
 
-        std::vector<RefCountPtr<IResource>> resources;
+        std::vector<RefCountPtr<Resource>> resources;
         
         const BindingSetDesc* getDesc() const override { return &desc; }
-        IBindingLayout* getLayout() const override { return layout; }
+        BindingLayout* getLayout() const override { return layout; }
         bool isSupersetOf(const BindingSet& other) const;
     };
 
-    class CommandList : public RefCounter<ICommandList>
+    class CommandList : public RefCounter<rhi::CommandList>
     {
     public:
-        explicit CommandList(const Context& context, IDevice* device, const CommandListParameters& params);
+        explicit CommandList(const Context& context, Device* device, const CommandListParameters& params);
         ~CommandList() override;
 
-        // IResource implementation
+        // Resource implementation
 
         Object getNativeObject(ObjectType objectType) override;
 
-        // ICommandList implementation
+        // CommandList implementation
 
         void open() override;
         void close() override;
         void clearState() override;
 
-        void clearTextureFloat(ITexture* t, TextureSubresourceSet subresources, const Color& clearColor) override;
-        void clearDepthStencilTexture(ITexture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
-        void clearTextureUInt(ITexture* t, TextureSubresourceSet subresources, uint32_t clearColor) override;
-        void clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture) override;
-        void decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, Format format) override;
-        void setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits) override;
+        void clearTextureFloat(rhi::Texture* t, TextureSubresourceSet subresources, const Color& clearColor) override;
+        void clearDepthStencilTexture(rhi::Texture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
+        void clearTextureUInt(rhi::Texture* t, TextureSubresourceSet subresources, uint32_t clearColor) override;
+        void clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture) override;
+        void decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, Format format) override;
+        void setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits) override;
 
-        void copyTexture(ITexture* dest, const TextureSlice& destSlice, ITexture* src, const TextureSlice& srcSlice) override;
-        void copyTexture(IStagingTexture* dest, const TextureSlice& destSlice, ITexture* src, const TextureSlice& srcSlice) override;
-        void copyTexture(ITexture* dest, const TextureSlice& destSlice, IStagingTexture* src, const TextureSlice& srcSlice) override;
-        void writeTexture(ITexture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
-        void resolveTexture(ITexture* dest, const TextureSubresourceSet& dstSubresources, ITexture* src, const TextureSubresourceSet& srcSubresources) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::StagingTexture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::StagingTexture* src, const TextureSlice& srcSlice) override;
+        void writeTexture(rhi::Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
+        void resolveTexture(rhi::Texture* dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* src, const TextureSubresourceSet& srcSubresources) override;
 
-        void writeBuffer(IBuffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
-        void clearBufferUInt(IBuffer* b, uint32_t clearValue) override;
-        void copyBuffer(IBuffer* dest, uint64_t destOffsetBytes, IBuffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
+        void writeBuffer(rhi::Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
+        void clearBufferUInt(rhi::Buffer* b, uint32_t clearValue) override;
+        void copyBuffer(rhi::Buffer* dest, uint64_t destOffsetBytes, rhi::Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
 
         void setPushConstants(const void* data, size_t byteSize) override;
 
@@ -313,52 +313,52 @@ namespace caustica::rhi::d3d11
         void setRayTracingState(const rt::State& state) override;
         void dispatchRays(const rt::DispatchRaysArguments& args) override;
 
-        void buildOpacityMicromap(rt::IOpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
-        void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
+        void buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
+        void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
-        void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
+        void buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
         void convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs) override;
 
-        void beginTimerQuery(ITimerQuery* query) override;
-        void endTimerQuery(ITimerQuery* query) override;
+        void beginTimerQuery(rhi::TimerQuery* query) override;
+        void endTimerQuery(rhi::TimerQuery* query) override;
 
         // perf markers
         void beginMarker(const char* name) override;
         void endMarker() override;
 
         void setEnableAutomaticBarriers(bool enable) override { (void)enable; }
-        void setResourceStatesForBindingSet(IBindingSet* bindingSet) override { (void)bindingSet; }
+        void setResourceStatesForBindingSet(rhi::BindingSet* bindingSet) override { (void)bindingSet; }
 
-        void setEnableUavBarriersForTexture(ITexture* texture, bool enableBarriers) override;
-        void setEnableUavBarriersForBuffer(IBuffer* buffer, bool enableBarriers) override;
+        void setEnableUavBarriersForTexture(rhi::Texture* texture, bool enableBarriers) override;
+        void setEnableUavBarriersForBuffer(rhi::Buffer* buffer, bool enableBarriers) override;
 
-        void beginTrackingTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override { (void)texture; (void)subresources; (void)stateBits; }
-        void beginTrackingBufferState(IBuffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
+        void beginTrackingTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override { (void)texture; (void)subresources; (void)stateBits; }
+        void beginTrackingBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
 
-        void setTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override { (void)texture; (void)subresources; (void)stateBits; }
-        void setBufferState(IBuffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
-        void textureAliasingBarrier(ITexture* before, ITexture* after) override { (void)before; (void)after; }
-        void bufferAliasingBarrier(IBuffer* before, IBuffer* after) override { (void)before; (void)after; }
-        void setAccelStructState(rt::IAccelStruct* as, ResourceStates stateBits) override { (void)as; (void)stateBits; }
+        void setTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override { (void)texture; (void)subresources; (void)stateBits; }
+        void setBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
+        void textureAliasingBarrier(rhi::Texture* before, rhi::Texture* after) override { (void)before; (void)after; }
+        void bufferAliasingBarrier(rhi::Buffer* before, rhi::Buffer* after) override { (void)before; (void)after; }
+        void setAccelStructState(rt::AccelStruct* as, ResourceStates stateBits) override { (void)as; (void)stateBits; }
 
-        void setPermanentTextureState(ITexture* texture, ResourceStates stateBits) override { (void)texture; (void)stateBits; }
-        void setPermanentBufferState(IBuffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
+        void setPermanentTextureState(rhi::Texture* texture, ResourceStates stateBits) override { (void)texture; (void)stateBits; }
+        void setPermanentBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override { (void)buffer; (void)stateBits; }
 
         void commitBarriers() override { }
 
-        ResourceStates getTextureSubresourceState(ITexture* texture, ArraySlice arraySlice, MipLevel mipLevel) override { (void)texture; (void)arraySlice; (void)mipLevel; return ResourceStates::Common; }
-        ResourceStates getBufferState(IBuffer* buffer) override { (void)buffer; return ResourceStates::Common; }
+        ResourceStates getTextureSubresourceState(rhi::Texture* texture, ArraySlice arraySlice, MipLevel mipLevel) override { (void)texture; (void)arraySlice; (void)mipLevel; return ResourceStates::Common; }
+        ResourceStates getBufferState(rhi::Buffer* buffer) override { (void)buffer; return ResourceStates::Common; }
 
-        IDevice* getDevice() override { return m_Device; }
+        Device* getDevice() override { return m_Device; }
         const CommandListParameters& getDesc() override { return m_Desc; }
 
     private:
         const Context& m_Context;
-        IDevice* m_Device; // weak reference - to avoid a cyclic reference between Device and its ImmediateCommandList
+        Device* m_Device; // weak reference - to avoid a cyclic reference between Device and its ImmediateCommandList
         CommandListParameters m_Desc;
 
         RefCountPtr<ID3DUserDefinedAnnotation> m_UserDefinedAnnotation;
@@ -399,72 +399,72 @@ namespace caustica::rhi::d3d11
         void prepareToBindGraphicsResourceSets(
             const BindingSetVector& resourceSets,
             const static_vector<BindingSetHandle, c_MaxBindingLayouts>* currentResourceSets,
-            const IGraphicsPipeline* currentPipeline,
-            const IGraphicsPipeline* newPipeline,
+            const GraphicsPipeline* currentPipeline,
+            const GraphicsPipeline* newPipeline,
             bool updateFramebuffer,
             BindingSetVector& outSetsToBind) const;
-        void bindGraphicsResourceSets(const BindingSetVector& setsToBind, const IGraphicsPipeline* newPipeline) const;
+        void bindGraphicsResourceSets(const BindingSetVector& setsToBind, const GraphicsPipeline* newPipeline) const;
         void bindComputeResourceSets(const BindingSetVector& resourceSets, const static_vector<BindingSetHandle, c_MaxBindingLayouts>* currentResourceSets) const;
     };
 
-    class Device : public RefCounter<IDevice>
+    class Device : public RefCounter<rhi::Device>
     {
     public:
         explicit Device(const DeviceDesc& desc);
         ~Device() override;
 
-        // IResource implementation
+        // Resource implementation
 
         Object getNativeObject(ObjectType objectType) override;
 
-        // IDevice implementation
+        // Device implementation
 
         HeapHandle createHeap(const HeapDesc& d) override;
 
         TextureHandle createTexture(const TextureDesc& d) override;
-        MemoryRequirements getTextureMemoryRequirements(ITexture* texture) override;
-        bool bindTextureMemory(ITexture* texture, IHeap* heap, uint64_t offset) override;
+        MemoryRequirements getTextureMemoryRequirements(rhi::Texture* texture) override;
+        bool bindTextureMemory(rhi::Texture* texture, rhi::Heap* heap, uint64_t offset) override;
 
         TextureHandle createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc) override;
 
         StagingTextureHandle createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess) override;
-        void *mapStagingTexture(IStagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
-        void unmapStagingTexture(IStagingTexture* tex) override;
+        void *mapStagingTexture(rhi::StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
+        void unmapStagingTexture(rhi::StagingTexture* tex) override;
 
-        void getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
-        void updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        void getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
 
-        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
-        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture) override;
 
         BufferHandle createBuffer(const BufferDesc& d) override;
-        void *mapBuffer(IBuffer* b, CpuAccessMode mapFlags) override;
-        void unmapBuffer(IBuffer* b) override;
-        MemoryRequirements getBufferMemoryRequirements(IBuffer* buffer) override;
-        bool bindBufferMemory(IBuffer* buffer, IHeap* heap, uint64_t offset) override;
+        void *mapBuffer(rhi::Buffer* b, CpuAccessMode mapFlags) override;
+        void unmapBuffer(rhi::Buffer* b) override;
+        MemoryRequirements getBufferMemoryRequirements(rhi::Buffer* buffer) override;
+        bool bindBufferMemory(rhi::Buffer* buffer, rhi::Heap* heap, uint64_t offset) override;
 
         BufferHandle createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc) override;
 
         ShaderHandle createShader(const ShaderDesc& d, const void* binary, const size_t binarySize) override;
-        ShaderHandle createShaderSpecialization(IShader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
+        ShaderHandle createShaderSpecialization(rhi::Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
         ShaderLibraryHandle createShaderLibrary(const void* binary, const size_t binarySize) override { (void)binary; (void)binarySize; return nullptr; }
 
         SamplerHandle createSampler(const SamplerDesc& d) override;
 
-        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, IShader* vertexShader) override;
+        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* vertexShader) override;
 
         // event queries
         EventQueryHandle createEventQuery(void) override;
-        void setEventQuery(IEventQuery* query, CommandQueue queue) override;
-        bool pollEventQuery(IEventQuery* query) override;
-        void waitEventQuery(IEventQuery* query) override;
-        void resetEventQuery(IEventQuery* query) override;
+        void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
+        bool pollEventQuery(rhi::EventQuery* query) override;
+        void waitEventQuery(rhi::EventQuery* query) override;
+        void resetEventQuery(rhi::EventQuery* query) override;
 
         // timer queries
         TimerQueryHandle createTimerQuery(void) override;
-        bool pollTimerQuery(ITimerQuery* query) override;
-        float getTimerQueryTime(ITimerQuery* query) override;
-        void resetTimerQuery(ITimerQuery* query) override;
+        bool pollTimerQuery(rhi::TimerQuery* query) override;
+        float getTimerQueryTime(rhi::TimerQuery* query) override;
+        void resetTimerQuery(rhi::TimerQuery* query) override;
 
         GraphicsAPI getGraphicsAPI() override;
 
@@ -472,33 +472,33 @@ namespace caustica::rhi::d3d11
 
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
 
-        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb) override;
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb) override;
 
         ComputePipelineHandle createComputePipeline(const ComputePipelineDesc& desc) override;
 
         MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
 
-        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, IFramebuffer* fb) override;
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb) override;
 
         rt::PipelineHandle createRayTracingPipeline(const rt::PipelineDesc& desc) override;
 
         BindingLayoutHandle createBindingLayout(const BindingLayoutDesc& desc) override;
         BindingLayoutHandle createBindlessLayout(const BindlessLayoutDesc& desc) override;
 
-        BindingSetHandle createBindingSet(const BindingSetDesc& desc, IBindingLayout* layout) override;
-        DescriptorTableHandle createDescriptorTable(IBindingLayout* layout) override;
+        BindingSetHandle createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* layout) override;
+        DescriptorTableHandle createDescriptorTable(rhi::BindingLayout* layout) override;
 
-        void resizeDescriptorTable(IDescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
-        bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) override;
+        void resizeDescriptorTable(rhi::DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
+        bool writeDescriptorTable(rhi::DescriptorTable* descriptorTable, const BindingSetItem& item) override;
 
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
-        MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
+        MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
-        bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) override;
+        bool bindAccelStructMemory(rt::AccelStruct* as, rhi::Heap* heap, uint64_t offset) override;
 
         CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
-        uint64_t executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override { (void)pCommandLists; (void)numCommandLists; (void)executionQueue; return 0; }
+        uint64_t executeCommandLists(rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override { (void)pCommandLists; (void)numCommandLists; (void)executionQueue; return 0; }
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override { (void)waitQueue; (void)executionQueue; (void)instance; }
         bool waitForIdle() override;
         void runGarbageCollection() override { }
@@ -507,7 +507,7 @@ namespace caustica::rhi::d3d11
         coopvec::DeviceFeatures queryCoopVecFeatures() override;
         size_t getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns) override;
         Object getNativeQueue(ObjectType objectType, CommandQueue queue) override { (void)objectType; (void)queue;  return nullptr; }
-        IMessageCallback* getMessageCallback() override { return m_Context.messageCallback; }
+        MessageCallback* getMessageCallback() override { return m_Context.messageCallback; }
         bool isAftermathEnabled() override { return m_AftermathEnabled; }
         AftermathCrashDumpHelper& getAftermathCrashDumpHelper() override { return m_AftermathCrashDumpHelper; }
 

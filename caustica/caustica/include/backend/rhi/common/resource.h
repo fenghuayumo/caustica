@@ -80,11 +80,11 @@ namespace caustica::rhi
         template<typename T> operator T* () const { return static_cast<T*>(pointer); }
     };
 
-    class IResource
+    class Resource
     {
     protected:
-        IResource() = default;
-        virtual ~IResource() = default;
+        Resource() = default;
+        virtual ~Resource() = default;
 
     public:
         virtual unsigned long AddRef() = 0;
@@ -96,10 +96,10 @@ namespace caustica::rhi
         virtual Object getNativeObject(ObjectType objectType) { (void)objectType; return nullptr; }
         
         // Non-copyable and non-movable
-        IResource(const IResource&) = delete;
-        IResource(const IResource&&) = delete;
-        IResource& operator=(const IResource&) = delete;
-        IResource& operator=(const IResource&&) = delete;
+        Resource(const Resource&) = delete;
+        Resource(const Resource&&) = delete;
+        Resource& operator=(const Resource&) = delete;
+        Resource& operator=(const Resource&&) = delete;
     };
 
 
@@ -340,13 +340,13 @@ namespace caustica::rhi
         }
     };    // RefCountPtr
 
-    typedef RefCountPtr<IResource> ResourceHandle;
+    typedef RefCountPtr<Resource> ResourceHandle;
 
     //////////////////////////////////////////////////////////////////////////
     // RefCounter<T>
     // A class that implements reference counting in a way compatible with RefCountPtr.
     // Intended usage is to use it as a base class for interface implementations, like so:
-    // class Texture : public RefCounter<ITexture> { ... }
+    // class Texture : public RefCounter<Texture> { ... }
     //////////////////////////////////////////////////////////////////////////
 
     template<class T>

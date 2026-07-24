@@ -48,7 +48,7 @@ namespace
 }
 
 SampleProceduralSky::SampleProceduralSky(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
@@ -216,7 +216,7 @@ void SampleProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
 }
 
 void SampleProceduralSky::dispatchLutPasses(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const ProceduralSkyConstants& consts,
     bool rebuildAtmosphereLuts,
     bool rebuildSkyView)
@@ -307,9 +307,9 @@ void SampleProceduralSky::dispatchLutPasses(
 }
 
 void SampleProceduralSky::applyAerialPerspective(
-    caustica::rhi::ICommandList* commandList,
-    caustica::rhi::ITexture* color,
-    caustica::rhi::ITexture* depth,
+    caustica::rhi::CommandList* commandList,
+    caustica::rhi::Texture* color,
+    caustica::rhi::Texture* depth,
     const caustica::IView& view,
     uint width,
     uint height,
@@ -365,7 +365,7 @@ void SampleProceduralSky::applyAerialPerspective(
 }
 
 bool SampleProceduralSky::update(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     double sceneTime,
     ProceduralSkyConstants& outConstants,
     const std::string& presetType,

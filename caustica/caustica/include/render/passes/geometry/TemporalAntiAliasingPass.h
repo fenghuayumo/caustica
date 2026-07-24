@@ -48,33 +48,33 @@ namespace caustica::render
     public:
         struct CreateParameters
         {
-            caustica::rhi::ITexture* sourceDepth = nullptr;
-            caustica::rhi::ITexture* motionVectors = nullptr;
-            caustica::rhi::ITexture* unresolvedColor = nullptr;
-            caustica::rhi::ITexture* resolvedColor = nullptr;
-            caustica::rhi::ITexture* feedback1 = nullptr;
-            caustica::rhi::ITexture* feedback2 = nullptr;
-            caustica::rhi::ITexture* historyClampRelax = nullptr;
+            caustica::rhi::Texture* sourceDepth = nullptr;
+            caustica::rhi::Texture* motionVectors = nullptr;
+            caustica::rhi::Texture* unresolvedColor = nullptr;
+            caustica::rhi::Texture* resolvedColor = nullptr;
+            caustica::rhi::Texture* feedback1 = nullptr;
+            caustica::rhi::Texture* feedback2 = nullptr;
+            caustica::rhi::Texture* historyClampRelax = nullptr;
             bool useCatmullRomFilter = true;
             uint32_t motionVectorStencilMask = 0;
             uint32_t numConstantBufferVersions = 16;
         };
 
         TemporalAntiAliasingPass(
-            caustica::rhi::IDevice* device,
+            caustica::rhi::Device* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             caustica::render::RenderDevice& renderDevice,
             const caustica::ICompositeView& compositeView,
             const CreateParameters& params);
 
         void renderMotionVectors(
-            caustica::rhi::ICommandList* commandList,
+            caustica::rhi::CommandList* commandList,
             const caustica::ICompositeView& compositeView,
             const caustica::ICompositeView& compositeViewPrevious,
             dm::float3 preViewTranslationDifference = dm::float3::zero());
 
         void temporalResolve(
-            caustica::rhi::ICommandList* commandList,
+            caustica::rhi::CommandList* commandList,
             const TemporalAntiAliasingParameters& params,
             bool feedbackIsValid,
             const caustica::ICompositeView& compositeViewInput,

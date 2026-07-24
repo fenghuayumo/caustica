@@ -22,10 +22,10 @@ namespace caustica::render
 
 struct GaussianSplatSortResources
 {
-    caustica::rhi::IBuffer* sortKeyBuffer = nullptr;
-    caustica::rhi::IBuffer* indexBuffer = nullptr;
-    caustica::rhi::IBuffer* sortControlBuffer = nullptr;
-    caustica::rhi::IBuffer* drawIndirectBuffer = nullptr;
+    caustica::rhi::Buffer* sortKeyBuffer = nullptr;
+    caustica::rhi::Buffer* indexBuffer = nullptr;
+    caustica::rhi::Buffer* sortControlBuffer = nullptr;
+    caustica::rhi::Buffer* drawIndirectBuffer = nullptr;
     caustica::rhi::BindingSetHandle sortKeyBindingSet;
     caustica::rhi::ComputePipelineHandle sortKeyPipeline;
     std::shared_ptr<GPUSort> gpuSort;
@@ -39,19 +39,19 @@ public:
     void onSplatCountChanged(uint32_t splatCount);
 
     void updateIndices(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const GaussianSplatConstants& constants,
         GaussianSplatSortMode sortMode,
         const GaussianSplatSortResources& resources);
 
 private:
     void buildDistanceCulledSplatList(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         GaussianSplatSortMode sortMode,
         const GaussianSplatSortResources& resources);
 
     void uploadStochasticSplatIndices(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const GaussianSplatSortResources& resources);
 
     [[nodiscard]] bool canReuseSort(

@@ -31,7 +31,7 @@ using namespace caustica;
 using namespace caustica::render;
 
 RtxdiPass::RtxdiPass(
-	caustica::rhi::IDevice* device,
+	caustica::rhi::Device* device,
 	std::shared_ptr<caustica::ShaderFactory> shaderFactory,
 	caustica::render::RenderDevice& renderDevice,
 	caustica::rhi::BindingLayoutHandle bindlessLayout) :
@@ -268,7 +268,7 @@ void RtxdiPass::prepareResources(
     EnvMapSceneParams envMapSceneParams,
     const caustica::scene::SceneRenderData* renderData,
     size_t geometryInstanceCount,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::DescriptorTable* descriptorTable,
     const caustica::render::SceneGpuFrameHandles& gpuHandles,
     std::shared_ptr<class MaterialGpuCache> materialGpuCache,
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
@@ -730,7 +730,7 @@ void RtxdiPass::executePT(caustica::rhi::CommandListHandle commandList, caustica
 void RtxdiPass::endFrame(){}
 
 void RtxdiPass::executeFrame(
-	caustica::rhi::ICommandList* commandList,
+	caustica::rhi::CommandList* commandList,
 	caustica::rhi::BindingSetHandle globalBindingSet,
 	const PathTracerSettings& settings)
 {
@@ -983,7 +983,7 @@ void RtxdiPass::executeRayTracingPass(
 	RayTracingPass& pass, 
 	const char* passName, 
 	dm::int2 dispatchSize, 
-	caustica::rhi::IBindingSet* extraBindingSet /* = nullptr */
+	caustica::rhi::BindingSet* extraBindingSet /* = nullptr */
 )
 {
 	commandList->beginMarker(passName);

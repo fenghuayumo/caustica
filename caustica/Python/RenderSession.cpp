@@ -492,7 +492,7 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     if (!device)
         return false;
 
-    caustica::rhi::ITexture* tex = m_engine->ldrColorTexture();
+    caustica::rhi::Texture* tex = m_engine->ldrColorTexture();
     caustica::rhi::ResourceStates state = caustica::rhi::ResourceStates::ShaderResource;
 
     if (!tex)
@@ -550,11 +550,11 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
     if (!gpuDevice)
         return std::nullopt;
 
-    caustica::rhi::IDevice* device = gpuDevice->getDevice();
+    caustica::rhi::Device* device = gpuDevice->getDevice();
     if (!device)
         return std::nullopt;
 
-    caustica::rhi::ITexture* texture = m_engine->ldrColorTexture();
+    caustica::rhi::Texture* texture = m_engine->ldrColorTexture();
     caustica::rhi::ResourceStates textureState = caustica::rhi::ResourceStates::ShaderResource;
 
     if (!texture)

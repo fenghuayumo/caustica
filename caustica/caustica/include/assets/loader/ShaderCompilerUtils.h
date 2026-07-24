@@ -28,7 +28,7 @@ struct ShaderCompilerConfig
     caustica::rhi::GraphicsAPI      GraphicsAPI;
     bool                    RuntimeCompilationAvailable = false;
 
-    bool initialize(caustica::rhi::IDevice* device, const std::string& binarySubfolder);
+    bool initialize(caustica::rhi::Device* device, const std::string& binarySubfolder);
     std::string getCompilerPathQuoted() const;
     bool canCompile() const { return RuntimeCompilationAvailable; }
 };

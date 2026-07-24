@@ -21,13 +21,13 @@ public:
         caustica::math::int2   BoxSize     = { 128, 96 };
     };
 
-    ZoomTool( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
+    ZoomTool( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~ZoomTool( );
 
 public:
     ZoomSettings &                  settings( )         { return m_settings; }
 
-     void                           render( caustica::rhi::ICommandList * commandList, caustica::rhi::TextureHandle colorInOut );
+     void                           render( caustica::rhi::CommandList * commandList, caustica::rhi::TextureHandle colorInOut );
 
      bool                           keyboardUpdate(int key, int scancode, int action, int mods);
      void                           mousePosUpdate(double xpos, double ypos);

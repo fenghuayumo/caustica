@@ -3,7 +3,7 @@
 namespace caustica
 {
 
-caustica::rhi::BindingSetHandle BindingCache::getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
+caustica::rhi::BindingSetHandle BindingCache::getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout)
 {
     size_t hash = 0;
     caustica::rhi::hash_combine(hash, desc);
@@ -27,7 +27,7 @@ caustica::rhi::BindingSetHandle BindingCache::getCachedBindingSet(const caustica
     return result;
 }
 
-caustica::rhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
+caustica::rhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout)
 {
     size_t hash = 0;
     caustica::rhi::hash_combine(hash, desc);

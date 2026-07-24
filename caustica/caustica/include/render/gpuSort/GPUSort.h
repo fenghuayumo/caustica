@@ -25,7 +25,7 @@ class ShaderDebug;
 class GPUSort
 {
 public:
-    GPUSort(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    GPUSort(caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~GPUSort();
 
     void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug);
@@ -35,7 +35,7 @@ public:
     // Provide indices in the indices buffer (uint32). These have to be already initialized to [1, 2, 3, 4, 5, ..., itemCount-1] and will be sorted in-place. Also known as the "payload". If you do not want to pre-initialize them, use `resetIndices`
     // Provide maxItemCount as the maximum possible itemCount - this will be used to create needed scratch buffers at runtime.
     // Do all necessary resource barriers before and after the call to sort.
-    void                            sort(caustica::rhi::ICommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint maxItemCount, bool resetIndices);
+    void                            sort(caustica::rhi::CommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint maxItemCount, bool resetIndices);
 
 private:
     void                            reCreateWorkingBuffers(uint32_t maxItemCount);

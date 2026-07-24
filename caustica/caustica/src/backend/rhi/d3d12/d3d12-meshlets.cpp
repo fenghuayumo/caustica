@@ -142,7 +142,7 @@ namespace caustica::rhi::d3d12
         return createHandleForNativeMeshletPipeline(pRS, pPSO, desc, fbinfo);
     }
 
-    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc& desc, IFramebuffer* fb)
+    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb)
     {
         if (!fb)
             return nullptr;
@@ -150,7 +150,7 @@ namespace caustica::rhi::d3d12
         return createMeshletPipeline(desc, fb->getFramebufferInfo());
     }
 
-	caustica::rhi::MeshletPipelineHandle Device::createHandleForNativeMeshletPipeline(IRootSignature* rootSignature, ID3D12PipelineState* pipelineState, const MeshletPipelineDesc& desc, const FramebufferInfo& framebufferInfo)
+	caustica::rhi::MeshletPipelineHandle Device::createHandleForNativeMeshletPipeline(RootSignature* rootSignature, ID3D12PipelineState* pipelineState, const MeshletPipelineDesc& desc, const FramebufferInfo& framebufferInfo)
     {
         if (rootSignature == nullptr)
             return nullptr;
@@ -161,7 +161,7 @@ namespace caustica::rhi::d3d12
         MeshletPipeline *pso = new MeshletPipeline();
         pso->desc = desc;
         pso->framebufferInfo = framebufferInfo;
-        pso->rootSignature = checked_cast<RootSignature*>(rootSignature);
+        pso->rootSignature = rootSignature;
         pso->pipelineState = pipelineState;
         pso->requiresBlendFactor = desc.renderState.blendState.usesConstantColor(uint32_t(pso->framebufferInfo.colorFormats.size()));
 
@@ -257,7 +257,7 @@ namespace caustica::rhi::d3d12
         }
         
         setGraphicsBindings(state.bindings, bindingUpdateMask,
-            state.indirectParams, updateIndirectParams,
+            checked_cast<Buffer*>(state.indirectParams), updateIndirectParams,
             nullptr, false, // <-- indirect count buffer not supported for meshlets
             pso->rootSignature);
         

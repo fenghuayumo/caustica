@@ -692,7 +692,7 @@ namespace caustica
         return true;
     }
 
-    static caustica::rhi::TextureHandle CreateDDSTextureInternal(caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, ImageAsset& info, const char* debugName)
+    static caustica::rhi::TextureHandle CreateDDSTextureInternal(caustica::rhi::Device* device, caustica::rhi::CommandList* commandList, ImageAsset& info, const char* debugName)
     {
         if (!loadDDSTextureFromMemory(info))
             return nullptr;
@@ -730,7 +730,7 @@ namespace caustica
         return texture;
     }
 
-    caustica::rhi::TextureHandle createDDSTextureFromMemory(caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
+    caustica::rhi::TextureHandle createDDSTextureFromMemory(caustica::rhi::Device* device, caustica::rhi::CommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
     {
         if (!data)
             return nullptr;
@@ -742,7 +742,7 @@ namespace caustica
         return CreateDDSTextureInternal(device, commandList, info, debugName);
     }
 
-    std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::IDevice* device, caustica::rhi::IStagingTexture* stagingTexture)
+    std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::Device* device, caustica::rhi::StagingTexture* stagingTexture)
     {
         DDS_HEADER header = {};
         DDS_HEADER_DXT10 dx10header = {};

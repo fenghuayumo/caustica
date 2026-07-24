@@ -34,7 +34,7 @@ bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
 
 void preUpdateLighting(PreUpdateLightingParams& params)
 {
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr)
         return;
 
@@ -50,7 +50,7 @@ void preUpdateLighting(PreUpdateLightingParams& params)
 
 void updateEnvMapLighting(UpdateLightingParams& params)
 {
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.bindingCache == nullptr
         || params.sceneData == nullptr)
     {
@@ -107,7 +107,7 @@ void updateLightSamplingBegin(
     AccelStructManager& accelStructs,
     UpdateLightingParams& params)
 {
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
         || params.bindingCache == nullptr || params.sceneData == nullptr || !params.gpuHandles.valid())
     {

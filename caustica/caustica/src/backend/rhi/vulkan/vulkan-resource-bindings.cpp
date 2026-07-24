@@ -273,7 +273,7 @@ namespace caustica::rhi::vulkan
             return Texture::TextureSubresourceViewType::AllAspects;
     }
 
-    BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, IBindingLayout* _layout)
+    BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* _layout)
     {
         BindingLayout* layout = checked_cast<BindingLayout*>(_layout);
 
@@ -617,7 +617,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    DescriptorTableHandle Device::createDescriptorTable(IBindingLayout* _layout)
+    DescriptorTableHandle Device::createDescriptorTable(rhi::BindingLayout* _layout)
     { 
         BindingLayout* layout = checked_cast<BindingLayout*>(_layout);
 
@@ -675,7 +675,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void Device::resizeDescriptorTable(IDescriptorTable* _descriptorTable, uint32_t newSize, bool keepContents)
+    void Device::resizeDescriptorTable(rhi::DescriptorTable* _descriptorTable, uint32_t newSize, bool keepContents)
     {
         assert(newSize <= checked_cast<DescriptorTable*>(_descriptorTable)->layout->getBindlessDesc()->maxCapacity);
         (void)_descriptorTable;
@@ -683,7 +683,7 @@ namespace caustica::rhi::vulkan
         (void)keepContents;
     }
 
-    bool Device::writeDescriptorTable(IDescriptorTable* _descriptorTable, const BindingSetItem& binding)
+    bool Device::writeDescriptorTable(rhi::DescriptorTable* _descriptorTable, const BindingSetItem& binding)
     {
         DescriptorTable* descriptorTable = checked_cast<DescriptorTable*>(_descriptorTable);
         BindingLayout* layout = checked_cast<BindingLayout*>(descriptorTable->layout.Get());
@@ -887,7 +887,7 @@ namespace caustica::rhi::vulkan
         static_vector<uint32_t, c_MaxVolatileConstantBuffers> dynamicOffsets;
         for (uint32_t i = 0; i < numDescriptorSets; ++i)
         {
-            IBindingSet* bindingSetHandle = nullptr;
+            BindingSet* bindingSetHandle = nullptr;
             if (descriptorSetIdxToBindingIdx.empty())
             {
                 bindingSetHandle = bindings[i];

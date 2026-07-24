@@ -35,7 +35,7 @@ class AssetSystem
 {
 public:
     void initialize(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<IFileSystem> fileSystem,
         std::shared_ptr<IDescriptorTableManager> descriptorTable);
     // Idempotent; safe if never initialized or already shut down.
@@ -67,7 +67,7 @@ public:
         const std::filesystem::path& path,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        caustica::rhi::ICommandList* commandList);
+        caustica::rhi::CommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromFileDeferred(
         const std::filesystem::path& path,
@@ -84,7 +84,7 @@ public:
         const std::string& mimeType,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        caustica::rhi::ICommandList* commandList);
+        caustica::rhi::CommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromMemoryDeferred(
         const std::shared_ptr<IBlob>& data,

@@ -350,7 +350,7 @@ bool StreamlineIntegration::setD3DDevice(IUnknown* nativeDevice)
 #endif
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::initializeDeviceDX(caustica::rhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
+bool StreamlineIntegration::initializeDeviceDX(caustica::rhi::Device *device, AdapterInfo::LUID *pAdapterIdDx11)
 {
     m_device = device;
 
@@ -384,7 +384,7 @@ bool StreamlineIntegration::upgradeInterface(IUnknown*& interfacePointer)
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-bool StreamlineIntegration::initializeDeviceVK(caustica::rhi::IDevice* device, const VulkanInfo& vulkanInfo)
+bool StreamlineIntegration::initializeDeviceVK(caustica::rhi::Device* device, const VulkanInfo& vulkanInfo)
 {
     m_device = device;
 
@@ -1325,7 +1325,7 @@ D3D12_RESOURCE_STATES D3D12convertResourceStates(caustica::rhi::ResourceStates s
 }
 #endif
 
-caustica::rhi::Object StreamlineIntegration::getNativeCommandList(caustica::rhi::ICommandList* commandList)
+caustica::rhi::Object StreamlineIntegration::getNativeCommandList(caustica::rhi::CommandList* commandList)
 {
 #if CAUSTICA_WITH_DX11
     if (m_api == caustica::rhi::GraphicsAPI::D3D11)
@@ -1377,9 +1377,9 @@ static inline VkImageLayout toVkImageLayout(caustica::rhi::ResourceStates stateB
 #endif
 
 static void GetSLResource(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     sl::Resource& slResource,
-    caustica::rhi::ITexture* inputTex,
+    caustica::rhi::Texture* inputTex,
     const caustica::IView* view)
 {
     if (commandList == nullptr)
@@ -1440,11 +1440,11 @@ static void GetSLResource(
 }
 
 void StreamlineIntegration::tagResourcesGeneral(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView* view,
-    caustica::rhi::ITexture* motionVectors,
-    caustica::rhi::ITexture* depth,
-    caustica::rhi::ITexture* finalColorHudless)
+    caustica::rhi::Texture* motionVectors,
+    caustica::rhi::Texture* depth,
+    caustica::rhi::Texture* finalColorHudless)
 {
     if (!m_slInitialized)
     {
@@ -1470,10 +1470,10 @@ void StreamlineIntegration::tagResourcesGeneral(
 }
 
 void StreamlineIntegration::tagResourcesDLSSNIS(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView* view,
-    caustica::rhi::ITexture* Output,
-    caustica::rhi::ITexture* Input)
+    caustica::rhi::Texture* Output,
+    caustica::rhi::Texture* Input)
 {
     if (!m_slInitialized)
     {
@@ -1497,7 +1497,7 @@ void StreamlineIntegration::tagResourcesDLSSNIS(
 }
 
 void StreamlineIntegration::tagResourcesDLSSFG(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     bool validViewportExtent,
     const Extent& backBufferExtent)
 {
@@ -1518,9 +1518,9 @@ void StreamlineIntegration::tagResourcesDLSSFG(
 }
 
 void StreamlineIntegration::tagResourcesDeepDVC(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView* view,
-    caustica::rhi::ITexture* Output)
+    caustica::rhi::Texture* Output)
 {
     if (!m_slInitialized)
     {
@@ -1549,18 +1549,18 @@ void StreamlineIntegration::unTagResourcesDeepDVC()
 }
 
 void StreamlineIntegration::tagResourcesDLSSRR(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView* view,
     dm::int2 renderSize,
     dm::int2 displaySize,
-    caustica::rhi::ITexture* inputColor,
-    caustica::rhi::ITexture* diffuseAlbedo,
-    caustica::rhi::ITexture* specAlbedo,
-    caustica::rhi::ITexture* normalsAndOptionalRoughness,
-    caustica::rhi::ITexture* roughness,
-    caustica::rhi::ITexture* specHitDist,
-    caustica::rhi::ITexture* specMotionVectors,
-    caustica::rhi::ITexture* outputColor
+    caustica::rhi::Texture* inputColor,
+    caustica::rhi::Texture* diffuseAlbedo,
+    caustica::rhi::Texture* specAlbedo,
+    caustica::rhi::Texture* normalsAndOptionalRoughness,
+    caustica::rhi::Texture* roughness,
+    caustica::rhi::Texture* specHitDist,
+    caustica::rhi::Texture* specMotionVectors,
+    caustica::rhi::Texture* outputColor
 )
 {
     if (!m_slInitialized)
@@ -1624,7 +1624,7 @@ void StreamlineIntegration::tagResourcesDLSSRR(
 #endif
 }
 
-void StreamlineIntegration::evaluateDLSS(caustica::rhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSS(caustica::rhi::CommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
@@ -1644,7 +1644,7 @@ void StreamlineIntegration::evaluateDLSS(caustica::rhi::ICommandList* commandLis
     commandList->clearState();
 }
 
-void StreamlineIntegration::evaluateDLSSRR(caustica::rhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSSRR(caustica::rhi::CommandList* commandList)
 {
 #if STREAMLINE_HAS_DLSS_RR
     void* nativeCommandList = getNativeCommandList(commandList);
@@ -1666,7 +1666,7 @@ void StreamlineIntegration::evaluateDLSSRR(caustica::rhi::ICommandList* commandL
 #endif
 }
 
-void StreamlineIntegration::evaluateNIS(caustica::rhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateNIS(caustica::rhi::CommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
@@ -1686,7 +1686,7 @@ void StreamlineIntegration::evaluateNIS(caustica::rhi::ICommandList* commandList
     commandList->clearState();
 }
 
-void StreamlineIntegration::evaluateDeepDVC(caustica::rhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDeepDVC(caustica::rhi::CommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)

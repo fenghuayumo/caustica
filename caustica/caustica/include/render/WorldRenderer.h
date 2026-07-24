@@ -111,12 +111,12 @@ public:
     [[nodiscard]] SceneGpuResources& sceneGpuResources() { return m_context->sceneGpuResources; }
     [[nodiscard]] const SceneGpuResources& sceneGpuResources() const { return m_context->sceneGpuResources; }
 
-    static caustica::rhi::BindingLayoutHandle createBindlessLayout(caustica::rhi::IDevice* device);
-    void createBindingLayouts(caustica::rhi::IBindingLayout* precreatedBindless = nullptr);
+    static caustica::rhi::BindingLayoutHandle createBindlessLayout(caustica::rhi::Device* device);
+    void createBindingLayouts(caustica::rhi::BindingLayout* precreatedBindless = nullptr);
     void createDeviceResources();
     void onBackBufferResizing();
     void preRender();
-    void render(caustica::rhi::IFramebuffer* framebuffer);
+    void render(caustica::rhi::Framebuffer* framebuffer);
 
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
@@ -208,7 +208,7 @@ public:
     DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
 #endif
 
-    void denoisedScreenshot(caustica::rhi::ITexture* framebufferTexture) const;
+    void denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const;
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
@@ -222,13 +222,13 @@ private:
     friend class PathTracingPipelinePlugin;
     friend class RenderPipelineRegistry;
 
-    [[nodiscard]] caustica::rhi::IDevice* device() const { return m_context->gpuDevice.getDevice(); }
+    [[nodiscard]] caustica::rhi::Device* device() const { return m_context->gpuDevice.getDevice(); }
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
 
-    void populateRenderFrameContext(caustica::rhi::IFramebuffer* framebuffer, RenderFrameContext& ctx);
+    void populateRenderFrameContext(caustica::rhi::Framebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
     [[nodiscard]] FrameGraphContext makeFrameGraphContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);

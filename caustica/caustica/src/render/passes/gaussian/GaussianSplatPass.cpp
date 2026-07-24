@@ -126,7 +126,7 @@ namespace
 }
 
 GaussianSplatPass::GaussianSplatPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
@@ -375,7 +375,7 @@ void GaussianSplatPass::buildEmissionProxies(
 }
 
 void GaussianSplatPass::buildAccelerationStructures(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     bool useAABBs,
     bool useTLASInstances,
     bool allowBlasCompaction,
@@ -403,7 +403,7 @@ void GaussianSplatPass::releaseAccelerationStructures()
     m_accelBuilder.release(hasSplats());
 }
 
-void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::IAccelStruct* meshTopLevelAS)
+void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS)
 {
     if (!m_splatBuffer || !m_colorBuffer || !m_shBuffer || !m_indexBuffer || !m_sortKeyBuffer || !m_sortControlBuffer || !m_drawIndirectBuffer)
         return;
@@ -624,7 +624,7 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     m_hybridRenderMeshTopLevelAS = nullptr;
 }
 
-void GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::ICommandList* commandList)
+void GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList)
 {
     if (!m_splatUploadPending || m_splats.empty())
         return;
@@ -674,7 +674,7 @@ void GaussianSplatPass::ensureFormatBuffers(
 }
 
 void GaussianSplatPass::uploadFormatDataIfNeeded(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     GaussianSplatStorageFormat shFormat,
     GaussianSplatStorageFormat rgbaFormat)
 {
@@ -750,9 +750,9 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
 }
 
 bool GaussianSplatPass::upload(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView& view,
-    caustica::rhi::rt::IAccelStruct* meshTopLevelAS,
+    caustica::rhi::rt::AccelStruct* meshTopLevelAS,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
@@ -848,7 +848,7 @@ bool GaussianSplatPass::upload(
             ? (stochasticToOutput ? m_stochasticRasterRenderPipeline : m_stochasticProcessedRasterRenderPipeline)
             : m_rasterRenderPipeline;
     }
-    caustica::rhi::IFramebuffer* framebuffer = stochasticSplats
+    caustica::rhi::Framebuffer* framebuffer = stochasticSplats
         ? stochasticFramebuffer->getFramebuffer(caustica::rhi::AllSubresources)
         : renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources);
     if (!renderPipeline || !framebuffer)
@@ -870,7 +870,7 @@ bool GaussianSplatPass::upload(
     return true;
 }
 
-void GaussianSplatPass::sort(caustica::rhi::ICommandList* commandList)
+void GaussianSplatPass::sort(caustica::rhi::CommandList* commandList)
 {
     if (!m_framePrepared)
         return;
@@ -885,7 +885,7 @@ void GaussianSplatPass::sort(caustica::rhi::ICommandList* commandList)
 }
 
 bool GaussianSplatPass::raster(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::IView& view)
 {
     if (!m_framePrepared)

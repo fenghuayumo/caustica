@@ -45,7 +45,7 @@ EventQueryHandle Device::createEventQuery()
     return EventQueryHandle::Create(ret);
 }
 
-void Device::setEventQuery(IEventQuery* _query, CommandQueue queue)
+void Device::setEventQuery(rhi::EventQuery* _query, CommandQueue queue)
 {
     (void)queue;
 
@@ -54,7 +54,7 @@ void Device::setEventQuery(IEventQuery* _query, CommandQueue queue)
     m_Context.immediateContext->End(query->query.Get());
 }
 
-bool Device::pollEventQuery(IEventQuery* _query)
+bool Device::pollEventQuery(rhi::EventQuery* _query)
 {
     EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -74,7 +74,7 @@ bool Device::pollEventQuery(IEventQuery* _query)
     }
 }
 
-void Device::waitEventQuery(IEventQuery* _query)
+void Device::waitEventQuery(rhi::EventQuery* _query)
 {
     EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -92,7 +92,7 @@ void Device::waitEventQuery(IEventQuery* _query)
     assert(SUCCEEDED(hr));
 }
 
-void Device::resetEventQuery(IEventQuery* _query)
+void Device::resetEventQuery(rhi::EventQuery* _query)
 {
     EventQuery* query = checked_cast<EventQuery*>(_query);
 
@@ -132,7 +132,7 @@ TimerQueryHandle Device::createTimerQuery(void)
     return TimerQueryHandle::Create(ret);
 }
 
-void CommandList::beginTimerQuery(ITimerQuery* _query)
+void CommandList::beginTimerQuery(rhi::TimerQuery* _query)
 {
     TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -141,7 +141,7 @@ void CommandList::beginTimerQuery(ITimerQuery* _query)
     m_Context.immediateContext->End(query->start.Get());
 }
 
-void CommandList::endTimerQuery(ITimerQuery* _query)
+void CommandList::endTimerQuery(rhi::TimerQuery* _query)
 {
     TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -150,7 +150,7 @@ void CommandList::endTimerQuery(ITimerQuery* _query)
     m_Context.immediateContext->End(query->disjoint.Get());
 }
 
-bool Device::pollTimerQuery(ITimerQuery* _query)
+bool Device::pollTimerQuery(rhi::TimerQuery* _query)
 {
     TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -171,7 +171,7 @@ bool Device::pollTimerQuery(ITimerQuery* _query)
     }
 }
 
-float Device::getTimerQueryTime(ITimerQuery* _query)
+float Device::getTimerQueryTime(rhi::TimerQuery* _query)
 {
     TimerQuery* query = checked_cast<TimerQuery*>(_query);
 
@@ -213,7 +213,7 @@ float Device::getTimerQueryTime(ITimerQuery* _query)
     return query->time;
 }
 
-void Device::resetTimerQuery(ITimerQuery* _query)
+void Device::resetTimerQuery(rhi::TimerQuery* _query)
 {
     TimerQuery* query = checked_cast<TimerQuery*>(_query);
 

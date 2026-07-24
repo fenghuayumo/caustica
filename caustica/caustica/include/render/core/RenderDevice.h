@@ -20,13 +20,13 @@ struct SceneGpuResources;
 class RenderDevice
 {
 public:
-    RenderDevice(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    RenderDevice(caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~RenderDevice();
 
     RenderDevice(const RenderDevice&) = delete;
     RenderDevice& operator=(const RenderDevice&) = delete;
 
-    [[nodiscard]] caustica::rhi::IDevice* getDevice() const { return m_device; }
+    [[nodiscard]] caustica::rhi::Device* getDevice() const { return m_device; }
 
     [[nodiscard]] BuiltinTextures& builtins() { return *m_builtins; }
     [[nodiscard]] const BuiltinTextures& builtins() const { return *m_builtins; }
@@ -40,7 +40,7 @@ public:
     [[nodiscard]] SceneGpuResources* activeSceneGpuResources() const { return m_activeSceneGpuResources; }
 
 private:
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
     std::unique_ptr<BuiltinTextures> m_builtins;
     std::unique_ptr<StandardSamplers> m_samplers;
     std::unique_ptr<FullscreenBlitPass> m_blit;

@@ -22,20 +22,20 @@ struct GaussianSplatAccelBuildParams
 class GaussianSplatAccelBuilder
 {
 public:
-    explicit GaussianSplatAccelBuilder(caustica::rhi::IDevice* device);
+    explicit GaussianSplatAccelBuilder(caustica::rhi::Device* device);
 
     void invalidate();
     void release(bool markBuildPending = true);
 
     void build(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const GaussianSplatAccelBuildParams& params,
         const std::vector<caustica::GaussianSplatData>& splats,
         uint32_t splatCount,
-        caustica::rhi::IBuffer* aabbBuffer);
+        caustica::rhi::Buffer* aabbBuffer);
 
-    [[nodiscard]] caustica::rhi::rt::IAccelStruct* getTopLevelAS() const { return m_topLevelAS.Get(); }
-    [[nodiscard]] caustica::rhi::rt::IAccelStruct* getBottomLevelAS() const { return m_bottomLevelAS.Get(); }
+    [[nodiscard]] caustica::rhi::rt::AccelStruct* getTopLevelAS() const { return m_topLevelAS.Get(); }
+    [[nodiscard]] caustica::rhi::rt::AccelStruct* getBottomLevelAS() const { return m_bottomLevelAS.Get(); }
     [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_shadowPrimitiveCountPerSplat; }
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_lastUseTLASInstances; }
     [[nodiscard]] bool isBuildPending() const { return m_buildPending; }

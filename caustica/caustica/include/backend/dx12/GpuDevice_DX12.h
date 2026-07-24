@@ -62,7 +62,7 @@ public:
         return m_RendererString.c_str();
     }
 
-    caustica::rhi::IDevice *getDevice() const override
+    caustica::rhi::Device *getDevice() const override
     {
         return m_RhiDevice;
     }
@@ -82,8 +82,8 @@ protected:
     bool createSwapChain() override;
     void destroyDeviceAndSwapChain() override;
     void resizeSwapChain() override;
-    caustica::rhi::ITexture* getCurrentBackBuffer() override;
-    caustica::rhi::ITexture* getBackBuffer(uint32_t index) override;
+    caustica::rhi::Texture* getCurrentBackBuffer() override;
+    caustica::rhi::Texture* getBackBuffer(uint32_t index) override;
     uint32_t getCurrentBackBufferIndex() override;
     uint32_t getBackBufferCount() override;
     bool beginFrame() override;

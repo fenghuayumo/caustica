@@ -32,7 +32,7 @@ void SceneLightingPasses::setEnvMapOverrideSource(const std::string& envMapOverr
     m_envMapOverride = envMapOverride;
 }
 
-void SceneLightingPasses::createOpacityMapsIfSupported(caustica::rhi::IDevice* device,
+void SceneLightingPasses::createOpacityMapsIfSupported(caustica::rhi::Device* device,
     const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
     const std::shared_ptr<caustica::TextureLoader>& textureLoader,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)

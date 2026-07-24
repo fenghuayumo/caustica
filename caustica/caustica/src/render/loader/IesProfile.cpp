@@ -22,7 +22,7 @@
 using namespace caustica;
 
 IesProfileLoader::IesProfileLoader(
-    caustica::rhi::IDevice* device, 
+    caustica::rhi::Device* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
     std::shared_ptr<IDescriptorTableManager> descriptorTableManager)
     : m_Device(device)
@@ -222,7 +222,7 @@ std::shared_ptr<IesProfile> IesProfileLoader::loadIesProfile(caustica::IFileSyst
     return profile;
 }
 
-void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::ICommandList* commandList)
+void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::CommandList* commandList)
 {
     if (profile.texture)
         return;

@@ -18,7 +18,7 @@ class RenderTargets
     const dm::uint m_sampleCount = 1; // no MSAA supported in this sample
     bool m_useReverseProjection = false;
     int m_backbufferCount = -1;
-    caustica::rhi::IDevice* m_device;
+    caustica::rhi::Device* m_device;
 public:
     caustica::rhi::TextureHandle accumulatedRadiance;   // used only in non-realtime mode
     caustica::rhi::TextureHandle ldrColor;              // final, post-tonemapped color
@@ -92,9 +92,9 @@ public:
     std::shared_ptr<caustica::FramebufferFactory> processedOutputFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> ldrFramebuffer;
 
-    void init(caustica::rhi::IDevice* device, dm::uint2 renderSize, dm::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
+    void init(caustica::rhi::Device* device, dm::uint2 renderSize, dm::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
     [[nodiscard]] bool isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount = 1) const;
-    void clear(caustica::rhi::ICommandList* commandList);
+    void clear(caustica::rhi::CommandList* commandList);
 
     static uint32_t getNumMipLevels(uint32_t width, uint32_t height);
 };

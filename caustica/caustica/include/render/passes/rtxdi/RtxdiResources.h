@@ -33,7 +33,7 @@ public:
     caustica::rhi::TextureHandle LocalLightPdfTexture;
 
     RtxdiResources(
-        caustica::rhi::IDevice* device, 
+        caustica::rhi::Device* device, 
         const rtxdi::ReSTIRDIContext& context,
         const rtxdi::ReSTIRPTContext& ptContext,
         const rtxdi::RISBufferSegmentAllocator& risBufferSegmentAllocator,
@@ -42,7 +42,7 @@ public:
         uint32_t maxPrimitiveLights,
         uint32_t maxGeometryInstances);
 
-    void initializeNeighborOffsets(caustica::rhi::ICommandList* commandList, uint32_t neighborOffsetCount);
+    void initializeNeighborOffsets(caustica::rhi::CommandList* commandList, uint32_t neighborOffsetCount);
 
     uint32_t getMaxEmissiveMeshes() const { return m_MaxEmissiveMeshes; }
     uint32_t getMaxEmissiveTriangles() const { return m_MaxEmissiveTriangles; }

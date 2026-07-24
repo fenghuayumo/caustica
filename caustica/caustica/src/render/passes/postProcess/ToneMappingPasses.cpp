@@ -20,7 +20,7 @@ using namespace caustica::render;
 #endif
 
 ToneMappingPass::ToneMappingPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
@@ -31,7 +31,7 @@ ToneMappingPass::ToneMappingPass(
     , m_FramebufferFactory(colorFramebufferFactory)
 {
     const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
-    caustica::rhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
+    caustica::rhi::Framebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
     {
         m_LuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, caustica::rhi::ShaderType::Pixel);
         m_ToneMapShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "main_ps", nullptr, caustica::rhi::ShaderType::Pixel);
@@ -64,7 +64,7 @@ ToneMappingPass::ToneMappingPass(
         for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
         {
             const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-            caustica::rhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
+            caustica::rhi::Framebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
             PerViewData& perViewData = m_PerView[viewIndex];
 
             ScissorDesc viewExtent = view->getViewExtent();
@@ -184,10 +184,10 @@ void ToneMappingPass::preRender(const ToneMappingParameters& params)
 }
 
 bool ToneMappingPass::render(
-    caustica::rhi::ICommandList* commandList, 
+    caustica::rhi::CommandList* commandList, 
     const caustica::ICompositeView& compositeView,
-    caustica::rhi::ITexture* sourceTexture,
-    caustica::rhi::IBuffer* constantsBuffer,
+    caustica::rhi::Texture* sourceTexture,
+    caustica::rhi::Buffer* constantsBuffer,
     bool enabled)
 {
     assert( m_FrameParamsSet ); // forgot to call preRender before this?
@@ -484,7 +484,7 @@ float3 ToneMappingPass::getPreExposedGray(uint viewIndex)
 }
 #endif
 
-void ToneMappingPass::generateMips(caustica::rhi::ICommandList* commandList, uint32_t numberOfViews)
+void ToneMappingPass::generateMips(caustica::rhi::CommandList* commandList, uint32_t numberOfViews)
 {
     for (uint32_t i = 0; i < numberOfViews; i++)
     {

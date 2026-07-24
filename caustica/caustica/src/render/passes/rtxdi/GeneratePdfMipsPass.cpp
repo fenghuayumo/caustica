@@ -10,10 +10,10 @@ using namespace caustica::math;
 #include <shaders/render/rtxdi/ShaderParameters.h>
 
 GenerateMipsPass::GenerateMipsPass(
-    caustica::rhi::IDevice* device, 
+    caustica::rhi::Device* device, 
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-    caustica::rhi::ITexture* sourceEnvironmentMap,
-    caustica::rhi::ITexture* destinationTexture)
+    caustica::rhi::Texture* sourceEnvironmentMap,
+    caustica::rhi::Texture* destinationTexture)
     : m_sourceTexture(sourceEnvironmentMap)
     , m_destinationTexture(destinationTexture)
 {
@@ -64,7 +64,7 @@ GenerateMipsPass::GenerateMipsPass(
 
 GenerateMipsPass::~GenerateMipsPass(){}
 
-void GenerateMipsPass::process(caustica::rhi::ICommandList* commandList)
+void GenerateMipsPass::process(caustica::rhi::CommandList* commandList)
 {
     commandList->beginMarker("generateMips");
     

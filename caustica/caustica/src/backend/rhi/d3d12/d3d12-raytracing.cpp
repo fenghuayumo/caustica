@@ -256,7 +256,7 @@ namespace caustica::rhi::d3d12
             uint32_t(callableShaders.size());
     }
 
-    bool ShaderTable::verifyExport(const RayTracingPipeline::ExportTableEntry* pExport, IBindingSet* bindings) const
+    bool ShaderTable::verifyExport(const RayTracingPipeline::ExportTableEntry* pExport, BindingSet* bindings) const
     {
         if (!pExport)
         {
@@ -276,7 +276,7 @@ namespace caustica::rhi::d3d12
             return false;
         }
 
-        if (bindings && (checked_cast<d3d12::BindingSet*>(bindings)->layout != pExport->bindingLayout))
+        if (bindings && (bindings->layout != pExport->bindingLayout))
         {
             m_Context.error("A shader table entry provides local bindings that do not match the expected layout");
             return false;
@@ -285,11 +285,11 @@ namespace caustica::rhi::d3d12
         return true;
     }
 
-    void ShaderTable::setRayGenerationShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    void ShaderTable::setRayGenerationShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         const RayTracingPipeline::ExportTableEntry* pipelineExport = pipeline->getExport(exportName);
 
-        if (verifyExport(pipelineExport, bindings))
+        if (verifyExport(pipelineExport, checked_cast<BindingSet*>(bindings)))
         {
             rayGenerationShader.pShaderIdentifier = pipelineExport->pShaderIdentifier;
             rayGenerationShader.localBindings = bindings;
@@ -298,11 +298,11 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    int ShaderTable::addMissShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addMissShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         const RayTracingPipeline::ExportTableEntry* pipelineExport = pipeline->getExport(exportName);
 
-        if (verifyExport(pipelineExport, bindings))
+        if (verifyExport(pipelineExport, checked_cast<BindingSet*>(bindings)))
         {
             Entry entry;
             entry.pShaderIdentifier = pipelineExport->pShaderIdentifier;
@@ -317,11 +317,11 @@ namespace caustica::rhi::d3d12
         return -1;
     }
 
-    int ShaderTable::addHitGroup(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addHitGroup(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         const RayTracingPipeline::ExportTableEntry* pipelineExport = pipeline->getExport(exportName);
 
-        if (verifyExport(pipelineExport, bindings))
+        if (verifyExport(pipelineExport, checked_cast<BindingSet*>(bindings)))
         {
             Entry entry;
             entry.pShaderIdentifier = pipelineExport->pShaderIdentifier;
@@ -336,11 +336,11 @@ namespace caustica::rhi::d3d12
         return -1;
     }
 
-    int ShaderTable::addCallableShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addCallableShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         const RayTracingPipeline::ExportTableEntry* pipelineExport = pipeline->getExport(exportName);
 
-        if (verifyExport(pipelineExport, bindings))
+        if (verifyExport(pipelineExport, checked_cast<BindingSet*>(bindings)))
         {
             Entry entry;
             entry.pShaderIdentifier = pipelineExport->pShaderIdentifier;
@@ -922,7 +922,7 @@ namespace caustica::rhi::d3d12
         return rt::AccelStructHandle::Create(as);
     }
 
-    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::IAccelStruct* _as)
+    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::AccelStruct* _as)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -932,7 +932,7 @@ namespace caustica::rhi::d3d12
         return MemoryRequirements();
     }
 
-    bool Device::bindAccelStructMemory(rt::IAccelStruct* _as, IHeap* heap, uint64_t offset)
+    bool Device::bindAccelStructMemory(rt::AccelStruct* _as, rhi::Heap* heap, uint64_t offset)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -1228,7 +1228,7 @@ namespace caustica::rhi::d3d12
         // Rename all exports used in the hit groups to avoid collisions between different libraries.
 
         std::vector<D3D12_HIT_GROUP_DESC> d3dHitGroups;
-        std::unordered_map<IShader*, std::wstring> hitGroupShaderNames;
+        std::unordered_map<rhi::Shader*, std::wstring> hitGroupShaderNames;
         std::vector<std::wstring> hitGroupExportNames;
         hitGroupExportNames.reserve(desc.hitGroups.size());
 
@@ -1388,7 +1388,7 @@ namespace caustica::rhi::d3d12
         if (!desc.globalBindingLayouts.empty())
         {
             RootSignatureHandle rootSignature = buildRootSignature(desc.globalBindingLayouts, false, false);
-            pso->globalRootSignature = checked_cast<RootSignature*>(rootSignature.Get());
+            pso->globalRootSignature = rootSignature;
             d3dGlobalRootSignature.pGlobalRootSignature = pso->globalRootSignature->getNativeObject(ObjectTypes::D3D12_RootSignature);
 
             d3dSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
@@ -1634,7 +1634,7 @@ namespace caustica::rhi::d3d12
         }
     }
     
-    ShaderTableState& CommandList::getShaderTableState(rt::IShaderTable* _shaderTable)
+    ShaderTableState& CommandList::getShaderTableState(rt::ShaderTable* _shaderTable)
     {
         ShaderTable* shaderTable = checked_cast<ShaderTable*>(_shaderTable);
         if (shaderTable->getDesc().isCached)
@@ -1786,7 +1786,7 @@ namespace caustica::rhi::d3d12
         m_ActiveCommandList->commandList4->DispatchRays(&desc);
     }
 
-    void CommandList::buildOpacityMicromap([[maybe_unused]] rt::IOpacityMicromap* pOmm, [[maybe_unused]] const rt::OpacityMicromapDesc& desc)
+    void CommandList::buildOpacityMicromap([[maybe_unused]] rt::OpacityMicromap* pOmm, [[maybe_unused]] const rt::OpacityMicromapDesc& desc)
     {
 #if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP || CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP
         OpacityMicromap* omm = checked_cast<OpacityMicromap*>(pOmm);
@@ -1891,7 +1891,7 @@ namespace caustica::rhi::d3d12
 #endif
     }
 
-    void CommandList::buildBottomLevelAccelStruct(rt::IAccelStruct* _as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildBottomLevelAccelStruct(rt::AccelStruct* _as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -2069,7 +2069,7 @@ namespace caustica::rhi::d3d12
 #else
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO ASPreBuildInfo = {};
 
-        if (!checked_cast<d3d12::Device*>(m_Device)->GetAccelStructPreBuildInfo(ASPreBuildInfo, as->getDesc()))
+        if (!m_Device->GetAccelStructPreBuildInfo(ASPreBuildInfo, as->getDesc()))
             return;
 
         if (ASPreBuildInfo.ResultDataMaxSizeInBytes > as->dataBuffer->desc.byteSize)
@@ -2107,7 +2107,7 @@ namespace caustica::rhi::d3d12
         commitBarriers();
 
 #if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP || CAUSTICA_RHI_WITH_NVAPI_LSS
-        d3d12::Device* d3d12Device = checked_cast<d3d12::Device*>(m_Device);
+        d3d12::Device* d3d12Device = m_Device;
         if (requiresNvapiExtendedBuild
             && (d3d12Device->GetOpacityMicromapSupported() || d3d12Device->GetLinearSweptSpheresSupported()))
         {
@@ -2222,7 +2222,7 @@ namespace caustica::rhi::d3d12
         m_ActiveCommandList->commandList4->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
     }
 
-    void CommandList::buildTopLevelAccelStruct(rt::IAccelStruct* _as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildTopLevelAccelStruct(rt::AccelStruct* _as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
         
@@ -2295,7 +2295,7 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(as);
     }
 
-    void CommandList::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* _as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildTopLevelAccelStructFromBuffer(rt::AccelStruct* _as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
         

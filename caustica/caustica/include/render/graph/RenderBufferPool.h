@@ -13,8 +13,8 @@ namespace caustica::rg
 class RenderBufferPool
 {
 public:
-    void setDevice(caustica::rhi::IDevice* device) { m_device = device; }
-    [[nodiscard]] caustica::rhi::IDevice* device() const { return m_device; }
+    void setDevice(caustica::rhi::Device* device) { m_device = device; }
+    [[nodiscard]] caustica::rhi::Device* device() const { return m_device; }
 
     [[nodiscard]] caustica::rhi::BufferHandle acquireBuffer(const BufferDesc& desc);
     [[nodiscard]] caustica::rhi::BufferHandle tryAcquireBuffer(const BufferDesc& desc);
@@ -34,7 +34,7 @@ private:
     [[nodiscard]] int findFreeSlot(const BufferDesc& desc) const;
     [[nodiscard]] caustica::rhi::BufferHandle createPooledBuffer(const BufferDesc& desc);
 
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
     uint64_t m_frameIndex = 0;
     std::vector<PooledBuffer> m_buffers;
 };

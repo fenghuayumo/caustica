@@ -7,7 +7,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-PostProcess::PostProcess( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
+PostProcess::PostProcess( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, 
     caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug
     )
     : m_device(device)
@@ -85,7 +85,7 @@ PostProcess::PostProcess( caustica::rhi::IDevice* device, std::shared_ptr<causti
     m_pointSampler = m_device->createSampler(samplerDesc);
 }
 
-void PostProcess::apply(caustica::rhi::ICommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
+void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
 {
     uint passIndex = (uint32_t)passType;
 
@@ -109,7 +109,7 @@ void PostProcess::apply(caustica::rhi::ICommandList* commandList, ComputePassTyp
     commandList->dispatch(dispatchSize.x, dispatchSize.y);
 }
 
-void PostProcess::apply( caustica::rhi::ICommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::ITexture* workTexture, RenderTargets & renderTargets, caustica::rhi::ITexture* sourceTexture)
+void PostProcess::apply( caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture)
 {
     // commandList->beginMarker("PostProcessCS");
 

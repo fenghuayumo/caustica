@@ -24,7 +24,7 @@ uint32_t getNextPowerOf2(uint32_t a)
 }
 
 RtxdiResources::RtxdiResources(
-    caustica::rhi::IDevice* device, 
+    caustica::rhi::Device* device, 
     const rtxdi::ReSTIRDIContext& context,
     const rtxdi::ReSTIRPTContext& ptContext,
     const rtxdi::RISBufferSegmentAllocator& risBufferSegmentAllocator,
@@ -155,7 +155,7 @@ RtxdiResources::RtxdiResources(
     LocalLightPdfTexture = device->createTexture(localLightPdfDesc);
 }
 
-void RtxdiResources::initializeNeighborOffsets(caustica::rhi::ICommandList* commandList, uint32_t neighborOffsetCount)
+void RtxdiResources::initializeNeighborOffsets(caustica::rhi::CommandList* commandList, uint32_t neighborOffsetCount)
 {
     if (m_NeighborOffsetsInitialized)
         return;

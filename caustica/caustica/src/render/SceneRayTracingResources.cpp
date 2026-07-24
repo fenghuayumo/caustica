@@ -137,7 +137,7 @@ bool SceneRayTracingResources::ensureFeaturePresetReady(PtFeaturePresetId id, bo
 }
 
 void SceneRayTracingResources::createBlases(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
@@ -145,20 +145,20 @@ void SceneRayTracingResources::createBlases(
     m_accelStructs->createBlases(commandList, renderData.meshSnapshots, settings);
 }
 
-void SceneRayTracingResources::uploadSubInstanceData(caustica::rhi::ICommandList* commandList)
+void SceneRayTracingResources::uploadSubInstanceData(caustica::rhi::CommandList* commandList)
 {
     m_accelStructs->uploadSubInstanceData(commandList);
 }
 
 void SceneRayTracingResources::createTlas(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     m_accelStructs->createTlas(commandList, renderData);
 }
 
 void SceneRayTracingResources::createAccelStructs(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData* renderData)
 {
@@ -173,7 +173,7 @@ void SceneRayTracingResources::createAccelStructs(
 }
 
 void SceneRayTracingResources::recreateAccelStructs(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData* renderData)
 {
@@ -246,7 +246,7 @@ void SceneRayTracingResources::recreateBindingSet(
     m_worldRenderer->recreateBindingSet(renderData);
 }
 
-void SceneRayTracingResources::sampleRenderCode(caustica::rhi::IFramebuffer* framebuffer,
+void SceneRayTracingResources::sampleRenderCode(caustica::rhi::Framebuffer* framebuffer,
     caustica::rhi::CommandListHandle commandList,
     const SampleConstants& constants)
 {

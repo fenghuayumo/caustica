@@ -9,15 +9,15 @@ using namespace caustica;
 
 
 bool RayTracingPass::init(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     caustica::ShaderFactory& shaderFactory,
     const char* shaderName,
     const std::vector<caustica::ShaderMacro>& extraMacros,
     bool useRayQuery,
     uint32_t computeGroupSize,
-    caustica::rhi::IBindingLayout* bindingLayout,
-    caustica::rhi::IBindingLayout* extraBindingLayout,
-    caustica::rhi::IBindingLayout* bindlessLayout)
+    caustica::rhi::BindingLayout* bindingLayout,
+    caustica::rhi::BindingLayout* extraBindingLayout,
+    caustica::rhi::BindingLayout* bindlessLayout)
 {
     caustica::debug("Initializing RayTracingPass %s...", shaderName);
 
@@ -99,12 +99,12 @@ bool RayTracingPass::init(
 }
 
 void RayTracingPass::execute(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     int width,
     int height,
-    caustica::rhi::IBindingSet* bindingSet,
-    caustica::rhi::IBindingSet* extraBindingSet,
-    caustica::rhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::BindingSet* bindingSet,
+    caustica::rhi::BindingSet* extraBindingSet,
+    caustica::rhi::DescriptorTable* descriptorTable,
     const void* pushConstants,
     const size_t pushConstantSize)
 {

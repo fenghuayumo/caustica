@@ -24,7 +24,7 @@ struct GeometrySequenceComponent;
 
 struct SetSceneMeshVerticesParams
 {
-    caustica::rhi::IDevice* device = nullptr;
+    caustica::rhi::Device* device = nullptr;
     IDescriptorTableManager* descriptorTable = nullptr;
     render::SceneGpuResources* gpuResources = nullptr;
     std::shared_ptr<Scene> scene;

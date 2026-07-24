@@ -425,7 +425,7 @@ namespace caustica::rhi::vulkan
         return GraphicsPipelineHandle::Create(pso);
     }
 
-    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb)
+    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb)
     {
         if (!fb)
             return nullptr;
@@ -461,7 +461,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void CommandList::beginRenderPass(caustica::rhi::IFramebuffer* _framebuffer)
+    void CommandList::beginRenderPass(caustica::rhi::Framebuffer* _framebuffer)
     {
         endRenderPass();
 

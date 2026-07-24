@@ -53,12 +53,17 @@ Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs
 
 Frame rendering already uses light proxies + cached splat transforms; do not move these load/edit paths onto the render thread.
 
+## RHI threading
+
+Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md) (Phase 1 MT foundation).
+
 ## Remaining gaps
 
 | Item | Status |
 | --- | --- |
 | OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
+| Parallel RHI command-list recording | Phase 1: submit/GC locking + deferred CL default; Phase 2+: worker recording |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |

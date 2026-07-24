@@ -359,7 +359,7 @@ bool EngineApp::accumulationCompleted() const
     return m_app && caustica::accumulationCompleted(*m_app);
 }
 
-caustica::rhi::ITexture* EngineApp::ldrColorTexture() const
+caustica::rhi::Texture* EngineApp::ldrColorTexture() const
 {
     return m_app ? caustica::ldrColorTexture(*m_app) : nullptr;
 }

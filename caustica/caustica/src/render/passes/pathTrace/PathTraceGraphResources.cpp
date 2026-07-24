@@ -87,7 +87,7 @@ PathTraceLightingEndTargets importPathTraceLightingEndTargets(
     rg::GraphBuilder& graph,
     RenderTargets& targets,
     LightSamplingCache* lightSampling,
-    caustica::rhi::IBuffer* subInstanceDataBuffer)
+    caustica::rhi::Buffer* subInstanceDataBuffer)
 {
     PathTraceLightingEndTargets handles{};
     handles.depth = graph.importTexture(targets.depth, rg::TextureAccess::ShaderResource);

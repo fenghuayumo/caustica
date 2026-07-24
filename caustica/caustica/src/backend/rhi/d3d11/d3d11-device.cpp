@@ -142,12 +142,7 @@ namespace caustica::rhi::d3d11
 
     CommandListHandle Device::createCommandList(const CommandListParameters& params)
     {
-        if (!params.enableImmediateExecution)
-        {
-            m_Context.error("Deferred command lists are not supported by the D3D11 backend.");
-            return nullptr;
-        }
-
+        // D3D11 only has an immediate context; silently accept the deferred default.
         if (params.queueType != CommandQueue::Graphics)
         {
             m_Context.error("Non-graphics queues are not supported by the D3D11 backend.");
@@ -157,7 +152,7 @@ namespace caustica::rhi::d3d11
         return m_ImmediateCommandList;
     }
 
-    void Device::getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings)
+    void Device::getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings)
     {
         (void)texture;
         (void)numTiles;
@@ -169,7 +164,7 @@ namespace caustica::rhi::d3d11
         utils::NotSupported();
     }
 
-    void Device::updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
+    void Device::updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
     {
         (void)texture;
         (void)tileMappings;
@@ -179,7 +174,7 @@ namespace caustica::rhi::d3d11
         utils::NotSupported();
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
         (void)pairedTexture;
         (void)desc;
@@ -189,7 +184,7 @@ namespace caustica::rhi::d3d11
         return nullptr;
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture)
     {
         (void)objectType;
         (void)texture;
@@ -294,7 +289,7 @@ namespace caustica::rhi::d3d11
         return nullptr;
     }
 
-    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::IAccelStruct*)
+    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::AccelStruct*)
     {
         utils::NotSupported();
         return MemoryRequirements();
@@ -306,7 +301,7 @@ namespace caustica::rhi::d3d11
         return rt::cluster::OperationSizeInfo();
     }
 
-    bool Device::bindAccelStructMemory(rt::IAccelStruct*, IHeap*, uint64_t)
+    bool Device::bindAccelStructMemory(rt::AccelStruct*, rhi::Heap*, uint64_t)
     {
         utils::NotSupported();
         return false;
@@ -318,7 +313,7 @@ namespace caustica::rhi::d3d11
         return nullptr;
     }
 
-    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc&, IFramebuffer*)
+    MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc&, rhi::Framebuffer*)
     {
         utils::NotSupported();
         return nullptr;

@@ -221,7 +221,7 @@ void registerCompositeGraphPasses(FrameGraphContext ctx)
         ctx.renderTargets->ldrColor,
         caustica::rhi::ResourceStates::ShaderResource);
 
-    caustica::rhi::ITexture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
+    caustica::rhi::Texture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
     assert(targetColor);
 
     const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(targetColor, rg::TextureAccess::RenderTarget);

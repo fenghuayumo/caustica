@@ -12,12 +12,12 @@ struct ImageAsset;
 bool loadDDSTextureFromMemory(ImageAsset& textureInfo);
 
 caustica::rhi::TextureHandle createDDSTextureFromMemory(
-    caustica::rhi::IDevice* device,
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::Device* device,
+    caustica::rhi::CommandList* commandList,
     std::shared_ptr<IBlob> data,
     const char* debugName = nullptr,
     bool forceSRGB = false);
 
-std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::IDevice* device, caustica::rhi::IStagingTexture* stagingTexture);
+std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::Device* device, caustica::rhi::StagingTexture* stagingTexture);
 
 } // namespace caustica

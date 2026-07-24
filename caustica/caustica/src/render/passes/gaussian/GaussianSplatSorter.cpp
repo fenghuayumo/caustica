@@ -40,7 +40,7 @@ void GaussianSplatSorter::onSplatCountChanged(uint32_t splatCount)
 }
 
 void GaussianSplatSorter::uploadStochasticSplatIndices(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const GaussianSplatSortResources& resources)
 {
     if (!resources.indexBuffer || resources.splatCount == 0)
@@ -63,7 +63,7 @@ void GaussianSplatSorter::uploadStochasticSplatIndices(
 }
 
 void GaussianSplatSorter::buildDistanceCulledSplatList(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     GaussianSplatSortMode sortMode,
     const GaussianSplatSortResources& resources)
 {
@@ -124,7 +124,7 @@ bool GaussianSplatSorter::canReuseSort(
 }
 
 void GaussianSplatSorter::updateIndices(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const GaussianSplatConstants& constants,
     GaussianSplatSortMode sortMode,
     const GaussianSplatSortResources& resources)

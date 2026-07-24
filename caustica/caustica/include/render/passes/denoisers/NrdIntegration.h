@@ -20,14 +20,14 @@ namespace caustica
 class NrdIntegration
 {
 public:
-    NrdIntegration(caustica::rhi::IDevice* device, nrd::Denoiser method);
+    NrdIntegration(caustica::rhi::Device* device, nrd::Denoiser method);
     ~NrdIntegration();
 
     bool initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory);
     bool isAvailable() const;
 
     void runDenoiserPasses(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const RenderTargets& renderTargets,
         int pass,
         const caustica::PlanarView& view, 

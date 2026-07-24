@@ -20,7 +20,7 @@ namespace caustica::rhi::utils
         uint32_t maxVersions);
 
     CAUSTICA_RHI_API bool CreateBindingSetAndLayout(
-        IDevice* device, 
+        Device* device, 
         caustica::rhi::ShaderType visibility,
         uint32_t registerSpace,
         const BindingSetDesc& bindingSetDesc, 
@@ -29,22 +29,22 @@ namespace caustica::rhi::utils
         bool registerSpaceIsDescriptorSet = false);
 
     CAUSTICA_RHI_API void ClearColorAttachment(
-        ICommandList* commandList,
-        IFramebuffer* framebuffer,
+        CommandList* commandList,
+        Framebuffer* framebuffer,
         uint32_t attachmentIndex,
         Color color
     );
 
     CAUSTICA_RHI_API void ClearDepthStencilAttachment(
-        ICommandList* commandList,
-        IFramebuffer* framebuffer,
+        CommandList* commandList,
+        Framebuffer* framebuffer,
         float depth,
         uint32_t stencil
     );
 
     CAUSTICA_RHI_API void BuildBottomLevelAccelStruct(
-        ICommandList* commandList,
-        rt::IAccelStruct* as,
+        CommandList* commandList,
+        rt::AccelStruct* as,
         const rt::AccelStructDesc& desc
     );
 
@@ -52,21 +52,21 @@ namespace caustica::rhi::utils
     // Useful when doing multiple consecutive dispatch calls with the same resources but different constants.
     // Ignored if there was a call to setEnableUavBarriersForTexrure(..., false) on this texture.
     CAUSTICA_RHI_API void TextureUavBarrier(
-        ICommandList* commandList,
-        ITexture* texture);
+        CommandList* commandList,
+        Texture* texture);
 
     // Places a UAV barrier on the provided buffer.
     // Useful when doing multiple consecutive dispatch calls with the same resources but different constants.
     // Ignored if there was a call to setEnableUavBarriersForBuffer(..., false) on this buffer.
     CAUSTICA_RHI_API void BufferUavBarrier(
-        ICommandList* commandList,
-        IBuffer* buffer);
+        CommandList* commandList,
+        Buffer* buffer);
 
     // Selects a format from the supplied list that supports all the required features on the given device.
     // The formats are tested in the same order they're provided, and the first matching one is returned.
     // If no formats are matching, Format::UNKNOWN is returned.
     CAUSTICA_RHI_API Format ChooseFormat(
-        IDevice* device,
+        Device* device,
         caustica::rhi::FormatSupport requiredFeatures,
         const caustica::rhi::Format* requestedFormats,
         size_t requestedFormatCount);
@@ -107,8 +107,8 @@ namespace caustica::rhi::utils
     class ScopedMarker
     {
     public:
-        ICommandList* m_commandList;
-        ScopedMarker(ICommandList* commandList, const char* markerName) : m_commandList(commandList)
+        CommandList* m_commandList;
+        ScopedMarker(CommandList* commandList, const char* markerName) : m_commandList(commandList)
         {
             m_commandList->beginMarker(markerName);
         }

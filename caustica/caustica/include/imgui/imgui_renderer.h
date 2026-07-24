@@ -134,7 +134,7 @@ namespace caustica
         void setDefaultFont(std::shared_ptr<RegisteredFont> font);
 
         virtual void animate(float elapsedTimeSeconds);
-        virtual void render(caustica::rhi::IFramebuffer* framebuffer);
+        virtual void render(caustica::rhi::Framebuffer* framebuffer);
         virtual void backBufferResizing();
         virtual void backBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
         virtual void displayScaleChanged(float scaleX, float scaleY);

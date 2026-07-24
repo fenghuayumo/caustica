@@ -58,13 +58,13 @@ private:
 public:
 
     PostProcess(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<ShaderDebug> shaderDebug
         //, std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory
     );
 
-    void apply(caustica::rhi::ICommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
-    void apply(caustica::rhi::ICommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::ITexture* workTexture, RenderTargets & renderTargets, caustica::rhi::ITexture* sourceTexture);
+    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
+    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture);
 };

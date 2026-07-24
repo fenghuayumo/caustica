@@ -15,15 +15,15 @@ namespace caustica
         std::unordered_map<caustica::rhi::TextureSubresourceSet, caustica::rhi::FramebufferHandle> m_framebufferCache;
 
     public:
-        FramebufferFactory(caustica::rhi::IDevice* device) : m_device(device) {}
+        FramebufferFactory(caustica::rhi::Device* device) : m_device(device) {}
         virtual ~FramebufferFactory() = default;
 
         std::vector<caustica::rhi::TextureHandle> renderTargets;
         caustica::rhi::TextureHandle depthTarget;
         caustica::rhi::TextureHandle shadingRateSurface;
 
-        virtual caustica::rhi::IFramebuffer* getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources);
-        caustica::rhi::IFramebuffer* getFramebuffer(const IView& view);
+        virtual caustica::rhi::Framebuffer* getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources);
+        caustica::rhi::Framebuffer* getFramebuffer(const IView& view);
         caustica::rhi::FramebufferInfo getFramebufferInfo();
     };
 }

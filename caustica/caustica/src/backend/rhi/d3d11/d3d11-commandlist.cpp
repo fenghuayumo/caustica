@@ -3,7 +3,7 @@
 
 namespace caustica::rhi::d3d11
 {
-    CommandList::CommandList(const Context& context, IDevice* device, const CommandListParameters& params)
+    CommandList::CommandList(const Context& context, Device* device, const CommandListParameters& params)
         : m_Context(context)
         , m_Device(device)
         , m_Desc(params)
@@ -72,7 +72,7 @@ namespace caustica::rhi::d3d11
         m_CurrentBlendConstantColor = Color{};
     }
 
-    void CommandList::setEnableUavBarriersForTexture(ITexture* texture, bool enableBarriers)
+    void CommandList::setEnableUavBarriersForTexture(rhi::Texture* texture, bool enableBarriers)
     {
         (void)texture;
 
@@ -82,7 +82,7 @@ namespace caustica::rhi::d3d11
             enterUAVOverlapSection();
     }
 
-    void CommandList::setEnableUavBarriersForBuffer(IBuffer* buffer, bool enableBarriers)
+    void CommandList::setEnableUavBarriersForBuffer(rhi::Buffer* buffer, bool enableBarriers)
     {
         (void)buffer;
 
@@ -176,12 +176,12 @@ namespace caustica::rhi::d3d11
         utils::NotSupported();
     }
 
-    void CommandList::buildOpacityMicromap(rt::IOpacityMicromap* , const rt::OpacityMicromapDesc& )
+    void CommandList::buildOpacityMicromap(rt::OpacityMicromap* , const rt::OpacityMicromapDesc& )
     {
         utils::NotSupported();
     }
 
-    void CommandList::buildBottomLevelAccelStruct(rt::IAccelStruct*, const rt::GeometryDesc*, size_t, rt::AccelStructBuildFlags)
+    void CommandList::buildBottomLevelAccelStruct(rt::AccelStruct*, const rt::GeometryDesc*, size_t, rt::AccelStructBuildFlags)
     {
         utils::NotSupported();
     }
@@ -191,12 +191,12 @@ namespace caustica::rhi::d3d11
         utils::NotSupported();
     }
 
-    void CommandList::buildTopLevelAccelStruct(rt::IAccelStruct*, const rt::InstanceDesc*, size_t, rt::AccelStructBuildFlags)
+    void CommandList::buildTopLevelAccelStruct(rt::AccelStruct*, const rt::InstanceDesc*, size_t, rt::AccelStructBuildFlags)
     {
         utils::NotSupported();
     }
 
-    void CommandList::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct*, caustica::rhi::IBuffer*, uint64_t, size_t, rt::AccelStructBuildFlags)
+    void CommandList::buildTopLevelAccelStructFromBuffer(rt::AccelStruct*, caustica::rhi::Buffer*, uint64_t, size_t, rt::AccelStructBuildFlags)
     {
         utils::NotSupported();
     }

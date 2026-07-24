@@ -1075,7 +1075,7 @@ std::filesystem::path MaterialGpuCache::getMaterialStoragePath(StandardMaterialB
     return matPath;
 }
 
-MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::Device* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_relativeShaderSourcePath(relativeShaderSourcePath)
     , m_device(device)
     , m_textureCache(textureCache)
@@ -1572,7 +1572,7 @@ MaterialGpuCache::RayTracingState MaterialGpuCache::resolveRayTracingState(
     };
 }
 
-void MaterialGpuCache::completeDeferredTexturesLoad(caustica::rhi::ICommandList* commandList)
+void MaterialGpuCache::completeDeferredTexturesLoad(caustica::rhi::CommandList* commandList)
 {
     if (m_deferredTextureLoadInProgress)
     {
@@ -1702,7 +1702,7 @@ void MaterialGpuCache::bakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
@@ -1867,7 +1867,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
 }
 
-void MaterialGpuCache::update(caustica::rhi::ICommandList* commandList,
+void MaterialGpuCache::update(caustica::rhi::CommandList* commandList,
     const caustica::scene::SceneRenderData& renderData,
     const caustica::render::SceneGpuResources* gpuResources,
     std::vector<SubInstanceData>& subInstanceData)

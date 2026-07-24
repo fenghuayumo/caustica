@@ -9,7 +9,7 @@
 namespace caustica::rhi::validation
 {
 
-    CommandListWrapper::CommandListWrapper(DeviceWrapper* device, ICommandList* commandList, bool isImmediate, CommandQueue queueType)
+    CommandListWrapper::CommandListWrapper(DeviceWrapper* device, CommandList* commandList, bool isImmediate, CommandQueue queueType)
         : m_CommandList(commandList)
         , m_Device(device)
         , m_MessageCallback(device->getMessageCallback())
@@ -180,7 +180,7 @@ namespace caustica::rhi::validation
         m_MeshletStateSet = false;
     }
 
-    void CommandListWrapper::clearTextureFloat(ITexture* t, TextureSubresourceSet subresources, const Color& clearColor)
+    void CommandListWrapper::clearTextureFloat(Texture* t, TextureSubresourceSet subresources, const Color& clearColor)
     {
         if (!requireOpenState())
             return;
@@ -221,7 +221,7 @@ namespace caustica::rhi::validation
         m_CommandList->clearTextureFloat(t, subresources, clearColor);
     }
 
-    void CommandListWrapper::clearDepthStencilTexture(ITexture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
+    void CommandListWrapper::clearDepthStencilTexture(Texture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
     {
         if (!requireOpenState())
             return;
@@ -251,7 +251,7 @@ namespace caustica::rhi::validation
         m_CommandList->clearDepthStencilTexture(t, subresources, clearDepth, depth, clearStencil, stencil);
     }
 
-    void CommandListWrapper::clearTextureUInt(ITexture* t, TextureSubresourceSet subresources, uint32_t clearColor)
+    void CommandListWrapper::clearTextureUInt(Texture* t, TextureSubresourceSet subresources, uint32_t clearColor)
     {
         if (!requireOpenState())
             return;
@@ -292,7 +292,7 @@ namespace caustica::rhi::validation
         m_CommandList->clearTextureUInt(t, subresources, clearColor);
     }
 
-    void CommandListWrapper::copyTexture(ITexture* dest, const TextureSlice& destSlice, ITexture* src, const TextureSlice& srcSlice)
+    void CommandListWrapper::copyTexture(Texture* dest, const TextureSlice& destSlice, Texture* src, const TextureSlice& srcSlice)
     {
         if (!requireOpenState())
             return;
@@ -300,7 +300,7 @@ namespace caustica::rhi::validation
         m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
-    void CommandListWrapper::copyTexture(IStagingTexture* dest, const TextureSlice& destSlice, ITexture* src, const TextureSlice& srcSlice)
+    void CommandListWrapper::copyTexture(StagingTexture* dest, const TextureSlice& destSlice, Texture* src, const TextureSlice& srcSlice)
     {
         if (!requireOpenState())
             return;
@@ -308,7 +308,7 @@ namespace caustica::rhi::validation
         m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
-    void CommandListWrapper::copyTexture(ITexture* dest, const TextureSlice& destSlice, IStagingTexture* src, const TextureSlice& srcSlice)
+    void CommandListWrapper::copyTexture(Texture* dest, const TextureSlice& destSlice, StagingTexture* src, const TextureSlice& srcSlice)
     {
         if (!requireOpenState())
             return;
@@ -316,7 +316,7 @@ namespace caustica::rhi::validation
         m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
-    void CommandListWrapper::writeTexture(ITexture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
+    void CommandListWrapper::writeTexture(Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
     {
         if (!requireOpenState())
             return;
@@ -329,7 +329,7 @@ namespace caustica::rhi::validation
         m_CommandList->writeTexture(dest, arraySlice, mipLevel, data, rowPitch, depthPitch);
     }
 
-    void CommandListWrapper::resolveTexture(ITexture* dest, const TextureSubresourceSet& dstSubresources, ITexture* src, const TextureSubresourceSet& srcSubresources)
+    void CommandListWrapper::resolveTexture(Texture* dest, const TextureSubresourceSet& dstSubresources, Texture* src, const TextureSubresourceSet& srcSubresources)
     {
         if (!requireOpenState())
             return;
@@ -400,7 +400,7 @@ namespace caustica::rhi::validation
         m_CommandList->resolveTexture(dest, dstSubresources, src, srcSubresources);
     }
 
-    void CommandListWrapper::writeBuffer(IBuffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes)
+    void CommandListWrapper::writeBuffer(Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes)
     {
         if (!requireOpenState())
             return;
@@ -426,7 +426,7 @@ namespace caustica::rhi::validation
         m_CommandList->writeBuffer(b, data, dataSize, destOffsetBytes);
     }
 
-    void CommandListWrapper::clearBufferUInt(IBuffer* b, uint32_t clearValue)
+    void CommandListWrapper::clearBufferUInt(Buffer* b, uint32_t clearValue)
     {
         if (!requireOpenState())
             return;
@@ -437,7 +437,7 @@ namespace caustica::rhi::validation
         m_CommandList->clearBufferUInt(b, clearValue);
     }
 
-    void CommandListWrapper::copyBuffer(IBuffer* dest, uint64_t destOffsetBytes, IBuffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
+    void CommandListWrapper::copyBuffer(Buffer* dest, uint64_t destOffsetBytes, Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
     {
         if (!requireOpenState())
             return;
@@ -445,22 +445,22 @@ namespace caustica::rhi::validation
         m_CommandList->copyBuffer(dest, destOffsetBytes, src, srcOffsetBytes, dataSizeBytes);
     }
 
-    void CommandListWrapper::clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture)
+    void CommandListWrapper::clearSamplerFeedbackTexture(SamplerFeedbackTexture* texture)
     {
         m_CommandList->clearSamplerFeedbackTexture(texture);
     }
 
-    void CommandListWrapper::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format)
+    void CommandListWrapper::decodeSamplerFeedbackTexture(Buffer* buffer, SamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
         m_CommandList->decodeSamplerFeedbackTexture(buffer, texture, format);
     }
 
-    void CommandListWrapper::setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits)
+    void CommandListWrapper::setSamplerFeedbackTextureState(SamplerFeedbackTexture* texture, ResourceStates stateBits)
     {
         m_CommandList->setSamplerFeedbackTextureState(texture, stateBits);
     }
 
-    bool CommandListWrapper::validateBindingSetsAgainstLayouts(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& layouts, const static_vector<IBindingSet*, c_MaxBindingLayouts>& sets) const
+    bool CommandListWrapper::validateBindingSetsAgainstLayouts(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& layouts, const static_vector<BindingSet*, c_MaxBindingLayouts>& sets) const
     {
         if (layouts.size() != sets.size())
         {
@@ -484,8 +484,8 @@ namespace caustica::rhi::validation
                 continue;
             }
 
-            IBindingLayout* setLayout = sets[index]->getLayout();
-            IBindingLayout* expectedLayout = layouts[index];
+            BindingLayout* setLayout = sets[index]->getLayout();
+            BindingLayout* expectedLayout = layouts[index];
             bool setIsBindless = (sets[index]->getDesc() == nullptr);
             bool expectedBindless = expectedLayout->getBindlessDesc();
 
@@ -929,7 +929,7 @@ namespace caustica::rhi::validation
         m_CommandList->dispatchMesh(groupsX, groupsY, groupsZ);
     }
 
-    void CommandListWrapper::beginTimerQuery(ITimerQuery* query)
+    void CommandListWrapper::beginTimerQuery(TimerQuery* query)
     {
         if (!requireOpenState())
             return;
@@ -937,7 +937,7 @@ namespace caustica::rhi::validation
         m_CommandList->beginTimerQuery(query);
     }
 
-    void CommandListWrapper::endTimerQuery(ITimerQuery* query)
+    void CommandListWrapper::endTimerQuery(TimerQuery* query)
     {
         if (!requireOpenState())
             return;
@@ -969,7 +969,7 @@ namespace caustica::rhi::validation
         m_CommandList->setEnableAutomaticBarriers(enable);
     }
 
-    void CommandListWrapper::setResourceStatesForBindingSet(IBindingSet* bindingSet)
+    void CommandListWrapper::setResourceStatesForBindingSet(BindingSet* bindingSet)
     {
         if (!requireOpenState())
             return;
@@ -977,7 +977,7 @@ namespace caustica::rhi::validation
         m_CommandList->setResourceStatesForBindingSet(bindingSet);
     }
 
-    void CommandListWrapper::setEnableUavBarriersForTexture(ITexture* texture, bool enableBarriers)
+    void CommandListWrapper::setEnableUavBarriersForTexture(Texture* texture, bool enableBarriers)
     {
         if (!requireOpenState())
             return;
@@ -988,7 +988,7 @@ namespace caustica::rhi::validation
         m_CommandList->setEnableUavBarriersForTexture(texture, enableBarriers);
     }
 
-    void CommandListWrapper::setEnableUavBarriersForBuffer(IBuffer* buffer, bool enableBarriers)
+    void CommandListWrapper::setEnableUavBarriersForBuffer(Buffer* buffer, bool enableBarriers)
     {
         if (!requireOpenState())
             return;
@@ -999,7 +999,7 @@ namespace caustica::rhi::validation
         m_CommandList->setEnableUavBarriersForBuffer(buffer, enableBarriers);
     }
 
-    void CommandListWrapper::beginTrackingTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
+    void CommandListWrapper::beginTrackingTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1007,7 +1007,7 @@ namespace caustica::rhi::validation
         m_CommandList->beginTrackingTextureState(texture, subresources, stateBits);
     }
 
-    void CommandListWrapper::beginTrackingBufferState(IBuffer* buffer, ResourceStates stateBits)
+    void CommandListWrapper::beginTrackingBufferState(Buffer* buffer, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1015,7 +1015,7 @@ namespace caustica::rhi::validation
         m_CommandList->beginTrackingBufferState(buffer, stateBits);
     }
 
-    void CommandListWrapper::setTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
+    void CommandListWrapper::setTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1023,7 +1023,7 @@ namespace caustica::rhi::validation
         m_CommandList->setTextureState(texture, subresources, stateBits);
     }
 
-    void CommandListWrapper::setBufferState(IBuffer* buffer, ResourceStates stateBits)
+    void CommandListWrapper::setBufferState(Buffer* buffer, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1031,35 +1031,35 @@ namespace caustica::rhi::validation
         m_CommandList->setBufferState(buffer, stateBits);
     }
 
-    void CommandListWrapper::textureAliasingBarrier(ITexture* before, ITexture* after)
+    void CommandListWrapper::textureAliasingBarrier(Texture* before, Texture* after)
     {
         if (!requireOpenState())
             return;
 
         m_CommandList->textureAliasingBarrier(
-            before ? checked_cast<ITexture*>(unwrapResource(before)) : nullptr,
-            after ? checked_cast<ITexture*>(unwrapResource(after)) : nullptr);
+            before ? checked_cast<Texture*>(unwrapResource(before)) : nullptr,
+            after ? checked_cast<Texture*>(unwrapResource(after)) : nullptr);
     }
 
-    void CommandListWrapper::bufferAliasingBarrier(IBuffer* before, IBuffer* after)
+    void CommandListWrapper::bufferAliasingBarrier(Buffer* before, Buffer* after)
     {
         if (!requireOpenState())
             return;
 
         m_CommandList->bufferAliasingBarrier(
-            before ? checked_cast<IBuffer*>(unwrapResource(before)) : nullptr,
-            after ? checked_cast<IBuffer*>(unwrapResource(after)) : nullptr);
+            before ? checked_cast<Buffer*>(unwrapResource(before)) : nullptr,
+            after ? checked_cast<Buffer*>(unwrapResource(after)) : nullptr);
     }
 
-    void CommandListWrapper::setAccelStructState(rt::IAccelStruct* as, ResourceStates stateBits)
+    void CommandListWrapper::setAccelStructState(rt::AccelStruct* as, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
 
-        m_CommandList->setAccelStructState(checked_cast<rt::IAccelStruct*>(unwrapResource(as)), stateBits);
+        m_CommandList->setAccelStructState(checked_cast<rt::AccelStruct*>(unwrapResource(as)), stateBits);
     }
 
-    void CommandListWrapper::setPermanentTextureState(ITexture* texture, ResourceStates stateBits)
+    void CommandListWrapper::setPermanentTextureState(Texture* texture, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1067,7 +1067,7 @@ namespace caustica::rhi::validation
         m_CommandList->setPermanentTextureState(texture, stateBits);
     }
 
-    void CommandListWrapper::setPermanentBufferState(IBuffer* buffer, ResourceStates stateBits)
+    void CommandListWrapper::setPermanentBufferState(Buffer* buffer, ResourceStates stateBits)
     {
         if (!requireOpenState())
             return;
@@ -1083,7 +1083,7 @@ namespace caustica::rhi::validation
         m_CommandList->commitBarriers();
     }
 
-    ResourceStates CommandListWrapper::getTextureSubresourceState(ITexture* texture, ArraySlice arraySlice, MipLevel mipLevel)
+    ResourceStates CommandListWrapper::getTextureSubresourceState(Texture* texture, ArraySlice arraySlice, MipLevel mipLevel)
     {
         if (!requireOpenState())
             return ResourceStates::Common;
@@ -1091,7 +1091,7 @@ namespace caustica::rhi::validation
         return m_CommandList->getTextureSubresourceState(texture, arraySlice, mipLevel);
     }
 
-    ResourceStates CommandListWrapper::getBufferState(IBuffer* buffer)
+    ResourceStates CommandListWrapper::getBufferState(Buffer* buffer)
     {
         if (!requireOpenState())
             return ResourceStates::Common;
@@ -1113,7 +1113,7 @@ namespace caustica::rhi::validation
         m_CommandList->clearState();
     }
 
-    IDevice* CommandListWrapper::getDevice()
+    Device* CommandListWrapper::getDevice()
     {
         return m_Device;
     }
@@ -1175,7 +1175,7 @@ namespace caustica::rhi::validation
         m_CommandList->compactBottomLevelAccelStructs();
     }
 
-    void CommandListWrapper::buildOpacityMicromap(rt::IOpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) 
+    void CommandListWrapper::buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) 
     {
         if (!requireOpenState())
             return;
@@ -1186,7 +1186,7 @@ namespace caustica::rhi::validation
         m_CommandList->buildOpacityMicromap(omm, desc);
     }
 
-    void CommandListWrapper::buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    void CommandListWrapper::buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
     {
         if (!requireOpenState())
             return;
@@ -1194,7 +1194,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "buildBottomLevelAccelStruct"))
             return;
 
-        rt::IAccelStruct* underlyingAS = as;
+        rt::AccelStruct* underlyingAS = as;
 
         AccelStructWrapper* wrapper = dynamic_cast<AccelStructWrapper*>(as);
         if (wrapper)
@@ -1626,7 +1626,7 @@ namespace caustica::rhi::validation
     }
 
 
-    void CommandListWrapper::buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandListWrapper::buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         if (!requireOpenState())
             return;
@@ -1645,10 +1645,10 @@ namespace caustica::rhi::validation
 
         for (auto& instance : patchedInstances)
         {
-            instance.bottomLevelAS = checked_cast<rt::IAccelStruct*>(unwrapResource(instance.bottomLevelAS));
+            instance.bottomLevelAS = checked_cast<rt::AccelStruct*>(unwrapResource(instance.bottomLevelAS));
         }
 
-        rt::IAccelStruct* underlyingAS = as;
+        rt::AccelStruct* underlyingAS = as;
 
         AccelStructWrapper* wrapper = dynamic_cast<AccelStructWrapper*>(as);
         if (wrapper)
@@ -1718,7 +1718,7 @@ namespace caustica::rhi::validation
         m_CommandList->buildTopLevelAccelStruct(underlyingAS, patchedInstances.data(), uint32_t(patchedInstances.size()), buildFlags);
     }
 
-    void CommandListWrapper::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandListWrapper::buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         if (!requireOpenState())
             return;
@@ -1738,7 +1738,7 @@ namespace caustica::rhi::validation
             return;
         }
 
-        rt::IAccelStruct* underlyingAS = as;
+        rt::AccelStruct* underlyingAS = as;
 
         AccelStructWrapper* wrapper = dynamic_cast<AccelStructWrapper*>(as);
         if (wrapper)

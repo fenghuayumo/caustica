@@ -79,7 +79,7 @@ static caustica::rhi::Format GetRhiFormat(nrd::Format format)
     }
 }
 
-NrdIntegration::NrdIntegration(caustica::rhi::IDevice* device, nrd::Denoiser denoiser)
+NrdIntegration::NrdIntegration(caustica::rhi::Device* device, nrd::Denoiser denoiser)
     : m_device(device)
     , m_initialized(false)
     , m_instance(nullptr)
@@ -343,7 +343,7 @@ static inline void MatrixToNrd(float* dest, const dm::float4x4& m)
 }
 
 void NrdIntegration::runDenoiserPasses(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const RenderTargets& renderTargets,
     int pass,
     const caustica::PlanarView& view, 

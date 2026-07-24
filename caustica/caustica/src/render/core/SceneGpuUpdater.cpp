@@ -70,7 +70,7 @@ inline void AppendBufferRange(caustica::rhi::BufferRange& range, size_t size, ui
 }
 
 template <typename T>
-inline void WriteAttributeRange(caustica::rhi::ICommandList* commandList, caustica::rhi::IBuffer* buffer,
+inline void WriteAttributeRange(caustica::rhi::CommandList* commandList, caustica::rhi::Buffer* buffer,
     const std::vector<T>& data, const caustica::rhi::BufferRange& range)
 {
     if (data.empty() || range.byteSize == 0)
@@ -136,19 +136,19 @@ caustica::rhi::BufferHandle CreateMaterialConstantBuffer(SceneGpuResources& gpu,
     return gpu.device->createBuffer(bufferDesc);
 }
 
-void WriteMaterialBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteMaterialBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.materialBuffer, gpu.materialData.data(),
         gpu.materialData.size() * sizeof(MaterialConstants));
 }
 
-void WriteGeometryBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteGeometryBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.geometryBuffer, gpu.geometryData.data(),
         gpu.geometryData.size() * sizeof(GeometryData));
 }
 
-void WriteInstanceBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteInstanceBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.instanceBuffer, gpu.instanceData.data(),
         gpu.instanceData.size() * sizeof(InstanceData));
@@ -261,7 +261,7 @@ void EnsureMeshGpuBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
-    caustica::rhi::ICommandList* commandList)
+    caustica::rhi::CommandList* commandList)
 {
     for (const auto& mesh : renderData.meshSnapshots)
     {
@@ -502,7 +502,7 @@ void EnsureMeshGpuBuffers(
 void DispatchSkinnedMeshUpdates(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     uint32_t /*frameIndex*/)
 {
     bool skinningMarkerPlaced = false;
@@ -615,7 +615,7 @@ void DispatchSkinnedMeshUpdates(
 void ApplyMeshGpuUploadCommands(
     SceneGpuResources& gpu,
     std::span<const MeshGpuUploadCommand> commands,
-    caustica::rhi::ICommandList* commandList)
+    caustica::rhi::CommandList* commandList)
 {
     for (const MeshGpuUploadCommand& command : commands)
     {
@@ -694,7 +694,7 @@ void UpdateGpuSceneBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     uint32_t frameIndex,
     bool structureChanged,
     bool transformsChanged)
@@ -851,7 +851,7 @@ void UpdateGpuSceneBuffers(
 
 void SceneGpuUpdater::initialize(
     SceneGpuResources& gpu,
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     ShaderFactory& shaderFactory)
 {
     gpu.clearSceneResources();
@@ -884,7 +884,7 @@ void SceneGpuUpdater::refresh(
     Scene& scene,
     SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     uint32_t frameIndex)
 {
     assertRenderThread();

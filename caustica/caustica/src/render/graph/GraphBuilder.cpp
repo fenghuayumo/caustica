@@ -62,19 +62,19 @@ BufferHandle PassBuilder::createBuffer(const BufferDesc& desc)
     return m_graph->createBuffer(desc);
 }
 
-RenderPassContext::RenderPassContext(caustica::rhi::ICommandList* commandList, const GraphBuilder& graph)
+RenderPassContext::RenderPassContext(caustica::rhi::CommandList* commandList, const GraphBuilder& graph)
     : m_commandList(commandList)
     , m_graph(&graph)
 {
 }
 
-caustica::rhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
+caustica::rhi::Texture* RenderPassContext::texture(TextureHandle handle) const
 {
     assert(m_graph);
     return m_graph->resolveTexture(handle);
 }
 
-caustica::rhi::IBuffer* RenderPassContext::buffer(BufferHandle handle) const
+caustica::rhi::Buffer* RenderPassContext::buffer(BufferHandle handle) const
 {
     assert(m_graph);
     return m_graph->resolveBuffer(handle);
@@ -128,7 +128,7 @@ caustica::rhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
     }
 }
 
-void GraphBuilder::setDevice(caustica::rhi::IDevice* device)
+void GraphBuilder::setDevice(caustica::rhi::Device* device)
 {
     if (m_device != device)
     {
@@ -175,7 +175,7 @@ bool GraphBuilder::isPassActive(const std::string_view name) const
     return false;
 }
 
-TextureHandle GraphBuilder::importTexture(caustica::rhi::ITexture* texture, caustica::rhi::ResourceStates initialState)
+TextureHandle GraphBuilder::importTexture(caustica::rhi::Texture* texture, caustica::rhi::ResourceStates initialState)
 {
     assert(texture);
 
@@ -192,12 +192,12 @@ TextureHandle GraphBuilder::importTexture(caustica::rhi::ITexture* texture, caus
     return handle;
 }
 
-TextureHandle GraphBuilder::importTexture(caustica::rhi::ITexture* texture, TextureAccess initialAccess)
+TextureHandle GraphBuilder::importTexture(caustica::rhi::Texture* texture, TextureAccess initialAccess)
 {
     return importTexture(texture, accessToState(initialAccess));
 }
 
-BufferHandle GraphBuilder::importBuffer(caustica::rhi::IBuffer* buffer, caustica::rhi::ResourceStates initialState)
+BufferHandle GraphBuilder::importBuffer(caustica::rhi::Buffer* buffer, caustica::rhi::ResourceStates initialState)
 {
     assert(buffer);
 
@@ -214,7 +214,7 @@ BufferHandle GraphBuilder::importBuffer(caustica::rhi::IBuffer* buffer, caustica
     return handle;
 }
 
-BufferHandle GraphBuilder::importBuffer(caustica::rhi::IBuffer* buffer, BufferAccess initialAccess)
+BufferHandle GraphBuilder::importBuffer(caustica::rhi::Buffer* buffer, BufferAccess initialAccess)
 {
     return importBuffer(buffer, accessToState(initialAccess));
 }
@@ -708,12 +708,12 @@ void GraphBuilder::releaseTransientResources()
     m_bufferAliasingBarriers.clear();
 }
 
-void GraphBuilder::transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, TextureAccess access)
+void GraphBuilder::transitionTexture(caustica::rhi::CommandList* commandList, TextureHandle handle, TextureAccess access)
 {
     transitionTexture(commandList, handle, accessToState(access));
 }
 
-void GraphBuilder::transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState)
+void GraphBuilder::transitionTexture(caustica::rhi::CommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState)
 {
     if (!isValid(handle, m_textures.size()))
         return;
@@ -729,12 +729,12 @@ void GraphBuilder::transitionTexture(caustica::rhi::ICommandList* commandList, T
     resource.currentState = targetState;
 }
 
-void GraphBuilder::transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, BufferAccess access)
+void GraphBuilder::transitionBuffer(caustica::rhi::CommandList* commandList, BufferHandle handle, BufferAccess access)
 {
     transitionBuffer(commandList, handle, accessToState(access));
 }
 
-void GraphBuilder::transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, caustica::rhi::ResourceStates targetState)
+void GraphBuilder::transitionBuffer(caustica::rhi::CommandList* commandList, BufferHandle handle, caustica::rhi::ResourceStates targetState)
 {
     if (!isValid(handle, m_buffers.size()))
         return;
@@ -750,7 +750,7 @@ void GraphBuilder::transitionBuffer(caustica::rhi::ICommandList* commandList, Bu
     resource.currentState = targetState;
 }
 
-void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::ICommandList* commandList, TextureHandle handle)
+void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::CommandList* commandList, TextureHandle handle)
 {
     if (!isValid(handle, m_textures.size()))
         return;
@@ -760,10 +760,10 @@ void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::ICommandList* comma
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        caustica::rhi::ITexture* before = isValid(barrier.before, m_textures.size())
+        caustica::rhi::Texture* before = isValid(barrier.before, m_textures.size())
             ? m_textures[barrier.before.index].texture
             : nullptr;
-        caustica::rhi::ITexture* after = m_textures[handle.index].texture;
+        caustica::rhi::Texture* after = m_textures[handle.index].texture;
         if (after)
         {
             commandList->textureAliasingBarrier(before, after);
@@ -773,7 +773,7 @@ void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::ICommandList* comma
     }
 }
 
-void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::ICommandList* commandList, BufferHandle handle)
+void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::CommandList* commandList, BufferHandle handle)
 {
     if (!isValid(handle, m_buffers.size()))
         return;
@@ -783,10 +783,10 @@ void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::ICommandList* comman
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        caustica::rhi::IBuffer* before = isValid(barrier.before, m_buffers.size())
+        caustica::rhi::Buffer* before = isValid(barrier.before, m_buffers.size())
             ? m_buffers[barrier.before.index].buffer
             : nullptr;
-        caustica::rhi::IBuffer* after = m_buffers[handle.index].buffer;
+        caustica::rhi::Buffer* after = m_buffers[handle.index].buffer;
         if (after)
         {
             commandList->bufferAliasingBarrier(before, after);
@@ -847,7 +847,7 @@ bool GraphBuilder::passUsesBufferAsWrite(const Pass& pass, BufferHandle handle)
     return false;
 }
 
-void GraphBuilder::transitionExtractedResources(caustica::rhi::ICommandList* commandList)
+void GraphBuilder::transitionExtractedResources(caustica::rhi::CommandList* commandList)
 {
     bool hasTransitions = false;
 
@@ -877,7 +877,7 @@ void GraphBuilder::transitionExtractedResources(caustica::rhi::ICommandList* com
         commandList->commitBarriers();
 }
 
-void GraphBuilder::execute(caustica::rhi::ICommandList* commandList)
+void GraphBuilder::execute(caustica::rhi::CommandList* commandList)
 {
     assert(commandList);
     if (!m_compiled)
@@ -955,14 +955,14 @@ void GraphBuilder::reset()
     m_compiled = false;
 }
 
-caustica::rhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const
+caustica::rhi::Texture* GraphBuilder::resolveTexture(TextureHandle handle) const
 {
     if (!isValid(handle, m_textures.size()))
         return nullptr;
     return m_textures[handle.index].texture;
 }
 
-caustica::rhi::IBuffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
+caustica::rhi::Buffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
 {
     if (!isValid(handle, m_buffers.size()))
         return nullptr;

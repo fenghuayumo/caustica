@@ -9,7 +9,7 @@ namespace caustica
 
 void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
 {
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     if (commandList == nullptr || params.renderTargets == nullptr || params.bloomPass == nullptr)
         return;
 

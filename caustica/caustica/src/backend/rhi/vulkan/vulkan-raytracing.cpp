@@ -4,7 +4,7 @@
 
 namespace caustica::rhi::vulkan
 {
-    static vk::DeviceOrHostAddressConstKHR getBufferAddress(IBuffer* _buffer, uint64_t offset)
+    static vk::DeviceOrHostAddressConstKHR getBufferAddress(Buffer* _buffer, uint64_t offset)
     {
         if (!_buffer)
             return vk::DeviceOrHostAddressConstKHR();
@@ -14,7 +14,7 @@ namespace caustica::rhi::vulkan
         return vk::DeviceOrHostAddressConstKHR().setDeviceAddress(buffer->deviceAddress + size_t(offset));
     }
 
-    static vk::DeviceOrHostAddressKHR getMutableBufferAddress(IBuffer* _buffer, uint64_t offset)
+    static vk::DeviceOrHostAddressKHR getMutableBufferAddress(Buffer* _buffer, uint64_t offset)
     {
         if (!_buffer)
             return vk::DeviceOrHostAddressKHR();
@@ -407,7 +407,7 @@ namespace caustica::rhi::vulkan
         return rt::AccelStructHandle::Create(as);
     }
 
-    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::IAccelStruct* _as)
+    MemoryRequirements Device::getAccelStructMemoryRequirements(rt::AccelStruct* _as)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -563,7 +563,7 @@ namespace caustica::rhi::vulkan
         return info;
     }
 
-    bool Device::bindAccelStructMemory(rt::IAccelStruct* _as, IHeap* heap, uint64_t offset)
+    bool Device::bindAccelStructMemory(rt::AccelStruct* _as, rhi::Heap* heap, uint64_t offset)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -583,7 +583,7 @@ namespace caustica::rhi::vulkan
         return bound;
     }
 
-    void CommandList::buildOpacityMicromap(rt::IOpacityMicromap* pOpacityMicromap, const rt::OpacityMicromapDesc& desc)
+    void CommandList::buildOpacityMicromap(rt::OpacityMicromap* pOpacityMicromap, const rt::OpacityMicromapDesc& desc)
     {
         OpacityMicromap* omm = checked_cast<OpacityMicromap*>(pOpacityMicromap);
 
@@ -645,7 +645,7 @@ namespace caustica::rhi::vulkan
         m_CurrentCmdBuf->cmdBuf.buildMicromapsEXT(1, &buildInfo);
     }
 
-    void CommandList::buildBottomLevelAccelStruct(rt::IAccelStruct* _as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildBottomLevelAccelStruct(rt::AccelStruct* _as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -922,7 +922,7 @@ namespace caustica::rhi::vulkan
         m_CurrentCmdBuf->cmdBuf.buildAccelerationStructuresKHR(buildInfos, buildRangeArrays);
     }
 
-    void CommandList::buildTopLevelAccelStruct(rt::IAccelStruct* _as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildTopLevelAccelStruct(rt::AccelStruct* _as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -993,7 +993,7 @@ namespace caustica::rhi::vulkan
             m_CurrentCmdBuf->referencedResources.push_back(as);
     }
 
-    void CommandList::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* _as, caustica::rhi::IBuffer* _instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandList::buildTopLevelAccelStructFromBuffer(rt::AccelStruct* _as, caustica::rhi::Buffer* _instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
         Buffer* instanceBuffer = checked_cast<Buffer*>(_instanceBuffer);
@@ -1277,7 +1277,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    ShaderTableState& CommandList::getShaderTableState(rt::IShaderTable* _shaderTable)
+    ShaderTableState& CommandList::getShaderTableState(rt::ShaderTable* _shaderTable)
     {
         ShaderTable* shaderTable = checked_cast<ShaderTable*>(_shaderTable);
         if (shaderTable->getDesc().isCached)
@@ -1437,7 +1437,7 @@ namespace caustica::rhi::vulkan
     }
 
     static void registerShaderModule(
-        IShader* _shader,
+        Shader* _shader,
         std::unordered_map<Shader*, uint32_t>& shaderStageIndices,
         size_t& numShaders,
         size_t& numShadersWithSpecializations,
@@ -1715,7 +1715,7 @@ namespace caustica::rhi::vulkan
         return false;
     }
 
-    void ShaderTable::setRayGenerationShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    void ShaderTable::setRayGenerationShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1729,7 +1729,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    int ShaderTable::addMissShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addMissShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1747,7 +1747,7 @@ namespace caustica::rhi::vulkan
         return -1;
     }
 
-    int ShaderTable::addHitGroup(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addHitGroup(const char* exportName, BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1765,7 +1765,7 @@ namespace caustica::rhi::vulkan
         return -1;
     }
 
-    int ShaderTable::addCallableShader(const char* exportName, IBindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addCallableShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();

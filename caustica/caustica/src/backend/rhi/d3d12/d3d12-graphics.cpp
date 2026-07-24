@@ -174,7 +174,7 @@ namespace caustica::rhi::d3d12
         return createHandleForNativeGraphicsPipeline(pRS, pPSO, desc, fbinfo);
     }
     
-    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb)
+    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb)
     {
         if (!fb)
             return nullptr;
@@ -182,7 +182,7 @@ namespace caustica::rhi::d3d12
         return createGraphicsPipeline(desc, fb->getFramebufferInfo());
     }
 
-    caustica::rhi::GraphicsPipelineHandle Device::createHandleForNativeGraphicsPipeline(IRootSignature* rootSignature, ID3D12PipelineState* pipelineState, const GraphicsPipelineDesc& desc, const FramebufferInfo& framebufferInfo)
+    caustica::rhi::GraphicsPipelineHandle Device::createHandleForNativeGraphicsPipeline(RootSignature* rootSignature, ID3D12PipelineState* pipelineState, const GraphicsPipelineDesc& desc, const FramebufferInfo& framebufferInfo)
     {
         if (rootSignature == nullptr)
             return nullptr;
@@ -193,7 +193,7 @@ namespace caustica::rhi::d3d12
         GraphicsPipeline *pso = new GraphicsPipeline();
         pso->desc = desc;
         pso->framebufferInfo = framebufferInfo;
-        pso->rootSignature = checked_cast<RootSignature*>(rootSignature);
+        pso->rootSignature = rootSignature;
         pso->pipelineState = pipelineState;
         pso->requiresBlendFactor = desc.renderState.blendState.usesConstantColor(uint32_t(pso->framebufferInfo.colorFormats.size()));
         
@@ -344,8 +344,8 @@ namespace caustica::rhi::d3d12
         }
 
         setGraphicsBindings(state.bindings, bindingUpdateMask,
-            state.indirectParams, updateIndirectParams,
-            state.indirectCountBuffer, updateIndirectCountBuffer,
+            checked_cast<Buffer*>(state.indirectParams), updateIndirectParams,
+            checked_cast<Buffer*>(state.indirectCountBuffer), updateIndirectCountBuffer,
             pso->rootSignature);
 
         if (updateIndexBuffer)

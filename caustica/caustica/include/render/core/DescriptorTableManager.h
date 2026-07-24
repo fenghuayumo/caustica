@@ -50,10 +50,10 @@ namespace caustica
         int m_searchStart = 0;
         
     public:
-        DescriptorTableManager(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout);
+        DescriptorTableManager(caustica::rhi::Device* device, caustica::rhi::BindingLayout* layout);
         ~DescriptorTableManager();
         
-        caustica::rhi::IDescriptorTable* getDescriptorTable() const override { return m_descriptorTable; }
+        caustica::rhi::DescriptorTable* getDescriptorTable() const override { return m_descriptorTable; }
 
         DescriptorIndex createDescriptor(caustica::rhi::BindingSetItem item) override;
         DescriptorHandle createDescriptorHandle(caustica::rhi::BindingSetItem item) override;

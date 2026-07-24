@@ -111,19 +111,19 @@ private:
     void updateExposureValue();
 	void updateWhiteBalanceTransform();
 	void updateColorTransform();
-    void generateMips(caustica::rhi::ICommandList* commandList, uint32_t numberOfViews);
+    void generateMips(caustica::rhi::CommandList* commandList, uint32_t numberOfViews);
 public:
     struct CreateParameters
     {
         bool isTextureArray = false;
         uint32_t histogramBins = 256;
         uint32_t numConstantBufferVersions = 16;
-        caustica::rhi::IBuffer* exposureBufferOverride = nullptr;
-        caustica::rhi::ITexture* colorLUT = nullptr;
+        caustica::rhi::Buffer* exposureBufferOverride = nullptr;
+        caustica::rhi::Texture* colorLUT = nullptr;
     };
 
     ToneMappingPass(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
@@ -134,10 +134,10 @@ public:
     void preRender(const ToneMappingParameters& params);
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
-    bool render(caustica::rhi::ICommandList* commandList,
+    bool render(caustica::rhi::CommandList* commandList,
         const caustica::ICompositeView& compositeView,
-        caustica::rhi::ITexture* sourceTexture,
-        caustica::rhi::IBuffer* constantsBuffer,
+        caustica::rhi::Texture* sourceTexture,
+        caustica::rhi::Buffer* constantsBuffer,
         bool enabled);
 
     // R1 pilot — registers ToneMapping as a render-graph pass with automatic barriers.

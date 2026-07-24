@@ -105,7 +105,7 @@ void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bo
     worldRenderer(app)->rayTracingResources().requestMeshAccelRebuild(mesh, resetAccumulation);
 }
 
-caustica::rhi::ITexture* ldrColorTexture(const App& app)
+caustica::rhi::Texture* ldrColorTexture(const App& app)
 {
     auto* wr = worldRenderer(app);
     const auto* targets = wr ? wr->getRenderTargets() : nullptr;

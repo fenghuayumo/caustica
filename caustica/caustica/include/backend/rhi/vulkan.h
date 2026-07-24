@@ -13,21 +13,13 @@ namespace caustica::rhi
 
 namespace caustica::rhi::vulkan
 {
-    class IDevice : public caustica::rhi::IDevice
-    {
-    public:
-        // Additional Vulkan-specific public methods
-        virtual VkSemaphore getQueueSemaphore(CommandQueue queue) = 0;
-        virtual void queueWaitForSemaphore(CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value) = 0;
-        virtual void queueSignalSemaphore(CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value) = 0;
-        virtual uint64_t queueGetCompletedInstance(CommandQueue queue) = 0;
-    };
-
-    typedef RefCountPtr<IDevice> DeviceHandle;
+    // Vulkan-specific Device methods live on the concrete backend type
+    // (caustica::rhi::vulkan::Device). Use checked_cast when needed.
+    typedef caustica::rhi::DeviceHandle DeviceHandle;
 
     struct DeviceDesc
     {
-        IMessageCallback* errorCB = nullptr;
+        MessageCallback* errorCB = nullptr;
 
         VkInstance instance;
         VkPhysicalDevice physicalDevice;

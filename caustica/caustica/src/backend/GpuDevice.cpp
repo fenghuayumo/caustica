@@ -338,7 +338,7 @@ bool GpuDevice::presentHeadlessFrame()
     return true;
 }
 
-caustica::rhi::ITexture* GpuDevice::getHeadlessBackBuffer(uint32_t index)
+caustica::rhi::Texture* GpuDevice::getHeadlessBackBuffer(uint32_t index)
 {
     if (index < m_HeadlessBackBuffers.size())
         return m_HeadlessBackBuffers[index];
@@ -424,19 +424,19 @@ bool GpuDevice::validatePathTracerRequirements() const
 
 bool GpuDevice::supportsRayTracingPipeline() const
 {
-    caustica::rhi::IDevice* device = getDevice();
+    caustica::rhi::Device* device = getDevice();
     return device && device->queryFeatureSupport(caustica::rhi::Feature::RayTracingPipeline);
 }
 
 bool GpuDevice::supportsRayQuery() const
 {
-    caustica::rhi::IDevice* device = getDevice();
+    caustica::rhi::Device* device = getDevice();
     return device && device->queryFeatureSupport(caustica::rhi::Feature::RayQuery);
 }
 
 bool GpuDevice::supportsShaderExecutionReordering() const
 {
-    caustica::rhi::IDevice* device = getDevice();
+    caustica::rhi::Device* device = getDevice();
     return device
         && device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12
         && device->queryFeatureSupport(caustica::rhi::Feature::ShaderExecutionReordering);
@@ -538,12 +538,12 @@ void GpuDevice::shutdown()
     m_InstanceCreated = false;
 }
 
-caustica::rhi::IFramebuffer* caustica::GpuDevice::getCurrentFramebuffer(bool withDepth)
+caustica::rhi::Framebuffer* caustica::GpuDevice::getCurrentFramebuffer(bool withDepth)
 {
     return getFramebuffer(getCurrentBackBufferIndex(), withDepth);
 }
 
-caustica::rhi::IFramebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, bool withDepth)
+caustica::rhi::Framebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, bool withDepth)
 {
     if (withDepth)
     {

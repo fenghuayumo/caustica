@@ -65,11 +65,11 @@ namespace caustica::rhi
     class CommandListResourceStateTracker
     {
     public:
-        explicit CommandListResourceStateTracker(IMessageCallback* messageCallback)
+        explicit CommandListResourceStateTracker(MessageCallback* messageCallback)
             : m_MessageCallback(messageCallback)
         { }
 
-        // ICommandList-like interface
+        // CommandList-like interface
 
         void setEnableUavBarriersForTexture(TextureStateExtension* texture, bool enableBarriers);
         void setEnableUavBarriersForBuffer(BufferStateExtension* buffer, bool enableBarriers);
@@ -97,7 +97,7 @@ namespace caustica::rhi
         void clearBarriers() { m_TextureBarriers.clear(); m_BufferBarriers.clear(); }
 
     private:
-        IMessageCallback* m_MessageCallback;
+        MessageCallback* m_MessageCallback;
 
         std::unordered_map<TextureStateExtension*, std::unique_ptr<TextureState>> m_TextureStates;
         std::unordered_map<BufferStateExtension*, std::unique_ptr<BufferState>> m_BufferStates;
@@ -114,6 +114,6 @@ namespace caustica::rhi
         BufferState* getBufferStateTracking(BufferStateExtension* buffer, bool allowCreate);
     };
 
-    bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, IMessageCallback* messageCallback);
+    bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, MessageCallback* messageCallback);
 
 } // namespace caustica::rhi

@@ -10,7 +10,7 @@ using namespace caustica::math;
 namespace caustica::render
 {
 
-GaussianSplatAccelBuilder::GaussianSplatAccelBuilder(caustica::rhi::IDevice* device)
+GaussianSplatAccelBuilder::GaussianSplatAccelBuilder(caustica::rhi::Device* device)
     : m_device(device)
 {
 }
@@ -30,11 +30,11 @@ void GaussianSplatAccelBuilder::release(bool markBuildPending)
 }
 
 void GaussianSplatAccelBuilder::build(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const GaussianSplatAccelBuildParams& params,
     const std::vector<caustica::GaussianSplatData>& splats,
     uint32_t splatCount,
-    caustica::rhi::IBuffer* aabbBuffer)
+    caustica::rhi::Buffer* aabbBuffer)
 {
     if (splatCount == 0 || aabbBuffer == nullptr)
         return;

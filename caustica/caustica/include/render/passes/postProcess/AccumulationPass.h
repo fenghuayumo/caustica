@@ -12,11 +12,11 @@ namespace caustica
 class AccumulationPass
 {
 public:
-    AccumulationPass(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    AccumulationPass(caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void createPipeline();
-    void createBindingSet(caustica::rhi::ITexture* inputTexture, caustica::rhi::ITexture* outputTexture, caustica::rhi::ITexture* renderOutputTexture);
-    void render(caustica::rhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
+    void createBindingSet(caustica::rhi::Texture* inputTexture, caustica::rhi::Texture* outputTexture, caustica::rhi::Texture* renderOutputTexture);
+    void render(caustica::rhi::CommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
 
 private:
     caustica::rhi::DeviceHandle m_device;

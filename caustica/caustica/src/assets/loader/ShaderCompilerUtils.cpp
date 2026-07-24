@@ -31,7 +31,7 @@ namespace ShaderCompilerUtils
     // Shader compiler configuration
     //////////////////////////////////////////////////////////////////////////
     
-    bool ShaderCompilerConfig::initialize(caustica::rhi::IDevice* device, const std::string& binarySubfolder)
+    bool ShaderCompilerConfig::initialize(caustica::rhi::Device* device, const std::string& binarySubfolder)
     {
         std::string graphicsAPIName;
         if (device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)

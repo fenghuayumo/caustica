@@ -113,7 +113,7 @@ public:
     virtual void setDLSSOptions(const DLSSOptions& options) = 0;
     virtual bool isDLSSAvailable() const = 0;
     virtual void queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) = 0;
-    virtual void evaluateDLSS(caustica::rhi::ICommandList* commandList) = 0;
+    virtual void evaluateDLSS(caustica::rhi::CommandList* commandList) = 0;
     virtual void cleanupDLSS(bool wfi) = 0;
 
     // See sl_nis.h for documentation
@@ -139,7 +139,7 @@ public:
     };
     virtual void setNISOptions(const NISOptions& options) = 0;
     virtual bool isNISAvailable() const = 0;
-    virtual void evaluateNIS(caustica::rhi::ICommandList* commandList) = 0;
+    virtual void evaluateNIS(caustica::rhi::CommandList* commandList) = 0;
     virtual void cleanupNIS(bool wfi) = 0;
 
     // See sl_dvc.h for documentation
@@ -158,7 +158,7 @@ public:
     virtual void setDeepDVCOptions(const DeepDVCOptions& options) = 0;
     virtual bool isDeepDVCAvailable() const = 0;
     virtual void queryDeepDVCState(uint64_t& estimatedVRamUsage) = 0;
-    virtual void evaluateDeepDVC(caustica::rhi::ICommandList* commandList) = 0;
+    virtual void evaluateDeepDVC(caustica::rhi::CommandList* commandList) = 0;
     virtual void cleanupDeepDVC() = 0;
 
     // See sl_reflex.h for documentation
@@ -325,31 +325,31 @@ public:
     virtual void setDLSSRROptions(const DLSSRROptions& options) = 0;
     virtual bool isDLSSRRAvailable() const = 0;
     virtual void queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) = 0;
-    virtual void evaluateDLSSRR(caustica::rhi::ICommandList* commandList) = 0;
+    virtual void evaluateDLSSRR(caustica::rhi::CommandList* commandList) = 0;
     virtual void cleanupDLSSRR(bool wfi) = 0;
 
     virtual void tagResourcesGeneral(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const IView* view,
-        caustica::rhi::ITexture* motionVectors,
-        caustica::rhi::ITexture* depth,
-        caustica::rhi::ITexture* finalColorHudless) = 0;
+        caustica::rhi::Texture* motionVectors,
+        caustica::rhi::Texture* depth,
+        caustica::rhi::Texture* finalColorHudless) = 0;
 
     virtual void tagResourcesDLSSNIS(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const IView* view,
-        caustica::rhi::ITexture* output,
-        caustica::rhi::ITexture* input) = 0;
+        caustica::rhi::Texture* output,
+        caustica::rhi::Texture* input) = 0;
 
     virtual void tagResourcesDLSSFG(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         bool validViewportExtent = false,
         const Extent& backBufferExtent = {}) = 0;
 
     virtual void tagResourcesDeepDVC(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const IView* view,
-        caustica::rhi::ITexture* output) = 0;
+        caustica::rhi::Texture* output) = 0;
 
     virtual void unTagResourcesDeepDVC() = 0;
 
@@ -359,18 +359,18 @@ public:
 	// * Either specHitDist or specMotionVectors should be provided but not both nor neither. Refer to DLSS-RR 
 	//   documentation for more detail.
     virtual void tagResourcesDLSSRR(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
-        caustica::rhi::ITexture* inputColor,
-        caustica::rhi::ITexture* diffuseAlbedo,
-        caustica::rhi::ITexture* specAlbedo,
-        caustica::rhi::ITexture* normalsAndOptionalRoughness,
-        caustica::rhi::ITexture* roughness,
-        caustica::rhi::ITexture* specHitDist,
-        caustica::rhi::ITexture* specMotionVectors,
-        caustica::rhi::ITexture* outputColor
+        caustica::rhi::Texture* inputColor,
+        caustica::rhi::Texture* diffuseAlbedo,
+        caustica::rhi::Texture* specAlbedo,
+        caustica::rhi::Texture* normalsAndOptionalRoughness,
+        caustica::rhi::Texture* roughness,
+        caustica::rhi::Texture* specHitDist,
+        caustica::rhi::Texture* specMotionVectors,
+        caustica::rhi::Texture* outputColor
     ) = 0;
 
     virtual void simStart(GpuDevice& manager) = 0;

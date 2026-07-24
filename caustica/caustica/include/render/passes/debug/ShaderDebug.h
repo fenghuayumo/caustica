@@ -49,14 +49,14 @@ private:
     std::array<char, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES> m_lastBuffer;
 
 public:
-    ShaderDebug( caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
+    ShaderDebug( caustica::rhi::Device* device, caustica::rhi::CommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
 
-    void                    createRenderPasses( caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer );
+    void                    createRenderPasses( caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer );
 
-    void                    beginFrame( caustica::rhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
+    void                    beginFrame( caustica::rhi::CommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
     void                    clearDebugVizTexture(caustica::rhi::CommandListHandle commandList); // not merged with beginFrame since sometimes you want it to persist between frames
 
-    void                    endFrameAndOutput( caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport );
+    void                    endFrameAndOutput( caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport );
 
     caustica::rhi::BufferHandle     getGPUWriteBuffer()         { return m_bufferGPU; };
     caustica::rhi::TextureHandle    getDebugVizTexture()        { return m_debugVizOutput; };
@@ -65,5 +65,5 @@ public:
 
 private:
     void                    outputLastBufferPrints();
-    void                    drawCurrentBufferGeometry(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport);
+    void                    drawCurrentBufferGeometry(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport);
 };

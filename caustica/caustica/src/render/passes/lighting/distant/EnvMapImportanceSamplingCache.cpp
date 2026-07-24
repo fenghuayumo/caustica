@@ -23,7 +23,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-EnvMapImportanceSamplingCache::EnvMapImportanceSamplingCache( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
+EnvMapImportanceSamplingCache::EnvMapImportanceSamplingCache( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device), m_shaderFactory(shaderFactory)
 {
 }

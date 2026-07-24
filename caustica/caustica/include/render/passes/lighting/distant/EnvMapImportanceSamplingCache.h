@@ -40,7 +40,7 @@ class EnvMapImportanceSamplingCache
 public:
 
 public:
-    EnvMapImportanceSamplingCache( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
+    EnvMapImportanceSamplingCache( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~EnvMapImportanceSamplingCache();
 
     void                            createRenderPasses();

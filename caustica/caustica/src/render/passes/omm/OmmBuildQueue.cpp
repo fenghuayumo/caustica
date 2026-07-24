@@ -201,7 +201,7 @@ caustica::render::MeshGpuRecord* OmmBuildQueue::findMeshGpu(
     return it != m_sceneGpuResources->meshRegistry.end() ? &it->second : nullptr;
 }
 
-void OmmBuildQueue::runSetup(caustica::rhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::runSetup(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None);
 
@@ -323,7 +323,7 @@ void OmmBuildQueue::allocateOMMArrayDataBuffer(BuildTask& task)
     task.buffers.ommArrayDataBuffer = ommArrayDataBufferAllocator.CreateBuffer(m_device, "OmmArrayBuffer", BufferConfig::RawUAVAndASBuildInput);
 }
 
-void OmmBuildQueue::bakeOmmArrayData(caustica::rhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::bakeOmmArrayData(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     commandList.beginTrackingBufferState(task.buffers.ommIndexBuffer, caustica::rhi::ResourceStates::Common);
     commandList.beginTrackingBufferState(task.buffers.ommDescBuffer, caustica::rhi::ResourceStates::Common);
@@ -370,7 +370,7 @@ void OmmBuildQueue::bakeOmmArrayData(caustica::rhi::ICommandList& commandList, B
     }
 }
 
-std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(caustica::rhi::ICommandList& commandList, BuildTask& task)
+std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     std::vector<bvh::OmmAttachment> ommAttachment;
     ommAttachment.resize(task.input.mesh.geometries.size());
@@ -411,7 +411,7 @@ std::vector<bvh::OmmAttachment> OmmBuildQueue::buildOMMAttachments(caustica::rhi
     return ommAttachment;
 }
 
-void OmmBuildQueue::buildBLASWithOMM(caustica::rhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
+void OmmBuildQueue::buildBLASWithOMM(caustica::rhi::CommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment)
 {
     caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(task.input.mesh);
     if (meshGpu == nullptr)
@@ -429,7 +429,7 @@ void OmmBuildQueue::buildBLASWithOMM(caustica::rhi::ICommandList& commandList, B
     meshGpu->accelStructOmm = as;
 }
 
-void OmmBuildQueue::runBakeAndBuild(caustica::rhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::runBakeAndBuild(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     assert(task.state == BuildState::None || task.state == BuildState::Setup);
 
@@ -444,7 +444,7 @@ void OmmBuildQueue::runBakeAndBuild(caustica::rhi::ICommandList& commandList, Bu
     task.state = BuildState::BakeAndBuild;
 }
 
-void OmmBuildQueue::submitAndSubscribeQuery(caustica::rhi::ICommandList& commandList)
+void OmmBuildQueue::submitAndSubscribeQuery(caustica::rhi::CommandList& commandList)
 {
     // Need to submit the command list for the event query to be relevant. Ideally, we would have the query point to the next fence value instead of the last submitted one, or we would defer query set up to happen on command list submission.
     commandList.close();
@@ -455,7 +455,7 @@ void OmmBuildQueue::submitAndSubscribeQuery(caustica::rhi::ICommandList& command
     m_device->setEventQuery(m_InFlightQuery, caustica::rhi::CommandQueue::Graphics);
 }
 
-void OmmBuildQueue::finalize(caustica::rhi::ICommandList& commandList, BuildTask& task)
+void OmmBuildQueue::finalize(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     caustica::render::MeshGpuRecord* meshGpu = findMeshGpu(task.input.mesh);
     if (meshGpu == nullptr)
@@ -508,7 +508,7 @@ void OmmBuildQueue::BuildTask::reset()
     bufferInfos.clear();
 }
 
-void OmmBuildQueue::consumeOneTask(caustica::rhi::ICommandList& commandList, BuildState taskState)
+void OmmBuildQueue::consumeOneTask(caustica::rhi::CommandList& commandList, BuildState taskState)
 {
     for (auto& task : m_pending)
     {
@@ -528,7 +528,7 @@ void OmmBuildQueue::consumeOneTask(caustica::rhi::ICommandList& commandList, Bui
     }
 }
 
-bool OmmBuildQueue::executeTask(caustica::rhi::ICommandList& commandList, BuildTask& task)
+bool OmmBuildQueue::executeTask(caustica::rhi::CommandList& commandList, BuildTask& task)
 {
     if (!task.input.mesh.id || findMeshGpu(task.input.mesh) == nullptr)
     {
@@ -581,7 +581,7 @@ bool OmmBuildQueue::readyToRecordWork()
     return false;
 }
 
-void OmmBuildQueue::update(caustica::rhi::ICommandList& commandList)
+void OmmBuildQueue::update(caustica::rhi::CommandList& commandList)
 {
     if (readyToRecordWork() && !m_pending.empty())
     {

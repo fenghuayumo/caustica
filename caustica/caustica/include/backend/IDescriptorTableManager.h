@@ -13,7 +13,7 @@ class IDescriptorTableManager
 public:
     virtual ~IDescriptorTableManager() = default;
 
-    virtual caustica::rhi::IDescriptorTable* getDescriptorTable() const = 0;
+    virtual caustica::rhi::DescriptorTable* getDescriptorTable() const = 0;
     virtual DescriptorIndex createDescriptor(caustica::rhi::BindingSetItem item) = 0;
     virtual DescriptorHandle createDescriptorHandle(caustica::rhi::BindingSetItem item) = 0;
     virtual void releaseDescriptor(DescriptorIndex index) = 0;

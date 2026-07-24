@@ -18,7 +18,7 @@ class PathTracingContext;
 // Lighting create / per-frame update helpers (no WorldRenderer symbols).
 void createLightingRenderPasses(
     PathTracingContext& context,
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
     caustica::rhi::BindingLayoutHandle bindlessLayout,
     caustica::rhi::CommandListHandle initializeCommandList,

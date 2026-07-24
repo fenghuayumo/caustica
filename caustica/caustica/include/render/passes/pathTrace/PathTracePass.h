@@ -37,7 +37,7 @@ public:
     };
 
     bool createExportPipeline(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::ShaderFactory* shaderFactory,
         caustica::rhi::BindingLayoutHandle bindingLayout,
         caustica::rhi::BindingLayoutHandle bindlessLayout);
@@ -50,23 +50,23 @@ public:
         const FillConstantsParams& params) const;
 
     void prePass(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::DescriptorTable* descriptorTable,
         dm::uint2 viewSize,
         PTPipelineVariant* pipeline);
 
     void exportVBuffer(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::DescriptorTable* descriptorTable,
         dm::uint2 viewSize,
-        caustica::rhi::IComputePipeline* pipeline);
+        caustica::rhi::ComputePipeline* pipeline);
 
     void mainPass(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::DescriptorTable* descriptorTable,
         dm::uint2 viewSize,
         PTPipelineVariant* pipeline,
         uint32_t samplesPerPixel);

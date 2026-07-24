@@ -521,7 +521,7 @@ void GpuDevice_DX12::releaseRenderTargets()
 {
     if (m_RhiDevice)
     {
-        // make sure that all frames have finished rendering
+        // THREADING: sync-point, RT-only (swapchain resize / release).
         m_RhiDevice->waitForIdle();
 
         // Release all in-flight references to the render targets
@@ -599,7 +599,7 @@ bool GpuDevice_DX12::beginFrame()
     return true;
 }
 
-caustica::rhi::ITexture* GpuDevice_DX12::getCurrentBackBuffer()
+caustica::rhi::Texture* GpuDevice_DX12::getCurrentBackBuffer()
 {
     if (m_DeviceParams.headlessDevice)
         return getHeadlessBackBuffer(getCurrentHeadlessBackBufferIndex());
@@ -607,7 +607,7 @@ caustica::rhi::ITexture* GpuDevice_DX12::getCurrentBackBuffer()
     return m_RhiSwapChainBuffers[m_SwapChain->GetCurrentBackBufferIndex()];
 }
 
-caustica::rhi::ITexture* GpuDevice_DX12::getBackBuffer(uint32_t index)
+caustica::rhi::Texture* GpuDevice_DX12::getBackBuffer(uint32_t index)
 {
     if (m_DeviceParams.headlessDevice)
         return getHeadlessBackBuffer(index);

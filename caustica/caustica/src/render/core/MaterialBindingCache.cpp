@@ -7,13 +7,13 @@ namespace caustica
 {
 
 MaterialBindingCache::MaterialBindingCache(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     caustica::rhi::ShaderType shaderType,
     uint32_t registerSpace,
     bool registerSpaceIsDescriptorSet,
     const std::vector<MaterialResourceBinding>& bindings,
-    caustica::rhi::ISampler* sampler,
-    caustica::rhi::ITexture* fallbackTexture,
+    caustica::rhi::Sampler* sampler,
+    caustica::rhi::Texture* fallbackTexture,
     render::SceneGpuResources* sceneGpuResources,
     bool trackLiveness)
     : m_device(device)
@@ -62,12 +62,12 @@ MaterialBindingCache::MaterialBindingCache(
     m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 }
 
-caustica::rhi::IBindingLayout* MaterialBindingCache::getLayout() const
+caustica::rhi::BindingLayout* MaterialBindingCache::getLayout() const
 {
     return m_bindingLayout;
 }
 
-caustica::rhi::IBindingSet* MaterialBindingCache::getMaterialBindingSet(const Material* material)
+caustica::rhi::BindingSet* MaterialBindingCache::getMaterialBindingSet(const Material* material)
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 

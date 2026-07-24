@@ -20,6 +20,12 @@ namespace caustica::rhi::d3d12
         }
     }
     
+    static bool isD3D12FenceComplete(void* fenceContext, uint64_t fenceValue)
+    {
+        auto* fence = static_cast<ID3D12Fence*>(fenceContext);
+        return fence && fence->GetCompletedValue() >= fenceValue;
+    }
+
     Buffer::~Buffer()
     {
         if (m_Context.logBufferLifetime)
@@ -33,6 +39,25 @@ namespace caustica::rhi::d3d12
         {
             m_Resources.shaderResourceViewHeap.releaseDescriptor(m_ClearUAV);
             m_ClearUAV = c_InvalidDescriptorIndex;
+        }
+
+        // Keep the ID3D12Resource alive until the GPU is done (no CPU wait on the destroy path).
+        if (resource && lastUseFence && m_Context.deferredDeletion)
+        {
+            RefCountPtr<ID3D12Resource> keepAlive = resource;
+            RefCountPtr<ID3D12Fence> fence = lastUseFence;
+            const uint64_t fenceValue = lastUseFenceValue;
+            resource = nullptr;
+            lastUseFence = nullptr;
+            m_Context.deferredDeletion->enqueue(
+                fence.Get(),
+                fenceValue,
+                &isD3D12FenceComplete,
+                [keepAlive = std::move(keepAlive), fence = std::move(fence)]() mutable
+                {
+                    keepAlive = nullptr;
+                    fence = nullptr;
+                });
         }
     }
 
@@ -226,7 +251,7 @@ namespace caustica::rhi::d3d12
         return m_ClearUAV;
     }
 
-    void *Device::mapBuffer(IBuffer* _b, CpuAccessMode flags)
+    void *Device::mapBuffer(rhi::Buffer* _b, CpuAccessMode flags)
     {
         Buffer* b = checked_cast<Buffer*>(_b);
 
@@ -261,14 +286,14 @@ namespace caustica::rhi::d3d12
         return mappedBuffer;
     }
 
-    void Device::unmapBuffer(IBuffer* _b)
+    void Device::unmapBuffer(rhi::Buffer* _b)
     {
         Buffer* b = checked_cast<Buffer*>(_b);
 
         b->resource->Unmap(0, nullptr);
     }
 
-    MemoryRequirements Device::getBufferMemoryRequirements(IBuffer* _buffer)
+    MemoryRequirements Device::getBufferMemoryRequirements(rhi::Buffer* _buffer)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -280,7 +305,7 @@ namespace caustica::rhi::d3d12
         return memReq;
     }
 
-    bool Device::bindBufferMemory(IBuffer* _buffer, IHeap* _heap, uint64_t offset)
+    bool Device::bindBufferMemory(rhi::Buffer* _buffer, rhi::Heap* _heap, uint64_t offset)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
         Heap* heap = checked_cast<Heap*>(_heap);
@@ -472,7 +497,7 @@ namespace caustica::rhi::d3d12
         m_Context.device->CreateUnorderedAccessView(resource, nullptr, &viewDesc, { descriptor });
     }
     
-    void CommandList::writeBuffer(IBuffer* _b, const void * data, size_t dataSize, uint64_t destOffsetBytes)
+    void CommandList::writeBuffer(rhi::Buffer* _b, const void * data, size_t dataSize, uint64_t destOffsetBytes)
     {
         Buffer* buffer = checked_cast<Buffer*>(_b);
 
@@ -515,7 +540,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void CommandList::clearBufferUInt(IBuffer* _b, uint32_t clearValue)
+    void CommandList::clearBufferUInt(rhi::Buffer* _b, uint32_t clearValue)
     {
         Buffer* b = checked_cast<Buffer*>(_b);
 
@@ -549,7 +574,7 @@ namespace caustica::rhi::d3d12
             b->resource, values, 0, nullptr);
     }
 
-    void CommandList::copyBuffer(IBuffer* _dest, uint64_t destOffsetBytes, IBuffer* _src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
+    void CommandList::copyBuffer(rhi::Buffer* _dest, uint64_t destOffsetBytes, rhi::Buffer* _src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
     {
         Buffer* dest = checked_cast<Buffer*>(_dest);
         Buffer* src = checked_cast<Buffer*>(_src);

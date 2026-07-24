@@ -9,7 +9,7 @@ namespace caustica
 // When framebuffer is null, the swapchain back buffer is used.
 struct RenderFramebufferOverride
 {
-    caustica::rhi::IFramebuffer* framebuffer = nullptr;
+    caustica::rhi::Framebuffer* framebuffer = nullptr;
 };
 
 } // namespace caustica

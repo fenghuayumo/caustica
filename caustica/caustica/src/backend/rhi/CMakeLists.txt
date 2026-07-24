@@ -66,6 +66,7 @@ set(include_common
     ${RHI_INCLUDE_DIR}/common/containers.h
     ${RHI_INCLUDE_DIR}/common/misc.h
     ${RHI_INCLUDE_DIR}/common/resource.h
+    ${RHI_INCLUDE_DIR}/common/deferred-deletion.h
     ${RHI_INCLUDE_DIR}/common/aftermath.h)
 
 set(src_common

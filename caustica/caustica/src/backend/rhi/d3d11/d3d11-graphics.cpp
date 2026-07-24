@@ -82,7 +82,7 @@ namespace caustica::rhi::d3d11
         return GraphicsPipelineHandle::Create(pso);
     }
 
-    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb)
+    GraphicsPipelineHandle Device::createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb)
     {
         if (!fb)
             return nullptr;

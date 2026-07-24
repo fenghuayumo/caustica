@@ -21,14 +21,14 @@ class SceneGpuUpdater
 public:
     static void initialize(
         SceneGpuResources& gpuResources,
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         ShaderFactory& shaderFactory);
 
     static void refresh(
         Scene& scene,
         SceneGpuResources& gpuResources,
         IDescriptorTableManager* descriptorTable,
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         uint32_t frameIndex);
 
     // Exclusive GPU setup from logic-thread staging data. Does not publish snapshots.

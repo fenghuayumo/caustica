@@ -308,7 +308,7 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
     m_imguiFrameOpened = true;
 }
 
-void ImGui_Renderer::render(caustica::rhi::IFramebuffer* framebuffer)
+void ImGui_Renderer::render(caustica::rhi::Framebuffer* framebuffer)
 {
     if (!m_imguiRhi)
         return;

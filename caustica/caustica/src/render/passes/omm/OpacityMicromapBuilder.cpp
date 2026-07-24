@@ -212,7 +212,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 }
 
 void OpacityMicromapBuilder::destroyOpacityMicromaps(
-    caustica::rhi::ICommandList& commandList,
+    caustica::rhi::CommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     commandList.close();
@@ -237,7 +237,7 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 }
 
 void OpacityMicromapBuilder::buildOpacityMicromaps(
-    caustica::rhi::ICommandList& commandList,
+    caustica::rhi::CommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     commandList.beginMarker("OMM Updates");
@@ -279,7 +279,7 @@ void OpacityMicromapBuilder::buildOpacityMicromaps(
     commandList.endMarker();
 }
 
-void OpacityMicromapBuilder::writeGeometryDebugBuffer(caustica::rhi::ICommandList& commandList)
+void OpacityMicromapBuilder::writeGeometryDebugBuffer(caustica::rhi::CommandList& commandList)
 {
     commandList.writeBuffer(m_geometryDebugBuffer, m_geometryDebugDataPtr.data(), m_geometryDebugDataPtr.size() * sizeof(GeometryDebugData));
 }
@@ -334,7 +334,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(
 }
 
 bool OpacityMicromapBuilder::update(
-    caustica::rhi::ICommandList& commandList,
+    caustica::rhi::CommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );

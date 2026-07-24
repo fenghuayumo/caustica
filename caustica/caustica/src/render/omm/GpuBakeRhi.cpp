@@ -119,11 +119,11 @@ namespace
 		std::shared_mutex m_Mutex;
 
 	public:
-		BindingCache(caustica::rhi::IDevice* device)
+		BindingCache(caustica::rhi::Device* device)
 			: m_Device(device)
 		{ }
 
-		caustica::rhi::BindingSetHandle GetCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
+		caustica::rhi::BindingSetHandle GetCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout)
 		{
 			size_t hash = 0;
 			caustica::rhi::hash_combine(hash, desc);
@@ -146,7 +146,7 @@ namespace
 
 			return result;
 		}
-		caustica::rhi::BindingSetHandle GetOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
+		caustica::rhi::BindingSetHandle GetOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout)
 		{
 			size_t hash = 0;
 			caustica::rhi::hash_combine(hash, desc);
@@ -1031,7 +1031,7 @@ void GpuBakeRhiImpl::ExecuteDispatchChain(
 				commandList,
 				compute.resources, compute.resourceNum, 
 				pipeline.compute.descriptorRanges, pipeline.compute.descriptorRangeNum);
-			caustica::rhi::IComputePipeline* csPipeline = caustica::rhi::checked_cast<caustica::rhi::IComputePipeline*>(m_pipelines[compute.pipelineIndex].Get());
+			caustica::rhi::ComputePipeline* csPipeline = caustica::rhi::checked_cast<caustica::rhi::ComputePipeline*>(m_pipelines[compute.pipelineIndex].Get());
 			caustica::rhi::BindingSetHandle bindingSet = m_bindingCache->GetOrCreateBindingSet(setDesc, csPipeline->getDesc().bindingLayouts[0].Get());
 
 			commandList->commitBarriers();
@@ -1058,7 +1058,7 @@ void GpuBakeRhiImpl::ExecuteDispatchChain(
 				commandList,
 				compute.resources, compute.resourceNum,
 				pipeline.compute.descriptorRanges, pipeline.compute.descriptorRangeNum);
-			caustica::rhi::IComputePipeline* csPipeline = caustica::rhi::checked_cast<caustica::rhi::IComputePipeline*>(m_pipelines[compute.pipelineIndex].Get());
+			caustica::rhi::ComputePipeline* csPipeline = caustica::rhi::checked_cast<caustica::rhi::ComputePipeline*>(m_pipelines[compute.pipelineIndex].Get());
 			caustica::rhi::BindingSetHandle bindingSet = m_bindingCache->GetOrCreateBindingSet(setDesc, csPipeline->getDesc().bindingLayouts[0].Get());
 
 			uint32_t indirectArgOffset = 0;
@@ -1089,7 +1089,7 @@ void GpuBakeRhiImpl::ExecuteDispatchChain(
 				commandList,
 				draw.resources, draw.resourceNum,
 				pipeline.graphics.descriptorRanges, pipeline.graphics.descriptorRangeNum);
-			caustica::rhi::IGraphicsPipeline* gfxPipeline = caustica::rhi::checked_cast<caustica::rhi::IGraphicsPipeline*>(m_pipelines[draw.pipelineIndex].Get());
+			caustica::rhi::GraphicsPipeline* gfxPipeline = caustica::rhi::checked_cast<caustica::rhi::GraphicsPipeline*>(m_pipelines[draw.pipelineIndex].Get());
 			caustica::rhi::BindingSetHandle bindingSet = m_bindingCache->GetOrCreateBindingSet(setDesc, gfxPipeline->getDesc().bindingLayouts[0].Get());
 			
 			uint32_t indirectArgOffset = 0;

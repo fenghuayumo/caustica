@@ -19,13 +19,13 @@ class DenoisingGuidesPass
 {
 public:
 
-    DenoisingGuidesPass( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle globalBindingLayout );
+    DenoisingGuidesPass( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle globalBindingLayout );
     ~DenoisingGuidesPass( );
 
 public:
-    void                            denoiseSpecHitT( caustica::rhi::ICommandList * commandList, caustica::rhi::BindingSetHandle bindingSet );
-    void                            computeAvgLayerRadiance( caustica::rhi::ICommandList * commandList, caustica::rhi::BindingSetHandle bindingSet );
-    void                            renderDebugViz( caustica::rhi::ICommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet );
+    void                            denoiseSpecHitT( caustica::rhi::CommandList * commandList, caustica::rhi::BindingSetHandle bindingSet );
+    void                            computeAvgLayerRadiance( caustica::rhi::CommandList * commandList, caustica::rhi::BindingSetHandle bindingSet );
+    void                            renderDebugViz( caustica::rhi::CommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet );
 
     bool                            debugGUI(float indent);
 

@@ -180,7 +180,9 @@ void SceneManager::setLoadingCallbacks(std::function<void()> onLoaded,
 void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                                      const std::filesystem::path& sceneFileName)
 {
+    // After RT drain: safe to touch RHI from the caller (logic) thread for load barriers.
     m_device.waitForRenderThreadIdle();
+    // THREADING: sync-point — RT is idle; one-shot GC before scene load.
     m_device.getDevice()->waitForIdle();
     m_device.getDevice()->runGarbageCollection();
 

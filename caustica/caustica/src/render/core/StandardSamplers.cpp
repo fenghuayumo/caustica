@@ -3,7 +3,7 @@
 namespace caustica::render
 {
 
-StandardSamplers::StandardSamplers(caustica::rhi::IDevice* device)
+StandardSamplers::StandardSamplers(caustica::rhi::Device* device)
     : m_device(device)
 {
     auto samplerDesc = caustica::rhi::SamplerDesc()

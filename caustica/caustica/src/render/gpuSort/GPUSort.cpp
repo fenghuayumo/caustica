@@ -27,7 +27,7 @@ using namespace caustica::math;
 using namespace caustica;
 
 
-GPUSort::GPUSort(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+GPUSort::GPUSort(caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_bindingCache(device)
     , m_shaderFactory(shaderFactory)
@@ -166,7 +166,7 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
 uint32_t FloorLog2(uint32_t n)  { assert(n > 0); return n == 1 ? 0 : 1 + FloorLog2(n >> 1); }
 uint32_t CeilLog2(uint32_t n)   { assert(n > 0); return n == 1 ? 0 : FloorLog2(n - 1) + 1; };
 
-void GPUSort::sort(caustica::rhi::ICommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
+void GPUSort::sort(caustica::rhi::CommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
 {
     RAII_SCOPE( commandList->beginMarker("GPUSort");, commandList->endMarker(); );
 

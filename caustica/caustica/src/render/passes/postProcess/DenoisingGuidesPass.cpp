@@ -31,7 +31,7 @@ using namespace caustica::math;
 
 static_assert( sizeof(DenoisingGuidesPassConstants) == sizeof(SampleMiniConstants) );
 
-DenoisingGuidesPass::DenoisingGuidesPass( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle bindingLayout )
+DenoisingGuidesPass::DenoisingGuidesPass( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle bindingLayout )
     : m_device(device)
     , m_bindingCache(device)
     , m_renderTargets(renderTargets)
@@ -63,7 +63,7 @@ DenoisingGuidesPass::~DenoisingGuidesPass( )
 
 #pragma optimize("", off)
 
-void DenoisingGuidesPass::denoiseSpecHitT(caustica::rhi::ICommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::denoiseSpecHitT(caustica::rhi::CommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("denoiseSpecHitT"); , commandList->endMarker(); );
 
@@ -87,7 +87,7 @@ void DenoisingGuidesPass::denoiseSpecHitT(caustica::rhi::ICommandList* commandLi
     commandList->setTextureState(m_renderTargets->specularHitT, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::computeAvgLayerRadiance(caustica::rhi::CommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("computeAvgLayerRadiance"); , commandList->endMarker(); );
 
@@ -104,7 +104,7 @@ void DenoisingGuidesPass::computeAvgLayerRadiance(caustica::rhi::ICommandList* c
     commandList->setTextureState(m_renderTargets->denoiserAvgLayerRadianceHalfRes, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::renderDebugViz( caustica::rhi::ICommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet )
+void DenoisingGuidesPass::renderDebugViz( caustica::rhi::CommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet )
 {
     //if( !m_settings.enabled )
     //    return;

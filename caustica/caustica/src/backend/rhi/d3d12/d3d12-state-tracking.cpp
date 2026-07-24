@@ -5,7 +5,7 @@
 
 namespace caustica::rhi::d3d12
 {
-    void CommandList::setResourceStatesForBindingSet(IBindingSet* _bindingSet)
+    void CommandList::setResourceStatesForBindingSet(rhi::BindingSet* _bindingSet)
     {
         if (_bindingSet->getDesc() == nullptr)
             return; // is bindless
@@ -19,27 +19,27 @@ namespace caustica::rhi::d3d12
             switch (binding.type)  // NOLINT(clang-diagnostic-switch-enum)
             {
             case ResourceType::Texture_SRV:
-                requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::ShaderResource);
+                requireTextureState(checked_cast<Texture*>(binding.resourceHandle), binding.subresources, ResourceStates::ShaderResource);
                 break;
 
             case ResourceType::Texture_UAV:
-                requireTextureState(checked_cast<ITexture*>(binding.resourceHandle), binding.subresources, ResourceStates::UnorderedAccess);
+                requireTextureState(checked_cast<Texture*>(binding.resourceHandle), binding.subresources, ResourceStates::UnorderedAccess);
                 break;
 
             case ResourceType::TypedBuffer_SRV:
             case ResourceType::StructuredBuffer_SRV:
             case ResourceType::RawBuffer_SRV:
-                requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), ResourceStates::ShaderResource);
+                requireBufferState(checked_cast<Buffer*>(binding.resourceHandle), ResourceStates::ShaderResource);
                 break;
 
             case ResourceType::TypedBuffer_UAV:
             case ResourceType::StructuredBuffer_UAV:
             case ResourceType::RawBuffer_UAV:
-                requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), ResourceStates::UnorderedAccess);
+                requireBufferState(checked_cast<Buffer*>(binding.resourceHandle), ResourceStates::UnorderedAccess);
                 break;
 
             case ResourceType::ConstantBuffer:
-                requireBufferState(checked_cast<IBuffer*>(binding.resourceHandle), ResourceStates::ConstantBuffer);
+                requireBufferState(checked_cast<Buffer*>(binding.resourceHandle), ResourceStates::ConstantBuffer);
                 break;
 
             case ResourceType::RayTracingAccelStruct:
@@ -57,21 +57,21 @@ namespace caustica::rhi::d3d12
         }
     }
     
-    void CommandList::requireTextureState(ITexture* _texture, TextureSubresourceSet subresources, ResourceStates state)
+    void CommandList::requireTextureState(rhi::Texture* _texture, TextureSubresourceSet subresources, ResourceStates state)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
         m_StateTracker.requireTextureState(texture, subresources, state);
     }
 
-    void CommandList::requireSamplerFeedbackTextureState(ISamplerFeedbackTexture* _texture, ResourceStates state)
+    void CommandList::requireSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* _texture, ResourceStates state)
     {
         SamplerFeedbackTexture* texture = checked_cast<SamplerFeedbackTexture*>(_texture);
 
         m_StateTracker.requireTextureState(texture, AllSubresources, state);
     }
     
-    void CommandList::requireBufferState(IBuffer* _buffer, ResourceStates state)
+    void CommandList::requireBufferState(rhi::Buffer* _buffer, ResourceStates state)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -175,7 +175,7 @@ namespace caustica::rhi::d3d12
         m_StateTracker.clearBarriers();
     }
 
-    void CommandList::textureAliasingBarrier(ITexture* _before, ITexture* _after)
+    void CommandList::textureAliasingBarrier(rhi::Texture* _before, rhi::Texture* _after)
     {
         commitBarriers();
 
@@ -190,7 +190,7 @@ namespace caustica::rhi::d3d12
         m_ActiveCommandList->commandList->ResourceBarrier(1, &barrier);
     }
 
-    void CommandList::bufferAliasingBarrier(IBuffer* _before, IBuffer* _after)
+    void CommandList::bufferAliasingBarrier(rhi::Buffer* _before, rhi::Buffer* _after)
     {
         commitBarriers();
 
@@ -210,35 +210,35 @@ namespace caustica::rhi::d3d12
         m_EnableAutomaticBarriers = enable;
     }
 
-    void CommandList::setEnableUavBarriersForTexture(ITexture* _texture, bool enableBarriers)
+    void CommandList::setEnableUavBarriersForTexture(rhi::Texture* _texture, bool enableBarriers)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
         m_StateTracker.setEnableUavBarriersForTexture(texture, enableBarriers);
     }
 
-    void CommandList::setEnableUavBarriersForBuffer(IBuffer* _buffer, bool enableBarriers)
+    void CommandList::setEnableUavBarriersForBuffer(rhi::Buffer* _buffer, bool enableBarriers)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
         m_StateTracker.setEnableUavBarriersForBuffer(buffer, enableBarriers);
     }
     
-    void CommandList::beginTrackingTextureState(ITexture* _texture, TextureSubresourceSet subresources, ResourceStates stateBits)
+    void CommandList::beginTrackingTextureState(rhi::Texture* _texture, TextureSubresourceSet subresources, ResourceStates stateBits)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
         m_StateTracker.beginTrackingTextureState(texture, subresources, stateBits);
     }
 
-    void CommandList::beginTrackingBufferState(IBuffer* _buffer, ResourceStates stateBits)
+    void CommandList::beginTrackingBufferState(rhi::Buffer* _buffer, ResourceStates stateBits)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
         m_StateTracker.beginTrackingBufferState(buffer, stateBits);
     }
 
-    void CommandList::setTextureState(ITexture* _texture, TextureSubresourceSet subresources, ResourceStates stateBits)
+    void CommandList::setTextureState(rhi::Texture* _texture, TextureSubresourceSet subresources, ResourceStates stateBits)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -248,7 +248,7 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(texture);
     }
 
-    void CommandList::setBufferState(IBuffer* _buffer, ResourceStates stateBits)
+    void CommandList::setBufferState(rhi::Buffer* _buffer, ResourceStates stateBits)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -258,7 +258,7 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(buffer);
     }
 
-    void CommandList::setAccelStructState(rt::IAccelStruct* _as, ResourceStates stateBits)
+    void CommandList::setAccelStructState(rt::AccelStruct* _as, ResourceStates stateBits)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
 
@@ -271,7 +271,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void CommandList::setPermanentTextureState(ITexture* _texture, ResourceStates stateBits)
+    void CommandList::setPermanentTextureState(rhi::Texture* _texture, ResourceStates stateBits)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -281,7 +281,7 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(texture);
     }
 
-    void CommandList::setPermanentBufferState(IBuffer* _buffer, ResourceStates stateBits)
+    void CommandList::setPermanentBufferState(rhi::Buffer* _buffer, ResourceStates stateBits)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
@@ -291,14 +291,14 @@ namespace caustica::rhi::d3d12
             m_Instance->referencedResources.push_back(buffer);
     }
 
-    ResourceStates CommandList::getTextureSubresourceState(ITexture* _texture, ArraySlice arraySlice, MipLevel mipLevel)
+    ResourceStates CommandList::getTextureSubresourceState(rhi::Texture* _texture, ArraySlice arraySlice, MipLevel mipLevel)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
         return m_StateTracker.getTextureSubresourceState(texture, arraySlice, mipLevel);
     }
 
-    ResourceStates CommandList::getBufferState(IBuffer* _buffer)
+    ResourceStates CommandList::getBufferState(rhi::Buffer* _buffer)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 

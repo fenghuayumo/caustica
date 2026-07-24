@@ -44,7 +44,7 @@ namespace caustica::rhi::utils
     }
 
     bool CreateBindingSetAndLayout(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::rhi::ShaderType visibility,
         uint32_t registerSpace,
         const caustica::rhi::BindingSetDesc& bindingSetDesc,
@@ -91,7 +91,7 @@ namespace caustica::rhi::utils
         return true;
     }
 
-    void ClearColorAttachment(ICommandList* commandList, IFramebuffer* framebuffer, uint32_t attachmentIndex, Color color)
+    void ClearColorAttachment(CommandList* commandList, Framebuffer* framebuffer, uint32_t attachmentIndex, Color color)
     {
         const FramebufferAttachment& att = framebuffer->getDesc().colorAttachments[attachmentIndex];
         if (att.texture)
@@ -100,7 +100,7 @@ namespace caustica::rhi::utils
         }
     }
 
-    void ClearDepthStencilAttachment(ICommandList* commandList, IFramebuffer* framebuffer, float depth, uint32_t stencil)
+    void ClearDepthStencilAttachment(CommandList* commandList, Framebuffer* framebuffer, float depth, uint32_t stencil)
     {
         const FramebufferAttachment& att = framebuffer->getDesc().depthAttachment;
         if (att.texture)
@@ -111,7 +111,7 @@ namespace caustica::rhi::utils
         }
     }
 
-    void BuildBottomLevelAccelStruct(ICommandList* commandList, rt::IAccelStruct* as, const rt::AccelStructDesc& desc)
+    void BuildBottomLevelAccelStruct(CommandList* commandList, rt::AccelStruct* as, const rt::AccelStructDesc& desc)
     {
         commandList->buildBottomLevelAccelStruct(as, 
             desc.bottomLevelGeometries.data(),
@@ -119,17 +119,17 @@ namespace caustica::rhi::utils
             desc.buildFlags);
     }
 
-    void TextureUavBarrier(ICommandList* commandList, ITexture* texture)
+    void TextureUavBarrier(CommandList* commandList, Texture* texture)
     {
         commandList->setTextureState(texture, AllSubresources, ResourceStates::UnorderedAccess);
     }
 
-    void BufferUavBarrier(ICommandList* commandList, IBuffer* buffer)
+    void BufferUavBarrier(CommandList* commandList, Buffer* buffer)
     {
         commandList->setBufferState(buffer, ResourceStates::UnorderedAccess);
     }
 
-    Format ChooseFormat(IDevice* device, caustica::rhi::FormatSupport requiredFeatures, const caustica::rhi::Format* requestedFormats, size_t requestedFormatCount)
+    Format ChooseFormat(Device* device, caustica::rhi::FormatSupport requiredFeatures, const caustica::rhi::Format* requestedFormats, size_t requestedFormatCount)
     {
         assert(device);
         assert(requestedFormats || requestedFormatCount == 0);

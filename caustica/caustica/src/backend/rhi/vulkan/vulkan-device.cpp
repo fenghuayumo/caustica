@@ -1,6 +1,7 @@
 #include "vulkan-backend.h"
 #include <unordered_map>
 #include <sstream>
+#include <mutex>
 
 #include <rhi/common/misc.h>
 
@@ -33,6 +34,9 @@ namespace caustica::rhi::vulkan
         , m_Allocator(m_Context)
         , m_TimerQueryAllocator(desc.maxTimerQueries, true)
     {
+        m_Context.deferredDeletion = &m_DeferredDeletion;
+        m_Context.parentDevice = this;
+
         if (desc.graphicsQueue)
         {
             m_Queues[uint32_t(CommandQueue::Graphics)] = std::make_unique<Queue>(m_Context,
@@ -246,6 +250,11 @@ namespace caustica::rhi::vulkan
 
     Device::~Device()
     {
+        waitForIdle();
+        m_DeferredDeletion.flushAllBlocking();
+        m_Context.deferredDeletion = nullptr;
+        m_Context.parentDevice = nullptr;
+
         if (m_TimerQueryPool)
         {
             m_Context.device.destroyQueryPool(m_TimerQueryPool);
@@ -289,6 +298,8 @@ namespace caustica::rhi::vulkan
 
     bool Device::waitForIdle()
     {
+        // THREADING: sync-point, RT-only.
+        std::lock_guard lockGuard(m_Mutex);
         try {
             m_Context.device.waitIdle();
         }
@@ -301,6 +312,7 @@ namespace caustica::rhi::vulkan
 
     void Device::runGarbageCollection()
     {
+        std::lock_guard lockGuard(m_Mutex);
         for (auto& m_Queue : m_Queues)
         {
             if (m_Queue)
@@ -308,6 +320,7 @@ namespace caustica::rhi::vulkan
                 m_Queue->retireCommandBuffers();
             }
         }
+        m_DeferredDeletion.flush();
     }
 
     bool Device::queryFeatureSupport(Feature feature, void* pInfo, size_t infoSize)
@@ -530,6 +543,26 @@ namespace caustica::rhi::vulkan
         return Object(m_Queues[uint32_t(queue)]->getVkQueue());
     }
 
+    bool Device::isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const
+    {
+        if (queue >= CommandQueue::Count)
+            return true;
+        const auto& q = m_Queues[uint32_t(queue)];
+        if (!q)
+            return true;
+        return q->pollCommandList(submissionID);
+    }
+
+    bool Device::isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const
+    {
+        if (queue >= CommandQueue::Count)
+            return true;
+        const auto& q = m_Queues[uint32_t(queue)];
+        if (!q)
+            return true;
+        return q->pollCommandList(submissionID);
+    }
+
     CommandListHandle Device::createCommandList(const CommandListParameters& params)
     {
         if (!m_Queues[uint32_t(params.queueType)])
@@ -540,8 +573,11 @@ namespace caustica::rhi::vulkan
         return CommandListHandle::Create(cmdList);
     }
     
-    uint64_t Device::executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
+    uint64_t Device::executeCommandLists(rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
     {
+        // Serialize submit + permanentState writeback (CommandList::executed).
+        std::lock_guard lockGuard(m_Mutex);
+
         Queue& queue = *m_Queues[uint32_t(executionQueue)];
 
         uint64_t submissionID = queue.submit(pCommandLists, numCommandLists);
@@ -554,7 +590,7 @@ namespace caustica::rhi::vulkan
         return submissionID;
     }
 
-    void Device::getTextureTiling(ITexture* _texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings)
+    void Device::getTextureTiling(rhi::Texture* _texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
         uint32_t numStandardMips = 0;
@@ -636,7 +672,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
         (void)pairedTexture;
         (void)desc;
@@ -646,7 +682,7 @@ namespace caustica::rhi::vulkan
         return nullptr;
     }
 
-    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture)
+    SamplerFeedbackTextureHandle Device::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture)
     {
         (void)objectType;
         (void)texture;

@@ -113,7 +113,7 @@ namespace caustica::rhi::vulkan
         return StagingTextureHandle::Create(tex);
     }
 
-    void *Device::mapStagingTexture(IStagingTexture* _tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
+    void *Device::mapStagingTexture(rhi::StagingTexture* _tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
     {
         assert(slice.x == 0);
         assert(slice.y == 0);
@@ -138,14 +138,14 @@ namespace caustica::rhi::vulkan
         return mapBuffer(tex->buffer, cpuAccess, layout->offset, layout->totalBytes);
     }
 
-    void Device::unmapStagingTexture(IStagingTexture* _tex)
+    void Device::unmapStagingTexture(rhi::StagingTexture* _tex)
     {
         StagingTexture* tex = checked_cast<StagingTexture*>(_tex);
 
         unmapBuffer(tex->buffer);
     }
 
-    void CommandList::copyTexture(IStagingTexture* _dst, const TextureSlice& dstSlice, ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::StagingTexture* _dst, const TextureSlice& dstSlice, rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* src = checked_cast<Texture*>(_src);
         StagingTexture* dst = checked_cast<StagingTexture*>(_dst);
@@ -202,7 +202,7 @@ namespace caustica::rhi::vulkan
                                       dst->buffer->buffer, 1, &imageCopy);
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice, IStagingTexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice, rhi::StagingTexture* _src, const TextureSlice& srcSlice)
     {
         StagingTexture* src = checked_cast<StagingTexture*>(_src);
         Texture* dst = checked_cast<Texture*>(_dst);

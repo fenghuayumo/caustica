@@ -8,7 +8,7 @@ namespace caustica::render
 class StandardSamplers
 {
 public:
-    explicit StandardSamplers(caustica::rhi::IDevice* device);
+    explicit StandardSamplers(caustica::rhi::Device* device);
 
     caustica::rhi::SamplerHandle pointClamp() const { return m_pointClampSampler; }
     caustica::rhi::SamplerHandle linearClamp() const { return m_linearClampSampler; }

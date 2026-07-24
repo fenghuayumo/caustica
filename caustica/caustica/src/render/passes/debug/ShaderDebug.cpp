@@ -22,7 +22,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-ShaderDebug::ShaderDebug( caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice )
+ShaderDebug::ShaderDebug( caustica::rhi::Device* device, caustica::rhi::CommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice )
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_renderDevice(renderDevice)
@@ -76,7 +76,7 @@ ShaderDebug::ShaderDebug( caustica::rhi::IDevice* device, caustica::rhi::IComman
     reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data())->VertexCountPerInstance = 3;  // needed for indirect draw
 }
 
-void ShaderDebug::createRenderPasses( caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer )
+void ShaderDebug::createRenderPasses( caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer )
 {
     caustica::rhi::TextureDesc desc;
     //desc.width = frameBuffer->getDesc().colorAttachments[0].texture->getDesc().width;
@@ -165,7 +165,7 @@ void ShaderDebug::createRenderPasses( caustica::rhi::IFramebuffer * frameBuffer,
     m_linesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
 }
 
-void ShaderDebug::beginFrame( caustica::rhi::ICommandList* commandList, const float4x4& matWorldToClip )
+void ShaderDebug::beginFrame( caustica::rhi::CommandList* commandList, const float4x4& matWorldToClip )
 {
     ShaderDebugHeader* header = reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data());
     memcpy( header->WorldViewProjectionMatrix, matWorldToClip.m_data, sizeof(float)*16 );
@@ -178,7 +178,7 @@ void ShaderDebug::clearDebugVizTexture(caustica::rhi::CommandListHandle commandL
     commandList->clearTextureFloat(m_debugVizOutput, caustica::rhi::AllSubresources, caustica::rhi::Color(0, 0, 0, 0));
 }
 
-void ShaderDebug::endFrameAndOutput( caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport )
+void ShaderDebug::endFrameAndOutput( caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport )
 {
     RAII_SCOPE( commandList->beginMarker("ShaderDebug");, commandList->endMarker(); );
 
@@ -369,7 +369,7 @@ void ShaderDebug::outputLastBufferPrints()
     }
 }
 
-void ShaderDebug::drawCurrentBufferGeometry(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport)
+void ShaderDebug::drawCurrentBufferGeometry(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport)
 {
     RAII_SCOPE(commandList->beginMarker("Tris"); , commandList->endMarker(); );
 

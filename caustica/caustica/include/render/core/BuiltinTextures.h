@@ -8,7 +8,7 @@ namespace caustica::render
 class BuiltinTextures
 {
 public:
-    explicit BuiltinTextures(caustica::rhi::IDevice* device);
+    explicit BuiltinTextures(caustica::rhi::Device* device);
 
     caustica::rhi::TextureHandle blackTexture() const { return m_blackTexture; }
     caustica::rhi::TextureHandle grayTexture() const { return m_grayTexture; }

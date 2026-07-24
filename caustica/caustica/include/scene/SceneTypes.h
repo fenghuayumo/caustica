@@ -239,7 +239,7 @@ namespace caustica
         }
     };
 
-    inline caustica::rhi::IBuffer* bufferOrFallback(caustica::rhi::IBuffer* primary, caustica::rhi::IBuffer* secondary)
+    inline caustica::rhi::Buffer* bufferOrFallback(caustica::rhi::Buffer* primary, caustica::rhi::Buffer* secondary)
     {
         return primary ? primary : secondary;
     }

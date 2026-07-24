@@ -21,7 +21,7 @@ class ComputePipelineRegistry : public std::enable_shared_from_this<ComputePipel
 {
 public:
     // additionalMonitorPaths: extra directories to monitor for hot reload (in addition to the default ShadersPath)
-    ComputePipelineRegistry(caustica::rhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
+    ComputePipelineRegistry(caustica::rhi::Device* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
     ~ComputePipelineRegistry();
 
     // Register a compute shader for hot reload management

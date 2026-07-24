@@ -21,23 +21,23 @@ struct RayTracingPass
     uint32_t ComputeGroupSize = 0;
 
     bool init(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         caustica::ShaderFactory& shaderFactory,
         const char* shaderName,
         const std::vector<caustica::ShaderMacro>& extraMacros,
         bool useRayQuery,
         uint32_t computeGroupSize,
-        caustica::rhi::IBindingLayout* bindingLayout,
-        caustica::rhi::IBindingLayout* extraBindingLayout = nullptr,
-        caustica::rhi::IBindingLayout* bindlessLayout = nullptr);
+        caustica::rhi::BindingLayout* bindingLayout,
+        caustica::rhi::BindingLayout* extraBindingLayout = nullptr,
+        caustica::rhi::BindingLayout* bindlessLayout = nullptr);
 
     void execute(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         int width,
         int height,
-        caustica::rhi::IBindingSet* bindingSet,
-        caustica::rhi::IBindingSet* extraBindingSet,
-        caustica::rhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::BindingSet* bindingSet,
+        caustica::rhi::BindingSet* extraBindingSet,
+        caustica::rhi::DescriptorTable* descriptorTable,
         const void* pushConstants = nullptr,
         size_t pushConstantSize = 0);
 };

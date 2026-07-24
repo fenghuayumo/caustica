@@ -274,8 +274,8 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
     if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
         return;
 
-    caustica::rhi::ITexture* currentColorTexture = ctx.gaussian->currentColor();
-    caustica::rhi::ITexture* accumulatedColorTexture = ctx.gaussian->accumulatedColor();
+    caustica::rhi::Texture* currentColorTexture = ctx.gaussian->currentColor();
+    caustica::rhi::Texture* accumulatedColorTexture = ctx.gaussian->accumulatedColor();
     if (currentColorTexture == nullptr || accumulatedColorTexture == nullptr)
         return;
 

@@ -18,7 +18,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
     assert(ctx.targetFramebuffer);
     assert(ctx.renderTargets);
 
-    caustica::rhi::IFramebuffer* framebuffer = ctx.targetFramebuffer;
+    caustica::rhi::Framebuffer* framebuffer = ctx.targetFramebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
     const bool showDebugLines = ctx.showDebugLines;
     const bool copyDebugFeedback = ctx.copyDebugFeedback;
@@ -48,7 +48,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 
     if (showDebugLines)
     {
-        caustica::rhi::ITexture* targetColor = framebuffer->getDesc().colorAttachments[0].texture;
+        caustica::rhi::Texture* targetColor = framebuffer->getDesc().colorAttachments[0].texture;
         assert(targetColor);
 
         const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(
@@ -94,7 +94,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             [framebuffer, viewport = fbinfo.getViewport(), capturedLineVertexCount,
                 cpuLineVertexCount, debugLineCapture, debugLineDisplay,
                 linesBindingSet, linesPipeline](rg::RenderPassContext& passCtx) {
-                caustica::rhi::ICommandList* commandList = passCtx.commandList();
+                caustica::rhi::CommandList* commandList = passCtx.commandList();
                 commandList->beginMarker("Debug Lines");
 
                 caustica::rhi::GraphicsState state;
@@ -156,7 +156,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             },
             [feedbackCpu, feedbackGpu, debugLineCapture, debugLineDisplay,
                 debugDeltaPathTreeCpu, debugDeltaPathTreeGpu](rg::RenderPassContext& passCtx) {
-                caustica::rhi::ICommandList* commandList = passCtx.commandList();
+                caustica::rhi::CommandList* commandList = passCtx.commandList();
                 commandList->copyBuffer(
                     passCtx.buffer(feedbackCpu), 0,
                     passCtx.buffer(feedbackGpu), 0,

@@ -3,6 +3,7 @@
 #include <rhi/vulkan.h>
 #include <rhi/utils.h>
 #include <rhi/common/aftermath.h>
+#include <rhi/common/deferred-deletion.h>
 #include "../common/state-tracking.h"
 #include "../common/versioning.h"
 #include <mutex>
@@ -151,13 +152,17 @@ namespace caustica::rhi::vulkan
         vk::PhysicalDeviceCooperativeVectorPropertiesNV coopVecProperties;
         vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV linearSweptSpheresFeatures;
         vk::PhysicalDeviceSubgroupProperties subgroupProperties;
-        IMessageCallback* messageCallback = nullptr;
+        MessageCallback* messageCallback = nullptr;
         bool logBufferLifetime = false;
 #ifdef CAUSTICA_RHI_WITH_RTXMU
         std::unique_ptr<rtxmu::VkAccelStructManager> rtxMemUtil;
         std::unique_ptr<RtxMuResources> rtxMuResources;
 #endif
         vk::DescriptorSetLayout emptyDescriptorSetLayout;
+
+        // Owned by Device; used to defer VkBuffer/VkImage destroy past last-use timeline.
+        DeferredDeletionQueue* deferredDeletion = nullptr;
+        Device* parentDevice = nullptr;
 
         void nameVKObject(const void* handle, const vk::ObjectType objtype,
             const vk::DebugReportObjectTypeEXT objtypeEXT, const char* name) const;
@@ -175,7 +180,7 @@ namespace caustica::rhi::vulkan
         vk::CommandBuffer cmdBuf = vk::CommandBuffer();
         vk::CommandPool cmdPool = vk::CommandPool();
 
-        std::vector<RefCountPtr<IResource>> referencedResources; // to keep them alive
+        std::vector<RefCountPtr<Resource>> referencedResources; // to keep them alive
         std::vector<RefCountPtr<Buffer>> referencedStagingBuffers; // to allow synchronous mapBuffer
 
         uint64_t recordingID = 0;
@@ -216,9 +221,9 @@ namespace caustica::rhi::vulkan
         void addSignalSemaphore(vk::Semaphore semaphore, uint64_t value);
 
         // submits a command buffer to this queue, returns submissionID
-        uint64_t submit(ICommandList* const* ppCmd, size_t numCmd);
+        uint64_t submit(CommandList* const* ppCmd, size_t numCmd);
 
-        void updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings);
+        void updateTextureTileMappings(Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings);
 
         // retire any command buffers that have finished execution from the pending execution list
         void retireCommandBuffers();
@@ -289,7 +294,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class Heap : public MemoryResource, public RefCounter<IHeap>
+    class Heap : public MemoryResource, public RefCounter<rhi::Heap>
     {
     public:
         explicit Heap(VulkanAllocator& allocator)
@@ -329,7 +334,7 @@ namespace caustica::rhi::vulkan
         }
     };
 
-    class Texture : public MemoryResource, public RefCounter<ITexture>, public TextureStateExtension
+    class Texture : public MemoryResource, public RefCounter<rhi::Texture>, public TextureStateExtension
     {
     public:
 
@@ -506,7 +511,7 @@ namespace caustica::rhi::vulkan
         }
     };
 
-    class Buffer : public MemoryResource, public RefCounter<IBuffer>, public BufferStateExtension
+    class Buffer : public MemoryResource, public RefCounter<rhi::Buffer>, public BufferStateExtension
     {
     public:
         BufferDesc desc;
@@ -557,7 +562,7 @@ namespace caustica::rhi::vulkan
         uint32_t rowPitch;
     };
 
-    class StagingTexture : public RefCounter<IStagingTexture>
+    class StagingTexture : public RefCounter<rhi::StagingTexture>
     {
     public:
         TextureDesc desc;
@@ -572,7 +577,7 @@ namespace caustica::rhi::vulkan
         const TextureDesc& getDesc() const override { return desc; }
     };
 
-    class Sampler : public RefCounter<ISampler>
+    class Sampler : public RefCounter<rhi::Sampler>
     {
     public:
         SamplerDesc desc;
@@ -592,7 +597,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class Shader : public RefCounter<IShader>
+    class Shader : public RefCounter<rhi::Shader>
     {
     public:
         ShaderDesc desc;
@@ -618,7 +623,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class ShaderLibrary : public RefCounter<IShaderLibrary>
+    class ShaderLibrary : public RefCounter<rhi::ShaderLibrary>
     {
     public:
         vk::ShaderModule shaderModule;
@@ -634,7 +639,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class InputLayout : public RefCounter<IInputLayout>
+    class InputLayout : public RefCounter<rhi::InputLayout>
     {
     public:
         std::vector<VertexAttributeDesc> inputDesc;
@@ -646,14 +651,14 @@ namespace caustica::rhi::vulkan
         const VertexAttributeDesc* getAttributeDesc(uint32_t index) const override;
     };
 
-    class EventQuery : public RefCounter<IEventQuery>
+    class EventQuery : public RefCounter<rhi::EventQuery>
     {
     public:
         CommandQueue queue = CommandQueue::Graphics;
         uint64_t commandListID = 0;
     };
     
-    class TimerQuery : public RefCounter<ITimerQuery>
+    class TimerQuery : public RefCounter<rhi::TimerQuery>
     {
     public:
         int beginQueryIndex = -1;
@@ -673,7 +678,7 @@ namespace caustica::rhi::vulkan
         utils::BitSetAllocator& m_QueryAllocator;
     };
 
-    class Framebuffer : public RefCounter<IFramebuffer>
+    class Framebuffer : public RefCounter<rhi::Framebuffer>
     {
     public:
         FramebufferDesc desc;
@@ -692,7 +697,7 @@ namespace caustica::rhi::vulkan
         const FramebufferInfoEx& getFramebufferInfo() const override { return framebufferInfo; }
     };
 
-    class BindingLayout : public RefCounter<IBindingLayout>
+    class BindingLayout : public RefCounter<rhi::BindingLayout>
     {
     public:
         BindingLayoutDesc desc;
@@ -721,7 +726,7 @@ namespace caustica::rhi::vulkan
     };
 
     // contains a vk::DescriptorSet
-    class BindingSet : public RefCounter<IBindingSet>
+    class BindingSet : public RefCounter<rhi::BindingSet>
     {
     public:
         BindingSetDesc desc;
@@ -743,14 +748,14 @@ namespace caustica::rhi::vulkan
 
         ~BindingSet() override;
         const BindingSetDesc* getDesc() const override { return &desc; }
-        IBindingLayout* getLayout() const override { return layout; }
+        BindingLayout* getLayout() const override { return layout; }
         Object getNativeObject(ObjectType objectType) override;
 
     private:
         const VulkanContext& m_Context;
     };
 
-    class DescriptorTable : public RefCounter<IDescriptorTable>
+    class DescriptorTable : public RefCounter<rhi::DescriptorTable>
     {
     public:
         BindingLayoutHandle layout;
@@ -765,7 +770,7 @@ namespace caustica::rhi::vulkan
 
         ~DescriptorTable() override;
         const BindingSetDesc* getDesc() const override { return nullptr; }
-        IBindingLayout* getLayout() const override { return layout; }
+        BindingLayout* getLayout() const override { return layout; }
         uint32_t getCapacity() const override { return capacity; }
 
         // Vulkan doesn't have a concept of the first descriptor in the heap
@@ -788,7 +793,7 @@ namespace caustica::rhi::vulkan
         VulkanContext const& context,
         BindingLayoutVector const& inBindingLayouts);
 
-    class GraphicsPipeline : public RefCounter<IGraphicsPipeline>
+    class GraphicsPipeline : public RefCounter<rhi::GraphicsPipeline>
     {
     public:
         GraphicsPipelineDesc desc;
@@ -814,7 +819,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class ComputePipeline : public RefCounter<IComputePipeline>
+    class ComputePipeline : public RefCounter<rhi::ComputePipeline>
     {
     public:
         ComputePipelineDesc desc;
@@ -837,7 +842,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class MeshletPipeline : public RefCounter<IMeshletPipeline>
+    class MeshletPipeline : public RefCounter<rhi::MeshletPipeline>
     {
     public:
         MeshletPipelineDesc desc;
@@ -863,7 +868,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class RayTracingPipeline : public RefCounter<rt::IPipeline>
+    class RayTracingPipeline : public RefCounter<rt::Pipeline>
     {
     public:
         rt::PipelineDesc desc;
@@ -903,7 +908,7 @@ namespace caustica::rhi::vulkan
         vk::StridedDeviceAddressRegionKHR callable;
     };
 
-    class ShaderTable : public RefCounter<rt::IShaderTable>
+    class ShaderTable : public RefCounter<rt::ShaderTable>
     {
     public:
         RefCountPtr<RayTracingPipeline> pipeline;
@@ -929,11 +934,11 @@ namespace caustica::rhi::vulkan
 
         rt::ShaderTableDesc const& getDesc() const override { return m_Desc; }
         uint32_t getNumEntries() const override;
-        rt::IPipeline* getPipeline() const override { return pipeline; }
-        void setRayGenerationShader(const char* exportName, IBindingSet* bindings = nullptr) override;
-        int addMissShader(const char* exportName, IBindingSet* bindings = nullptr) override;
-        int addHitGroup(const char* exportName, IBindingSet* bindings = nullptr) override;
-        int addCallableShader(const char* exportName, IBindingSet* bindings = nullptr) override;
+        rt::Pipeline* getPipeline() const override { return pipeline; }
+        void setRayGenerationShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addMissShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addHitGroup(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addCallableShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
         void clearMissShaders() override;
         void clearHitShaders() override;
         void clearCallableShaders() override;
@@ -982,7 +987,7 @@ namespace caustica::rhi::vulkan
         std::shared_ptr<BufferChunk> m_CurrentChunk;
     };
 
-    class AccelStruct : public RefCounter<rt::IAccelStruct>
+    class AccelStruct : public RefCounter<rt::AccelStruct>
     {
     public:
         BufferHandle dataBuffer;
@@ -1011,7 +1016,7 @@ namespace caustica::rhi::vulkan
         const VulkanContext& m_Context;
     };
 
-    class OpacityMicromap : public RefCounter<rt::IOpacityMicromap>
+    class OpacityMicromap : public RefCounter<rt::OpacityMicromap>
     {
     public:
         BufferHandle dataBuffer;
@@ -1031,7 +1036,7 @@ namespace caustica::rhi::vulkan
         uint64_t getDeviceAddress() const override;
     };
 
-    class Device : public RefCounter<caustica::rhi::vulkan::IDevice>
+    class Device : public RefCounter<rhi::Device>
     {
     public:
         // Internal backend methods
@@ -1042,59 +1047,59 @@ namespace caustica::rhi::vulkan
         Queue* getQueue(CommandQueue queue) const { return m_Queues[int(queue)].get(); }
         vk::QueryPool getTimerQueryPool() const { return m_TimerQueryPool; }
 
-        // IResource implementation
+        // Resource implementation
 
         Object getNativeObject(ObjectType objectType) override;
 
 
-        // IDevice implementation
+        // Device implementation
 
         HeapHandle createHeap(const HeapDesc& d) override;
 
         TextureHandle createTexture(const TextureDesc& d) override;
-        MemoryRequirements getTextureMemoryRequirements(ITexture* texture) override;
-        bool bindTextureMemory(ITexture* texture, IHeap* heap, uint64_t offset) override;
+        MemoryRequirements getTextureMemoryRequirements(rhi::Texture* texture) override;
+        bool bindTextureMemory(rhi::Texture* texture, rhi::Heap* heap, uint64_t offset) override;
 
         TextureHandle createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc) override;
 
         StagingTextureHandle createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess) override;
-        void *mapStagingTexture(IStagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
-        void unmapStagingTexture(IStagingTexture* tex) override;
+        void *mapStagingTexture(rhi::StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
+        void unmapStagingTexture(rhi::StagingTexture* tex) override;
 
-        void getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
-        void updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        void getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
 
-        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(ITexture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
-        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, ITexture* pairedTexture) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture) override;
 
         BufferHandle createBuffer(const BufferDesc& d) override;
-        void *mapBuffer(IBuffer* b, CpuAccessMode mapFlags) override;
-        void unmapBuffer(IBuffer* b) override;
-        MemoryRequirements getBufferMemoryRequirements(IBuffer* buffer) override;
-        bool bindBufferMemory(IBuffer* buffer, IHeap* heap, uint64_t offset) override;
+        void *mapBuffer(rhi::Buffer* b, CpuAccessMode mapFlags) override;
+        void unmapBuffer(rhi::Buffer* b) override;
+        MemoryRequirements getBufferMemoryRequirements(rhi::Buffer* buffer) override;
+        bool bindBufferMemory(rhi::Buffer* buffer, rhi::Heap* heap, uint64_t offset) override;
 
         BufferHandle createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc) override;
 
         ShaderHandle createShader(const ShaderDesc& d, const void* binary, size_t binarySize) override;
-        ShaderHandle createShaderSpecialization(IShader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
+        ShaderHandle createShaderSpecialization(rhi::Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
         ShaderLibraryHandle createShaderLibrary(const void* binary, size_t binarySize) override;
 
         SamplerHandle createSampler(const SamplerDesc& d) override;
 
-        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, IShader* vertexShader) override;
+        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* vertexShader) override;
 
         // event queries
         EventQueryHandle createEventQuery() override;
-        void setEventQuery(IEventQuery* query, CommandQueue queue) override;
-        bool pollEventQuery(IEventQuery* query) override;
-        void waitEventQuery(IEventQuery* query) override;
-        void resetEventQuery(IEventQuery* query) override;
+        void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
+        bool pollEventQuery(rhi::EventQuery* query) override;
+        void waitEventQuery(rhi::EventQuery* query) override;
+        void resetEventQuery(rhi::EventQuery* query) override;
 
         // timer queries
         TimerQueryHandle createTimerQuery() override;
-        bool pollTimerQuery(ITimerQuery* query) override;
-        float getTimerQueryTime(ITimerQuery* query) override;
-        void resetTimerQuery(ITimerQuery* query) override;
+        bool pollTimerQuery(rhi::TimerQuery* query) override;
+        float getTimerQueryTime(rhi::TimerQuery* query) override;
+        void resetTimerQuery(rhi::TimerQuery* query) override;
 
         GraphicsAPI getGraphicsAPI() override;
 
@@ -1102,33 +1107,33 @@ namespace caustica::rhi::vulkan
 
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
 
-        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, IFramebuffer* fb) override;
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb) override;
 
         ComputePipelineHandle createComputePipeline(const ComputePipelineDesc& desc) override;
 
         MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
 
-        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, IFramebuffer* fb) override;
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb) override;
 
         rt::PipelineHandle createRayTracingPipeline(const rt::PipelineDesc& desc) override;
 
         BindingLayoutHandle createBindingLayout(const BindingLayoutDesc& desc) override;
         BindingLayoutHandle createBindlessLayout(const BindlessLayoutDesc& desc) override;
 
-        BindingSetHandle createBindingSet(const BindingSetDesc& desc, IBindingLayout* layout) override;
-        DescriptorTableHandle createDescriptorTable(IBindingLayout* layout) override;
+        BindingSetHandle createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* layout) override;
+        DescriptorTableHandle createDescriptorTable(rhi::BindingLayout* layout) override;
 
-        void resizeDescriptorTable(IDescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
-        bool writeDescriptorTable(IDescriptorTable* descriptorTable, const BindingSetItem& item) override;
+        void resizeDescriptorTable(rhi::DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
+        bool writeDescriptorTable(rhi::DescriptorTable* descriptorTable, const BindingSetItem& item) override;
         
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
-        MemoryRequirements getAccelStructMemoryRequirements(rt::IAccelStruct* as) override;
+        MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
-        bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) override;
+        bool bindAccelStructMemory(rt::AccelStruct* as, rhi::Heap* heap, uint64_t offset) override;
 
         CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
-        uint64_t executeCommandLists(ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        uint64_t executeCommandLists(rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
         bool waitForIdle() override;
         void runGarbageCollection() override;
@@ -1137,15 +1142,18 @@ namespace caustica::rhi::vulkan
         coopvec::DeviceFeatures queryCoopVecFeatures() override;
         size_t getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns) override;
         Object getNativeQueue(ObjectType objectType, CommandQueue queue) override;
-        IMessageCallback* getMessageCallback() override { return m_Context.messageCallback; }
+        MessageCallback* getMessageCallback() override { return m_Context.messageCallback; }
         bool isAftermathEnabled() override { return m_AftermathEnabled; }
         AftermathCrashDumpHelper& getAftermathCrashDumpHelper() override { return m_AftermathCrashDumpHelper; }
 
-        // vulkan::IDevice implementation
-        VkSemaphore getQueueSemaphore(CommandQueue queue) override;
-        void queueWaitForSemaphore(CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value) override;
-        void queueSignalSemaphore(CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value) override;
-        uint64_t queueGetCompletedInstance(CommandQueue queue) override;
+        // vulkan::Device implementation
+        VkSemaphore getQueueSemaphore(CommandQueue queue);
+        void queueWaitForSemaphore(CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value);
+        void queueSignalSemaphore(CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value);
+        uint64_t queueGetCompletedInstance(CommandQueue queue);
+
+        // Used by DeferredDeletionQueue (staging buffer last-use timeline).
+        [[nodiscard]] bool isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const;
 
     private:
         // Warning m_AftermathCrashDump helper must be first due to reverse destruction order
@@ -1159,15 +1167,17 @@ namespace caustica::rhi::vulkan
         vk::QueryPool m_TimerQueryPool = nullptr;
         utils::BitSetAllocator m_TimerQueryAllocator;
 
+        // Serializes execute + permanentState writeback and GC flush ordering.
         std::mutex m_Mutex;
+        DeferredDeletionQueue m_DeferredDeletion;
 
         // array of submission queues
         std::array<std::unique_ptr<Queue>, uint32_t(CommandQueue::Count)> m_Queues;
         
-        void *mapBuffer(IBuffer* b, CpuAccessMode flags, uint64_t offset, size_t size) const;
+        void *mapBuffer(Buffer* b, CpuAccessMode flags, uint64_t offset, size_t size) const;
     };
 
-    class CommandList : public RefCounter<ICommandList>
+    class CommandList : public RefCounter<rhi::CommandList>
     {
     public:
         // Internal backend methods
@@ -1177,32 +1187,32 @@ namespace caustica::rhi::vulkan
 
         void executed(Queue& queue, uint64_t submissionID);
 
-        // IResource implementation
+        // Resource implementation
 
         Object getNativeObject(ObjectType objectType) override;
 
-        // ICommandList implementation
+        // CommandList implementation
 
         void open() override;
         void close() override;
         void clearState() override;
 
-        void clearTextureFloat(ITexture* texture, TextureSubresourceSet subresources, const Color& clearColor) override;
-        void clearDepthStencilTexture(ITexture* texture, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
-        void clearTextureUInt(ITexture* texture, TextureSubresourceSet subresources, uint32_t clearColor) override;
-        void clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture) override;
-        void decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, Format format) override;
-        void setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits) override;
+        void clearTextureFloat(rhi::Texture* texture, TextureSubresourceSet subresources, const Color& clearColor) override;
+        void clearDepthStencilTexture(rhi::Texture* texture, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
+        void clearTextureUInt(rhi::Texture* texture, TextureSubresourceSet subresources, uint32_t clearColor) override;
+        void clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture) override;
+        void decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, Format format) override;
+        void setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits) override;
 
-        void copyTexture(ITexture* dest, const TextureSlice& destSlice, ITexture* src, const TextureSlice& srcSlice) override;
-        void copyTexture(IStagingTexture* dest, const TextureSlice& dstSlice, ITexture* src, const TextureSlice& srcSlice) override;
-        void copyTexture(ITexture* dest, const TextureSlice& dstSlice, IStagingTexture* src, const TextureSlice& srcSlice) override;
-        void writeTexture(ITexture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
-        void resolveTexture(ITexture* dest, const TextureSubresourceSet& dstSubresources, ITexture* src, const TextureSubresourceSet& srcSubresources) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::StagingTexture* dest, const TextureSlice& dstSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& dstSlice, rhi::StagingTexture* src, const TextureSlice& srcSlice) override;
+        void writeTexture(rhi::Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
+        void resolveTexture(rhi::Texture* dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* src, const TextureSubresourceSet& srcSubresources) override;
 
-        void writeBuffer(IBuffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
-        void clearBufferUInt(IBuffer* b, uint32_t clearValue) override;
-        void copyBuffer(IBuffer* dest, uint64_t destOffsetBytes, IBuffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
+        void writeBuffer(rhi::Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
+        void clearBufferUInt(rhi::Buffer* b, uint32_t clearValue) override;
+        void copyBuffer(rhi::Buffer* dest, uint64_t destOffsetBytes, rhi::Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
 
         void setPushConstants(const void* data, size_t byteSize) override;
 
@@ -1223,46 +1233,46 @@ namespace caustica::rhi::vulkan
         void setRayTracingState(const rt::State& state) override;
         void dispatchRays(const rt::DispatchRaysArguments& args) override;
         
-        void buildOpacityMicromap(rt::IOpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
-        void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
+        void buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
+        void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
-        void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
+        void buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
         void convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs) override;
 
-        void beginTimerQuery(ITimerQuery* query) override;
-        void endTimerQuery(ITimerQuery* query) override;
+        void beginTimerQuery(rhi::TimerQuery* query) override;
+        void endTimerQuery(rhi::TimerQuery* query) override;
 
         void beginMarker(const char* name) override;
         void endMarker() override;
 
         void setEnableAutomaticBarriers(bool enable) override;
-        void setResourceStatesForBindingSet(IBindingSet* bindingSet) override;
+        void setResourceStatesForBindingSet(rhi::BindingSet* bindingSet) override;
 
-        void setEnableUavBarriersForTexture(ITexture* texture, bool enableBarriers) override;
-        void setEnableUavBarriersForBuffer(IBuffer* buffer, bool enableBarriers) override;
+        void setEnableUavBarriersForTexture(rhi::Texture* texture, bool enableBarriers) override;
+        void setEnableUavBarriersForBuffer(rhi::Buffer* buffer, bool enableBarriers) override;
         
-        void beginTrackingTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
-        void beginTrackingBufferState(IBuffer* buffer, ResourceStates stateBits) override;
+        void beginTrackingTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void beginTrackingBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
 
-        void setTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
-        void setBufferState(IBuffer* buffer, ResourceStates stateBits) override;
-        void textureAliasingBarrier(ITexture* before, ITexture* after) override;
-        void bufferAliasingBarrier(IBuffer* before, IBuffer* after) override;
-        void setAccelStructState(rt::IAccelStruct* _as, ResourceStates stateBits) override;
+        void setTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void setBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+        void textureAliasingBarrier(rhi::Texture* before, rhi::Texture* after) override;
+        void bufferAliasingBarrier(rhi::Buffer* before, rhi::Buffer* after) override;
+        void setAccelStructState(rt::AccelStruct* _as, ResourceStates stateBits) override;
 
-        void setPermanentTextureState(ITexture* texture, ResourceStates stateBits) override;
-        void setPermanentBufferState(IBuffer* buffer, ResourceStates stateBits) override;
+        void setPermanentTextureState(rhi::Texture* texture, ResourceStates stateBits) override;
+        void setPermanentBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
 
         void commitBarriers() override;
 
-        ResourceStates getTextureSubresourceState(ITexture* texture, ArraySlice arraySlice, MipLevel mipLevel) override;
-        ResourceStates getBufferState(IBuffer* buffer) override;
+        ResourceStates getTextureSubresourceState(rhi::Texture* texture, ArraySlice arraySlice, MipLevel mipLevel) override;
+        ResourceStates getBufferState(rhi::Buffer* buffer) override;
 
-        IDevice* getDevice() override { return m_Device; }
+        Device* getDevice() override { return m_Device; }
         const CommandListParameters& getDesc() override { return m_CommandListParameters; }
 
         TrackedCommandBufferPtr getCurrentCmdBuf() const { return m_CurrentCmdBuf; }
@@ -1292,19 +1302,19 @@ namespace caustica::rhi::vulkan
         bool m_AnyVolatileBufferWrites = false;
         bool m_BindingStatesDirty = false;
 
-        std::unordered_map<rt::IShaderTable*, std::unique_ptr<ShaderTableState>> m_UncachedShaderTableStates;
-        ShaderTableState& getShaderTableState(rt::IShaderTable* shaderTable);
+        std::unordered_map<rt::ShaderTable*, std::unique_ptr<ShaderTableState>> m_UncachedShaderTableStates;
+        ShaderTableState& getShaderTableState(rt::ShaderTable* shaderTable);
 
         std::unordered_map<Buffer*, VolatileBufferState> m_VolatileBufferStates;
 
         std::unique_ptr<UploadManager> m_UploadManager;
         std::unique_ptr<UploadManager> m_ScratchManager;
         
-        void clearTexture(ITexture* texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue);
+        void clearTexture(Texture* texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue);
 
         void bindBindingSets(vk::PipelineBindPoint bindPoint, vk::PipelineLayout pipelineLayout, const BindingSetVector& bindings, BindingVector<uint32_t> const& descriptorSetIdxToBindingIdx);
 
-        void beginRenderPass(caustica::rhi::IFramebuffer* framebuffer);
+        void beginRenderPass(caustica::rhi::Framebuffer* framebuffer);
         void endRenderPass();
 
         void insertGraphicsResourceBarriers(const GraphicsState& state);
@@ -1322,8 +1332,8 @@ namespace caustica::rhi::vulkan
         void updateMeshletVolatileBuffers();
         void updateRayTracingVolatileBuffers();
 
-        void requireTextureState(ITexture* texture, TextureSubresourceSet subresources, ResourceStates state);
-        void requireBufferState(IBuffer* buffer, ResourceStates state);
+        void requireTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
+        void requireBufferState(Buffer* buffer, ResourceStates state);
         bool anyBarriers() const;
 
         void buildTopLevelAccelStructInternal(AccelStruct* as, VkDeviceAddress instanceData, size_t numInstances, rt::AccelStructBuildFlags buildFlags, uint64_t currentVersion);

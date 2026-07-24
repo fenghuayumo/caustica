@@ -130,7 +130,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
                     setup.write(constants, rg::BufferAccess::CopyDest);
             },
             [ctx](rg::RenderPassContext& passCtx) {
-                caustica::rhi::ICommandList* commandList = passCtx.commandList();
+                caustica::rhi::CommandList* commandList = passCtx.commandList();
                 if (commandList == nullptr || ctx.pathTracingContext == nullptr)
                     return;
 

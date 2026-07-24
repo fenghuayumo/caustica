@@ -30,7 +30,7 @@ using namespace caustica::math;
 namespace caustica::render
 {
 
-FullscreenBlitPass::FullscreenBlitPass(caustica::rhi::IDevice* device,
+FullscreenBlitPass::FullscreenBlitPass(caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     const StandardSamplers& samplers)
     : m_device(device)
@@ -81,7 +81,7 @@ static bool IsTextureArray(caustica::rhi::TextureDimension dimension)
         || dimension == caustica::rhi::TextureDimension::TextureCubeArray;
 }
 
-void FullscreenBlitPass::blitTexture(caustica::rhi::ICommandList* commandList, const BlitParameters& params, caustica::BindingCache* bindingCache)
+void FullscreenBlitPass::blitTexture(caustica::rhi::CommandList* commandList, const BlitParameters& params, caustica::BindingCache* bindingCache)
 {
     assert(commandList);
     assert(params.targetFramebuffer);
@@ -106,7 +106,7 @@ void FullscreenBlitPass::blitTexture(caustica::rhi::ICommandList* commandList, c
     if (targetViewport.width() == 0 && targetViewport.height() == 0)
         targetViewport = caustica::rhi::Viewport(float(fbinfo.width), float(fbinfo.height));
 
-    caustica::rhi::IShader* shader = nullptr;
+    caustica::rhi::Shader* shader = nullptr;
     switch (params.sampler)
     {
     case BlitSampler::Point:
@@ -174,9 +174,9 @@ void FullscreenBlitPass::blitTexture(caustica::rhi::ICommandList* commandList, c
     commandList->draw(args);
 }
 
-void FullscreenBlitPass::blitTexture(caustica::rhi::ICommandList* commandList,
-    caustica::rhi::IFramebuffer* targetFramebuffer,
-    caustica::rhi::ITexture* sourceTexture,
+void FullscreenBlitPass::blitTexture(caustica::rhi::CommandList* commandList,
+    caustica::rhi::Framebuffer* targetFramebuffer,
+    caustica::rhi::Texture* sourceTexture,
     caustica::BindingCache* bindingCache)
 {
     assert(commandList);

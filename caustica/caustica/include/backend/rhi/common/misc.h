@@ -48,7 +48,7 @@ namespace caustica::rhi
     }
 
     // A type cast that is safer than static_cast in debug builds, and is a simple static_cast in release builds.
-    // Used for downcasting various ISomething* pointers to their implementation classes in the backends.
+    // Used for downcasting abstract RHI resource pointers to their backend implementation classes.
     template <typename T, typename U>
     T checked_cast(U u)
     {

@@ -193,7 +193,7 @@ namespace caustica::rhi::d3d12
         return ShaderHandle::Create(shader);
     }
     
-    ShaderHandle Device::createShaderSpecialization(IShader*, const ShaderSpecialization*, uint32_t)
+    ShaderHandle Device::createShaderSpecialization(rhi::Shader*, const ShaderSpecialization*, uint32_t)
     {
         utils::NotSupported();
         return nullptr;
@@ -209,7 +209,7 @@ namespace caustica::rhi::d3d12
         return ShaderLibraryHandle::Create(shaderLibrary);
     }
     
-    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc * d, uint32_t attributeCount, IShader* vertexShader)
+    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc * d, uint32_t attributeCount, rhi::Shader* vertexShader)
     {
         // The shader is not needed here, there are no separate IL objects in DX12
         (void)vertexShader;

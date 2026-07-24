@@ -24,7 +24,7 @@ GaussianSplatFramePass::GaussianSplatFramePass() = default;
 GaussianSplatFramePass::~GaussianSplatFramePass() = default;
 
 void GaussianSplatFramePass::createTemporalResources(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     RenderTargets* renderTargets)
 {
@@ -61,7 +61,7 @@ void GaussianSplatFramePass::createTemporalResources(
 
 void GaussianSplatFramePass::bindStable(
     PathTracingContext* context,
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     caustica::AccelStructManager* accelStructs,
     SceneGaussianSplatPasses* scenePasses)
 {
@@ -174,7 +174,7 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
     return resources;
 }
 
-void GaussianSplatFramePass::executeAccelBuild(caustica::rhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeAccelBuild(caustica::rhi::CommandList* commandList)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -189,7 +189,7 @@ void GaussianSplatFramePass::executeAccelBuild(caustica::rhi::ICommandList* comm
         m_context->activeSettings());
 }
 
-void GaussianSplatFramePass::executeUpload(caustica::rhi::ICommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeUpload(caustica::rhi::CommandList* commandList, bool renderToOutputColor)
 {
     m_compositeRendered = false;
     if (commandList == nullptr || !hasActiveSplats())
@@ -243,7 +243,7 @@ void GaussianSplatFramePass::executeUpload(caustica::rhi::ICommandList* commandL
         settings);
 }
 
-void GaussianSplatFramePass::executeSort(caustica::rhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeSort(caustica::rhi::CommandList* commandList)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -257,7 +257,7 @@ void GaussianSplatFramePass::executeSort(caustica::rhi::ICommandList* commandLis
         *m_scenePasses);
 }
 
-void GaussianSplatFramePass::executeRaster(caustica::rhi::ICommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -281,7 +281,7 @@ void GaussianSplatFramePass::executeRaster(caustica::rhi::ICommandList* commandL
     m_compositeRendered = renderedAny && !renderToOutputColor;
 }
 
-void GaussianSplatFramePass::executeAccumulate(caustica::rhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeAccumulate(caustica::rhi::CommandList* commandList)
 {
     if (commandList == nullptr || !m_compositeRendered)
         return;

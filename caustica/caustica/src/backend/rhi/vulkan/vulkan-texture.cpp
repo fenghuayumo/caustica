@@ -337,7 +337,7 @@ namespace caustica::rhi::vulkan
         return TextureHandle::Create(texture);
     }
 
-    MemoryRequirements Device::getTextureMemoryRequirements(ITexture* _texture)
+    MemoryRequirements Device::getTextureMemoryRequirements(rhi::Texture* _texture)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -350,7 +350,7 @@ namespace caustica::rhi::vulkan
         return memReq;
     }
 
-    bool Device::bindTextureMemory(ITexture* _texture, IHeap* _heap, uint64_t offset)
+    bool Device::bindTextureMemory(rhi::Texture* _texture, rhi::Heap* _heap, uint64_t offset)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
         Heap* heap = checked_cast<Heap*>(_heap);
@@ -368,8 +368,8 @@ namespace caustica::rhi::vulkan
         return true;
     }
 
-    void CommandList::copyTexture(ITexture* _dst, const TextureSlice& dstSlice,
-                                  ITexture* _src, const TextureSlice& srcSlice)
+    void CommandList::copyTexture(rhi::Texture* _dst, const TextureSlice& dstSlice,
+                                  rhi::Texture* _src, const TextureSlice& srcSlice)
     {
         Texture* dst = checked_cast<Texture*>(_dst);
         Texture* src = checked_cast<Texture*>(_src);
@@ -449,7 +449,7 @@ namespace caustica::rhi::vulkan
             *depthOut = depth;
     }
 
-    void CommandList::writeTexture(ITexture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
+    void CommandList::writeTexture(rhi::Texture* _dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
     {
         endRenderPass();
 
@@ -516,7 +516,7 @@ namespace caustica::rhi::vulkan
             1, &imageCopy);
     }
 
-    void CommandList::resolveTexture(ITexture* _dest, const TextureSubresourceSet& dstSubresources, ITexture* _src, const TextureSubresourceSet& srcSubresources)
+    void CommandList::resolveTexture(rhi::Texture* _dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* _src, const TextureSubresourceSet& srcSubresources)
     {
         endRenderPass();
 
@@ -559,7 +559,7 @@ namespace caustica::rhi::vulkan
         m_CurrentCmdBuf->cmdBuf.resolveImage(src->image, vk::ImageLayout::eTransferSrcOptimal, dest->image, vk::ImageLayout::eTransferDstOptimal, regions);
     }
 
-    void CommandList::clearTexture(ITexture* _texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue)
+    void CommandList::clearTexture(rhi::Texture* _texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue)
     {
         endRenderPass();
 
@@ -589,7 +589,7 @@ namespace caustica::rhi::vulkan
             1, &subresourceRange);
     }
 
-    void CommandList::clearTextureFloat(ITexture* texture, TextureSubresourceSet subresources, const Color& clearColor)
+    void CommandList::clearTextureFloat(rhi::Texture* texture, TextureSubresourceSet subresources, const Color& clearColor)
     {
         auto clearValue = vk::ClearColorValue()
             .setFloat32({ clearColor.r, clearColor.g, clearColor.b, clearColor.a });
@@ -597,7 +597,7 @@ namespace caustica::rhi::vulkan
         clearTexture(texture, subresources, clearValue);
     }
 
-    void CommandList::clearDepthStencilTexture(ITexture* _texture, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
+    void CommandList::clearDepthStencilTexture(rhi::Texture* _texture, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
     {
         endRenderPass();
 
@@ -640,7 +640,7 @@ namespace caustica::rhi::vulkan
             1, &subresourceRange);
     }
 
-    void CommandList::clearTextureUInt(ITexture* texture, TextureSubresourceSet subresources, uint32_t clearColor)
+    void CommandList::clearTextureUInt(rhi::Texture* texture, TextureSubresourceSet subresources, uint32_t clearColor)
     {
         int clearColorInt = int(clearColor);
 
@@ -651,14 +651,14 @@ namespace caustica::rhi::vulkan
         clearTexture(texture, subresources, clearValue);
     }
 
-    void CommandList::clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture)
+    void CommandList::clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture)
     {
         (void)texture;
 
         utils::NotSupported();
     }
 
-    void CommandList::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format)
+    void CommandList::decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
         (void)buffer;
         (void)texture;
@@ -667,7 +667,7 @@ namespace caustica::rhi::vulkan
         utils::NotSupported();
     }
 
-    void CommandList::setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits)
+    void CommandList::setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits)
     {
         (void)texture;
         (void)stateBits;

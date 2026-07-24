@@ -4,6 +4,6 @@
 
 namespace caustica::rhi::validation
 {
-    CAUSTICA_RHI_API DeviceHandle createValidationLayer(IDevice* underlyingDevice);
+    CAUSTICA_RHI_API DeviceHandle createValidationLayer(Device* underlyingDevice);
 }
 

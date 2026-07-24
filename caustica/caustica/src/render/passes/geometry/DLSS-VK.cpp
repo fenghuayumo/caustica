@@ -20,7 +20,7 @@ static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Lev
 class DLSS_VK : public DLSS
 {
 public:
-    DLSS_VK(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+    DLSS_VK(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
@@ -148,7 +148,7 @@ public:
         m_initParameters = params;
     }
 
-    static void FillTextureResource(NVSDK_NGX_Resource_VK& resource, caustica::rhi::ITexture* texture)
+    static void FillTextureResource(NVSDK_NGX_Resource_VK& resource, caustica::rhi::Texture* texture)
     {
         const caustica::rhi::TextureDesc& desc = texture->getDesc();
         resource.ReadWrite = desc.isUAV;
@@ -168,7 +168,7 @@ public:
     }
 
     bool evaluate(
-        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::CommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
     {
@@ -281,7 +281,7 @@ public:
     }
 };
 
-std::unique_ptr<DLSS> DLSS::createVK(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createVK(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_VK>(device, shaderFactory, directoryWithExecutable, applicationID);

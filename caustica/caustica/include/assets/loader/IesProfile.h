@@ -31,12 +31,12 @@ class IesProfileLoader
 
 public:
     IesProfileLoader(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<ShaderFactory> shaderFactory,
         std::shared_ptr<IDescriptorTableManager> descriptorTableManager);
 
     std::shared_ptr<IesProfile> loadIesProfile(IFileSystem& fs, const std::filesystem::path& path);
-    void bakeIesProfile(IesProfile& profile, caustica::rhi::ICommandList* commandList);
+    void bakeIesProfile(IesProfile& profile, caustica::rhi::CommandList* commandList);
 };
 
 } // namespace caustica

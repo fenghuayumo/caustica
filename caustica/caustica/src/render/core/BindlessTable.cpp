@@ -10,7 +10,7 @@ namespace caustica
 // =============================================================================
 // Constructor
 // =============================================================================
-BindlessTable::BindlessTable(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout)
+BindlessTable::BindlessTable(caustica::rhi::Device* device, caustica::rhi::BindingLayout* layout)
     : m_manager(std::make_shared<DescriptorTableManager>(device, layout))
 {
     uint32_t capacity = m_manager->getDescriptorTable()->getCapacity();
@@ -161,7 +161,7 @@ bool BindlessTable::isValid(uint32_t handle) const
 // =============================================================================
 // Accessors
 // =============================================================================
-caustica::rhi::IDescriptorTable* BindlessTable::getDescriptorTable() const
+caustica::rhi::DescriptorTable* BindlessTable::getDescriptorTable() const
 {
     return m_manager->getDescriptorTable();
 }

@@ -35,7 +35,7 @@ bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh);
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation);
 
-[[nodiscard]] caustica::rhi::ITexture* ldrColorTexture(const App& app);
+[[nodiscard]] caustica::rhi::Texture* ldrColorTexture(const App& app);
 [[nodiscard]] const DebugFeedbackStruct& feedbackData(const App& app);
 [[nodiscard]] const DeltaTreeVizPathVertex* debugDeltaPathTree(const App& app);
 [[nodiscard]] int accumulationSampleIndex(const App& app);

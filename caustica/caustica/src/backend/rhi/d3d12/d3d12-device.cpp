@@ -9,6 +9,8 @@
 #include <sstream>
 #include <iomanip>
 #include <atomic>
+#include <mutex>
+#include <vector>
 
 namespace caustica::rhi::d3d12
 {
@@ -204,6 +206,7 @@ namespace caustica::rhi::d3d12
         m_Context.device = desc.pDevice;
         m_Context.logBufferLifetime = desc.logBufferLifetime;
         m_Context.messageCallback = desc.errorCB;
+        m_Context.deferredDeletion = &m_DeferredDeletion;
 
         if (desc.pGraphicsCommandQueue)
             m_Queues[int(CommandQueue::Graphics)] = std::make_unique<Queue>(m_Context, desc.pGraphicsCommandQueue);
@@ -290,8 +293,6 @@ namespace caustica::rhi::d3d12
         }
         
         m_FenceEvent = CreateEvent(nullptr, false, false, nullptr);
-
-        m_CommandListsToExecute.reserve(64);
 
 #if CAUSTICA_RHI_D3D12_WITH_NVAPI
         //We need to use NVAPI to set resource hints for SLI
@@ -422,6 +423,8 @@ namespace caustica::rhi::d3d12
     Device::~Device()
     {
         waitForIdle();
+        m_DeferredDeletion.flushAllBlocking();
+        m_Context.deferredDeletion = nullptr;
 
         if (m_FenceEvent)
         {
@@ -432,6 +435,9 @@ namespace caustica::rhi::d3d12
 
     bool Device::waitForIdle()
     {
+        // THREADING: sync-point, RT-only. Serialize with submit/GC.
+        std::lock_guard lockGuard(m_Mutex);
+
         // Wait for every queue to reach its last submitted instance
         for (const auto& pQueue : m_Queues)
         {
@@ -542,17 +548,20 @@ namespace caustica::rhi::d3d12
         return CommandListHandle::Create(new CommandList(this, m_Context, m_Resources, params));
     }
     
-    uint64_t Device::executeCommandLists(caustica::rhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
+    uint64_t Device::executeCommandLists(caustica::rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
     {
-        m_CommandListsToExecute.resize(numCommandLists);
+        // Serialize submit + permanentState writeback (CommandList::executed) for MT readiness.
+        std::lock_guard lockGuard(m_Mutex);
+
+        std::vector<ID3D12CommandList*> d3dCommandLists(numCommandLists);
         for (size_t i = 0; i < numCommandLists; i++)
         {
-            m_CommandListsToExecute[i] = checked_cast<CommandList*>(pCommandLists[i])->getD3D12CommandList();
+            d3dCommandLists[i] = checked_cast<CommandList*>(pCommandLists[i])->getD3D12CommandList();
         }
 
         Queue* pQueue = getQueue(executionQueue);
 
-        pQueue->queue->ExecuteCommandLists(uint32_t(m_CommandListsToExecute.size()), m_CommandListsToExecute.data());
+        pQueue->queue->ExecuteCommandLists(uint32_t(d3dCommandLists.size()), d3dCommandLists.data());
         pQueue->lastSubmittedInstance++;
         pQueue->queue->Signal(pQueue->fence, pQueue->lastSubmittedInstance);
 
@@ -572,7 +581,7 @@ namespace caustica::rhi::d3d12
             for (size_t i = 0; i < numCommandLists; i++)
             {
                 ss << ", cl[" << i << "] rhi=0x" << std::hex << reinterpret_cast<uintptr_t>(pCommandLists[i])
-                    << " d3d12=0x" << reinterpret_cast<uintptr_t>(m_CommandListsToExecute[i]);
+                    << " d3d12=0x" << reinterpret_cast<uintptr_t>(d3dCommandLists[i]);
             }
             m_Context.error(ss.str());
             DumpDredIfAvailable(m_Context);
@@ -583,6 +592,8 @@ namespace caustica::rhi::d3d12
 
     void Device::queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instanceID)
     {
+        std::lock_guard lockGuard(m_Mutex);
+
         Queue* pWaitQueue = getQueue(waitQueue);
         Queue* pExecutionQueue = getQueue(executionQueue);
         assert(instanceID <= pExecutionQueue->lastSubmittedInstance);
@@ -590,7 +601,7 @@ namespace caustica::rhi::d3d12
         pWaitQueue->queue->Wait(pExecutionQueue->fence, instanceID);
     }
 
-    void Device::getTextureTiling(ITexture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* _subresourceTilings)
+    void Device::getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* _subresourceTilings)
     {
         ID3D12Resource* resource = checked_cast<Texture*>(texture)->resource;
         
@@ -624,7 +635,7 @@ namespace caustica::rhi::d3d12
         }
     }
 
-    void Device::updateTextureTileMappings(ITexture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
+    void Device::updateTextureTileMappings(rhi::Texture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
     {
         Queue* queue = getQueue(executionQueue);
         Texture* texture = checked_cast<Texture*>(_texture);
@@ -686,6 +697,8 @@ namespace caustica::rhi::d3d12
 
     void Device::runGarbageCollection()
     {
+        std::lock_guard lockGuard(m_Mutex);
+
         for (const auto& pQueue : m_Queues)
         {
             if (!pQueue)
@@ -704,7 +717,7 @@ namespace caustica::rhi::d3d12
 #ifdef CAUSTICA_RHI_WITH_RTXMU
                     if (!instance->rtxmuBuildIds.empty())
                     {
-                        std::lock_guard lockGuard(m_Resources.asListMutex);
+                        std::lock_guard asLockGuard(m_Resources.asListMutex);
 
                         m_Resources.asBuildsCompleted.insert(m_Resources.asBuildsCompleted.end(),
                             instance->rtxmuBuildIds.begin(), instance->rtxmuBuildIds.end());
@@ -725,6 +738,8 @@ namespace caustica::rhi::d3d12
                 }
             }
         }
+
+        m_DeferredDeletion.flush();
     }
 
     bool Device::queryFeatureSupport(Feature feature, void* pInfo, size_t infoSize)
@@ -960,7 +975,7 @@ namespace caustica::rhi::d3d12
         return Object(pQueue->queue.Get());
     }
 
-    IDescriptorHeap* Device::getDescriptorHeap(DescriptorHeapType heapType)
+    DescriptorHeap* Device::getDescriptorHeap(DescriptorHeapType heapType)
     {
         switch(heapType)
         {

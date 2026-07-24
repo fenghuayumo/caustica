@@ -19,32 +19,20 @@ namespace caustica::rhi
 
 namespace caustica::rhi::d3d12
 {
-    class IRootSignature : public IResource
-    {
-    };
+    class RootSignature;
+    typedef RefCountPtr<RootSignature> RootSignatureHandle;
 
-    typedef RefCountPtr<IRootSignature> RootSignatureHandle;
-
-    class ICommandList : public caustica::rhi::ICommandList
-    {
-    public:
-        virtual bool allocateUploadBuffer(size_t size, void** pCpuAddress, D3D12_GPU_VIRTUAL_ADDRESS* pGpuAddress) = 0;
-        virtual bool commitDescriptorHeaps() = 0;
-        virtual D3D12_GPU_VIRTUAL_ADDRESS getBufferGpuVA(IBuffer* buffer) = 0;
-
-        virtual void updateGraphicsVolatileBuffers() = 0;
-        virtual void updateComputeVolatileBuffers() = 0;
-    };
-
-    typedef RefCountPtr<ICommandList> CommandListHandle;
+    // D3D12-specific CommandList methods live on the concrete backend type
+    // (caustica::rhi::d3d12::CommandList). Use checked_cast when needed.
+    typedef caustica::rhi::CommandListHandle CommandListHandle;
 
     typedef uint32_t DescriptorIndex;
 
-    class IDescriptorHeap
+    class DescriptorHeap
     {
     protected:
-        IDescriptorHeap() = default;
-        virtual ~IDescriptorHeap() = default;
+        DescriptorHeap() = default;
+        virtual ~DescriptorHeap() = default;
     public:
         virtual DescriptorIndex allocateDescriptors(uint32_t count) = 0;
         virtual DescriptorIndex allocateDescriptor() = 0;
@@ -56,10 +44,10 @@ namespace caustica::rhi::d3d12
         [[nodiscard]] virtual ID3D12DescriptorHeap* getHeap() const = 0;
         [[nodiscard]] virtual ID3D12DescriptorHeap* getShaderVisibleHeap() const = 0;
 
-        IDescriptorHeap(const IDescriptorHeap&) = delete;
-        IDescriptorHeap(const IDescriptorHeap&&) = delete;
-        IDescriptorHeap& operator=(const IDescriptorHeap&) = delete;
-        IDescriptorHeap& operator=(const IDescriptorHeap&&) = delete;
+        DescriptorHeap(const DescriptorHeap&) = delete;
+        DescriptorHeap(const DescriptorHeap&&) = delete;
+        DescriptorHeap& operator=(const DescriptorHeap&) = delete;
+        DescriptorHeap& operator=(const DescriptorHeap&&) = delete;
     };
 
     enum class DescriptorHeapType
@@ -70,21 +58,13 @@ namespace caustica::rhi::d3d12
         Sampler
     };
 
-    class IDevice : public caustica::rhi::IDevice
-    {
-    public:
-        // D3D12-specific methods
-        virtual RootSignatureHandle buildRootSignature(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& pipelineLayouts, bool allowInputLayout, bool isLocal, const D3D12_ROOT_PARAMETER1* pCustomParameters = nullptr, uint32_t numCustomParameters = 0) = 0;
-        virtual GraphicsPipelineHandle createHandleForNativeGraphicsPipeline(IRootSignature* rootSignature, ID3D12PipelineState* pipelineState, const GraphicsPipelineDesc& desc, const FramebufferInfo& framebufferInfo) = 0;
-        virtual MeshletPipelineHandle createHandleForNativeMeshletPipeline(IRootSignature* rootSignature, ID3D12PipelineState* pipelineState, const MeshletPipelineDesc& desc, const FramebufferInfo& framebufferInfo) = 0;
-        [[nodiscard]] virtual IDescriptorHeap* getDescriptorHeap(DescriptorHeapType heapType) = 0;
-    };
-
-    typedef RefCountPtr<IDevice> DeviceHandle;
+    // D3D12-specific Device methods live on the concrete backend type
+    // (caustica::rhi::d3d12::Device). Use checked_cast when needed.
+    typedef caustica::rhi::DeviceHandle DeviceHandle;
 
     struct DeviceDesc
     {
-        IMessageCallback* errorCB = nullptr;
+        MessageCallback* errorCB = nullptr;
         ID3D12Device* pDevice = nullptr;
         ID3D12CommandQueue* pGraphicsCommandQueue = nullptr;
         ID3D12CommandQueue* pComputeCommandQueue = nullptr;
@@ -103,7 +83,7 @@ namespace caustica::rhi::d3d12
 
         bool aftermathEnabled = false;
 
-        // Enable logging the buffer lifetime to IMessageCallback
+        // Enable logging the buffer lifetime to MessageCallback
         // Useful for debugging resource lifetimes
         bool logBufferLifetime = false;
     };

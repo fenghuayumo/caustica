@@ -310,13 +310,13 @@ public:
         bool transmission = false;
     };
 
-    MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::Device* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialGpuCache();
 
-    void                            createRenderPassesAndLoadMaterials(caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            createRenderPassesAndLoadMaterials(caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
-    void                            update(caustica::rhi::ICommandList* commandList,
+    void                            update(caustica::rhi::CommandList* commandList,
                                            const caustica::scene::SceneRenderData& renderData,
                                            const caustica::render::SceneGpuResources* gpuResources,
                                            std::vector<SubInstanceData>& subInstanceData);
@@ -368,7 +368,7 @@ private:
     std::shared_ptr<StandardMaterial> importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
     void                            saveAll();
 
-    void                            completeDeferredTexturesLoad(caustica::rhi::ICommandList* commandList);
+    void                            completeDeferredTexturesLoad(caustica::rhi::CommandList* commandList);
     void                            recordTexture(const StandardMaterialTexture& texture);
     bool                            reconcileLiveMaterials(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
     void                            rebuildActiveTextureIndex();

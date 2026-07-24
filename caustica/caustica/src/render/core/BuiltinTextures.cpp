@@ -3,7 +3,7 @@
 namespace caustica::render
 {
 
-BuiltinTextures::BuiltinTextures(caustica::rhi::IDevice* device)
+BuiltinTextures::BuiltinTextures(caustica::rhi::Device* device)
     : m_device(device)
 {
     const unsigned int blackImage = 0xff000000;

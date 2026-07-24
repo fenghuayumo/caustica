@@ -39,7 +39,7 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
 }
 
 void transitionSkinnedMeshBuffersToReadOnly(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const scene::SceneRenderData& renderData,
     render::SceneGpuResources& gpuResources)
 {
@@ -65,7 +65,7 @@ const scene::SceneRenderData& resolveRenderData(const UpdateSceneGeometryParams&
 
 void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params)
 {
-    caustica::rhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::CommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;
     if (scene == nullptr)
         return;

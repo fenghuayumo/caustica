@@ -57,7 +57,7 @@ public:
 	);
 	~OmmBuildQueue();
 
-	void update(caustica::rhi::ICommandList& commandList);
+	void update(caustica::rhi::CommandList& commandList);
 	void setSceneGpuResources(caustica::render::SceneGpuResources* resources)
 	{
 		m_sceneGpuResources = resources;
@@ -123,22 +123,22 @@ private:
 		void reset();
 	};
 
-	void consumeOneTask(caustica::rhi::ICommandList& commandList, BuildState taskState);
-	bool executeTask(caustica::rhi::ICommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
+	void consumeOneTask(caustica::rhi::CommandList& commandList, BuildState taskState);
+	bool executeTask(caustica::rhi::CommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
 
-	void runSetup(caustica::rhi::ICommandList& commandList, BuildTask& task);
-	void runBakeAndBuild(caustica::rhi::ICommandList& commandList, BuildTask& task);
-	void finalize(caustica::rhi::ICommandList& commandList, BuildTask& task);
+	void runSetup(caustica::rhi::CommandList& commandList, BuildTask& task);
+	void runBakeAndBuild(caustica::rhi::CommandList& commandList, BuildTask& task);
+	void finalize(caustica::rhi::CommandList& commandList, BuildTask& task);
 	
 	void allocateOMMArrayDataBuffer(BuildTask& task);
-	void bakeOmmArrayData(caustica::rhi::ICommandList& commandList, BuildTask& task);
-	std::vector<bvh::OmmAttachment> buildOMMAttachments(caustica::rhi::ICommandList& commandList, BuildTask& task);
-	void buildBLASWithOMM(caustica::rhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
+	void bakeOmmArrayData(caustica::rhi::CommandList& commandList, BuildTask& task);
+	std::vector<bvh::OmmAttachment> buildOMMAttachments(caustica::rhi::CommandList& commandList, BuildTask& task);
+	void buildBLASWithOMM(caustica::rhi::CommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
 	caustica::render::MeshGpuRecord* findMeshGpu(
 		const caustica::scene::MeshRenderResourceSnapshot& mesh) const;
 
 	bool readyToRecordWork();
-	void submitAndSubscribeQuery(caustica::rhi::ICommandList& commandList);
+	void submitAndSubscribeQuery(caustica::rhi::CommandList& commandList);
 
 	std::vector<BuildTask> m_pending;
 	caustica::rhi::EventQueryHandle m_InFlightQuery;

@@ -159,7 +159,7 @@ namespace
         return bestSlot;
     }
 
-    TextureDesc textureDescFromNative(caustica::rhi::ITexture* texture, const TextureDesc& requestDesc)
+    TextureDesc textureDescFromNative(caustica::rhi::Texture* texture, const TextureDesc& requestDesc)
     {
         TextureDesc desc = requestDesc;
         if (!texture)

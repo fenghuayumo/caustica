@@ -37,7 +37,7 @@ caustica::DescriptorIndex caustica::DescriptorHandle::getIndexInHeap() const
     return -1;
 }
 
-caustica::DescriptorTableManager::DescriptorTableManager(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout)
+caustica::DescriptorTableManager::DescriptorTableManager(caustica::rhi::Device* device, caustica::rhi::BindingLayout* layout)
     : m_device(device)
 {
     m_descriptorTable = m_device->createDescriptorTable(layout);

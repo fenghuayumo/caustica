@@ -12,12 +12,12 @@ class GenerateMipsPass
 {
 public:
     GenerateMipsPass(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        caustica::rhi::ITexture* sourceEnvironmentMap,
-        caustica::rhi::ITexture* destinationTexture);
+        caustica::rhi::Texture* sourceEnvironmentMap,
+        caustica::rhi::Texture* destinationTexture);
     ~GenerateMipsPass();
-    void process(caustica::rhi::ICommandList* commandList);
+    void process(caustica::rhi::CommandList* commandList);
 
 private:
     caustica::rhi::ComputePipelineHandle n_pipeline;

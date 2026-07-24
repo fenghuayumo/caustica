@@ -162,7 +162,7 @@ namespace caustica::rhi
         }
     }
 
-    void ICommandList::setResourceStatesForFramebuffer(IFramebuffer* framebuffer)
+    void CommandList::setResourceStatesForFramebuffer(Framebuffer* framebuffer)
     {
         const FramebufferDesc& desc = framebuffer->getDesc();
 

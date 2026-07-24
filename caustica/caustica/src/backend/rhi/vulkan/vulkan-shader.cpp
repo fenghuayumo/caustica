@@ -38,7 +38,7 @@ namespace caustica::rhi::vulkan
         return ShaderLibraryHandle::Create(library);
     }
 
-    ShaderHandle Device::createShaderSpecialization(IShader* _baseShader, const ShaderSpecialization* constants, const uint32_t numConstants)
+    ShaderHandle Device::createShaderSpecialization(rhi::Shader* _baseShader, const ShaderSpecialization* constants, const uint32_t numConstants)
     {
         Shader* baseShader = checked_cast<Shader*>(_baseShader);
         assert(constants);
@@ -111,7 +111,7 @@ namespace caustica::rhi::vulkan
         return ShaderHandle::Create(newShader);
     }
 
-    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc* attributeDesc, uint32_t attributeCount, IShader* vertexShader)
+    InputLayoutHandle Device::createInputLayout(const VertexAttributeDesc* attributeDesc, uint32_t attributeCount, rhi::Shader* vertexShader)
     {
         (void)vertexShader;
 

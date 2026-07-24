@@ -35,7 +35,7 @@ struct UpdateSceneGeometryParams
     const scene::SceneRenderData*    renderData = nullptr;
     render::SceneGpuResources*       gpuResources = nullptr;
 
-    caustica::rhi::ICommandList*             commandList = nullptr;
+    caustica::rhi::CommandList*             commandList = nullptr;
     IDescriptorTableManager*         descriptorTable = nullptr;
     MaterialGpuCache*                materials = nullptr;
     OpacityMicromapBuilder*          opacityMaps = nullptr;

@@ -19,7 +19,7 @@ public:
     virtual ~renderContext() = default;
 
     [[nodiscard]] GpuDevice* getGpuDevice() const { return m_GpuDevice; }
-    [[nodiscard]] caustica::rhi::IDevice* getDevice() const;
+    [[nodiscard]] caustica::rhi::Device* getDevice() const;
     [[nodiscard]] uint32_t getFrameIndex() const;
 
 protected:

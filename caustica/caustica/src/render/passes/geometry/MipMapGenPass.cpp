@@ -76,7 +76,7 @@ struct MipMapGenPass::NullTextures {
 };
 
 MipMapGenPass::MipMapGenPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<ShaderFactory> shaderFactory,
     caustica::rhi::TextureHandle input, 
     Mode mode)
@@ -153,7 +153,7 @@ MipMapGenPass::MipMapGenPass(
     m_Pso = device->createComputePipeline(computePipelineDesc);
 }
 
-void MipMapGenPass::dispatch(caustica::rhi::ICommandList* commandList, int maxLOD) 
+void MipMapGenPass::dispatch(caustica::rhi::CommandList* commandList, int maxLOD) 
 {
     assert(m_Texture);
 
@@ -190,7 +190,7 @@ void MipMapGenPass::dispatch(caustica::rhi::ICommandList* commandList, int maxLO
 }
 
 
-void MipMapGenPass::display(caustica::render::RenderDevice& renderDevice, caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* target)
+void MipMapGenPass::display(caustica::render::RenderDevice& renderDevice, caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* target)
 {
     assert(m_Texture);
     

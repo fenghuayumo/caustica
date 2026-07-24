@@ -25,11 +25,11 @@ enum class BlitSampler
 
 struct BlitParameters
 {
-    caustica::rhi::IFramebuffer* targetFramebuffer = nullptr;
+    caustica::rhi::Framebuffer* targetFramebuffer = nullptr;
     caustica::rhi::Viewport targetViewport;
     dm::box2 targetBox = dm::box2(0.f, 1.f);
 
-    caustica::rhi::ITexture* sourceTexture = nullptr;
+    caustica::rhi::Texture* sourceTexture = nullptr;
     uint32_t sourceArraySlice = 0;
     uint32_t sourceMip = 0;
     dm::box2 sourceBox = dm::box2(0.f, 1.f);
@@ -43,7 +43,7 @@ struct BlitParameters
 class FullscreenBlitPass
 {
 public:
-    FullscreenBlitPass(caustica::rhi::IDevice* device,
+    FullscreenBlitPass(caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         const StandardSamplers& samplers);
 
@@ -56,17 +56,17 @@ public:
     caustica::rhi::ShaderHandle sharpenArrayPS() const { return m_sharpenArrayPS; }
     caustica::rhi::BindingLayoutHandle blitBindingLayout() const { return m_blitBindingLayout; }
 
-    void blitTexture(caustica::rhi::ICommandList* commandList, const BlitParameters& params, caustica::BindingCache* bindingCache = nullptr);
-    void blitTexture(caustica::rhi::ICommandList* commandList,
-        caustica::rhi::IFramebuffer* targetFramebuffer,
-        caustica::rhi::ITexture* sourceTexture,
+    void blitTexture(caustica::rhi::CommandList* commandList, const BlitParameters& params, caustica::BindingCache* bindingCache = nullptr);
+    void blitTexture(caustica::rhi::CommandList* commandList,
+        caustica::rhi::Framebuffer* targetFramebuffer,
+        caustica::rhi::Texture* sourceTexture,
         caustica::BindingCache* bindingCache = nullptr);
 
 private:
     struct PsoCacheKey
     {
         caustica::rhi::FramebufferInfo fbinfo;
-        caustica::rhi::IShader* shader;
+        caustica::rhi::Shader* shader;
         caustica::rhi::BlendState::RenderTarget blendState;
 
         bool operator==(const PsoCacheKey& other) const

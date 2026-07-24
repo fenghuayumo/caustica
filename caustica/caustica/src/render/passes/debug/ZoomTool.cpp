@@ -27,7 +27,7 @@ using namespace caustica::math;
 #include <shaders/render/misc/ZoomTool.hlsl>
 
 
-ZoomTool::ZoomTool( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
+ZoomTool::ZoomTool( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device)
     , m_bindingCache(device)
 { 
@@ -82,7 +82,7 @@ bool ZoomTool::mouseButtonUpdate(int button, int action, int mods)
     return false;
 }
 
-void ZoomTool::render( caustica::rhi::ICommandList * commandList, caustica::rhi::TextureHandle colorInOut )
+void ZoomTool::render( caustica::rhi::CommandList * commandList, caustica::rhi::TextureHandle colorInOut )
 {
     if( !m_settings.enabled )
         return;

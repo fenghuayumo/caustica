@@ -26,7 +26,7 @@ class TextureLoader
 {
 public:
     TextureLoader(
-        caustica::rhi::IDevice* device,
+        caustica::rhi::Device* device,
         std::shared_ptr<IFileSystem> fs,
         std::shared_ptr<IDescriptorTableManager> descriptorTable,
         AssetRegistry& registry,
@@ -39,7 +39,7 @@ public:
         const std::filesystem::path& path,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        caustica::rhi::ICommandList* commandList);
+        caustica::rhi::CommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromFileDeferred(
         const std::filesystem::path& path,
@@ -63,7 +63,7 @@ public:
         const std::string& mimeType,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        caustica::rhi::ICommandList* commandList);
+        caustica::rhi::CommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromMemoryDeferred(
         const std::shared_ptr<IBlob>& data,
@@ -124,7 +124,7 @@ private:
     void finalizeTexture(
         std::shared_ptr<ImageAsset> texture,
         render::RenderDevice* renderDevice,
-        caustica::rhi::ICommandList* commandList);
+        caustica::rhi::CommandList* commandList);
 
     void textureLoaded(std::shared_ptr<ImageAsset> texture);
     std::shared_ptr<ImageAsset> createTextureData();
@@ -133,9 +133,9 @@ private:
 };
 
 bool saveTextureToFile(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     render::RenderDevice& renderDevice,
-    caustica::rhi::ITexture* texture,
+    caustica::rhi::Texture* texture,
     caustica::rhi::ResourceStates textureState,
     const char* fileName,
     bool saveAlphaChannel = true);

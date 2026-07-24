@@ -18,7 +18,7 @@ class CameraController;
 struct HdrPostProcessParams
 {
     PathTracerSettings&              settings;
-    caustica::rhi::ICommandList*             commandList = nullptr;
+    caustica::rhi::CommandList*             commandList = nullptr;
     RenderTargets*                   renderTargets = nullptr;
     dm::uint2                        displaySize{};
 

@@ -44,33 +44,33 @@ class AccelStructManager
 {
 public:
     AccelStructManager() = default;
-    explicit AccelStructManager(caustica::rhi::IDevice* device);
+    explicit AccelStructManager(caustica::rhi::Device* device);
     void bindSceneGpuResources(render::SceneGpuResources* resources) { m_sceneGpuResources = resources; }
     void bindMaterialGpuCache(MaterialGpuCache* materials) { m_materialGpuCache = materials; }
 
-    void createBlases(caustica::rhi::ICommandList* commandList,
+    void createBlases(caustica::rhi::CommandList* commandList,
                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                       const AccelStructBuildSettings& settings);
 
-    void createTlas(caustica::rhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
+    void createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData);
 
-    void uploadSubInstanceData(caustica::rhi::ICommandList* commandList) const;
+    void uploadSubInstanceData(caustica::rhi::CommandList* commandList) const;
 
     void clearMeshAccelStructs(std::span<const scene::MeshRenderResourceSnapshot> meshes);
 
     void requestMeshRebuild(scene::MeshRenderResourceId meshId);
 
-    void rebuildDirtyMeshes(caustica::rhi::ICommandList*            commandList,
+    void rebuildDirtyMeshes(caustica::rhi::CommandList*            commandList,
                             const scene::SceneRenderData&   renderData,
                             const AccelStructBuildSettings& settings,
                             bool&                           fullRebuildRequested);
 
-    void updateSkinnedBlases(caustica::rhi::ICommandList*            commandList,
+    void updateSkinnedBlases(caustica::rhi::CommandList*            commandList,
                              const scene::SceneRenderData&   renderData,
                              const AccelStructBuildSettings& settings,
                              uint32_t                        frameIndex) const;
 
-    void buildTlas(caustica::rhi::ICommandList*            commandList,
+    void buildTlas(caustica::rhi::CommandList*            commandList,
                    const scene::SceneRenderData&   renderData,
                    const AccelStructBuildSettings& settings,
                    const OmmAccelStructState&      ommState,
@@ -87,7 +87,7 @@ public:
     [[nodiscard]] bool                           hasTopLevelAS() const { return m_topLevelAS != nullptr; }
 
 private:
-    caustica::rhi::IDevice* m_device = nullptr;
+    caustica::rhi::Device* m_device = nullptr;
     render::SceneGpuResources* m_sceneGpuResources = nullptr;
     MaterialGpuCache* m_materialGpuCache = nullptr;
     uint64_t m_materialStateRevision = 0;

@@ -74,7 +74,7 @@ bool ImGui_RHI::updateFontTexture()
     return true;
 }
 
-bool ImGui_RHI::init(caustica::rhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
+bool ImGui_RHI::init(caustica::rhi::Device* device, std::shared_ptr<ShaderFactory> shaderFactory)
 {
     m_device = device;
 
@@ -182,7 +182,7 @@ bool ImGui_RHI::reallocateBuffer(caustica::rhi::BufferHandle& buffer, size_t req
     return true;
 }
 
-caustica::rhi::IGraphicsPipeline* ImGui_RHI::getPSO(caustica::rhi::FramebufferInfo const& framebufferInfo)
+caustica::rhi::GraphicsPipeline* ImGui_RHI::getPSO(caustica::rhi::FramebufferInfo const& framebufferInfo)
 {
     if (pso)
         return pso;
@@ -193,7 +193,7 @@ caustica::rhi::IGraphicsPipeline* ImGui_RHI::getPSO(caustica::rhi::FramebufferIn
     return pso;
 }
 
-caustica::rhi::IBindingSet* ImGui_RHI::getBindingSet(caustica::rhi::ITexture* texture)
+caustica::rhi::BindingSet* ImGui_RHI::getBindingSet(caustica::rhi::Texture* texture)
 {
     auto iter = bindingsCache.find(texture);
     if (iter != bindingsCache.end())
@@ -263,7 +263,7 @@ void ImGui_RHI::captureDrawData()
             if (!srcCmd.UserCallback)
             {
                 CapturedDrawCmd cmd;
-                cmd.texture = reinterpret_cast<caustica::rhi::ITexture*>(srcCmd.TexRef.GetTexID());
+                cmd.texture = reinterpret_cast<caustica::rhi::Texture*>(srcCmd.TexRef.GetTexID());
                 cmd.elemCount = srcCmd.ElemCount;
                 cmd.idxOffset = idxOffset;
                 cmd.vtxOffset = vtxOffset;
@@ -288,7 +288,7 @@ void ImGui_RHI::captureDrawData()
     m_readSlot.store(frame.valid ? published : -1, std::memory_order_release);
 }
 
-bool ImGui_RHI::updateGeometry(caustica::rhi::ICommandList* commandList, const CapturedFrame& frame)
+bool ImGui_RHI::updateGeometry(caustica::rhi::CommandList* commandList, const CapturedFrame& frame)
 {
     if (!reallocateBuffer(vertexBuffer,
         frame.vtx.size() * sizeof(ImDrawVert),
@@ -314,7 +314,7 @@ bool ImGui_RHI::updateGeometry(caustica::rhi::ICommandList* commandList, const C
     return true;
 }
 
-bool ImGui_RHI::render(caustica::rhi::IFramebuffer* framebuffer)
+bool ImGui_RHI::render(caustica::rhi::Framebuffer* framebuffer)
 {
     // Swapchain FBs are cleared during backBufferResizing(); never assert-crash here.
     if (!framebuffer)

@@ -83,6 +83,7 @@ namespace caustica::rhi::vulkan
         if (!semaphore)
             return;
 
+        std::lock_guard lockGuard(m_Mutex);
         m_WaitSemaphores.push_back(semaphore);
         m_WaitSemaphoreValues.push_back(value);
     }
@@ -92,12 +93,16 @@ namespace caustica::rhi::vulkan
         if (!semaphore)
             return;
 
+        std::lock_guard lockGuard(m_Mutex);
         m_SignalSemaphores.push_back(semaphore);
         m_SignalSemaphoreValues.push_back(value);
     }
 
-    uint64_t Queue::submit(ICommandList* const* ppCmd, size_t numCmd)
+    uint64_t Queue::submit(CommandList* const* ppCmd, size_t numCmd)
     {
+        // Serialize with getOrCreateCommandBuffer / retire / wait-signal staging.
+        std::lock_guard lockGuard(m_Mutex);
+
         std::vector<vk::PipelineStageFlags> waitStageArray(m_WaitSemaphores.size());
         std::vector<vk::CommandBuffer> commandBuffers(numCmd);
 
@@ -162,7 +167,7 @@ namespace caustica::rhi::vulkan
         return m_LastSubmittedID;
     }
 
-    void Queue::updateTextureTileMappings(ITexture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings)
+    void Queue::updateTextureTileMappings(Texture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 
@@ -271,6 +276,8 @@ namespace caustica::rhi::vulkan
 
     void Queue::retireCommandBuffers()
     {
+        std::lock_guard lockGuard(m_Mutex);
+
         std::list<TrackedCommandBufferPtr> submissions = std::move(m_CommandBuffersInFlight);
 
         uint64_t lastFinishedID = updateLastFinishedID();
@@ -345,7 +352,7 @@ namespace caustica::rhi::vulkan
         queueWaitForSemaphore(waitQueueID, getQueueSemaphore(executionQueueID), instance);
     }
 
-    void Device::updateTextureTileMappings(ITexture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
+    void Device::updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
     {
         Queue& queue = *m_Queues[uint32_t(executionQueue)];
 

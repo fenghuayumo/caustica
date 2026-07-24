@@ -4,7 +4,7 @@
 
 using namespace caustica;
 
-caustica::rhi::IFramebuffer* FramebufferFactory::getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources)
+caustica::rhi::Framebuffer* FramebufferFactory::getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources)
 {
     caustica::rhi::FramebufferHandle& item = m_framebufferCache[subresources];
 
@@ -26,7 +26,7 @@ caustica::rhi::IFramebuffer* FramebufferFactory::getFramebuffer(const caustica::
     return item;
 }
 
-caustica::rhi::IFramebuffer* FramebufferFactory::getFramebuffer(const IView& view)
+caustica::rhi::Framebuffer* FramebufferFactory::getFramebuffer(const IView& view)
 {
     return getFramebuffer(caustica::toRhi(view.getSubresources()));
 }

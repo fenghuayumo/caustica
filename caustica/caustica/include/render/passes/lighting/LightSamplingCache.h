@@ -75,21 +75,21 @@ public:
     };
 
 public:
-    LightSamplingCache(caustica::rhi::IDevice* device);
+    LightSamplingCache(caustica::rhi::Device* device);
     ~LightSamplingCache();
 
     // reset scene related stuff
     void                            sceneReloaded();
 
-    void                            createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
+    void                            createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
 
     // Main and only processing stage is split into updateBegin/updateEnd. These can be called one after the other as soon as screen space motion vectors are available.
     // The split is purely to facilitate any potential async compute.
     
     // updateBegin can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers. Emissive triangle emission must be accessible at this point.
-    void                            updateBegin(caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, caustica::rhi::IDescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, caustica::rhi::TextureHandle envMapProcessed);
+    void                            updateBegin(caustica::rhi::CommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, caustica::rhi::DescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, caustica::rhi::TextureHandle envMapProcessed);
     // updateEnd must happen BEFORE any light sampling (e.g. PT pass with NEE) but AFTER screen space motion vectors are available for reprojection.
-    void                            updateEnd(caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors);
+    void                            updateEnd(caustica::rhi::CommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors);
 
     caustica::rhi::BufferHandle             getControlBuffer() const                    { return m_controlBuffer; }
     caustica::rhi::BufferHandle             getLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights

@@ -20,13 +20,13 @@ All BindingCache methods are thread-safe.
 class BindingCache
 {
 public:
-    explicit BindingCache(caustica::rhi::IDevice* device)
+    explicit BindingCache(caustica::rhi::Device* device)
         : m_device(device)
     {
     }
 
-    caustica::rhi::BindingSetHandle getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout);
-    caustica::rhi::BindingSetHandle getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout);
+    caustica::rhi::BindingSetHandle getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout);
+    caustica::rhi::BindingSetHandle getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout);
     void clear();
 
 private:

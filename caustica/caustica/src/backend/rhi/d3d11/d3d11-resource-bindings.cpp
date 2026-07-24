@@ -21,7 +21,7 @@ BindingLayoutHandle Device::createBindlessLayout(const BindlessLayoutDesc&)
     return nullptr;
 }
 
-BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, IBindingLayout* layout)
+BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* layout)
 {
     BindingSet *ret = new BindingSet();
     ret->desc = desc;
@@ -153,17 +153,17 @@ BindingSetHandle Device::createBindingSet(const BindingSetDesc& desc, IBindingLa
     return BindingSetHandle::Create(ret);
 }
 
-DescriptorTableHandle Device::createDescriptorTable(IBindingLayout*)
+DescriptorTableHandle Device::createDescriptorTable(rhi::BindingLayout*)
 {
     return nullptr;
 }
 
-void Device::resizeDescriptorTable(IDescriptorTable*, uint32_t, bool)
+void Device::resizeDescriptorTable(rhi::DescriptorTable*, uint32_t, bool)
 {
     utils::NotSupported();
 }
 
-bool Device::writeDescriptorTable(IDescriptorTable*, const BindingSetItem&)
+bool Device::writeDescriptorTable(rhi::DescriptorTable*, const BindingSetItem&)
 {
     utils::NotSupported();
     return false;
@@ -193,8 +193,8 @@ bool BindingSet::isSupersetOf(const BindingSet& other) const
 void CommandList::prepareToBindGraphicsResourceSets(
     const BindingSetVector& resourceSets, 
     const static_vector<BindingSetHandle, c_MaxBindingLayouts>* currentResourceSets,
-    const IGraphicsPipeline* _currentPipeline,
-    const IGraphicsPipeline* _newPipeline, 
+    const rhi::GraphicsPipeline* _currentPipeline,
+    const rhi::GraphicsPipeline* _newPipeline, 
     bool updateFramebuffer, 
     BindingSetVector& outSetsToBind) const
 {
@@ -246,7 +246,7 @@ void CommandList::prepareToBindGraphicsResourceSets(
             }
         }
 
-        for (IBindingSet* _set : setsToUnbind)
+        for (BindingSet* _set : setsToUnbind)
         {
             if (!_set)
                 continue;
@@ -296,9 +296,9 @@ void CommandList::prepareToBindGraphicsResourceSets(
 
 void CommandList::bindGraphicsResourceSets(
     const BindingSetVector& setsToBind,
-    const IGraphicsPipeline* newPipeline) const
+    const rhi::GraphicsPipeline* newPipeline) const
 {
-    for(IBindingSet* _set : setsToBind)
+    for(BindingSet* _set : setsToBind)
     {
         if (!_set)
             continue;
@@ -424,7 +424,7 @@ void CommandList::bindComputeResourceSets(
                 }
         }
 
-        for (IBindingSet* _set : setsToUnbind)
+        for (BindingSet* _set : setsToUnbind)
         {
             if (!_set)
                 continue;
@@ -448,7 +448,7 @@ void CommandList::bindComputeResourceSets(
         }
     }
 
-    for(IBindingSet* _set : resourceSets)
+    for(BindingSet* _set : resourceSets)
     {
         BindingSet* set = checked_cast<BindingSet*>(_set);
 

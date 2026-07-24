@@ -117,7 +117,7 @@ namespace caustica
         virtual ~Scene() = default;
 
         Scene(
-            caustica::rhi::IDevice* device,
+            caustica::rhi::Device* device,
             ShaderFactory& shaderFactory,
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureLoader> textureCache,

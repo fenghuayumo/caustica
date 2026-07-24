@@ -20,8 +20,8 @@ public:
     void flushRetired(caustica::GpuDevice& device);
     void release();
 
-    [[nodiscard]] caustica::rhi::IFramebuffer* framebuffer() const { return m_framebuffer.Get(); }
-    [[nodiscard]] caustica::rhi::ITexture* colorTexture() const { return m_color.Get(); }
+    [[nodiscard]] caustica::rhi::Framebuffer* framebuffer() const { return m_framebuffer.Get(); }
+    [[nodiscard]] caustica::rhi::Texture* colorTexture() const { return m_color.Get(); }
     [[nodiscard]] uint32_t width() const { return m_width; }
     [[nodiscard]] uint32_t height() const { return m_height; }
     [[nodiscard]] bool isValid() const { return m_framebuffer != nullptr && m_width > 0 && m_height > 0; }

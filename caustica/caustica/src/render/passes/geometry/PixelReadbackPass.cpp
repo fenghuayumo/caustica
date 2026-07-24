@@ -21,9 +21,9 @@ using namespace caustica;
 using namespace caustica::render;
 
 PixelReadbackPass::PixelReadbackPass(
-    caustica::rhi::IDevice* device, 
+    caustica::rhi::Device* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
-    caustica::rhi::ITexture* inputTexture, 
+    caustica::rhi::Texture* inputTexture, 
     caustica::rhi::Format format,
     uint32_t arraySlice,
     uint32_t mipLevel)
@@ -92,7 +92,7 @@ PixelReadbackPass::PixelReadbackPass(
 }
 
 
-void PixelReadbackPass::capture(caustica::rhi::ICommandList* commandList, dm::uint2 pixelPosition)
+void PixelReadbackPass::capture(caustica::rhi::CommandList* commandList, dm::uint2 pixelPosition)
 {
     PixelReadbackConstants constants = {};
     constants.pixelPosition = dm::int2(pixelPosition);

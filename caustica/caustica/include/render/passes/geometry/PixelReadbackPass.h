@@ -29,14 +29,14 @@ namespace caustica::render
 
     public:
         PixelReadbackPass(
-            caustica::rhi::IDevice* device,
+            caustica::rhi::Device* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            caustica::rhi::ITexture* inputTexture,
+            caustica::rhi::Texture* inputTexture,
             caustica::rhi::Format format,
             uint32_t arraySlice = 0,
             uint32_t mipLevel = 0);
 
-        void capture(caustica::rhi::ICommandList* commandList, dm::uint2 pixelPosition);
+        void capture(caustica::rhi::CommandList* commandList, dm::uint2 pixelPosition);
 
         dm::float4 readFloats();
         dm::uint4 readUInts();

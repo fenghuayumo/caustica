@@ -32,7 +32,7 @@ using namespace caustica;
 using namespace caustica::render;
 
 TemporalAntiAliasingPass::TemporalAntiAliasingPass(
-    caustica::rhi::IDevice* device,
+    caustica::rhi::Device* device,
     std::shared_ptr<ShaderFactory> shaderFactory, 
     caustica::render::RenderDevice& renderDevice,
     const ICompositeView& compositeView,
@@ -181,7 +181,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 }
 
 void TemporalAntiAliasingPass::renderMotionVectors(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const ICompositeView& compositeView,
     const ICompositeView& compositeViewPrevious,
     dm::float3 preViewTranslationDifference)
@@ -228,7 +228,7 @@ void TemporalAntiAliasingPass::renderMotionVectors(
 }
 
 void TemporalAntiAliasingPass::temporalResolve(
-    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::CommandList* commandList,
     const TemporalAntiAliasingParameters& params,
     bool feedbackIsValid,
     const ICompositeView& compositeViewInput,
