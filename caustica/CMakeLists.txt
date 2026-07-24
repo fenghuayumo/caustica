@@ -497,6 +497,60 @@ endmacro()
 add_caustica_sample(caustica "${CAUSTICA_EDITOR_ENTRY_SOURCE}")
 
 # -------------------------------------------------------------------
+# Official thin client (EngineApp only - no editor / ImGui)
+# -------------------------------------------------------------------
+set(CAUSTICA_THIN_CLIENT_SOURCES
+    "${CMAKE_SOURCE_DIR}/application/samples/thin_client/Main.cpp"
+)
+if (EXISTS "${CMAKE_SOURCE_DIR}/application/editor/app/D3D12AgilityExports.cpp")
+    list(APPEND CAUSTICA_THIN_CLIENT_SOURCES
+        "${CMAKE_SOURCE_DIR}/application/editor/app/D3D12AgilityExports.cpp")
+endif()
+add_executable(caustica_thin_client WIN32 ${CAUSTICA_THIN_CLIENT_SOURCES})
+if (MSVC)
+    target_compile_options(caustica_thin_client PRIVATE /utf-8)
+endif()
+target_link_libraries(caustica_thin_client PRIVATE causEngine caustica_rhi)
+add_dependencies(caustica_thin_client caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+if (CAUSTICA_PACKAGE_SHADER_PACK)
+    add_dependencies(caustica_thin_client causticaShaderPack)
+endif()
+set_target_properties(caustica_thin_client PROPERTIES
+    FOLDER ${folder}
+    OUTPUT_NAME_DEBUG "caustica_thin_clientD"
+    OUTPUT_NAME_RELEASE "caustica_thin_client"
+)
+if (CAUSTICA_WITH_OIDN)
+    add_custom_command(
+        TARGET caustica_thin_client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_OIDN_RUNTIME_LIBS} "$<TARGET_FILE_DIR:caustica_thin_client>"
+        COMMAND_EXPAND_LISTS
+    )
+endif()
+if (CAUSTICA_WITH_OPENUSD AND CAUSTICA_USD_RUNTIME_DLLS)
+    add_custom_command(
+        TARGET caustica_thin_client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:caustica_thin_client>/usd"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_USD_RUNTIME_DLLS} "$<TARGET_FILE_DIR:caustica_thin_client>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CAUSTICA_USD_PLUGIN_DIR}" "$<TARGET_FILE_DIR:caustica_thin_client>/usd"
+        COMMAND_EXPAND_LISTS
+        COMMENT "Deploy OpenUSD runtime DLLs and plugins beside caustica_thin_client"
+    )
+endif()
+if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
+    target_compile_definitions(caustica_thin_client PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
+    target_compile_definitions(caustica_thin_client PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+    target_include_directories(caustica_thin_client PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
+    add_custom_command(
+        TARGET caustica_thin_client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:caustica_thin_client>/D3D12/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:caustica_thin_client>/D3D12/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:caustica_thin_client>/D3D12/"
+    )
+endif()
+
+
+# -------------------------------------------------------------------
 # Python extension module: caustica.pyd
 # -------------------------------------------------------------------
 # Allows scripts to drive the renderer headlessly:

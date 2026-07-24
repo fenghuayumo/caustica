@@ -139,6 +139,13 @@ public:
         SystemLabel label,
         SystemFn system,
         AppSystemOrdering ordering = {});
+
+    // Set-level edge: every system in `earlier` runs before every system in `later`.
+    AppSchedules& configureSets(AppSchedule schedule, SystemLabel earlier, SystemLabel later);
+
+    // Every system not in `later` runs before every system in `later`.
+    AppSchedules& configureSetAfterOthers(AppSchedule schedule, SystemLabel later);
+
     void run(AppSchedule schedule, SystemContext& context) const;
     void clear();
 
@@ -150,9 +157,17 @@ private:
         AppSystemOrdering ordering;
     };
 
+    struct SetOrderRule
+    {
+        SystemLabel earlier{};
+        SystemLabel later{};
+        bool earlierIsAnyOutsideLater = false;
+    };
+
     struct PhaseSchedule
     {
         std::vector<System> systems;
+        std::vector<SetOrderRule> setOrder;
     };
 
     [[nodiscard]] static std::size_t phaseIndex(AppSchedule schedule);

@@ -62,6 +62,20 @@ AppSchedules& AppSchedules::addSystem(
     return *this;
 }
 
+AppSchedules& AppSchedules::configureSets(AppSchedule schedule, SystemLabel earlier, SystemLabel later)
+{
+    PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
+    phase.setOrder.push_back(SetOrderRule{ std::move(earlier), std::move(later), false });
+    return *this;
+}
+
+AppSchedules& AppSchedules::configureSetAfterOthers(AppSchedule schedule, SystemLabel later)
+{
+    PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
+    phase.setOrder.push_back(SetOrderRule{ {}, std::move(later), true });
+    return *this;
+}
+
 void AddEdge(std::vector<std::vector<int>>& outgoing, std::vector<int>& indegree, int from, int to)
 {
     if (from < 0 || to < 0 || from == to)
@@ -100,6 +114,35 @@ std::vector<int> AppSchedules::buildExecutionOrder(const PhaseSchedule& phase)
             AddEdge(outgoing, indegree, i, findSystemIndex(before));
         for (const SystemLabel& after : ordering.after)
             AddEdge(outgoing, indegree, findSystemIndex(after), i);
+    }
+
+    for (const SetOrderRule& rule : phase.setOrder)
+    {
+        std::vector<int> earlierIdx;
+        std::vector<int> laterIdx;
+        earlierIdx.reserve(static_cast<std::size_t>(count));
+        laterIdx.reserve(static_cast<std::size_t>(count));
+        for (int i = 0; i < count; ++i)
+        {
+            const SystemLabel& set = systems[static_cast<std::size_t>(i)].ordering.set;
+            if (rule.earlierIsAnyOutsideLater)
+            {
+                if (set.valid() && set == rule.later)
+                    laterIdx.push_back(i);
+                else
+                    earlierIdx.push_back(i);
+            }
+            else
+            {
+                if (set.valid() && set == rule.earlier)
+                    earlierIdx.push_back(i);
+                if (set.valid() && set == rule.later)
+                    laterIdx.push_back(i);
+            }
+        }
+        for (int a : earlierIdx)
+            for (int b : laterIdx)
+                AddEdge(outgoing, indegree, a, b);
     }
 
     std::vector<int> ordered;
@@ -152,7 +195,10 @@ void AppSchedules::run(AppSchedule schedule, SystemContext& context) const
 void AppSchedules::clear()
 {
     for (PhaseSchedule& phase : m_phases)
+    {
         phase.systems.clear();
+        phase.setOrder.clear();
+    }
 }
 
 } // namespace caustica

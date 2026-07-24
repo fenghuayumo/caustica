@@ -6,6 +6,7 @@
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
+#include <engine/SystemSets.h>
 #include <backend/GpuDevice.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>

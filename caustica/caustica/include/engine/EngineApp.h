@@ -6,6 +6,9 @@
 #include <engine/EngineSceneCallbacks.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
+#include <engine/SceneTransform.h>
+#include <engine/SystemSets.h>
+#include <engine/EnqueueRenderCommand.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
@@ -81,8 +84,10 @@ struct EngineAppDesc
 //   auto engine = caustica::EngineApp::create({ .headless = true });
 //   while (running) engine->stepFrame();
 //
-// Scene mutations: caustica::load/spawn/despawn (ECS only; Extract flushes GPU).
+// Scene mutations: caustica::load/spawn/despawn + SceneTransform (ECS only; Extract flushes GPU).
 // Scene queries: ctx.entityWorld() / caustica::entityWorld(app) -- not GpuRenderSubsystem.
+// Systems on update default to system_set::Simulation; hierarchy refresh is TransformPropagate.
+// Occasional RT work: EnqueueRenderCommand (non-blocking).
 class EngineApp
 {
 public:

@@ -69,6 +69,20 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
 Editor `game::PropComponentBase` is a sample script layer over ECS, not a second component system.
 
+## SystemSet + thin client (P2)
+
+Default SystemSets (`SystemSets.h`):
+
+- `system_set::Simulation` — gameplay / host systems on `AppSchedule::update` (default membership)
+- `system_set::TransformPropagate` — hierarchy refresh in `PostUpdate` (after other PostUpdate systems)
+- `system_set::Extract` — Extract publish path
+
+Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
+(`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).
+
+Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
+(EngineApp + one Simulation system that `spawnFromFile` + `setEntityLocalTransform`).
+
 ## Async structure handoff (P0)
 
 Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous

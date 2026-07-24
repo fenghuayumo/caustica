@@ -36,6 +36,7 @@ struct AppSystemOrdering
 {
     std::vector<SystemLabel> before;
     std::vector<SystemLabel> after;
+    SystemLabel set{};
 
     template<typename... Tags>
     AppSystemOrdering& runAfter()
@@ -48,6 +49,13 @@ struct AppSystemOrdering
     AppSystemOrdering& runBefore()
     {
         (before.push_back(systemLabel<Tags>()), ...);
+        return *this;
+    }
+
+    template<typename SetTag>
+    AppSystemOrdering& inSet()
+    {
+        set = systemLabel<SetTag>();
         return *this;
     }
 };

@@ -6,6 +6,7 @@
 #include <engine/SceneViewState.h>
 #include <engine/SceneScheduleRegistration.h>
 #include <engine/SystemLabels.h>
+#include <engine/SystemSets.h>
 
 #include <backend/GpuDevice.h>
 #include <core/ThreadContext.h>
@@ -126,6 +127,10 @@ App& App::addSystem(
     SystemFn system,
     AppSystemOrdering ordering)
 {
+    // Default: gameplay / host systems on `update` join Simulation unless tagged otherwise.
+    if (schedule == AppSchedule::update && !ordering.set.valid())
+        ordering.inSet<system_set::Simulation>();
+
     m_schedules.addSystem(schedule, std::move(label), std::move(system), std::move(ordering));
     return *this;
 }
@@ -144,6 +149,10 @@ void App::registerDefaultSchedules()
 {
     if (m_defaultSchedulesRegistered)
         return;
+
+    // Default SystemSet edges (Bevy-style groupings).
+    m_schedules.configureSetAfterOthers(
+        AppSchedule::PostUpdate, systemLabel<system_set::TransformPropagate>());
 
 #if CAUSTICA_WITH_STREAMLINE
     addSystem<system_label::StreamlineSimStart>(AppSchedule::First, [](SystemContext& ctx) {

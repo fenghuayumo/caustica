@@ -5,6 +5,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SystemLabels.h>
+#include <engine/SystemSets.h>
 
 #include <scene/Scene.h>
 
@@ -22,16 +23,22 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void SceneAnimationPlugin::configureSchedules(App& app)
 {
-    app.addSystem<system_label::SceneAnimate>(AppSchedule::update, [](SystemContext& ctx) {
-        if (!ctx.windowFocused)
-            return;
+    app.addSystem<system_label::SceneAnimate>(
+        AppSchedule::update,
+        [](SystemContext& ctx) {
+            if (!ctx.windowFocused)
+                return;
 
-        animate(ctx.app, ctx.deltaTimeSeconds);
-    });
+            animate(ctx.app, ctx.deltaTimeSeconds);
+        },
+        AppSystemOrdering{}.inSet<system_set::Simulation>());
 
-    app.addSystem<system_label::SceneRefreshEntityWorld>(AppSchedule::PostUpdate, [](SystemContext& ctx) {
-        refreshEntityWorld(ctx.app, ctx.frameIndex);
-    });
+    app.addSystem<system_label::SceneRefreshEntityWorld>(
+        AppSchedule::PostUpdate,
+        [](SystemContext& ctx) {
+            refreshEntityWorld(ctx.app, ctx.frameIndex);
+        },
+        AppSystemOrdering{}.inSet<system_set::TransformPropagate>());
 
     app.addSystemAfter<system_label::SceneTickSimulation, system_label::SceneUpdateCamera>(
         AppSchedule::update,

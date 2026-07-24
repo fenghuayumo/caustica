@@ -6,6 +6,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>
+#include <engine/SystemSets.h>
 
 #include <backend/GpuDevice.h>
 #include <render/RenderRuntimeState.h>
@@ -89,14 +90,17 @@ void prepareRenderFrame(App& app)
 
 void RenderExtractPlugin::configureSchedules(App& app)
 {
-    app.addSystemAfter<system_label::ScenePrepareRenderFrame, system_label::SetRenderFrameIndex>(
+    app.addSystem<system_label::ScenePrepareRenderFrame>(
         AppSchedule::Extract,
         [](SystemContext& ctx) {
             if (!ctx.gpuDevice || !activeScene(ctx.app))
                 return;
 
             prepareRenderFrame(ctx.app);
-        });
+        },
+        AppSystemOrdering{}
+            .runAfter<system_label::SetRenderFrameIndex>()
+            .inSet<system_set::Extract>());
 }
 
 } // namespace caustica
