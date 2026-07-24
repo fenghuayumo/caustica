@@ -210,6 +210,10 @@ namespace caustica
         Count
     };
 
+    // CPU mesh authoring record. dual identity:
+    // - shared_ptr<MeshInfo> on MeshInstanceComponent = logic/deform handle
+    // - renderResourceId = Extract / GPU scene key (assigned on register)
+    // - asset = AssetSystem MeshAsset handle (hot-reload / deps)
     struct MeshInfo
     {
         scene::MeshRenderResourceId renderResourceId;

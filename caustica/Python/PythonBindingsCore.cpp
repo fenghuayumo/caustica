@@ -16,7 +16,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
-#include <engine/SceneMeshEditing.h>
+#include <engine/SceneMeshEdit.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
 #include <backend/GpuDevice.h>
@@ -371,28 +371,6 @@ namespace
         if (!scene || !ecs::isValid(entity))
             return nullptr;
         return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
-    }
-
-    SetSceneMeshVerticesParams MakeMeshEditParams(App& app)
-    {
-        GpuSharedCaches* caches = gpuSharedCaches(app);
-        render::WorldRenderer* wr = worldRenderer(app);
-        GpuDevice* device = gpuDevice(app);
-        PathTracerSettings* pathSettings = settings(app);
-        if (!wr || !device || !device->getDevice())
-            throw std::runtime_error("Mesh edit requires an initialized GPU device and world renderer");
-
-        return SetSceneMeshVerticesParams{
-            .device = device->getDevice(),
-            .descriptorTable = caches ? caches->descriptorTable.get() : nullptr,
-            .gpuResources = &wr->sceneGpuResources(),
-            .scene = activeScene(app),
-            .frameIndex = device->getFrameIndex(),
-            .resetAccumulation = pathSettings ? &pathSettings->ResetAccumulation : nullptr,
-            .requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& dirtyMesh) {
-                requestMeshAccelRebuild(app, dirtyMesh);
-            },
-        };
     }
 
     void WalkEntitiesByName(const scene::SceneEntityWorld& entityWorld, ecs::Entity root, const std::string& name, ecs::Entity& outEntity)
@@ -1930,17 +1908,18 @@ void RegisterCoreBindings(nb::module_& m)
             "Remove a scene entity (and children) via the engine despawn path.")
 
         .def("get_mesh_vertices", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                (void)self;
-                return Float3VectorToList(caustica::getMeshVertices(mesh));
+                return Float3VectorToList(caustica::getMeshVertices(self, mesh));
             }, nb::arg("mesh"),
             "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
         .def("set_mesh_vertices",
             [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVertices(mesh, ToFloat3Vector(vertices), params);
+                caustica::setMeshVertices(
+                    self,
+                    mesh,
+                    ToFloat3Vector(vertices),
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
             },
             nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
@@ -1948,69 +1927,71 @@ void RegisterCoreBindings(nb::module_& m)
         .def("deform_mesh",
             [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = caustica::getMeshVertices(mesh);
+                std::vector<float3> vertices = caustica::getMeshVertices(self, mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVertices(mesh, vertices, params);
+                caustica::setMeshVertices(
+                    self,
+                    mesh,
+                    vertices,
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
                 return vertices.size();
             },
             nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
             "Apply a Python callback(i, (x,y,z)) to each unique object-space vertex.")
         .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                GpuDevice* device = gpuDevice(self);
-                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-                return Float3VectorToList(caustica::getMeshVerticesWorld(activeScene(self), mesh, frameIndex));
+                return Float3VectorToList(caustica::getMeshVerticesWorld(self, mesh));
             }, nb::arg("mesh"))
         .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
-                GpuDevice* device = gpuDevice(self);
-                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-                return Float3VectorToList(caustica::getMeshVerticesWorld(
-                    activeScene(self), EntityHandleFromPyNode(node), frameIndex));
+                return Float3VectorToList(
+                    caustica::getMeshVerticesWorld(self, EntityHandleFromPyNode(node)));
             }, nb::arg("node"))
         .def("set_mesh_vertices_world",
             [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVerticesWorld(mesh, ToFloat3Vector(vertices), params);
+                caustica::setMeshVerticesWorld(
+                    self,
+                    mesh,
+                    ToFloat3Vector(vertices),
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
             },
             nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("set_mesh_vertices_world",
             [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), params);
+                caustica::setMeshVerticesWorld(
+                    self,
+                    EntityHandleFromPyNode(node),
+                    ToFloat3Vector(vertices),
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
             },
             nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh_world",
             [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                GpuDevice* device = gpuDevice(self);
-                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-                std::vector<float3> vertices = caustica::getMeshVerticesWorld(activeScene(self), mesh, frameIndex);
+                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, mesh);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVerticesWorld(mesh, vertices, params);
+                caustica::setMeshVerticesWorld(
+                    self,
+                    mesh,
+                    vertices,
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
                 return vertices.size();
             },
             nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
@@ -2019,19 +2000,19 @@ void RegisterCoreBindings(nb::module_& m)
             [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 const ecs::Entity entity = EntityHandleFromPyNode(node);
-                GpuDevice* device = gpuDevice(self);
-                const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-                std::vector<float3> vertices = caustica::getMeshVerticesWorld(activeScene(self), entity, frameIndex);
+                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, entity);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                auto params = MakeMeshEditParams(self);
-                params.recomputeNormals = recomputeNormals;
-                params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-                caustica::setMeshVerticesWorld(entity, vertices, params);
+                caustica::setMeshVerticesWorld(
+                    self,
+                    entity,
+                    vertices,
+                    { .recomputeNormals = recomputeNormals,
+                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
                 return vertices.size();
             },
             nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,

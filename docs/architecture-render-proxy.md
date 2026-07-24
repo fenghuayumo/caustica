@@ -57,6 +57,18 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md) (Phase 1 MT foundation).
 
+## App scene-edit API (P1)
+
+Prefer these for application / Python / editor scene edits (no WorldRenderer / AS words):
+
+- `SceneSpawn.h` - `load` / `spawn` / `despawn`
+- `SceneTransform.h` - local transform / translation / visibility
+- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`)
+
+`SetSceneMeshVerticesParams` / `SceneMeshEditing.h` remain engine-internal.
+Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
+Editor `game::PropComponentBase` is a sample script layer over ECS, not a second component system.
+
 ## Async structure handoff (P0)
 
 Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous
@@ -82,7 +94,7 @@ Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
 | Async structure GPU build | Phase 1+2: committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | Phase 1–3: see [architecture-rhi-threading.md](architecture-rhi-threading.md) (`FrameCommandContext` + GraphBuilder waves) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
-| Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
+| Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `SceneMeshEdit` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |

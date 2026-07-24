@@ -9,8 +9,8 @@
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
+#include <engine/SceneMeshEdit.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/SceneMeshEditing.h>
 #include <scene/SceneEcs.h>
 
 #include <algorithm>
@@ -25,22 +25,6 @@ namespace
     {
         return caustica::SceneApplyCallbacks{
             .postMaterialLoad = [](caustica::Material& material) { LocalConfig::postMaterialLoad(material); },
-        };
-    }
-
-    caustica::SetSceneMeshVerticesParams makeMeshEditParams(SceneEditor& sceneEditor)
-    {
-        caustica::GpuSharedCaches* gpuSharedCaches = editorGpuSharedCaches(sceneEditor);
-        return caustica::SetSceneMeshVerticesParams{
-            .device = sceneEditor.app()->getGpuDevice()->getDevice(),
-            .descriptorTable = gpuSharedCaches ? gpuSharedCaches->descriptorTable.get() : nullptr,
-            .gpuResources = &requireWorldRenderer(sceneEditor).sceneGpuResources(),
-            .scene = caustica::activeScene(*sceneEditor.app()),
-            .frameIndex = sceneEditor.app()->getGpuDevice()->getFrameIndex(),
-            .resetAccumulation = &sceneEditor.pathTracerSettings().ResetAccumulation,
-            .requestMeshAccelRebuild = [&sceneEditor](const std::shared_ptr<caustica::MeshInfo>& dirtyMesh) {
-                caustica::editor::requireWorldRenderer(sceneEditor).rayTracingResources().requestMeshAccelRebuild(dirtyMesh);
-            },
         };
     }
 }
@@ -149,17 +133,17 @@ void SceneContentEditor::requestFullRebuild()
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::getMeshVertices(mesh);
+    return caustica::getMeshVertices(*m_sceneEditor.app(), mesh);
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const
 {
-    return caustica::getMeshVerticesWorld(caustica::activeScene(*m_sceneEditor.app()), mesh, m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
+    return caustica::getMeshVerticesWorld(*m_sceneEditor.app(), mesh);
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(caustica::ecs::Entity entity) const
 {
-    return caustica::getMeshVerticesWorld(caustica::activeScene(*m_sceneEditor.app()), entity, m_sceneEditor.app()->getGpuDevice()->getFrameIndex());
+    return caustica::getMeshVerticesWorld(*m_sceneEditor.app(), entity);
 }
 
 void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
@@ -167,10 +151,11 @@ void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::Me
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = makeMeshEditParams(m_sceneEditor);
-    params.recomputeNormals = recomputeNormals;
-    params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::setMeshVerticesWorld(mesh, vertices, params);
+    caustica::setMeshVerticesWorld(
+        *m_sceneEditor.app(),
+        mesh,
+        vertices,
+        { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }
 
 void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
@@ -178,10 +163,11 @@ void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = makeMeshEditParams(m_sceneEditor);
-    params.recomputeNormals = recomputeNormals;
-    params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::setMeshVerticesWorld(entity, vertices, params);
+    caustica::setMeshVerticesWorld(
+        *m_sceneEditor.app(),
+        entity,
+        vertices,
+        { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }
 
 void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
@@ -189,10 +175,11 @@ void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInf
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    auto params = makeMeshEditParams(m_sceneEditor);
-    params.recomputeNormals = recomputeNormals;
-    params.rebuildAccelerationStructure = rebuildAccelerationStructure;
-    caustica::setMeshVertices(mesh, vertices, params);
+    caustica::setMeshVertices(
+        *m_sceneEditor.app(),
+        mesh,
+        vertices,
+        { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }
 
 } // namespace caustica::editor

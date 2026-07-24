@@ -90,6 +90,9 @@ struct SceneContentComponent
 
 struct MeshInstanceComponent
 {
+    // Logic/authoring handle (CPU geometry + materials). Extract keys GPU state by
+    // mesh->renderResourceId; AssetSystem owns MeshAsset via mesh->asset.
+    // Apps should prefer SceneMeshEdit / SceneSpawn / SceneTransform - do not dig renderResourceId.
     std::shared_ptr<MeshInfo> mesh;
     int instanceIndex = -1;
     int geometryInstanceIndex = -1;
@@ -287,7 +290,7 @@ void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std
 [[nodiscard]] std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
 
-// ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, …).
+// ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, ...).
 class SceneEntityWorld : public SceneResources
 {
 public:

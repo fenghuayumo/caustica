@@ -22,6 +22,8 @@ namespace scene
 struct GeometrySequenceComponent;
 }
 
+// Engine-internal GPU wiring for mesh uploads. Application / Python / editor code
+// should call SceneMeshEdit.h App overloads instead of filling this struct.
 struct SetSceneMeshVerticesParams
 {
     caustica::rhi::Device* device = nullptr;

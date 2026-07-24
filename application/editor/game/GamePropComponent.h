@@ -11,7 +11,9 @@ namespace caustica
 
 namespace game
 {
-    // placeholder for prop components - which are things that you add to props that makes them do things
+    // Sample/demo gameplay *script* attached to a PropBase - NOT an engine ECS component.
+    // Scene truth lives in SceneEntityWorld; scripts only Tick / drive UI over that ECS.
+    // Prefer caustica::spawn / SceneMeshEdit / SceneTransform for mesh and transform edits.
     class PropComponentBase
     {
     public:

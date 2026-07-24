@@ -16,7 +16,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/Scene.h>
 #include <scene/scene_utils.h>
-#include <engine/SceneMeshEditing.h>
+#include <engine/SceneMeshEdit.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/WorldRenderer.h>
@@ -312,40 +312,21 @@ void animate(App& app, float fElapsedTimeSeconds)
                 if (touchedGaussianVisibility)
                     runtime->Invalidation.AccelerationStructRebuildRequested = true;
 
-                // Fixed-topology USD / soft-body point caches.
-                if (GpuDevice* device = gpuDevice(app))
+                // Fixed-topology USD / soft-body point caches (SceneMeshEdit hides GPU wiring).
                 {
-                    bool temporalResetNeeded = false;
-                    SetSceneMeshVerticesParams deformParams;
-                    deformParams.device = device->getDevice();
-                    if (GpuSharedCaches* caches = gpuSharedCaches(app))
-                        deformParams.descriptorTable = caches->descriptorTable.get();
-                    if (auto* renderer = worldRenderer(app))
-                        deformParams.gpuResources = &renderer->sceneGpuResources();
-                    deformParams.scene = scene;
-                    deformParams.frameIndex = device->getFrameIndex();
-                    deformParams.recomputeNormals = true;
-                    deformParams.rebuildAccelerationStructure = true;
-                    // Continuous playback must not wipe temporal denoise/TAA history every
-                    // source frame ??that reads as whole-scene shimmer. Loop wraps are
-                    // handled separately via resetAccumulation when the sample index jumps.
-                    deformParams.resetAccumulation = &temporalResetNeeded;
-                    deformParams.requestMeshAccelRebuild = [&app](const std::shared_ptr<MeshInfo>& mesh) {
-                        requestMeshAccelRebuild(app, mesh, /*resetAccumulation=*/false);
-                    };
-
+                    const PathTracerSettings* before = cfg;
+                    const bool hadResetAccumulation = before && before->ResetAccumulation;
                     world.each<scene::GeometrySequenceComponent>(
-                        [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
-                            (void)applyGeometrySequence(sequence, animTime, deformParams);
+                        [&](ecs::Entity entity, scene::GeometrySequenceComponent&) {
+                            (void)applyGeometrySequence(
+                                app,
+                                entity,
+                                animTime,
+                                SceneMeshEditOptions{ .resetAccumulationOnAccelRebuild = false });
                         });
-
-                    if (temporalResetNeeded)
-                    {
-                        // Drop NRD/TAA history on loop wrap so the end?start pose jump
-                        // does not thrash temporal filters for many frames.
+                    // Loop wraps may request accumulation reset via mesh-edit internals.
+                    if (cfg && cfg->ResetAccumulation && !hadResetAccumulation)
                         cfg->ResetRealtimeCaches = true;
-                        cfg->ResetAccumulation = true;
-                    }
                 }
             }
         }
