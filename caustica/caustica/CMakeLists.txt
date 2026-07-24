@@ -32,6 +32,12 @@
 # ============================================================================
 
 # ═══════════════════════════════════════════════════════════════════════════
+# First-party NRD (vendored SDK sources; not an External submodule)
+# ═══════════════════════════════════════════════════════════════════════════
+
+add_subdirectory(nrd)
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Common configuration
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -41,7 +47,7 @@ set(CAUSTICA_COMMON_INCLUDE_PUBLIC
 )
 
 set(CAUSTICA_COMMON_INCLUDE_PRIVATE
-    "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrd/Include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtxdi/Include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include"

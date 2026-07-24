@@ -19,9 +19,6 @@ list(REMOVE_ITEM caustica_python_core_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/PythonBindings_Extension.cpp"
 )
 
-file(GLOB NRD_INTEGRATION_HEADERS "../External/Nrd/Integration/*.h" "../External/Nrd/Integration/*.hpp")
-source_group("RayTracingDenoiser" FILES ${NRD_INTEGRATION_HEADERS})
-
 set(project caustica)
 set(folder "caustica")
 
@@ -71,7 +68,7 @@ set(caustica_shader_compile_common
     TARGET caustica_shaders
     SOURCES ${shaders}
     FOLDER ${folder}
-    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/caustica ${CMAKE_SOURCE_DIR}/External/Nrd/Shaders/Include ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party/rtxdi/Include ${CMAKE_SOURCE_DIR}/External
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/caustica ${CMAKE_CURRENT_SOURCE_DIR}/caustica/nrd/Shaders/Include ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party ${CMAKE_CURRENT_SOURCE_DIR}/caustica/third_party/rtxdi/Include ${CMAKE_SOURCE_DIR}/External
     SHADERMAKE_OPTIONS ${shadermake_options}
 )
 if (WIN32)
@@ -292,7 +289,46 @@ endif()
 ##########################################################################
 
 # Engine runtime (caustica.lib) + editor application sources
-add_subdirectory(caustica)       # builds caustica (engine static library)
+add_subdirectory(caustica)       # builds caustica (engine static library) + first-party NRD
+
+# Compile NRD compute shaders into ShaderPrecompiled/nrd (loaded by NrdIntegration).
+# Config paths are relative to CAUSTICA_NRD_ROOT so ShaderMake can resolve sources.
+if (TARGET NRD AND DEFINED CAUSTICA_NRD_ROOT)
+    get_target_property(_caustica_mathlib_dir MathLib SOURCE_DIR)
+    set(_nrd_shader_cfg "${CAUSTICA_NRD_ROOT}/nrd_shaders.cfg")
+    set(_nrd_shader_defines "-D NRD_COMPILER_DXC=1 -D NRD_NORMAL_ENCODING=${NRD_NORMAL_ENCODING} -D NRD_ROUGHNESS_ENCODING=${NRD_ROUGHNESS_ENCODING}")
+    file(GLOB _nrd_hlsl_files "${CAUSTICA_NRD_SHADER_SOURCE_DIR}/*.hlsl")
+    set(_nrd_cfg_content "")
+    foreach(_nrd_hlsl ${_nrd_hlsl_files})
+        get_filename_component(_nrd_name ${_nrd_hlsl} NAME)
+        # util_get_shader_profile_from_name always writes DXC_PROFILE in parent scope.
+        set(DXC_PROFILE "")
+        util_get_shader_profile_from_name(${_nrd_hlsl} DXC_PROFILE)
+        if (NOT DXC_PROFILE AND _nrd_name MATCHES "\\.cs\\.hlsl$")
+            set(DXC_PROFILE "cs")
+        endif()
+        string(APPEND _nrd_cfg_content "Shaders/Source/${_nrd_name} -T ${DXC_PROFILE} -E main ${_nrd_shader_defines}\n")
+    endforeach()
+    file(WRITE "${_nrd_shader_cfg}" "${_nrd_cfg_content}")
+
+    set(nrd_shader_compile_args
+        TARGET nrd_shaders
+        CONFIG ${_nrd_shader_cfg}
+        SOURCES ${CAUSTICA_NRD_SHADER_INCLUDE_DIR} ${CAUSTICA_NRD_SHADER_SOURCE_DIR} ${CAUSTICA_NRD_SHADER_RESOURCE_DIR}
+        FOLDER "caustica/nrd"
+        SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/spirv
+        CFLAGS "-WX -O3 -enable-16bit-types -all_resources_bound"
+        INCLUDES ${_caustica_mathlib_dir} ${CAUSTICA_NRD_SHADER_INCLUDE_DIR} ${CAUSTICA_NRD_SHADER_RESOURCE_DIR}
+    )
+    if (WIN32)
+        list(APPEND nrd_shader_compile_args
+            DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/dxil
+        )
+    endif()
+    caustica_compile_shaders(${nrd_shader_compile_args})
+    add_dependencies(causRender nrd_shaders)
+endif()
+
 add_subdirectory(../application/editor application/editor)  # sets CAUSTICA_EDITOR_SOURCES and CAUSTICA_EDITOR_ENTRY_SOURCE
 add_library(causticaApp STATIC ${CAUSTICA_EDITOR_SOURCES})
 if (MSVC)

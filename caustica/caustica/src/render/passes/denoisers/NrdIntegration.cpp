@@ -168,7 +168,7 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
     {
         const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[pipelineIndex];
 
-        std::string fileName = std::string("nrd/Nrd/Shaders/Source/") + nrdPipelineDesc.shaderFileName;
+        std::string fileName = std::string("nrd/Shaders/Source/") + nrdPipelineDesc.shaderFileName;
         std::vector<caustica::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
         
         NrdPipeline pipeline;
@@ -180,8 +180,8 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
             return false;
         }
 
-        // our NRD integration compiles shaders using caustica_compile_shaders (see \external\CMakeLists.txt) - that's why we're not relying on libraryDesc.spirvBindingOffsets anymore!
-        // see CAUSTICA_RHI_DEFAULT_VK_REGISTER_OFFSETS in \external\cmake\compileshaders.cmake - it now matches the Caustica RHI defaults
+        // NRD shaders are compiled by caustica_compile_shaders (caustica/CMakeLists.txt); ignore libraryDesc.spirvBindingOffsets.
+        // see CAUSTICA_RHI_DEFAULT_VK_REGISTER_OFFSETS in External/cmake/compileshaders.cmake
 		caustica::rhi::VulkanBindingOffsets cNRDBindingOffsets; // = { .shaderResource = libraryDesc.spirvBindingOffsets.textureOffset, .sampler = libraryDesc.spirvBindingOffsets.samplerOffset, .constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset, .unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset };
         
         pipeline.ResourcesBindingLayout = createResourcesBindingLayout(instanceDesc, nrdPipelineDesc);

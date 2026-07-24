@@ -1,7 +1,3 @@
-[submodule "External/RayTracingDenoiser"]
-	path = External/Nrd
-	url = https://github.com/NVIDIA-RTX/NRD.git
-	shallow = false
 [submodule "External/NVAPI"]
 	path = External/NVAPI
 	url = https://github.com/NVIDIA/nvapi.git

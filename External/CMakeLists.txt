@@ -261,72 +261,8 @@ function(util_generate_shader_config_file OUT_FILE_NAME DIR DEFINES)
     file(WRITE ${OUT_FILE_NAME} ${out_content})
 endfunction()
 
-##########################################################################
-########################### Mathlib ###########################
-##########################################################################
-# Note: Fetching mathlib manually to bypass NRD trying to fetch an invalid
-# tag. This is fixed in latest NRD, so we can remove the workaround after
-# we update NRD again.
-
-if(NOT TARGET MathLib)
-    # MathLib
-    FetchContent_Declare(
-        mathlib
-        GIT_REPOSITORY https://github.com/NVIDIA-RTX/MathLib.git
-        GIT_TAG v7
-        GIT_SHALLOW 1
-    )
-    message("Downloading Mathlib")
-
-    FetchContent_MakeAvailable(mathlib)
-endif()
-
-##########################################################################
-########################### Nrd ###########################
-##########################################################################
-
-# see https://github.com/NVIDIA-RTX/NRD?tab=readme-ov-file#how-to-build
-# set(NRD_DXC_CUSTOM_PATH ${DXC_CUSTOM_PATH})
-set(NRD_DXC_PATH "${DXC_DXIL_EXECUTABLE}" CACHE STRING "DXC shader compiler path for NRD")
-set(NRD_SHADER_OUTPUT_PATH "${SHADER_OUTPUT_PATH}" CACHE STRING "")
-set(NRD_PROJECT_FOLDER "External/Nrd")
-set(NRD_NORMAL_ENCODING "2" CACHE STRING "Normal encoding variant (0-4, matches nrd::NormalEncoding)")
-set(NRD_ROUGHNESS_ENCODING "1" CACHE STRING "Roughness encoding variant (0-2, matches nrd::RoughnessEncoding)")
-set(NRD_IS_SUBMODULE ON)
-# NRD uses a custom output path for some reason
-set(GLOBAL_BIN_OUTPUT_PATH ${CMAKE_BINARY_DIR} CACHE STRING "")
-set(NRD_SHADERS_PATH "${CMAKE_BINARY_DIR}/NRDShaders" CACHE STRING "")
-option(NRD_EMBEDS_SPIRV_SHADERS "NRD embeds SPIRV shaders" OFF)
-option(NRD_EMBEDS_DXIL_SHADERS "NRD embeds DXIL shaders" OFF)
-option(NRD_EMBEDS_DXBC_SHADERS "NRD embeds DXBC shaders" OFF)
-option(NRD_DISABLE_SHADER_COMPILATION "" ON)
-option(NRD_USE_PRECOMPILED_SHADERS "" OFF)
-
-add_subdirectory("Nrd")
-
-# Let CMake generate the nrd_shaders.cfg file 
-util_generate_shader_config_file(
-    "Nrd.cfg" 
-    "Nrd/Shaders/Source"
-    "-D NRD_COMPILER_DXC=1 -D NRD_NORMAL_ENCODING=${NRD_NORMAL_ENCODING} -D NRD_ROUGHNESS_ENCODING=${NRD_ROUGHNESS_ENCODING}"
-)
-
-# Compile all shaders in nrd_shaders.cfg
-set(nrd_shader_compile_args
-    TARGET nrd_shaders
-    CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/Nrd.cfg
-    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Nrd/Shaders/Include
-    FOLDER "NRD"
-    SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/spirv
-    CFLAGS "-WX -O3 -enable-16bit-types -all_resources_bound"
-    INCLUDES ${CMAKE_BINARY_DIR}/_deps/mathlib-src ${CMAKE_CURRENT_SOURCE_DIR}/Nrd/Shaders/Include ${CMAKE_CURRENT_SOURCE_DIR}/Nrd/Shaders/Resources
-)
-if (WIN32)
-    list(APPEND nrd_shader_compile_args
-        DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/dxil
-    )
-endif()
-caustica_compile_shaders(${nrd_shader_compile_args})
+# NRD lives in caustica/caustica/nrd (first-party). MathLib + nrd_shaders are
+# wired from caustica/CMakeLists.txt / caustica/caustica/CMakeLists.txt.
 
 ##########################################################################
 ################################ cxxopts ###############################
