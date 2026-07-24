@@ -8,11 +8,13 @@ namespace caustica::render
 // Stable pass names used as executeAfter targets. Prefer these over empty fence nodes.
 
 inline constexpr const char* kClearFrameTargetsPass = "ClearFrameTargets";
+inline constexpr const char* kUploadFrameConstantsPass = "UploadFrameConstants";
 inline constexpr const char* kEnvMapUpdatePass = "EnvMapUpdate";
 inline constexpr const char* kLightSamplingUpdateBeginPass = "LightSamplingUpdateBegin";
 inline constexpr const char* kUploadSubInstanceDataPass = "UploadSubInstanceData";
 
 // Last lighting prep pass — path trace / RTXDI begin depend on this.
+// When there is no scene, lighting ready is the FrameConstants upload alone.
 inline constexpr const char* kLightingReadyPass = kUploadSubInstanceDataPass;
 
 inline constexpr const char* kPathTraceLightingEndPass = "PathTraceLightingEnd";

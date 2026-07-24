@@ -17,7 +17,7 @@
 #include <core/scope.h>
 #include <math/float.h>
 #include <rhi/utils.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <algorithm>
 #include <cmath>
@@ -210,7 +210,7 @@ void DenoisePass::stablePlanesDebugViz(caustica::rhi::CommandList* commandList)
     assert(m_postProcess);
     assert(m_renderTargets);
 
-    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+    FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     commandList->beginMarker("StablePlanesDebugViz");
     caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
@@ -251,7 +251,7 @@ void DenoisePass::ensureNrdIntegrations()
 namespace
 {
 
-SampleMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings, int planeIndex)
+FrameMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings, int planeIndex)
 {
     const int maxPassCount = std::min(
         settings.StablePlanesActiveCount,
@@ -278,7 +278,7 @@ void DenoisePass::prepareNrdInputs(caustica::rhi::CommandList* commandList, int 
         ? PostProcess::ComputePassType::RELAXDenoiserPrepareInputs
         : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
 
-    SampleMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
+    FrameMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
     caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
 
     commandList->beginMarker("PrepareInputs");
@@ -365,7 +365,7 @@ void DenoisePass::mergeNrdOutputs(caustica::rhi::CommandList* commandList, int p
         ? PostProcess::ComputePassType::RELAXDenoiserFinalMerge
         : PostProcess::ComputePassType::REBLURDenoiserFinalMerge;
 
-    SampleMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
+    FrameMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
 
     commandList->beginMarker("MergeOutputs");
     m_postProcess->apply(
@@ -434,7 +434,7 @@ void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::CommandList* commandLis
         || m_context->activeSettings().RealtimeAA == 3)
         return;
 
-    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+    FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
     caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
     commandList->beginMarker("NoDenoiserFinalMerge");
     m_postProcess->apply(
@@ -471,7 +471,7 @@ bool DenoisePass::evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bo
     {
         RAII_SCOPE(commandList->beginMarker("DLSSRR_PrepareInputs");, commandList->endMarker(););
 
-        SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+        FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
         m_postProcess->apply(
             commandList,
@@ -594,7 +594,7 @@ void DenoisePass::runDlssUpscale(caustica::rhi::CommandList* commandList, bool r
             }
             else
             {
-                SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+                FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
                 caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
                 commandList->beginMarker("NoDenoiserFinalMerge");
                 m_postProcess->apply(
@@ -640,7 +640,7 @@ void DenoisePass::resetReferenceOIDN()
         m_oidnDenoiser->reset();
 }
 
-void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
+bool DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
 {
     assert(m_context);
     assert(commandList);
@@ -648,7 +648,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     if (m_context->activeSettings().RealtimeMode
         || !m_context->activeSettings().ReferenceOIDNDenoiser
         || m_renderTargets == nullptr)
-        return;
+        return false;
 
 #if CAUSTICA_WITH_OIDN
     caustica::rhi::Device* device = m_device;
@@ -657,10 +657,10 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     const bool accumulationReady = m_accumulationCompleted
         || m_accumulationSampleIndex >= m_context->activeSettings().AccumulationTarget;
     if (!accumulationReady)
-        return;
+        return false;
 
     if (m_oidnDenoiserFailed)
-        return;
+        return false;
 
     const caustica::rhi::TextureDesc processedDesc = m_renderTargets->processedOutputColor->getDesc();
     if (m_oidnDenoisedOutput == nullptr
@@ -681,7 +681,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
         commandList->copyTexture(
             m_renderTargets->processedOutputColor, caustica::rhi::TextureSlice(),
             m_oidnDenoisedOutput, caustica::rhi::TextureSlice());
-        return;
+        return false;
     }
 
     caustica::rhi::Texture* sourceTexture = m_renderTargets->accumulatedRadiance;
@@ -692,7 +692,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
             "OIDN reference denoiser expected RGBA32_FLOAT accumulation buffer, got %s.",
             caustica::rhi::utils::FormatToString(sourceDesc.format));
         m_oidnDenoiserFailed = true;
-        return;
+        return false;
     }
 
     const uint32_t width = sourceDesc.width;
@@ -712,7 +712,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     const bool requestNormalGuide = oidnOptions.GuidePasses == OidnDenoiser::Passes::AlbedoNormal;
     if (requestAlbedoGuide || requestNormalGuide)
     {
-        SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+        FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
         commandList->beginMarker("OIDN_PrepareGuides");
         m_postProcess->apply(
@@ -734,7 +734,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     {
         caustica::warning("OIDN reference denoiser failed to create a staging texture.");
         m_oidnDenoiserFailed = true;
-        return;
+        return false;
     }
 
     caustica::rhi::StagingTextureHandle albedoStagingTexture;
@@ -772,7 +772,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
         commandList->open();
         caustica::warning("OIDN reference denoiser readback failed because the GPU device was lost.");
         m_oidnDenoiserFailed = true;
-        return;
+        return true;
     }
 
     size_t rowPitch = 0;
@@ -783,7 +783,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
         commandList->open();
         caustica::warning("OIDN reference denoiser failed to map the accumulation buffer.");
         m_oidnDenoiserFailed = true;
-        return;
+        return true;
     }
 
     std::vector<float> inputRgb(size_t(width) * size_t(height) * 3);
@@ -832,7 +832,7 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     {
         caustica::warning("OIDN reference denoiser failed: %s", m_oidnDenoiser->getLastError().c_str());
         m_oidnDenoiserFailed = true;
-        return;
+        return true;
     }
 
     std::vector<float16_t4> outputHalf(size_t(width) * size_t(height));
@@ -855,11 +855,13 @@ void DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     caustica::info(
         "OIDN reference denoiser completed on %s for %ux%u image.",
         m_oidnDenoiser->getDeviceDescription().c_str(), width, height);
+    return true;
 #else
     if (!m_oidnDenoiserFailed)
     {
         caustica::warning("OIDN reference denoiser requested, but CAUSTICA_WITH_OIDN is disabled in this build.");
         m_oidnDenoiserFailed = true;
     }
+    return false;
 #endif
 }

@@ -93,7 +93,7 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
         layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
             caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(FrameMiniConstants)),
             caustica::rhi::BindingLayoutItem::Texture_UAV(0),
             caustica::rhi::BindingLayoutItem::Texture_UAV(1),
             caustica::rhi::BindingLayoutItem::Texture_SRV(0),
@@ -115,7 +115,7 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
         layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
             caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(FrameMiniConstants)),
             caustica::rhi::BindingLayoutItem::Texture_UAV(0),
             caustica::rhi::BindingLayoutItem::Texture_UAV(1),
             caustica::rhi::BindingLayoutItem::Sampler(0),
@@ -491,7 +491,7 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
     caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
             caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-            //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(FrameMiniConstants)),
             caustica::rhi::BindingSetItem::Texture_UAV(0, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
             caustica::rhi::BindingSetItem::Texture_UAV(1, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
             caustica::rhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((caustica::rhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
@@ -538,7 +538,7 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
             caustica::rhi::BindingSetDesc localBindingSetDesc;
             localBindingSetDesc.bindings = {
                     caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-                    //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+                    //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(FrameMiniConstants)),
                     caustica::rhi::BindingSetItem::Texture_UAV(0, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
                     caustica::rhi::BindingSetItem::Texture_UAV(1, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i - 1, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
                     caustica::rhi::BindingSetItem::Sampler(0, m_pointSampler),

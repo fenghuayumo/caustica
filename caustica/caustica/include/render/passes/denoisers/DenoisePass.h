@@ -70,7 +70,8 @@ public:
     void runDlssUpscale(caustica::rhi::CommandList* commandList, bool reset);
 
     void resetReferenceOIDN();
-    void applyReferenceOIDN(caustica::rhi::CommandList* commandList);
+    // Returns true if the command list was closed/executed/reopened (volatile CBs need rewrite).
+    bool applyReferenceOIDN(caustica::rhi::CommandList* commandList);
     void invalidateNrdIntegrations();
     void invalidateOidnOutput();
 

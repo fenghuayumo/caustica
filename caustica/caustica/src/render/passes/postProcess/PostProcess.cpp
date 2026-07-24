@@ -58,7 +58,7 @@ PostProcess::PostProcess( caustica::rhi::Device* device, std::shared_ptr<caustic
     layoutDesc.visibility = caustica::rhi::ShaderType::Compute | caustica::rhi::ShaderType::Pixel;
     layoutDesc.bindings = {
         caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(FrameMiniConstants)),
         caustica::rhi::BindingLayoutItem::Texture_SRV(0),
         caustica::rhi::BindingLayoutItem::Texture_UAV(0),
         caustica::rhi::BindingLayoutItem::Texture_SRV(2),
@@ -85,7 +85,7 @@ PostProcess::PostProcess( caustica::rhi::Device* device, std::shared_ptr<caustic
     m_pointSampler = m_device->createSampler(samplerDesc);
 }
 
-void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
+void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, FrameMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height)
 {
     uint passIndex = (uint32_t)passType;
 
@@ -109,7 +109,7 @@ void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType
     commandList->dispatch(dispatchSize.x, dispatchSize.y);
 }
 
-void PostProcess::apply( caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture)
+void PostProcess::apply( caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, FrameMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture)
 {
     // commandList->beginMarker("PostProcessCS");
 
@@ -118,7 +118,7 @@ void PostProcess::apply( caustica::rhi::CommandList* commandList, ComputePassTyp
     caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
     		caustica::rhi::BindingSetItem::ConstantBuffer(0, consts),
-            caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)), 
+            caustica::rhi::BindingSetItem::PushConstants(1, sizeof(FrameMiniConstants)), 
             caustica::rhi::BindingSetItem::Texture_SRV(0, (sourceTexture!=nullptr)?(sourceTexture):(m_renderDevice.builtins().whiteTexture().Get())),
             caustica::rhi::BindingSetItem::Texture_UAV(0, workTexture),
     		//caustica::rhi::BindingSetItem::StructuredBuffer_SRV(1, renderTargets.DenoiserPixelDataBuffer),

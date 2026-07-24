@@ -8,6 +8,8 @@ struct FrameGraphContext;
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx);
 
 void registerClearFrameTargetsPass(FrameGraphContext ctx);
+// Writes FrameConstants after Clear (graph-owned; not pre-graph CL).
+void registerUploadFrameConstantsPass(FrameGraphContext ctx);
 // Registers EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData.
 void registerLightingUpdateBeginPass(FrameGraphContext ctx);
 void registerLightingGraphPasses(FrameGraphContext ctx);

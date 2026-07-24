@@ -10,7 +10,7 @@
 using namespace caustica::math;
 
 #include <render/core/RenderTargets.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 namespace caustica
 {
@@ -65,6 +65,6 @@ public:
         //, std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory
     );
 
-    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
-    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture);
+    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, FrameMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
+    void apply(caustica::rhi::CommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, FrameMiniConstants & miniConsts, caustica::rhi::Texture* workTexture, RenderTargets & renderTargets, caustica::rhi::Texture* sourceTexture);
 };

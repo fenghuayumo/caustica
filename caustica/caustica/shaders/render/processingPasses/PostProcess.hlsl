@@ -567,12 +567,12 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
 #if defined(DENOISER_FINAL_MERGE)
 
 #include <shaders/binding_helpers.hlsli>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include "../nrd/DenoiserNRD.hlsli"
 #include <shaders/PathTracer/StablePlanes.hlsli>
 
-ConstantBuffer<SampleConstants>         g_Const             : register(b0);
-VK_PUSH_CONSTANT ConstantBuffer<SampleMiniConstants>     g_MiniConst         : register(b1);
+ConstantBuffer<FrameConstants>         g_Const             : register(b0);
+VK_PUSH_CONSTANT ConstantBuffer<FrameMiniConstants>     g_MiniConst         : register(b1);
 
 RWTexture2D<float4>     u_InputOutput                           : register(u0);
 Texture2D<float4>       t_DiffRadiance                          : register(t2);

@@ -5,7 +5,7 @@
 #include <render/core/PtPipelineFeaturePresets.h>
 #include <render/RenderRuntimeState.h>
 #include <rhi/rhi.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <functional>
 #include <memory>
@@ -76,7 +76,7 @@ public:
 
     void sampleRenderCode(caustica::rhi::Framebuffer* framebuffer,
         caustica::rhi::CommandListHandle commandList,
-        const SampleConstants& constants);
+        const FrameConstants& constants);
 
     bool consumeShaderReloadRequest();
     bool& accelerationStructRebuildRequested();

@@ -3,8 +3,8 @@
 
 #ifndef __cplusplus
 
-#include <shaders/SampleConstantBuffer.h>
-ConstantBuffer<SampleConstants> g_Const : register(b0);
+#include <shaders/FrameConstantBuffer.h>
+ConstantBuffer<FrameConstants> g_Const : register(b0);
 
 #ifdef DRAW_LINES_SHADERS_OLD
 

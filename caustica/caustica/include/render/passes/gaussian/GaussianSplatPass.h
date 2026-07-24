@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 namespace caustica
 {

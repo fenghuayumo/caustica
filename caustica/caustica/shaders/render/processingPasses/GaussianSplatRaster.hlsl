@@ -1,6 +1,6 @@
 #pragma pack_matrix(row_major)
 
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #ifndef GAUSSIAN_SPLAT_SORT_KEYS
 #define GAUSSIAN_SPLAT_SORT_KEYS 0

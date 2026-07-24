@@ -18,7 +18,7 @@
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <scene/SceneRenderData.h>
 #include <shaders/render/rtxdi/ShaderParameters.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <core/scope.h>
 
 #include <render/core/RenderTargets.h>
@@ -971,7 +971,7 @@ void RtxdiPass::executeComputePass(
 {
 	commandList->beginMarker(passName);
     
-    SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
+    FrameMiniConstants unusedPushConstants = { };  // shared bindings require them
 	pass.execute(commandList, dispatchSize.x, dispatchSize.y, dispatchSize.z, m_bindingSet,
 		extraBindingSet, m_descriptorTable, &unusedPushConstants, sizeof(unusedPushConstants));
 
@@ -988,7 +988,7 @@ void RtxdiPass::executeRayTracingPass(
 {
 	commandList->beginMarker(passName);
 	
-    SampleMiniConstants unusedPushConstants = { };  // shared bindings require them
+    FrameMiniConstants unusedPushConstants = { };  // shared bindings require them
 	pass.execute(commandList, dispatchSize.x, dispatchSize.y, m_bindingSet,
 		extraBindingSet, m_descriptorTable, &unusedPushConstants, sizeof(unusedPushConstants));
 

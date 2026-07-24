@@ -43,7 +43,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <core/path_utils.h>
 #include <core/log.h>
 #include <scene/View.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <shaders/view_cb.h>
 
 #include <cstring>
@@ -129,7 +129,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .frame = &ctx.frame,
         .renderTargets = m_renderTargets.get(),
         .settings = &m_context->activeSettings(),
-        .sampleConstants = &m_currentConstants,
+        .frameConstants = &m_frameConstants,
         .gaussianSplatEmissionProxies = m_gaussianSplatEmissionProxies.empty()
             ? nullptr
             : &m_gaussianSplatEmissionProxies,
@@ -164,7 +164,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .subInstanceDataBuffer = m_context->accelStructs.getSubInstanceBuffer(),
         .pathTracingContext = m_context,
         .device = device(),
-        .commandList = m_commandList,
+        .commandList = m_frameCommands->primary(),
         .accelStructs = &m_accelStructs,
         .gaussianScenePasses = &m_context->scenePasses.gaussianSplats,
         .camera = &m_context->camera,
@@ -251,7 +251,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
     {
         m_shaderDebug->endFrameAndOutput(
-            m_commandList,
+            m_frameCommands->primary(),
             m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.view.postProcessView),
             m_renderTargets->depth,
             fbinfo.getViewport());
@@ -265,7 +265,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
 {
     assert(ctx.graph != nullptr);
 
-    SampleConstants& constants = m_currentConstants;
+    FrameConstants& constants = m_frameConstants;
 
     ctx.graph->compile();
 
@@ -274,22 +274,20 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         validateReferencePathTraceGraph(*ctx.graph, m_context->activeSettings());
 #endif
 
-    ctx.graph->execute(m_commandList);
+    ctx.graph->execute(*m_frameCommands);
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();
 
+    // ToneMapping / ReferenceOIDN may close+reopen primary mid-graph; they rewrite
+    // FrameConstants before later passes. A final rewrite covers any leftover use.
     if (ctx.commandListWasClosed)
-        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
+        m_frameCommands->primary()->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     abortIfSubmitFailed(ctx.frame, "postToneMapping");
     if (ctx.frame.aborted)
         return;
 
     abortIfSubmitFailed(ctx.frame, "finalBlit");
-    if (ctx.frame.aborted)
-        return;
-
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
 void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ctx)
@@ -419,11 +417,13 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     }
 
     if (m_context->sessionScene && m_context->frameScene)
+    {
+        m_frameCommands->ensurePrimary();
         m_context->scenePasses.rayTracing.recreateAccelStructs(
-            m_commandList, *m_context->sessionScene, m_context->frameScene);
+            m_frameCommands->primary(), *m_context->sessionScene, m_context->frameScene);
+    }
     else
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested() = false;
-    m_commandList = device()->createCommandList();
 
     if (m_context->activeSettings().actualUseRTXDIPasses() && m_rtxdiPass == nullptr)
         ctx.needNewPasses = true;
@@ -441,10 +441,9 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             ctx.aborted = true;
             return;
         }
-        m_commandList->open();
-        createRenderPasses(ctx.exposureResetRequired, m_commandList);
-        m_commandList->close();
-        device()->executeCommandList(m_commandList);
+        m_frameCommands->beginPrimary();
+        createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
+        m_frameCommands->endFrame();
         const bool createPassesWaitOk = device()->waitForIdle();
         if (!createPassesWaitOk)
         {
@@ -508,20 +507,19 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
 
 void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrameContext& ctx)
 {
-    m_commandList->open();
+    m_frameCommands->beginPrimary();
     ctx.submitInitializationStage = [this, &ctx](const char* stage) -> bool {
         if (!ctx.needNewPasses)
             return true;
 
-        m_commandList->close();
-        device()->executeCommandList(m_commandList);
+        // THREADING: sync-point, RT-only.
+        m_frameCommands->flushPrimary();
         const bool waitOk = device()->waitForIdle();
         if (!waitOk)
         {
             caustica::error("Renderer init synchronization failed after %s", stage);
             return false;
         }
-        m_commandList->open();
         return true;
     };
 }
@@ -555,7 +553,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
     {
         dm::float4x4 viewProj = m_context->camera.view()->getViewProjectionMatrix();
-        m_shaderDebug->beginFrame(m_commandList, viewProj);
+        m_shaderDebug->beginFrame(m_frameCommands->primary(), viewProj);
     }
 
     UpdateSceneGeometryParams geoParams{
@@ -564,7 +562,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         m_context->sessionScene,
         m_context->frameScene,
         m_context->sessionScene ? &m_context->sceneGpuResources : nullptr,
-        m_commandList,
+        m_frameCommands->primary(),
     };
     geoParams.descriptorTable = m_context->descriptorTable.get();
     geoParams.materials = m_context->scenePasses.lighting.materials().get();
@@ -576,7 +574,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (ctx.aborted)
         return;
 
-    preUpdateLightingFrame(*m_context, m_commandList, ctx.needNewBindings);
+    preUpdateLightingFrame(*m_context, m_frameCommands->primaryHandle(), ctx.needNewBindings);
     abortIfSubmitFailed(ctx, "preUpdateLighting");
     if (ctx.aborted)
         return;
@@ -590,7 +588,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
         const bool envMapPresent = m_context->activeSettings().EnvironmentMapParams.enabled;
         RtxdiPass::SetupParams rtxdiParams{};
-        rtxdiParams.commandList = m_commandList;
+        rtxdiParams.commandList = m_frameCommands->primaryHandle();
         rtxdiParams.renderTargets = m_renderTargets.get();
         rtxdiParams.environment = envMapPresent
             ? m_context->scenePasses.lighting.environment().get()
@@ -667,21 +665,18 @@ void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrame
 {
     if (m_toneMappingPass != nullptr)
         m_toneMappingPass->preRender(m_context->activeSettings().ToneMappingParams);
-    preUpdatePathTracing(ctx.needNewPasses, m_commandList);
+    preUpdatePathTracing(ctx.needNewPasses, m_frameCommands->primaryHandle());
 
     abortIfSubmitFailed(ctx, "preUpdatePathTracing");
 }
 
 void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext& ctx)
 {
-    SampleConstants& constants = m_currentConstants;
+    FrameConstants& constants = m_frameConstants;
     memset(&constants, 0, sizeof(constants));
 
     if (!m_context->hasFrameScene())
-    {
-        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
         return;
-    }
 
     if (m_toneMappingPass != nullptr && m_context->activeSettings().EnableToneMapping)
         m_toneMappingPass->preRender(m_context->activeSettings().ToneMappingParams);
@@ -769,43 +764,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         m_context->activeSettings().ReblurSettings.hitDistanceParameters.D
     };
 
-    // EnvMap / LightSampling / SubInstance upload run as graph passes after ClearFrameTargets.
+    // FrameConstants / EnvMap / LightSampling / SubInstance / OIDN / AA are graph-owned.
     buildGaussianSplatEmissionProxies();
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }
 
 void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameContext& ctx)
 {
-    if (!m_context->hasFrameScene())
-        return;
-
-    SampleConstants& constants = m_currentConstants;
-
-    // Copy, TAA, DLSS, accumulation, and Gaussian splats run in the frame graph after path trace and NRD.
-    if (m_denoisePass)
-    {
-        FrameGraphContext oidnCtx{};
-        oidnCtx.pathTracingContext = m_context;
-        oidnCtx.device = device();
-        oidnCtx.commandList = m_commandList;
-        oidnCtx.renderTargets = m_renderTargets.get();
-        oidnCtx.postProcess = m_postProcess.get();
-        oidnCtx.bindingSet = m_bindingSet;
-        oidnCtx.bindingLayout = m_bindingLayout;
-        oidnCtx.constantBuffer = m_constantBuffer;
-        oidnCtx.accumulationSampleIndex = m_accumulationSampleIndex;
-        oidnCtx.accumulationCompleted = m_accumulationCompleted;
-        m_denoisePass->bindFrame(oidnCtx);
-        m_denoisePass->applyReferenceOIDN(m_commandList);
-    }
-    if (m_context->activeSettings().ReferenceOIDNDenoiser)
-        m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
-
-    abortIfSubmitFailed(ctx, "denoiseAndAA");
-    if (ctx.aborted)
-        return;
-
-    m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
+    // Denoise / TAA / DLSS / Accumulation / ReferenceOIDN record inside the frame graph.
+    (void)ctx;
 }
 
 void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext& ctx)
@@ -813,8 +779,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
     caustica::rhi::Texture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
 
-    m_commandList->close();
-    device()->executeCommandList(m_commandList);
+    m_frameCommands->endFrame();
     if (ctx.needNewPasses)
     {
         const bool finalWaitOk = device()->waitForIdle();
@@ -903,6 +868,7 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
     registerClearFrameTargetsPass(ctx);
+    registerUploadFrameConstantsPass(ctx);
     registerLightingGraphPasses(ctx);
     registerRtxdiBeginFramePass(ctx);
     registerPathTracePrePass(ctx);

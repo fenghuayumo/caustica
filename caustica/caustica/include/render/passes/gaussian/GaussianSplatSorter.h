@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 class GPUSort;
 

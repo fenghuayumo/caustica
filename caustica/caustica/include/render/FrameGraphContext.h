@@ -6,7 +6,7 @@
 #include <math/math.h>
 #include <rhi/rhi.h>
 #include <shaders/PathTracer/Config.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <cstdint>
 #include <memory>
@@ -67,7 +67,7 @@ struct FrameGraphContext
     PathTracingFrameContext* frame = nullptr;
     RenderTargets* renderTargets = nullptr;
     PathTracerSettings* settings = nullptr;
-    SampleConstants* sampleConstants = nullptr;
+    FrameConstants* frameConstants = nullptr;
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
     caustica::rhi::Framebuffer* targetFramebuffer = nullptr;
     const ExtractedFrameView* extractedView = nullptr;

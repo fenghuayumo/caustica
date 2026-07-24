@@ -18,7 +18,7 @@
 #include <scene/View.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/PathTracer/StablePlanes.hlsli>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <algorithm>
 #include <cassert>
@@ -189,7 +189,7 @@ void PathTracePass::prePass(
     args.width = viewSize.x;
     args.height = viewSize.y;
 
-    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+    FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     RAII_SCOPE(commandList->beginMarker("PathTracePrePass");, commandList->endMarker(););
 
@@ -212,7 +212,7 @@ void PathTracePass::exportVBuffer(
     assert(bindingSet);
     assert(descriptorTable);
 
-    SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+    FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     RAII_SCOPE(commandList->beginMarker("VBufferExport");, commandList->endMarker(););
 
@@ -256,7 +256,7 @@ void PathTracePass::mainPass(
     {
         commandList->setRayTracingState(state);
 
-        SampleMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };
+        FrameMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };
         commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
 
         commandList->dispatchRays(args);

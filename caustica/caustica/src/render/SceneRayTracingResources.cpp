@@ -248,7 +248,7 @@ void SceneRayTracingResources::recreateBindingSet(
 
 void SceneRayTracingResources::sampleRenderCode(caustica::rhi::Framebuffer* framebuffer,
     caustica::rhi::CommandListHandle commandList,
-    const SampleConstants& constants)
+    const FrameConstants& constants)
 {
     (void)framebuffer;
     (void)commandList;

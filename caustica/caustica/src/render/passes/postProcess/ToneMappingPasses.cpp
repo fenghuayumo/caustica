@@ -382,6 +382,10 @@ void ToneMappingPass::registerGraphPass(
                 enabled);
             if (outCommandListWasClosed)
                 *outCommandListWasClosed = closed;
+        },
+        caustica::rg::PassOptions{
+            .sideEffect = true,
+            .serialOnPrimary = true, // mid-pass close/execute/waitForIdle/open for AE
         });
 }
 

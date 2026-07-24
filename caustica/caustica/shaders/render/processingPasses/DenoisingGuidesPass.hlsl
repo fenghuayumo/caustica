@@ -28,7 +28,7 @@ struct DenoisingGuidesPassConstants
 ////#include <shaders/PathTracer/PathTracer.hlsli>
 ////#include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsli>
 //=======
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <shaders/binding_helpers.hlsli>
 
 // Only the UAV bindings needed by this shader (avoids including ShaderResourceBindings.hlsli

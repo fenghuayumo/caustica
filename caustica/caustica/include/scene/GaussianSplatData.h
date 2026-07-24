@@ -7,7 +7,7 @@
 namespace caustica
 {
 
-// GPU-compatible splat vertex layout (matches shaders/SampleConstantBuffer.h).
+// GPU-compatible splat vertex layout (matches shaders/FrameConstantBuffer.h).
 struct GaussianSplatData
 {
     math::float4 centerOpacity;

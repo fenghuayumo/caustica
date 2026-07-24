@@ -2,7 +2,7 @@
 
 #include <math/math.h>
 #include <rhi/rhi.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <functional>
 #include <string>
@@ -32,7 +32,7 @@ struct PathTracingFrameContext
     bool forcePathTracingShaderReload = false;
 
     PathTracerCameraData cameraData{};
-    SampleConstants      constants{};
+    FrameConstants      constants{};
 
     // Set to true when a GPU sync point fails and the frame must abort.
     bool aborted = false;

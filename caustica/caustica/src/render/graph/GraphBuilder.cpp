@@ -2,6 +2,7 @@
 #include <render/graph/RenderBufferPool.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/TransientResourceAllocator.h>
+#include <core/JobSystem.h>
 
 #include <algorithm>
 #include <cassert>
@@ -345,6 +346,7 @@ void GraphBuilder::compile()
     for (Pass& pass : m_passes)
         pass.active = false;
     m_compiledPassOrder.clear();
+    m_compiledWaves.clear();
 
     std::vector<std::vector<uint32_t>> incoming(m_passes.size());
     std::vector<std::vector<uint32_t>> outgoing(m_passes.size());
@@ -353,6 +355,8 @@ void GraphBuilder::compile()
     std::vector<bool> referencedBuffers(m_buffers.size(), false);
     std::vector<int32_t> lastTextureWriter(m_textures.size(), -1);
     std::vector<int32_t> lastBufferWriter(m_buffers.size(), -1);
+    std::vector<std::vector<uint32_t>> lastTextureReaders(m_textures.size());
+    std::vector<std::vector<uint32_t>> lastBufferReaders(m_buffers.size());
 
     const auto addDependency = [&](uint32_t before, uint32_t after) {
         if (before == after)
@@ -381,6 +385,7 @@ void GraphBuilder::compile()
 
             if (lastTextureWriter[handle.index] >= 0)
                 addDependency(static_cast<uint32_t>(lastTextureWriter[handle.index]), passIndex);
+            lastTextureReaders[handle.index].push_back(passIndex);
         }
         for (const auto& [handle, access] : pass.textureWrites)
         {
@@ -388,6 +393,11 @@ void GraphBuilder::compile()
             assert(isValid(handle, m_textures.size()) && "RenderGraph pass write references invalid texture handle");
             if (!isValid(handle, m_textures.size()))
                 continue;
+
+            // WAR: writers wait for prior readers in the same resource.
+            for (const uint32_t reader : lastTextureReaders[handle.index])
+                addDependency(reader, passIndex);
+            lastTextureReaders[handle.index].clear();
 
             if (lastTextureWriter[handle.index] >= 0)
                 addDependency(static_cast<uint32_t>(lastTextureWriter[handle.index]), passIndex);
@@ -402,6 +412,7 @@ void GraphBuilder::compile()
 
             if (lastBufferWriter[handle.index] >= 0)
                 addDependency(static_cast<uint32_t>(lastBufferWriter[handle.index]), passIndex);
+            lastBufferReaders[handle.index].push_back(passIndex);
         }
         for (const auto& [handle, access] : pass.bufferWrites)
         {
@@ -409,6 +420,10 @@ void GraphBuilder::compile()
             assert(isValid(handle, m_buffers.size()) && "RenderGraph pass write references invalid buffer handle");
             if (!isValid(handle, m_buffers.size()))
                 continue;
+
+            for (const uint32_t reader : lastBufferReaders[handle.index])
+                addDependency(reader, passIndex);
+            lastBufferReaders[handle.index].clear();
 
             if (lastBufferWriter[handle.index] >= 0)
                 addDependency(static_cast<uint32_t>(lastBufferWriter[handle.index]), passIndex);
@@ -516,43 +531,7 @@ void GraphBuilder::compile()
         }
     }
 
-    std::vector<uint32_t> indegree(m_passes.size(), 0);
-    for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
-    {
-        if (!needed[passIndex])
-            continue;
-
-        for (const uint32_t dependency : incoming[passIndex])
-        {
-            if (needed[dependency])
-                ++indegree[passIndex];
-        }
-    }
-
-    std::vector<bool> emitted(m_passes.size(), false);
-    for (size_t emittedCount = 0; emittedCount < m_passes.size();)
-    {
-        bool emittedOne = false;
-        for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
-        {
-            if (!needed[passIndex] || emitted[passIndex] || indegree[passIndex] != 0)
-                continue;
-
-            emitted[passIndex] = true;
-            emittedOne = true;
-            ++emittedCount;
-            m_compiledPassOrder.push_back(passIndex);
-
-            for (const uint32_t dependent : outgoing[passIndex])
-            {
-                if (needed[dependent] && indegree[dependent] > 0)
-                    --indegree[dependent];
-            }
-        }
-
-        if (!emittedOne)
-            break;
-    }
+    buildCompiledWaves(needed, incoming, outgoing);
 
     size_t neededPassCount = 0;
     for (const bool isNeeded : needed)
@@ -565,11 +544,14 @@ void GraphBuilder::compile()
     {
         assert(false && "RenderGraph dependency cycle detected");
         m_compiledPassOrder.clear();
+        m_compiledWaves.clear();
         for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
         {
             if (needed[passIndex])
                 m_compiledPassOrder.push_back(passIndex);
         }
+        for (const uint32_t passIndex : m_compiledPassOrder)
+            m_compiledWaves.push_back({ passIndex });
     }
 
     for (size_t i = 0; i < m_textures.size(); ++i)
@@ -877,68 +859,286 @@ void GraphBuilder::transitionExtractedResources(caustica::rhi::CommandList* comm
         commandList->commitBarriers();
 }
 
-void GraphBuilder::execute(caustica::rhi::CommandList* commandList)
+void GraphBuilder::buildCompiledWaves(
+    const std::vector<bool>& needed,
+    const std::vector<std::vector<uint32_t>>& incoming,
+    const std::vector<std::vector<uint32_t>>& outgoing)
 {
-    assert(commandList);
-    if (!m_compiled)
-        compile();
+    m_compiledPassOrder.clear();
+    m_compiledWaves.clear();
 
-    for (const uint32_t passIndex : m_compiledPassOrder)
+    std::vector<uint32_t> indegree(m_passes.size(), 0);
+    for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
+    {
+        if (!needed[passIndex])
+            continue;
+        for (const uint32_t dependency : incoming[passIndex])
+        {
+            if (needed[dependency])
+                ++indegree[passIndex];
+        }
+    }
+
+    std::vector<bool> emitted(m_passes.size(), false);
+    for (;;)
+    {
+        std::vector<uint32_t> wave;
+        wave.reserve(8);
+        for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
+        {
+            if (!needed[passIndex] || emitted[passIndex] || indegree[passIndex] != 0)
+                continue;
+            wave.push_back(passIndex);
+        }
+
+        if (wave.empty())
+            break;
+
+        // serialOnPrimary passes never share a parallel wave.
+        std::vector<uint32_t> parallelEligible;
+        for (const uint32_t passIndex : wave)
+        {
+            if (m_passes[passIndex].options.serialOnPrimary)
+            {
+                m_compiledWaves.push_back({ passIndex });
+                m_compiledPassOrder.push_back(passIndex);
+                emitted[passIndex] = true;
+                for (const uint32_t dependent : outgoing[passIndex])
+                {
+                    if (needed[dependent] && indegree[dependent] > 0)
+                        --indegree[dependent];
+                }
+            }
+            else
+            {
+                parallelEligible.push_back(passIndex);
+            }
+        }
+
+        if (!parallelEligible.empty())
+        {
+            m_compiledWaves.push_back(parallelEligible);
+            for (const uint32_t passIndex : parallelEligible)
+            {
+                m_compiledPassOrder.push_back(passIndex);
+                emitted[passIndex] = true;
+                for (const uint32_t dependent : outgoing[passIndex])
+                {
+                    if (needed[dependent] && indegree[dependent] > 0)
+                        --indegree[dependent];
+                }
+            }
+        }
+    }
+}
+
+void GraphBuilder::recordPass(
+    caustica::rhi::CommandList* commandList,
+    const Pass& pass,
+    std::vector<caustica::rhi::ResourceStates>* localTextureStates,
+    std::vector<caustica::rhi::ResourceStates>* localBufferStates)
+{
+    commandList->beginMarker(pass.name.c_str());
+
+    // Aliasing barriers mutate shared emitted flags — only safe on the render thread
+    // (serial path, or RT setup before parallel body). Skip when using local state.
+    if (!localTextureStates)
+    {
+        for (const auto& [handle, access] : pass.textureReads)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.textureWrites)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.bufferReads)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(commandList, handle);
+        }
+        for (const auto& [handle, access] : pass.bufferWrites)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(commandList, handle);
+        }
+    }
+
+    const auto transitionTex = [&](TextureHandle handle, TextureAccess access) {
+        if (!isValid(handle, m_textures.size()))
+            return;
+        GraphTexture& resource = m_textures[handle.index];
+        if (!resource.texture)
+            return;
+        const caustica::rhi::ResourceStates target = accessToState(access);
+        caustica::rhi::ResourceStates& current = localTextureStates
+            ? (*localTextureStates)[handle.index]
+            : resource.currentState;
+        if (current == target)
+            return;
+        commandList->setTextureState(resource.texture, caustica::rhi::AllSubresources, target);
+        current = target;
+    };
+    const auto transitionBuf = [&](BufferHandle handle, BufferAccess access) {
+        if (!isValid(handle, m_buffers.size()))
+            return;
+        GraphBuffer& resource = m_buffers[handle.index];
+        if (!resource.buffer)
+            return;
+        const caustica::rhi::ResourceStates target = accessToState(access);
+        caustica::rhi::ResourceStates& current = localBufferStates
+            ? (*localBufferStates)[handle.index]
+            : resource.currentState;
+        if (current == target)
+            return;
+        commandList->setBufferState(resource.buffer, target);
+        current = target;
+    };
+
+    for (const auto& [handle, access] : pass.textureReads)
+        transitionTex(handle, access);
+    for (const auto& [handle, access] : pass.textureWrites)
+        transitionTex(handle, access);
+    for (const auto& [handle, access] : pass.bufferReads)
+        transitionBuf(handle, access);
+    for (const auto& [handle, access] : pass.bufferWrites)
+        transitionBuf(handle, access);
+
+    if (!pass.textureReads.empty() || !pass.textureWrites.empty() || !pass.bufferReads.empty() || !pass.bufferWrites.empty())
+        commandList->commitBarriers();
+
+    if (pass.execute)
+    {
+        RenderPassContext context(commandList, *this);
+        pass.execute(context);
+    }
+
+    commandList->endMarker();
+}
+
+void GraphBuilder::executeWaveSerial(caustica::rhi::CommandList* commandList, const std::vector<uint32_t>& wave)
+{
+    for (const uint32_t passIndex : wave)
     {
         if (passIndex >= m_passes.size())
             continue;
-
         const Pass& pass = m_passes[passIndex];
         if (!pass.active)
             continue;
-
-        commandList->beginMarker(pass.name.c_str());
-
-        for (const auto& [handle, access] : pass.textureReads)
-        {
-            (void)access;
-            emitTextureAliasingBarrier(commandList, handle);
-        }
-        for (const auto& [handle, access] : pass.textureWrites)
-        {
-            (void)access;
-            emitTextureAliasingBarrier(commandList, handle);
-        }
-        for (const auto& [handle, access] : pass.bufferReads)
-        {
-            (void)access;
-            emitBufferAliasingBarrier(commandList, handle);
-        }
-        for (const auto& [handle, access] : pass.bufferWrites)
-        {
-            (void)access;
-            emitBufferAliasingBarrier(commandList, handle);
-        }
-
-        for (const auto& [handle, access] : pass.textureReads)
-            transitionTexture(commandList, handle, access);
-        for (const auto& [handle, access] : pass.textureWrites)
-            transitionTexture(commandList, handle, access);
-        for (const auto& [handle, access] : pass.bufferReads)
-            transitionBuffer(commandList, handle, access);
-        for (const auto& [handle, access] : pass.bufferWrites)
-            transitionBuffer(commandList, handle, access);
-
-        if (!pass.textureReads.empty() || !pass.textureWrites.empty() || !pass.bufferReads.empty() || !pass.bufferWrites.empty())
-            commandList->commitBarriers();
-
-        if (pass.execute)
-        {
-            RenderPassContext context(commandList, *this);
-            pass.execute(context);
-        }
-
+        recordPass(commandList, pass);
         syncPassEndStates(pass);
+    }
+}
 
-        commandList->endMarker();
+void GraphBuilder::executeWaveParallel(caustica::rhi::FrameCommandContext& frameCtx, const std::vector<uint32_t>& wave)
+{
+    // Prior serial waves may still be pending on the open primary. Flush them
+    // before submitting forks so GPU order matches the compiled wave order.
+    // WARNING: flush closes the primary and clears volatile CB address maps on
+    // that list — later primary passes must writeBuffer those CBs again.
+    if (frameCtx.primaryOpen())
+        frameCtx.flushPrimary();
+
+    std::vector<caustica::rhi::ResourceStates> waveTextureStates(m_textures.size());
+    std::vector<caustica::rhi::ResourceStates> waveBufferStates(m_buffers.size());
+    for (size_t i = 0; i < m_textures.size(); ++i)
+        waveTextureStates[i] = m_textures[i].currentState;
+    for (size_t i = 0; i < m_buffers.size(); ++i)
+        waveBufferStates[i] = m_buffers[i].currentState;
+
+    std::vector<caustica::rhi::CommandListHandle> forks(wave.size());
+    for (size_t i = 0; i < wave.size(); ++i)
+    {
+        forks[i] = frameCtx.fork();
+        // Emit aliasing on the RT before workers touch the lists.
+        const uint32_t passIndex = wave[i];
+        if (passIndex >= m_passes.size() || !m_passes[passIndex].active)
+            continue;
+        const Pass& pass = m_passes[passIndex];
+        for (const auto& [handle, access] : pass.textureReads)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(forks[i].Get(), handle);
+        }
+        for (const auto& [handle, access] : pass.textureWrites)
+        {
+            (void)access;
+            emitTextureAliasingBarrier(forks[i].Get(), handle);
+        }
+        for (const auto& [handle, access] : pass.bufferReads)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(forks[i].Get(), handle);
+        }
+        for (const auto& [handle, access] : pass.bufferWrites)
+        {
+            (void)access;
+            emitBufferAliasingBarrier(forks[i].Get(), handle);
+        }
     }
 
-    transitionExtractedResources(commandList);
+    JobSystem::Context jobs;
+    JobSystem::dispatch(jobs, static_cast<uint32_t>(wave.size()), 1, [&](JobDispatchArgs args) {
+        const uint32_t slot = args.jobIndex;
+        const uint32_t passIndex = wave[slot];
+        if (passIndex >= m_passes.size())
+            return;
+
+        const Pass& pass = m_passes[passIndex];
+        if (!pass.active)
+            return;
+
+        auto localTex = waveTextureStates;
+        auto localBuf = waveBufferStates;
+        recordPass(forks[slot].Get(), pass, &localTex, &localBuf);
+    });
+    JobSystem::wait(jobs);
+
+    frameCtx.submitForks();
+
+    for (const uint32_t passIndex : wave)
+    {
+        if (passIndex >= m_passes.size())
+            continue;
+        const Pass& pass = m_passes[passIndex];
+        if (pass.active)
+            syncPassEndStates(pass);
+    }
+}
+
+void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params)
+{
+    caustica::rhi::CommandList* primary = frameCtx.primary();
+    assert(primary);
+    assert(frameCtx.primaryOpen());
+    if (!m_compiled)
+        compile();
+
+    for (const std::vector<uint32_t>& wave : m_compiledWaves)
+    {
+        if (wave.empty())
+            continue;
+
+        const bool forceSerial = !params.parallelWaves || wave.size() == 1;
+        bool hasSerialPass = false;
+        for (const uint32_t passIndex : wave)
+        {
+            if (passIndex < m_passes.size() && m_passes[passIndex].options.serialOnPrimary)
+            {
+                hasSerialPass = true;
+                break;
+            }
+        }
+
+        if (forceSerial || hasSerialPass)
+            executeWaveSerial(primary, wave);
+        else
+            executeWaveParallel(frameCtx, wave);
+    }
+
+    transitionExtractedResources(primary);
 }
 
 void GraphBuilder::reset()
@@ -948,6 +1148,7 @@ void GraphBuilder::reset()
     m_buffers.clear();
     m_passes.clear();
     m_compiledPassOrder.clear();
+    m_compiledWaves.clear();
     m_passNames.clear();
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();

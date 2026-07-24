@@ -8,12 +8,41 @@
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/pipeline/FrameGraphPassNames.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <cassert>
 
 namespace caustica::render
 {
+
+void registerUploadFrameConstantsPass(FrameGraphContext ctx)
+{
+    assert(ctx.graph);
+    if (!ctx.constantBuffer || !ctx.frameConstants)
+        return;
+
+    const rg::BufferHandle constants =
+        ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
+
+    ctx.graph->addPass(
+        kUploadFrameConstantsPass,
+        [constants](rg::PassBuilder& setup) {
+            setup.write(constants, rg::BufferAccess::CopyDest);
+        },
+        [ctx](rg::RenderPassContext& passCtx) {
+            if (passCtx.commandList() == nullptr || ctx.frameConstants == nullptr
+                || ctx.constantBuffer == nullptr)
+                return;
+            passCtx.commandList()->writeBuffer(
+                ctx.constantBuffer,
+                ctx.frameConstants,
+                sizeof(FrameConstants));
+        },
+        rg::PassOptions{
+            .sideEffect = true,
+            .executeAfter = kClearFrameTargetsPass,
+        });
+}
 
 void registerLightingGraphPasses(FrameGraphContext ctx)
 {
@@ -28,7 +57,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.executeAfter = kClearFrameTargetsPass;
+        passOptions.executeAfter = kUploadFrameConstantsPass;
 
         rg::TextureHandle envCube{};
         rg::TextureHandle radianceImportance{};
@@ -136,15 +165,15 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
 
                 ctx.pathTracingContext->scenePasses.rayTracing.uploadSubInstanceData(commandList);
 
-                if (ctx.sampleConstants != nullptr && ctx.constantBuffer != nullptr
+                if (ctx.frameConstants != nullptr && ctx.constantBuffer != nullptr
                     && ctx.environment != nullptr)
                 {
-                    ctx.sampleConstants->envMapImportanceSamplingParams =
+                    ctx.frameConstants->envMapImportanceSamplingParams =
                         ctx.environment->getImportanceSampling()->getShaderParams();
                     commandList->writeBuffer(
                         ctx.constantBuffer,
-                        ctx.sampleConstants,
-                        sizeof(SampleConstants));
+                        ctx.frameConstants,
+                        sizeof(FrameConstants));
                 }
             },
             passOptions);

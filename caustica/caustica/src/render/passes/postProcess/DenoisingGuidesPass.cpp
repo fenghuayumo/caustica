@@ -27,9 +27,9 @@ using namespace caustica::math;
 
 #include <render/core/RenderTargets.h>
 
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
-static_assert( sizeof(DenoisingGuidesPassConstants) == sizeof(SampleMiniConstants) );
+static_assert( sizeof(DenoisingGuidesPassConstants) == sizeof(FrameMiniConstants) );
 
 DenoisingGuidesPass::DenoisingGuidesPass( caustica::rhi::Device* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle bindingLayout )
     : m_device(device)

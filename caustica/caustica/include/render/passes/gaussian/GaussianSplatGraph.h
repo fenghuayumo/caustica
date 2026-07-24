@@ -5,7 +5,7 @@
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <scene/SceneRenderData.h>
 
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <span>
 
@@ -35,7 +35,7 @@ uint32_t clampGaussianSplatEmissionProxyCount(int proxyCount);
 
 bool isGaussianSplatEmissionEnabled(const PathTracerSettings& settings);
 void fillGaussianSplatShadowConstants(
-    SampleConstants& constants,
+    FrameConstants& constants,
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex);

@@ -856,7 +856,7 @@ caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVec
 
     outBindingSetDesc.bindings = {
             //caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-            //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(FrameMiniConstants)),
             caustica::rhi::BindingSetItem::StructuredBuffer_UAV(0, m_controlBuffer),
             caustica::rhi::BindingSetItem::StructuredBuffer_UAV(1, m_lightsBuffer),
             caustica::rhi::BindingSetItem::StructuredBuffer_UAV(2, m_lightsExBuffer),

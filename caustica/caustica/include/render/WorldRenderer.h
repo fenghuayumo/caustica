@@ -11,7 +11,7 @@
 #include <render/PathTracerScenePasses.h>
 #include <render/PathTracingContext.h>
 #include <shaders/PathTracer/Config.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <render/core/RenderTargets.h>
 #include <render/passes/postProcess/PostProcess.h>
 #include <render/passes/postProcess/AccumulationPass.h>
@@ -169,8 +169,14 @@ public:
     std::shared_ptr<PTPipelineVariant>& ptPipelineTestRaygenPPHDR() { return m_ptPipelineTestRaygenPPHDR; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineEdgeDetection() { return m_ptPipelineEdgeDetection; }
 
-    caustica::rhi::CommandListHandle getCommandList() const { return m_commandList; }
+    caustica::rhi::CommandListHandle getCommandList() const
+    {
+        return m_frameCommands ? m_frameCommands->primaryHandle() : nullptr;
+    }
     caustica::rhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
+
+    [[nodiscard]] caustica::rhi::CommandListPool* commandListPool() { return m_commandListPool.get(); }
+    [[nodiscard]] caustica::rhi::FrameCommandContext* frameCommands() { return m_frameCommands.get(); }
 
     TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
     AccumulationPass* getAccumulationPass() { return m_accumulationPass.get(); }
@@ -276,7 +282,8 @@ private:
     std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
     std::shared_ptr<RtPipelineCache>                      m_rtPipelineCache;
 
-    caustica::rhi::CommandListHandle                    m_commandList;
+    std::unique_ptr<caustica::rhi::CommandListPool>     m_commandListPool;
+    std::unique_ptr<caustica::rhi::FrameCommandContext> m_frameCommands;
     caustica::rhi::BufferHandle                         m_constantBuffer;
 
     std::unique_ptr<TemporalAntiAliasingPass>    m_temporalAntiAliasingPass;
@@ -303,7 +310,7 @@ private:
     int                                         m_accumulationSampleIndex = 0;
     uint64_t                                    m_frameIndex = 0;
     uint                                        m_sampleIndex = 0;
-    SampleConstants                             m_currentConstants = {};
+    FrameConstants                             m_frameConstants = {};
     bool                                        m_accumulationCompleted = false;
     bool                                        m_lastRealtimeMode = true;
     int                                         m_lastScheduledRealtimeAA = -1;

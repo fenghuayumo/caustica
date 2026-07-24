@@ -876,6 +876,9 @@ void GaussianSplatPass::sort(caustica::rhi::CommandList* commandList)
         return;
 
     commandList->beginMarker("GaussianSplatsSort");
+    // Volatile CBs are per command-list open session. Upload may have run on a
+    // prior list instance (e.g. after FrameCommandContext::flushPrimary).
+    commandList->writeBuffer(m_constantBuffer, &m_frameConstants, sizeof(m_frameConstants));
     m_sorter.updateIndices(
         commandList,
         m_frameConstants,
@@ -892,6 +895,7 @@ bool GaussianSplatPass::raster(
         return false;
 
     commandList->beginMarker("GaussianSplatsRaster");
+    commandList->writeBuffer(m_constantBuffer, &m_frameConstants, sizeof(m_frameConstants));
 
     const bool stochasticSplats =
         m_frameRenderSettings.sortingMode == GaussianSplatSortMode::StochasticSplats;

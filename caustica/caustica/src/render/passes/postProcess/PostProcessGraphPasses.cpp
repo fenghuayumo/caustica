@@ -8,7 +8,7 @@
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <cassert>
 
@@ -88,7 +88,7 @@ namespace
                 state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
 
-                SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+                FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
                 passCtx.commandList()->setPushConstants(&miniConstants, sizeof(miniConstants));
                 passCtx.commandList()->dispatchRays(args);
                 (void)passCtx.texture(processedOutputColor);
@@ -139,7 +139,7 @@ namespace
                 state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
 
-                SampleMiniConstants miniConstants = {
+                FrameMiniConstants miniConstants = {
                     uint4(*reinterpret_cast<uint*>(&ctx.settings->PostProcessEdgeDetectionThreshold), 0, 0, 0)
                 };
                 passCtx.commandList()->setPushConstants(&miniConstants, sizeof(miniConstants));

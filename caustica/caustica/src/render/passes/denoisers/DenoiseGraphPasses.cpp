@@ -12,6 +12,7 @@
 #include <render/pipeline/FrameGraphPassNames.h>
 #include <scene/View.h>
 #include <shaders/PathTracer/Config.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <algorithm>
 #include <cassert>
@@ -528,6 +529,8 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
             rg::PassOptions{ .sideEffect = true });
     }
 
+    const char* afterDenoiseAa = nullptr;
+
     if (needsAccumulationPass(*ctx.settings, accumulationPass))
     {
         const int accumulationSampleIndex = ctx.accumulationSampleIndex;
@@ -550,6 +553,52 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                     view,
                     accumulationWeight);
             });
+        afterDenoiseAa = "Accumulation";
+    }
+    else if (needsDlssPass(*ctx.settings))
+        afterDenoiseAa = ctx.settings->RealtimeAA == 3 ? "DLSS-RR" : "DLSS";
+    else if (needsTemporalAAPass(*ctx.settings, temporalAAPass))
+        afterDenoiseAa = "TAA";
+    else if (needsRealtimeCopyPass(*ctx.settings))
+        afterDenoiseAa = "CopyOutputToProcessed";
+    else if (needsNoDenoiserFinalMergePass(*ctx.settings))
+        afterDenoiseAa = "NoDenoiserFinalMerge";
+
+    // Reference OIDN: mid-pass close/execute/wait — keep on primary, after AA/accum.
+    if (!ctx.settings->RealtimeMode && ctx.settings->ReferenceOIDNDenoiser && ctx.denoise)
+    {
+        rg::BufferHandle constants{};
+        if (ctx.constantBuffer)
+            constants = ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
+
+        rg::PassOptions oidnOptions{};
+        oidnOptions.sideEffect = true;
+        oidnOptions.serialOnPrimary = true;
+        oidnOptions.executeAfter = afterDenoiseAa;
+
+        ctx.graph->addPass(
+            "ReferenceOIDN",
+            [processedOutputColor, accumulatedRadiance, constants](rg::PassBuilder& setup) {
+                setup.read(accumulatedRadiance, rg::TextureAccess::CopySource);
+                setup.write(processedOutputColor, rg::TextureAccess::CopyDest);
+                if (constants.isValid())
+                    setup.write(constants, rg::BufferAccess::CopyDest);
+            },
+            [ctx, constants](rg::RenderPassContext& passCtx) {
+                const bool closed = ctx.denoise->applyReferenceOIDN(passCtx.commandList());
+                if (closed && ctx.commandListWasClosed)
+                    *ctx.commandListWasClosed = true;
+                // Volatile FrameConstants must be rewritten after reopen for later passes.
+                if (closed && ctx.frameConstants != nullptr && ctx.constantBuffer != nullptr)
+                {
+                    passCtx.commandList()->writeBuffer(
+                        ctx.constantBuffer,
+                        ctx.frameConstants,
+                        sizeof(FrameConstants));
+                }
+                (void)constants;
+            },
+            oidnOptions);
     }
 }
 

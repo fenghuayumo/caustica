@@ -51,7 +51,19 @@ struct PassOptions
 {
     bool enabled = true;
     bool sideEffect = false;
+    // Force this pass onto the primary list (and alone in its wave). Use for
+    // mid-pass close/execute sync-points (e.g. ToneMapping first-frame AE).
+    bool serialOnPrimary = false;
     const char* executeAfter = nullptr;
+};
+
+struct ExecuteParams
+{
+    // Off by default: parallel waves flush the primary list between waves, which
+    // clears NVRHI volatile CB addresses. Passes that write a volatile CB in one
+    // wave and bind it in a later wave then fail validation. Re-enable only when
+    // every volatile use re-writes on the consuming command-list open session.
+    bool parallelWaves = false;
 };
 
 class PassBuilder
@@ -122,7 +134,9 @@ public:
     void addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options = {});
 
     void compile();
-    void execute(caustica::rhi::CommandList* commandList);
+    // Primary must already be open. Parallel waves fork deferred lists and submit
+    // them before continuing; serial waves / serialOnPrimary record on primary.
+    void execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params = {});
 
     void reset();
 
@@ -135,6 +149,7 @@ public:
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
     [[nodiscard]] const std::vector<std::string>& passNames() const { return m_passNames; }
     [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const { return m_compiledPassOrder; }
+    [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaves() const { return m_compiledWaves; }
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
     [[nodiscard]] size_t activePassCount() const;
     [[nodiscard]] bool isPassRegistered(std::string_view name) const;
@@ -228,6 +243,17 @@ private:
     static bool passUsesTextureAsWrite(const Pass& pass, TextureHandle handle);
     static bool passUsesBufferAsWrite(const Pass& pass, BufferHandle handle);
     void transitionExtractedResources(caustica::rhi::CommandList* commandList);
+    void recordPass(
+        caustica::rhi::CommandList* commandList,
+        const Pass& pass,
+        std::vector<caustica::rhi::ResourceStates>* localTextureStates = nullptr,
+        std::vector<caustica::rhi::ResourceStates>* localBufferStates = nullptr);
+    void executeWaveSerial(caustica::rhi::CommandList* commandList, const std::vector<uint32_t>& wave);
+    void executeWaveParallel(caustica::rhi::FrameCommandContext& frameCtx, const std::vector<uint32_t>& wave);
+    void buildCompiledWaves(
+        const std::vector<bool>& needed,
+        const std::vector<std::vector<uint32_t>>& incoming,
+        const std::vector<std::vector<uint32_t>>& outgoing);
 
     caustica::rhi::Device* m_device = nullptr;
     RenderTargetPool* m_renderTargetPool = nullptr;
@@ -237,6 +263,7 @@ private:
     std::vector<GraphBuffer> m_buffers;
     std::vector<Pass> m_passes;
     std::vector<uint32_t> m_compiledPassOrder;
+    std::vector<std::vector<uint32_t>> m_compiledWaves;
     std::vector<std::string> m_passNames;
     std::unordered_map<caustica::rhi::Texture*, uint32_t> m_importIndexByTexture;
     std::unordered_map<caustica::rhi::Buffer*, uint32_t> m_importIndexByBuffer;

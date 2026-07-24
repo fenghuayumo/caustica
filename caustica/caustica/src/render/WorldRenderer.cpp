@@ -64,7 +64,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/PathTracerSettings.h>
 #include <math/float.h>
 #include <math/math.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <shaders/view_cb.h>
 #include <rhi/utils.h>
 
@@ -161,6 +161,11 @@ void caustica::render::WorldRenderer::destroy()
     m_frameGraph.reset();
     m_rtxdiPass.reset();
 
+    m_frameCommands.reset();
+    if (m_commandListPool)
+        m_commandListPool->clear();
+    m_commandListPool.reset();
+
     if (m_context)
         m_context->renderDevice.setActiveSceneGpuResources(nullptr);
     m_context = nullptr;
@@ -193,7 +198,7 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
     globalBindingLayoutDesc.visibility = caustica::rhi::ShaderType::All;
     globalBindingLayoutDesc.bindings = {
         caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(FrameMiniConstants)),
         caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(0),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(1),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(2),
@@ -280,6 +285,10 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
 void caustica::render::WorldRenderer::createDeviceResources()
 {
     caustica::rhi::Device* device = this->device();
+
+    m_commandListPool = std::make_unique<caustica::rhi::CommandListPool>(device);
+    m_frameCommands = std::make_unique<caustica::rhi::FrameCommandContext>(*m_commandListPool);
+    m_frameCommands->ensurePrimary();
 
     m_renderTargetPool.setDevice(device);
     m_renderBufferPool.setDevice(device);
@@ -401,9 +410,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
     }
 
     m_constantBuffer = device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(SampleConstants), "SampleConstants", caustica::c_MaxRenderPassConstantBufferVersions * 2));
-
-    m_commandList = device->createCommandList();
+        sizeof(FrameConstants), "FrameConstants", caustica::c_MaxRenderPassConstantBufferVersions * 2));
 }
 
 
@@ -442,8 +449,8 @@ void caustica::render::WorldRenderer::onSceneUnloading()
 
     m_bindingSet = nullptr;
     m_context->bindingCache.clear();
-    if (m_commandList)
-        m_commandList = device()->createCommandList();
+    if (m_frameCommands)
+        m_frameCommands->abort();
     m_gaussianSplatTemporalReset = true;
     m_gaussianSplatEmissionProxies.clear();
     if (m_rtxdiPass != nullptr)
@@ -731,7 +738,11 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
         scene->endGpuReadFrame();
 
     if (m_renderFrameCtx.frame.aborted)
+    {
+        if (m_frameCommands)
+            m_frameCommands->abort();
         postUpdatePathTracing();
+    }
 }
 void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRenderData* renderData)
 {
@@ -762,7 +773,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     caustica::rhi::BindingSetDesc bindingSetDescBase;
     bindingSetDescBase.bindings = {
         caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-        caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        caustica::rhi::BindingSetItem::PushConstants(1, sizeof(FrameMiniConstants)),
         //caustica::rhi::BindingSetItem::ConstantBuffer(2, m_context->scenePasses.lighting.lightSampling()->GetLightingConstants()),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(0, m_context->accelStructs.getTopLevelAS()),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(1, m_context->accelStructs.getSubInstanceBuffer()),

@@ -1,5 +1,5 @@
-#ifndef __SAMPLE_CONSTANT_BUFFER_H__
-#define __SAMPLE_CONSTANT_BUFFER_H__
+#ifndef __FRAME_CONSTANT_BUFFER_H__
+#define __FRAME_CONSTANT_BUFFER_H__
 
 #if !defined(__cplusplus) // not needed in the port so far
 #pragma pack_matrix(row_major) // matrices below are expected in row_major
@@ -39,7 +39,7 @@ struct SimpleViewConstants
     float2      clipToWindowBias;
 };
 
-struct SampleConstants
+struct FrameConstants
 {    
     SimpleViewConstants view;
     SimpleViewConstants previousView;
@@ -72,10 +72,10 @@ struct SampleConstants
     float4x4 GaussianSplatShadowWorldToObject;
 };
 
-// Used in a couple of places like multipass postprocess where you want to keep SampleConstants the same for all passes, but send just a few additional per-pass parameters 
+// Used in a couple of places like multipass postprocess where you want to keep FrameConstants the same for all passes, but send just a few additional per-pass parameters 
 // In path tracing used to pass subSampleIndex (when enabled).
 // Set as 'push constants' (root constants)
-struct SampleMiniConstants
+struct FrameMiniConstants
 {
     uint4 params;
     uint4 params1;
@@ -134,4 +134,4 @@ struct GaussianSplatData
     float4 color;         // rgb = SH degree 0 color, a unused
 };
 
-#endif // __SAMPLE_CONSTANT_BUFFER_H__
+#endif // __FRAME_CONSTANT_BUFFER_H__

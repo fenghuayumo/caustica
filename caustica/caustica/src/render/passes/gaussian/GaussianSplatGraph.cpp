@@ -3,7 +3,7 @@
 #include <math/math.h>
 #include <scene/SceneLightAccess.h>
 #include <shaders/light_cb.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #include <algorithm>
 
@@ -45,7 +45,7 @@ namespace
 }
 
 void fillGaussianSplatShadowConstants(
-    SampleConstants& constants,
+    FrameConstants& constants,
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex)

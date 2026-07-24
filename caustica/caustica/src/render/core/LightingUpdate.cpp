@@ -12,7 +12,7 @@
 #include <scene/SceneLightAccess.h>
 #include <core/scope.h>
 #include <shaders/light_cb.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 using namespace caustica::math;
 

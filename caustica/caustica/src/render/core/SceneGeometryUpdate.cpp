@@ -119,7 +119,9 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     if (params.materials != nullptr)
         params.materials->update(commandList, renderData, gpuResources, accelStructs.getSubInstanceData());
 
-    accelStructs.uploadSubInstanceData(commandList);
+    // SubInstance GPU upload is owned by the frame-graph pass UploadSubInstanceData
+    // (kLightingReadyPass). Do not upload here — that would duplicate work and
+    // hide the graph fence from path-trace / RTXDI dependents.
 }
 
 } // namespace caustica

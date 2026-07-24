@@ -5,7 +5,7 @@
 #include <render/passes/postProcess/PostProcess.h>
 #include <backend/GpuDevice.h>
 #include <core/scope.h>
-#include <shaders/SampleConstantBuffer.h>
+#include <shaders/FrameConstantBuffer.h>
 
 #if CAUSTICA_WITH_STREAMLINE
 #include <backend/StreamlineInterface.h>
@@ -107,7 +107,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
     {
         RAII_SCOPE(commandList->beginMarker("DLSS-RR");, commandList->endMarker(););
 
-        SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+        FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         caustica::rhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("DLSSRR_PrepareInputs");
         params.postProcess->apply(
@@ -146,7 +146,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         && !settings.actualUseStandaloneDenoiser())
     {
         // Skip after DLSS/DLSS-RR: merge is for native-res realtime without AA upscale.
-        SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
+        FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
         caustica::rhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("NoDenoiserFinalMerge");
         params.postProcess->apply(

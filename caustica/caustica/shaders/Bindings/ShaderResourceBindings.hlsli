@@ -1,12 +1,12 @@
 #ifndef __SHADER_RESOURCE_BINDINGS_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __SHADER_RESOURCE_BINDINGS_HLSLI__
 
-#include "../SampleConstantBuffer.h"
+#include "../FrameConstantBuffer.h"
 #include "BindingDataTypes.hlsli"
 #include <shaders/binding_helpers.hlsli>
 
-ConstantBuffer<SampleConstants>         g_Const                         : register(b0);
-VK_PUSH_CONSTANT ConstantBuffer<SampleMiniConstants> g_MiniConst        : register(b1);
+ConstantBuffer<FrameConstants>         g_Const                         : register(b0);
+VK_PUSH_CONSTANT ConstantBuffer<FrameMiniConstants> g_MiniConst        : register(b1);
 
 Texture2D<float4>                       t_LdrColorScratch               : register(t6);
 

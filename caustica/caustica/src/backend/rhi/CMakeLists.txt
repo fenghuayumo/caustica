@@ -63,6 +63,7 @@ set(include_common
     ${RHI_INCLUDE_DIR}/caustica.h
     ${RHI_INCLUDE_DIR}/caustica/format.h
     ${RHI_INCLUDE_DIR}/utils.h
+    ${RHI_INCLUDE_DIR}/command_list_pool.h
     ${RHI_INCLUDE_DIR}/common/containers.h
     ${RHI_INCLUDE_DIR}/common/misc.h
     ${RHI_INCLUDE_DIR}/common/resource.h
@@ -76,6 +77,7 @@ set(src_common
     common/state-tracking.cpp
     common/state-tracking.h
     common/utils.cpp
+    common/command_list_pool.cpp
     common/aftermath.cpp)
 
 # ------------------------------------------------------------------
