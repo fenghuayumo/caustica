@@ -25,7 +25,7 @@ struct EditorColors
 
 const EditorColors& GetEditorColors();
 
-// Apply the Caustica editor dark theme to the current ImGui context.
+// Apply the Caustica editor Dark theme (near-black) to the current ImGui context.
 // displayScale should match the OS/UI scale used by ImGui_Renderer (typically 1.0 at init).
 void ApplyEditorTheme(float displayScale = 1.0f);
 

@@ -15,20 +15,21 @@ ImVec4 WithAlpha(const ImVec4& c, float a)
     return ImVec4(c.x, c.y, c.z, a);
 }
 
-// Cool graphite shell + clear cyan accent (readable with proportional UI fonts).
+// Deep dark shell (near-black) + cool accent — closer to Blender / VS Code Dark
+// than mid-gray graphite.
 const EditorColors kColors = {
-    /* Text */               Rgba(236, 238, 241),
-    /* TextMuted */          Rgba(148, 154, 162),
-    /* TextWarning */        Rgba(236, 176, 112),
-    /* TextCategory */       Rgba(120, 196, 176),
+    /* Text */               Rgba(230, 230, 230),
+    /* TextMuted */          Rgba(140, 140, 140),
+    /* TextWarning */        Rgba(232, 168, 96),
+    /* TextCategory */       Rgba(120, 188, 168),
 
-    /* Accent */             Rgba(72, 168, 184),
-    /* AccentHovered */      Rgba(98, 192, 206),
-    /* AccentActive */       Rgba(52, 140, 156),
+    /* Accent */             Rgba(64, 156, 196),
+    /* AccentHovered */      Rgba(92, 180, 216),
+    /* AccentActive */       Rgba(48, 128, 168),
 
-    /* ToolbarIdle */        Rgba(38, 42, 48, 0.88f),
-    /* ToolbarIdleHovered */ Rgba(54, 60, 68, 0.95f),
-    /* ToolbarIdleActive */  Rgba(72, 168, 184, 0.50f),
+    /* ToolbarIdle */        Rgba(28, 28, 28, 0.92f),
+    /* ToolbarIdleHovered */ Rgba(42, 42, 42, 0.96f),
+    /* ToolbarIdleActive */  Rgba(64, 156, 196, 0.50f),
 };
 
 float Scaled(float value, float displayScale)
@@ -61,7 +62,7 @@ void ApplyEditorTheme(float displayScale)
     const float fontScaleDpi = style.FontScaleDpi;
     const float nextFrameFontSizeBase = style._NextFrameFontSizeBase;
 
-    // Flat DCC shell tuned for proportional UI type.
+    // Flat dark DCC shell.
     style.WindowRounding = 0.0f;
     style.ChildRounding = 0.0f;
     style.FrameRounding = Scaled(3.0f, displayScale);
@@ -95,27 +96,28 @@ void ApplyEditorTheme(float displayScale)
     style.TabCloseButtonMinWidthSelected = 0.0f;
     style.TabCloseButtonMinWidthUnselected = 0.0f;
 
-    const ImVec4 bg0 = Rgba(24, 26, 29);
-    const ImVec4 bg1 = Rgba(30, 33, 37);
-    const ImVec4 bg2 = Rgba(38, 42, 47);
-    const ImVec4 bg3 = Rgba(46, 51, 57);
-    const ImVec4 border = Rgba(58, 64, 72);
-    const ImVec4 separator = Rgba(44, 48, 54, 1.0f);
+    // Near-black stack: window / chrome / controls / raised.
+    const ImVec4 bg0 = Rgba(18, 18, 18);
+    const ImVec4 bg1 = Rgba(24, 24, 24);
+    const ImVec4 bg2 = Rgba(32, 32, 32);
+    const ImVec4 bg3 = Rgba(40, 40, 40);
+    const ImVec4 border = Rgba(56, 56, 56);
+    const ImVec4 separator = Rgba(40, 40, 40, 1.0f);
 
     const EditorColors& col = kColors;
     ImVec4* c = style.Colors;
 
     c[ImGuiCol_Text] = col.Text;
-    c[ImGuiCol_TextDisabled] = Rgba(118, 124, 132);
+    c[ImGuiCol_TextDisabled] = Rgba(110, 110, 110);
     c[ImGuiCol_WindowBg] = WithAlpha(bg0, 1.0f);
     c[ImGuiCol_ChildBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     c[ImGuiCol_PopupBg] = WithAlpha(bg2, 0.98f);
-    c[ImGuiCol_Border] = WithAlpha(border, 0.45f);
+    c[ImGuiCol_Border] = WithAlpha(border, 0.55f);
     c[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
     c[ImGuiCol_FrameBg] = WithAlpha(bg2, 1.0f);
-    c[ImGuiCol_FrameBgHovered] = Rgba(52, 58, 66, 1.0f);
-    c[ImGuiCol_FrameBgActive] = WithAlpha(col.Accent, 0.30f);
+    c[ImGuiCol_FrameBgHovered] = Rgba(48, 48, 48, 1.0f);
+    c[ImGuiCol_FrameBgActive] = WithAlpha(col.Accent, 0.28f);
 
     c[ImGuiCol_TitleBg] = WithAlpha(bg1, 1.0f);
     c[ImGuiCol_TitleBgActive] = WithAlpha(bg1, 1.0f);
@@ -124,8 +126,8 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_MenuBarBg] = WithAlpha(bg1, 1.0f);
 
     c[ImGuiCol_ScrollbarBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-    c[ImGuiCol_ScrollbarGrab] = Rgba(72, 80, 90, 0.80f);
-    c[ImGuiCol_ScrollbarGrabHovered] = Rgba(96, 106, 118, 0.95f);
+    c[ImGuiCol_ScrollbarGrab] = Rgba(64, 64, 64, 0.85f);
+    c[ImGuiCol_ScrollbarGrabHovered] = Rgba(96, 96, 96, 0.95f);
     c[ImGuiCol_ScrollbarGrabActive] = WithAlpha(col.Accent, 0.80f);
 
     c[ImGuiCol_CheckMark] = col.AccentHovered;
@@ -133,12 +135,12 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_SliderGrabActive] = col.AccentHovered;
 
     c[ImGuiCol_Button] = WithAlpha(bg3, 1.0f);
-    c[ImGuiCol_ButtonHovered] = WithAlpha(col.Accent, 0.42f);
-    c[ImGuiCol_ButtonActive] = WithAlpha(col.Accent, 0.68f);
+    c[ImGuiCol_ButtonHovered] = WithAlpha(col.Accent, 0.40f);
+    c[ImGuiCol_ButtonActive] = WithAlpha(col.Accent, 0.65f);
 
-    c[ImGuiCol_Header] = WithAlpha(bg3, 0.90f);
-    c[ImGuiCol_HeaderHovered] = WithAlpha(col.Accent, 0.28f);
-    c[ImGuiCol_HeaderActive] = WithAlpha(col.Accent, 0.42f);
+    c[ImGuiCol_Header] = WithAlpha(bg3, 0.85f);
+    c[ImGuiCol_HeaderHovered] = WithAlpha(col.Accent, 0.26f);
+    c[ImGuiCol_HeaderActive] = WithAlpha(col.Accent, 0.40f);
 
     c[ImGuiCol_Separator] = separator;
     c[ImGuiCol_SeparatorHovered] = WithAlpha(col.Accent, 0.55f);
@@ -168,7 +170,7 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_TableBorderStrong] = WithAlpha(border, 0.70f);
     c[ImGuiCol_TableBorderLight] = WithAlpha(border, 0.35f);
     c[ImGuiCol_TableRowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-    c[ImGuiCol_TableRowBgAlt] = Rgba(255, 255, 255, 0.025f);
+    c[ImGuiCol_TableRowBgAlt] = Rgba(255, 255, 255, 0.02f);
 
     c[ImGuiCol_TextLink] = col.AccentHovered;
     c[ImGuiCol_TextSelectedBg] = WithAlpha(col.Accent, 0.35f);
@@ -178,8 +180,8 @@ void ApplyEditorTheme(float displayScale)
     c[ImGuiCol_DragDropTarget] = WithAlpha(col.AccentHovered, 0.90f);
     c[ImGuiCol_NavCursor] = col.Accent;
     c[ImGuiCol_NavWindowingHighlight] = Rgba(255, 255, 255, 0.55f);
-    c[ImGuiCol_NavWindowingDimBg] = Rgba(0, 0, 0, 0.45f);
-    c[ImGuiCol_ModalWindowDimBg] = Rgba(0, 0, 0, 0.55f);
+    c[ImGuiCol_NavWindowingDimBg] = Rgba(0, 0, 0, 0.50f);
+    c[ImGuiCol_ModalWindowDimBg] = Rgba(0, 0, 0, 0.60f);
 
     style.FontSizeBase = fontSizeBase;
     style.FontScaleMain = fontScaleMain;
