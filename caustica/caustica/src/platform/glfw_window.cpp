@@ -79,6 +79,9 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
     if (desc.Borderless)
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
 
+    if (desc.Maximized && !desc.Fullscreen)
+        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+
     glfwWindowHint(GLFW_SAMPLES, 1);
 
     GLFWmonitor* monitor = desc.Fullscreen ? glfwGetPrimaryMonitor() : nullptr;

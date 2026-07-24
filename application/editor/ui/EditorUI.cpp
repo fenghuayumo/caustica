@@ -173,8 +173,6 @@ void EditorUI::buildUI(void)
             return;
         }
 
-        BuildDisplayPerformancePanel(layout);
-        BuildSystemPanel(layout);
         if (BuildSceneComboPanel(layout))
         {
             BuildStatusBar();
@@ -197,6 +195,7 @@ void EditorUI::buildUI(void)
         BuildQuickToneMappingBar(layout);
     }
 
+    BuildPreferencesPanel(layout);
     BuildInspectorPanel(layout);
     BuildMaterialEditorPanel(layout);
     BuildPostProcessPanel(layout);

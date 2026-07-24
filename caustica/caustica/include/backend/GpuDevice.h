@@ -219,6 +219,7 @@ namespace caustica
         uint32_t backBufferHeight = 720;
         uint32_t swapChainBufferCount = 0; // 0 = engine default (triple buffering)
         bool startFullscreen = false;
+        bool startMaximized = false;
         bool startBorderless = false;
         bool vsyncEnabled = true;
         int adapterIndex = -1;

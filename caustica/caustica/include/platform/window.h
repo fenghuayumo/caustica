@@ -18,6 +18,7 @@ struct WindowDesc
     uint32_t Width  = 1280;
     uint32_t Height = 720;
     bool Fullscreen   = false;
+    bool Maximized    = false;
     bool VSync        = true;
     bool Borderless   = false;
     bool Resizeable   = true;

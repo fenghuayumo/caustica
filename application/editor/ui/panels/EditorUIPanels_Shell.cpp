@@ -90,6 +90,9 @@ void EditorUI::BuildMainMenuBar()
             m_sceneEditor.requestRedo();
         ImGui::Separator();
         ImGui::MenuItem("Transform Gizmo", nullptr, &m_editorUI.ShowTransformGizmo);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Preferences..."))
+            m_editorUI.ShowPreferences = true;
         ImGui::EndMenu();
     }
 

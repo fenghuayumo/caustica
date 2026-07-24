@@ -92,6 +92,7 @@ namespace
         if (desc.swapChainBufferCount != 0)
             params.swapChainBufferCount = desc.swapChainBufferCount;
         params.startFullscreen = desc.startFullscreen;
+        params.startMaximized = desc.startMaximized;
         params.startBorderless = desc.startBorderless;
         params.vsyncEnabled = desc.vsyncEnabled;
         params.adapterIndex = desc.adapterIndex;
@@ -144,6 +145,7 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
     windowDesc.Width = desc.backBufferWidth;
     windowDesc.Height = desc.backBufferHeight;
     windowDesc.Fullscreen = desc.startFullscreen;
+    windowDesc.Maximized = desc.startMaximized && !desc.startFullscreen;
     windowDesc.Borderless = desc.startBorderless;
     windowDesc.VSync = desc.vsyncEnabled;
     windowDesc.Title = desc.windowTitle;
@@ -155,6 +157,9 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
         caustica::error("GpuDevice::createInitialized: failed to create platform window");
         return result;
     }
+
+    if (windowDesc.Maximized)
+        window->maximise();
 
     if (!gpuDevice->initializeGraphicsDevice(deviceParams))
     {

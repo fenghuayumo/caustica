@@ -52,13 +52,14 @@ namespace
             if (presentedFrames == 0)
                 presentedFrames = 1u + cfg->DLSSFGNumFramesToGenerate;
 
-            vs->fpsInfo = stringFormat("%.3f ms/%d-frames* (%.1f FPS*) *DLSS-G",
+            // Fixed-width fields avoid ImGui layout flicker in narrow docks.
+            vs->fpsInfo = stringFormat("%6.2f ms/%u-frames* (%5.1f FPS*) *DLSS-G",
                 frameTimeSeconds * 1e3, presentedFrames, presentedFrames / frameTimeSeconds);
             return;
         }
 #endif
 
-        vs->fpsInfo = stringFormat("%.3f ms/frame (%.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+        vs->fpsInfo = stringFormat("%6.2f ms/frame (%5.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
     }
 
     void recordFrameTiming(App& app, const GpuDevice& gpuDevice)

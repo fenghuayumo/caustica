@@ -12,8 +12,8 @@ namespace caustica::editor
 
 namespace
 {
-    // Keep the OS title bar (min/max/close) on-screen. A client size equal to the
-    // monitor resolution pushes decorations off the top edge and looks "fullscreen".
+    // Size the restore/client rect for the primary monitor. The editor starts
+    // maximized, so this mainly affects the un-maximize restore size.
     void ApplyDefaultWindowSizeForLargeDisplays(CommandLineOptions& cmdLine)
     {
         if (cmdLine.fullscreen)
@@ -39,11 +39,8 @@ namespace
         if (workW <= 0 || workH <= 0)
             return;
 
-        // Room for title bar + borders + a little breathing space around the window.
-        constexpr int kChromeX = 48;
-        constexpr int kChromeY = 96;
-        const uint32_t maxW = static_cast<uint32_t>(std::max(1280, workW - kChromeX));
-        const uint32_t maxH = static_cast<uint32_t>(std::max(720, workH - kChromeY));
+        const uint32_t maxW = static_cast<uint32_t>(workW);
+        const uint32_t maxH = static_cast<uint32_t>(workH);
 
         if (workW > 2560 && workH > 1440)
         {
@@ -95,6 +92,7 @@ bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
     createDesc.backBufferWidth = cmdLine.width;
     createDesc.backBufferHeight = cmdLine.height;
     createDesc.startFullscreen = cmdLine.fullscreen;
+    createDesc.startMaximized = !cmdLine.fullscreen;
     createDesc.adapterIndex = cmdLine.adapterIndex;
 
     return true;

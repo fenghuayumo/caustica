@@ -38,83 +38,60 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
 
-            if (!m_settings.UseNEE )
-                ImGui::TextColored(warnColor, "NOTE: NEE inactive (enable in `Path Tracer -> Next Event Estimation` settings).");
+            if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
 
-            ImGui::TextColored(categoryColor, "Info and statistics:");
+            if (!m_settings.UseNEE)
+                ImGui::TextColored(warnColor, "NEE inactive — enable in Path Tracer.");
+            else if (m_settings.NEEType != 2)
+                ImGui::TextColored(warnColor, "NEE-AT inactive — enable in Path Tracer.");
 
+            if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)"))
+            {
+                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
+                if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
+                    m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
+            }
+
+            if (m_settings.UseNEE && m_settings.NEEType == 2)
+            {
+                RESET_ON_CHANGE(SettingsSliderFloat(
+                    "Global Feedback", &m_settings.NEEAT_GlobalTemporalFeedbackWeight, 0.0f, 0.95f));
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Blend of last-frame usage vs power-based sampling.\nSome power sampling is needed so new lights can appear.");
+
+                RESET_ON_CHANGE(SettingsSliderFloat(
+                    "Local / Global", &m_settings.NEEAT_LocalToGlobalSampleRatio, 0.0f, 0.95f));
+                if (ImGui::IsItemHovered())
+                {
+                    const uint localCandidateSamples = ComputeCandidateSampleLocalCount(
+                        m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
+                    const uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(
+                        m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
+                    ImGui::SetTooltip(
+                        "Share of NEE-AT candidates from local (tile) vs global samplers.\n"
+                        "%d candidates: %d local, %d global",
+                        m_settings.NEECandidateSamples, localCandidateSamples, globalCandidateSamples);
+                }
+
+                SettingsSliderFloat(
+                    "Distant / Local",
+                    &m_settings.NEEAT_Distant_vs_Local_Importance,
+                    0.01f,
+                    100.0f,
+                    "%.2f",
+                    ImGuiSliderFlags_Logarithmic);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Higher = more importance for envmap/sun vs local lights.");
+            }
+
+            if (ImGui::CollapsingHeader("Debugging"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                    m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
-            }
-
-
-            //ImGui::TextColored(categoryColor, "Distant lighting (envmap+directional):");
-            {
-                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
-                {
-                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-                    if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
-                        m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
-                }
-            }
-
-            ImGui::TextColored(categoryColor, "Importance sampling:");
-            {
-                RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                {
-                    if( m_settings.NEEType != 2 )
-                    {
-                        ImGui::TextWrapped("NOTE: NEE-AT inactive (enable in `Path Tracer -> Next Event Estimation` settings).");
-                    }
-                    else
-                    {
-                        ImGui::TextColored(categoryColor, "NEE-AT settings:");
-                        {
-                            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent););
-
-                            RESET_ON_CHANGE(SettingsSliderFloat(
-                                "Global Feedback", &m_settings.NEEAT_GlobalTemporalFeedbackWeight, 0.0f, 0.95f));
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("How much to rely on last frame's usage statistic as opposed to simple power based sampling.\nSome power based sampling is essential to allow new lights to be considered.");
-
-                            RESET_ON_CHANGE(SettingsSliderFloat(
-                                "Local / Global", &m_settings.NEEAT_LocalToGlobalSampleRatio, 0.0f, 0.95f));
-                    
-                            uint localCandidateSamples = ComputeCandidateSampleLocalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
-                            uint globalCandidateSamples = ComputeCandidateSampleGlobalCount(m_settings.ActualNEEAT_LocalToGlobalSampleRatio(), m_settings.NEECandidateSamples);
-                    
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("When drawing new light candidate samples, how many to draw from Global versus Local (tile) samplers.\n"
-                                                                            "Current total candidate sample count is %d, and out of those %d will be Local and %d will be Global", 
-                                                                                m_settings.NEECandidateSamples, localCandidateSamples, globalCandidateSamples);
-
-                            // ImGui::SliderFloat("BSDF vs NEE-AT MIS boost", &m_settings.NEEAT_MIS_Boost, 0.0f, 1000.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-                            // if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tweak the MIS to give more power to NEE-AT (>1) or to BSDF sampled emissives (<1);\nuseful since NEE-AT is shadow aware and boosting it can provide better overall sampling quality");
-                            
-                            SettingsSliderFloat(
-                                "Distant / Local",
-                                &m_settings.NEEAT_Distant_vs_Local_Importance,
-                                0.01f,
-                                100.0f,
-                                "%.2f",
-                                ImGuiSliderFlags_Logarithmic);
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("The higher the setting, the more initial importance will be given to environment map / sunlight vs local scene lights and vice versa.");
-                        }
-                    }
-                
-                    ImGui::TextColored(categoryColor, "Debugging:");
-                    {
-                        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                        if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                            m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
-                    }
-                }
+                    m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
             }
         }
-
-
 }
 
 void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)

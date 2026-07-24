@@ -1434,32 +1434,20 @@ void LightSamplingCache::updateEnd(nvrhi::ICommandList * commandList, caustica::
 
 bool LightSamplingCache::infoGUI(float indent)
 {
+    (void)indent;
     RAII_SCOPE(ImGui::PushID("LightSamplingCacheInfoGUI");, ImGui::PopID(); );
 
-    if (totalLightCountOverflow())
+    // Keep only actionable status: overflow warning + compact light totals.
+    const LightingControlData& ctrl = m_currentCtrlBuff;
+    if (ctrl.TotalLightCount >= CAUSTICA_LIGHTING_MAX_LIGHTS)
     {
-        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "!!WARNING - scene light count overflow!!");
-        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "increase CAUSTICA_LIGHTING_MAX_LIGHTS (%d)", CAUSTICA_LIGHTING_MAX_LIGHTS);
+        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "Light count overflow — raise CAUSTICA_LIGHTING_MAX_LIGHTS (%d)", CAUSTICA_LIGHTING_MAX_LIGHTS);
     }
-
-    const char* modes[] = { "Uniform", "Power+", "NEE-AT" };
-    ImGui::Text("Current mode:  %s", modes[dm::clamp(m_lastReadback.ImportanceSamplingType, 0u, 2u)]);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("As set in Path Tracer Next Event Estimation options\n(in the future, mode will be set here)");
-
-    ImGui::Text("Scene lights by type: ");
-    ImGui::Text("   envmap quads:  %d", m_lastReadback.EnvmapQuadNodeCount);
-    ImGui::Text("   emissive tris: %d", m_lastReadback.TriangleLightCount);
-    ImGui::Text("   analytic:      %d", m_lastReadback.AnalyticLightCount);
-    ImGui::Text("   TOTAL:         %d", m_lastReadback.TotalLightCount);
-    ImGui::Text("(used: %.2f%% of max %d)", (m_lastReadback.TotalLightCount / (float)CAUSTICA_LIGHTING_MAX_LIGHTS * 100.0f), CAUSTICA_LIGHTING_MAX_LIGHTS );
-    ImGui::Text("(proxies: %d, weightsum: %.5f)", m_lastReadback.SamplingProxyCount, m_lastReadback.WeightsSum());
-#if LLB_ENABLE_VALIDATION
-    ImGui::Text("Validation:");
-    float feedbackPerc = m_lastReadback.ValidFeedbackCount / float(m_currentCtrlBuff.CacheConstants.FeedbackResolution.x * m_currentCtrlBuff.CacheConstants.FeedbackResolution.y);
-    ImGui::Text(" feedback num: %d (%.3f)", m_lastReadback.ValidFeedbackCount, feedbackPerc);
-#endif
-    float allocRam = (float)(double(m_allocatedVRAM)/1024.0/1024.0);
-    ImGui::Text("Memory use: %.1f MiB", allocRam);
+    else
+    {
+        ImGui::Text("Lights: %u  (env %u / tri %u / analytic %u)",
+            ctrl.TotalLightCount, ctrl.EnvmapQuadNodeCount, ctrl.TriangleLightCount, ctrl.AnalyticLightCount);
+    }
 
     return false;
 }

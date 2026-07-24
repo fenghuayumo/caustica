@@ -79,6 +79,7 @@ private:
     // settings window collapsing-header panels
     void BuildDisplayPerformancePanel(const PanelLayout& layout);
     void BuildSystemPanel(const PanelLayout& layout);
+    void BuildPreferencesPanel(const PanelLayout& layout);
     bool BuildSceneComboPanel(const PanelLayout& layout);
     void BuildScenePanel(const PanelLayout& layout);
     void BuildSampleGamePanel(const PanelLayout& layout);
