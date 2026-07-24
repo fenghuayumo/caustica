@@ -79,7 +79,10 @@ struct FrameGraphContext
     PathTracePass* pathTrace = nullptr;
     DenoisePass* denoise = nullptr;
     GaussianSplatFramePass* gaussian = nullptr;
-    std::shared_ptr<EnvMapProcessor> environment;
+    // Non-owning: graph lambdas capture FrameGraphContext by value; owning
+    // shared_ptrs here would keep EnvMapProcessor (etc.) alive until GraphBuilder
+    // teardown and can unload textures after TextureLoader is already gone.
+    EnvMapProcessor* environment = nullptr;
 
     nvrhi::BindingLayoutHandle bindingLayout;
     nvrhi::BindingSetHandle bindingSet;
@@ -101,8 +104,8 @@ struct FrameGraphContext
 
     // PathTraceLightingEnd → updateLightingEnd
     LightSamplingCache* lightSampling = nullptr;
-    std::shared_ptr<MaterialGpuCache> materials;
-    std::shared_ptr<OpacityMicromapBuilder> opacityMaps;
+    MaterialGpuCache* materials = nullptr;
+    OpacityMicromapBuilder* opacityMaps = nullptr;
     SceneGpuFrameHandles gpuHandles{};
     nvrhi::BufferHandle subInstanceDataBuffer;
 

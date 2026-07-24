@@ -347,13 +347,19 @@ void registerPathTraceLightingEndPass(FrameGraphContext ctx)
             declarePathTraceLightingEndAccess(setup, handles);
         },
         [ctx](rg::RenderPassContext& passCtx) {
+            // Resolve owning shared_ptrs from the live session, not from FrameGraphContext
+            // (graph lambdas must not extend EnvMap/material lifetime past destroy()).
             UpdateLightingEndParams lightingEndParams{
                 .commandList = passCtx.commandList(),
                 .lightSampling = ctx.lightSampling,
                 .bindingCache = ctx.bindingCache,
                 .gpuHandles = ctx.gpuHandles,
-                .materials = ctx.materials,
-                .opacityMaps = ctx.opacityMaps,
+                .materials = ctx.pathTracingContext
+                    ? ctx.pathTracingContext->scenePasses.lighting.materials()
+                    : nullptr,
+                .opacityMaps = ctx.pathTracingContext
+                    ? ctx.pathTracingContext->scenePasses.lighting.opacityMaps()
+                    : nullptr,
                 .subInstanceDataBuffer = ctx.subInstanceDataBuffer,
                 .depthBuffer = ctx.renderTargets->depth,
                 .motionVectors = ctx.renderTargets->screenMotionVectors,

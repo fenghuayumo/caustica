@@ -155,6 +155,11 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
 
 void caustica::render::WorldRenderer::destroy()
 {
+    // Drop graph lambdas before releasing scene lighting / env-map ownership.
+    // Pass execute closures capture FrameGraphContext by value; any leftover
+    // ownership there must not outlive TextureLoader / scene passes.
+    m_frameGraph.reset();
+
     if (m_context)
         m_context->renderDevice.setActiveSceneGpuResources(nullptr);
     m_context = nullptr;
