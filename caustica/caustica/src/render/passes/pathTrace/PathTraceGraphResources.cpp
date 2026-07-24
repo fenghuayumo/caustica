@@ -3,6 +3,7 @@
 #include <render/core/RenderTargets.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
+#include <render/passes/lighting/LightSamplingCache.h>
 #include <render/pipeline/FrameGraphPassNames.h>
 
 #include <cassert>
@@ -82,11 +83,74 @@ void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTa
     setup.write(handles.surfaceDataBuffer, rg::BufferAccess::UnorderedAccess);
 }
 
-void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)
+PathTraceLightingEndTargets importPathTraceLightingEndTargets(
+    rg::GraphBuilder& graph,
+    RenderTargets& targets,
+    LightSamplingCache* lightSampling,
+    caustica::rhi::IBuffer* subInstanceDataBuffer)
 {
-    // LightSamplingCache uses t_depthBuffer / t_motionVectors SRV slots.
+    PathTraceLightingEndTargets handles{};
+    handles.depth = graph.importTexture(targets.depth, rg::TextureAccess::ShaderResource);
+    handles.motionVectors =
+        graph.importTexture(targets.screenMotionVectors, rg::TextureAccess::ShaderResource);
+
+    if (lightSampling != nullptr)
+    {
+        if (auto texture = lightSampling->getFeedbackTotalWeight())
+            handles.feedbackTotalWeight =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getFeedbackCandidates())
+            handles.feedbackCandidates =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getFeedbackTotalWeightScratch())
+            handles.feedbackTotalWeightScratch =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getFeedbackCandidatesScratch())
+            handles.feedbackCandidatesScratch =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getFeedbackTotalWeightBlended())
+            handles.feedbackTotalWeightBlended =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getFeedbackCandidatesBlended())
+            handles.feedbackCandidatesBlended =
+                graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = lightSampling->getHistoryDepth())
+            handles.historyDepth = graph.importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto buffer = lightSampling->getLocalSamplingBuffer())
+            handles.localSamplingBuffer =
+                graph.importBuffer(buffer, rg::BufferAccess::UnorderedAccess);
+    }
+
+    if (subInstanceDataBuffer != nullptr)
+        handles.subInstanceData =
+            graph.importBuffer(subInstanceDataBuffer, rg::BufferAccess::ShaderResource);
+
+    return handles;
+}
+
+void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceLightingEndTargets& handles)
+{
     setup.read(handles.depth, rg::TextureAccess::ShaderResource);
     setup.read(handles.motionVectors, rg::TextureAccess::ShaderResource);
+
+    if (handles.feedbackTotalWeight.isValid())
+        setup.write(handles.feedbackTotalWeight, rg::TextureAccess::UnorderedAccess);
+    if (handles.feedbackCandidates.isValid())
+        setup.write(handles.feedbackCandidates, rg::TextureAccess::UnorderedAccess);
+    if (handles.feedbackTotalWeightScratch.isValid())
+        setup.write(handles.feedbackTotalWeightScratch, rg::TextureAccess::UnorderedAccess);
+    if (handles.feedbackCandidatesScratch.isValid())
+        setup.write(handles.feedbackCandidatesScratch, rg::TextureAccess::UnorderedAccess);
+    if (handles.feedbackTotalWeightBlended.isValid())
+        setup.write(handles.feedbackTotalWeightBlended, rg::TextureAccess::UnorderedAccess);
+    if (handles.feedbackCandidatesBlended.isValid())
+        setup.write(handles.feedbackCandidatesBlended, rg::TextureAccess::UnorderedAccess);
+    if (handles.historyDepth.isValid())
+        setup.write(handles.historyDepth, rg::TextureAccess::UnorderedAccess);
+    if (handles.localSamplingBuffer.isValid())
+        setup.write(handles.localSamplingBuffer, rg::BufferAccess::UnorderedAccess);
+    if (handles.subInstanceData.isValid())
+        setup.read(handles.subInstanceData, rg::BufferAccess::ShaderResource);
 }
 
 void declarePathTracePrePassAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)
@@ -126,18 +190,18 @@ bool needsPathTraceLightingEndPass(const PathTracerSettings& settings)
 
 const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings)
 {
-    return settings.RealtimeMode ? "VBufferExport" : kLightingReadyPass;
+    return settings.RealtimeMode ? kVBufferExportPass : kLightingReadyPass;
 }
 
 const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
 {
     if (needsGaussianSplatAccelBuild(settings))
-        return "GaussianSplatsAccelBuild";
+        return kGaussianSplatsAccelBuildPass;
 
     if (needsPathTraceLightingEndPass(settings))
-        return "PathTraceLightingEnd";
+        return kPathTraceLightingEndPass;
 
-    return settings.RealtimeMode ? "VBufferExport" : kLightingReadyPass;
+    return settings.RealtimeMode ? kVBufferExportPass : kLightingReadyPass;
 }
 
 void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings)
@@ -158,9 +222,9 @@ void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTr
     assert(graph.isPassActive("MainPathTrace"));
 
     if (needsPathTraceLightingEndPass(settings))
-        assert(graph.isPassActive("PathTraceLightingEnd"));
+        assert(graph.isPassActive(kPathTraceLightingEndPass));
     else
-        assert(!graph.isPassRegistered("PathTraceLightingEnd"));
+        assert(!graph.isPassRegistered(kPathTraceLightingEndPass));
 }
 
 } // namespace caustica::render

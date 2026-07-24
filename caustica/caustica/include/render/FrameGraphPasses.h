@@ -8,7 +8,9 @@ struct FrameGraphContext;
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx);
 
 void registerClearFrameTargetsPass(FrameGraphContext ctx);
+// Registers EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData.
 void registerLightingUpdateBeginPass(FrameGraphContext ctx);
+void registerLightingGraphPasses(FrameGraphContext ctx);
 void registerRtxdiBeginFramePass(FrameGraphContext ctx);
 void registerPathTracePrePass(FrameGraphContext ctx);
 void registerVBufferExportPass(FrameGraphContext ctx);

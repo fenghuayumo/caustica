@@ -206,16 +206,32 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
     if (!needsGaussianSplatAccelBuild(*ctx.settings))
         return;
 
-    rg::PassOptions passOptions{ .sideEffect = true };
+    // AABB buffers are the AS build inputs. executeAfter still carries MainPathTrace
+    // readiness (LightingEnd / VBuffer) until TLAS/BLAS are first-class graph resources.
+    std::vector<rg::BufferHandle> aabbBuffers;
+    for (const GaussianSplatGraphResources& resources :
+        ctx.gaussian->prepareGraphResources(/*renderToOutputColor=*/true))
+    {
+        if (resources.splatAabbBuffer == nullptr)
+            continue;
+        aabbBuffers.push_back(
+            ctx.graph->importBuffer(resources.splatAabbBuffer, rg::BufferAccess::AccelStructBuildInput));
+    }
+
+    rg::PassOptions passOptions{};
+    // AS handles are not graph resources yet; sideEffect keeps the build alive for PT bindings.
+    passOptions.sideEffect = true;
     if (needsPathTraceLightingEndPass(*ctx.settings))
-        passOptions.executeAfter = "PathTraceLightingEnd";
+        passOptions.executeAfter = kPathTraceLightingEndPass;
     else
-        passOptions.executeAfter = ctx.settings->RealtimeMode ? "VBufferExport" : kLightingReadyPass;
+        passOptions.executeAfter =
+            ctx.settings->RealtimeMode ? kVBufferExportPass : kLightingReadyPass;
 
     ctx.graph->addPass(
-        "GaussianSplatsAccelBuild",
-        [](rg::PassBuilder& setup) {
-            (void)setup;
+        kGaussianSplatsAccelBuildPass,
+        [aabbBuffers](rg::PassBuilder& setup) {
+            for (const rg::BufferHandle& aabb : aabbBuffers)
+                setup.write(aabb, rg::BufferAccess::AccelStructBuildInput);
         },
         [ctx](rg::RenderPassContext& passCtx) {
             if (!gaussianSplatsEnabled(ctx))

@@ -15,6 +15,12 @@ inline constexpr const char* kUploadSubInstanceDataPass = "UploadSubInstanceData
 // Last lighting prep pass — path trace / RTXDI begin depend on this.
 inline constexpr const char* kLightingReadyPass = kUploadSubInstanceDataPass;
 
+inline constexpr const char* kPathTraceLightingEndPass = "PathTraceLightingEnd";
+inline constexpr const char* kVBufferExportPass = "VBufferExport";
+inline constexpr const char* kGaussianSplatsAccelBuildPass = "GaussianSplatsAccelBuild";
+inline constexpr const char* kMainPathTracePass = "MainPathTrace";
+inline constexpr const char* kStablePlanesDebugVizPass = "StablePlanesDebugViz";
+
 inline constexpr const char* kRtxdiPrepareLightsPass = "RtxdiPrepareLights";
 inline constexpr const char* kRtxdiFillConstantsPass = "RtxdiFillConstants";
 inline constexpr const char* kRtxdiGeneratePdfMipsPass = "RtxdiGeneratePdfMips";

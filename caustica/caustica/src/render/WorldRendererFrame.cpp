@@ -901,7 +901,7 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
     registerClearFrameTargetsPass(ctx);
-    registerLightingUpdateBeginPass(ctx);
+    registerLightingGraphPasses(ctx);
     registerRtxdiBeginFramePass(ctx);
     registerPathTracePrePass(ctx);
     registerVBufferExportPass(ctx);

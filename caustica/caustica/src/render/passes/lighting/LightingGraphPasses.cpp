@@ -15,7 +15,7 @@
 namespace caustica::render
 {
 
-void registerLightingUpdateBeginPass(FrameGraphContext ctx)
+void registerLightingGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.graph);
 
@@ -149,6 +149,11 @@ void registerLightingUpdateBeginPass(FrameGraphContext ctx)
             },
             passOptions);
     }
+}
+
+void registerLightingUpdateBeginPass(FrameGraphContext ctx)
+{
+    registerLightingGraphPasses(ctx);
 }
 
 } // namespace caustica::render

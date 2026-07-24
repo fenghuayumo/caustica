@@ -3,6 +3,7 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/graph/GraphBuilder.h>
 
+class LightSamplingCache;
 class RenderTargets;
 
 namespace caustica::render
@@ -38,12 +39,33 @@ struct PathTraceGraphTargets
     rg::TextureHandle secondarySurfaceRadiance;
 };
 
+struct PathTraceLightingEndTargets
+{
+    rg::TextureHandle depth;
+    rg::TextureHandle motionVectors;
+    rg::TextureHandle feedbackTotalWeight;
+    rg::TextureHandle feedbackCandidates;
+    rg::TextureHandle feedbackTotalWeightScratch;
+    rg::TextureHandle feedbackCandidatesScratch;
+    rg::TextureHandle feedbackTotalWeightBlended;
+    rg::TextureHandle feedbackCandidatesBlended;
+    rg::TextureHandle historyDepth;
+    rg::BufferHandle localSamplingBuffer;
+    rg::BufferHandle subInstanceData;
+};
+
 PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, RenderTargets& targets);
+
+PathTraceLightingEndTargets importPathTraceLightingEndTargets(
+    rg::GraphBuilder& graph,
+    RenderTargets& targets,
+    LightSamplingCache* lightSampling,
+    caustica::rhi::IBuffer* subInstanceDataBuffer);
 
 void extractPathTraceGraphOutputs(rg::GraphBuilder& graph, const PathTraceGraphTargets& handles);
 
 void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
-void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
+void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceLightingEndTargets& handles);
 
 void declarePathTracePrePassAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declareVBufferExportAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);

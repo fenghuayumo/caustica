@@ -97,6 +97,7 @@ struct GaussianSplatGraphResources
     caustica::rhi::IBuffer* sortKeyBuffer = nullptr;
     caustica::rhi::IBuffer* sortControlBuffer = nullptr;
     caustica::rhi::IBuffer* drawIndirectBuffer = nullptr;
+    caustica::rhi::IBuffer* splatAabbBuffer = nullptr;
     caustica::rhi::ITexture* stochasticDepth = nullptr;
     GaussianSplatSortMode sortMode = GaussianSplatSortMode::GpuSort;
     bool distanceStageCulling = false;

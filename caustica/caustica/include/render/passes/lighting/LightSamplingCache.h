@@ -103,6 +103,11 @@ public:
 
     caustica::rhi::TextureHandle            getFeedbackTotalWeight() const              { return m_NEE_AT_FeedbackTotalWeight; }
     caustica::rhi::TextureHandle            getFeedbackCandidates() const               { return m_NEE_AT_FeedbackCandidates; }
+    caustica::rhi::TextureHandle            getFeedbackTotalWeightScratch() const       { return m_NEE_AT_FeedbackTotalWeightScratch; }
+    caustica::rhi::TextureHandle            getFeedbackCandidatesScratch() const        { return m_NEE_AT_FeedbackCandidatesScratch; }
+    caustica::rhi::TextureHandle            getFeedbackTotalWeightBlended() const       { return m_NEE_AT_FeedbackTotalWeightBlended; }
+    caustica::rhi::TextureHandle            getFeedbackCandidatesBlended() const        { return m_NEE_AT_FeedbackCandidatesBlended; }
+    caustica::rhi::TextureHandle            getHistoryDepth() const                     { return m_NEE_AT_HistoryDepth; }
 
 
     bool                            infoGUI(float indent);

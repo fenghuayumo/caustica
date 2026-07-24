@@ -739,6 +739,7 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
         .sortKeyBuffer = m_sortKeyBuffer.Get(),
         .sortControlBuffer = m_sortControlBuffer.Get(),
         .drawIndirectBuffer = m_drawIndirectBuffer.Get(),
+        .splatAabbBuffer = m_splatAabbBuffer.Get(),
         .stochasticDepth = stochasticSplats
             ? (stochasticToOutput ? m_stochasticDepthBuffer.Get() : m_stochasticProcessedDepthBuffer.Get())
             : nullptr,

@@ -337,13 +337,17 @@ void registerPathTraceLightingEndPass(FrameGraphContext ctx)
     if (!ctx.hasScene || !needsPathTraceLightingEndPass(*ctx.settings))
         return;
 
-    const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
+    const PathTraceLightingEndTargets handles = importPathTraceLightingEndTargets(
+        *ctx.graph,
+        *ctx.renderTargets,
+        ctx.lightSampling,
+        ctx.subInstanceDataBuffer);
 
     rg::PassOptions passOptions{};
     passOptions.executeAfter = pathTraceLightingEndExecuteAfterPass(*ctx.settings);
 
     ctx.graph->addPass(
-        "PathTraceLightingEnd",
+        kPathTraceLightingEndPass,
         [handles](rg::PassBuilder& setup) {
             declarePathTraceLightingEndAccess(setup, handles);
         },

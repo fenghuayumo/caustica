@@ -84,7 +84,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
         debugVizPassOptions.executeAfter = denoiseGuidesReadyPass();
 
         ctx.graph->addPass(
-            "StablePlanesDebugViz",
+            kStablePlanesDebugVizPass,
             [handles](rg::PassBuilder& setup) {
                 declareStablePlanesDebugVizAccess(setup, handles);
             },
@@ -231,10 +231,13 @@ void registerNrdPass(FrameGraphContext ctx)
         ctx.settings->StablePlanesActiveCount,
         static_cast<int>(cStablePlaneCount));
 
-    // Highest plane first (initializes outputColor from stable radiance), then lower planes accumulate.
-    const char* prevPass = needsStablePlanesDebugViz(*ctx.settings)
-        ? "StablePlanesDebugViz"
+    // Highest plane first (initializes outputColor from stable radiance), then lower planes
+    // accumulate. Within/across planes, resource edges (guides / outDiff / outputColor) order
+    // Prepare → Run → Merge; only the first Prepare needs an external executeAfter.
+    const char* guidesReadyPass = needsStablePlanesDebugViz(*ctx.settings)
+        ? kStablePlanesDebugVizPass
         : denoiseGuidesReadyPass();
+    bool firstPrepare = true;
 
     for (int pass = maxPassCount - 1; pass >= 0; --pass)
     {
@@ -249,8 +252,11 @@ void registerNrdPass(FrameGraphContext ctx)
             planeIndex);
 
         rg::PassOptions prepareOptions{};
-        prepareOptions.sideEffect = true;
-        prepareOptions.executeAfter = prevPass;
+        if (firstPrepare)
+        {
+            prepareOptions.executeAfter = guidesReadyPass;
+            firstPrepare = false;
+        }
         ctx.graph->addPass(
             nrdPreparePassName(planeIndex),
             [handles, initWithStableRadiance](rg::PassBuilder& setup) {
@@ -261,9 +267,6 @@ void registerNrdPass(FrameGraphContext ctx)
             },
             prepareOptions);
 
-        rg::PassOptions runOptions{};
-        runOptions.sideEffect = true;
-        runOptions.executeAfter = nrdPreparePassName(planeIndex);
         ctx.graph->addPass(
             nrdRunPassName(planeIndex),
             [handles](rg::PassBuilder& setup) {
@@ -271,12 +274,8 @@ void registerNrdPass(FrameGraphContext ctx)
             },
             [ctx, planeIndex](rg::RenderPassContext& passCtx) {
                 ctx.denoise->runNrd(passCtx.commandList(), planeIndex);
-            },
-            runOptions);
+            });
 
-        rg::PassOptions mergeOptions{};
-        mergeOptions.sideEffect = true;
-        mergeOptions.executeAfter = nrdRunPassName(planeIndex);
         ctx.graph->addPass(
             nrdMergePassName(planeIndex),
             [handles, readsExistingOutputColor](rg::PassBuilder& setup) {
@@ -284,10 +283,7 @@ void registerNrdPass(FrameGraphContext ctx)
             },
             [ctx, planeIndex](rg::RenderPassContext& passCtx) {
                 ctx.denoise->mergeNrdOutputs(passCtx.commandList(), planeIndex);
-            },
-            mergeOptions);
-
-        prevPass = nrdReadyPassName(planeIndex);
+            });
     }
 }
 
