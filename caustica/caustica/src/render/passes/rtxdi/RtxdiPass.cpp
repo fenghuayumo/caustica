@@ -11,6 +11,7 @@
 #include <render/pipeline/FrameGraphPassNames.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
+#include <render/core/RenderPassConstants.h>
 #include <render/graph/GraphBuilder.h>
 #include <scene/View.h>
 #include <render/passes/rtxdi/GeneratePdfMipsPass.h>
@@ -63,7 +64,10 @@ RtxdiPass::RtxdiPass(
 	};
 	m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 
-	m_rtxdiConstantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(sizeof(RtxdiBridgeConstants), "RtxdiBridgeConstants", 16));
+	m_rtxdiConstantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
+		sizeof(RtxdiBridgeConstants),
+		"RtxdiBridgeConstants",
+		caustica::c_MaxRenderPassConstantBufferVersions * 8));
 }
 
 RtxdiPass::~RtxdiPass(){}
@@ -542,20 +546,20 @@ void RtxdiPass::execute(
 void RtxdiPass::fillConstants(caustica::rhi::CommandListHandle commandList)
 {
 	// Set the ReGir center and the camera position 
-	RtxdiBridgeConstants bridgeConstants{};
-	bridgeConstants.lightBufferParams = m_ImportanceSamplingContext->GetLightBufferParameters();
-	bridgeConstants.localLightsRISBufferSegmentParams = m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams();
-	bridgeConstants.environmentLightRISBufferSegmentParams = m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams();
-	bridgeConstants.runtimeParams = m_ImportanceSamplingContext->GetReSTIRDIContext().GetRuntimeParams();
+	m_bridgeConstantsCpu = {};
+	m_bridgeConstantsCpu.lightBufferParams = m_ImportanceSamplingContext->GetLightBufferParameters();
+	m_bridgeConstantsCpu.localLightsRISBufferSegmentParams = m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams();
+	m_bridgeConstantsCpu.environmentLightRISBufferSegmentParams = m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams();
+	m_bridgeConstantsCpu.runtimeParams = m_ImportanceSamplingContext->GetReSTIRDIContext().GetRuntimeParams();
 
-	fillSharedConstants(bridgeConstants);
-	fillDIConstants(bridgeConstants.restirDI);
-	fillGIConstants(bridgeConstants.restirGI);
-    fillPTConstants(bridgeConstants.restirPT);
-	fillReGIRConstant(bridgeConstants.regir);
-	fillReGirIndirectConstants(bridgeConstants.regirIndirect);
+	fillSharedConstants(m_bridgeConstantsCpu);
+	fillDIConstants(m_bridgeConstantsCpu.restirDI);
+	fillGIConstants(m_bridgeConstantsCpu.restirGI);
+	fillPTConstants(m_bridgeConstantsCpu.restirPT);
+	fillReGIRConstant(m_bridgeConstantsCpu.regir);
+	fillReGirIndirectConstants(m_bridgeConstantsCpu.regirIndirect);
 
-	commandList->writeBuffer(m_rtxdiConstantBuffer, &bridgeConstants, sizeof(RtxdiBridgeConstants));
+	commandList->writeBuffer(m_rtxdiConstantBuffer, &m_bridgeConstantsCpu, sizeof(RtxdiBridgeConstants));
 }
 
 void RtxdiPass::fillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const

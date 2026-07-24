@@ -21,6 +21,7 @@ struct MeshInfo;
 
 void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4 col1, math::float4 col2);
 void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
+void enqueueGpuWorkOnRenderThread(App& app, const std::function<void()>& work);
 
 void setEnvMapOverrideSource(App& app, const std::string& envMapOverride);
 [[nodiscard]] const std::string& envMapLocalPath(const App& app);

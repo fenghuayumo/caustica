@@ -274,7 +274,22 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         validateReferencePathTraceGraph(*ctx.graph, m_context->activeSettings());
 #endif
 
-    ctx.graph->execute(*m_frameCommands);
+    // Shared volatiles rewritten on every recordPass so parallel waves (flush + fork)
+    // keep NVRHI per-list addresses valid.
+    ctx.graph->clearVolatileConstantRewrites();
+    if (m_constantBuffer)
+        ctx.graph->addVolatileConstantRewrite(m_constantBuffer.Get(), &constants, sizeof(constants));
+    if (m_rtxdiPass)
+    {
+        if (caustica::rhi::BufferHandle rtxdiCb = m_rtxdiPass->getRTXDIConstants())
+        {
+            ctx.graph->addVolatileConstantRewrite(
+                rtxdiCb.Get(),
+                &m_rtxdiPass->bridgeConstantsCpu(),
+                sizeof(RtxdiBridgeConstants));
+        }
+    }
+    ctx.graph->execute(*m_frameCommands, { .parallelWaves = true });
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();
 
@@ -416,13 +431,14 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             m_context->diagnostics.progressInitializingRenderer.Set(20);
     }
 
-    if (m_context->sessionScene && m_context->frameScene)
+    if (m_context->sessionScene && m_context->frameScene
+        && !m_context->sessionScene->structureGpuBuildInFlight())
     {
         m_frameCommands->ensurePrimary();
         m_context->scenePasses.rayTracing.recreateAccelStructs(
             m_frameCommands->primary(), *m_context->sessionScene, m_context->frameScene);
     }
-    else
+    else if (!m_context->sessionScene || !m_context->frameScene)
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested() = false;
 
     if (m_context->activeSettings().actualUseRTXDIPasses() && m_rtxdiPass == nullptr)

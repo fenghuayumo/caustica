@@ -72,6 +72,11 @@ void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
             continue;
         }
         caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
+        // Retire the previous BLAS so in-flight frames that still reference the old
+        // TLAS keep valid bottom-level handles (double-buffered structure rebuild).
+        // Do not touch accelStructOmm here — OpacityMicromapBuilder owns that path.
+        if (meshGpu.accelStruct)
+            m_retiredBlas.push_back(std::move(meshGpu.accelStruct));
         meshGpu.accelStruct = as;
     }
     m_materialStateRevision = m_materialGpuCache
@@ -102,8 +107,9 @@ void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, con
 
     tlasDesc.topLevelMaxInstances = std::max<size_t>(1, renderData.meshInstanceEntities.size());
     assert(tlasDesc.topLevelMaxInstances < (1 << 15));
-    m_topLevelAS = m_device->createAccelStruct(tlasDesc);
-    if (!m_topLevelAS)
+
+    caustica::rhi::rt::AccelStructHandle newTlas = m_device->createAccelStruct(tlasDesc);
+    if (!newTlas)
     {
         error("Failed to create TLAS for %zu instances.", renderData.meshInstanceEntities.size());
         return;
@@ -118,8 +124,16 @@ void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, con
     bufferDesc.isVertexBuffer = false;
     bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.keepInitialState = true;
-    m_subInstanceBuffer = m_device->createBuffer(bufferDesc);
+    caustica::rhi::BufferHandle newSubInstanceBuffer = m_device->createBuffer(bufferDesc);
 
+    // Keep the previous TLAS/sub-instance buffer alive for in-flight frames.
+    if (m_topLevelAS)
+        m_retiredTopLevelAS.push_back(std::move(m_topLevelAS));
+    if (m_subInstanceBuffer)
+        m_retiredSubInstanceBuffers.push_back(std::move(m_subInstanceBuffer));
+
+    m_topLevelAS = std::move(newTlas);
+    m_subInstanceBuffer = std::move(newSubInstanceBuffer);
     m_subInstanceData.clear();
     m_subInstanceData.assign(m_subInstanceCount, SubInstanceData{});
 }
@@ -511,12 +525,20 @@ void AccelStructManager::buildTlas(caustica::rhi::CommandList*            comman
     commandList->endMarker();
 }
 
+void AccelStructManager::clearRetiredAccelStructs()
+{
+    m_retiredTopLevelAS.clear();
+    m_retiredSubInstanceBuffers.clear();
+    m_retiredBlas.clear();
+}
+
 void AccelStructManager::releaseGpuResources()
 {
     m_topLevelAS = nullptr;
     m_subInstanceBuffer = nullptr;
     m_subInstanceData.clear();
     m_subInstanceCount = 0;
+    clearRetiredAccelStructs();
     std::lock_guard lock(*m_pendingRebuildMutex);
     m_meshesPendingAccelRebuild.clear();
 }

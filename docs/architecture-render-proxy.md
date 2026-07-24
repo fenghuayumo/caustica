@@ -57,12 +57,29 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md) (Phase 1 MT foundation).
 
+## Async structure handoff (P0)
+
+Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous
+proxy packet as `Scene::committedRenderData()`, publishes the new generation, and
+`enqueuePendingStructureGpu` builds meshes/AS/SBT/bindings on the render thread via
+`enqueueGpuWorkOnRenderThread` (non-blocking for Logic).
+
+While `structureGpuBuildInFlight()`:
+
+- `WorldRenderer` serves committed proxies for path tracing (latest slot only for camera/settings)
+- `SceneGpuUpdater::refresh` skips so it cannot race prune/upload against the old TLAS
+- RT commits with `finishStructureGpuBuild` after binding-set recreate
+
+First structure publish with no prior extract still uses exclusive `flushPendingStructureGpuSync`.
+Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
+
 ## Remaining gaps
 
 | Item | Status |
 | --- | --- |
 | OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
+| Async structure GPU build | Phase 1+2: committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | Phase 1–3: see [architecture-rhi-threading.md](architecture-rhi-threading.md) (`FrameCommandContext` + GraphBuilder waves) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |

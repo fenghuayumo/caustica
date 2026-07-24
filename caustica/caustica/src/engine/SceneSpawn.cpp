@@ -31,7 +31,93 @@ using namespace caustica::render;
 namespace caustica
 {
 
-void flushPendingStructureGpu(App& app)
+namespace
+{
+
+void runStructureGpuBuild(
+    render::WorldRenderer* worldRendererResource,
+    GpuSharedCaches* caches,
+    const std::shared_ptr<Scene>& scenePtr,
+    GpuDevice* device,
+    uint32_t frameIndex,
+    const std::shared_ptr<const scene::SceneRenderData>& gpuSetupData)
+{
+    if (caches->textureLoader && caches->renderDevice)
+    {
+        caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
+        caches->textureLoader->loadingFinished();
+    }
+
+    worldRendererResource->lightingPasses().ensureMaterialsFromScene(*gpuSetupData);
+    // Do not prune mesh/material GPU records still referenced by the retired TLAS.
+    render::SceneGpuUpdater::refreshAfterLoad(
+        *scenePtr,
+        *gpuSetupData,
+        worldRendererResource->sceneGpuResources(),
+        caches->descriptorTable.get(),
+        frameIndex,
+        /*pruneRemovedResources=*/false);
+
+    // Double-buffered AS rebuild: previous TLAS/BLAS stay alive for in-flight frames
+    // while this task builds the new generation (overlaps prior-frame GPU work).
+    worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
+    caustica::rhi::CommandListHandle commandList = device->getDevice()->createCommandList();
+    worldRendererResource->rayTracingResources().recreateAccelStructs(
+        commandList, *scenePtr, gpuSetupData.get());
+
+    // SBT: rebuildShaderTableOnly allocates a new table; old tables stay referenced by
+    // in-flight DispatchRays (no waitForIdle required).
+    if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
+    {
+        compiler->update(
+            gpuSetupData.get(),
+            static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
+            [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
+                worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
+            },
+            false);
+    }
+
+    worldRendererResource->rayTracingResources().recreateBindingSet(gpuSetupData.get());
+    scenePtr->finishStructureGpuBuild(frameIndex, gpuSetupData);
+}
+
+} // namespace
+
+bool enqueuePendingStructureGpu(App& app)
+{
+    render::WorldRenderer* worldRendererResource = worldRenderer(app);
+    GpuSharedCaches* caches = gpuSharedCaches(app);
+    GpuDevice* device = gpuDevice(app);
+    auto scenePtr = activeScene(app);
+    if (!worldRendererResource || !caches || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
+        return false;
+
+    // Coalesce: one in-flight structure build at a time. Keep pending so Extract retries.
+    if (scenePtr->structureGpuBuildInFlight())
+        return false;
+
+    const uint32_t frameIndex = device->getPreparedRenderFrameIndex();
+    assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
+
+    // Copy the published packet — the triple-buffer slot may be reused before RT runs.
+    auto gpuSetupData = std::make_shared<const scene::SceneRenderData>(
+        scenePtr->getRenderDataForFrame(frameIndex));
+
+    scenePtr->beginStructureGpuBuild();
+    scenePtr->clearGpuStructureSyncRequest();
+
+    enqueueGpuWorkOnRenderThread(
+        app,
+        [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
+            runStructureGpuBuild(
+                worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData);
+        });
+
+    return true;
+}
+
+void flushPendingStructureGpuSync(App& app)
 {
     render::WorldRenderer* worldRendererResource = worldRenderer(app);
     GpuSharedCaches* caches = gpuSharedCaches(app);
@@ -40,53 +126,22 @@ void flushPendingStructureGpu(App& app)
     if (!worldRendererResource || !caches || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
         return;
 
-    // prepareRenderFrame already waited for RT idle and published this frame.
+    if (scenePtr->structureGpuBuildInFlight())
+        return;
+
     const uint32_t frameIndex = device->getPreparedRenderFrameIndex();
     assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
-    const scene::SceneRenderData& gpuSetupData = scenePtr->getRenderDataForFrame(frameIndex);
-    runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, &gpuSetupData]() {
-        if (caustica::rhi::Device* rhiDevice = device->getDevice())
-            rhiDevice->waitForIdle();
 
-        if (caches->textureLoader && caches->renderDevice)
-        {
-            caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
-            caches->textureLoader->loadingFinished();
-        }
+    auto gpuSetupData = std::make_shared<const scene::SceneRenderData>(
+        scenePtr->getRenderDataForFrame(frameIndex));
 
-        worldRendererResource->lightingPasses().ensureMaterialsFromScene(gpuSetupData);
-        render::SceneGpuUpdater::refreshAfterLoad(
-            *scenePtr,
-            gpuSetupData,
-            worldRendererResource->sceneGpuResources(),
-            caches->descriptorTable.get(),
-            frameIndex);
-
-        // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
-        // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
-        worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
-        caustica::rhi::CommandListHandle commandList = device->getDevice()->createCommandList();
-        worldRendererResource->rayTracingResources().recreateAccelStructs(commandList, *scenePtr, &gpuSetupData);
-
-        // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.
-        // Otherwise the next DispatchRays can use new contribution indices against a
-        // short/stale shader table (intermittent hang after drag-drop import).
-        if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
-        {
-            compiler->update(
-                &gpuSetupData,
-                static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
-                [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
-                    worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
-                },
-                false);
-        }
-
-        // Binding set still points at the destroyed TLAS until the next frame otherwise.
-        worldRendererResource->rayTracingResources().recreateBindingSet(&gpuSetupData);
-    });
-
+    scenePtr->beginStructureGpuBuild();
     scenePtr->clearGpuStructureSyncRequest();
+
+    runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
+        runStructureGpuBuild(
+            worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData);
+    });
 }
 
 Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
@@ -122,9 +177,8 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
         return ecs::NullEntity;
 
     ::SceneManager* manager = detail::sessionManager(app);
-    GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
-    if (!manager || !device || !scenePtr)
+    if (!manager || !scenePtr)
         return ecs::NullEntity;
 
     if (!manager->tryBeginStructureEdit())
@@ -140,14 +194,12 @@ ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneA
         }
     } guard{ manager };
 
-    // Some render paths still touch live ECS; never mutate structure while RT is in-flight.
-    device->waitForRenderThreadIdle();
-
+    // ECS mutation is logic-thread only (assertLogicThread on getEntityWorld).
+    // GPU/AS work is enqueued from Extract; no RT idle stall on spawn.
     const ecs::Entity root = attachImportedScene(scenePtr, *prefab->import, callbacks);
     if (!ecs::isValid(root))
         return ecs::NullEntity;
 
-    // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
     return root;
 }
 
@@ -163,9 +215,8 @@ bool despawn(App& app, ecs::Entity entity)
 {
     ::SceneManager* manager = detail::sessionManager(app);
     render::WorldRenderer* worldRendererResource = worldRenderer(app);
-    GpuDevice* device = gpuDevice(app);
     auto scenePtr = activeScene(app);
-    if (!manager || !worldRendererResource || !device || !scenePtr || !ecs::isValid(entity))
+    if (!manager || !worldRendererResource || !scenePtr || !ecs::isValid(entity))
         return false;
 
     if (!manager->tryBeginStructureEdit())
@@ -181,8 +232,6 @@ bool despawn(App& app, ecs::Entity entity)
         }
     } guard{ manager };
 
-    device->waitForRenderThreadIdle();
-
     if (!destroySceneEntity(DestroySceneEntityParams{
             .scene = scenePtr,
             .entity = entity,
@@ -195,7 +244,6 @@ bool despawn(App& app, ecs::Entity entity)
         return false;
     }
 
-    // GPU upload / AS rebuild happens in Extract (PrepareRenderFrame).
     return true;
 }
 

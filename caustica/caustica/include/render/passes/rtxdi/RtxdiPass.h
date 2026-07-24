@@ -33,6 +33,7 @@ namespace caustica
 #include <render/passes/rtxdi/RtxdiUserSettings.h>
 #include <render/SceneGpuResources.h>
 #include <render/core/PathTracerSettings.h>
+#include <shaders/render/rtxdi/ShaderParameters.h>
 
 namespace caustica::scene { class SceneRenderData; }
 
@@ -143,6 +144,8 @@ public:
 	
 	std::shared_ptr<RtxdiResources> getRTXDIResources() { return m_rtxdiResources; }
 	caustica::rhi::BufferHandle getRTXDIConstants() { return m_rtxdiConstantBuffer; }
+	// CPU shadow for GraphBuilder volatile rewrite across parallel waves / forks.
+	[[nodiscard]] const RtxdiBridgeConstants& bridgeConstantsCpu() const { return m_bridgeConstantsCpu; }
 
 private:
 	void checkContextStaticParameters();
@@ -210,6 +213,7 @@ private:
 	void fillReGirIndirectConstants(ReGirIndirectConstants& regirIndirectConstants);
 
 	RtxdiBridgeParameters m_BridgeParameters;
+	RtxdiBridgeConstants m_bridgeConstantsCpu{};
 	uint32_t m_CurrentReservoirIndex;
 	uint32_t m_PreviousReservoirIndex;
 };

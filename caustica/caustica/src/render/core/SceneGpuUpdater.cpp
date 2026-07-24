@@ -697,7 +697,8 @@ void UpdateGpuSceneBuffers(
     caustica::rhi::CommandList* commandList,
     uint32_t frameIndex,
     bool structureChanged,
-    bool transformsChanged)
+    bool transformsChanged,
+    bool pruneRemovedResources = true)
 {
     gpu.enableBindlessResources = descriptorTable != nullptr;
     std::vector<MeshGpuUploadCommand> meshUploads = gpu.takePendingMeshUploads();
@@ -719,7 +720,8 @@ void UpdateGpuSceneBuffers(
         if (structureChanged)
         {
             gpu.skinnedGpuByEntity.clear();
-            PruneRemovedGpuResources(gpu, renderData);
+            if (pruneRemovedResources)
+                PruneRemovedGpuResources(gpu, renderData);
         }
         EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);
     }
@@ -894,6 +896,11 @@ void SceneGpuUpdater::refresh(
 
     const GpuReadFrameScope gpuReadScope(scene, frameIndex);
 
+    // Async structure build owns mesh upload / AS / acknowledge via refreshAfterLoad.
+    // Skip per-frame GPU scene updates so we don't race prune/upload against the old TLAS.
+    if (scene.structureGpuBuildInFlight())
+        return;
+
     if (!scene.wasRenderSnapshotExtractedOnLogicThread(frameIndex))
     {
         caustica::warning(
@@ -923,10 +930,10 @@ void SceneGpuUpdater::refreshAfterLoad(
     const scene::SceneRenderData& renderData,
     SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
-    uint32_t frameIndex)
+    uint32_t frameIndex,
+    bool pruneRemovedResources)
 {
-    if (!gpu.device->waitForIdle())
-        return;
+    (void)scene;
 
     caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
@@ -939,11 +946,13 @@ void SceneGpuUpdater::refreshAfterLoad(
             commandList,
             frameIndex,
             /*structureChanged=*/true,
-            /*transformsChanged=*/true);
+            /*transformsChanged=*/true,
+            pruneRemovedResources);
     }
     commandList->close();
+    // Same-queue submit order makes the subsequent AS-build CL see these uploads
+    // without a device-wide waitForIdle (overlaps prior frame GPU work).
     gpu.device->executeCommandList(commandList);
-    gpu.device->waitForIdle();
 }
 
 } // namespace caustica::render

@@ -57,13 +57,19 @@ struct PassOptions
     const char* executeAfter = nullptr;
 };
 
+struct VolatileConstantRewrite
+{
+    caustica::rhi::Buffer* buffer = nullptr;
+    const void* data = nullptr;
+    size_t byteSize = 0;
+};
+
 struct ExecuteParams
 {
-    // Off by default: parallel waves flush the primary list between waves, which
-    // clears NVRHI volatile CB addresses. Passes that write a volatile CB in one
-    // wave and bind it in a later wave then fail validation. Re-enable only when
-    // every volatile use re-writes on the consuming command-list open session.
-    bool parallelWaves = false;
+    // Parallel waves flush the primary list between multi-pass waves, which clears
+    // NVRHI volatile CB addresses. GraphBuilder rewrites registered volatiles at the
+    // start of every recordPass so consumers stay valid on forks / after reopen.
+    bool parallelWaves = true;
 };
 
 class PassBuilder
@@ -137,6 +143,12 @@ public:
     // Primary must already be open. Parallel waves fork deferred lists and submit
     // them before continuing; serial waves / serialOnPrimary record on primary.
     void execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params = {});
+
+    // CPU shadows rewritten onto each command-list open session before pass execute.
+    // Required for parallelWaves (flush/fork clears volatile CB address maps).
+    void clearVolatileConstantRewrites();
+    void addVolatileConstantRewrite(
+        caustica::rhi::Buffer* buffer, const void* data, size_t byteSize);
 
     void reset();
 
@@ -272,6 +284,7 @@ private:
     std::vector<TextureAliasingBarrier> m_textureAliasingBarriers;
     std::vector<BufferAliasingBarrier> m_bufferAliasingBarriers;
     TransientResourceStats m_transientStats;
+    std::vector<VolatileConstantRewrite> m_volatileConstantRewrites;
 };
 
 } // namespace caustica::rg

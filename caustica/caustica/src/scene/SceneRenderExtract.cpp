@@ -9,6 +9,7 @@
 #include <render/core/ToneMappingParameters.h>
 
 #include <algorithm>
+#include <unordered_map>
 #include <vector>
 
 namespace caustica::scene
@@ -157,17 +158,47 @@ void ExtractMeshInstancesFull(ecs::World& world, SceneRenderData& out)
 
 bool ExtractMeshInstancesTransforms(ecs::World& world, SceneRenderData& inout)
 {
-    std::vector<MeshInstanceRef> meshRefs;
-    CollectMeshInstanceRefs(world, meshRefs);
-    if (meshRefs.size() != inout.meshInstances.size())
+    // Fast path: patch only entities with Changed global transforms. Falls back to a
+    // full refill when the cached entity order no longer matches the live set.
+    if (inout.meshInstances.size() != inout.meshInstanceEntities.size())
         return false;
 
-    for (size_t i = 0; i < meshRefs.size(); ++i)
+    std::unordered_map<uint32_t, uint32_t> indexByEntity;
+    indexByEntity.reserve(inout.meshInstances.size());
+    for (uint32_t i = 0; i < inout.meshInstances.size(); ++i)
     {
-        if (meshRefs[i].entity != inout.meshInstances[i].entity)
+        if (inout.meshInstances[i].entity != inout.meshInstanceEntities[i])
             return false;
-        FillMeshInstanceProxy(world, meshRefs[i], inout.meshInstances[i]);
-        inout.meshInstanceEntities[i] = meshRefs[i].entity;
+        indexByEntity.emplace(static_cast<uint32_t>(inout.meshInstances[i].entity), i);
+    }
+
+    bool entitySetDrift = false;
+    world.each<MeshInstanceComponent, GlobalTransformComponent, BoundsComponent, SceneContentComponent,
+        ecs::Changed<GlobalTransformComponent>>(
+        [&](ecs::Entity entity,
+            MeshInstanceComponent& meshComp,
+            GlobalTransformComponent& global,
+            BoundsComponent& bounds,
+            SceneContentComponent& content) {
+            const auto it = indexByEntity.find(static_cast<uint32_t>(entity));
+            if (it == indexByEntity.end())
+            {
+                entitySetDrift = true;
+                return;
+            }
+            MeshInstanceRef ref{ entity, &meshComp, &global, &bounds, &content };
+            FillMeshInstanceProxy(world, ref, inout.meshInstances[it->second]);
+            inout.meshInstanceEntities[it->second] = entity;
+        });
+
+    if (entitySetDrift)
+        return false;
+
+    // Visibility can toggle without a transform dirty bit.
+    for (MeshInstanceRenderProxy& proxy : inout.meshInstances)
+    {
+        if (const auto* meshComp = world.tryGet<MeshInstanceComponent>(proxy.entity))
+            proxy.enabled = meshComp->enabled;
     }
     return true;
 }
@@ -596,10 +627,17 @@ void extractSceneRenderData(
     if (flags.transformsChanged)
     {
         if (!ExtractMeshInstancesTransforms(world, inout))
-        {
             ExtractMeshInstancesFull(world, inout);
-        }
         ExtractLightsTransforms(world, inout);
+    }
+    else
+    {
+        // Visibility can toggle without a transform/structure dirty bit.
+        for (MeshInstanceRenderProxy& proxy : inout.meshInstances)
+        {
+            if (const auto* meshComp = world.tryGet<MeshInstanceComponent>(proxy.entity))
+                proxy.enabled = meshComp->enabled;
+        }
     }
 
     // Skinned joints track animation every frame even when hierarchy is idle.
@@ -608,14 +646,7 @@ void extractSceneRenderData(
     ExtractCameras(entityWorld, world, inout);
     // Gaussian splats are few; refresh transforms and enabled state every frame.
     ExtractGaussianSplats(world, inout);
-    // Mesh visibility can toggle without a transform/structure dirty bit.
-    for (MeshInstanceRenderProxy& proxy : inout.meshInstances)
-    {
-        if (const auto* meshComp = world.tryGet<MeshInstanceComponent>(proxy.entity))
-            proxy.enabled = meshComp->enabled;
-    }
-    // Material authoring data is copied on the logic thread; render never reads it live.
-    ExtractMaterialSnapshots(entityWorld, inout);
+    // Material snapshots are structure-owned; skip the full copy on transform-only frames.
 }
 
 void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)

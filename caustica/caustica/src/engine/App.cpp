@@ -403,6 +403,20 @@ void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
     }
 }
 
+void App::enqueueGpuWorkOnRenderThread(const std::function<void()>& work)
+{
+    if (!work)
+        return;
+
+    if (m_useDedicatedRenderThread && m_renderThread.isRunning())
+        m_renderThread.dispatch(work);
+    else
+    {
+        const ThreadDomainScope renderDomain(ThreadDomain::Render);
+        work();
+    }
+}
+
 void App::requestExit()
 {
     m_requestExit = true;

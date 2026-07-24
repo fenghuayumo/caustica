@@ -76,8 +76,11 @@ NVRHI tracks volatile CB GPU addresses **per command-list open session**. `close
 
 Implications:
 
-- `ExecuteParams::parallelWaves` defaults to **false** (parallel waves flush primary between waves).
-- Any pass that binds a volatile CB must `writeBuffer` it on the same open session (producer + consumer on different waves is unsafe across a flush).
+- `ExecuteParams::parallelWaves` defaults to **true**. GraphBuilder rewrites registered
+  volatile CPU shadows (`addVolatileConstantRewrite`) at the start of every `recordPass`
+  so flush/fork open sessions stay valid. WorldRenderer registers `FrameConstants`.
+- WorldRenderer also registers the RTXDI bridge CB CPU shadow (`RtxdiPass::bridgeConstantsCpu`)
+  so ReSTIR consumers stay valid across parallel waves after `FillConstants`.
 - `FrameConstants` is graph-owned (`UploadFrameConstants`, refreshed again by `UploadSubInstanceData` / after serial sync-points like ToneMapping and ReferenceOIDN).
 
 ## Resource state

@@ -68,9 +68,12 @@ namespace caustica
         // structure publish. Logic writes published generation; render advances consumed.
         std::atomic<uint64_t> m_gpuStructureGeneration{0};
         std::atomic<uint64_t> m_gpuStructureConsumedGeneration{0};
-        // Logic mutated ECS structure; Extract must exclusive-upload meshes/AS before
-        // publishing proxies that reference the new graph.
+        // Logic mutated ECS structure; Extract enqueues async GPU/AS build for the
+        // published generation. Render serves m_committedRenderData until commit.
         bool m_pendingGpuStructureSync = false;
+        std::atomic<bool> m_structureGpuBuildInFlight{false};
+        mutable std::mutex m_committedRenderDataMutex;
+        std::shared_ptr<const scene::SceneRenderData> m_committedRenderData;
 
         std::atomic<uint32_t> m_gpuReadFrameIndex{UINT32_MAX};
 
@@ -148,10 +151,21 @@ namespace caustica
         void syncRenderSnapshotGpuIndices(uint32_t frameIndex);
         void acknowledgeGpuStructureConsumed(uint32_t frameIndex);
 
-        // Bevy-style: mutate ECS only; engine flushes GPU/AS before Extract.
+        // Bevy-style: mutate ECS only; Extract enqueues async GPU/AS build.
         void requestGpuStructureSync();
         [[nodiscard]] bool needsGpuStructureSync() const { return m_pendingGpuStructureSync; }
         void clearGpuStructureSyncRequest();
+
+        // Async structure handoff: freeze pre-edit proxies, mark build in flight, commit
+        // after RT finishes AS/SBT/bindings for the published generation.
+        void freezeCommittedFromLogicCache();
+        void beginStructureGpuBuild();
+        void finishStructureGpuBuild(uint32_t frameIndex, std::shared_ptr<const scene::SceneRenderData> built);
+        [[nodiscard]] bool structureGpuBuildInFlight() const
+        {
+            return m_structureGpuBuildInFlight.load(std::memory_order_acquire);
+        }
+        [[nodiscard]] std::shared_ptr<const scene::SceneRenderData> committedRenderData() const;
 
         [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
         [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;

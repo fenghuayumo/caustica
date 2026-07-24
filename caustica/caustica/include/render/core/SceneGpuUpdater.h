@@ -32,12 +32,15 @@ public:
         uint32_t frameIndex);
 
     // Exclusive GPU setup from logic-thread staging data. Does not publish snapshots.
+    // pruneRemovedResources=false keeps GPU records referenced by a live/retired TLAS
+    // during async double-buffered structure rebuild.
     static void refreshAfterLoad(
         Scene& scene,
         const scene::SceneRenderData& renderData,
         SceneGpuResources& gpuResources,
         IDescriptorTableManager* descriptorTable,
-        uint32_t frameIndex);
+        uint32_t frameIndex,
+        bool pruneRemovedResources = true);
 };
 
 } // namespace caustica::render

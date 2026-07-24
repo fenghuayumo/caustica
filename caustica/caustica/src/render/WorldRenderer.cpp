@@ -409,8 +409,9 @@ void caustica::render::WorldRenderer::createDeviceResources()
         m_debugDeltaPathTreeSearchStack = device->createBuffer(bufferDesc);
     }
 
+    // Parallel graph waves rewrite FrameConstants per forked list; keep headroom.
     m_constantBuffer = device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
-        sizeof(FrameConstants), "FrameConstants", caustica::c_MaxRenderPassConstantBufferVersions * 2));
+        sizeof(FrameConstants), "FrameConstants", caustica::c_MaxRenderPassConstantBufferVersions * 8));
 }
 
 
@@ -663,43 +664,59 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
 
     const uint32_t renderPhaseFrameIndex = m_context->gpuDevice.getRenderPhaseFrameIndex();
     std::shared_ptr<Scene> scene = m_context->sessionScene;
+    // Held for the frame so committed proxies stay alive if finishStructureGpuBuild swaps.
+    std::shared_ptr<const scene::SceneRenderData> committedSceneHold;
     if (scene)
     {
         scene->beginGpuReadFrame(renderPhaseFrameIndex);
-        const scene::SceneRenderData& renderData = scene->getRenderData();
+        const scene::SceneRenderData& sessionData = scene->getRenderData();
+        const bool structureBuildInFlight = scene->structureGpuBuildInFlight();
+        committedSceneHold = structureBuildInFlight ? scene->committedRenderData() : nullptr;
+        // While AS build is in flight, never bind the newly published structure proxies —
+        // they are not TLAS/SBT compatible until finishStructureGpuBuild.
+        const scene::SceneRenderData* structureData = nullptr;
+        if (structureBuildInFlight)
+            structureData = committedSceneHold ? committedSceneHold.get() : nullptr;
+        else
+            structureData = &sessionData;
 
-        m_frameSettingsSnapshot = renderData.renderSettings.settings;
-        m_frameRuntimeSnapshot.Invalidation = renderData.renderSettings.invalidation;
-        m_frameRuntimeSnapshot.Picking = renderData.renderSettings.picking;
+        // Camera / settings always track the latest Extract slot so the view stays live
+        // while structure GPU build serves the previous TLAS-compatible proxies.
+        m_frameSettingsSnapshot = sessionData.renderSettings.settings;
+        m_frameRuntimeSnapshot.Invalidation = sessionData.renderSettings.invalidation;
+        m_frameRuntimeSnapshot.Picking = sessionData.renderSettings.picking;
         m_frameRuntimeSnapshot.GaussianSplats = m_context->runtimeState.GaussianSplats;
-        m_frameGaussianSplatTemporalReset = renderData.renderSettings.gaussianSplatTemporalReset;
-        m_context->sceneTime = renderData.renderSettings.sceneTime;
+        m_frameGaussianSplatTemporalReset = sessionData.renderSettings.gaussianSplatTemporalReset;
+        m_context->sceneTime = sessionData.renderSettings.sceneTime;
 
         m_context->frameSettings = &m_frameSettingsSnapshot;
         m_context->frameRuntime = &m_frameRuntimeSnapshot;
-        m_context->frameScene = &renderData;
+        m_context->frameScene = structureData;
         m_context->frameGpu = m_context->sceneGpuResources.frameHandles();
-        m_context->frameSceneStructureChanged = scene->hasSceneStructureChanged(renderPhaseFrameIndex);
-        m_context->frameSceneTransformsChanged = scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
+        // Suppress structure/transform GPU paths until async AS commit finishes.
+        m_context->frameSceneStructureChanged =
+            !structureBuildInFlight && scene->hasSceneStructureChanged(renderPhaseFrameIndex);
+        m_context->frameSceneTransformsChanged =
+            !structureBuildInFlight && scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
 
         // Apply extracted camera pose before view update (RT owns view matrices).
         // Skip when snapshot has no session camera (structure-only republish / scene-load extract).
-        if (renderData.camera.valid)
+        if (sessionData.camera.valid)
         {
             m_context->camera.camera().lookTo(
-                renderData.camera.position, renderData.camera.direction, renderData.camera.up);
-            m_context->camera.setVerticalFOV(renderData.camera.verticalFovRadians);
-            m_context->camera.setZNear(renderData.camera.zNear);
-            m_context->camera.setSelectedCameraIndex(renderData.camera.selectedCameraIndex);
-            if (renderData.camera.useCustomIntrinsics)
+                sessionData.camera.position, sessionData.camera.direction, sessionData.camera.up);
+            m_context->camera.setVerticalFOV(sessionData.camera.verticalFovRadians);
+            m_context->camera.setZNear(sessionData.camera.zNear);
+            m_context->camera.setSelectedCameraIndex(sessionData.camera.selectedCameraIndex);
+            if (sessionData.camera.useCustomIntrinsics)
             {
                 m_context->camera.setIntrinsics(
-                    renderData.camera.intrinsics.x,
-                    renderData.camera.intrinsics.y,
-                    renderData.camera.intrinsics.z,
-                    renderData.camera.intrinsics.w,
-                    renderData.camera.intrinsicsViewport.x,
-                    renderData.camera.intrinsicsViewport.y);
+                    sessionData.camera.intrinsics.x,
+                    sessionData.camera.intrinsics.y,
+                    sessionData.camera.intrinsics.z,
+                    sessionData.camera.intrinsics.w,
+                    sessionData.camera.intrinsicsViewport.x,
+                    sessionData.camera.intrinsicsViewport.y);
             }
             else
             {

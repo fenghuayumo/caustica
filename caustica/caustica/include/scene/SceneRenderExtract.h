@@ -18,7 +18,9 @@ namespace caustica::scene
     struct SessionRenderExtractInputs;
 
     // What changed since the last extract into the logic-side cache.
-    // Structure → rebuild proxy lists; transforms → patch fields; neither → skinned only.
+    // Structure → rebuild proxy lists + mesh/material snapshots;
+    // transforms → Changed<> patch of mesh/light proxies;
+    // neither → skinned / camera / splat refresh only.
     struct SceneRenderExtractFlags
     {
         bool structureChanged = true;

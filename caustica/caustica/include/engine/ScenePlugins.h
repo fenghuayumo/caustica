@@ -47,9 +47,12 @@ void updateWindowTitle(App& app);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);
 
-// Extract-only: upload meshes/AS for Scene::requestGpuStructureSync() after publish.
+// Extract-only: enqueue async mesh/AS build for Scene::requestGpuStructureSync() after publish.
 // Requires the current frame already published via extractAndPublishRenderSnapshot.
-// Applications must not call this -- spawn/despawn only mark dirty; Extract flushes.
-void flushPendingStructureGpu(App& app);
+// Applications must not call this -- spawn/despawn only mark dirty; Extract enqueues.
+// Returns false when a prior structure build is still in flight (pending flag kept).
+bool enqueuePendingStructureGpu(App& app);
+// Fallback when there is no committed proxy packet to serve during async build.
+void flushPendingStructureGpuSync(App& app);
 
 } // namespace caustica

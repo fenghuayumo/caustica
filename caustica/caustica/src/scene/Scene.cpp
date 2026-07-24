@@ -525,6 +525,41 @@ void Scene::clearGpuStructureSyncRequest()
     m_pendingGpuStructureSync = false;
 }
 
+void Scene::freezeCommittedFromLogicCache()
+{
+    assertLogicThread();
+    if (!m_LogicExtractCacheValid)
+        return;
+
+    auto frozen = std::make_shared<scene::SceneRenderData>(m_LogicExtractCache);
+    std::lock_guard lock(m_committedRenderDataMutex);
+    m_committedRenderData = std::move(frozen);
+}
+
+void Scene::beginStructureGpuBuild()
+{
+    m_structureGpuBuildInFlight.store(true, std::memory_order_release);
+}
+
+void Scene::finishStructureGpuBuild(
+    uint32_t frameIndex, std::shared_ptr<const scene::SceneRenderData> built)
+{
+    assertRenderThread();
+    if (built)
+    {
+        std::lock_guard lock(m_committedRenderDataMutex);
+        m_committedRenderData = std::move(built);
+    }
+    acknowledgeGpuStructureConsumed(frameIndex);
+    m_structureGpuBuildInFlight.store(false, std::memory_order_release);
+}
+
+std::shared_ptr<const scene::SceneRenderData> Scene::committedRenderData() const
+{
+    std::lock_guard lock(m_committedRenderDataMutex);
+    return m_committedRenderData;
+}
+
 void Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))

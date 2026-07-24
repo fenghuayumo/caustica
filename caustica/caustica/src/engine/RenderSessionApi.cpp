@@ -70,6 +70,13 @@ void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
     app.runGpuWorkOnRenderThread(work);
 }
 
+void enqueueGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
+{
+    if (!work)
+        return;
+    app.enqueueGpuWorkOnRenderThread(work);
+}
+
 std::string resolutionInfo(const App& app)
 {
     auto* wr = worldRenderer(app);

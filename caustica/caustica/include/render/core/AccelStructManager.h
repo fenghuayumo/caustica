@@ -78,6 +78,10 @@ public:
 
     void releaseGpuResources();
 
+    // Drop AS handles retired by the previous double-buffered rebuild. Safe once
+    // no in-flight frame still references that generation (next structure edit).
+    void clearRetiredAccelStructs();
+
     [[nodiscard]] caustica::rhi::rt::AccelStructHandle getTopLevelAS() const { return m_topLevelAS; }
     [[nodiscard]] caustica::rhi::BufferHandle          getSubInstanceBuffer() const { return m_subInstanceBuffer; }
     [[nodiscard]] std::vector<SubInstanceData>& getSubInstanceData() { return m_subInstanceData; }
@@ -96,6 +100,11 @@ private:
     caustica::rhi::BufferHandle                          m_subInstanceBuffer;
     std::vector<SubInstanceData>                 m_subInstanceData;
     uint32_t                                         m_subInstanceCount = 0;
+    // Previous generation kept alive so in-flight DispatchRays can finish against
+    // the old TLAS/BLAS while the new generation is built and bound.
+    std::vector<caustica::rhi::rt::AccelStructHandle> m_retiredTopLevelAS;
+    std::vector<caustica::rhi::BufferHandle>          m_retiredSubInstanceBuffers;
+    std::vector<caustica::rhi::rt::AccelStructHandle> m_retiredBlas;
     std::vector<scene::MeshRenderResourceId>     m_meshesPendingAccelRebuild;
     std::shared_ptr<std::mutex>                  m_pendingRebuildMutex =
         std::make_shared<std::mutex>();

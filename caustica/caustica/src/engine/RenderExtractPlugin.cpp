@@ -38,11 +38,16 @@ void prepareRenderFrame(App& app)
         return;
 
     const bool structureSync = scene->needsGpuStructureSync();
-    if (structureSync)
-    {
-        // Exclusive access before publishing a new structure into the triple buffer.
-        device->waitForRenderThreadIdle();
-    }
+    const bool canStartStructure = structureSync && !scene->structureGpuBuildInFlight();
+
+    // Serve the last committed (TLAS-compatible) packet during build. Only freeze from
+    // the pre-edit cache when we have never committed before — never overwrite an
+    // existing committed snapshot with newer ECS state that is not AS-ready yet.
+    if (canStartStructure && !scene->committedRenderData())
+        scene->freezeCommittedFromLogicCache();
+
+    const bool haveCommittedServeTarget =
+        !canStartStructure || static_cast<bool>(scene->committedRenderData());
 
     scene::SessionRenderExtractInputs sessionInputs;
     sessionInputs.camera = &sessionCam->camera;
@@ -55,9 +60,18 @@ void prepareRenderFrame(App& app)
     // Sole Extract publish for this frame (includes session camera/settings).
     scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
 
-    // GPU structure flush consumes the published slot — never a second extract.
-    if (structureSync)
-        flushPendingStructureGpu(app);
+    if (!canStartStructure)
+        return;
+
+    // No prior proxies to serve during build (first structure publish) — exclusive sync.
+    if (!haveCommittedServeTarget)
+    {
+        device->waitForRenderThreadIdle();
+        flushPendingStructureGpuSync(app);
+        return;
+    }
+
+    enqueuePendingStructureGpu(app);
 }
 
 void RenderExtractPlugin::configureSchedules(App& app)

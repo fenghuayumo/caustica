@@ -779,16 +779,9 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             rebuildPerSubInstanceHitGroups();
             remapHitGroupsOntoFrozenUnique();
 
-            // Previous frames may still be referencing the old ShaderTable on the GPU.
-            // Swap only after idle so we never race DispatchRays (probabilistic hang/TDR).
-            if (!m_device->waitForIdle())
-            {
-                caustica::error(
-                    "PathTracingShaderCompiler: waitForIdle failed before shader table refresh; "
-                    "skipping SBT update this frame");
-                return;
-            }
-
+            // rebuildShaderTableOnly allocates a new ShaderTable and swaps the handle.
+            // In-flight DispatchRays keep the previous table alive via CL refs — no
+            // device-wide waitForIdle (allows AS/SBT refresh to overlap prior GPU work).
             caustica::info(
                 "PathTracingShaderCompiler: refreshing shader tables only "
                 "(hit entries=%zu, unique groups=%zu, macrosChanged=%d missingPipelines=%d)",

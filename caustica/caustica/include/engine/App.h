@@ -303,7 +303,10 @@ public:
     [[nodiscard]] const RenderThread& renderThread() const { return m_renderThread; }
 
     void waitForDedicatedRenderThreadIdle();
+    // Blocks until the work finishes on the render thread (resize / exclusive setup).
     void runGpuWorkOnRenderThread(const std::function<void()>& work);
+    // Fire-and-forget RT work. Blocks only when the frame queue is full (same as dispatch).
+    void enqueueGpuWorkOnRenderThread(const std::function<void()>& work);
     void requestExit();
     void requestRenderUnfocused();
 

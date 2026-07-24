@@ -183,22 +183,21 @@ void SceneRayTracingResources::recreateAccelStructs(
     m_invalidation->AccelerationStructRebuildRequested = false;
     m_settings->ResetAccumulation = true;
 
-    if (!m_gpuDevice->getDevice()->waitForIdle())
-        return;
-
     assert(renderData && "recreateAccelStructs requires published SceneRenderData");
 
+    // Double-buffered rebuild: keep the previous TLAS/BLAS generation alive in
+    // AccelStructManager retired lists so in-flight DispatchRays can finish while
+    // this CL builds the new generation. No device-wide waitForIdle — previous
+    // frame GPU work overlaps with the AS build on the graphics queue.
+    m_accelStructs->clearRetiredAccelStructs();
     m_worldRenderer->invalidateBindingSet();
-    m_accelStructs->releaseGpuResources();
-    const caustica::scene::SceneRenderData& data = *renderData;
-    m_accelStructs->clearMeshAccelStructs(data.meshSnapshots);
-    m_gpuDevice->getDevice()->runGarbageCollection();
 
     commandList->open();
     createAccelStructs(commandList, scene, renderData);
     commandList->close();
     m_gpuDevice->getDevice()->executeCommandList(commandList);
-    m_gpuDevice->getDevice()->waitForIdle();
+    // Binding-set recreate (caller) points at the new TLAS; retired handles keep
+    // the old generation valid until the next structure rebuild clears them.
 }
 
 void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation)
