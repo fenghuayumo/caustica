@@ -42,7 +42,9 @@ private:
     nvrhi::BufferHandle m_GeometryInstanceToLightBuffer;
     nvrhi::TextureHandle m_LocalLightPdfTexture;
 
-    std::shared_ptr<EnvMapProcessor> m_EnvironmentMap;
+    // Non-owning: scene lighting owns EnvMapProcessor. Holding a shared_ptr here
+    // keeps it alive until RtxdiPass teardown and can unload textures after AssetSystem.
+    EnvMapProcessor* m_EnvironmentMap = nullptr;
     EnvMapSceneParams m_EnvironmentMapSceneParams;
 
     nvrhi::BufferHandle m_constantBuffer;
@@ -85,7 +87,7 @@ public:
         size_t geometryInstanceCount,
         nvrhi::IDescriptorTable* descriptorTable,
         const caustica::render::SceneGpuFrameHandles& gpuHandles,
-        std::shared_ptr<EnvMapProcessor> environmentMap = nullptr,
+        EnvMapProcessor* environmentMap = nullptr,
         EnvMapSceneParams envMapSceneParams = {});
     void setGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void createPipeline();

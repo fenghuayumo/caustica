@@ -211,6 +211,7 @@ void RtxdiPass::reset()
     m_ReSTIRPTContext = nullptr;
 	m_rtxdiResources = nullptr;
 	m_LocalLightPdfMipmapPass = nullptr;
+	m_PrepareLightsPass = nullptr;
 	m_bindingSet = nullptr;
     m_PrevBindingSet = nullptr;
 }
@@ -262,7 +263,7 @@ void RtxdiPass::setupFrame(const SetupParams& params)
 void RtxdiPass::prepareResources(
     nvrhi::CommandListHandle commandList,
     const RenderTargets& renderTargets,
-    std::shared_ptr<EnvMapProcessor> envMap,
+    EnvMapProcessor* envMap,
     EnvMapSceneParams envMapSceneParams,
     const caustica::scene::SceneRenderData* renderData,
     size_t geometryInstanceCount,

@@ -88,14 +88,14 @@ void PrepareLightsPass::setFrameInputs(
     size_t geometryInstanceCount,
     nvrhi::IDescriptorTable* descriptorTable,
     const caustica::render::SceneGpuFrameHandles& gpuHandles,
-    std::shared_ptr<EnvMapProcessor> environmentMap,
+    EnvMapProcessor* environmentMap,
     EnvMapSceneParams envMapSceneParams)
 {
     m_renderData = renderData;
     m_geometryInstanceCount = geometryInstanceCount;
     m_descriptorTable = descriptorTable;
     m_gpuHandles = gpuHandles;
-    m_EnvironmentMap = std::move(environmentMap);
+    m_EnvironmentMap = environmentMap;
     m_EnvironmentMapSceneParams = envMapSceneParams;
 }
 
@@ -520,7 +520,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
     for (const scene::LightRenderProxy* lightProxy : sortedLights)
     {
         PolymorphicLightInfoFull polymorphicLight = {};
-        if (!ConvertLightProxy(*lightProxy, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap.get()))
+        if (!ConvertLightProxy(*lightProxy, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap))
             continue;
 
         auto pOffset = m_PrimitiveLightBufferOffsets.find(lightProxy->entity);

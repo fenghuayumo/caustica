@@ -590,7 +590,9 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         RtxdiPass::SetupParams rtxdiParams{};
         rtxdiParams.commandList = m_commandList;
         rtxdiParams.renderTargets = m_renderTargets.get();
-        rtxdiParams.environment = envMapPresent ? m_context->scenePasses.lighting.environment() : nullptr;
+        rtxdiParams.environment = envMapPresent
+            ? m_context->scenePasses.lighting.environment().get()
+            : nullptr;
         rtxdiParams.envMapSceneParams = m_context->scenePasses.lighting.envMapSceneParams();
         rtxdiParams.renderData = m_context->frameScene;
         rtxdiParams.descriptorTable = m_context->descriptorTable

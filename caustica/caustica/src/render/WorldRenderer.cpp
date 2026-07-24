@@ -155,10 +155,11 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
 
 void caustica::render::WorldRenderer::destroy()
 {
-    // Drop graph lambdas before releasing scene lighting / env-map ownership.
-    // Pass execute closures capture FrameGraphContext by value; any leftover
-    // ownership there must not outlive TextureLoader / scene passes.
+    // Drop graph lambdas and RTXDI (PrepareLightsPass) before releasing scene
+    // lighting / env-map ownership. Those paths must not keep EnvMapProcessor
+    // alive past TextureLoader / AssetSystem shutdown.
     m_frameGraph.reset();
+    m_rtxdiPass.reset();
 
     if (m_context)
         m_context->renderDevice.setActiveSceneGpuResources(nullptr);

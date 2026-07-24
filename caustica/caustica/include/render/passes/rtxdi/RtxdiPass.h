@@ -69,7 +69,7 @@ public:
 	{
 		nvrhi::CommandListHandle commandList;
 		const RenderTargets* renderTargets = nullptr;
-		std::shared_ptr<EnvMapProcessor> environment;
+		EnvMapProcessor* environment = nullptr;
 		EnvMapSceneParams envMapSceneParams{};
 		const caustica::scene::SceneRenderData* renderData = nullptr;
 		nvrhi::IDescriptorTable* descriptorTable = nullptr;
@@ -99,7 +99,7 @@ public:
     void prepareResources(
         nvrhi::CommandListHandle commandList,
         const RenderTargets& renderTargets,
-        std::shared_ptr<EnvMapProcessor> envMap,
+        EnvMapProcessor* envMap,
         EnvMapSceneParams envMapSceneParams,
         const caustica::scene::SceneRenderData* renderData,
         size_t geometryInstanceCount,
