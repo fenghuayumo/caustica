@@ -21,6 +21,36 @@ using namespace caustica::render;
 namespace
 {
     constexpr float c_envMapRadianceScale = 1.0f / 4.0f;
+
+    UpdateLightingParams makeUpdateLightingParams(
+        PathTracingContext& context,
+        caustica::rhi::CommandListHandle commandList,
+        uint64_t frameIndex,
+        const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
+    {
+        UpdateLightingParams params{
+            .settings = context.activeSettings(),
+            .commandList = commandList,
+            .environment = context.scenePasses.lighting.environment().get(),
+            .lightSampling = context.scenePasses.lighting.lightSampling().get(),
+            .bindingCache = &context.bindingCache,
+            .renderDevice = context.renderDevice,
+            .sceneData = context.frameScene,
+            .gpuHandles = context.resolveGpuHandles(),
+            .bindlessDescriptorTable = context.descriptorTable
+                ? context.descriptorTable->getDescriptorTable()
+                : nullptr,
+            .materials = context.scenePasses.lighting.materials(),
+            .opacityMaps = context.scenePasses.lighting.opacityMaps(),
+            .envMapSceneParams = context.scenePasses.lighting.envMapSceneParams(),
+            .sceneTime = context.sceneTime,
+            .frameIndex = frameIndex,
+            .envMapRadianceScale = c_envMapRadianceScale,
+        };
+        if (gaussianSplatEmissionProxies && !gaussianSplatEmissionProxies->empty())
+            params.gaussianSplatEmissionProxies = gaussianSplatEmissionProxies;
+        return params;
+    }
 }
 
 void caustica::render::createLightingRenderPasses(
@@ -81,32 +111,32 @@ void caustica::render::preUpdateLightingFrame(
     caustica::preUpdateLighting(params);
 }
 
+void caustica::render::updateEnvMapFrame(
+    PathTracingContext& context,
+    caustica::rhi::CommandListHandle commandList,
+    uint64_t frameIndex)
+{
+    UpdateLightingParams params = makeUpdateLightingParams(context, commandList, frameIndex, nullptr);
+    caustica::updateEnvMapLighting(params);
+}
+
+void caustica::render::updateLightSamplingBeginFrame(
+    PathTracingContext& context,
+    caustica::rhi::CommandListHandle commandList,
+    uint64_t frameIndex,
+    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
+{
+    UpdateLightingParams params =
+        makeUpdateLightingParams(context, commandList, frameIndex, gaussianSplatEmissionProxies);
+    caustica::updateLightSamplingBegin(context.camera, context.accelStructs, params);
+}
+
 void caustica::render::updateLightingFrame(
     PathTracingContext& context,
     caustica::rhi::CommandListHandle commandList,
     uint64_t frameIndex,
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
 {
-    UpdateLightingParams params{
-        .settings = context.activeSettings(),
-        .commandList = commandList,
-        .environment = context.scenePasses.lighting.environment().get(),
-        .lightSampling = context.scenePasses.lighting.lightSampling().get(),
-        .bindingCache = &context.bindingCache,
-        .renderDevice = context.renderDevice,
-        .sceneData = context.frameScene,
-        .gpuHandles = context.resolveGpuHandles(),
-        .bindlessDescriptorTable = context.descriptorTable
-            ? context.descriptorTable->getDescriptorTable()
-            : nullptr,
-        .materials = context.scenePasses.lighting.materials(),
-        .opacityMaps = context.scenePasses.lighting.opacityMaps(),
-        .envMapSceneParams = context.scenePasses.lighting.envMapSceneParams(),
-        .sceneTime = context.sceneTime,
-        .frameIndex = frameIndex,
-        .envMapRadianceScale = c_envMapRadianceScale,
-    };
-    if (gaussianSplatEmissionProxies && !gaussianSplatEmissionProxies->empty())
-        params.gaussianSplatEmissionProxies = gaussianSplatEmissionProxies;
-    caustica::updateLighting(context.camera, context.accelStructs, params);
+    updateEnvMapFrame(context, commandList, frameIndex);
+    updateLightSamplingBeginFrame(context, commandList, frameIndex, gaussianSplatEmissionProxies);
 }

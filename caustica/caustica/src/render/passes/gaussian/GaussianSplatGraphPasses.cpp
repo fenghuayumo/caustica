@@ -6,6 +6,7 @@
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
+#include <render/pipeline/FrameGraphPassNames.h>
 
 #include <cassert>
 #include <vector>
@@ -209,7 +210,7 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
     if (needsPathTraceLightingEndPass(*ctx.settings))
         passOptions.executeAfter = "PathTraceLightingEnd";
     else
-        passOptions.executeAfter = ctx.settings->RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
+        passOptions.executeAfter = ctx.settings->RealtimeMode ? "VBufferExport" : kLightingReadyPass;
 
     ctx.graph->addPass(
         "GaussianSplatsAccelBuild",

@@ -767,8 +767,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         m_context->activeSettings().ReblurSettings.hitDistanceParameters.D
     };
 
-    // EnvMap + LightSampling updateBegin / subInstance upload run in the
-    // LightingUpdateBegin graph pass after ClearFrameTargets.
+    // EnvMap / LightSampling / SubInstance upload run as graph passes after ClearFrameTargets.
     buildGaussianSplatEmissionProxies();
     m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 }

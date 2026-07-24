@@ -29,6 +29,17 @@ void preUpdateLightingFrame(
     caustica::rhi::CommandListHandle commandList,
     bool& needNewBindings);
 
+void updateEnvMapFrame(
+    PathTracingContext& context,
+    caustica::rhi::CommandListHandle commandList,
+    uint64_t frameIndex);
+
+void updateLightSamplingBeginFrame(
+    PathTracingContext& context,
+    caustica::rhi::CommandListHandle commandList,
+    uint64_t frameIndex,
+    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies);
+
 void updateLightingFrame(
     PathTracingContext& context,
     caustica::rhi::CommandListHandle commandList,

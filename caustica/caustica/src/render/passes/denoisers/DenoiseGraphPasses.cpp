@@ -9,6 +9,7 @@
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/postProcess/AccumulationPass.h>
+#include <render/pipeline/FrameGraphPassNames.h>
 #include <scene/View.h>
 #include <shaders/PathTracer/Config.h>
 
@@ -45,13 +46,15 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     extractPathTraceGraphOutputs(*ctx.graph, handles);
 
-    const char* afterPathTrace = ctx.settings->actualUseRTXDIPasses() ? "Rtxdi" : "MainPathTrace";
+    const char* afterPathTrace = ctx.settings->actualUseRTXDIPasses()
+        ? rtxdiExecuteReadyPass(*ctx.settings)
+        : "MainPathTrace";
 
     rg::PassOptions specHitPassOptions{};
     specHitPassOptions.executeAfter = afterPathTrace;
 
     ctx.graph->addPass(
-        "DenoiseSpecHitT",
+        kDenoiseSpecHitTPass,
         [handles](rg::PassBuilder& setup) {
             setup.write(handles.depth, rg::TextureAccess::UnorderedAccess);
             setup.write(handles.specularHitT, rg::TextureAccess::UnorderedAccess);
@@ -63,10 +66,10 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
         specHitPassOptions);
 
     rg::PassOptions avgLayerPassOptions{};
-    avgLayerPassOptions.executeAfter = "DenoiseSpecHitT";
+    avgLayerPassOptions.executeAfter = kDenoiseSpecHitTPass;
 
     ctx.graph->addPass(
-        "AvgLayerRadiance",
+        kAvgLayerRadiancePass,
         [handles](rg::PassBuilder& setup) {
             declareDenoiserPrepareAccess(setup, handles);
         },
@@ -75,20 +78,10 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
         },
         avgLayerPassOptions);
 
-    // Fence name kept for any external executeAfter("DenoiserPrepare") dependents.
-    rg::PassOptions fenceOptions{};
-    fenceOptions.sideEffect = true;
-    fenceOptions.executeAfter = "AvgLayerRadiance";
-    ctx.graph->addPass(
-        "DenoiserPrepare",
-        [](rg::PassBuilder&) {},
-        [](rg::RenderPassContext&) {},
-        fenceOptions);
-
     if (needsStablePlanesDebugViz(*ctx.settings))
     {
         rg::PassOptions debugVizPassOptions{};
-        debugVizPassOptions.executeAfter = "DenoiserPrepare";
+        debugVizPassOptions.executeAfter = denoiseGuidesReadyPass();
 
         ctx.graph->addPass(
             "StablePlanesDebugViz",
@@ -234,21 +227,6 @@ void registerNrdPass(FrameGraphContext ctx)
 
     ctx.denoise->ensureNrdIntegrations();
 
-    // Stable string literals for executeAfter (PassOptions keeps const char* through compile).
-    static constexpr const char* kNrdPrepareNames[] = {
-        "NRD Prepare 0", "NRD Prepare 1", "NRD Prepare 2"
-    };
-    static constexpr const char* kNrdRunNames[] = {
-        "NRD Run 0", "NRD Run 1", "NRD Run 2"
-    };
-    static constexpr const char* kNrdMergeNames[] = {
-        "NRD Merge 0", "NRD Merge 1", "NRD Merge 2"
-    };
-    static constexpr const char* kNrdPlaneFenceNames[] = {
-        "NRD Plane 0", "NRD Plane 1", "NRD Plane 2"
-    };
-    static_assert(std::size(kNrdPrepareNames) == cStablePlaneCount);
-
     const int maxPassCount = std::min(
         ctx.settings->StablePlanesActiveCount,
         static_cast<int>(cStablePlaneCount));
@@ -256,7 +234,7 @@ void registerNrdPass(FrameGraphContext ctx)
     // Highest plane first (initializes outputColor from stable radiance), then lower planes accumulate.
     const char* prevPass = needsStablePlanesDebugViz(*ctx.settings)
         ? "StablePlanesDebugViz"
-        : "DenoiserPrepare";
+        : denoiseGuidesReadyPass();
 
     for (int pass = maxPassCount - 1; pass >= 0; --pass)
     {
@@ -274,7 +252,7 @@ void registerNrdPass(FrameGraphContext ctx)
         prepareOptions.sideEffect = true;
         prepareOptions.executeAfter = prevPass;
         ctx.graph->addPass(
-            kNrdPrepareNames[planeIndex],
+            nrdPreparePassName(planeIndex),
             [handles, initWithStableRadiance](rg::PassBuilder& setup) {
                 declareNrdPrepareAccess(setup, handles, initWithStableRadiance);
             },
@@ -285,9 +263,9 @@ void registerNrdPass(FrameGraphContext ctx)
 
         rg::PassOptions runOptions{};
         runOptions.sideEffect = true;
-        runOptions.executeAfter = kNrdPrepareNames[planeIndex];
+        runOptions.executeAfter = nrdPreparePassName(planeIndex);
         ctx.graph->addPass(
-            kNrdRunNames[planeIndex],
+            nrdRunPassName(planeIndex),
             [handles](rg::PassBuilder& setup) {
                 declareNrdRunAccess(setup, handles);
             },
@@ -298,9 +276,9 @@ void registerNrdPass(FrameGraphContext ctx)
 
         rg::PassOptions mergeOptions{};
         mergeOptions.sideEffect = true;
-        mergeOptions.executeAfter = kNrdRunNames[planeIndex];
+        mergeOptions.executeAfter = nrdRunPassName(planeIndex);
         ctx.graph->addPass(
-            kNrdMergeNames[planeIndex],
+            nrdMergePassName(planeIndex),
             [handles, readsExistingOutputColor](rg::PassBuilder& setup) {
                 declareNrdMergeAccess(setup, handles, readsExistingOutputColor);
             },
@@ -309,17 +287,7 @@ void registerNrdPass(FrameGraphContext ctx)
             },
             mergeOptions);
 
-        // Fence kept for any external executeAfter("NRD Plane N") dependents.
-        rg::PassOptions fenceOptions{};
-        fenceOptions.sideEffect = true;
-        fenceOptions.executeAfter = kNrdMergeNames[planeIndex];
-        ctx.graph->addPass(
-            kNrdPlaneFenceNames[planeIndex],
-            [](rg::PassBuilder&) {},
-            [](rg::RenderPassContext&) {},
-            fenceOptions);
-
-        prevPass = kNrdPlaneFenceNames[planeIndex];
+        prevPass = nrdReadyPassName(planeIndex);
     }
 }
 

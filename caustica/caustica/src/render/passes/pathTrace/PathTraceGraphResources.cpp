@@ -3,6 +3,7 @@
 #include <render/core/RenderTargets.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
+#include <render/pipeline/FrameGraphPassNames.h>
 
 #include <cassert>
 
@@ -125,7 +126,7 @@ bool needsPathTraceLightingEndPass(const PathTracerSettings& settings)
 
 const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings)
 {
-    return settings.RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
+    return settings.RealtimeMode ? "VBufferExport" : kLightingReadyPass;
 }
 
 const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
@@ -136,7 +137,7 @@ const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings)
     if (needsPathTraceLightingEndPass(settings))
         return "PathTraceLightingEnd";
 
-    return settings.RealtimeMode ? "VBufferExport" : "LightingUpdateBegin";
+    return settings.RealtimeMode ? "VBufferExport" : kLightingReadyPass;
 }
 
 void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings)
@@ -149,11 +150,11 @@ void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTr
 
     if (!settings.actualUseRTXDIPasses())
     {
-        assert(!graph.isPassRegistered("RtxdiBeginFrame"));
-        assert(!graph.isPassRegistered("Rtxdi"));
+        assert(!graph.isPassRegistered(kRtxdiFillConstantsPass));
+        assert(!graph.isPassRegistered(kRtxdiDIPass));
     }
 
-    assert(graph.isPassActive("LightingUpdateBegin"));
+    assert(graph.isPassActive(kLightingReadyPass));
     assert(graph.isPassActive("MainPathTrace"));
 
     if (needsPathTraceLightingEndPass(settings))

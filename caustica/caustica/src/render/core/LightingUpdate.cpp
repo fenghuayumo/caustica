@@ -48,16 +48,16 @@ void preUpdateLighting(PreUpdateLightingParams& params)
         params.needNewBindings = true;
 }
 
-void updateLighting(CameraController& camera, AccelStructManager& accelStructs, UpdateLightingParams& params)
+void updateEnvMapLighting(UpdateLightingParams& params)
 {
     caustica::rhi::ICommandList* commandList = params.commandList;
-    if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
-        || params.bindingCache == nullptr || params.sceneData == nullptr || !params.gpuHandles.valid())
+    if (commandList == nullptr || params.environment == nullptr || params.bindingCache == nullptr
+        || params.sceneData == nullptr)
     {
         return;
     }
 
-    RAII_SCOPE(commandList->beginMarker("UpdateLighting");, commandList->endMarker(););
+    RAII_SCOPE(commandList->beginMarker("EnvMapUpdate");, commandList->endMarker(););
 
     EMB_DirectionalLight dirLights[EnvMapProcessor::c_MaxDirLights];
     uint32_t dirLightCount = 0;
@@ -100,6 +100,21 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
     {
         params.settings.ResetAccumulation = true;
     }
+}
+
+void updateLightSamplingBegin(
+    CameraController& camera,
+    AccelStructManager& accelStructs,
+    UpdateLightingParams& params)
+{
+    caustica::rhi::ICommandList* commandList = params.commandList;
+    if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
+        || params.bindingCache == nullptr || params.sceneData == nullptr || !params.gpuHandles.valid())
+    {
+        return;
+    }
+
+    RAII_SCOPE(commandList->beginMarker("LightSamplingUpdateBegin");, commandList->endMarker(););
 
     LightSamplingCache::UpdateSettings settings;
     settings.ImportanceSamplingType = static_cast<uint>(params.settings.NEEType);
@@ -152,6 +167,19 @@ void updateLighting(CameraController& camera, AccelStructManager& accelStructs, 
         accelStructs.getSubInstanceBuffer(),
         accelStructs.getSubInstanceData(),
         params.environment->getImportanceSampling()->getRadianceAndImportanceMap());
+}
+
+void updateLighting(CameraController& camera, AccelStructManager& accelStructs, UpdateLightingParams& params)
+{
+    RAII_SCOPE(
+        if (params.commandList)
+            params.commandList->beginMarker("UpdateLighting");
+        ,
+        if (params.commandList)
+            params.commandList->endMarker(););
+
+    updateEnvMapLighting(params);
+    updateLightSamplingBegin(camera, accelStructs, params);
 }
 
 void syncEnvMapSceneParams(

@@ -11,6 +11,7 @@
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
+#include <render/pipeline/FrameGraphPassNames.h>
 #include <assets/loader/ShaderFactory.h>
 #include <core/scope.h>
 #include <math/math.h>
@@ -276,8 +277,8 @@ void registerPathTracePrePass(FrameGraphContext ctx)
 
     rg::PassOptions passOptions{};
     passOptions.executeAfter = ctx.settings->actualUseRTXDIPasses()
-        ? "RtxdiBeginFrame"
-        : "LightingUpdateBegin";
+        ? rtxdiBeginReadyPass(ctx.settings->actualUseReSTIRDI())
+        : kLightingReadyPass;
 
     ctx.graph->addPass(
         "PathTracePrePass",

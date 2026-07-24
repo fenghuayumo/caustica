@@ -8,6 +8,7 @@
 #include <render/passes/rtxdi/RtxdiGraphResources.h>
 #include <render/passes/rtxdi/PrepareLightsPass.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
+#include <render/pipeline/FrameGraphPassNames.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
 #include <render/graph/GraphBuilder.h>
@@ -771,7 +772,14 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 		return;
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
-	const char* prevPass = "LightingUpdateBegin";
+	const char* prevPass = kLightingReadyPass;
+
+	rg::BufferHandle rtxdiConstants{};
+	if (rtxdiPass != nullptr)
+	{
+		if (auto buffer = rtxdiPass->getRTXDIConstants())
+			rtxdiConstants = ctx.graph->importBuffer(buffer, rg::BufferAccess::CopyDest);
+	}
 
 	auto addRtxdiBeginStage = [&](const char* name, auto declareAccess, auto execute)
 	{
@@ -790,7 +798,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 	if (usingLightSampling)
 	{
 		addRtxdiBeginStage(
-			"RtxdiPrepareLights",
+			kRtxdiPrepareLightsPass,
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPrepareLightsAccess(setup, rtxdiResources);
 			},
@@ -801,8 +809,11 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 	}
 
 	addRtxdiBeginStage(
-		"RtxdiFillConstants",
-		[](rg::PassBuilder&) {},
+		kRtxdiFillConstantsPass,
+		[rtxdiConstants](rg::PassBuilder& setup) {
+			if (rtxdiConstants.isValid())
+				setup.write(rtxdiConstants, rg::BufferAccess::CopyDest);
+		},
 		[rtxdiPass](rg::RenderPassContext& passCtx) {
 			if (rtxdiPass)
 				rtxdiPass->writeBridgeConstants(passCtx.commandList());
@@ -811,7 +822,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 	if (usingLightSampling)
 	{
 		addRtxdiBeginStage(
-			"RtxdiGeneratePdfMips",
+			kRtxdiGeneratePdfMipsPass,
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiGeneratePdfMipsAccess(setup, rtxdiResources);
 			},
@@ -821,7 +832,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 			});
 
 		addRtxdiBeginStage(
-			"RtxdiPresampleLights",
+			kRtxdiPresampleLightsPass,
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
@@ -831,7 +842,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 			});
 
 		addRtxdiBeginStage(
-			"RtxdiPresampleEnvMap",
+			kRtxdiPresampleEnvMapPass,
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
@@ -841,7 +852,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 			});
 
 		addRtxdiBeginStage(
-			"RtxdiPresampleReGIR",
+			kRtxdiPresampleReGIRPass,
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
@@ -850,12 +861,6 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 					rtxdiPass->presampleReGIR(passCtx.commandList(), ctx.bindingSet);
 			});
 	}
-
-	// Fence pass kept for PathTracePrePass / validation dependency names.
-	addRtxdiBeginStage(
-		"RtxdiBeginFrame",
-		[](rg::PassBuilder&) {},
-		[](rg::RenderPassContext&) {});
 }
 
 void registerRtxdiExecutePass(FrameGraphContext ctx)
@@ -907,7 +912,7 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	if (useDI)
 	{
 		addRtxdiExecuteStage(
-			"RtxdiDI",
+			kRtxdiDIPass,
 			makeExecuteAccess(),
 			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
@@ -918,7 +923,7 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	if (useGI)
 	{
 		addRtxdiExecuteStage(
-			"RtxdiGI",
+			kRtxdiGIPass,
 			makeExecuteAccess(),
 			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
@@ -929,7 +934,7 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	if (useFusedDIGIFinal)
 	{
 		addRtxdiExecuteStage(
-			"RtxdiFusedDIGIFinal",
+			kRtxdiFusedDIGIFinalPass,
 			makeExecuteAccess(),
 			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
@@ -940,19 +945,13 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	if (usePT)
 	{
 		addRtxdiExecuteStage(
-			"RtxdiPT",
+			kRtxdiPTPass,
 			makeExecuteAccess(),
 			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
 					rtxdiPass->executePT(passCtx.commandList(), ctx.bindingSet);
 			});
 	}
-
-	// Fence kept for DenoiserPrepare / validation dependency names.
-	addRtxdiExecuteStage(
-		"Rtxdi",
-		[](rg::PassBuilder&) {},
-		[](rg::RenderPassContext&) {});
 }
 
 void registerRtxdiGraphPasses(FrameGraphContext ctx)

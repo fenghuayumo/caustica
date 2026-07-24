@@ -84,6 +84,16 @@ void syncEnvMapSceneParams(
 
 void preUpdateLighting(PreUpdateLightingParams& params);
 
+// EnvMap bake / importance (no LightSampling). May set ResetAccumulation.
+void updateEnvMapLighting(UpdateLightingParams& params);
+
+// Light proxy / emissive bake begin. Requires EnvMap importance map to be current.
+void updateLightSamplingBegin(
+    CameraController& camera,
+    AccelStructManager& accelStructs,
+    UpdateLightingParams& params);
+
+// Convenience: EnvMap then LightSampling begin (legacy callers).
 void updateLighting(
     CameraController& camera,
     AccelStructManager& accelStructs,
