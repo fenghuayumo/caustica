@@ -261,8 +261,8 @@ function(util_generate_shader_config_file OUT_FILE_NAME DIR DEFINES)
     file(WRITE ${OUT_FILE_NAME} ${out_content})
 endfunction()
 
-# NRD lives in caustica/caustica/nrd (first-party). MathLib + nrd_shaders are
-# wired from caustica/CMakeLists.txt / caustica/caustica/CMakeLists.txt.
+# NRD CPU/GPU sources live under caustica/.../render/passes/denoisers/nrd
+# and are built into causRender (see caustica/caustica/CMakeLists.txt).
 
 ##########################################################################
 ################################ cxxopts ###############################

@@ -4,7 +4,7 @@
 
 #if WITH_NRD
 
-#include <NRD.h>
+#include <render/passes/denoisers/nrd/NRD.h>
 #include <rhi/rhi.h>
 #include <unordered_map>
 #include <render/core/BindingCache.h>

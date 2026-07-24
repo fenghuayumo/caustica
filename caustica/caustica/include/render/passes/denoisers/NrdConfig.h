@@ -1,7 +1,7 @@
 #pragma once
 
 //#include "NrdIntegration.h"
-#include <NRD.h>
+#include <render/passes/denoisers/nrd/NRD.h>
 
 namespace NrdConfig {
 

@@ -168,7 +168,7 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
     {
         const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[pipelineIndex];
 
-        std::string fileName = std::string("nrd/Shaders/Source/") + nrdPipelineDesc.shaderFileName;
+        std::string fileName = std::string("nrd/Source/") + nrdPipelineDesc.shaderFileName;
         std::vector<caustica::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
         
         NrdPipeline pipeline;
