@@ -30,7 +30,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #endif // _WIN32
 #include <GLFW/glfw3native.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <core/log.h>
 #include <backend/GpuFrameDriver.h>
 #include <backend/SwapChain.h>
@@ -44,13 +44,13 @@
 namespace caustica
 {
     class Window; // Platform layer: window abstraction
-    class App; // Engine layer: frame driver (friend — accesses protected state)
+    class App; // Engine layer: frame driver (friend - accesses protected state)
 
-    struct DefaultMessageCallback : public nvrhi::IMessageCallback
+    struct DefaultMessageCallback : public caustica::rhi::IMessageCallback
     {
         static DefaultMessageCallback& getInstance();
 
-        void message(nvrhi::MessageSeverity severity, const char* messageText) override;
+        void message(caustica::rhi::MessageSeverity severity, const char* messageText) override;
     };
 
     struct InstanceParameters
@@ -110,16 +110,16 @@ namespace caustica
         uint32_t backBufferHeight = 720;
         uint32_t refreshRate = 0;
         uint32_t swapChainBufferCount = 3;
-        nvrhi::Format swapChainFormat = nvrhi::Format::SRGBA8_UNORM;
+        caustica::rhi::Format swapChainFormat = caustica::rhi::Format::SRGBA8_UNORM;
         uint32_t swapChainSampleCount = 1;
         uint32_t swapChainSampleQuality = 0;
 
         // Sets the format for the primary depth buffer. UNKNOWN means no depth buffer (legacy behavior).
         // The depth buffer is attached to every swap chain framebuffer provided to the render passes.
-        nvrhi::Format depthBufferFormat = nvrhi::Format::UNKNOWN;
+        caustica::rhi::Format depthBufferFormat = caustica::rhi::Format::UNKNOWN;
 
         uint32_t maxFramesInFlight = 2;
-        bool enableNvrhiValidationLayer = false;
+        bool enableRhiValidationLayer = false;
         bool vsyncEnabled = false;
         bool enableRayTracingExtensions = false; // for vulkan
         bool requirePathTracerFeatures = true;   // Ray tracing pipeline + ray query
@@ -147,7 +147,7 @@ namespace caustica
         // the initial window size will be larger than specified in 'backBufferWidth' and 'backBufferHeight' parameters.
         bool resizeWindowWithDisplayScale = false;
 
-        nvrhi::IMessageCallback *messageCallback = nullptr;
+        caustica::rhi::IMessageCallback *messageCallback = nullptr;
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
         DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -202,7 +202,7 @@ namespace caustica
         std::optional<LUID> luid;
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-        nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
+        caustica::rhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
 #endif
 #if CAUSTICA_WITH_VULKAN
         VkPhysicalDevice vkPhysicalDevice = nullptr;
@@ -211,7 +211,7 @@ namespace caustica
 
     struct GpuDeviceCreateDesc
     {
-        nvrhi::GraphicsAPI api = nvrhi::GraphicsAPI::D3D12;
+        caustica::rhi::GraphicsAPI api = caustica::rhi::GraphicsAPI::D3D12;
         bool headless = false;
         std::string windowTitle = "caustica";
 
@@ -313,12 +313,12 @@ namespace caustica
         // Frame index for the upcoming render (set on the main thread before onPrepareRenderScene).
         uint32_t m_preparedRenderFrameIndex = 0;
 
-        std::vector<nvrhi::TextureHandle> m_HeadlessBackBuffers;
+        std::vector<caustica::rhi::TextureHandle> m_HeadlessBackBuffers;
         uint32_t m_HeadlessBackBufferIndex = 0;
 
         GpuDevice();
 
-        static GpuDevice* create(nvrhi::GraphicsAPI api);
+        static GpuDevice* create(caustica::rhi::GraphicsAPI api);
         bool initializeGraphicsDevice(const DeviceCreationParameters& params);
         bool initializeWindowSwapChain(class Window* window);
         bool initializeHeadlessGraphics(const DeviceCreationParameters& params);
@@ -334,7 +334,7 @@ namespace caustica
         void releaseHeadlessBackBuffers();
         bool beginHeadlessFrame();
         bool presentHeadlessFrame();
-        nvrhi::ITexture* getHeadlessBackBuffer(uint32_t index);
+        caustica::rhi::ITexture* getHeadlessBackBuffer(uint32_t index);
         uint32_t getCurrentHeadlessBackBufferIndex() const;
         uint32_t getHeadlessBackBufferCount() const;
 
@@ -351,9 +351,9 @@ namespace caustica
         virtual void prepareShutdown() {}
 
     public:
-        [[nodiscard]] virtual nvrhi::IDevice *getDevice() const = 0;
+        [[nodiscard]] virtual caustica::rhi::IDevice *getDevice() const = 0;
         [[nodiscard]] virtual const char *getRendererString() const = 0;
-        [[nodiscard]] virtual nvrhi::GraphicsAPI getGraphicsAPI() const = 0;
+        [[nodiscard]] virtual caustica::rhi::GraphicsAPI getGraphicsAPI() const = 0;
 
         [[nodiscard]] BackBufferInfo getBackBufferInfo() const;
         [[nodiscard]] double getAverageFrameTimeSeconds() const { return m_AverageFrameTime; }
@@ -367,8 +367,8 @@ namespace caustica
 
         [[nodiscard]] virtual bool queryVideoMemoryInfo(VideoMemoryInfo& out) const;
 
-        [[nodiscard]] bool isD3D12() const { return getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12; }
-        [[nodiscard]] bool isVulkan() const { return getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN; }
+        [[nodiscard]] bool isD3D12() const { return getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12; }
+        [[nodiscard]] bool isVulkan() const { return getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN; }
 
         [[nodiscard]] GLFWwindow* getWindow() const { return m_Window; }
         [[nodiscard]] Window* getPlatformWindow() const { return m_WindowPtr; }
@@ -383,13 +383,13 @@ namespace caustica
         [[nodiscard]] uint32_t getPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
         void setPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
 
-        virtual nvrhi::ITexture* getCurrentBackBuffer() = 0;
-        virtual nvrhi::ITexture* getBackBuffer(uint32_t index) = 0;
+        virtual caustica::rhi::ITexture* getCurrentBackBuffer() = 0;
+        virtual caustica::rhi::ITexture* getBackBuffer(uint32_t index) = 0;
         virtual uint32_t getCurrentBackBufferIndex() = 0;
         virtual uint32_t getBackBufferCount() = 0;
-        nvrhi::IFramebuffer* getCurrentFramebuffer(bool withDepth = true);
-        nvrhi::IFramebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
-        nvrhi::ITexture* getDepthBuffer() const { return m_SwapChain.depthBuffer; }
+        caustica::rhi::IFramebuffer* getCurrentFramebuffer(bool withDepth = true);
+        caustica::rhi::IFramebuffer* getFramebuffer(uint32_t index, bool withDepth = true);
+        caustica::rhi::ITexture* getDepthBuffer() const { return m_SwapChain.depthBuffer; }
 
         virtual void shutdown();
         virtual ~GpuDevice() = default;

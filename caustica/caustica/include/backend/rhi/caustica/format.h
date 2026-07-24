@@ -1,15 +1,15 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
 #include <cstdint>
 
-namespace nvrhi::caustica
+namespace caustica::rhi
 {
 
 static constexpr uint32_t c_ForkVersion = 1;
 
-// Render-graph pixel format subset. Maps to nvrhi::Format inside the Caustica RHI fork.
+// Render-graph pixel format subset. Maps to caustica::rhi::Format.
 enum class PixelFormat : uint16_t
 {
     Unknown = 0,
@@ -46,7 +46,7 @@ struct PixelFormatInfo
 };
 
 [[nodiscard]] PixelFormatInfo getPixelFormatInfo(PixelFormat format);
-[[nodiscard]] Format toNvrhiFormat(PixelFormat format);
-[[nodiscard]] PixelFormat fromNvrhiFormat(Format format);
+[[nodiscard]] Format toRhiFormat(PixelFormat format);
+[[nodiscard]] PixelFormat fromRhiFormat(Format format);
 
-} // namespace nvrhi::caustica
+} // namespace caustica::rhi

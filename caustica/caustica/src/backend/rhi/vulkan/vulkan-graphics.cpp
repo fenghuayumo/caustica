@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
     static TextureDimension getDimensionForFramebuffer(TextureDimension dimension, bool isArray)
     {
@@ -461,7 +461,7 @@ namespace nvrhi::vulkan
         }
     }
 
-    void CommandList::beginRenderPass(nvrhi::IFramebuffer* _framebuffer)
+    void CommandList::beginRenderPass(caustica::rhi::IFramebuffer* _framebuffer)
     {
         endRenderPass();
 
@@ -547,7 +547,7 @@ namespace nvrhi::vulkan
 
         if (!state.viewport.viewports.empty() && arraysAreDifferent(state.viewport.viewports, m_CurrentGraphicsState.viewport.viewports))
         {
-            nvrhi::static_vector<vk::Viewport, c_MaxViewports> viewports;
+            caustica::rhi::static_vector<vk::Viewport, c_MaxViewports> viewports;
             for (const auto& vp : state.viewport.viewports)
             {
                 viewports.push_back(VKViewportWithDXCoords(vp));
@@ -558,7 +558,7 @@ namespace nvrhi::vulkan
 
         if (!state.viewport.scissorRects.empty() && arraysAreDifferent(state.viewport.scissorRects, m_CurrentGraphicsState.viewport.scissorRects))
         {
-            nvrhi::static_vector<vk::Rect2D, c_MaxViewports> scissors;
+            caustica::rhi::static_vector<vk::Rect2D, c_MaxViewports> scissors;
             for (const auto& sc : state.viewport.scissorRects)
             {
                 scissors.push_back(vk::Rect2D(vk::Offset2D(sc.minX, sc.minY),
@@ -716,4 +716,4 @@ namespace nvrhi::vulkan
         );
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

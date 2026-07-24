@@ -1,9 +1,9 @@
 #include "d3d12-backend.h"
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
 
-#if NVRHI_D3D12_WITH_NVAPI
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
     static bool convertCustomSemantics(uint32_t numSemantics, const CustomSemantic* semantics, std::vector<NV_CUSTOM_SEMANTIC>& output)
     {
         output.resize(numSemantics);
@@ -51,7 +51,7 @@ namespace nvrhi::d3d12
         shader->desc = d;
         memcpy(&shader->bytecode[0], binary, binarySize);
 
-#if NVRHI_D3D12_WITH_NVAPI
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
         // Save the custom semantics structure because it may be on the stack or otherwise dynamic.
         // Note that this has to be a deep copy; currently NV_CUSTOM_SEMANTIC has no pointers, but that might change.
         if (d.numCustomSemantics && d.pCustomSemantics)
@@ -199,7 +199,7 @@ namespace nvrhi::d3d12
         return nullptr;
     }
 
-    nvrhi::ShaderLibraryHandle Device::createShaderLibrary(const void* binary, const size_t binarySize)
+    caustica::rhi::ShaderLibraryHandle Device::createShaderLibrary(const void* binary, const size_t binarySize)
     {
         ShaderLibrary* shaderLibrary = new ShaderLibrary();
 
@@ -296,4 +296,4 @@ namespace nvrhi::d3d12
     {
         return ShaderHandle::Create(new ShaderLibraryEntry(this, entryName, shaderType));
     }
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

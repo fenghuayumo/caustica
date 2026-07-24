@@ -23,7 +23,7 @@
 using namespace caustica::math;
 using namespace caustica;
 
-EnvMapImportanceSamplingCache::EnvMapImportanceSamplingCache( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
+EnvMapImportanceSamplingCache::EnvMapImportanceSamplingCache( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device), m_shaderFactory(shaderFactory)
 {
 }
@@ -36,20 +36,20 @@ void EnvMapImportanceSamplingCache::createRenderPasses()
 {
     // Samplers
     {
-        nvrhi::SamplerDesc samplerDesc;
-        samplerDesc.setBorderColor(nvrhi::Color(0.f));
+        caustica::rhi::SamplerDesc samplerDesc;
+        samplerDesc.setBorderColor(caustica::rhi::Color(0.f));
         samplerDesc.setAllFilters(true);
         samplerDesc.setMipFilter(true);
-        samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
+        samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
         m_linearWrapSampler = m_device->createSampler(samplerDesc);
 
         samplerDesc.setAllFilters(false);
-        samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Clamp);
+        samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Clamp);
         m_pointClampSampler = m_device->createSampler(samplerDesc);
     }
 
     {
-        nvrhi::BufferDesc constBufferDesc;
+        caustica::rhi::BufferDesc constBufferDesc;
         constBufferDesc.byteSize = sizeof(EnvMapImportanceSamplingCacheConstants);
         constBufferDesc.debugName = "EnvMapImportanceSamplingCacheConstants";
         constBufferDesc.isConstantBuffer = true;
@@ -60,22 +60,22 @@ void EnvMapImportanceSamplingCache::createRenderPasses()
 
     //create importance map (for MIP descent) builder shader and resources
     {
-        m_importanceMapComputeShader = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "BuildMIPDescentImportanceMapCS", nullptr, nvrhi::ShaderType::Compute);
+        m_importanceMapComputeShader = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "BuildMIPDescentImportanceMapCS", nullptr, caustica::rhi::ShaderType::Compute);
         assert(m_importanceMapComputeShader);
 
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(1),
-            nvrhi::BindingLayoutItem::Sampler(0),
-            nvrhi::BindingLayoutItem::Sampler(1)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(1),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::Sampler(1)
         };
         m_importanceMapBindingLayout = m_device->createBindingLayout(layoutDesc);
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.setComputeShader(m_importanceMapComputeShader);
         pipelineDesc.addBindingLayout(m_importanceMapBindingLayout);
         m_importanceMapPipeline = m_device->createComputePipeline(pipelineDesc);
@@ -87,32 +87,32 @@ void EnvMapImportanceSamplingCache::createRenderPasses()
 #if 0
     {
         // Stuff for presampling goes below
-        m_presamplingCS = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "PreSampleCS", nullptr, nvrhi::ShaderType::Compute);
+        m_presamplingCS = m_shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapImportanceSamplingCache.hlsl", "PreSampleCS", nullptr, caustica::rhi::ShaderType::Compute);
         assert(m_presamplingCS);
 
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),
-            nvrhi::BindingLayoutItem::Sampler(0),
-            nvrhi::BindingLayoutItem::Sampler(1)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::Sampler(1)
         };
         m_presamplingBindingLayout = m_device->createBindingLayout(layoutDesc);
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.setComputeShader(m_presamplingCS);
         pipelineDesc.addBindingLayout(m_presamplingBindingLayout);
         m_presamplingPipeline = m_device->createComputePipeline(pipelineDesc);
 
         // buffer that stores pre-generated samples which get updated once per frame
-        nvrhi::BufferDesc buffDesc;
+        caustica::rhi::BufferDesc buffDesc;
         buffDesc.byteSize = sizeof(uint32_t) * 2 * std::max(ENVMAP_PRESAMPLED_COUNT, 1u); // RG32_UINT (2 UINTs) per element
-        buffDesc.format = nvrhi::Format::RG32_UINT;
+        buffDesc.format = caustica::rhi::Format::RG32_UINT;
         buffDesc.canHaveTypedViews = true;
-        buffDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+        buffDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
         buffDesc.keepInitialState = true;
         buffDesc.debugName = "PresampledEnvironmentSamples";
         buffDesc.canHaveUAVs = true;
@@ -152,19 +152,19 @@ void EnvMapImportanceSamplingCache::createImportanceMap()
 
     uint32_t mips = getImportanceMapMIPLevels();
 
-    nvrhi::TextureDesc texDesc;
-    texDesc.format = nvrhi::Format::R32_FLOAT;
+    caustica::rhi::TextureDesc texDesc;
+    texDesc.format = caustica::rhi::Format::R32_FLOAT;
     texDesc.width = dimensions;
     texDesc.height = dimensions;
     texDesc.mipLevels = mips;
     texDesc.isRenderTarget = true;
     texDesc.isUAV = true;
     texDesc.debugName = "EnvImportanceMap";
-    texDesc.setInitialState(nvrhi::ResourceStates::UnorderedAccess);
+    texDesc.setInitialState(caustica::rhi::ResourceStates::UnorderedAccess);
     texDesc.keepInitialState = true;
     m_importanceMapTexture = m_device->createTexture(texDesc);
 
-    texDesc.format = nvrhi::Format::RGBA16_FLOAT;
+    texDesc.format = caustica::rhi::Format::RGBA16_FLOAT;
     texDesc.debugName = "EnvRadianceMap";
     m_radianceMapTexture = m_device->createTexture(texDesc);
 
@@ -172,7 +172,7 @@ void EnvMapImportanceSamplingCache::createImportanceMap()
     m_MIPMapPassRad = std::make_unique<caustica::render::MipMapGenPass>(m_device, m_shaderFactory, m_radianceMapTexture, caustica::render::MipMapGenPass::MODE_COLOR);
 }
 
-void EnvMapImportanceSamplingCache::fillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
+void EnvMapImportanceSamplingCache::fillCacheConsts(EnvMapImportanceSamplingCacheConstants & constants, caustica::rhi::TextureHandle sourceCubemap, int sampleIndex)
 {
     const uint32_t dimensions = EMISB_IMPORTANCE_MAP_DIM;
     const uint32_t samples = EMISB_IMPORTANCE_SAMPLES_PER_PIXEL;
@@ -189,7 +189,7 @@ void EnvMapImportanceSamplingCache::fillCacheConsts(EnvMapImportanceSamplingCach
     constants.SampleIndex = sampleIndex;
 }
 
-void EnvMapImportanceSamplingCache::preUpdate(nvrhi::TextureHandle sourceCubemap, bool newSource)
+void EnvMapImportanceSamplingCache::preUpdate(caustica::rhi::TextureHandle sourceCubemap, bool newSource)
 {
     assert(sourceCubemap);
 
@@ -198,22 +198,22 @@ void EnvMapImportanceSamplingCache::preUpdate(nvrhi::TextureHandle sourceCubemap
 
     if (m_importanceMapBindingSet == nullptr || newSource)
     {
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_builderConstants),
-            nvrhi::BindingSetItem::Texture_SRV(0, sourceCubemap),
-            nvrhi::BindingSetItem::Texture_UAV(0, m_importanceMapTexture),
-            nvrhi::BindingSetItem::Texture_UAV(1, m_radianceMapTexture),
-            nvrhi::BindingSetItem::Sampler(0, m_pointClampSampler),
-            nvrhi::BindingSetItem::Sampler(1, m_linearWrapSampler),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_builderConstants),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, sourceCubemap),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, m_importanceMapTexture),
+            caustica::rhi::BindingSetItem::Texture_UAV(1, m_radianceMapTexture),
+            caustica::rhi::BindingSetItem::Sampler(0, m_pointClampSampler),
+            caustica::rhi::BindingSetItem::Sampler(1, m_linearWrapSampler),
         };
         m_importanceMapBindingSet = m_device->createBindingSet(bindingSetDesc, m_importanceMapBindingLayout);
     }
 }
 
-void EnvMapImportanceSamplingCache::generateImportanceMap(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
+void EnvMapImportanceSamplingCache::generateImportanceMap(caustica::rhi::CommandListHandle commandList, caustica::rhi::TextureHandle sourceCubemap)
 {
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.pipeline = m_importanceMapPipeline;
     state.bindings = { m_importanceMapBindingSet };
 
@@ -235,7 +235,7 @@ void EnvMapImportanceSamplingCache::generateImportanceMap(nvrhi::CommandListHand
         m_MIPMapPassRad->dispatch(commandList);
     }
 
-    commandList->setTextureState(m_importanceMapTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    commandList->setTextureState(m_importanceMapTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
     commandList->commitBarriers();
 
     m_envMapImportanceSamplingParams.ImportanceBaseMip = constants.ImportanceMapBaseMip;
@@ -243,14 +243,14 @@ void EnvMapImportanceSamplingCache::generateImportanceMap(nvrhi::CommandListHand
     m_envMapImportanceSamplingParams.padding0 = 0;
 }
 
-void EnvMapImportanceSamplingCache::update(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap)
+void EnvMapImportanceSamplingCache::update(caustica::rhi::CommandListHandle commandList, caustica::rhi::TextureHandle sourceCubemap)
 {
     RAII_SCOPE( commandList->beginMarker("ISBake");, commandList->endMarker(); );
 
     generateImportanceMap(commandList, sourceCubemap);
 }
 
-void EnvMapImportanceSamplingCache::executePresampling(nvrhi::CommandListHandle commandList, nvrhi::TextureHandle sourceCubemap, int sampleIndex)
+void EnvMapImportanceSamplingCache::executePresampling(caustica::rhi::CommandListHandle commandList, caustica::rhi::TextureHandle sourceCubemap, int sampleIndex)
 {
     assert( false );
 #if 0
@@ -258,14 +258,14 @@ void EnvMapImportanceSamplingCache::executePresampling(nvrhi::CommandListHandle 
 
     if (!m_presamplingBindingSet)
     {
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_builderConstants),
-            nvrhi::BindingSetItem::Texture_SRV(0, sourceCubemap),
-            nvrhi::BindingSetItem::Texture_SRV(1, m_importanceMapTexture),
-            nvrhi::BindingSetItem::TypedBuffer_UAV(0, m_presampledBuffer),
-            nvrhi::BindingSetItem::Sampler(0, m_pointClampSampler),
-            nvrhi::BindingSetItem::Sampler(1, m_linearWrapSampler),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_builderConstants),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, sourceCubemap),
+            caustica::rhi::BindingSetItem::Texture_SRV(1, m_importanceMapTexture),
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_presampledBuffer),
+            caustica::rhi::BindingSetItem::Sampler(0, m_pointClampSampler),
+            caustica::rhi::BindingSetItem::Sampler(1, m_linearWrapSampler),
         };
         m_presamplingBindingSet = m_device->createBindingSet(bindingSetDesc, m_presamplingBindingLayout);
     }
@@ -277,7 +277,7 @@ void EnvMapImportanceSamplingCache::executePresampling(nvrhi::CommandListHandle 
         RAII_SCOPE(commandList->beginMarker("Pre-sampling");, commandList->endMarker(); );
         commandList->writeBuffer(m_builderConstants, &constants, sizeof(EnvMapImportanceSamplingCacheConstants));
 
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = m_presamplingPipeline;
         state.bindings = { m_presamplingBindingSet };
         commandList->setComputeState(state);

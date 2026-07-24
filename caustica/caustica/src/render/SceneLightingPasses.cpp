@@ -32,12 +32,12 @@ void SceneLightingPasses::setEnvMapOverrideSource(const std::string& envMapOverr
     m_envMapOverride = envMapOverride;
 }
 
-void SceneLightingPasses::createOpacityMapsIfSupported(nvrhi::IDevice* device,
+void SceneLightingPasses::createOpacityMapsIfSupported(caustica::rhi::IDevice* device,
     const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
     const std::shared_ptr<caustica::TextureLoader>& textureLoader,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory)
 {
-    if (device != nullptr && device->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
+    if (device != nullptr && device->queryFeatureSupport(caustica::rhi::Feature::RayTracingOpacityMicromap))
         m_opacityMaps = std::make_shared<OpacityMicromapBuilder>(device, descriptorTable, textureLoader, shaderFactory);
 }
 

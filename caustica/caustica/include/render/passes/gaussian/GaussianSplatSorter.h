@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <memory>
@@ -22,12 +22,12 @@ namespace caustica::render
 
 struct GaussianSplatSortResources
 {
-    nvrhi::IBuffer* sortKeyBuffer = nullptr;
-    nvrhi::IBuffer* indexBuffer = nullptr;
-    nvrhi::IBuffer* sortControlBuffer = nullptr;
-    nvrhi::IBuffer* drawIndirectBuffer = nullptr;
-    nvrhi::BindingSetHandle sortKeyBindingSet;
-    nvrhi::ComputePipelineHandle sortKeyPipeline;
+    caustica::rhi::IBuffer* sortKeyBuffer = nullptr;
+    caustica::rhi::IBuffer* indexBuffer = nullptr;
+    caustica::rhi::IBuffer* sortControlBuffer = nullptr;
+    caustica::rhi::IBuffer* drawIndirectBuffer = nullptr;
+    caustica::rhi::BindingSetHandle sortKeyBindingSet;
+    caustica::rhi::ComputePipelineHandle sortKeyPipeline;
     std::shared_ptr<GPUSort> gpuSort;
     uint32_t splatCount = 0;
 };
@@ -39,19 +39,19 @@ public:
     void onSplatCountChanged(uint32_t splatCount);
 
     void updateIndices(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const GaussianSplatConstants& constants,
         GaussianSplatSortMode sortMode,
         const GaussianSplatSortResources& resources);
 
 private:
     void buildDistanceCulledSplatList(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         GaussianSplatSortMode sortMode,
         const GaussianSplatSortResources& resources);
 
     void uploadStochasticSplatIndices(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const GaussianSplatSortResources& resources);
 
     [[nodiscard]] bool canReuseSort(

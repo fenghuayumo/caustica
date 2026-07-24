@@ -9,20 +9,20 @@ using namespace caustica;
 
 
 bool ComputePass::init(
-	nvrhi::IDevice* device, 
+	caustica::rhi::IDevice* device, 
 	caustica::ShaderFactory& shaderFactory, 
 	const char* fileName, 
     const char* entry, 
 	const std::vector<caustica::ShaderMacro>& macros, 
-	nvrhi::IBindingLayout* bindingLayout,
-	nvrhi::IBindingLayout* extraBindingLayout /*= nullptr*/, 
-	nvrhi::IBindingLayout* bindlessLayout /*= nullptr*/)
+	caustica::rhi::IBindingLayout* bindingLayout,
+	caustica::rhi::IBindingLayout* extraBindingLayout /*= nullptr*/, 
+	caustica::rhi::IBindingLayout* bindlessLayout /*= nullptr*/)
 {
-	m_computeShader = shaderFactory.createShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
+	m_computeShader = shaderFactory.createShader(fileName, entry, &macros, caustica::rhi::ShaderType::Compute);
 	if (!m_computeShader)
 		return false;
 
-	nvrhi::ComputePipelineDesc pipelineDesc;
+	caustica::rhi::ComputePipelineDesc pipelineDesc;
 	if(extraBindingLayout)
 		pipelineDesc.bindingLayouts.push_back(extraBindingLayout);
 	if (bindlessLayout)
@@ -39,18 +39,18 @@ bool ComputePass::init(
 }
 
 bool ComputePass::init(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     caustica::ShaderFactory& shaderFactory,
     const char* fileName,
     const char* entry,
     const std::vector<caustica::ShaderMacro>& macros,
-    nvrhi::BindingLayoutVector & bindingLayouts )
+    caustica::rhi::BindingLayoutVector & bindingLayouts )
 {
-    m_computeShader = shaderFactory.createShader(fileName, entry, &macros, nvrhi::ShaderType::Compute);
+    m_computeShader = shaderFactory.createShader(fileName, entry, &macros, caustica::rhi::ShaderType::Compute);
     if (!m_computeShader)
         return false;
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = bindingLayouts;
     pipelineDesc.CS = m_computeShader;
     m_computePipeline = device->createComputePipeline(pipelineDesc);
@@ -63,17 +63,17 @@ bool ComputePass::init(
 
 
 void ComputePass::execute(
-	nvrhi::ICommandList* commandList, 
+	caustica::rhi::ICommandList* commandList, 
 	int width, 
 	int height, 
 	int depth, 
-	nvrhi::IBindingSet* bindingSet, 
-	nvrhi::IBindingSet* extraBindingSet /*= nullptr*/, 
-	nvrhi::IDescriptorTable* descriptorTable /*= nullptr*/, 
+	caustica::rhi::IBindingSet* bindingSet, 
+	caustica::rhi::IBindingSet* extraBindingSet /*= nullptr*/, 
+	caustica::rhi::IDescriptorTable* descriptorTable /*= nullptr*/, 
 	const void* pushConstants /*= nullptr*/, 
 	size_t pushConstantSize /*= 0*/)
 {
-	nvrhi::ComputeState state;
+	caustica::rhi::ComputeState state;
 	state.bindings;
     if (extraBindingSet)
         state.bindings.push_back(extraBindingSet);
@@ -91,13 +91,13 @@ void ComputePass::execute(
 }
 
 void ComputePass::execute(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     int width,
     int height,
     int depth,
-    const nvrhi::BindingSetVector & bindings)
+    const caustica::rhi::BindingSetVector & bindings)
 {
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = bindings;
     state.pipeline = m_computePipeline;
     commandList->setComputeState(state);

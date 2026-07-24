@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <cstdint>
 
 namespace caustica
@@ -19,7 +19,7 @@ public:
     virtual ~renderContext() = default;
 
     [[nodiscard]] GpuDevice* getGpuDevice() const { return m_GpuDevice; }
-    [[nodiscard]] nvrhi::IDevice* getDevice() const;
+    [[nodiscard]] caustica::rhi::IDevice* getDevice() const;
     [[nodiscard]] uint32_t getFrameIndex() const;
 
 protected:

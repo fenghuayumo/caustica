@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -13,43 +13,43 @@ class ComputePass
 {
 public:
     bool init(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry, 
         const std::vector<caustica::ShaderMacro>& macros,
-        nvrhi::IBindingLayout* bindingLayout,
-        nvrhi::IBindingLayout* extraBindingLayout = nullptr,
-        nvrhi::IBindingLayout* bindlessLayout = nullptr);
+        caustica::rhi::IBindingLayout* bindingLayout,
+        caustica::rhi::IBindingLayout* extraBindingLayout = nullptr,
+        caustica::rhi::IBindingLayout* bindlessLayout = nullptr);
 
     bool init(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* fileName,
         const char* entry,
         const std::vector<caustica::ShaderMacro>& macros,
-        nvrhi::BindingLayoutVector & bindingLayouts );
+        caustica::rhi::BindingLayoutVector & bindingLayouts );
 
     void execute(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         int width,
         int height,
         int depth,
-        nvrhi::IBindingSet* bindingSet,
-        nvrhi::IBindingSet* extraBindingSet = nullptr,
-        nvrhi::IDescriptorTable* descriptorTable = nullptr,
+        caustica::rhi::IBindingSet* bindingSet,
+        caustica::rhi::IBindingSet* extraBindingSet = nullptr,
+        caustica::rhi::IDescriptorTable* descriptorTable = nullptr,
         const void* pushConstants = nullptr,
         size_t pushConstantSize = 0);
 
     void execute(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         int width,
         int height,
         int depth,
-        const nvrhi::BindingSetVector & bindings);
+        const caustica::rhi::BindingSetVector & bindings);
 
 private:
-    nvrhi::ShaderHandle             m_computeShader;
-    nvrhi::ComputePipelineHandle    m_computePipeline;
-    nvrhi::ShaderLibraryHandle      m_shaderLibrary;
+    caustica::rhi::ShaderHandle             m_computeShader;
+    caustica::rhi::ComputePipelineHandle    m_computePipeline;
+    caustica::rhi::ShaderLibraryHandle      m_shaderLibrary;
 };

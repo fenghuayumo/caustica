@@ -2,7 +2,7 @@
 
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneGpuResources.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 
 #include <filesystem>
@@ -27,7 +27,7 @@ namespace scene { class SceneRenderData; }
 
 struct PreUpdateLightingParams
 {
-    nvrhi::ICommandList*                         commandList = nullptr;
+    caustica::rhi::ICommandList*                         commandList = nullptr;
     bool&                                          needNewBindings;
 
     EnvMapProcessor*                             environment = nullptr;
@@ -41,7 +41,7 @@ struct UpdateLightingParams
 {
     PathTracerSettings&                            settings;
 
-    nvrhi::ICommandList*                           commandList = nullptr;
+    caustica::rhi::ICommandList*                           commandList = nullptr;
     EnvMapProcessor*                             environment = nullptr;
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
@@ -49,7 +49,7 @@ struct UpdateLightingParams
 
     const scene::SceneRenderData*                  sceneData = nullptr;
     render::SceneGpuFrameHandles                   gpuHandles{};
-    nvrhi::IDescriptorTable*                       bindlessDescriptorTable = nullptr;
+    caustica::rhi::IDescriptorTable*                       bindlessDescriptorTable = nullptr;
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
@@ -64,7 +64,7 @@ struct UpdateLightingParams
 
 struct UpdateLightingEndParams
 {
-    nvrhi::ICommandList*                           commandList = nullptr;
+    caustica::rhi::ICommandList*                           commandList = nullptr;
     LightSamplingCache*                          lightSampling = nullptr;
     BindingCache*                                  bindingCache = nullptr;
 
@@ -72,9 +72,9 @@ struct UpdateLightingEndParams
     std::shared_ptr<MaterialGpuCache>              materials;
     std::shared_ptr<OpacityMicromapBuilder>        opacityMaps;
 
-    nvrhi::BufferHandle                            subInstanceDataBuffer;
-    nvrhi::TextureHandle                           depthBuffer;
-    nvrhi::TextureHandle                           motionVectors;
+    caustica::rhi::BufferHandle                            subInstanceDataBuffer;
+    caustica::rhi::TextureHandle                           depthBuffer;
+    caustica::rhi::TextureHandle                           motionVectors;
 };
 
 void syncEnvMapSceneParams(

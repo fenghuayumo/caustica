@@ -20,87 +20,87 @@ namespace caustica
 
     struct FormatMapping
     {
-        nvrhi::Format nvrhiFormat;
+        caustica::rhi::Format rhiFormat;
         DXGI_FORMAT dxgiFormat;
         uint32_t bitsPerPixel;
     };
 
     const FormatMapping g_FormatMappings[] = {
-        { nvrhi::Format::UNKNOWN,              DXGI_FORMAT_UNKNOWN,                0 },
-        { nvrhi::Format::R8_UINT,              DXGI_FORMAT_R8_UINT,                8 },
-        { nvrhi::Format::R8_SINT,              DXGI_FORMAT_R8_SINT,                8 },
-        { nvrhi::Format::R8_UNORM,             DXGI_FORMAT_R8_UNORM,               8 },
-        { nvrhi::Format::R8_SNORM,             DXGI_FORMAT_R8_SNORM,               8 },
-        { nvrhi::Format::RG8_UINT,             DXGI_FORMAT_R8G8_UINT,              16 },
-        { nvrhi::Format::RG8_SINT,             DXGI_FORMAT_R8G8_SINT,              16 },
-        { nvrhi::Format::RG8_UNORM,            DXGI_FORMAT_R8G8_UNORM,             16 },
-        { nvrhi::Format::RG8_SNORM,            DXGI_FORMAT_R8G8_SNORM,             16 },
-        { nvrhi::Format::R16_UINT,             DXGI_FORMAT_R16_UINT,               16 },
-        { nvrhi::Format::R16_SINT,             DXGI_FORMAT_R16_SINT,               16 },
-        { nvrhi::Format::R16_UNORM,            DXGI_FORMAT_R16_UNORM,              16 },
-        { nvrhi::Format::R16_SNORM,            DXGI_FORMAT_R16_SNORM,              16 },
-        { nvrhi::Format::R16_FLOAT,            DXGI_FORMAT_R16_FLOAT,              16 },
-        { nvrhi::Format::BGRA4_UNORM,          DXGI_FORMAT_B4G4R4A4_UNORM,         16 },
-        { nvrhi::Format::B5G6R5_UNORM,         DXGI_FORMAT_B5G6R5_UNORM,           16 },
-        { nvrhi::Format::B5G5R5A1_UNORM,       DXGI_FORMAT_B5G5R5A1_UNORM,         16 },
-        { nvrhi::Format::RGBA8_UINT,           DXGI_FORMAT_R8G8B8A8_UINT,          32 },
-        { nvrhi::Format::RGBA8_SINT,           DXGI_FORMAT_R8G8B8A8_SINT,          32 },
-        { nvrhi::Format::RGBA8_UNORM,          DXGI_FORMAT_R8G8B8A8_UNORM,         32 },
-        { nvrhi::Format::RGBA8_SNORM,          DXGI_FORMAT_R8G8B8A8_SNORM,         32 },
-        { nvrhi::Format::BGRA8_UNORM,          DXGI_FORMAT_B8G8R8A8_UNORM,         32 },
-        { nvrhi::Format::BGRX8_UNORM,          DXGI_FORMAT_B8G8R8X8_UNORM,         32 },
-        { nvrhi::Format::SRGBA8_UNORM,         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,    32 },
-        { nvrhi::Format::SBGRA8_UNORM,         DXGI_FORMAT_B8G8R8A8_UNORM_SRGB,    32 },
-        { nvrhi::Format::SBGRX8_UNORM,         DXGI_FORMAT_B8G8R8X8_UNORM_SRGB,    32 },
-        { nvrhi::Format::R10G10B10A2_UNORM,    DXGI_FORMAT_R10G10B10A2_UNORM,      32 },
-        { nvrhi::Format::R11G11B10_FLOAT,      DXGI_FORMAT_R11G11B10_FLOAT,        32 },
-        { nvrhi::Format::RG16_UINT,            DXGI_FORMAT_R16G16_UINT,            32 },
-        { nvrhi::Format::RG16_SINT,            DXGI_FORMAT_R16G16_SINT,            32 },
-        { nvrhi::Format::RG16_UNORM,           DXGI_FORMAT_R16G16_UNORM,           32 },
-        { nvrhi::Format::RG16_SNORM,           DXGI_FORMAT_R16G16_SNORM,           32 },
-        { nvrhi::Format::RG16_FLOAT,           DXGI_FORMAT_R16G16_FLOAT,           32 },
-        { nvrhi::Format::R32_UINT,             DXGI_FORMAT_R32_UINT,               32 },
-        { nvrhi::Format::R32_SINT,             DXGI_FORMAT_R32_SINT,               32 },
-        { nvrhi::Format::R32_FLOAT,            DXGI_FORMAT_R32_FLOAT,              32 },
-        { nvrhi::Format::RGBA16_UINT,          DXGI_FORMAT_R16G16B16A16_UINT,      64 },
-        { nvrhi::Format::RGBA16_SINT,          DXGI_FORMAT_R16G16B16A16_SINT,      64 },
-        { nvrhi::Format::RGBA16_FLOAT,         DXGI_FORMAT_R16G16B16A16_FLOAT,     64 },
-        { nvrhi::Format::RGBA16_UNORM,         DXGI_FORMAT_R16G16B16A16_UNORM,     64 },
-        { nvrhi::Format::RGBA16_SNORM,         DXGI_FORMAT_R16G16B16A16_SNORM,     64 },
-        { nvrhi::Format::RG32_UINT,            DXGI_FORMAT_R32G32_UINT,            64 },
-        { nvrhi::Format::RG32_SINT,            DXGI_FORMAT_R32G32_SINT,            64 },
-        { nvrhi::Format::RG32_FLOAT,           DXGI_FORMAT_R32G32_FLOAT,           64 },
-        { nvrhi::Format::RGB32_UINT,           DXGI_FORMAT_R32G32B32_UINT,         96 },
-        { nvrhi::Format::RGB32_SINT,           DXGI_FORMAT_R32G32B32_SINT,         96 },
-        { nvrhi::Format::RGB32_FLOAT,          DXGI_FORMAT_R32G32B32_FLOAT,        96 },
-        { nvrhi::Format::RGBA32_UINT,          DXGI_FORMAT_R32G32B32A32_UINT,      128 },
-        { nvrhi::Format::RGBA32_SINT,          DXGI_FORMAT_R32G32B32A32_SINT,      128 },
-        { nvrhi::Format::RGBA32_FLOAT,         DXGI_FORMAT_R32G32B32A32_FLOAT,     128 },
-        { nvrhi::Format::D16,                  DXGI_FORMAT_R16_UNORM,              16 },
-        { nvrhi::Format::D24S8,                DXGI_FORMAT_R24_UNORM_X8_TYPELESS,  32 },
-        { nvrhi::Format::X24G8_UINT,           DXGI_FORMAT_X24_TYPELESS_G8_UINT,   32 },
-        { nvrhi::Format::D32,                  DXGI_FORMAT_R32_FLOAT,              32 },
-        { nvrhi::Format::D32S8,                DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS, 64 },
-        { nvrhi::Format::X32G8_UINT,           DXGI_FORMAT_X32_TYPELESS_G8X24_UINT,  64 },
-        { nvrhi::Format::BC1_UNORM,            DXGI_FORMAT_BC1_UNORM,              4 },
-        { nvrhi::Format::BC1_UNORM_SRGB,       DXGI_FORMAT_BC1_UNORM_SRGB,         4 },
-        { nvrhi::Format::BC2_UNORM,            DXGI_FORMAT_BC2_UNORM,              8 },
-        { nvrhi::Format::BC2_UNORM_SRGB,       DXGI_FORMAT_BC2_UNORM_SRGB,         8 },
-        { nvrhi::Format::BC3_UNORM,            DXGI_FORMAT_BC3_UNORM,              8 },
-        { nvrhi::Format::BC3_UNORM_SRGB,       DXGI_FORMAT_BC3_UNORM_SRGB,         8 },
-        { nvrhi::Format::BC4_UNORM,            DXGI_FORMAT_BC4_UNORM,              4 },
-        { nvrhi::Format::BC4_SNORM,            DXGI_FORMAT_BC4_SNORM,              4 },
-        { nvrhi::Format::BC5_UNORM,            DXGI_FORMAT_BC5_UNORM,              8 },
-        { nvrhi::Format::BC5_SNORM,            DXGI_FORMAT_BC5_SNORM,              8 },
-        { nvrhi::Format::BC6H_UFLOAT,          DXGI_FORMAT_BC6H_UF16,              8 },
-        { nvrhi::Format::BC6H_SFLOAT,          DXGI_FORMAT_BC6H_SF16,              8 },
-        { nvrhi::Format::BC7_UNORM,            DXGI_FORMAT_BC7_UNORM,              8 },
-        { nvrhi::Format::BC7_UNORM_SRGB,       DXGI_FORMAT_BC7_UNORM_SRGB,         8 },
+        { caustica::rhi::Format::UNKNOWN,              DXGI_FORMAT_UNKNOWN,                0 },
+        { caustica::rhi::Format::R8_UINT,              DXGI_FORMAT_R8_UINT,                8 },
+        { caustica::rhi::Format::R8_SINT,              DXGI_FORMAT_R8_SINT,                8 },
+        { caustica::rhi::Format::R8_UNORM,             DXGI_FORMAT_R8_UNORM,               8 },
+        { caustica::rhi::Format::R8_SNORM,             DXGI_FORMAT_R8_SNORM,               8 },
+        { caustica::rhi::Format::RG8_UINT,             DXGI_FORMAT_R8G8_UINT,              16 },
+        { caustica::rhi::Format::RG8_SINT,             DXGI_FORMAT_R8G8_SINT,              16 },
+        { caustica::rhi::Format::RG8_UNORM,            DXGI_FORMAT_R8G8_UNORM,             16 },
+        { caustica::rhi::Format::RG8_SNORM,            DXGI_FORMAT_R8G8_SNORM,             16 },
+        { caustica::rhi::Format::R16_UINT,             DXGI_FORMAT_R16_UINT,               16 },
+        { caustica::rhi::Format::R16_SINT,             DXGI_FORMAT_R16_SINT,               16 },
+        { caustica::rhi::Format::R16_UNORM,            DXGI_FORMAT_R16_UNORM,              16 },
+        { caustica::rhi::Format::R16_SNORM,            DXGI_FORMAT_R16_SNORM,              16 },
+        { caustica::rhi::Format::R16_FLOAT,            DXGI_FORMAT_R16_FLOAT,              16 },
+        { caustica::rhi::Format::BGRA4_UNORM,          DXGI_FORMAT_B4G4R4A4_UNORM,         16 },
+        { caustica::rhi::Format::B5G6R5_UNORM,         DXGI_FORMAT_B5G6R5_UNORM,           16 },
+        { caustica::rhi::Format::B5G5R5A1_UNORM,       DXGI_FORMAT_B5G5R5A1_UNORM,         16 },
+        { caustica::rhi::Format::RGBA8_UINT,           DXGI_FORMAT_R8G8B8A8_UINT,          32 },
+        { caustica::rhi::Format::RGBA8_SINT,           DXGI_FORMAT_R8G8B8A8_SINT,          32 },
+        { caustica::rhi::Format::RGBA8_UNORM,          DXGI_FORMAT_R8G8B8A8_UNORM,         32 },
+        { caustica::rhi::Format::RGBA8_SNORM,          DXGI_FORMAT_R8G8B8A8_SNORM,         32 },
+        { caustica::rhi::Format::BGRA8_UNORM,          DXGI_FORMAT_B8G8R8A8_UNORM,         32 },
+        { caustica::rhi::Format::BGRX8_UNORM,          DXGI_FORMAT_B8G8R8X8_UNORM,         32 },
+        { caustica::rhi::Format::SRGBA8_UNORM,         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,    32 },
+        { caustica::rhi::Format::SBGRA8_UNORM,         DXGI_FORMAT_B8G8R8A8_UNORM_SRGB,    32 },
+        { caustica::rhi::Format::SBGRX8_UNORM,         DXGI_FORMAT_B8G8R8X8_UNORM_SRGB,    32 },
+        { caustica::rhi::Format::R10G10B10A2_UNORM,    DXGI_FORMAT_R10G10B10A2_UNORM,      32 },
+        { caustica::rhi::Format::R11G11B10_FLOAT,      DXGI_FORMAT_R11G11B10_FLOAT,        32 },
+        { caustica::rhi::Format::RG16_UINT,            DXGI_FORMAT_R16G16_UINT,            32 },
+        { caustica::rhi::Format::RG16_SINT,            DXGI_FORMAT_R16G16_SINT,            32 },
+        { caustica::rhi::Format::RG16_UNORM,           DXGI_FORMAT_R16G16_UNORM,           32 },
+        { caustica::rhi::Format::RG16_SNORM,           DXGI_FORMAT_R16G16_SNORM,           32 },
+        { caustica::rhi::Format::RG16_FLOAT,           DXGI_FORMAT_R16G16_FLOAT,           32 },
+        { caustica::rhi::Format::R32_UINT,             DXGI_FORMAT_R32_UINT,               32 },
+        { caustica::rhi::Format::R32_SINT,             DXGI_FORMAT_R32_SINT,               32 },
+        { caustica::rhi::Format::R32_FLOAT,            DXGI_FORMAT_R32_FLOAT,              32 },
+        { caustica::rhi::Format::RGBA16_UINT,          DXGI_FORMAT_R16G16B16A16_UINT,      64 },
+        { caustica::rhi::Format::RGBA16_SINT,          DXGI_FORMAT_R16G16B16A16_SINT,      64 },
+        { caustica::rhi::Format::RGBA16_FLOAT,         DXGI_FORMAT_R16G16B16A16_FLOAT,     64 },
+        { caustica::rhi::Format::RGBA16_UNORM,         DXGI_FORMAT_R16G16B16A16_UNORM,     64 },
+        { caustica::rhi::Format::RGBA16_SNORM,         DXGI_FORMAT_R16G16B16A16_SNORM,     64 },
+        { caustica::rhi::Format::RG32_UINT,            DXGI_FORMAT_R32G32_UINT,            64 },
+        { caustica::rhi::Format::RG32_SINT,            DXGI_FORMAT_R32G32_SINT,            64 },
+        { caustica::rhi::Format::RG32_FLOAT,           DXGI_FORMAT_R32G32_FLOAT,           64 },
+        { caustica::rhi::Format::RGB32_UINT,           DXGI_FORMAT_R32G32B32_UINT,         96 },
+        { caustica::rhi::Format::RGB32_SINT,           DXGI_FORMAT_R32G32B32_SINT,         96 },
+        { caustica::rhi::Format::RGB32_FLOAT,          DXGI_FORMAT_R32G32B32_FLOAT,        96 },
+        { caustica::rhi::Format::RGBA32_UINT,          DXGI_FORMAT_R32G32B32A32_UINT,      128 },
+        { caustica::rhi::Format::RGBA32_SINT,          DXGI_FORMAT_R32G32B32A32_SINT,      128 },
+        { caustica::rhi::Format::RGBA32_FLOAT,         DXGI_FORMAT_R32G32B32A32_FLOAT,     128 },
+        { caustica::rhi::Format::D16,                  DXGI_FORMAT_R16_UNORM,              16 },
+        { caustica::rhi::Format::D24S8,                DXGI_FORMAT_R24_UNORM_X8_TYPELESS,  32 },
+        { caustica::rhi::Format::X24G8_UINT,           DXGI_FORMAT_X24_TYPELESS_G8_UINT,   32 },
+        { caustica::rhi::Format::D32,                  DXGI_FORMAT_R32_FLOAT,              32 },
+        { caustica::rhi::Format::D32S8,                DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS, 64 },
+        { caustica::rhi::Format::X32G8_UINT,           DXGI_FORMAT_X32_TYPELESS_G8X24_UINT,  64 },
+        { caustica::rhi::Format::BC1_UNORM,            DXGI_FORMAT_BC1_UNORM,              4 },
+        { caustica::rhi::Format::BC1_UNORM_SRGB,       DXGI_FORMAT_BC1_UNORM_SRGB,         4 },
+        { caustica::rhi::Format::BC2_UNORM,            DXGI_FORMAT_BC2_UNORM,              8 },
+        { caustica::rhi::Format::BC2_UNORM_SRGB,       DXGI_FORMAT_BC2_UNORM_SRGB,         8 },
+        { caustica::rhi::Format::BC3_UNORM,            DXGI_FORMAT_BC3_UNORM,              8 },
+        { caustica::rhi::Format::BC3_UNORM_SRGB,       DXGI_FORMAT_BC3_UNORM_SRGB,         8 },
+        { caustica::rhi::Format::BC4_UNORM,            DXGI_FORMAT_BC4_UNORM,              4 },
+        { caustica::rhi::Format::BC4_SNORM,            DXGI_FORMAT_BC4_SNORM,              4 },
+        { caustica::rhi::Format::BC5_UNORM,            DXGI_FORMAT_BC5_UNORM,              8 },
+        { caustica::rhi::Format::BC5_SNORM,            DXGI_FORMAT_BC5_SNORM,              8 },
+        { caustica::rhi::Format::BC6H_UFLOAT,          DXGI_FORMAT_BC6H_UF16,              8 },
+        { caustica::rhi::Format::BC6H_SFLOAT,          DXGI_FORMAT_BC6H_SF16,              8 },
+        { caustica::rhi::Format::BC7_UNORM,            DXGI_FORMAT_BC7_UNORM,              8 },
+        { caustica::rhi::Format::BC7_UNORM_SRGB,       DXGI_FORMAT_BC7_UNORM_SRGB,         8 },
     };
 
 #define ISBITMASK( r,g,b,a ) ( ddpf.RBitMask == r && ddpf.GBitMask == g && ddpf.BBitMask == b && ddpf.ABitMask == a )
 
-    static nvrhi::Format ConvertDDSFormat(const DDS_PIXELFORMAT& ddpf, bool forceSRGB)
+    static caustica::rhi::Format ConvertDDSFormat(const DDS_PIXELFORMAT& ddpf, bool forceSRGB)
     {
         if (ddpf.flags & DDS_RGB)
         {
@@ -111,17 +111,17 @@ namespace caustica
             case 32:
                 if (ISBITMASK(0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000))
                 {
-                    return forceSRGB ? nvrhi::Format::RGBA8_UNORM : nvrhi::Format::SRGBA8_UNORM;
+                    return forceSRGB ? caustica::rhi::Format::RGBA8_UNORM : caustica::rhi::Format::SRGBA8_UNORM;
                 }
 
                 if (ISBITMASK(0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000))
                 {
-                    return forceSRGB ? nvrhi::Format::BGRA8_UNORM : nvrhi::Format::SBGRA8_UNORM;
+                    return forceSRGB ? caustica::rhi::Format::BGRA8_UNORM : caustica::rhi::Format::SBGRA8_UNORM;
                 }
 
                 if (ISBITMASK(0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000))
                 {
-                    return forceSRGB ? nvrhi::Format::BGRA8_UNORM : nvrhi::Format::SBGRA8_UNORM; // actually BGRX8, but there's no such format in NVRHI
+                    return forceSRGB ? caustica::rhi::Format::BGRA8_UNORM : caustica::rhi::Format::SBGRA8_UNORM; // actually BGRX8, but there's no such format in RHI
                 }
 
                 // No DXGI format maps to ISBITMASK(0x000000ff,0x0000ff00,0x00ff0000,0x00000000) aka D3DFMT_X8B8G8R8
@@ -135,20 +135,20 @@ namespace caustica
                 // For 'correct' writers, this should be 0x000003ff,0x000ffc00,0x3ff00000 for RGB data
                 if (ISBITMASK(0x3ff00000, 0x000ffc00, 0x000003ff, 0xc0000000))
                 {
-                    return nvrhi::Format::R10G10B10A2_UNORM;
+                    return caustica::rhi::Format::R10G10B10A2_UNORM;
                 }
 
                 // No DXGI format maps to ISBITMASK(0x000003ff,0x000ffc00,0x3ff00000,0xc0000000) aka D3DFMT_A2R10G10B10
 
                 if (ISBITMASK(0x0000ffff, 0xffff0000, 0x00000000, 0x00000000))
                 {
-                    return nvrhi::Format::RG16_UNORM;
+                    return caustica::rhi::Format::RG16_UNORM;
                 }
 
                 if (ISBITMASK(0xffffffff, 0x00000000, 0x00000000, 0x00000000))
                 {
                     // Only 32-bit color channel format in D3D9 was R32F
-                    return nvrhi::Format::R32_FLOAT;
+                    return caustica::rhi::Format::R32_FLOAT;
                 }
                 break;
 
@@ -159,18 +159,18 @@ namespace caustica
             case 16:
                 if (ISBITMASK(0x7c00, 0x03e0, 0x001f, 0x8000))
                 {
-                    return nvrhi::Format::B5G5R5A1_UNORM;
+                    return caustica::rhi::Format::B5G5R5A1_UNORM;
                 }
                 if (ISBITMASK(0xf800, 0x07e0, 0x001f, 0x0000))
                 {
-                    return nvrhi::Format::B5G6R5_UNORM;
+                    return caustica::rhi::Format::B5G6R5_UNORM;
                 }
 
                 // No DXGI format maps to ISBITMASK(0x7c00,0x03e0,0x001f,0x0000) aka D3DFMT_X1R5G5B5
 
                 if (ISBITMASK(0x0f00, 0x00f0, 0x000f, 0xf000))
                 {
-                    return nvrhi::Format::BGRA4_UNORM;
+                    return caustica::rhi::Format::BGRA4_UNORM;
                 }
 
                 // No DXGI format maps to ISBITMASK(0x0f00,0x00f0,0x000f,0x0000) aka D3DFMT_X4R4G4B4
@@ -185,14 +185,14 @@ namespace caustica
             {
                 if (ISBITMASK(0x000000ff, 0x00000000, 0x00000000, 0x00000000))
                 {
-                    return nvrhi::Format::R8_UNORM;
+                    return caustica::rhi::Format::R8_UNORM;
                 }
 
                 // No DXGI format maps to ISBITMASK(0x0f,0x00,0x00,0xf0) aka D3DFMT_A4L4
 
                 if (ISBITMASK(0x000000ff, 0x00000000, 0x00000000, 0x0000ff00))
                 {
-                    return nvrhi::Format::RG8_UNORM;
+                    return caustica::rhi::Format::RG8_UNORM;
                 }
             }
 
@@ -200,11 +200,11 @@ namespace caustica
             {
                 if (ISBITMASK(0x0000ffff, 0x00000000, 0x00000000, 0x00000000))
                 {
-                    return nvrhi::Format::R16_UNORM;
+                    return caustica::rhi::Format::R16_UNORM;
                 }
                 if (ISBITMASK(0x000000ff, 0x00000000, 0x00000000, 0x0000ff00))
                 {
-                    return nvrhi::Format::RG8_UNORM;
+                    return caustica::rhi::Format::RG8_UNORM;
                 }
             }
         }
@@ -212,7 +212,7 @@ namespace caustica
         {
             if (8 == ddpf.RGBBitCount)
             {
-                return nvrhi::Format::R8_UNORM; // we don't support A8 in NVRHI
+                return caustica::rhi::Format::R8_UNORM; // we don't support A8 in RHI
             }
         }
         else if (ddpf.flags & DDS_BUMPDUDV)
@@ -221,7 +221,7 @@ namespace caustica
             {
                 if (ISBITMASK(0x00ff, 0xff00, 0x0000, 0x0000))
                 {
-                    return nvrhi::Format::RG8_SNORM;
+                    return caustica::rhi::Format::RG8_SNORM;
                 }
             }
 
@@ -229,11 +229,11 @@ namespace caustica
             {
                 if (ISBITMASK(0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000))
                 {
-                    return nvrhi::Format::RGBA8_SNORM;
+                    return caustica::rhi::Format::RGBA8_SNORM;
                 }
                 if (ISBITMASK(0x0000ffff, 0xffff0000, 0x00000000, 0x00000000))
                 {
-                    return nvrhi::Format::RG16_SNORM;
+                    return caustica::rhi::Format::RG16_SNORM;
                 }
 
                 // No DXGI format maps to ISBITMASK(0x3ff00000, 0x000ffc00, 0x000003ff, 0xc0000000) aka D3DFMT_A2W10V10U10
@@ -243,52 +243,52 @@ namespace caustica
         {
             if (MAKEFOURCC('D', 'X', 'T', '1') == ddpf.fourCC)
             {
-                return forceSRGB ? nvrhi::Format::BC1_UNORM_SRGB : nvrhi::Format::BC1_UNORM;
+                return forceSRGB ? caustica::rhi::Format::BC1_UNORM_SRGB : caustica::rhi::Format::BC1_UNORM;
             }
             if (MAKEFOURCC('D', 'X', 'T', '3') == ddpf.fourCC)
             {
-                return forceSRGB ? nvrhi::Format::BC2_UNORM_SRGB : nvrhi::Format::BC2_UNORM;
+                return forceSRGB ? caustica::rhi::Format::BC2_UNORM_SRGB : caustica::rhi::Format::BC2_UNORM;
             }
             if (MAKEFOURCC('D', 'X', 'T', '5') == ddpf.fourCC)
             {
-                return forceSRGB ? nvrhi::Format::BC3_UNORM_SRGB : nvrhi::Format::BC3_UNORM;
+                return forceSRGB ? caustica::rhi::Format::BC3_UNORM_SRGB : caustica::rhi::Format::BC3_UNORM;
             }
 
             // While pre-multiplied alpha isn't directly supported by the DXGI formats,
             // they are basically the same as these BC formats so they can be mapped
             if (MAKEFOURCC('D', 'X', 'T', '2') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC2_UNORM;
+                return caustica::rhi::Format::BC2_UNORM;
             }
             if (MAKEFOURCC('D', 'X', 'T', '4') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC3_UNORM;
+                return caustica::rhi::Format::BC3_UNORM;
             }
 
             if (MAKEFOURCC('A', 'T', 'I', '1') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC4_UNORM;
+                return caustica::rhi::Format::BC4_UNORM;
             }
             if (MAKEFOURCC('B', 'C', '4', 'U') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC4_UNORM;
+                return caustica::rhi::Format::BC4_UNORM;
             }
             if (MAKEFOURCC('B', 'C', '4', 'S') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC4_SNORM;
+                return caustica::rhi::Format::BC4_SNORM;
             }
 
             if (MAKEFOURCC('A', 'T', 'I', '2') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC5_UNORM;
+                return caustica::rhi::Format::BC5_UNORM;
             }
             if (MAKEFOURCC('B', 'C', '5', 'U') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC5_UNORM;
+                return caustica::rhi::Format::BC5_UNORM;
             }
             if (MAKEFOURCC('B', 'C', '5', 'S') == ddpf.fourCC)
             {
-                return nvrhi::Format::BC5_SNORM;
+                return caustica::rhi::Format::BC5_SNORM;
             }
 
             // BC6H and BC7 are written using the "DX10" extended header
@@ -312,45 +312,45 @@ namespace caustica
             switch (ddpf.fourCC)
             {
             case 36: // D3DFMT_A16B16G16R16
-                return nvrhi::Format::RGBA16_UNORM;
+                return caustica::rhi::Format::RGBA16_UNORM;
 
             case 110: // D3DFMT_Q16W16V16U16
-                return nvrhi::Format::RGBA16_SNORM;
+                return caustica::rhi::Format::RGBA16_SNORM;
 
             case 111: // D3DFMT_R16F
-                return nvrhi::Format::R16_FLOAT;
+                return caustica::rhi::Format::R16_FLOAT;
 
             case 112: // D3DFMT_G16R16F
-                return nvrhi::Format::RG16_FLOAT;
+                return caustica::rhi::Format::RG16_FLOAT;
 
             case 113: // D3DFMT_A16B16G16R16F
-                return nvrhi::Format::RGBA16_FLOAT;
+                return caustica::rhi::Format::RGBA16_FLOAT;
 
             case 114: // D3DFMT_R32F
-                return nvrhi::Format::R32_FLOAT;
+                return caustica::rhi::Format::R32_FLOAT;
 
             case 115: // D3DFMT_G32R32F
-                return nvrhi::Format::RG32_FLOAT;
+                return caustica::rhi::Format::RG32_FLOAT;
 
             case 116: // D3DFMT_A32B32G32R32F
-                return nvrhi::Format::RGBA32_FLOAT;
+                return caustica::rhi::Format::RGBA32_FLOAT;
             }
         }
 
-        return nvrhi::Format::UNKNOWN;
+        return caustica::rhi::Format::UNKNOWN;
     }
 
-    static uint32_t BitsPerPixel(nvrhi::Format format)
+    static uint32_t BitsPerPixel(caustica::rhi::Format format)
     {
         const FormatMapping& mapping = g_FormatMappings[static_cast<uint32_t>(format)];
-        assert(mapping.nvrhiFormat == format);
+        assert(mapping.rhiFormat == format);
 
         return mapping.bitsPerPixel;
     }
 
     static void GetSurfaceInfo(size_t width,
         size_t height,
-        nvrhi::Format fmt,
+        caustica::rhi::Format fmt,
         uint32_t bitsPerPixel,
         size_t* outNumBytes,
         size_t* outRowBytes,
@@ -364,24 +364,24 @@ namespace caustica
         size_t bpe = 0;
         switch (fmt)
         {
-        case nvrhi::Format::BC1_UNORM:
-        case nvrhi::Format::BC1_UNORM_SRGB:
-        case nvrhi::Format::BC4_UNORM:
-        case nvrhi::Format::BC4_SNORM:
+        case caustica::rhi::Format::BC1_UNORM:
+        case caustica::rhi::Format::BC1_UNORM_SRGB:
+        case caustica::rhi::Format::BC4_UNORM:
+        case caustica::rhi::Format::BC4_SNORM:
             bc = true;
             bpe = 8;
             break;
 
-        case nvrhi::Format::BC2_UNORM:
-        case nvrhi::Format::BC2_UNORM_SRGB:
-        case nvrhi::Format::BC3_UNORM:
-        case nvrhi::Format::BC3_UNORM_SRGB:
-        case nvrhi::Format::BC5_UNORM:
-        case nvrhi::Format::BC5_SNORM:
-        case nvrhi::Format::BC6H_UFLOAT:
-        case nvrhi::Format::BC6H_SFLOAT:
-        case nvrhi::Format::BC7_UNORM:
-        case nvrhi::Format::BC7_UNORM_SRGB:
+        case caustica::rhi::Format::BC2_UNORM:
+        case caustica::rhi::Format::BC2_UNORM_SRGB:
+        case caustica::rhi::Format::BC3_UNORM:
+        case caustica::rhi::Format::BC3_UNORM_SRGB:
+        case caustica::rhi::Format::BC5_UNORM:
+        case caustica::rhi::Format::BC5_SNORM:
+        case caustica::rhi::Format::BC6H_UFLOAT:
+        case caustica::rhi::Format::BC6H_SFLOAT:
+        case caustica::rhi::Format::BC7_UNORM:
+        case caustica::rhi::Format::BC7_UNORM_SRGB:
             bc = true;
             bpe = 16;
             break;
@@ -565,12 +565,12 @@ namespace caustica
             {
                 if (mapping.dxgiFormat == d3d10ext->dxgiFormat)
                 {
-                    textureInfo.format = mapping.nvrhiFormat;
+                    textureInfo.format = mapping.rhiFormat;
                     break;
                 }
             }
 
-            if (textureInfo.format == nvrhi::Format::UNKNOWN)
+            if (textureInfo.format == caustica::rhi::Format::UNKNOWN)
             {
                 return false;
             }
@@ -580,32 +580,32 @@ namespace caustica
             {
                 switch (textureInfo.format)  // NOLINT(clang-diagnostic-switch-enum)
                 {
-                case(nvrhi::Format::RGBA8_UNORM):
-                    textureInfo.format = nvrhi::Format::SRGBA8_UNORM;
+                case(caustica::rhi::Format::RGBA8_UNORM):
+                    textureInfo.format = caustica::rhi::Format::SRGBA8_UNORM;
                     break;
 
-                case(nvrhi::Format::BGRA8_UNORM):
-                    textureInfo.format = nvrhi::Format::SBGRA8_UNORM;
+                case(caustica::rhi::Format::BGRA8_UNORM):
+                    textureInfo.format = caustica::rhi::Format::SBGRA8_UNORM;
                     break;
 
-                case(nvrhi::Format::BGRX8_UNORM):
-                    textureInfo.format = nvrhi::Format::SBGRX8_UNORM;
+                case(caustica::rhi::Format::BGRX8_UNORM):
+                    textureInfo.format = caustica::rhi::Format::SBGRX8_UNORM;
                     break;
 
-                case(nvrhi::Format::BC1_UNORM):
-                    textureInfo.format = nvrhi::Format::BC1_UNORM_SRGB;
+                case(caustica::rhi::Format::BC1_UNORM):
+                    textureInfo.format = caustica::rhi::Format::BC1_UNORM_SRGB;
                     break;
 
-                case(nvrhi::Format::BC2_UNORM):
-                    textureInfo.format = nvrhi::Format::BC2_UNORM_SRGB;
+                case(caustica::rhi::Format::BC2_UNORM):
+                    textureInfo.format = caustica::rhi::Format::BC2_UNORM_SRGB;
                     break;
 
-                case(nvrhi::Format::BC3_UNORM):
-                    textureInfo.format = nvrhi::Format::BC3_UNORM_SRGB;
+                case(caustica::rhi::Format::BC3_UNORM):
+                    textureInfo.format = caustica::rhi::Format::BC3_UNORM_SRGB;
                     break;
 
-                case(nvrhi::Format::BC7_UNORM):
-                    textureInfo.format = nvrhi::Format::BC7_UNORM_SRGB;
+                case(caustica::rhi::Format::BC7_UNORM):
+                    textureInfo.format = caustica::rhi::Format::BC7_UNORM_SRGB;
                     break;
 
                 default:
@@ -622,19 +622,19 @@ namespace caustica
                     return false;
                 }
                 textureInfo.height = 1;
-                textureInfo.dimension = d3d10ext->arraySize > 1 ? nvrhi::TextureDimension::Texture1DArray : nvrhi::TextureDimension::Texture1D;
+                textureInfo.dimension = d3d10ext->arraySize > 1 ? caustica::rhi::TextureDimension::Texture1DArray : caustica::rhi::TextureDimension::Texture1D;
                 break;
 
             case DDS_DIMENSION_TEXTURE2D:
                 if (d3d10ext->miscFlag & D3D11_RESOURCE_MISC_TEXTURECUBE)
                 {
                     textureInfo.arraySize = d3d10ext->arraySize * 6;
-                    textureInfo.dimension = d3d10ext->arraySize > 1 ? nvrhi::TextureDimension::TextureCubeArray : nvrhi::TextureDimension::TextureCube;
+                    textureInfo.dimension = d3d10ext->arraySize > 1 ? caustica::rhi::TextureDimension::TextureCubeArray : caustica::rhi::TextureDimension::TextureCube;
                 }
                 else
                 {
                     textureInfo.arraySize = d3d10ext->arraySize;
-                    textureInfo.dimension = d3d10ext->arraySize > 1 ? nvrhi::TextureDimension::Texture2DArray : nvrhi::TextureDimension::Texture2D;
+                    textureInfo.dimension = d3d10ext->arraySize > 1 ? caustica::rhi::TextureDimension::Texture2DArray : caustica::rhi::TextureDimension::Texture2D;
                 }
 
                 break;
@@ -645,7 +645,7 @@ namespace caustica
                     return false;
                 }
                 textureInfo.depth = header->depth;
-                textureInfo.dimension = nvrhi::TextureDimension::Texture3D;
+                textureInfo.dimension = caustica::rhi::TextureDimension::Texture3D;
                 break;
 
             default:
@@ -656,7 +656,7 @@ namespace caustica
         {
             textureInfo.format = ConvertDDSFormat(header->ddspf, textureInfo.forceSRGB);
 
-            if (textureInfo.format == nvrhi::Format::UNKNOWN)
+            if (textureInfo.format == caustica::rhi::Format::UNKNOWN)
             {
                 return false;
             }
@@ -664,7 +664,7 @@ namespace caustica
             if (header->flags & DDS_HEADER_FLAGS_VOLUME)
             {
                 textureInfo.depth = header->depth;
-                textureInfo.dimension = nvrhi::TextureDimension::Texture3D;
+                textureInfo.dimension = caustica::rhi::TextureDimension::Texture3D;
             }
             else
             {
@@ -677,11 +677,11 @@ namespace caustica
                     }
 
                     textureInfo.arraySize = 6;
-                    textureInfo.dimension = nvrhi::TextureDimension::TextureCube;
+                    textureInfo.dimension = caustica::rhi::TextureDimension::TextureCube;
                 }
                 else
                 {
-                    textureInfo.dimension = nvrhi::TextureDimension::Texture2D;
+                    textureInfo.dimension = caustica::rhi::TextureDimension::Texture2D;
                 }
             }
         }
@@ -692,12 +692,12 @@ namespace caustica
         return true;
     }
 
-    static nvrhi::TextureHandle CreateDDSTextureInternal(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, ImageAsset& info, const char* debugName)
+    static caustica::rhi::TextureHandle CreateDDSTextureInternal(caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, ImageAsset& info, const char* debugName)
     {
         if (!loadDDSTextureFromMemory(info))
             return nullptr;
 
-        nvrhi::TextureDesc desc;
+        caustica::rhi::TextureDesc desc;
         desc.width = info.width;
         desc.height = info.height;
         desc.depth = info.depth;
@@ -707,12 +707,12 @@ namespace caustica
         desc.format = info.format;
         desc.debugName = debugName;
 
-        nvrhi::TextureHandle texture = device->createTexture(desc);
+        caustica::rhi::TextureHandle texture = device->createTexture(desc);
 
         if (!texture)
             return nullptr;
 
-        commandList->beginTrackingTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+        commandList->beginTrackingTextureState(texture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
         for (uint32_t arraySlice = 0; arraySlice < info.arraySize; arraySlice++)
         {
@@ -724,13 +724,13 @@ namespace caustica
             }
         }
 
-        commandList->setPermanentTextureState(texture, nvrhi::ResourceStates::ShaderResource);
+        commandList->setPermanentTextureState(texture, caustica::rhi::ResourceStates::ShaderResource);
         commandList->commitBarriers();
 
         return texture;
     }
 
-    nvrhi::TextureHandle createDDSTextureFromMemory(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
+    caustica::rhi::TextureHandle createDDSTextureFromMemory(caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<IBlob> data, const char* debugName /*= nullptr*/, bool forceSRGB /*= false*/)
     {
         if (!data)
             return nullptr;
@@ -742,11 +742,11 @@ namespace caustica
         return CreateDDSTextureInternal(device, commandList, info, debugName);
     }
 
-    std::shared_ptr<IBlob> saveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture)
+    std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::IDevice* device, caustica::rhi::IStagingTexture* stagingTexture)
     {
         DDS_HEADER header = {};
         DDS_HEADER_DXT10 dx10header = {};
-        const nvrhi::TextureDesc& textureDesc = stagingTexture->getDesc();
+        const caustica::rhi::TextureDesc& textureDesc = stagingTexture->getDesc();
 
         header.size = sizeof(DDS_HEADER);
         header.flags = DDS_HEADER_FLAGS_TEXTURE;
@@ -760,34 +760,34 @@ namespace caustica
 
         switch (textureDesc.dimension)
         {
-        case nvrhi::TextureDimension::Texture1D:
-        case nvrhi::TextureDimension::Texture1DArray:
+        case caustica::rhi::TextureDimension::Texture1D:
+        case caustica::rhi::TextureDimension::Texture1DArray:
             dx10header.resourceDimension = DDS_DIMENSION_TEXTURE1D;
             break;
 
-        case nvrhi::TextureDimension::Texture2D:
-        case nvrhi::TextureDimension::Texture2DArray:
-        case nvrhi::TextureDimension::TextureCube:
-        case nvrhi::TextureDimension::TextureCubeArray:
+        case caustica::rhi::TextureDimension::Texture2D:
+        case caustica::rhi::TextureDimension::Texture2DArray:
+        case caustica::rhi::TextureDimension::TextureCube:
+        case caustica::rhi::TextureDimension::TextureCubeArray:
             dx10header.resourceDimension = DDS_DIMENSION_TEXTURE2D;
             break;
 
-        case nvrhi::TextureDimension::Texture3D:
+        case caustica::rhi::TextureDimension::Texture3D:
             // Unsupported
             return nullptr;
             /*header.flags |= DDS_HEADER_FLAGS_VOLUME;
             dx10header.resourceDimension = DDS_DIMENSION_TEXTURE3D;
             break;*/
 
-        case nvrhi::TextureDimension::Texture2DMS:
-        case nvrhi::TextureDimension::Texture2DMSArray:
-        case nvrhi::TextureDimension::Unknown:
+        case caustica::rhi::TextureDimension::Texture2DMS:
+        case caustica::rhi::TextureDimension::Texture2DMSArray:
+        case caustica::rhi::TextureDimension::Unknown:
             // Unsupported
             return nullptr;
         }
 
         dx10header.arraySize = textureDesc.arraySize;
-        if (textureDesc.dimension == nvrhi::TextureDimension::TextureCube || textureDesc.dimension == nvrhi::TextureDimension::TextureCubeArray)
+        if (textureDesc.dimension == caustica::rhi::TextureDimension::TextureCube || textureDesc.dimension == caustica::rhi::TextureDimension::TextureCubeArray)
         {
             dx10header.arraySize /= 6;
             dx10header.miscFlag |= D3D11_RESOURCE_MISC_TEXTURECUBE;
@@ -795,7 +795,7 @@ namespace caustica
 
         for (const FormatMapping& mapping : g_FormatMappings)
         {
-            if (mapping.nvrhiFormat == textureDesc.format)
+            if (mapping.rhiFormat == textureDesc.format)
             {
                 dx10header.dxgiFormat = mapping.dxgiFormat;
                 break;
@@ -836,12 +836,12 @@ namespace caustica
 
             for (uint32_t mipLevel = 0; mipLevel < textureDesc.mipLevels; mipLevel++)
             {
-                nvrhi::TextureSlice slice;
+                caustica::rhi::TextureSlice slice;
                 slice.arraySlice = arraySlice;
                 slice.mipLevel = mipLevel;
 
                 size_t rowPitch = 0;
-                const char* sliceData = reinterpret_cast<const char*>(device->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Read, &rowPitch));
+                const char* sliceData = reinterpret_cast<const char*>(device->mapStagingTexture(stagingTexture, slice, caustica::rhi::CpuAccessMode::Read, &rowPitch));
 
                 const TextureSubresourceData& subresourceData = textureInfo.dataLayout[arraySlice][mipLevel];
 

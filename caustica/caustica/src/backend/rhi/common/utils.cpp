@@ -1,7 +1,7 @@
 #include <rhi/utils.h>
 #include <sstream>
 
-namespace nvrhi::utils
+namespace caustica::rhi::utils
 {
     BlendState::RenderTarget CreateAddBlendState(
         BlendFactor srcBlend,
@@ -44,12 +44,12 @@ namespace nvrhi::utils
     }
 
     bool CreateBindingSetAndLayout(
-        nvrhi::IDevice* device,
-        nvrhi::ShaderType visibility,
+        caustica::rhi::IDevice* device,
+        caustica::rhi::ShaderType visibility,
         uint32_t registerSpace,
-        const nvrhi::BindingSetDesc& bindingSetDesc,
-        nvrhi::BindingLayoutHandle& bindingLayout,
-        nvrhi::BindingSetHandle& bindingSet,
+        const caustica::rhi::BindingSetDesc& bindingSetDesc,
+        caustica::rhi::BindingLayoutHandle& bindingLayout,
+        caustica::rhi::BindingSetHandle& bindingSet,
         bool registerSpaceIsDescriptorSet)
     {
         auto convertSetToLayout = [](const std::vector<BindingSetItem>& setDesc, std::vector<BindingLayoutItem>& layoutDesc)
@@ -68,7 +68,7 @@ namespace nvrhi::utils
 
         if (!bindingLayout)
         {
-            nvrhi::BindingLayoutDesc bindingLayoutDesc;
+            caustica::rhi::BindingLayoutDesc bindingLayoutDesc;
             bindingLayoutDesc.visibility = visibility;
             bindingLayoutDesc.registerSpace = registerSpace;
             bindingLayoutDesc.registerSpaceIsDescriptorSet = registerSpaceIsDescriptorSet;
@@ -129,7 +129,7 @@ namespace nvrhi::utils
         commandList->setBufferState(buffer, ResourceStates::UnorderedAccess);
     }
 
-    Format ChooseFormat(IDevice* device, nvrhi::FormatSupport requiredFeatures, const nvrhi::Format* requestedFormats, size_t requestedFormatCount)
+    Format ChooseFormat(IDevice* device, caustica::rhi::FormatSupport requiredFeatures, const caustica::rhi::Format* requestedFormats, size_t requestedFormatCount)
     {
         assert(device);
         assert(requestedFormats || requestedFormatCount == 0);

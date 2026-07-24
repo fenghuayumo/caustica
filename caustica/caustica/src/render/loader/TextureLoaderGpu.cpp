@@ -33,7 +33,7 @@ uint32_t GetMipLevelsNum(uint32_t width, uint32_t height)
 void TextureLoader::finalizeTexture(
     std::shared_ptr<ImageAsset> texture,
     render::RenderDevice* renderDevice,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     assert(texture->data);
     assert(commandList);
@@ -42,20 +42,20 @@ void TextureLoader::finalizeTexture(
     uint32_t originalHeight = texture->height;
 
     bool isBlockCompressed =
-        (texture->format == nvrhi::Format::BC1_UNORM) ||
-        (texture->format == nvrhi::Format::BC1_UNORM_SRGB) ||
-        (texture->format == nvrhi::Format::BC2_UNORM) ||
-        (texture->format == nvrhi::Format::BC2_UNORM_SRGB) ||
-        (texture->format == nvrhi::Format::BC3_UNORM) ||
-        (texture->format == nvrhi::Format::BC3_UNORM_SRGB) ||
-        (texture->format == nvrhi::Format::BC4_SNORM) ||
-        (texture->format == nvrhi::Format::BC4_UNORM) ||
-        (texture->format == nvrhi::Format::BC5_SNORM) ||
-        (texture->format == nvrhi::Format::BC5_UNORM) ||
-        (texture->format == nvrhi::Format::BC6H_SFLOAT) ||
-        (texture->format == nvrhi::Format::BC6H_UFLOAT) ||
-        (texture->format == nvrhi::Format::BC7_UNORM) ||
-        (texture->format == nvrhi::Format::BC7_UNORM_SRGB);
+        (texture->format == caustica::rhi::Format::BC1_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC1_UNORM_SRGB) ||
+        (texture->format == caustica::rhi::Format::BC2_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC2_UNORM_SRGB) ||
+        (texture->format == caustica::rhi::Format::BC3_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC3_UNORM_SRGB) ||
+        (texture->format == caustica::rhi::Format::BC4_SNORM) ||
+        (texture->format == caustica::rhi::Format::BC4_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC5_SNORM) ||
+        (texture->format == caustica::rhi::Format::BC5_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC6H_SFLOAT) ||
+        (texture->format == caustica::rhi::Format::BC6H_UFLOAT) ||
+        (texture->format == caustica::rhi::Format::BC7_UNORM) ||
+        (texture->format == caustica::rhi::Format::BC7_UNORM_SRGB);
 
     if (isBlockCompressed)
     {
@@ -67,7 +67,7 @@ void TextureLoader::finalizeTexture(
     uint32_t scaledHeight = originalHeight;
 
     if (m_MaxTextureSize > 0 && int(std::max(originalWidth, originalHeight)) > m_MaxTextureSize &&
-        texture->isRenderTarget && texture->dimension == nvrhi::TextureDimension::Texture2D)
+        texture->isRenderTarget && texture->dimension == caustica::rhi::TextureDimension::Texture2D)
     {
         if (originalWidth >= originalHeight)
         {
@@ -83,7 +83,7 @@ void TextureLoader::finalizeTexture(
 
     const char* dataPointer = static_cast<const char*>(texture->data->data());
 
-    nvrhi::TextureDesc textureDesc;
+    caustica::rhi::TextureDesc textureDesc;
     textureDesc.format = texture->format;
     textureDesc.width = scaledWidth;
     textureDesc.height = scaledHeight;
@@ -97,15 +97,15 @@ void TextureLoader::finalizeTexture(
     textureDesc.isRenderTarget = texture->isRenderTarget;
     texture->gpu.texture = m_Device->createTexture(textureDesc);
 
-    commandList->beginTrackingTextureState(texture->gpu.texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+    commandList->beginTrackingTextureState(texture->gpu.texture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
     if (m_DescriptorTable)
         texture->gpu.bindlessDescriptor = m_DescriptorTable->createDescriptorHandle(
-            nvrhi::BindingSetItem::Texture_SRV(0, texture->gpu.texture));
+            caustica::rhi::BindingSetItem::Texture_SRV(0, texture->gpu.texture));
 
     if (scaledWidth != originalWidth || scaledHeight != originalHeight)
     {
-        nvrhi::TextureDesc tempTextureDesc;
+        caustica::rhi::TextureDesc tempTextureDesc;
         tempTextureDesc.format = texture->format;
         tempTextureDesc.width = originalWidth;
         tempTextureDesc.height = originalHeight;
@@ -114,9 +114,9 @@ void TextureLoader::finalizeTexture(
         tempTextureDesc.mipLevels = 1;
         tempTextureDesc.dimension = textureDesc.dimension;
 
-        nvrhi::TextureHandle tempTexture = m_Device->createTexture(tempTextureDesc);
+        caustica::rhi::TextureHandle tempTexture = m_Device->createTexture(tempTextureDesc);
         assert(tempTexture);
-        commandList->beginTrackingTextureState(tempTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+        commandList->beginTrackingTextureState(tempTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
         for (uint32_t arraySlice = 0; arraySlice < texture->arraySize; arraySlice++)
         {
@@ -126,8 +126,8 @@ void TextureLoader::finalizeTexture(
                 layout.rowPitch, layout.depthPitch);
         }
 
-        nvrhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(
-            nvrhi::FramebufferDesc().addColorAttachment(texture->gpu.texture));
+        caustica::rhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(
+            caustica::rhi::FramebufferDesc().addColorAttachment(texture->gpu.texture));
 
         renderDevice->blit().blitTexture(commandList, framebuffer, tempTexture);
     }
@@ -149,8 +149,8 @@ void TextureLoader::finalizeTexture(
 
     for (uint32_t mipLevel = texture->mipLevels; mipLevel < textureDesc.mipLevels; mipLevel++)
     {
-        nvrhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(nvrhi::FramebufferDesc()
-            .addColorAttachment(nvrhi::FramebufferAttachment()
+        caustica::rhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(caustica::rhi::FramebufferDesc()
+            .addColorAttachment(caustica::rhi::FramebufferAttachment()
                 .setTexture(texture->gpu.texture)
                 .setArraySlice(0)
                 .setMipLevel(mipLevel)));
@@ -162,7 +162,7 @@ void TextureLoader::finalizeTexture(
         renderDevice->blit().blitTexture(commandList, blitParams);
     }
 
-    commandList->setPermanentTextureState(texture->gpu.texture, nvrhi::ResourceStates::ShaderResource);
+    commandList->setPermanentTextureState(texture->gpu.texture, caustica::rhi::ResourceStates::ShaderResource);
     commandList->commitBarriers();
 
     ++m_TexturesFinalized;
@@ -221,10 +221,10 @@ void TextureLoader::loadingFinished()
 }
 
 bool saveTextureToFile(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     render::RenderDevice& renderDevice,
-    nvrhi::ITexture* texture,
-    nvrhi::ResourceStates textureState,
+    caustica::rhi::ITexture* texture,
+    caustica::rhi::ResourceStates textureState,
     const char* fileName,
     bool saveAlphaChannel)
 {
@@ -250,56 +250,56 @@ bool saveTextureToFile(
     if (destFormat == JPG)
         saveAlphaChannel = false;
 
-    nvrhi::TextureDesc desc = texture->getDesc();
-    nvrhi::TextureHandle tempTexture;
-    nvrhi::FramebufferHandle tempFramebuffer;
+    caustica::rhi::TextureDesc desc = texture->getDesc();
+    caustica::rhi::TextureHandle tempTexture;
+    caustica::rhi::FramebufferHandle tempFramebuffer;
 
-    nvrhi::CommandListHandle commandList = device->createCommandList();
+    caustica::rhi::CommandListHandle commandList = device->createCommandList();
     commandList->open();
 
-    if (textureState != nvrhi::ResourceStates::Unknown)
+    if (textureState != caustica::rhi::ResourceStates::Unknown)
     {
-        commandList->beginTrackingTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+        commandList->beginTrackingTextureState(texture, caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
     }
 
     switch (desc.format)
     {
-    case nvrhi::Format::RGBA8_UNORM:
-    case nvrhi::Format::SRGBA8_UNORM:
+    case caustica::rhi::Format::RGBA8_UNORM:
+    case caustica::rhi::Format::SRGBA8_UNORM:
         tempTexture = texture;
         break;
     default:
-        desc.format = nvrhi::Format::SRGBA8_UNORM;
+        desc.format = caustica::rhi::Format::SRGBA8_UNORM;
         desc.isRenderTarget = true;
-        desc.initialState = nvrhi::ResourceStates::RenderTarget;
+        desc.initialState = caustica::rhi::ResourceStates::RenderTarget;
         desc.keepInitialState = true;
 
         tempTexture = device->createTexture(desc);
-        tempFramebuffer = device->createFramebuffer(nvrhi::FramebufferDesc().addColorAttachment(tempTexture));
+        tempFramebuffer = device->createFramebuffer(caustica::rhi::FramebufferDesc().addColorAttachment(tempTexture));
 
         renderDevice.blit().blitTexture(commandList, tempFramebuffer, texture);
     }
 
-    nvrhi::TextureDesc stagingDesc = desc;
+    caustica::rhi::TextureDesc stagingDesc = desc;
     stagingDesc.isRenderTarget = false;
     stagingDesc.isUAV = false;
     stagingDesc.isTypeless = false;
-    stagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
+    stagingDesc.initialState = caustica::rhi::ResourceStates::CopyDest;
     stagingDesc.keepInitialState = true;
     stagingDesc.debugName = "saveTextureToFile Staging";
 
-    nvrhi::StagingTextureHandle stagingTexture = device->createStagingTexture(stagingDesc, nvrhi::CpuAccessMode::Read);
+    caustica::rhi::StagingTextureHandle stagingTexture = device->createStagingTexture(stagingDesc, caustica::rhi::CpuAccessMode::Read);
     if (!stagingTexture)
     {
         commandList->close();
         return false;
     }
 
-    commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), tempTexture, nvrhi::TextureSlice());
+    commandList->copyTexture(stagingTexture, caustica::rhi::TextureSlice(), tempTexture, caustica::rhi::TextureSlice());
 
-    if (textureState != nvrhi::ResourceStates::Unknown)
+    if (textureState != caustica::rhi::ResourceStates::Unknown)
     {
-        commandList->setTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+        commandList->setTextureState(texture, caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
         commandList->commitBarriers();
     }
 
@@ -311,7 +311,7 @@ bool saveTextureToFile(
 
     size_t rowPitch = 0;
     uint8_t const* pData = static_cast<uint8_t const*>(device->mapStagingTexture(
-        stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+        stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
 
     if (!pData)
         return false;

@@ -10,7 +10,7 @@ namespace caustica
 // =============================================================================
 // Constructor
 // =============================================================================
-BindlessTable::BindlessTable(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout)
+BindlessTable::BindlessTable(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout)
     : m_manager(std::make_shared<DescriptorTableManager>(device, layout))
 {
     uint32_t capacity = m_manager->getDescriptorTable()->getCapacity();
@@ -68,7 +68,7 @@ void BindlessTable::grow()
 // =============================================================================
 // allocate
 // =============================================================================
-uint32_t BindlessTable::allocate(nvrhi::BindingSetItem item)
+uint32_t BindlessTable::allocate(caustica::rhi::BindingSetItem item)
 {
     std::lock_guard lock(m_mutex);
 
@@ -161,7 +161,7 @@ bool BindlessTable::isValid(uint32_t handle) const
 // =============================================================================
 // Accessors
 // =============================================================================
-nvrhi::IDescriptorTable* BindlessTable::getDescriptorTable() const
+caustica::rhi::IDescriptorTable* BindlessTable::getDescriptorTable() const
 {
     return m_manager->getDescriptorTable();
 }
@@ -179,12 +179,12 @@ uint32_t BindlessTable::getAllocatedCount() const
 // =============================================================================
 // Backward-compatible API — replaces DescriptorTableManager
 // =============================================================================
-DescriptorIndex BindlessTable::createDescriptor(nvrhi::BindingSetItem item)
+DescriptorIndex BindlessTable::createDescriptor(caustica::rhi::BindingSetItem item)
 {
     return static_cast<DescriptorIndex>(allocate(item));
 }
 
-DescriptorHandle BindlessTable::createDescriptorHandle(nvrhi::BindingSetItem item)
+DescriptorHandle BindlessTable::createDescriptorHandle(caustica::rhi::BindingSetItem item)
 {
     DescriptorIndex index = createDescriptor(item);
     // Note: shared_from_this won't work (BindlessTable isn't shared_ptr-managed).
@@ -197,7 +197,7 @@ void BindlessTable::releaseDescriptor(DescriptorIndex index)
     freeDeferred(static_cast<uint32_t>(index));
 }
 
-nvrhi::BindingSetItem BindlessTable::getDescriptor(DescriptorIndex index) const
+caustica::rhi::BindingSetItem BindlessTable::getDescriptor(DescriptorIndex index) const
 {
     return m_manager->getDescriptor(index);
 }

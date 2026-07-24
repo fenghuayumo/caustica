@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include "GaussianSplatAccelBuilder.h"
 #include "GaussianSplatEmissionProxy.h"
@@ -89,15 +89,15 @@ struct GaussianSplatRenderSettings
 
 struct GaussianSplatGraphResources
 {
-    nvrhi::IBuffer* constantBuffer = nullptr;
-    nvrhi::IBuffer* splatBuffer = nullptr;
-    nvrhi::IBuffer* colorBuffer = nullptr;
-    nvrhi::IBuffer* shBuffer = nullptr;
-    nvrhi::IBuffer* indexBuffer = nullptr;
-    nvrhi::IBuffer* sortKeyBuffer = nullptr;
-    nvrhi::IBuffer* sortControlBuffer = nullptr;
-    nvrhi::IBuffer* drawIndirectBuffer = nullptr;
-    nvrhi::ITexture* stochasticDepth = nullptr;
+    caustica::rhi::IBuffer* constantBuffer = nullptr;
+    caustica::rhi::IBuffer* splatBuffer = nullptr;
+    caustica::rhi::IBuffer* colorBuffer = nullptr;
+    caustica::rhi::IBuffer* shBuffer = nullptr;
+    caustica::rhi::IBuffer* indexBuffer = nullptr;
+    caustica::rhi::IBuffer* sortKeyBuffer = nullptr;
+    caustica::rhi::IBuffer* sortControlBuffer = nullptr;
+    caustica::rhi::IBuffer* drawIndirectBuffer = nullptr;
+    caustica::rhi::ITexture* stochasticDepth = nullptr;
     GaussianSplatSortMode sortMode = GaussianSplatSortMode::GpuSort;
     bool distanceStageCulling = false;
 };
@@ -106,7 +106,7 @@ class GaussianSplatPass
 {
 public:
     GaussianSplatPass(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void setGpuSort(std::shared_ptr<GPUSort> gpuSort);
@@ -115,7 +115,7 @@ public:
 
     void createPipeline(const RenderTargets& renderTargets);
     void buildAccelerationStructures(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         bool useAABBs,
         bool useTLASInstances,
         bool allowBlasCompaction,
@@ -135,72 +135,72 @@ public:
     [[nodiscard]] GaussianSplatGraphResources graphResources(const GaussianSplatRenderSettings& settings) const;
 
     bool upload(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView& view,
-        nvrhi::rt::IAccelStruct* meshTopLevelAS,
+        caustica::rhi::rt::IAccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
-    void sort(nvrhi::ICommandList* commandList);
+    void sort(caustica::rhi::ICommandList* commandList);
     bool raster(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView& view);
 
     [[nodiscard]] bool hasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }
     [[nodiscard]] caustica::math::box3 getLocalBounds() const { return m_localBounds; }
     [[nodiscard]] const std::string& getSourceFileName() const { return m_sourceFileName; }
-    [[nodiscard]] nvrhi::rt::IAccelStruct* getTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
-    [[nodiscard]] nvrhi::IBuffer* getSplatBuffer() const { return m_splatBuffer.Get(); }
+    [[nodiscard]] caustica::rhi::rt::IAccelStruct* getTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
+    [[nodiscard]] caustica::rhi::IBuffer* getSplatBuffer() const { return m_splatBuffer.Get(); }
     [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
     [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& getEmissionProxies() const { return m_emissionProxies; }
 
 private:
-    void createBindingSets(const RenderTargets& renderTargets, nvrhi::rt::IAccelStruct* meshTopLevelAS);
+    void createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::IAccelStruct* meshTopLevelAS);
     void createStochasticFramebuffer(const RenderTargets& renderTargets);
     void ensureFormatBuffers(GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
-    void uploadSplatDataIfNeeded(nvrhi::ICommandList* commandList);
-    void uploadFormatDataIfNeeded(nvrhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
+    void uploadSplatDataIfNeeded(caustica::rhi::ICommandList* commandList);
+    void uploadFormatDataIfNeeded(caustica::rhi::ICommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     [[nodiscard]] caustica::render::GaussianSplatSortResources makeSortResources() const;
 
-    nvrhi::DeviceHandle m_device;
+    caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<GPUSort> m_gpuSort;
 
-    nvrhi::BufferHandle m_constantBuffer;
-    nvrhi::BufferHandle m_splatBuffer;
-    nvrhi::BufferHandle m_colorBuffer;
-    nvrhi::BufferHandle m_shBuffer;
-    nvrhi::BufferHandle m_indexBuffer;
-    nvrhi::BufferHandle m_sortKeyBuffer;
-    nvrhi::BufferHandle m_sortControlBuffer;
-    nvrhi::BufferHandle m_drawIndirectBuffer;
-    nvrhi::BufferHandle m_splatAabbBuffer;
-    nvrhi::TextureHandle m_stochasticDepthBuffer;
-    nvrhi::TextureHandle m_stochasticProcessedDepthBuffer;
+    caustica::rhi::BufferHandle m_constantBuffer;
+    caustica::rhi::BufferHandle m_splatBuffer;
+    caustica::rhi::BufferHandle m_colorBuffer;
+    caustica::rhi::BufferHandle m_shBuffer;
+    caustica::rhi::BufferHandle m_indexBuffer;
+    caustica::rhi::BufferHandle m_sortKeyBuffer;
+    caustica::rhi::BufferHandle m_sortControlBuffer;
+    caustica::rhi::BufferHandle m_drawIndirectBuffer;
+    caustica::rhi::BufferHandle m_splatAabbBuffer;
+    caustica::rhi::TextureHandle m_stochasticDepthBuffer;
+    caustica::rhi::TextureHandle m_stochasticProcessedDepthBuffer;
 
-    nvrhi::BindingLayoutHandle m_rasterRenderBindingLayout;
-    nvrhi::BindingLayoutHandle m_hybridRenderBindingLayout;
-    nvrhi::BindingLayoutHandle m_sortKeyBindingLayout;
-    nvrhi::BindingSetHandle m_rasterRenderBindingSet;
-    nvrhi::BindingSetHandle m_hybridRenderBindingSet;
-    nvrhi::BindingSetHandle m_sortKeyBindingSet;
+    caustica::rhi::BindingLayoutHandle m_rasterRenderBindingLayout;
+    caustica::rhi::BindingLayoutHandle m_hybridRenderBindingLayout;
+    caustica::rhi::BindingLayoutHandle m_sortKeyBindingLayout;
+    caustica::rhi::BindingSetHandle m_rasterRenderBindingSet;
+    caustica::rhi::BindingSetHandle m_hybridRenderBindingSet;
+    caustica::rhi::BindingSetHandle m_sortKeyBindingSet;
 
-    nvrhi::ShaderHandle m_rasterVertexShader;
-    nvrhi::ShaderHandle m_rasterPixelShader;
-    nvrhi::ShaderHandle m_hybridVertexShader;
-    nvrhi::ShaderHandle m_hybridPixelShader;
-    nvrhi::ShaderHandle m_sortKeyShader;
-    nvrhi::GraphicsPipelineHandle m_rasterRenderPipeline;
-    nvrhi::GraphicsPipelineHandle m_hybridRenderPipeline;
-    nvrhi::GraphicsPipelineHandle m_stochasticRasterRenderPipeline;
-    nvrhi::GraphicsPipelineHandle m_stochasticHybridRenderPipeline;
-    nvrhi::GraphicsPipelineHandle m_stochasticProcessedRasterRenderPipeline;
-    nvrhi::GraphicsPipelineHandle m_stochasticProcessedHybridRenderPipeline;
-    nvrhi::ComputePipelineHandle m_sortKeyPipeline;
+    caustica::rhi::ShaderHandle m_rasterVertexShader;
+    caustica::rhi::ShaderHandle m_rasterPixelShader;
+    caustica::rhi::ShaderHandle m_hybridVertexShader;
+    caustica::rhi::ShaderHandle m_hybridPixelShader;
+    caustica::rhi::ShaderHandle m_sortKeyShader;
+    caustica::rhi::GraphicsPipelineHandle m_rasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_hybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticProcessedRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticProcessedHybridRenderPipeline;
+    caustica::rhi::ComputePipelineHandle m_sortKeyPipeline;
     caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
     caustica::render::GaussianSplatSorter m_sorter;
-    nvrhi::rt::IAccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
+    caustica::rhi::rt::IAccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
 
@@ -227,10 +227,10 @@ private:
     GaussianSplatStorageFormat m_currentRgbaFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatRenderSettings m_frameRenderSettings;
     GaussianSplatConstants m_frameConstants = {};
-    nvrhi::BindingSetHandle m_frameRenderBindingSet;
-    nvrhi::GraphicsPipelineHandle m_frameRenderPipeline;
-    nvrhi::IFramebuffer* m_frameFramebuffer = nullptr;
-    nvrhi::TextureHandle m_frameStochasticDepthBuffer;
+    caustica::rhi::BindingSetHandle m_frameRenderBindingSet;
+    caustica::rhi::GraphicsPipelineHandle m_frameRenderPipeline;
+    caustica::rhi::IFramebuffer* m_frameFramebuffer = nullptr;
+    caustica::rhi::TextureHandle m_frameStochasticDepthBuffer;
     bool m_framePrepared = false;
     bool m_frameDistanceStageCulling = false;
     std::string m_sourceFileName;

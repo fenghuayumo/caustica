@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/caustica/format.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <string>
@@ -8,22 +8,24 @@
 namespace caustica::rg
 {
 
-using Format = nvrhi::caustica::PixelFormat;
-using FormatInfo = nvrhi::caustica::PixelFormatInfo;
+using Format = caustica::rhi::PixelFormat;
+using FormatInfo = caustica::rhi::PixelFormatInfo;
 
 [[nodiscard]] inline FormatInfo getFormatInfo(Format format)
 {
-    return nvrhi::caustica::getPixelFormatInfo(format);
+    return caustica::rhi::getPixelFormatInfo(format);
 }
 
-[[nodiscard]] inline nvrhi::Format toNvrhiFormat(Format format)
+// Named differently from caustica::rhi::toRhiFormat/fromRhiFormat to avoid ADL ambiguity
+// (rg::Format is an alias of caustica::rhi::PixelFormat).
+[[nodiscard]] inline caustica::rhi::Format toNativeFormat(Format format)
 {
-    return nvrhi::caustica::toNvrhiFormat(format);
+    return caustica::rhi::toRhiFormat(format);
 }
 
-[[nodiscard]] inline Format fromNvrhiFormat(nvrhi::Format nativeFormat)
+[[nodiscard]] inline Format fromNativeFormat(caustica::rhi::Format nativeFormat)
 {
-    return nvrhi::caustica::fromNvrhiFormat(nativeFormat);
+    return caustica::rhi::fromRhiFormat(nativeFormat);
 }
 
 struct TextureDesc

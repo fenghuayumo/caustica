@@ -18,7 +18,7 @@
 #include <StreamlineIntegration.h>
 #endif
 
-using nvrhi::RefCountPtr;
+using caustica::rhi::RefCountPtr;
 
 using namespace caustica;
 
@@ -36,7 +36,7 @@ static bool moveWindowOntoAdapter(IDXGIAdapter* targetAdapter, RECT& rect)
     unsigned int outputNo = 0;
     while (SUCCEEDED(hres))
     {
-        nvrhi::RefCountPtr<IDXGIOutput> pOutput;
+        caustica::rhi::RefCountPtr<IDXGIOutput> pOutput;
         hres = targetAdapter->EnumOutputs(outputNo++, &pOutput);
 
         if (SUCCEEDED(hres) && pOutput)
@@ -90,7 +90,7 @@ bool GpuDevice_DX11::beginFrame()
 
 void GpuDevice_DX11::reportLiveObjects()
 {
-    nvrhi::RefCountPtr<IDXGIDebug> pDebug;
+    caustica::rhi::RefCountPtr<IDXGIDebug> pDebug;
     DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug));
 
     if (pDebug)
@@ -100,7 +100,7 @@ void GpuDevice_DX11::reportLiveObjects()
 bool GpuDevice_DX11::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().initializePreDevice(nvrhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+    StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (!m_DxgiFactory)
@@ -206,25 +206,25 @@ bool GpuDevice_DX11::createDevice()
     StreamlineIntegration::Get().setD3DDevice(m_Device);
 #endif
 
-    nvrhi::d3d11::DeviceDesc deviceDesc;
+    caustica::rhi::d3d11::DeviceDesc deviceDesc;
     deviceDesc.messageCallback = &DefaultMessageCallback::getInstance();
     deviceDesc.context = m_ImmediateContext;
 #if CAUSTICA_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
-    m_NvrhiDevice = m_NvrhiDevice = nvrhi::d3d11::createDevice(deviceDesc);
+    m_RhiDevice = m_RhiDevice = caustica::rhi::d3d11::createDevice(deviceDesc);
 
-    if (m_DeviceParams.enableNvrhiValidationLayer)
+    if (m_DeviceParams.enableRhiValidationLayer)
     {
-        m_NvrhiDevice = m_NvrhiDevice = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_RhiDevice = m_RhiDevice = caustica::rhi::validation::createValidationLayer(m_RhiDevice);
     }
 
 #if CAUSTICA_WITH_STREAMLINE
     AdapterInfo::LUID luid;
     static_assert(luid.size() == sizeof(aDesc.AdapterLuid));
     memcpy(luid.data(), &aDesc.AdapterLuid, luid.size());
-    StreamlineIntegration::Get().initializeDeviceDX(m_NvrhiDevice, &luid);
+    StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice, &luid);
 #endif
 
     return true;
@@ -272,14 +272,14 @@ bool GpuDevice_DX11::createSwapChain()
     // So we need to use a non-sRGB format here, but store the true sRGB format for later framebuffer creation.
     switch (m_DeviceParams.swapChainFormat)  // NOLINT(clang-diagnostic-switch-enum)
     {
-    case nvrhi::Format::SRGBA8_UNORM:
+    case caustica::rhi::Format::SRGBA8_UNORM:
         m_SwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         break;
-    case nvrhi::Format::SBGRA8_UNORM:
+    case caustica::rhi::Format::SBGRA8_UNORM:
         m_SwapChainDesc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
         break;
     default:
-        m_SwapChainDesc.BufferDesc.Format = nvrhi::d3d11::convertFormat(m_DeviceParams.swapChainFormat);
+        m_SwapChainDesc.BufferDesc.Format = caustica::rhi::d3d11::convertFormat(m_DeviceParams.swapChainFormat);
         break;
     }
     
@@ -304,8 +304,8 @@ bool GpuDevice_DX11::createSwapChain()
 void GpuDevice_DX11::destroyDeviceAndSwapChain()
 {
     m_RhiBackBuffer = nullptr;
-    m_NvrhiDevice = nullptr;
-    m_NvrhiDevice = nullptr;
+    m_RhiDevice = nullptr;
+    m_RhiDevice = nullptr;
 
     if (m_SwapChain)
     {
@@ -329,7 +329,7 @@ bool GpuDevice_DX11::createRenderTarget()
         return false;
     }
 
-    nvrhi::TextureDesc textureDesc;
+    caustica::rhi::TextureDesc textureDesc;
     textureDesc.width = m_DeviceParams.backBufferWidth;
     textureDesc.height = m_DeviceParams.backBufferHeight;
     textureDesc.sampleCount = m_DeviceParams.swapChainSampleCount;
@@ -339,7 +339,7 @@ bool GpuDevice_DX11::createRenderTarget()
     textureDesc.isRenderTarget = true;
     textureDesc.isUAV = false;
 
-    m_RhiBackBuffer = m_NvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::D3D11_Resource, static_cast<ID3D11Resource*>(m_D3D11BackBuffer.Get()), textureDesc);
+    m_RhiBackBuffer = m_RhiDevice->createHandleForNativeTexture(caustica::rhi::ObjectTypes::D3D11_Resource, static_cast<ID3D11Resource*>(m_D3D11BackBuffer.Get()), textureDesc);
 
     if (FAILED(hr))
     {

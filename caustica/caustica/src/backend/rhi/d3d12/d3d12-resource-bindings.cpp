@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     static ResourceType GetNormalizedResourceType(ResourceType type)
     {
@@ -1162,4 +1162,4 @@ namespace nvrhi::d3d12
     }
 
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

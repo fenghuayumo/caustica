@@ -39,7 +39,7 @@ OmmAccelStructState makeOmmAccelState(OpacityMicromapBuilder* opacityMicromapBui
 }
 
 void transitionSkinnedMeshBuffersToReadOnly(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const scene::SceneRenderData& renderData,
     render::SceneGpuResources& gpuResources)
 {
@@ -50,7 +50,7 @@ void transitionSkinnedMeshBuffersToReadOnly(
             continue;
         commandList->setBufferState(
             meshGpuIt->second.vertexBuffer,
-            nvrhi::ResourceStates::ShaderResource);
+            caustica::rhi::ResourceStates::ShaderResource);
     }
     commandList->commitBarriers();
 }
@@ -65,7 +65,7 @@ const scene::SceneRenderData& resolveRenderData(const UpdateSceneGeometryParams&
 
 void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params)
 {
-    nvrhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::ICommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;
     if (scene == nullptr)
         return;

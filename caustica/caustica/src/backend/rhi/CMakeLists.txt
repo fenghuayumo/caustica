@@ -3,8 +3,8 @@ set(RHI_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend/rhi")
 
 include(CMakeDependentOption)
 
-if (NVRHI_WITH_DX12)
-    option(NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP "Use D3D12 native Opacity Micromaps from DXR 1.2" OFF)
+if (CAUSTICA_RHI_WITH_DX12)
+    option(CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP "Use D3D12 native Opacity Micromaps from DXR 1.2" OFF)
 endif()
 
 if (MSVC)
@@ -15,25 +15,25 @@ if (MSVC)
     endif()
 endif()
 
-# Global third-party submodules (moved from nvrhi/thirdparty/ to repo root)
-if (NVRHI_WITH_VULKAN AND NOT TARGET Vulkan-Headers AND NOT TARGET Vulkan::Headers)
+# Global third-party submodules (resolved from repo-root thirdparty/)
+if (CAUSTICA_RHI_WITH_VULKAN AND NOT TARGET Vulkan-Headers AND NOT TARGET Vulkan::Headers)
     add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/Vulkan-Headers
                      ${CMAKE_BINARY_DIR}/thirdparty/Vulkan-Headers)
 endif()
-if (NVRHI_WITH_DX12 AND NOT TARGET DirectX-Headers AND NOT TARGET Microsoft::DirectX-Headers)
+if (CAUSTICA_RHI_WITH_DX12 AND NOT TARGET DirectX-Headers AND NOT TARGET Microsoft::DirectX-Headers)
     add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/DirectX-Headers
                      ${CMAKE_BINARY_DIR}/thirdparty/DirectX-Headers)
 endif()
 
-if (NVRHI_WITH_RTXMU)
+if (CAUSTICA_RHI_WITH_RTXMU)
     if (TARGET Vulkan-Headers)
         get_target_property(RTXMU_VULKAN_INCLUDE_DIR Vulkan-Headers INTERFACE_INCLUDE_DIRECTORIES)
     elseif (TARGET Vulkan::Headers)
         get_target_property(RTXMU_VULKAN_INCLUDE_DIR Vulkan::Headers INTERFACE_INCLUDE_DIRECTORIES)
     endif()
 
-    option(RTXMU_WITH_VULKAN "" ${NVRHI_WITH_VULKAN})
-    option(RTXMU_WITH_D3D12 "" ${NVRHI_WITH_DX12})
+    option(RTXMU_WITH_VULKAN "" ${CAUSTICA_RHI_WITH_VULKAN})
+    option(RTXMU_WITH_D3D12 "" ${CAUSTICA_RHI_WITH_DX12})
 
     if (NOT TARGET rtxmu)
         add_subdirectory(${CMAKE_SOURCE_DIR}/rtxmu
@@ -41,15 +41,15 @@ if (NVRHI_WITH_RTXMU)
     endif()
 endif()
 
-if (NVRHI_WITH_NVAPI AND NOT TARGET nvapi)
+if (CAUSTICA_RHI_WITH_NVAPI AND NOT TARGET nvapi)
     add_library(nvapi STATIC IMPORTED GLOBAL)
     target_include_directories(nvapi INTERFACE "${NVAPI_INCLUDE_DIR}")
     set_property(TARGET nvapi PROPERTY IMPORTED_LOCATION "${NVAPI_LIBRARY}")
 endif()
 
-# NOTE: Aftermath SDK fetch was previously in nvrhi/cmake/FetchAftermath.cmake.
+# NOTE: Aftermath SDK fetch was previously fetched via Aftermath CMake helper.
 # Aftermath support can be re-enabled by providing the NSight Aftermath SDK.
-# if (NVRHI_WITH_AFTERMATH AND NOT TARGET aftermath)
+# if (CAUSTICA_RHI_WITH_AFTERMATH AND NOT TARGET aftermath)
 #     include(...)  # Path to FetchAftermath.cmake
 # endif()
 
@@ -57,8 +57,9 @@ endif()
 # Common headers and sources
 # ------------------------------------------------------------------
 set(include_common
-    ${RHI_INCLUDE_DIR}/nvrhi.h
-    ${RHI_INCLUDE_DIR}/nvrhiHLSL.h
+    ${RHI_INCLUDE_DIR}/rhi.h
+    ${RHI_INCLUDE_DIR}/rhi_types.h
+    ${RHI_INCLUDE_DIR}/rhi_hlsl.h
     ${RHI_INCLUDE_DIR}/caustica.h
     ${RHI_INCLUDE_DIR}/caustica/format.h
     ${RHI_INCLUDE_DIR}/utils.h
@@ -159,167 +160,145 @@ set(src_vk
     vulkan/vulkan-backend.h)
 
 # ==================================================================
-# nvrhi target: core interface + common implementation
+# caustica_rhi target: core interface + common implementation
 # ==================================================================
-if (NVRHI_BUILD_SHARED)
-    add_library(nvrhi SHARED
+if (CAUSTICA_RHI_BUILD_SHARED)
+    add_library(caustica_rhi SHARED
         ${include_common}
         ${src_common})
 else()
-    add_library(nvrhi STATIC
+    add_library(caustica_rhi STATIC
         ${include_common}
         ${src_common})
 endif()
 
-if (NVRHI_BUILD_SHARED)
-    target_compile_definitions(nvrhi PRIVATE NVRHI_SHARED_LIBRARY_BUILD=1)
-    if(NVRHI_WITH_VULKAN)
-        target_compile_definitions(nvrhi PRIVATE VULKAN_HPP_STORAGE_SHARED VULKAN_HPP_STORAGE_SHARED_EXPORT)
+if (CAUSTICA_RHI_BUILD_SHARED)
+    target_compile_definitions(caustica_rhi PRIVATE CAUSTICA_RHI_SHARED_LIBRARY_BUILD=1)
+    if(CAUSTICA_RHI_WITH_VULKAN)
+        target_compile_definitions(caustica_rhi PRIVATE VULKAN_HPP_STORAGE_SHARED VULKAN_HPP_STORAGE_SHARED_EXPORT)
     endif()
-    set_property(TARGET nvrhi PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set_property(TARGET caustica_rhi PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-if (NVRHI_WITH_VALIDATION)
-    target_sources(nvrhi PRIVATE
+if (CAUSTICA_RHI_WITH_VALIDATION)
+    target_sources(caustica_rhi PRIVATE
         ${include_validation}
         ${src_validation})
 endif()
 
-target_include_directories(nvrhi PUBLIC
+target_include_directories(caustica_rhi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend>)
 
-set_target_properties(nvrhi PROPERTIES FOLDER "caustica/backend")
+set_target_properties(caustica_rhi PROPERTIES FOLDER "caustica/backend")
 
-if (NOT TARGET caustica_rhi)
-    add_library(caustica_rhi ALIAS nvrhi)
-endif()
 
-target_compile_definitions(nvrhi PRIVATE NVRHI_WITH_AFTERMATH=$<BOOL:${NVRHI_WITH_AFTERMATH}>)
+target_compile_definitions(caustica_rhi PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
 
 # ==================================================================
 # D3D11 backend
 # ==================================================================
-if (NVRHI_WITH_DX11)
-    if (NVRHI_BUILD_SHARED)
-        set(nvrhi_d3d11_target nvrhi)
-        target_sources(${nvrhi_d3d11_target} PRIVATE
+if (CAUSTICA_RHI_WITH_DX11)
+    if (CAUSTICA_RHI_BUILD_SHARED)
+        set(caustica_rhi_d3d11_target caustica_rhi)
+        target_sources(${caustica_rhi_d3d11_target} PRIVATE
             ${include_d3d11}
             ${src_d3d11})
     else()
-        set(nvrhi_d3d11_target nvrhi_d3d11)
-        add_library(${nvrhi_d3d11_target} STATIC
+        set(caustica_rhi_d3d11_target caustica_rhi_d3d11)
+        add_library(${caustica_rhi_d3d11_target} STATIC
             ${include_d3d11}
             ${src_d3d11})
-        set_target_properties(${nvrhi_d3d11_target} PROPERTIES FOLDER "caustica/backend")
-        target_include_directories(${nvrhi_d3d11_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
+        set_target_properties(${caustica_rhi_d3d11_target} PROPERTIES FOLDER "caustica/backend")
+        target_include_directories(${caustica_rhi_d3d11_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
     endif()
 
-    target_link_libraries(${nvrhi_d3d11_target} PUBLIC d3d11 dxguid)
+    target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC d3d11 dxguid)
 
-    if (NVRHI_WITH_NVAPI)
-        target_link_libraries(${nvrhi_d3d11_target} PUBLIC nvapi)
+    if (CAUSTICA_RHI_WITH_NVAPI)
+        target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC nvapi)
     endif()
-    target_compile_definitions(${nvrhi_d3d11_target} PRIVATE NVRHI_D3D11_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
+    target_compile_definitions(${caustica_rhi_d3d11_target} PRIVATE CAUSTICA_RHI_D3D11_WITH_NVAPI=$<BOOL:${CAUSTICA_RHI_WITH_NVAPI}>)
 
-    if (NVRHI_WITH_AFTERMATH)
-        target_link_libraries(${nvrhi_d3d11_target} PUBLIC aftermath)
+    if (CAUSTICA_RHI_WITH_AFTERMATH)
+        target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC aftermath)
     endif()
-    target_compile_definitions(${nvrhi_d3d11_target} PRIVATE NVRHI_WITH_AFTERMATH=$<BOOL:${NVRHI_WITH_AFTERMATH}>)
+    target_compile_definitions(${caustica_rhi_d3d11_target} PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
 endif()
 
 # ==================================================================
 # D3D12 backend
 # ==================================================================
-if (NVRHI_WITH_DX12)
-    if (NVRHI_BUILD_SHARED)
-        set(nvrhi_d3d12_target nvrhi)
-        target_sources(${nvrhi_d3d12_target} PRIVATE
+if (CAUSTICA_RHI_WITH_DX12)
+    if (CAUSTICA_RHI_BUILD_SHARED)
+        set(caustica_rhi_d3d12_target caustica_rhi)
+        target_sources(${caustica_rhi_d3d12_target} PRIVATE
             ${include_d3d12}
             ${src_d3d12})
     else()
-        set(nvrhi_d3d12_target nvrhi_d3d12)
-        add_library(${nvrhi_d3d12_target} STATIC
+        set(caustica_rhi_d3d12_target caustica_rhi_d3d12)
+        add_library(${caustica_rhi_d3d12_target} STATIC
             ${include_d3d12}
             ${src_d3d12})
-        set_target_properties(${nvrhi_d3d12_target} PROPERTIES FOLDER "caustica/backend")
-        target_include_directories(${nvrhi_d3d12_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
+        set_target_properties(${caustica_rhi_d3d12_target} PROPERTIES FOLDER "caustica/backend")
+        target_include_directories(${caustica_rhi_d3d12_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
     endif()
 
-    if (NVRHI_WITH_RTXMU)
-        target_compile_definitions(${nvrhi_d3d12_target} PUBLIC NVRHI_WITH_RTXMU=1)
-        target_link_libraries(${nvrhi_d3d12_target} PUBLIC rtxmu)
+    if (CAUSTICA_RHI_WITH_RTXMU)
+        target_compile_definitions(${caustica_rhi_d3d12_target} PUBLIC CAUSTICA_RHI_WITH_RTXMU=1)
+        target_link_libraries(${caustica_rhi_d3d12_target} PUBLIC rtxmu)
     endif()
 
-    target_compile_definitions(${nvrhi_d3d12_target} PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+    target_compile_definitions(${caustica_rhi_d3d12_target} PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
 
-    target_link_libraries(${nvrhi_d3d12_target} PUBLIC Microsoft::DirectX-Headers Microsoft::DirectX-Guids d3d12)
+    target_link_libraries(${caustica_rhi_d3d12_target} PUBLIC Microsoft::DirectX-Headers Microsoft::DirectX-Guids d3d12)
 
-    if (NVRHI_WITH_NVAPI)
-        target_link_libraries(${nvrhi_d3d12_target} PUBLIC nvapi)
+    if (CAUSTICA_RHI_WITH_NVAPI)
+        target_link_libraries(${caustica_rhi_d3d12_target} PUBLIC nvapi)
     endif()
-    target_compile_definitions(${nvrhi_d3d12_target} PRIVATE NVRHI_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
+    target_compile_definitions(${caustica_rhi_d3d12_target} PRIVATE CAUSTICA_RHI_D3D12_WITH_NVAPI=$<BOOL:${CAUSTICA_RHI_WITH_NVAPI}>)
 
-    if (NVRHI_WITH_AFTERMATH)
-        target_link_libraries(${nvrhi_d3d12_target} PUBLIC aftermath)
+    if (CAUSTICA_RHI_WITH_AFTERMATH)
+        target_link_libraries(${caustica_rhi_d3d12_target} PUBLIC aftermath)
     endif()
-    target_compile_definitions(${nvrhi_d3d12_target} PRIVATE NVRHI_WITH_AFTERMATH=$<BOOL:${NVRHI_WITH_AFTERMATH}>)
+    target_compile_definitions(${caustica_rhi_d3d12_target} PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
 endif()
 
 # ==================================================================
 # Vulkan backend
 # ==================================================================
-if (NVRHI_WITH_VULKAN)
-    if (NVRHI_BUILD_SHARED)
-        set(nvrhi_vulkan_target nvrhi)
-        target_sources(${nvrhi_vulkan_target} PRIVATE
+if (CAUSTICA_RHI_WITH_VULKAN)
+    if (CAUSTICA_RHI_BUILD_SHARED)
+        set(caustica_rhi_vk_target caustica_rhi)
+        target_sources(${caustica_rhi_vk_target} PRIVATE
             ${include_vk}
             ${src_vk})
     else()
-        set(nvrhi_vulkan_target nvrhi_vk)
-        add_library(${nvrhi_vulkan_target} STATIC
+        set(caustica_rhi_vk_target caustica_rhi_vk)
+        add_library(${caustica_rhi_vk_target} STATIC
             ${include_vk}
             ${src_vk})
-        set_target_properties(${nvrhi_vulkan_target} PROPERTIES FOLDER "caustica/backend")
-        target_include_directories(${nvrhi_vulkan_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
+        set_target_properties(${caustica_rhi_vk_target} PROPERTIES FOLDER "caustica/backend")
+        target_include_directories(${caustica_rhi_vk_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
     endif()
 
     if(WIN32)
-        target_compile_definitions(${nvrhi_vulkan_target} PUBLIC VK_USE_PLATFORM_WIN32_KHR)
-        target_compile_definitions(${nvrhi_vulkan_target} PRIVATE NOMINMAX)
+        target_compile_definitions(${caustica_rhi_vk_target} PUBLIC VK_USE_PLATFORM_WIN32_KHR)
+        target_compile_definitions(${caustica_rhi_vk_target} PRIVATE NOMINMAX)
     endif()
 
-    if (NVRHI_WITH_RTXMU)
-        target_compile_definitions(${nvrhi_vulkan_target} PUBLIC NVRHI_WITH_RTXMU=1)
-        target_link_libraries(${nvrhi_vulkan_target} PUBLIC rtxmu)
+    if (CAUSTICA_RHI_WITH_RTXMU)
+        target_compile_definitions(${caustica_rhi_vk_target} PUBLIC CAUSTICA_RHI_WITH_RTXMU=1)
+        target_link_libraries(${caustica_rhi_vk_target} PUBLIC rtxmu)
     endif()
 
     if (TARGET Vulkan-Headers)
-        target_link_libraries(${nvrhi_vulkan_target} PRIVATE Vulkan-Headers)
+        target_link_libraries(${caustica_rhi_vk_target} PRIVATE Vulkan-Headers)
     elseif (TARGET Vulkan::Headers)
-        target_link_libraries(${nvrhi_vulkan_target} PRIVATE Vulkan::Headers)
+        target_link_libraries(${caustica_rhi_vk_target} PRIVATE Vulkan::Headers)
     endif()
 
-    if (NVRHI_WITH_AFTERMATH)
-        target_link_libraries(${nvrhi_vulkan_target} PUBLIC aftermath)
+    if (CAUSTICA_RHI_WITH_AFTERMATH)
+        target_link_libraries(${caustica_rhi_vk_target} PUBLIC aftermath)
     endif()
-    target_compile_definitions(${nvrhi_vulkan_target} PRIVATE NVRHI_WITH_AFTERMATH=$<BOOL:${NVRHI_WITH_AFTERMATH}>)
-endif()
-
-# ==================================================================
-# causticaRhi wrapper targets (expected by OMM)
-# ==================================================================
-if (NOT TARGET causticaRhi)
-    add_library(causticaRhi INTERFACE)
-    target_link_libraries(causticaRhi INTERFACE nvrhi)
-    set_target_properties(causticaRhi PROPERTIES FOLDER "caustica/backend")
-endif()
-if (NVRHI_WITH_DX12 AND NOT TARGET causticaRhi_d3d12)
-    add_library(causticaRhi_d3d12 INTERFACE)
-    target_link_libraries(causticaRhi_d3d12 INTERFACE nvrhi_d3d12)
-    set_target_properties(causticaRhi_d3d12 PROPERTIES FOLDER "caustica/backend")
-endif()
-if (NVRHI_WITH_VULKAN AND NOT TARGET causticaRhi_vk)
-    add_library(causticaRhi_vk INTERFACE)
-    target_link_libraries(causticaRhi_vk INTERFACE nvrhi_vk)
-    set_target_properties(causticaRhi_vk PROPERTIES FOLDER "caustica/backend")
+    target_compile_definitions(${caustica_rhi_vk_target} PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
 endif()

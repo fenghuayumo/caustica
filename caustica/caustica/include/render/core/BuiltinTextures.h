@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica::render
 {
@@ -8,29 +8,29 @@ namespace caustica::render
 class BuiltinTextures
 {
 public:
-    explicit BuiltinTextures(nvrhi::IDevice* device);
+    explicit BuiltinTextures(caustica::rhi::IDevice* device);
 
-    nvrhi::TextureHandle blackTexture() const { return m_blackTexture; }
-    nvrhi::TextureHandle grayTexture() const { return m_grayTexture; }
-    nvrhi::TextureHandle whiteTexture() const { return m_whiteTexture; }
-    nvrhi::TextureHandle blackTexture2DArray() const { return m_blackTexture2DArray; }
-    nvrhi::TextureHandle whiteTexture2DArray() const { return m_whiteTexture2DArray; }
-    nvrhi::TextureHandle blackCubeMapArray() const { return m_blackCubeMapArray; }
-    nvrhi::TextureHandle blackTexture3D() const { return m_blackTexture3D; }
-    nvrhi::TextureHandle blackDepthStencilTexture() const { return m_blackDepthStencilTexture; }
-    nvrhi::TextureHandle blackDepthStencilTexture2DArray() const { return m_blackDepthStencilTexture2DArray; }
+    caustica::rhi::TextureHandle blackTexture() const { return m_blackTexture; }
+    caustica::rhi::TextureHandle grayTexture() const { return m_grayTexture; }
+    caustica::rhi::TextureHandle whiteTexture() const { return m_whiteTexture; }
+    caustica::rhi::TextureHandle blackTexture2DArray() const { return m_blackTexture2DArray; }
+    caustica::rhi::TextureHandle whiteTexture2DArray() const { return m_whiteTexture2DArray; }
+    caustica::rhi::TextureHandle blackCubeMapArray() const { return m_blackCubeMapArray; }
+    caustica::rhi::TextureHandle blackTexture3D() const { return m_blackTexture3D; }
+    caustica::rhi::TextureHandle blackDepthStencilTexture() const { return m_blackDepthStencilTexture; }
+    caustica::rhi::TextureHandle blackDepthStencilTexture2DArray() const { return m_blackDepthStencilTexture2DArray; }
 
 private:
-    nvrhi::DeviceHandle m_device;
-    nvrhi::TextureHandle m_blackTexture;
-    nvrhi::TextureHandle m_grayTexture;
-    nvrhi::TextureHandle m_whiteTexture;
-    nvrhi::TextureHandle m_blackTexture2DArray;
-    nvrhi::TextureHandle m_whiteTexture2DArray;
-    nvrhi::TextureHandle m_blackCubeMapArray;
-    nvrhi::TextureHandle m_blackTexture3D;
-    nvrhi::TextureHandle m_blackDepthStencilTexture;
-    nvrhi::TextureHandle m_blackDepthStencilTexture2DArray;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::TextureHandle m_blackTexture;
+    caustica::rhi::TextureHandle m_grayTexture;
+    caustica::rhi::TextureHandle m_whiteTexture;
+    caustica::rhi::TextureHandle m_blackTexture2DArray;
+    caustica::rhi::TextureHandle m_whiteTexture2DArray;
+    caustica::rhi::TextureHandle m_blackCubeMapArray;
+    caustica::rhi::TextureHandle m_blackTexture3D;
+    caustica::rhi::TextureHandle m_blackDepthStencilTexture;
+    caustica::rhi::TextureHandle m_blackDepthStencilTexture2DArray;
 };
 
 } // namespace caustica::render

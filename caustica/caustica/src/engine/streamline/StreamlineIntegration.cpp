@@ -242,7 +242,7 @@ StreamlineIntegration& StreamlineIntegration::Get()
     return instance;
 }
 
-bool StreamlineIntegration::initializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig, const bool enableLog)
+bool StreamlineIntegration::initializePreDevice(caustica::rhi::GraphicsAPI api, int appId, const bool checkSig, const bool enableLog)
 {
     if (m_slInitialized)
     {
@@ -254,7 +254,7 @@ bool StreamlineIntegration::initializePreDevice(nvrhi::GraphicsAPI api, int appI
 
     m_api = api;
 
-    if (m_api != nvrhi::GraphicsAPI::VULKAN)
+    if (m_api != caustica::rhi::GraphicsAPI::VULKAN)
     {
         pref.allocateCallback = &allocateResourceCallback;
         pref.releaseCallback = &releaseResourceCallback;
@@ -300,13 +300,13 @@ bool StreamlineIntegration::initializePreDevice(nvrhi::GraphicsAPI api, int appI
 
     switch (api)
     {
-    case (nvrhi::GraphicsAPI::D3D11):
+    case (caustica::rhi::GraphicsAPI::D3D11):
         pref.renderAPI = sl::RenderAPI::eD3D11;
         break;
-    case (nvrhi::GraphicsAPI::D3D12):
+    case (caustica::rhi::GraphicsAPI::D3D12):
         pref.renderAPI = sl::RenderAPI::eD3D12;
         break;
-    case (nvrhi::GraphicsAPI::VULKAN):
+    case (caustica::rhi::GraphicsAPI::VULKAN):
         pref.renderAPI = sl::RenderAPI::eVulkan;
         break;
     }
@@ -350,12 +350,12 @@ bool StreamlineIntegration::setD3DDevice(IUnknown* nativeDevice)
 #endif
 
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::initializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
+bool StreamlineIntegration::initializeDeviceDX(caustica::rhi::IDevice *device, AdapterInfo::LUID *pAdapterIdDx11)
 {
     m_device = device;
 
 #if CAUSTICA_WITH_DX11
-    if (m_api == nvrhi::GraphicsAPI::D3D11 && pAdapterIdDx11)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D11 && pAdapterIdDx11)
     {
         assert(pAdapterIdDx11->size() == sizeof(m_d3d11Luid));
         memcpy(&m_d3d11Luid, pAdapterIdDx11->data(), pAdapterIdDx11->size());
@@ -384,7 +384,7 @@ bool StreamlineIntegration::upgradeInterface(IUnknown*& interfacePointer)
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-bool StreamlineIntegration::initializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo)
+bool StreamlineIntegration::initializeDeviceVK(caustica::rhi::IDevice* device, const VulkanInfo& vulkanInfo)
 {
     m_device = device;
 
@@ -447,7 +447,7 @@ uint32_t StreamlineIntegration::findBestAdapterDX()
     uint32_t foundAdapter = 0;
     int maxSLSupportedFeatures = -1;
 
-    if (m_api == nvrhi::GraphicsAPI::D3D11 || m_api == nvrhi::GraphicsAPI::D3D12)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D11 || m_api == caustica::rhi::GraphicsAPI::D3D12)
     {
         IDXGIFactory1* DXGIFactory;
         HRESULT hres = CreateDXGIFactory1(IID_PPV_ARGS(&DXGIFactory));
@@ -512,7 +512,7 @@ uint32_t StreamlineIntegration::findBestAdapterVulkan(const std::vector <vk::Phy
     uint32_t foundAdapter = 0;
     int maxSLSupportedFeatures = -1;
 
-    if (m_api == nvrhi::GraphicsAPI::VULKAN)
+    if (m_api == caustica::rhi::GraphicsAPI::VULKAN)
     {
         const vk::PhysicalDevice* pBestAdapter = nullptr;
         vk::PhysicalDeviceProperties bestAdapterDesc;
@@ -557,24 +557,24 @@ void StreamlineIntegration::updateFeatureAvailable()
     sl::AdapterInfo adapterInfo;
 
 #if CAUSTICA_WITH_DX11
-    if (m_api == nvrhi::GraphicsAPI::D3D11)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D11)
     {
         adapterInfo.deviceLUID = (uint8_t*)&m_d3d11Luid;
         adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
     }
 #endif
 #if CAUSTICA_WITH_DX12
-    if (m_api == nvrhi::GraphicsAPI::D3D12)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D12)
     {
-        auto a = ((ID3D12Device*)m_device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device))->GetAdapterLuid();
+        auto a = ((ID3D12Device*)m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Device))->GetAdapterLuid();
         adapterInfo.deviceLUID = (uint8_t*)&a;
         adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
     }
 #endif
 #if CAUSTICA_WITH_VULKAN
-    if (m_api == nvrhi::GraphicsAPI::VULKAN)
+    if (m_api == caustica::rhi::GraphicsAPI::VULKAN)
     {
-        adapterInfo.vkPhysicalDevice = m_device->getNativeObject(nvrhi::ObjectTypes::VK_PhysicalDevice);
+        adapterInfo.vkPhysicalDevice = m_device->getNativeObject(caustica::rhi::ObjectTypes::VK_PhysicalDevice);
     }
 #endif
 
@@ -1149,7 +1149,7 @@ void StreamlineIntegration::waitForDLSSGInputsProcessing()
         return;
 
 #if CAUSTICA_WITH_DX12
-    if (m_api == nvrhi::GraphicsAPI::D3D12)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D12)
     {
         auto* fence = static_cast<ID3D12Fence*>(m_dlssgInputsProcessingCompletionFence);
         const uint64_t value = m_dlssgLastPresentInputsProcessingCompletionFenceValue;
@@ -1212,7 +1212,7 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
     if (isBuffer)
     {
 #if CAUSTICA_WITH_DX11
-        if (Get().m_api == nvrhi::GraphicsAPI::D3D11)
+        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D11)
         {
             D3D11_BUFFER_DESC* desc = (D3D11_BUFFER_DESC*)resDesc->desc;
             ID3D11Device* pd3d11Device = (ID3D11Device*)device;
@@ -1226,7 +1226,7 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
 #endif
 
 #if CAUSTICA_WITH_DX12
-        if (Get().m_api == nvrhi::GraphicsAPI::D3D12)
+        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D12)
         {
             D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
             D3D12_HEAP_PROPERTIES* heap = (D3D12_HEAP_PROPERTIES*)resDesc->heap;
@@ -1243,7 +1243,7 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
     else
     {
 #if CAUSTICA_WITH_DX11
-        if (Get().m_api == nvrhi::GraphicsAPI::D3D11)
+        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D11)
         {
             D3D11_TEXTURE2D_DESC* desc = (D3D11_TEXTURE2D_DESC*)resDesc->desc;
             ID3D11Device* pd3d11Device = (ID3D11Device*)device;
@@ -1257,7 +1257,7 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
 #endif
 
 #if CAUSTICA_WITH_DX12
-        if (Get().m_api == nvrhi::GraphicsAPI::D3D12)
+        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D12)
         {
             D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
             D3D12_RESOURCE_STATES state = (D3D12_RESOURCE_STATES)resDesc->state;
@@ -1293,43 +1293,43 @@ void StreamlineIntegration::releaseResourceCallback(sl::Resource* resource, void
 };
 
 #if CAUSTICA_WITH_DX12
-D3D12_RESOURCE_STATES D3D12convertResourceStates(nvrhi::ResourceStates stateBits)
+D3D12_RESOURCE_STATES D3D12convertResourceStates(caustica::rhi::ResourceStates stateBits)
 {
-    if (stateBits == nvrhi::ResourceStates::Common)
+    if (stateBits == caustica::rhi::ResourceStates::Common)
         return D3D12_RESOURCE_STATE_COMMON;
 
     D3D12_RESOURCE_STATES result = D3D12_RESOURCE_STATE_COMMON; // also 0
 
-    if ((stateBits & nvrhi::ResourceStates::ConstantBuffer) != 0) result |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    if ((stateBits & nvrhi::ResourceStates::VertexBuffer) != 0) result |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    if ((stateBits & nvrhi::ResourceStates::IndexBuffer) != 0) result |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
-    if ((stateBits & nvrhi::ResourceStates::IndirectArgument) != 0) result |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-    if ((stateBits & nvrhi::ResourceStates::ShaderResource) != 0) result |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    if ((stateBits & nvrhi::ResourceStates::UnorderedAccess) != 0) result |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    if ((stateBits & nvrhi::ResourceStates::RenderTarget) != 0) result |= D3D12_RESOURCE_STATE_RENDER_TARGET;
-    if ((stateBits & nvrhi::ResourceStates::DepthWrite) != 0) result |= D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    if ((stateBits & nvrhi::ResourceStates::DepthRead) != 0) result |= D3D12_RESOURCE_STATE_DEPTH_READ;
-    if ((stateBits & nvrhi::ResourceStates::StreamOut) != 0) result |= D3D12_RESOURCE_STATE_STREAM_OUT;
-    if ((stateBits & nvrhi::ResourceStates::CopyDest) != 0) result |= D3D12_RESOURCE_STATE_COPY_DEST;
-    if ((stateBits & nvrhi::ResourceStates::CopySource) != 0) result |= D3D12_RESOURCE_STATE_COPY_SOURCE;
-    if ((stateBits & nvrhi::ResourceStates::ResolveDest) != 0) result |= D3D12_RESOURCE_STATE_RESOLVE_DEST;
-    if ((stateBits & nvrhi::ResourceStates::ResolveSource) != 0) result |= D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
-    if ((stateBits & nvrhi::ResourceStates::Present) != 0) result |= D3D12_RESOURCE_STATE_PRESENT;
-    if ((stateBits & nvrhi::ResourceStates::AccelStructRead) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-    if ((stateBits & nvrhi::ResourceStates::AccelStructWrite) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-    if ((stateBits & nvrhi::ResourceStates::AccelStructBuildInput) != 0) result |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    if ((stateBits & nvrhi::ResourceStates::AccelStructBuildBlas) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-    if ((stateBits & nvrhi::ResourceStates::ShadingRateSurface) != 0) result |= D3D12_RESOURCE_STATE_SHADING_RATE_SOURCE;
+    if ((stateBits & caustica::rhi::ResourceStates::ConstantBuffer) != 0) result |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if ((stateBits & caustica::rhi::ResourceStates::VertexBuffer) != 0) result |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if ((stateBits & caustica::rhi::ResourceStates::IndexBuffer) != 0) result |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    if ((stateBits & caustica::rhi::ResourceStates::IndirectArgument) != 0) result |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    if ((stateBits & caustica::rhi::ResourceStates::ShaderResource) != 0) result |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    if ((stateBits & caustica::rhi::ResourceStates::UnorderedAccess) != 0) result |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    if ((stateBits & caustica::rhi::ResourceStates::RenderTarget) != 0) result |= D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if ((stateBits & caustica::rhi::ResourceStates::DepthWrite) != 0) result |= D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if ((stateBits & caustica::rhi::ResourceStates::DepthRead) != 0) result |= D3D12_RESOURCE_STATE_DEPTH_READ;
+    if ((stateBits & caustica::rhi::ResourceStates::StreamOut) != 0) result |= D3D12_RESOURCE_STATE_STREAM_OUT;
+    if ((stateBits & caustica::rhi::ResourceStates::CopyDest) != 0) result |= D3D12_RESOURCE_STATE_COPY_DEST;
+    if ((stateBits & caustica::rhi::ResourceStates::CopySource) != 0) result |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+    if ((stateBits & caustica::rhi::ResourceStates::ResolveDest) != 0) result |= D3D12_RESOURCE_STATE_RESOLVE_DEST;
+    if ((stateBits & caustica::rhi::ResourceStates::ResolveSource) != 0) result |= D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+    if ((stateBits & caustica::rhi::ResourceStates::Present) != 0) result |= D3D12_RESOURCE_STATE_PRESENT;
+    if ((stateBits & caustica::rhi::ResourceStates::AccelStructRead) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+    if ((stateBits & caustica::rhi::ResourceStates::AccelStructWrite) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+    if ((stateBits & caustica::rhi::ResourceStates::AccelStructBuildInput) != 0) result |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    if ((stateBits & caustica::rhi::ResourceStates::AccelStructBuildBlas) != 0) result |= D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+    if ((stateBits & caustica::rhi::ResourceStates::ShadingRateSurface) != 0) result |= D3D12_RESOURCE_STATE_SHADING_RATE_SOURCE;
 
     return result;
 }
 #endif
 
-nvrhi::Object StreamlineIntegration::getNativeCommandList(nvrhi::ICommandList* commandList)
+caustica::rhi::Object StreamlineIntegration::getNativeCommandList(caustica::rhi::ICommandList* commandList)
 {
 #if CAUSTICA_WITH_DX11
-    if (m_api == nvrhi::GraphicsAPI::D3D11)
-        return m_device->getNativeObject(nvrhi::ObjectTypes::D3D11_DeviceContext);
+    if (m_api == caustica::rhi::GraphicsAPI::D3D11)
+        return m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D11_DeviceContext);
 #endif
 
     if (commandList == nullptr)
@@ -1339,16 +1339,16 @@ nvrhi::Object StreamlineIntegration::getNativeCommandList(nvrhi::ICommandList* c
     }
 
 #if CAUSTICA_WITH_DX12
-    if (m_api == nvrhi::GraphicsAPI::D3D12)
+    if (m_api == caustica::rhi::GraphicsAPI::D3D12)
     {
-        return commandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+        return commandList->getNativeObject(caustica::rhi::ObjectTypes::D3D12_GraphicsCommandList);
     }
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-    if (m_api == nvrhi::GraphicsAPI::VULKAN)
+    if (m_api == caustica::rhi::GraphicsAPI::VULKAN)
     {
-        return commandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
+        return commandList->getNativeObject(caustica::rhi::ObjectTypes::VK_CommandBuffer);
     }
 #endif
 
@@ -1356,30 +1356,30 @@ nvrhi::Object StreamlineIntegration::getNativeCommandList(nvrhi::ICommandList* c
 }
 
 #if CAUSTICA_WITH_VULKAN
-static inline VkImageLayout toVkImageLayout(nvrhi::ResourceStates stateBits)
+static inline VkImageLayout toVkImageLayout(caustica::rhi::ResourceStates stateBits)
 {
     switch (stateBits)
     {
-    case nvrhi::ResourceStates::Common:
-    case nvrhi::ResourceStates::UnorderedAccess: return VK_IMAGE_LAYOUT_GENERAL;
-    case nvrhi::ResourceStates::ShaderResource: return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    case nvrhi::ResourceStates::RenderTarget: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    case nvrhi::ResourceStates::DepthWrite: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    case nvrhi::ResourceStates::DepthRead: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-    case nvrhi::ResourceStates::CopyDest:
-    case nvrhi::ResourceStates::ResolveDest: return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    case nvrhi::ResourceStates::CopySource:
-    case nvrhi::ResourceStates::ResolveSource: return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    case nvrhi::ResourceStates::Present: return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    case caustica::rhi::ResourceStates::Common:
+    case caustica::rhi::ResourceStates::UnorderedAccess: return VK_IMAGE_LAYOUT_GENERAL;
+    case caustica::rhi::ResourceStates::ShaderResource: return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    case caustica::rhi::ResourceStates::RenderTarget: return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    case caustica::rhi::ResourceStates::DepthWrite: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case caustica::rhi::ResourceStates::DepthRead: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case caustica::rhi::ResourceStates::CopyDest:
+    case caustica::rhi::ResourceStates::ResolveDest: return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    case caustica::rhi::ResourceStates::CopySource:
+    case caustica::rhi::ResourceStates::ResolveSource: return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    case caustica::rhi::ResourceStates::Present: return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     default: return VK_IMAGE_LAYOUT_UNDEFINED;
     }
 }
 #endif
 
 static void GetSLResource(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     sl::Resource& slResource,
-    nvrhi::ITexture* inputTex,
+    caustica::rhi::ITexture* inputTex,
     const caustica::IView* view)
 {
     if (commandList == nullptr)
@@ -1397,34 +1397,34 @@ static void GetSLResource(
     switch (commandList->getDevice()->getGraphicsAPI())
     {
 #if CAUSTICA_WITH_DX11
-    case nvrhi::GraphicsAPI::D3D11:
-        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource), 0 };
+    case caustica::rhi::GraphicsAPI::D3D11:
+        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource), 0 };
         break;
 #endif
 
 #if CAUSTICA_WITH_DX12
-    case nvrhi::GraphicsAPI::D3D12:
+    case caustica::rhi::GraphicsAPI::D3D12:
     {
         uint32_t resourceState = static_cast<uint32_t>(D3D12convertResourceStates(commandList->getTextureSubresourceState(inputTex, 0, 0)));
-        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource), nullptr, nullptr, resourceState };
+        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource), nullptr, nullptr, resourceState };
         break;
     }
 #endif
 
 #if CAUSTICA_WITH_VULKAN
-    case nvrhi::GraphicsAPI::VULKAN:
+    case caustica::rhi::GraphicsAPI::VULKAN:
     {
-        nvrhi::TextureSubresourceSet subresources = caustica::toNvrhi(view->getSubresources());
+        caustica::rhi::TextureSubresourceSet subresources = caustica::toRhi(view->getSubresources());
         auto const& desc = inputTex->getDesc();
-        auto const vkDesc = static_cast<vk::ImageCreateInfo *>(inputTex->getNativeObject(nvrhi::ObjectTypes::VK_ImageCreateInfo));
+        auto const vkDesc = static_cast<vk::ImageCreateInfo *>(inputTex->getNativeObject(caustica::rhi::ObjectTypes::VK_ImageCreateInfo));
 
-        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(nvrhi::ObjectTypes::VK_Image),
-            inputTex->getNativeObject(nvrhi::ObjectTypes::VK_DeviceMemory),
-            inputTex->getNativeView(nvrhi::ObjectTypes::VK_ImageView, desc.format, subresources),
+        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(caustica::rhi::ObjectTypes::VK_Image),
+            inputTex->getNativeObject(caustica::rhi::ObjectTypes::VK_DeviceMemory),
+            inputTex->getNativeView(caustica::rhi::ObjectTypes::VK_ImageView, desc.format, subresources),
             static_cast<uint32_t>(toVkImageLayout(desc.initialState)) };
         slResource.width = desc.width;
         slResource.height = desc.height;
-        slResource.nativeFormat = static_cast<uint32_t>(nvrhi::vulkan::convertFormat(desc.format));
+        slResource.nativeFormat = static_cast<uint32_t>(caustica::rhi::vulkan::convertFormat(desc.format));
         slResource.mipLevels = desc.mipLevels;
         slResource.arrayLayers = vkDesc->arrayLayers;
         slResource.flags = static_cast<uint32_t>(vkDesc->flags);
@@ -1440,11 +1440,11 @@ static void GetSLResource(
 }
 
 void StreamlineIntegration::tagResourcesGeneral(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::IView* view,
-    nvrhi::ITexture* motionVectors,
-    nvrhi::ITexture* depth,
-    nvrhi::ITexture* finalColorHudless)
+    caustica::rhi::ITexture* motionVectors,
+    caustica::rhi::ITexture* depth,
+    caustica::rhi::ITexture* finalColorHudless)
 {
     if (!m_slInitialized)
     {
@@ -1470,10 +1470,10 @@ void StreamlineIntegration::tagResourcesGeneral(
 }
 
 void StreamlineIntegration::tagResourcesDLSSNIS(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::IView* view,
-    nvrhi::ITexture* Output,
-    nvrhi::ITexture* Input)
+    caustica::rhi::ITexture* Output,
+    caustica::rhi::ITexture* Input)
 {
     if (!m_slInitialized)
     {
@@ -1497,7 +1497,7 @@ void StreamlineIntegration::tagResourcesDLSSNIS(
 }
 
 void StreamlineIntegration::tagResourcesDLSSFG(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     bool validViewportExtent,
     const Extent& backBufferExtent)
 {
@@ -1518,9 +1518,9 @@ void StreamlineIntegration::tagResourcesDLSSFG(
 }
 
 void StreamlineIntegration::tagResourcesDeepDVC(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::IView* view,
-    nvrhi::ITexture* Output)
+    caustica::rhi::ITexture* Output)
 {
     if (!m_slInitialized)
     {
@@ -1549,18 +1549,18 @@ void StreamlineIntegration::unTagResourcesDeepDVC()
 }
 
 void StreamlineIntegration::tagResourcesDLSSRR(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::IView* view,
     dm::int2 renderSize,
     dm::int2 displaySize,
-    nvrhi::ITexture* inputColor,
-    nvrhi::ITexture* diffuseAlbedo,
-    nvrhi::ITexture* specAlbedo,
-    nvrhi::ITexture* normalsAndOptionalRoughness,
-    nvrhi::ITexture* roughness,
-    nvrhi::ITexture* specHitDist,
-    nvrhi::ITexture* specMotionVectors,
-    nvrhi::ITexture* outputColor
+    caustica::rhi::ITexture* inputColor,
+    caustica::rhi::ITexture* diffuseAlbedo,
+    caustica::rhi::ITexture* specAlbedo,
+    caustica::rhi::ITexture* normalsAndOptionalRoughness,
+    caustica::rhi::ITexture* roughness,
+    caustica::rhi::ITexture* specHitDist,
+    caustica::rhi::ITexture* specMotionVectors,
+    caustica::rhi::ITexture* outputColor
 )
 {
     if (!m_slInitialized)
@@ -1598,13 +1598,13 @@ void StreamlineIntegration::tagResourcesDLSSRR(
         GetSLResource(commandList, specMotionVectorsResource, specMotionVectors, view);
     GetSLResource(commandList, outputColorResource, outputColor, view);
 
-    if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
+    if (m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)
     {
-        cmdbuffer = commandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+        cmdbuffer = commandList->getNativeObject(caustica::rhi::ObjectTypes::D3D12_GraphicsCommandList);
     }
-    else if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)
+    else if (m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN)
     {
-        cmdbuffer = commandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
+        cmdbuffer = commandList->getNativeObject(caustica::rhi::ObjectTypes::VK_CommandBuffer);
     }
 
     // must match sl::DLSSDNormalRoughnessMode; if separate roughness provided then normalsAndOptionalRoughness is just normals, otherwise they're packed together with roughness in .w
@@ -1624,7 +1624,7 @@ void StreamlineIntegration::tagResourcesDLSSRR(
 #endif
 }
 
-void StreamlineIntegration::evaluateDLSS(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSS(caustica::rhi::ICommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
@@ -1644,7 +1644,7 @@ void StreamlineIntegration::evaluateDLSS(nvrhi::ICommandList* commandList)
     commandList->clearState();
 }
 
-void StreamlineIntegration::evaluateDLSSRR(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDLSSRR(caustica::rhi::ICommandList* commandList)
 {
 #if STREAMLINE_HAS_DLSS_RR
     void* nativeCommandList = getNativeCommandList(commandList);
@@ -1666,7 +1666,7 @@ void StreamlineIntegration::evaluateDLSSRR(nvrhi::ICommandList* commandList)
 #endif
 }
 
-void StreamlineIntegration::evaluateNIS(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateNIS(caustica::rhi::ICommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)
@@ -1686,7 +1686,7 @@ void StreamlineIntegration::evaluateNIS(nvrhi::ICommandList* commandList)
     commandList->clearState();
 }
 
-void StreamlineIntegration::evaluateDeepDVC(nvrhi::ICommandList* commandList)
+void StreamlineIntegration::evaluateDeepDVC(caustica::rhi::ICommandList* commandList)
 {
     void* nativeCommandList = getNativeCommandList(commandList);
     if (nativeCommandList == nullptr)

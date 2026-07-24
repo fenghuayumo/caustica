@@ -161,8 +161,8 @@ static void ImGui_ImplGlfw_UpdateKeyModifiers(ImGuiIO& io, GLFWwindow* window)
 
 bool ImGui_Renderer::init(std::shared_ptr<ShaderFactory> shaderFactory)
 {
-    imgui_nvrhi = std::make_unique<ImGui_NVRHI>();
-    return imgui_nvrhi->init(getDevice(), shaderFactory);
+    m_imguiRhi = std::make_unique<ImGui_RHI>();
+    return m_imguiRhi->init(getDevice(), shaderFactory);
 }
 
 std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromFile(IFileSystem& fs,
@@ -240,7 +240,7 @@ std::shared_ptr<RegisteredFont> ImGui_Renderer::createFontFromMemoryCompressed(v
 
 void ImGui_Renderer::animate(float elapsedTimeSeconds)
 {
-    if (!imgui_nvrhi)
+    if (!m_imguiRhi)
         return;
 
     // ImGui CPU frame (NewFrame/buildUI/Render) must run on the update thread:
@@ -249,7 +249,7 @@ void ImGui_Renderer::animate(float elapsedTimeSeconds)
     prepareImGuiFrame(elapsedTimeSeconds);
     buildUI();
     ImGui::Render();
-    imgui_nvrhi->captureDrawData();
+    m_imguiRhi->captureDrawData();
     m_imguiFrameOpened = false;
 }
 
@@ -275,7 +275,7 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
             font->createScaledFont(m_supportExplicitDisplayScaling ? scaleX : 1.f);
     }
 
-    imgui_nvrhi->updateFontTexture();
+    m_imguiRhi->updateFontTexture();
 
     int w, h;
     getGpuDevice()->getWindowDimensions(w, h);
@@ -308,18 +308,18 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
     m_imguiFrameOpened = true;
 }
 
-void ImGui_Renderer::render(nvrhi::IFramebuffer* framebuffer)
+void ImGui_Renderer::render(caustica::rhi::IFramebuffer* framebuffer)
 {
-    if (!imgui_nvrhi)
+    if (!m_imguiRhi)
         return;
 
     // Draw data was captured on the update thread after ImGui::Render().
-    imgui_nvrhi->render(framebuffer);
+    m_imguiRhi->render(framebuffer);
 }
 
 void ImGui_Renderer::backBufferResizing()
 {
-    if(imgui_nvrhi) imgui_nvrhi->backbufferResizing();
+    if(m_imguiRhi) m_imguiRhi->backbufferResizing();
 }
 
 void ImGui_Renderer::displayScaleChanged(float scaleX, float scaleY)

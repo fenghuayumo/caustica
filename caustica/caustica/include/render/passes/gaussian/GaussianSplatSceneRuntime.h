@@ -25,7 +25,7 @@ namespace caustica::render
 
 struct GaussianSplatPrepareContext
 {
-    nvrhi::IDevice* device = nullptr;
+    caustica::rhi::IDevice* device = nullptr;
     std::shared_ptr<caustica::ShaderFactory> shaderFactory;
     RenderTargets* renderTargets = nullptr;
     std::shared_ptr<ShaderDebug> shaderDebug;
@@ -50,27 +50,27 @@ void buildGaussianSplatEmissionProxies(
     const PathTracerSettings& settings);
 
 [[nodiscard]] bool uploadGaussianSplatScene(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView,
-    nvrhi::rt::IAccelStruct* meshTopLevelAS,
+    caustica::rhi::rt::IAccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings);
 
 void sortGaussianSplatScene(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses);
 
 [[nodiscard]] bool rasterGaussianSplatScene(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const caustica::IView& splatView);
 
 void buildGaussianSplatSceneAccelStructs(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
     const PathTracerSettings& settings);

@@ -10,7 +10,12 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #pragma once
 
-#include <rhi/nvrhi.h>
+/*
+ * Caustica first-party OMM GPU bake integration (forked from NVIDIA omm-gpu-RHI).
+ * Uses caustica::rhi as a first-party Caustica module.
+ */
+
+#include <rhi/rhi.h>
 
 #include <algorithm>
 #include <functional>
@@ -20,22 +25,22 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #include <omm.hpp>
 
-namespace omm
+namespace caustica::omm
 {
-	class GpuBakeNvrhiImpl;
+	class GpuBakeRhiImpl;
 
-	class GpuBakeNvrhi
+	class GpuBakeRhi
 	{
 	public:
 
 		// (Optional) In case the shaders are compiled externally the ShaderProvider can be provided 
 		struct ShaderProvider
 		{
-			nvrhi::VulkanBindingOffsets bindingOffsets;
-			std::function<nvrhi::ShaderHandle(nvrhi::ShaderType type, const char* shaderName, const char* shaderEntryName)> shaders;
+			caustica::rhi::VulkanBindingOffsets bindingOffsets;
+			std::function<caustica::rhi::ShaderHandle(caustica::rhi::ShaderType type, const char* shaderName, const char* shaderEntryName)> shaders;
 		};
 
-		using MessageCallback = std::function<void(omm::MessageSeverity severity, const char* message)>;
+		using MessageCallback = std::function<void(::omm::MessageSeverity severity, const char* message)>;
 
 		enum class Operation
 		{
@@ -48,35 +53,35 @@ namespace omm
 		struct Input
 		{
 			Operation							operation = Operation::Invalid;
-			nvrhi::TextureHandle				alphaTexture;
+			caustica::rhi::TextureHandle				alphaTexture;
 			uint32_t							alphaTextureChannel = 3;
 			float								alphaCutoff = 0.5f;
 			union {
 				OMM_DEPRECATED_MSG("alphaCutoffGT is deprectated, please use alphaCutoffGreater")
-				omm::OpacityState					alphaCutoffGT;
-				omm::OpacityState					alphaCutoffGreater = omm::OpacityState::Opaque;
+				::omm::OpacityState					alphaCutoffGT;
+				::omm::OpacityState					alphaCutoffGreater = ::omm::OpacityState::Opaque;
 			};
 			union {
 				OMM_DEPRECATED_MSG("alphaCutoffLT is deprectated, please use alphaCutoffLessEqual")
-				omm::OpacityState					alphaCutoffLT;
-				omm::OpacityState					alphaCutoffLessEqual = omm::OpacityState::Transparent;
+				::omm::OpacityState					alphaCutoffLT;
+				::omm::OpacityState					alphaCutoffLessEqual = ::omm::OpacityState::Transparent;
 			};
 			bool								bilinearFilter = true;
 			bool								enableLevelLineIntersection = true;
-			nvrhi::SamplerAddressMode			sampleMode = nvrhi::SamplerAddressMode::Clamp;
+			caustica::rhi::SamplerAddressMode			sampleMode = caustica::rhi::SamplerAddressMode::Clamp;
 
-			nvrhi::Format						texCoordFormat = nvrhi::Format::R32_FLOAT;
-			nvrhi::BufferHandle					texCoordBuffer;
+			caustica::rhi::Format						texCoordFormat = caustica::rhi::Format::R32_FLOAT;
+			caustica::rhi::BufferHandle					texCoordBuffer;
 			uint32_t							texCoordBufferOffsetInBytes = 0;
 			uint32_t							texCoordStrideInBytes = 0;
-			nvrhi::BufferHandle					indexBuffer;
+			caustica::rhi::BufferHandle					indexBuffer;
 			uint32_t							indexOffset = 0;
 			uint32_t							indexBufferOffsetInBytes = 0; // _byte_ offset when creating the input descriptor (indexOffset is preferred, this is kept for backwards comp.)
 			uint32_t							numIndices = 0;
 
 			uint32_t							maxSubdivisionLevel = 0;
 			uint32_t							maxOutOmmArraySize = 0xFFFFFFFF;
-			nvrhi::rt::OpacityMicromapFormat	format = nvrhi::rt::OpacityMicromapFormat::OC1_4_State;
+			caustica::rhi::rt::OpacityMicromapFormat	format = caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State;
 			float								dynamicSubdivisionScale = 0.5f;
 			bool								minimalMemoryMode = false;
 			bool								enableStats = false;
@@ -89,7 +94,7 @@ namespace omm
 
 		struct PreDispatchInfo
 		{
-			nvrhi::Format	ommIndexFormat;
+			caustica::rhi::Format	ommIndexFormat;
 			uint32_t		ommIndexCount;
 			size_t			ommIndexBufferSize;
 			size_t			ommIndexHistogramSize;
@@ -101,12 +106,12 @@ namespace omm
 
 		struct Buffers
 		{
-			nvrhi::BufferHandle ommArrayBuffer;
-			nvrhi::BufferHandle ommDescBuffer;
-			nvrhi::BufferHandle ommIndexBuffer;
-			nvrhi::BufferHandle ommDescArrayHistogramBuffer;
-			nvrhi::BufferHandle ommIndexHistogramBuffer;
-			nvrhi::BufferHandle ommPostDispatchInfoBuffer;
+			caustica::rhi::BufferHandle ommArrayBuffer;
+			caustica::rhi::BufferHandle ommDescBuffer;
+			caustica::rhi::BufferHandle ommIndexBuffer;
+			caustica::rhi::BufferHandle ommDescArrayHistogramBuffer;
+			caustica::rhi::BufferHandle ommIndexHistogramBuffer;
+			caustica::rhi::BufferHandle ommPostDispatchInfoBuffer;
 
 			uint32_t ommArrayBufferOffset = 0;
 			uint32_t ommDescBufferOffset = 0;
@@ -140,21 +145,21 @@ namespace omm
 			uint32_t totalFullyUnknownTransparent = 0;
 		};
 
-		GpuBakeNvrhi(nvrhi::DeviceHandle device, nvrhi::CommandListHandle commandList, bool enableDebug, ShaderProvider* shaderProvider = nullptr, std::optional<MessageCallback> callback = nullptr);
-		~GpuBakeNvrhi();
+		GpuBakeRhi(caustica::rhi::DeviceHandle device, caustica::rhi::CommandListHandle commandList, bool enableDebug, ShaderProvider* shaderProvider = nullptr, std::optional<MessageCallback> callback = std::nullopt);
+		~GpuBakeRhi();
 
 		// CPU side pre-build info.
 		void GetPreDispatchInfo(const Input& params, PreDispatchInfo& info);
 
 		void Dispatch(
-			nvrhi::CommandListHandle commandList,
+			caustica::rhi::CommandListHandle commandList,
 			const Input& params,
 			const Buffers& buffers);
 
 		void Clear();
 
 		static void ReadPostDispatchInfo(void* pData, size_t byteSize, PostDispatchInfo& outPostDispatchInfo);
-		static void ReadUsageDescBuffer(void* pData, size_t byteSize, std::vector<nvrhi::rt::OpacityMicromapUsageCount>& outVmUsages);
+		static void ReadUsageDescBuffer(void* pData, size_t byteSize, std::vector<caustica::rhi::rt::OpacityMicromapUsageCount>& outVmUsages);
 
 		// Debug dumping
 		void DumpDebug(
@@ -164,21 +169,21 @@ namespace omm
 			const std::vector<uint8_t>& ommArrayBuffer,
 			const std::vector<uint8_t>& ommDescBuffer,
 			const std::vector<uint8_t>& ommIndexBuffer,
-			nvrhi::Format ommIndexBufferFormat,
+			caustica::rhi::Format ommIndexBufferFormat,
 			const std::vector<uint8_t>& ommDescArrayHistogramBuffer,
 			const std::vector<uint8_t>& ommIndexHistogramBuffer,
 			const void* indexBuffer,
 			const uint32_t indexCount,
-			nvrhi::Format ommTexCoordBufferFormat,
+			caustica::rhi::Format ommTexCoordBufferFormat,
 			const void* texCoords,
 			const float* imageData,
 			const uint32_t width,
 			const uint32_t height
 		);
 
-		Stats GetStats(const omm::Cpu::BakeResultDesc& desc);
+		Stats GetStats(const ::omm::Cpu::BakeResultDesc& desc);
 
 	private:
-		std::unique_ptr< GpuBakeNvrhiImpl> m_impl;
+		std::unique_ptr< GpuBakeRhiImpl> m_impl;
 	};
-} // namespace omm
+} // namespace caustica::omm

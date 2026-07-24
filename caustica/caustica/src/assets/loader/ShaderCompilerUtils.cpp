@@ -31,12 +31,12 @@ namespace ShaderCompilerUtils
     // Shader compiler configuration
     //////////////////////////////////////////////////////////////////////////
     
-    bool ShaderCompilerConfig::initialize(nvrhi::IDevice* device, const std::string& binarySubfolder)
+    bool ShaderCompilerConfig::initialize(caustica::rhi::IDevice* device, const std::string& binarySubfolder)
     {
         std::string graphicsAPIName;
-        if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
+        if (device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)
             graphicsAPIName = "d3d12";
-        else if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)
+        else if (device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN)
             graphicsAPIName = "vk";
         else
         {
@@ -279,11 +279,11 @@ namespace ShaderCompilerUtils
         
         // Target API macro
         std::string targetMacro = " -D ";
-        if (config.GraphicsAPI == nvrhi::GraphicsAPI::D3D12)
+        if (config.GraphicsAPI == caustica::rhi::GraphicsAPI::D3D12)
         {
             targetMacro += "TARGET_D3D12";
         }
-        else if (config.GraphicsAPI == nvrhi::GraphicsAPI::VULKAN)
+        else if (config.GraphicsAPI == caustica::rhi::GraphicsAPI::VULKAN)
         {
             targetMacro += "TARGET_VULKAN";
         }
@@ -291,7 +291,7 @@ namespace ShaderCompilerUtils
         hashCommand += targetMacro;
         
         // Vulkan-specific options
-        if (config.GraphicsAPI == nvrhi::GraphicsAPI::VULKAN)
+        if (config.GraphicsAPI == caustica::rhi::GraphicsAPI::VULKAN)
         {
             command += " -D SPIRV";
             command += " -spirv";
@@ -304,7 +304,7 @@ namespace ShaderCompilerUtils
             hashCommand += " -fspv-extension=SPV_EXT_descriptor_indexing";
             hashCommand += " -fspv-extension=KHR";
             
-            nvrhi::VulkanBindingOffsets cBindingOffsets;
+            caustica::rhi::VulkanBindingOffsets cBindingOffsets;
             for (int i = 0; i < 7; i++)
             {
                 // TODO: test with 'all' instead of the second %d - should work as well
@@ -376,7 +376,7 @@ namespace ShaderCompilerUtils
             logicalSource.generic_string(),
             options.EntryPoint,
             kind,
-            caustica::shader::fromNvrhiGraphicsApi(config.GraphicsAPI),
+            caustica::shader::fromRhiGraphicsApi(config.GraphicsAPI),
             options.Profile,
             options.Macros);
     }

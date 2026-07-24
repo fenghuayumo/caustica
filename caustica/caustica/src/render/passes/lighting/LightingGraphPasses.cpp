@@ -30,7 +30,7 @@ void registerLightingUpdateBeginPass(FrameGraphContext ctx)
         "LightingUpdateBegin",
         [](rg::PassBuilder&) {},
         [ctx](rg::RenderPassContext& passCtx) {
-            nvrhi::ICommandList* commandList = passCtx.commandList();
+            caustica::rhi::ICommandList* commandList = passCtx.commandList();
             if (commandList == nullptr || ctx.pathTracingContext == nullptr
                 || ctx.lightSampling == nullptr)
                 return;

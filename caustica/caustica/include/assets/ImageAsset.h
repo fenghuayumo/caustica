@@ -2,7 +2,7 @@
 
 #include <assets/AssetId.h>
 #include <core/DescriptorHandle.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <array>
 #include <memory>
@@ -65,7 +65,7 @@ struct TextureSubresourceData
 
 struct GpuImage
 {
-    nvrhi::TextureHandle texture;
+    caustica::rhi::TextureHandle texture;
     DescriptorHandle bindlessDescriptor;
 };
 
@@ -79,13 +79,13 @@ struct ImageAsset
     TextureAlphaMode alphaMode = TextureAlphaMode::UNKNOWN;
     uint32_t originalBitsPerPixel = 0;
 
-    nvrhi::Format format = nvrhi::Format::UNKNOWN;
+    caustica::rhi::Format format = caustica::rhi::Format::UNKNOWN;
     uint32_t width = 1;
     uint32_t height = 1;
     uint32_t depth = 1;
     uint32_t arraySize = 1;
     uint32_t mipLevels = 1;
-    nvrhi::TextureDimension dimension = nvrhi::TextureDimension::Unknown;
+    caustica::rhi::TextureDimension dimension = caustica::rhi::TextureDimension::Unknown;
     bool isRenderTarget = false;
     bool forceSRGB = false;
 

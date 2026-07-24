@@ -24,7 +24,7 @@ struct WindowDesc
     bool Resizeable   = true;
     bool ShowConsole  = true;
     std::string Title = "caustica";
-    int  RenderAPI    = 1;       // Maps to nvrhi::GraphicsAPI
+    int  RenderAPI    = 1;       // Maps to caustica::rhi::GraphicsAPI
     std::string FilePath;
 
     std::vector<std::string> IconPaths;

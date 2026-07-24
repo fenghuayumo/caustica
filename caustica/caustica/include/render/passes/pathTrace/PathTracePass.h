@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <memory>
 
@@ -37,12 +37,12 @@ public:
     };
 
     bool createExportPipeline(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         caustica::ShaderFactory* shaderFactory,
-        nvrhi::BindingLayoutHandle bindingLayout,
-        nvrhi::BindingLayoutHandle bindlessLayout);
+        caustica::rhi::BindingLayoutHandle bindingLayout,
+        caustica::rhi::BindingLayoutHandle bindlessLayout);
 
-    [[nodiscard]] nvrhi::ComputePipelineHandle exportVBufferPSO() const { return m_exportVBufferPSO; }
+    [[nodiscard]] caustica::rhi::ComputePipelineHandle exportVBufferPSO() const { return m_exportVBufferPSO; }
 
     void fillConstants(
         PathTracerConstants& constants,
@@ -50,30 +50,30 @@ public:
         const FillConstantsParams& params) const;
 
     void prePass(
-        nvrhi::ICommandList* commandList,
-        nvrhi::BindingSetHandle bindingSet,
-        nvrhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::BindingSetHandle bindingSet,
+        caustica::rhi::IDescriptorTable* descriptorTable,
         dm::uint2 viewSize,
         PTPipelineVariant* pipeline);
 
     void exportVBuffer(
-        nvrhi::ICommandList* commandList,
-        nvrhi::BindingSetHandle bindingSet,
-        nvrhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::BindingSetHandle bindingSet,
+        caustica::rhi::IDescriptorTable* descriptorTable,
         dm::uint2 viewSize,
-        nvrhi::IComputePipeline* pipeline);
+        caustica::rhi::IComputePipeline* pipeline);
 
     void mainPass(
-        nvrhi::ICommandList* commandList,
-        nvrhi::BindingSetHandle bindingSet,
-        nvrhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::BindingSetHandle bindingSet,
+        caustica::rhi::IDescriptorTable* descriptorTable,
         dm::uint2 viewSize,
         PTPipelineVariant* pipeline,
         uint32_t samplesPerPixel);
 
 private:
-    nvrhi::ShaderHandle m_exportVBufferCS;
-    nvrhi::ComputePipelineHandle m_exportVBufferPSO;
+    caustica::rhi::ShaderHandle m_exportVBufferCS;
+    caustica::rhi::ComputePipelineHandle m_exportVBufferPSO;
 };
 
 } // namespace caustica::render

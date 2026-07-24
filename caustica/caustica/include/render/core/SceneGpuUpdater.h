@@ -1,12 +1,7 @@
 #pragma once
 
 #include <cstdint>
-
-namespace nvrhi
-{
-class ICommandList;
-class IDevice;
-}
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -26,14 +21,14 @@ class SceneGpuUpdater
 public:
     static void initialize(
         SceneGpuResources& gpuResources,
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         ShaderFactory& shaderFactory);
 
     static void refresh(
         Scene& scene,
         SceneGpuResources& gpuResources,
         IDescriptorTableManager* descriptorTable,
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         uint32_t frameIndex);
 
     // Exclusive GPU setup from logic-thread staging data. Does not publish snapshots.

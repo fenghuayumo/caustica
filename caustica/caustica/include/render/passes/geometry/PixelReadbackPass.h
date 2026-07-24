@@ -3,7 +3,7 @@
 #include <math/math.h>
 #include <memory>
 #include <map>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 
 namespace caustica
@@ -18,25 +18,25 @@ namespace caustica::render
     class PixelReadbackPass
     {
     private:
-        nvrhi::DeviceHandle m_device;
-        nvrhi::ShaderHandle m_Shader;
-        nvrhi::ComputePipelineHandle m_Pipeline;
-        nvrhi::BindingLayoutHandle m_BindingLayout;
-        nvrhi::BindingSetHandle m_BindingSet;
-        nvrhi::BufferHandle m_ConstantBuffer;
-        nvrhi::BufferHandle m_IntermediateBuffer;
-        nvrhi::BufferHandle m_ReadbackBuffer;
+        caustica::rhi::DeviceHandle m_device;
+        caustica::rhi::ShaderHandle m_Shader;
+        caustica::rhi::ComputePipelineHandle m_Pipeline;
+        caustica::rhi::BindingLayoutHandle m_BindingLayout;
+        caustica::rhi::BindingSetHandle m_BindingSet;
+        caustica::rhi::BufferHandle m_ConstantBuffer;
+        caustica::rhi::BufferHandle m_IntermediateBuffer;
+        caustica::rhi::BufferHandle m_ReadbackBuffer;
 
     public:
         PixelReadbackPass(
-            nvrhi::IDevice* device,
+            caustica::rhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            nvrhi::ITexture* inputTexture,
-            nvrhi::Format format,
+            caustica::rhi::ITexture* inputTexture,
+            caustica::rhi::Format format,
             uint32_t arraySlice = 0,
             uint32_t mipLevel = 0);
 
-        void capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition);
+        void capture(caustica::rhi::ICommandList* commandList, dm::uint2 pixelPosition);
 
         dm::float4 readFloats();
         dm::uint4 readUInts();

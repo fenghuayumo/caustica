@@ -17,34 +17,34 @@
 
 using namespace caustica::render;
 
-DLSS::DLSS(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
+DLSS::DLSS(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory)
     : m_device(device)
 {
     m_exposureShader = shaderFactory.createAutoShader("engine/passes/dlss_exposure_cs.hlsl", "main",
-        CAUSTICA_MAKE_PLATFORM_SHADER(g_dlss_exposure_cs), nullptr, nvrhi::ShaderType::Compute);
+        CAUSTICA_MAKE_PLATFORM_SHADER(g_dlss_exposure_cs), nullptr, caustica::rhi::ShaderType::Compute);
 
-    auto layoutDesc = nvrhi::BindingLayoutDesc()
-        .setVisibility(nvrhi::ShaderType::Compute)
-        .addItem(nvrhi::BindingLayoutItem::TypedBuffer_SRV(0))
-        .addItem(nvrhi::BindingLayoutItem::Texture_UAV(0))
-        .addItem(nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float)));
+    auto layoutDesc = caustica::rhi::BindingLayoutDesc()
+        .setVisibility(caustica::rhi::ShaderType::Compute)
+        .addItem(caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(0))
+        .addItem(caustica::rhi::BindingLayoutItem::Texture_UAV(0))
+        .addItem(caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(float)));
 
     m_exposureBindingLayout = device->createBindingLayout(layoutDesc);
 
-    auto pipelineDesc = nvrhi::ComputePipelineDesc()
+    auto pipelineDesc = caustica::rhi::ComputePipelineDesc()
         .addBindingLayout(m_exposureBindingLayout)
         .setComputeShader(m_exposureShader);
 
     m_exposurePipeline = device->createComputePipeline(pipelineDesc);
 
-    auto textureDesc = nvrhi::TextureDesc()
+    auto textureDesc = caustica::rhi::TextureDesc()
         .setWidth(1)
         .setHeight(1)
-        .setFormat(nvrhi::Format::R32_FLOAT)
+        .setFormat(caustica::rhi::Format::R32_FLOAT)
         .setDebugName("DLSS Exposure Texture")
-        .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
+        .setInitialState(caustica::rhi::ResourceStates::UnorderedAccess)
         .setKeepInitialState(true)
-        .setDimension(nvrhi::TextureDimension::Texture2D)
+        .setDimension(caustica::rhi::TextureDimension::Texture2D)
         .setIsUAV(true);
 
     m_exposureTexture = device->createTexture(textureDesc);
@@ -72,7 +72,7 @@ bool DLSS::isRayReconstructionInitialized() const
     return m_rayReconstructionInitialized;
 }
 
-void DLSS::computeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* toneMapperExposureBuffer, float exposureScale)
+void DLSS::computeExposure(caustica::rhi::ICommandList* commandList, caustica::rhi::IBuffer* toneMapperExposureBuffer, float exposureScale)
 {
     if (m_exposureSourceBuffer != toneMapperExposureBuffer)
     {
@@ -82,15 +82,15 @@ void DLSS::computeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* ton
 
     if (!m_exposureBindingSet)
     {
-        auto setDesc = nvrhi::BindingSetDesc()
-            .addItem(nvrhi::BindingSetItem::TypedBuffer_SRV(0, toneMapperExposureBuffer))
-            .addItem(nvrhi::BindingSetItem::Texture_UAV(0, m_exposureTexture))
-            .addItem(nvrhi::BindingSetItem::PushConstants(0, sizeof(float)));
+        auto setDesc = caustica::rhi::BindingSetDesc()
+            .addItem(caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, toneMapperExposureBuffer))
+            .addItem(caustica::rhi::BindingSetItem::Texture_UAV(0, m_exposureTexture))
+            .addItem(caustica::rhi::BindingSetItem::PushConstants(0, sizeof(float)));
 
         m_exposureBindingSet = m_device->createBindingSet(setDesc, m_exposureBindingLayout);
     }
 
-    auto state = nvrhi::ComputeState()
+    auto state = caustica::rhi::ComputeState()
         .setPipeline(m_exposurePipeline)
         .addBindingSet(m_exposureBindingSet);
 
@@ -99,24 +99,24 @@ void DLSS::computeExposure(nvrhi::ICommandList* commandList, nvrhi::IBuffer* ton
     commandList->dispatch(1);
 }
 
- std::unique_ptr<DLSS> DLSS::create(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+ std::unique_ptr<DLSS> DLSS::create(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     switch(device->getGraphicsAPI())
     {
-    case nvrhi::GraphicsAPI::D3D11:
+    case caustica::rhi::GraphicsAPI::D3D11:
         #if CAUSTICA_WITH_DX11
         return DLSS::createDX11(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
-    case nvrhi::GraphicsAPI::D3D12:
+    case caustica::rhi::GraphicsAPI::D3D12:
         #if CAUSTICA_WITH_DX12
         return DLSS::createDX12(device, shaderFactory, directoryWithExecutable, applicationID);
         #else
         return nullptr;
         #endif
-    case nvrhi::GraphicsAPI::VULKAN:
+    case caustica::rhi::GraphicsAPI::VULKAN:
         #if CAUSTICA_WITH_VULKAN
         return DLSS::createVK(device, shaderFactory, directoryWithExecutable, applicationID);
         #else

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <memory>
@@ -18,20 +18,20 @@ class PathTracingContext;
 // Lighting create / per-frame update helpers (no WorldRenderer symbols).
 void createLightingRenderPasses(
     PathTracingContext& context,
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
-    nvrhi::BindingLayoutHandle bindlessLayout,
-    nvrhi::CommandListHandle initializeCommandList,
+    caustica::rhi::BindingLayoutHandle bindlessLayout,
+    caustica::rhi::CommandListHandle initializeCommandList,
     dm::uint2 screenResolution);
 
 void preUpdateLightingFrame(
     PathTracingContext& context,
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     bool& needNewBindings);
 
 void updateLightingFrame(
     PathTracingContext& context,
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     uint64_t frameIndex,
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies);
 

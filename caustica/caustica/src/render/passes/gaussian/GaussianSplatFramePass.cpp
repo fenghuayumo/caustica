@@ -24,7 +24,7 @@ GaussianSplatFramePass::GaussianSplatFramePass() = default;
 GaussianSplatFramePass::~GaussianSplatFramePass() = default;
 
 void GaussianSplatFramePass::createTemporalResources(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     RenderTargets* renderTargets)
 {
@@ -34,22 +34,22 @@ void GaussianSplatFramePass::createTemporalResources(
     m_device = device;
     m_renderTargets = renderTargets;
 
-    nvrhi::TextureDesc gaussianCurrentDesc = renderTargets->processedOutputColor->getDesc();
+    caustica::rhi::TextureDesc gaussianCurrentDesc = renderTargets->processedOutputColor->getDesc();
     gaussianCurrentDesc.debugName = "GaussianSplatTemporalCurrentColor";
     gaussianCurrentDesc.isUAV = false;
     gaussianCurrentDesc.isRenderTarget = false;
     gaussianCurrentDesc.useClearValue = false;
-    gaussianCurrentDesc.clearValue = nvrhi::Color(0.0f);
-    gaussianCurrentDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    gaussianCurrentDesc.clearValue = caustica::rhi::Color(0.0f);
+    gaussianCurrentDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     gaussianCurrentDesc.keepInitialState = true;
     m_currentColor = device->createTexture(gaussianCurrentDesc);
 
-    nvrhi::TextureDesc gaussianAccumDesc = renderTargets->processedOutputColor->getDesc();
+    caustica::rhi::TextureDesc gaussianAccumDesc = renderTargets->processedOutputColor->getDesc();
     gaussianAccumDesc.debugName = "GaussianSplatTemporalAccumulatedColor";
-    gaussianAccumDesc.format = nvrhi::Format::RGBA32_FLOAT;
+    gaussianAccumDesc.format = caustica::rhi::Format::RGBA32_FLOAT;
     gaussianAccumDesc.isUAV = true;
     gaussianAccumDesc.isRenderTarget = true;
-    gaussianAccumDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    gaussianAccumDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     gaussianAccumDesc.keepInitialState = true;
     m_accumulatedColor = device->createTexture(gaussianAccumDesc);
 
@@ -61,7 +61,7 @@ void GaussianSplatFramePass::createTemporalResources(
 
 void GaussianSplatFramePass::bindStable(
     PathTracingContext* context,
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     caustica::AccelStructManager* accelStructs,
     SceneGaussianSplatPasses* scenePasses)
 {
@@ -174,7 +174,7 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
     return resources;
 }
 
-void GaussianSplatFramePass::executeAccelBuild(nvrhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeAccelBuild(caustica::rhi::ICommandList* commandList)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -189,7 +189,7 @@ void GaussianSplatFramePass::executeAccelBuild(nvrhi::ICommandList* commandList)
         m_context->activeSettings());
 }
 
-void GaussianSplatFramePass::executeUpload(nvrhi::ICommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeUpload(caustica::rhi::ICommandList* commandList, bool renderToOutputColor)
 {
     m_compositeRendered = false;
     if (commandList == nullptr || !hasActiveSplats())
@@ -243,7 +243,7 @@ void GaussianSplatFramePass::executeUpload(nvrhi::ICommandList* commandList, boo
         settings);
 }
 
-void GaussianSplatFramePass::executeSort(nvrhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeSort(caustica::rhi::ICommandList* commandList)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -257,7 +257,7 @@ void GaussianSplatFramePass::executeSort(nvrhi::ICommandList* commandList)
         *m_scenePasses);
 }
 
-void GaussianSplatFramePass::executeRaster(nvrhi::ICommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeRaster(caustica::rhi::ICommandList* commandList, bool renderToOutputColor)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -281,7 +281,7 @@ void GaussianSplatFramePass::executeRaster(nvrhi::ICommandList* commandList, boo
     m_compositeRendered = renderedAny && !renderToOutputColor;
 }
 
-void GaussianSplatFramePass::executeAccumulate(nvrhi::ICommandList* commandList)
+void GaussianSplatFramePass::executeAccumulate(caustica::rhi::ICommandList* commandList)
 {
     if (commandList == nullptr || !m_compositeRendered)
         return;

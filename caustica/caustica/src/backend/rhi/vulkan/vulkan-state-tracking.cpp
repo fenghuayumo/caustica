@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
     
     void CommandList::setResourceStatesForBindingSet(IBindingSet* _bindingSet)
@@ -397,4 +397,4 @@ namespace nvrhi::vulkan
         m_StateTracker.setEnableUavBarriersForBuffer(buffer, enableBarriers);
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

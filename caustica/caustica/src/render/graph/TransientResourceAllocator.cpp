@@ -23,7 +23,7 @@ namespace
 
     struct PhysicalTextureSlot
     {
-        nvrhi::TextureHandle handle;
+        caustica::rhi::TextureHandle handle;
         TextureDesc desc{};
         uint64_t exactDescHash = 0;
         int32_t lastPassOrder = -1;
@@ -31,7 +31,7 @@ namespace
 
     struct PhysicalBufferSlot
     {
-        nvrhi::BufferHandle handle;
+        caustica::rhi::BufferHandle handle;
         uint64_t compatibilityHash = 0;
         uint64_t byteSize = 0;
         int32_t lastPassOrder = -1;
@@ -51,8 +51,8 @@ namespace
         size_t resourceIndex = 0;
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
-        nvrhi::MemoryRequirements memReq{};
-        nvrhi::TextureHandle virtualTexture;
+        caustica::rhi::MemoryRequirements memReq{};
+        caustica::rhi::TextureHandle virtualTexture;
         uint64_t heapOffset = 0;
     };
 
@@ -61,8 +61,8 @@ namespace
         size_t resourceIndex = 0;
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
-        nvrhi::MemoryRequirements memReq{};
-        nvrhi::BufferHandle virtualBuffer;
+        caustica::rhi::MemoryRequirements memReq{};
+        caustica::rhi::BufferHandle virtualBuffer;
         uint64_t heapOffset = 0;
     };
 
@@ -133,7 +133,7 @@ namespace
 
     int findHeapMemorySlot(
         const std::vector<HeapMemorySlot>& memorySlots,
-        const nvrhi::MemoryRequirements& memReq,
+        const caustica::rhi::MemoryRequirements& memReq,
         int32_t firstPassOrder)
     {
         int bestSlot = -1;
@@ -159,19 +159,19 @@ namespace
         return bestSlot;
     }
 
-    TextureDesc textureDescFromNative(nvrhi::ITexture* texture, const TextureDesc& requestDesc)
+    TextureDesc textureDescFromNative(caustica::rhi::ITexture* texture, const TextureDesc& requestDesc)
     {
         TextureDesc desc = requestDesc;
         if (!texture)
             return desc;
 
-        const nvrhi::TextureDesc& nativeDesc = texture->getDesc();
+        const caustica::rhi::TextureDesc& nativeDesc = texture->getDesc();
         desc.width = nativeDesc.width;
         desc.height = nativeDesc.height;
         desc.depth = nativeDesc.depth;
         desc.mipLevels = nativeDesc.mipLevels;
         desc.arraySize = nativeDesc.arraySize;
-        desc.format = fromNvrhiFormat(nativeDesc.format);
+        desc.format = fromNativeFormat(nativeDesc.format);
         return desc;
     }
 
@@ -198,7 +198,7 @@ void TransientResourceAllocator::allocate(
         graph.m_transientStats.pooledHeapCount = 0;
         graph.m_transientStats.pooledHeapBytes = 0;
 
-        for (const nvrhi::HeapHandle& heap : graph.m_transientHeapPool)
+        for (const caustica::rhi::HeapHandle& heap : graph.m_transientHeapPool)
         {
             if (!heap)
                 continue;
@@ -207,17 +207,17 @@ void TransientResourceAllocator::allocate(
         }
     };
 
-    const auto acquireHeap = [&graph](uint64_t capacity, const char* debugName) -> nvrhi::HeapHandle {
+    const auto acquireHeap = [&graph](uint64_t capacity, const char* debugName) -> caustica::rhi::HeapHandle {
         int bestSlot = -1;
         uint64_t bestCapacity = UINT64_MAX;
 
         for (int i = 0; i < static_cast<int>(graph.m_transientHeapPool.size()); ++i)
         {
-            nvrhi::HeapHandle& heap = graph.m_transientHeapPool[static_cast<size_t>(i)];
+            caustica::rhi::HeapHandle& heap = graph.m_transientHeapPool[static_cast<size_t>(i)];
             if (!heap)
                 continue;
-            const nvrhi::HeapDesc& desc = heap->getDesc();
-            if (desc.type != nvrhi::HeapType::DeviceLocal || desc.capacity < capacity)
+            const caustica::rhi::HeapDesc& desc = heap->getDesc();
+            if (desc.type != caustica::rhi::HeapType::DeviceLocal || desc.capacity < capacity)
                 continue;
             if (desc.capacity < bestCapacity)
             {
@@ -228,14 +228,14 @@ void TransientResourceAllocator::allocate(
 
         if (bestSlot >= 0)
         {
-            nvrhi::HeapHandle heap = graph.m_transientHeapPool[static_cast<size_t>(bestSlot)];
+            caustica::rhi::HeapHandle heap = graph.m_transientHeapPool[static_cast<size_t>(bestSlot)];
             graph.m_transientHeapPool.erase(graph.m_transientHeapPool.begin() + bestSlot);
             ++graph.m_transientStats.reusedHeapCount;
             return heap;
         }
 
-        nvrhi::HeapDesc heapDesc;
-        heapDesc.type = nvrhi::HeapType::DeviceLocal;
+        caustica::rhi::HeapDesc heapDesc;
+        heapDesc.type = caustica::rhi::HeapType::DeviceLocal;
         heapDesc.capacity = capacity;
         heapDesc.debugName = debugName;
         ++graph.m_transientStats.createdHeapCount;
@@ -274,7 +274,7 @@ void TransientResourceAllocator::allocate(
 
     std::vector<PhysicalTextureSlot> physicalTextures;
     std::vector<TextureHeapRequest> heapRequests;
-    const bool canUseVirtualResources = graph.m_device->queryFeatureSupport(nvrhi::Feature::VirtualResources);
+    const bool canUseVirtualResources = graph.m_device->queryFeatureSupport(caustica::rhi::Feature::VirtualResources);
 
     for (const TransientAllocationRequest& request : textureRequests)
     {
@@ -291,14 +291,14 @@ void TransientResourceAllocator::allocate(
             slot.lastPassOrder = std::max(slot.lastPassOrder, request.lastPassOrder);
             resource.owned = slot.handle;
             resource.texture = slot.handle;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
             ++graph.m_transientStats.aliasedTextureCount;
             continue;
         }
 
         if (graph.m_renderTargetPool)
         {
-            if (nvrhi::TextureHandle pooled = graph.m_renderTargetPool->tryAcquireTexture(resource.desc))
+            if (caustica::rhi::TextureHandle pooled = graph.m_renderTargetPool->tryAcquireTexture(resource.desc))
             {
                 PhysicalTextureSlot slot{};
                 slot.desc = textureDescFromNative(pooled, resource.desc);
@@ -309,7 +309,7 @@ void TransientResourceAllocator::allocate(
 
                 resource.owned = slot.handle;
                 resource.texture = slot.handle;
-                resource.currentState = nvrhi::ResourceStates::Common;
+                resource.currentState = caustica::rhi::ResourceStates::Common;
                 ++graph.m_transientStats.pooledTextureCount;
                 continue;
             }
@@ -328,15 +328,15 @@ void TransientResourceAllocator::allocate(
 
             resource.owned = slot.handle;
             resource.texture = slot.handle;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
             if (graph.m_renderTargetPool)
                 ++graph.m_transientStats.pooledTextureCount;
             continue;
         }
 
-        nvrhi::TextureHandle virtualTexture = graph.createNativeTexture(resource.desc, true);
+        caustica::rhi::TextureHandle virtualTexture = graph.createNativeTexture(resource.desc, true);
         assert(virtualTexture);
-        const nvrhi::MemoryRequirements memReq = graph.m_device->getTextureMemoryRequirements(virtualTexture);
+        const caustica::rhi::MemoryRequirements memReq = graph.m_device->getTextureMemoryRequirements(virtualTexture);
         heapRequests.push_back({
             request.resourceIndex,
             request.firstPassOrder,
@@ -378,7 +378,7 @@ void TransientResourceAllocator::allocate(
             request.heapOffset = alignedOffset;
         }
 
-        nvrhi::HeapHandle heap = acquireHeap(heapSize, "rg_transient_texture_heap");
+        caustica::rhi::HeapHandle heap = acquireHeap(heapSize, "rg_transient_texture_heap");
         assert(heap);
         graph.m_transientHeaps.push_back(heap);
         graph.m_transientStats.textureHeapBytes += heap->getDesc().capacity;
@@ -393,7 +393,7 @@ void TransientResourceAllocator::allocate(
 
             resource.owned = request.virtualTexture;
             resource.texture = request.virtualTexture;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
         }
     }
     graph.m_transientStats.physicalTextureCount =
@@ -445,14 +445,14 @@ void TransientResourceAllocator::allocate(
             slot.lastPassOrder = std::max(slot.lastPassOrder, request.lastPassOrder);
             resource.owned = slot.handle;
             resource.buffer = slot.handle;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
             ++graph.m_transientStats.aliasedBufferCount;
             continue;
         }
 
         if (graph.m_renderBufferPool)
         {
-            if (nvrhi::BufferHandle pooled = graph.m_renderBufferPool->tryAcquireBuffer(resource.desc))
+            if (caustica::rhi::BufferHandle pooled = graph.m_renderBufferPool->tryAcquireBuffer(resource.desc))
             {
                 PhysicalBufferSlot slot{};
                 slot.compatibilityHash = request.compatibilityHash;
@@ -463,7 +463,7 @@ void TransientResourceAllocator::allocate(
 
                 resource.owned = slot.handle;
                 resource.buffer = resource.owned;
-                resource.currentState = nvrhi::ResourceStates::Common;
+                resource.currentState = caustica::rhi::ResourceStates::Common;
                 ++graph.m_transientStats.pooledBufferCount;
                 continue;
             }
@@ -485,15 +485,15 @@ void TransientResourceAllocator::allocate(
             resource.owned = slot.handle;
             assert(resource.owned);
             resource.buffer = resource.owned;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
             if (graph.m_renderBufferPool)
                 ++graph.m_transientStats.pooledBufferCount;
             continue;
         }
 
-        nvrhi::BufferHandle virtualBuffer = graph.createNativeBuffer(resource.desc, true);
+        caustica::rhi::BufferHandle virtualBuffer = graph.createNativeBuffer(resource.desc, true);
         assert(virtualBuffer);
-        const nvrhi::MemoryRequirements memReq = graph.m_device->getBufferMemoryRequirements(virtualBuffer);
+        const caustica::rhi::MemoryRequirements memReq = graph.m_device->getBufferMemoryRequirements(virtualBuffer);
         bufferHeapRequests.push_back({
             request.resourceIndex,
             request.firstPassOrder,
@@ -535,7 +535,7 @@ void TransientResourceAllocator::allocate(
             request.heapOffset = alignedOffset;
         }
 
-        nvrhi::HeapHandle heap = acquireHeap(heapSize, "rg_transient_buffer_heap");
+        caustica::rhi::HeapHandle heap = acquireHeap(heapSize, "rg_transient_buffer_heap");
         assert(heap);
         graph.m_transientHeaps.push_back(heap);
         graph.m_transientStats.bufferHeapBytes += heap->getDesc().capacity;
@@ -550,7 +550,7 @@ void TransientResourceAllocator::allocate(
 
             resource.owned = request.virtualBuffer;
             resource.buffer = request.virtualBuffer;
-            resource.currentState = nvrhi::ResourceStates::Common;
+            resource.currentState = caustica::rhi::ResourceStates::Common;
         }
     }
     graph.m_transientStats.physicalBufferCount =

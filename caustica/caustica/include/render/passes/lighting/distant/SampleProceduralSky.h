@@ -1,7 +1,7 @@
 // Hillaire 2020 (UE Sky Atmosphere) procedural sky — runtime LUT generation + cubemap bake source.
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <memory>
 #include <string>
@@ -20,14 +20,14 @@ class SampleProceduralSky
 {
 public:
     SampleProceduralSky(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~SampleProceduralSky() = default;
 
-    nvrhi::TextureHandle getTransmittanceTexture() const { return m_transmittanceLut; }
-    nvrhi::TextureHandle getSkyViewTexture() const { return m_skyViewLut; }
+    caustica::rhi::TextureHandle getTransmittanceTexture() const { return m_transmittanceLut; }
+    caustica::rhi::TextureHandle getSkyViewTexture() const { return m_skyViewLut; }
     bool update(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         double sceneTime,
         ProceduralSkyConstants& outConstants,
         const std::string& presetType,
@@ -39,9 +39,9 @@ public:
 
     bool isAerialPerspectiveEnabled() const { return m_aerialPerspectiveEnabled; }
     void applyAerialPerspective(
-        nvrhi::ICommandList* commandList,
-        nvrhi::ITexture* color,
-        nvrhi::ITexture* depth,
+        caustica::rhi::ICommandList* commandList,
+        caustica::rhi::ITexture* color,
+        caustica::rhi::ITexture* depth,
         const caustica::IView& view,
         uint width,
         uint height,
@@ -52,39 +52,39 @@ public:
 private:
     void createLutResources();
     void fillEarthAtmosphere(AtmosphereParameters& atm) const;
-    void dispatchLutPasses(nvrhi::ICommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
+    void dispatchLutPasses(caustica::rhi::ICommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
     float3 computeSunDirection(float elevationDeg, float azimuthDeg) const;
     void applySunPreset(float elevationDeg, float azimuthDeg);
 
     double m_lastSceneTime = 0.0;
 
-    nvrhi::DeviceHandle m_device;
+    caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
-    nvrhi::TextureHandle m_transmittanceLut;
-    nvrhi::TextureHandle m_multiScatLut;
-    nvrhi::TextureHandle m_skyViewLut;
-    nvrhi::TextureHandle m_blackLut;
+    caustica::rhi::TextureHandle m_transmittanceLut;
+    caustica::rhi::TextureHandle m_multiScatLut;
+    caustica::rhi::TextureHandle m_skyViewLut;
+    caustica::rhi::TextureHandle m_blackLut;
 
-    nvrhi::BufferHandle m_lutConstantBuffer;
-    nvrhi::SamplerHandle m_linearClampSampler;
+    caustica::rhi::BufferHandle m_lutConstantBuffer;
+    caustica::rhi::SamplerHandle m_linearClampSampler;
 
-    nvrhi::ShaderHandle m_transmittanceCS;
-    nvrhi::ShaderHandle m_multiScattCS;
-    nvrhi::ShaderHandle m_skyViewCS;
-    nvrhi::ComputePipelineHandle m_transmittancePSO;
-    nvrhi::ComputePipelineHandle m_multiScattPSO;
-    nvrhi::ComputePipelineHandle m_skyViewPSO;
-    nvrhi::BindingLayoutHandle m_lutBindingLayout;
-    nvrhi::BindingSetHandle m_transmittanceBindings;
-    nvrhi::BindingSetHandle m_multiScatBindings;
-    nvrhi::BindingSetHandle m_skyViewBindings;
+    caustica::rhi::ShaderHandle m_transmittanceCS;
+    caustica::rhi::ShaderHandle m_multiScattCS;
+    caustica::rhi::ShaderHandle m_skyViewCS;
+    caustica::rhi::ComputePipelineHandle m_transmittancePSO;
+    caustica::rhi::ComputePipelineHandle m_multiScattPSO;
+    caustica::rhi::ComputePipelineHandle m_skyViewPSO;
+    caustica::rhi::BindingLayoutHandle m_lutBindingLayout;
+    caustica::rhi::BindingSetHandle m_transmittanceBindings;
+    caustica::rhi::BindingSetHandle m_multiScatBindings;
+    caustica::rhi::BindingSetHandle m_skyViewBindings;
 
-    nvrhi::BufferHandle m_aerialPerspectiveConstantBuffer;
-    nvrhi::ShaderHandle m_aerialPerspectiveCS;
-    nvrhi::ComputePipelineHandle m_aerialPerspectivePSO;
-    nvrhi::BindingLayoutHandle m_aerialPerspectiveBindingLayout;
-    nvrhi::BindingSetHandle m_aerialPerspectiveBindings;
+    caustica::rhi::BufferHandle m_aerialPerspectiveConstantBuffer;
+    caustica::rhi::ShaderHandle m_aerialPerspectiveCS;
+    caustica::rhi::ComputePipelineHandle m_aerialPerspectivePSO;
+    caustica::rhi::BindingLayoutHandle m_aerialPerspectiveBindingLayout;
+    caustica::rhi::BindingSetHandle m_aerialPerspectiveBindings;
 
     bool m_atmosphereLutsValid = false;
     AtmosphereParameters m_lastAtmosphere = {};

@@ -497,7 +497,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     }
 
 #if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
-                    if (getDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
+                    if (getDevice()->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)
                     {
                         RESET_ON_CHANGE(SettingsCheckbox(
                             "DX HitObject", &m_settings.DXHitObjectExtension));

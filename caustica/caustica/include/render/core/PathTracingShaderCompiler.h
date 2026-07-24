@@ -2,7 +2,7 @@
 
 #include <mutex>
 #include <memory>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
 #include <core/ThreadPool.h>
 #include <scene/SceneRenderData.h>
@@ -38,7 +38,7 @@ class PTPipelineVariant
         std::string                             usCompileError;
         ShaderPermutation *                     usMasterCopy = nullptr;
 
-        nvrhi::ShaderLibraryHandle              shaderLibrary;
+        caustica::rhi::ShaderLibraryHandle              shaderLibrary;
 
         void                                    setPath(const std::filesystem::path & path);
         void                                    fromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
@@ -59,7 +59,7 @@ public:
     // TODO: this will invalidate content; make sure to set m_localVerison to -1 and call resetPipeline()
     //void                                    SetMacros(const std::vector<caustica::ShaderMacro> & variantMacros);
 
-    const nvrhi::rt::ShaderTableHandle &    getShaderTable() const { return m_shaderTable; }
+    const caustica::rhi::rt::ShaderTableHandle &    getShaderTable() const { return m_shaderTable; }
     [[nodiscard]] bool                      hasPipeline() const { return m_pipeline != nullptr; }
 
 private:
@@ -75,8 +75,8 @@ private:
 private:
 
     int64_t                                 m_localVersion = -1;        // if it doesn't match compiler version, we're out of date
-    nvrhi::rt::ShaderTableHandle            m_shaderTable;
-    nvrhi::rt::PipelineHandle               m_pipeline;
+    caustica::rhi::rt::ShaderTableHandle            m_shaderTable;
+    caustica::rhi::rt::PipelineHandle               m_pipeline;
     std::weak_ptr<class PathTracingShaderCompiler>    m_compiler;
     bool                                    m_rayGenOnly;
     bool                                    m_exportAnyHit = false;
@@ -112,7 +112,7 @@ struct HitGroupInfo
 class PathTracingShaderCompiler : public std::enable_shared_from_this<PathTracingShaderCompiler>
 {
 public:
-    PathTracingShaderCompiler(nvrhi::IDevice* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout);
+    PathTracingShaderCompiler(caustica::rhi::IDevice* device, std::shared_ptr<class MaterialGpuCache> & materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout);
     ~PathTracingShaderCompiler();
     
     void                                update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro> & macros)>& globalMacrosGetter, bool forceShaderReload);
@@ -150,9 +150,9 @@ private:
                                         getMacros() const                   { return m_macros; }
     int64_t                             getVersion() const                  { return m_version; }
 
-    nvrhi::BindingLayoutHandle          getBindingLayout() const            { return m_bindingLayout; }
-    nvrhi::BindingLayoutHandle          getBindlessLayout() const           { return m_bindlessLayout; }
-    nvrhi::DeviceHandle                 getDevice() const                   { return m_device; }
+    caustica::rhi::BindingLayoutHandle          getBindingLayout() const            { return m_bindingLayout; }
+    caustica::rhi::BindingLayoutHandle          getBindlessLayout() const           { return m_bindlessLayout; }
+    caustica::rhi::DeviceHandle                 getDevice() const                   { return m_device; }
 
     const std::filesystem::path &       getShaderBinariesPath() const       { return m_compilerConfig.ShaderBinariesPath; }
     const std::filesystem::path &       getShaderCompilerPath() const       { return m_compilerConfig.ShaderCompilerPath; }
@@ -178,11 +178,11 @@ private:
 
 
 private:
-    nvrhi::DeviceHandle                             m_device;
+    caustica::rhi::DeviceHandle                             m_device;
     std::shared_ptr<caustica::RootFileSystem>     m_shadersFS;
     std::shared_ptr<class MaterialGpuCache> &         m_materialGpuCache;
-    nvrhi::BindingLayoutHandle                      m_bindingLayout;
-    nvrhi::BindingLayoutHandle                      m_bindlessLayout;
+    caustica::rhi::BindingLayoutHandle                      m_bindingLayout;
+    caustica::rhi::BindingLayoutHandle                      m_bindlessLayout;
 
     ShaderCompilerUtils::ShaderCompilerConfig       m_compilerConfig;
 

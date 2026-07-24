@@ -15,17 +15,17 @@
 class GpuDevice_DX11 : public caustica::GpuDevice
 {
 protected:
-    nvrhi::RefCountPtr<IDXGIFactory1> m_DxgiFactory;
-    nvrhi::RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
-    nvrhi::RefCountPtr<ID3D11Device> m_Device;
-    nvrhi::RefCountPtr<ID3D11DeviceContext> m_ImmediateContext;
-    nvrhi::RefCountPtr<IDXGISwapChain> m_SwapChain;
+    caustica::rhi::RefCountPtr<IDXGIFactory1> m_DxgiFactory;
+    caustica::rhi::RefCountPtr<IDXGIAdapter> m_DxgiAdapter;
+    caustica::rhi::RefCountPtr<ID3D11Device> m_Device;
+    caustica::rhi::RefCountPtr<ID3D11DeviceContext> m_ImmediateContext;
+    caustica::rhi::RefCountPtr<IDXGISwapChain> m_SwapChain;
     DXGI_SWAP_CHAIN_DESC m_SwapChainDesc{};
     HWND m_hWnd = nullptr;
 
-    nvrhi::DeviceHandle m_NvrhiDevice;
-    nvrhi::TextureHandle m_RhiBackBuffer;
-    nvrhi::RefCountPtr<ID3D11Texture2D> m_D3D11BackBuffer;
+    caustica::rhi::DeviceHandle m_RhiDevice;
+    caustica::rhi::TextureHandle m_RhiBackBuffer;
+    caustica::rhi::RefCountPtr<ID3D11Texture2D> m_D3D11BackBuffer;
 
     std::string m_RendererString;
 
@@ -46,9 +46,9 @@ public:
         return m_RendererString.c_str();
     }
 
-    [[nodiscard]] nvrhi::IDevice* getDevice() const override
+    [[nodiscard]] caustica::rhi::IDevice* getDevice() const override
     {
-        return m_NvrhiDevice;
+        return m_RhiDevice;
     }
 
     bool beginFrame() override;
@@ -56,9 +56,9 @@ public:
     bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
     [[nodiscard]] bool queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
 
-    [[nodiscard]] nvrhi::GraphicsAPI getGraphicsAPI() const override
+    [[nodiscard]] caustica::rhi::GraphicsAPI getGraphicsAPI() const override
     {
-        return nvrhi::GraphicsAPI::D3D11;
+        return caustica::rhi::GraphicsAPI::D3D11;
     }
 protected:
     bool createInstanceInternal() override;
@@ -68,12 +68,12 @@ protected:
     void resizeSwapChain() override;
     void shutdown() override;
 
-    nvrhi::ITexture* getCurrentBackBuffer() override
+    caustica::rhi::ITexture* getCurrentBackBuffer() override
     {
         return m_RhiBackBuffer;
     }
 
-    nvrhi::ITexture* getBackBuffer(uint32_t index) override
+    caustica::rhi::ITexture* getBackBuffer(uint32_t index) override
     {
         if (index == 0)
             return m_RhiBackBuffer;

@@ -35,13 +35,13 @@ else()
 endif()
 #set(SHADERMAKE_OPTIONS_SPIRV "-D ENABLE_DEBUG_PRINT") # Disable SPIRV debug printf since it causes DXC to crash as of dxc 1.8.2505
 # SPIR-V cannot compile DX12 OMM ray-query variants (see shaders.cfg); match Linux.
-set(SHADERMAKE_OPTIONS_SPIRV "-D NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
+set(SHADERMAKE_OPTIONS_SPIRV "-D CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
 else()
 # DXIL is irrelevant on Linux
 set(SHADERMAKE_OPTIONS_DXIL "")
 # Don't enable DebugPrint with Linux DXC because that leads to segfaults in the compiler (as of v1.8.2407)
 # Disable DX12-only OMM ray-query flags for SPIR-V (see shaders.cfg OMM variants).
-set(SHADERMAKE_OPTIONS_SPIRV "-D NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
+set(SHADERMAKE_OPTIONS_SPIRV "-D CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=0 -D SPIRV")
 endif()
 
 if(CAUSTICA_WITH_AFTERMATH OR CAUSTICA_EMBED_SHADER_PDBS)
@@ -64,7 +64,7 @@ endif()
 set(caustica_shader_config_dxil "${CMAKE_CURRENT_SOURCE_DIR}/shaders.cfg")
 set(caustica_shader_config_vk "${CMAKE_CURRENT_SOURCE_DIR}/shaders_vk.cfg")
 file(READ "${caustica_shader_config_dxil}" caustica_shader_config_vk_contents)
-string(REGEX REPLACE "[^\n]*NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=1[^\n]*\n?" "" caustica_shader_config_vk_contents "${caustica_shader_config_vk_contents}")
+string(REGEX REPLACE "[^\n]*CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=1[^\n]*\n?" "" caustica_shader_config_vk_contents "${caustica_shader_config_vk_contents}")
 file(WRITE "${caustica_shader_config_vk}" "${caustica_shader_config_vk_contents}")
 
 set(caustica_shader_compile_common
@@ -320,7 +320,7 @@ target_include_directories(causticaApp PUBLIC
     "${CMAKE_SOURCE_DIR}/application/editor/ui"
     "${CMAKE_SOURCE_DIR}/application/editor/game"
 )
-target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${NVRHI_WITH_NVAPI}>)
+target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D12_WITH_NVAPI=$<BOOL:${CAUSTICA_RHI_WITH_NVAPI}>)
 target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_OIDN=$<BOOL:${CAUSTICA_WITH_OIDN}>)
 target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_PYTHON=$<BOOL:${CAUSTICA_WITH_PYTHON}>)
 target_compile_definitions(causticaApp PUBLIC CAUSTICA_WITH_NATIVE_DLSS=$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>)
@@ -379,7 +379,7 @@ if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
         message(FATAL_ERROR "CAUSTICA_D3D_AGILITY_SDK_VERSION must be defined when CAUSTICA_D3D_AGILITY_SDK_PATH is defined")
     endif()
     target_compile_definitions(causticaApp PUBLIC CAUSTICA_D3D_AGILITY_SDK_VERSION=${CAUSTICA_D3D_AGILITY_SDK_VERSION})
-    target_compile_definitions(causticaApp PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+    target_compile_definitions(causticaApp PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
     target_include_directories(causticaApp PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
 endif()
 
@@ -415,7 +415,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     if (MSVC)
         target_compile_options(${TARGET_NAME} PRIVATE /utf-8)
     endif()
-    target_link_libraries(${TARGET_NAME} PRIVATE causticaApp nvrhi)
+    target_link_libraries(${TARGET_NAME} PRIVATE causticaApp caustica_rhi)
     add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
     if (CAUSTICA_PACKAGE_SHADER_PACK)
         add_dependencies(${TARGET_NAME} causticaShaderPack)
@@ -454,7 +454,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:${project}>/D3D12/"
         )
-        target_compile_definitions(${project} PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+        target_compile_definitions(${project} PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
         target_include_directories(${project} PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
     endif()
 endmacro()
@@ -517,7 +517,7 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/D3D12Core.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/bin/x64/d3d12SDKLayers.dll "$<TARGET_FILE_DIR:caustica_py>/D3D12/"
         )
-        target_compile_definitions(caustica_py PRIVATE NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
+        target_compile_definitions(caustica_py PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
         target_include_directories(caustica_py PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
     endif()
 endif()

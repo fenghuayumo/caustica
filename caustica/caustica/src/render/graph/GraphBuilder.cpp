@@ -62,73 +62,73 @@ BufferHandle PassBuilder::createBuffer(const BufferDesc& desc)
     return m_graph->createBuffer(desc);
 }
 
-RenderPassContext::RenderPassContext(nvrhi::ICommandList* commandList, const GraphBuilder& graph)
+RenderPassContext::RenderPassContext(caustica::rhi::ICommandList* commandList, const GraphBuilder& graph)
     : m_commandList(commandList)
     , m_graph(&graph)
 {
 }
 
-nvrhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
+caustica::rhi::ITexture* RenderPassContext::texture(TextureHandle handle) const
 {
     assert(m_graph);
     return m_graph->resolveTexture(handle);
 }
 
-nvrhi::IBuffer* RenderPassContext::buffer(BufferHandle handle) const
+caustica::rhi::IBuffer* RenderPassContext::buffer(BufferHandle handle) const
 {
     assert(m_graph);
     return m_graph->resolveBuffer(handle);
 }
 
-nvrhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
+caustica::rhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
 {
     switch (access)
     {
     case TextureAccess::ShaderResource:
-        return nvrhi::ResourceStates::ShaderResource;
+        return caustica::rhi::ResourceStates::ShaderResource;
     case TextureAccess::RenderTarget:
-        return nvrhi::ResourceStates::RenderTarget;
+        return caustica::rhi::ResourceStates::RenderTarget;
     case TextureAccess::DepthWrite:
-        return nvrhi::ResourceStates::DepthWrite;
+        return caustica::rhi::ResourceStates::DepthWrite;
     case TextureAccess::UnorderedAccess:
-        return nvrhi::ResourceStates::UnorderedAccess;
+        return caustica::rhi::ResourceStates::UnorderedAccess;
     case TextureAccess::CopySource:
-        return nvrhi::ResourceStates::CopySource;
+        return caustica::rhi::ResourceStates::CopySource;
     case TextureAccess::CopyDest:
-        return nvrhi::ResourceStates::CopyDest;
+        return caustica::rhi::ResourceStates::CopyDest;
     default:
-        return nvrhi::ResourceStates::Common;
+        return caustica::rhi::ResourceStates::Common;
     }
 }
 
-nvrhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
+caustica::rhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
 {
     switch (access)
     {
     case BufferAccess::ShaderResource:
-        return nvrhi::ResourceStates::ShaderResource;
+        return caustica::rhi::ResourceStates::ShaderResource;
     case BufferAccess::UnorderedAccess:
-        return nvrhi::ResourceStates::UnorderedAccess;
+        return caustica::rhi::ResourceStates::UnorderedAccess;
     case BufferAccess::ConstantBuffer:
-        return nvrhi::ResourceStates::ConstantBuffer;
+        return caustica::rhi::ResourceStates::ConstantBuffer;
     case BufferAccess::CopySource:
-        return nvrhi::ResourceStates::CopySource;
+        return caustica::rhi::ResourceStates::CopySource;
     case BufferAccess::CopyDest:
-        return nvrhi::ResourceStates::CopyDest;
+        return caustica::rhi::ResourceStates::CopyDest;
     case BufferAccess::VertexBuffer:
-        return nvrhi::ResourceStates::VertexBuffer;
+        return caustica::rhi::ResourceStates::VertexBuffer;
     case BufferAccess::IndexBuffer:
-        return nvrhi::ResourceStates::IndexBuffer;
+        return caustica::rhi::ResourceStates::IndexBuffer;
     case BufferAccess::IndirectArgument:
-        return nvrhi::ResourceStates::IndirectArgument;
+        return caustica::rhi::ResourceStates::IndirectArgument;
     case BufferAccess::AccelStructBuildInput:
-        return nvrhi::ResourceStates::AccelStructBuildInput;
+        return caustica::rhi::ResourceStates::AccelStructBuildInput;
     default:
-        return nvrhi::ResourceStates::Common;
+        return caustica::rhi::ResourceStates::Common;
     }
 }
 
-void GraphBuilder::setDevice(nvrhi::IDevice* device)
+void GraphBuilder::setDevice(caustica::rhi::IDevice* device)
 {
     if (m_device != device)
     {
@@ -175,7 +175,7 @@ bool GraphBuilder::isPassActive(const std::string_view name) const
     return false;
 }
 
-TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState)
+TextureHandle GraphBuilder::importTexture(caustica::rhi::ITexture* texture, caustica::rhi::ResourceStates initialState)
 {
     assert(texture);
 
@@ -192,12 +192,12 @@ TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, nvrhi::Resou
     return handle;
 }
 
-TextureHandle GraphBuilder::importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess)
+TextureHandle GraphBuilder::importTexture(caustica::rhi::ITexture* texture, TextureAccess initialAccess)
 {
     return importTexture(texture, accessToState(initialAccess));
 }
 
-BufferHandle GraphBuilder::importBuffer(nvrhi::IBuffer* buffer, nvrhi::ResourceStates initialState)
+BufferHandle GraphBuilder::importBuffer(caustica::rhi::IBuffer* buffer, caustica::rhi::ResourceStates initialState)
 {
     assert(buffer);
 
@@ -214,29 +214,29 @@ BufferHandle GraphBuilder::importBuffer(nvrhi::IBuffer* buffer, nvrhi::ResourceS
     return handle;
 }
 
-BufferHandle GraphBuilder::importBuffer(nvrhi::IBuffer* buffer, BufferAccess initialAccess)
+BufferHandle GraphBuilder::importBuffer(caustica::rhi::IBuffer* buffer, BufferAccess initialAccess)
 {
     return importBuffer(buffer, accessToState(initialAccess));
 }
 
-nvrhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc, bool isVirtual) const
+caustica::rhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc, bool isVirtual) const
 {
     assert(m_device);
 
     const FormatInfo formatInfo = getFormatInfo(desc.format);
-    nvrhi::TextureDesc nativeDesc;
+    caustica::rhi::TextureDesc nativeDesc;
     nativeDesc.debugName = desc.name.empty() ? "rg_transient" : desc.name.c_str();
     nativeDesc.width = desc.width;
     nativeDesc.height = desc.height;
     nativeDesc.depth = desc.depth;
     nativeDesc.mipLevels = desc.mipLevels;
     nativeDesc.arraySize = desc.arraySize;
-    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
+    nativeDesc.format = toNativeFormat(desc.format);
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
     nativeDesc.isVirtual = isVirtual;
-    nativeDesc.initialState = nvrhi::ResourceStates::Common;
+    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createTexture(nativeDesc);
@@ -248,18 +248,18 @@ TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
 
     const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
     GraphTexture resource{};
-    resource.currentState = nvrhi::ResourceStates::Common;
+    resource.currentState = caustica::rhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
     resource.desc = desc;
     m_textures.push_back(resource);
     return handle;
 }
 
-nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc, bool isVirtual) const
+caustica::rhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc, bool isVirtual) const
 {
     assert(m_device);
 
-    nvrhi::BufferDesc nativeDesc;
+    caustica::rhi::BufferDesc nativeDesc;
     nativeDesc.debugName = desc.name.empty() ? "rg_transient_buffer" : desc.name;
     nativeDesc.byteSize = desc.byteSize;
     nativeDesc.structStride = desc.isStructuredBuffer ? desc.structuredStride : 0;
@@ -270,9 +270,9 @@ nvrhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc, boo
     nativeDesc.isDrawIndirectArgs = desc.isDrawIndirectArgs;
     nativeDesc.canHaveRawViews = desc.canHaveRawViews;
     nativeDesc.canHaveTypedViews = desc.canHaveTypedViews;
-    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
+    nativeDesc.format = toNativeFormat(desc.format);
     nativeDesc.isVirtual = isVirtual;
-    nativeDesc.initialState = nvrhi::ResourceStates::Common;
+    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createBuffer(nativeDesc);
@@ -284,14 +284,14 @@ BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
 
     const BufferHandle handle{ static_cast<uint32_t>(m_buffers.size()) };
     GraphBuffer resource{};
-    resource.currentState = nvrhi::ResourceStates::Common;
+    resource.currentState = caustica::rhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
     resource.desc = desc;
     m_buffers.push_back(resource);
     return handle;
 }
 
-void GraphBuilder::extractTexture(TextureHandle handle, nvrhi::ResourceStates finalState)
+void GraphBuilder::extractTexture(TextureHandle handle, caustica::rhi::ResourceStates finalState)
 {
     assert(isValid(handle, m_textures.size()) && "RenderGraph extract references invalid texture handle");
     if (!isValid(handle, m_textures.size()))
@@ -304,7 +304,7 @@ void GraphBuilder::extractTexture(TextureHandle handle, TextureAccess finalAcces
     extractTexture(handle, accessToState(finalAccess));
 }
 
-void GraphBuilder::extractBuffer(BufferHandle handle, nvrhi::ResourceStates finalState)
+void GraphBuilder::extractBuffer(BufferHandle handle, caustica::rhi::ResourceStates finalState)
 {
     assert(isValid(handle, m_buffers.size()) && "RenderGraph extract references invalid buffer handle");
     if (!isValid(handle, m_buffers.size()))
@@ -698,7 +698,7 @@ void GraphBuilder::releaseTransientResources()
         }
     }
 
-    for (nvrhi::HeapHandle& heap : m_transientHeaps)
+    for (caustica::rhi::HeapHandle& heap : m_transientHeaps)
     {
         if (heap)
             m_transientHeapPool.push_back(heap);
@@ -708,12 +708,12 @@ void GraphBuilder::releaseTransientResources()
     m_bufferAliasingBarriers.clear();
 }
 
-void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access)
+void GraphBuilder::transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, TextureAccess access)
 {
     transitionTexture(commandList, handle, accessToState(access));
 }
 
-void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, nvrhi::ResourceStates targetState)
+void GraphBuilder::transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState)
 {
     if (!isValid(handle, m_textures.size()))
         return;
@@ -725,16 +725,16 @@ void GraphBuilder::transitionTexture(nvrhi::ICommandList* commandList, TextureHa
     if (resource.currentState == targetState)
         return;
 
-    commandList->setTextureState(resource.texture, nvrhi::AllSubresources, targetState);
+    commandList->setTextureState(resource.texture, caustica::rhi::AllSubresources, targetState);
     resource.currentState = targetState;
 }
 
-void GraphBuilder::transitionBuffer(nvrhi::ICommandList* commandList, BufferHandle handle, BufferAccess access)
+void GraphBuilder::transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, BufferAccess access)
 {
     transitionBuffer(commandList, handle, accessToState(access));
 }
 
-void GraphBuilder::transitionBuffer(nvrhi::ICommandList* commandList, BufferHandle handle, nvrhi::ResourceStates targetState)
+void GraphBuilder::transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, caustica::rhi::ResourceStates targetState)
 {
     if (!isValid(handle, m_buffers.size()))
         return;
@@ -750,7 +750,7 @@ void GraphBuilder::transitionBuffer(nvrhi::ICommandList* commandList, BufferHand
     resource.currentState = targetState;
 }
 
-void GraphBuilder::emitTextureAliasingBarrier(nvrhi::ICommandList* commandList, TextureHandle handle)
+void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::ICommandList* commandList, TextureHandle handle)
 {
     if (!isValid(handle, m_textures.size()))
         return;
@@ -760,10 +760,10 @@ void GraphBuilder::emitTextureAliasingBarrier(nvrhi::ICommandList* commandList, 
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        nvrhi::ITexture* before = isValid(barrier.before, m_textures.size())
+        caustica::rhi::ITexture* before = isValid(barrier.before, m_textures.size())
             ? m_textures[barrier.before.index].texture
             : nullptr;
-        nvrhi::ITexture* after = m_textures[handle.index].texture;
+        caustica::rhi::ITexture* after = m_textures[handle.index].texture;
         if (after)
         {
             commandList->textureAliasingBarrier(before, after);
@@ -773,7 +773,7 @@ void GraphBuilder::emitTextureAliasingBarrier(nvrhi::ICommandList* commandList, 
     }
 }
 
-void GraphBuilder::emitBufferAliasingBarrier(nvrhi::ICommandList* commandList, BufferHandle handle)
+void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::ICommandList* commandList, BufferHandle handle)
 {
     if (!isValid(handle, m_buffers.size()))
         return;
@@ -783,10 +783,10 @@ void GraphBuilder::emitBufferAliasingBarrier(nvrhi::ICommandList* commandList, B
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        nvrhi::IBuffer* before = isValid(barrier.before, m_buffers.size())
+        caustica::rhi::IBuffer* before = isValid(barrier.before, m_buffers.size())
             ? m_buffers[barrier.before.index].buffer
             : nullptr;
-        nvrhi::IBuffer* after = m_buffers[handle.index].buffer;
+        caustica::rhi::IBuffer* after = m_buffers[handle.index].buffer;
         if (after)
         {
             commandList->bufferAliasingBarrier(before, after);
@@ -847,7 +847,7 @@ bool GraphBuilder::passUsesBufferAsWrite(const Pass& pass, BufferHandle handle)
     return false;
 }
 
-void GraphBuilder::transitionExtractedResources(nvrhi::ICommandList* commandList)
+void GraphBuilder::transitionExtractedResources(caustica::rhi::ICommandList* commandList)
 {
     bool hasTransitions = false;
 
@@ -857,7 +857,7 @@ void GraphBuilder::transitionExtractedResources(nvrhi::ICommandList* commandList
         if (!resource.finalState.has_value())
             continue;
 
-        const nvrhi::ResourceStates before = resource.currentState;
+        const caustica::rhi::ResourceStates before = resource.currentState;
         transitionTexture(commandList, TextureHandle{ static_cast<uint32_t>(i) }, *resource.finalState);
         hasTransitions = hasTransitions || before != resource.currentState;
     }
@@ -868,7 +868,7 @@ void GraphBuilder::transitionExtractedResources(nvrhi::ICommandList* commandList
         if (!resource.finalState.has_value())
             continue;
 
-        const nvrhi::ResourceStates before = resource.currentState;
+        const caustica::rhi::ResourceStates before = resource.currentState;
         transitionBuffer(commandList, BufferHandle{ static_cast<uint32_t>(i) }, *resource.finalState);
         hasTransitions = hasTransitions || before != resource.currentState;
     }
@@ -877,7 +877,7 @@ void GraphBuilder::transitionExtractedResources(nvrhi::ICommandList* commandList
         commandList->commitBarriers();
 }
 
-void GraphBuilder::execute(nvrhi::ICommandList* commandList)
+void GraphBuilder::execute(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
     if (!m_compiled)
@@ -955,31 +955,31 @@ void GraphBuilder::reset()
     m_compiled = false;
 }
 
-nvrhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const
+caustica::rhi::ITexture* GraphBuilder::resolveTexture(TextureHandle handle) const
 {
     if (!isValid(handle, m_textures.size()))
         return nullptr;
     return m_textures[handle.index].texture;
 }
 
-nvrhi::IBuffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
+caustica::rhi::IBuffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
 {
     if (!isValid(handle, m_buffers.size()))
         return nullptr;
     return m_buffers[handle.index].buffer;
 }
 
-nvrhi::ResourceStates GraphBuilder::textureState(TextureHandle handle) const
+caustica::rhi::ResourceStates GraphBuilder::textureState(TextureHandle handle) const
 {
     if (!isValid(handle, m_textures.size()))
-        return nvrhi::ResourceStates::Common;
+        return caustica::rhi::ResourceStates::Common;
     return m_textures[handle.index].currentState;
 }
 
-nvrhi::ResourceStates GraphBuilder::bufferState(BufferHandle handle) const
+caustica::rhi::ResourceStates GraphBuilder::bufferState(BufferHandle handle) const
 {
     if (!isValid(handle, m_buffers.size()))
-        return nvrhi::ResourceStates::Common;
+        return caustica::rhi::ResourceStates::Common;
     return m_buffers[handle.index].currentState;
 }
 

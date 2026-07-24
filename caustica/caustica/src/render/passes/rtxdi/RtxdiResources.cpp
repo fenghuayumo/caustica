@@ -24,7 +24,7 @@ uint32_t getNextPowerOf2(uint32_t a)
 }
 
 RtxdiResources::RtxdiResources(
-    nvrhi::IDevice* device, 
+    caustica::rhi::IDevice* device, 
     const rtxdi::ReSTIRDIContext& context,
     const rtxdi::ReSTIRPTContext& ptContext,
     const rtxdi::RISBufferSegmentAllocator& risBufferSegmentAllocator,
@@ -36,30 +36,30 @@ RtxdiResources::RtxdiResources(
     , m_MaxPrimitiveLights(maxPrimitiveLights)
     , m_MaxGeometryInstances(maxGeometryInstances)
 {
-    nvrhi::BufferDesc taskBufferDesc;
+    caustica::rhi::BufferDesc taskBufferDesc;
     taskBufferDesc.byteSize = sizeof(PrepareLightsTask) * std::max((maxEmissiveMeshes + maxPrimitiveLights), 1u);
     taskBufferDesc.structStride = sizeof(PrepareLightsTask);
-    taskBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    taskBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     taskBufferDesc.keepInitialState = true;
     taskBufferDesc.debugName = "TaskBuffer";
     taskBufferDesc.canHaveUAVs = true;
     TaskBuffer = device->createBuffer(taskBufferDesc);
 
 
-    nvrhi::BufferDesc primitiveLightBufferDesc;
+    caustica::rhi::BufferDesc primitiveLightBufferDesc;
     primitiveLightBufferDesc.byteSize = sizeof(PolymorphicLightInfoFull) * std::max(maxPrimitiveLights, 1u);
     primitiveLightBufferDesc.structStride = sizeof(PolymorphicLightInfoFull);
-    primitiveLightBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    primitiveLightBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     primitiveLightBufferDesc.keepInitialState = true;
     primitiveLightBufferDesc.debugName = "PrimitiveLightBuffer";
     PrimitiveLightBuffer = device->createBuffer(primitiveLightBufferDesc);
 
 
-    nvrhi::BufferDesc risBufferDesc;
+    caustica::rhi::BufferDesc risBufferDesc;
     risBufferDesc.byteSize = sizeof(uint32_t) * 2 * std::max(risBufferSegmentAllocator.getTotalSizeInElements(), 1u); // RG32_UINT per element
-    risBufferDesc.format = nvrhi::Format::RG32_UINT;
+    risBufferDesc.format = caustica::rhi::Format::RG32_UINT;
     risBufferDesc.canHaveTypedViews = true;
-    risBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    risBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     risBufferDesc.keepInitialState = true;
     risBufferDesc.debugName = "RisBuffer";
     risBufferDesc.canHaveUAVs = true;
@@ -67,7 +67,7 @@ RtxdiResources::RtxdiResources(
 
 
     risBufferDesc.byteSize = sizeof(uint32_t) * 8 * std::max(risBufferSegmentAllocator.getTotalSizeInElements(), 1u); // RGBA32_UINT x 2 per element
-    risBufferDesc.format = nvrhi::Format::RGBA32_UINT;
+    risBufferDesc.format = caustica::rhi::Format::RGBA32_UINT;
     risBufferDesc.debugName = "RisLightDataBuffer";
     RisLightDataBuffer = device->createBuffer(risBufferDesc);
 
@@ -75,87 +75,87 @@ RtxdiResources::RtxdiResources(
     uint32_t maxLocalLights = maxEmissiveTriangles + maxPrimitiveLights;
     uint32_t lightBufferElements = maxLocalLights * 2;
 
-    nvrhi::BufferDesc lightBufferDesc;
+    caustica::rhi::BufferDesc lightBufferDesc;
     lightBufferDesc.byteSize = sizeof(PolymorphicLightInfoFull) * std::max(lightBufferElements, 1u);
     lightBufferDesc.structStride = sizeof(PolymorphicLightInfoFull);
-    lightBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    lightBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     lightBufferDesc.keepInitialState = true;
     lightBufferDesc.debugName = "LightDataBuffer";
     lightBufferDesc.canHaveUAVs = true;
     LightDataBuffer = device->createBuffer(lightBufferDesc);
 
 
-    nvrhi::BufferDesc geometryInstanceToLightBufferDesc;
+    caustica::rhi::BufferDesc geometryInstanceToLightBufferDesc;
     geometryInstanceToLightBufferDesc.byteSize = sizeof(uint32_t) * std::max(maxGeometryInstances, 1u);
     geometryInstanceToLightBufferDesc.structStride = sizeof(uint32_t);
-    geometryInstanceToLightBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    geometryInstanceToLightBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     geometryInstanceToLightBufferDesc.keepInitialState = true;
     geometryInstanceToLightBufferDesc.debugName = "GeometryInstanceToLightBuffer";
     GeometryInstanceToLightBuffer = device->createBuffer(geometryInstanceToLightBufferDesc);
 
 
-    nvrhi::BufferDesc lightIndexMappingBufferDesc;
+    caustica::rhi::BufferDesc lightIndexMappingBufferDesc;
     lightIndexMappingBufferDesc.byteSize = sizeof(uint32_t) * std::max(lightBufferElements, 1u);
-    lightIndexMappingBufferDesc.format = nvrhi::Format::R32_UINT;
+    lightIndexMappingBufferDesc.format = caustica::rhi::Format::R32_UINT;
     lightIndexMappingBufferDesc.canHaveTypedViews = true;
-    lightIndexMappingBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    lightIndexMappingBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     lightIndexMappingBufferDesc.keepInitialState = true;
     lightIndexMappingBufferDesc.debugName = "LightIndexMappingBuffer";
     lightIndexMappingBufferDesc.canHaveUAVs = true;
     LightIndexMappingBuffer = device->createBuffer(lightIndexMappingBufferDesc);
     
 
-    nvrhi::BufferDesc neighborOffsetBufferDesc;
+    caustica::rhi::BufferDesc neighborOffsetBufferDesc;
     neighborOffsetBufferDesc.byteSize = context.GetStaticParameters().NeighborOffsetCount * 2;
-    neighborOffsetBufferDesc.format = nvrhi::Format::RG8_SNORM;
+    neighborOffsetBufferDesc.format = caustica::rhi::Format::RG8_SNORM;
     neighborOffsetBufferDesc.canHaveTypedViews = true;
     neighborOffsetBufferDesc.debugName = "NeighborOffsets";
-    neighborOffsetBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    neighborOffsetBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     neighborOffsetBufferDesc.keepInitialState = true;
     NeighborOffsetsBuffer = device->createBuffer(neighborOffsetBufferDesc);
 
 
-    nvrhi::BufferDesc lightReservoirBufferDesc;
+    caustica::rhi::BufferDesc lightReservoirBufferDesc;
     lightReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
     lightReservoirBufferDesc.structStride = sizeof(RTXDI_PackedDIReservoir);
-    lightReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    lightReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     lightReservoirBufferDesc.keepInitialState = true;
     lightReservoirBufferDesc.debugName = "LightReservoirBuffer";
     lightReservoirBufferDesc.canHaveUAVs = true;
     LightReservoirBuffer = device->createBuffer(lightReservoirBufferDesc);
 
 
-    nvrhi::BufferDesc giReservoirBufferDesc;
+    caustica::rhi::BufferDesc giReservoirBufferDesc;
     giReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedGIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
     giReservoirBufferDesc.structStride = sizeof(RTXDI_PackedGIReservoir);
-    giReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    giReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     giReservoirBufferDesc.keepInitialState = true;
     giReservoirBufferDesc.debugName = "GIReservoirBuffer";
     giReservoirBufferDesc.canHaveUAVs = true;
     GIReservoirBuffer = device->createBuffer(giReservoirBufferDesc);
 
 
-    nvrhi::BufferDesc ptReservoirBufferDesc;
+    caustica::rhi::BufferDesc ptReservoirBufferDesc;
     ptReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedPTReservoir) * ptContext.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRPTReservoirBuffers;
     ptReservoirBufferDesc.structStride = sizeof(RTXDI_PackedPTReservoir);
-    ptReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    ptReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     ptReservoirBufferDesc.keepInitialState = true;
     ptReservoirBufferDesc.debugName = "PTReservoirBuffer";
     ptReservoirBufferDesc.canHaveUAVs = true;
     PTReservoirBuffer = device->createBuffer(ptReservoirBufferDesc);
 
-    nvrhi::TextureDesc localLightPdfDesc;
+    caustica::rhi::TextureDesc localLightPdfDesc;
     rtxdi::ComputePdfTextureSize(maxLocalLights, localLightPdfDesc.width, localLightPdfDesc.height, localLightPdfDesc.mipLevels);
     assert(localLightPdfDesc.width * localLightPdfDesc.height >= maxLocalLights);
     localLightPdfDesc.isUAV = true;
     localLightPdfDesc.debugName = "LocalLightPdf";
-    localLightPdfDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    localLightPdfDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     localLightPdfDesc.keepInitialState = true;
-    localLightPdfDesc.format = nvrhi::Format::R32_FLOAT; // Use FP32 here to allow a wide range of flux values, esp. when downsampled.
+    localLightPdfDesc.format = caustica::rhi::Format::R32_FLOAT; // Use FP32 here to allow a wide range of flux values, esp. when downsampled.
     LocalLightPdfTexture = device->createTexture(localLightPdfDesc);
 }
 
-void RtxdiResources::initializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount)
+void RtxdiResources::initializeNeighborOffsets(caustica::rhi::ICommandList* commandList, uint32_t neighborOffsetCount)
 {
     if (m_NeighborOffsetsInitialized)
         return;

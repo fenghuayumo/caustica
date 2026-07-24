@@ -40,7 +40,7 @@ using namespace caustica;
 
 static const int    c_BlockCompressionBlockSize = 4;
 
-EnvMapProcessor::EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
+EnvMapProcessor::EnvMapProcessor( caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute )
     : m_device(device)
     , m_textureCache(textureCache)
 {
@@ -85,49 +85,49 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     std::vector<caustica::ShaderMacro> shaderMacros;
     //shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" }));
 
-    m_baseLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, nvrhi::ShaderType::Compute);
-    m_MIPReduceCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, nvrhi::ShaderType::Compute);
+    m_baseLayerCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "BaseLayerCS", &shaderMacros, caustica::rhi::ShaderType::Compute);
+    m_MIPReduceCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/EnvMapProcessor.hlsl", "MIPReduceCS", &shaderMacros, caustica::rhi::ShaderType::Compute);
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            //nvrhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(1),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::Texture_SRV(10),
-            nvrhi::BindingLayoutItem::Texture_SRV(12),
-            nvrhi::BindingLayoutItem::Sampler(0),
-            nvrhi::BindingLayoutItem::Sampler(1),
-            nvrhi::BindingLayoutItem::Sampler(2),
-            nvrhi::BindingLayoutItem::Sampler(3),
-            nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
-            nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(1),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(10),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(12),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::Sampler(1),
+            caustica::rhi::BindingLayoutItem::Sampler(2),
+            caustica::rhi::BindingLayoutItem::Sampler(3),
+            caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
         };
         m_commonBindingLayout = m_device->createBindingLayout(layoutDesc);
     }
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            //nvrhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(1),
-            nvrhi::BindingLayoutItem::Sampler(0),
-            nvrhi::BindingLayoutItem::Sampler(1),
-            nvrhi::BindingLayoutItem::Sampler(2),
-            nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
-            nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            //caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(1),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::Sampler(1),
+            caustica::rhi::BindingLayoutItem::Sampler(2),
+            caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
         };
         m_reduceBindingLayout = m_device->createBindingLayout(layoutDesc);
     }
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
 
     pipelineDesc.bindingLayouts = { m_commonBindingLayout };
     pipelineDesc.CS = m_baseLayerCS;
@@ -137,22 +137,22 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     pipelineDesc.CS = m_MIPReduceCS;
     m_MIPReducePSO = m_device->createComputePipeline(pipelineDesc);
 
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.setBorderColor(nvrhi::Color(0.f));
+    caustica::rhi::SamplerDesc samplerDesc;
+    samplerDesc.setBorderColor(caustica::rhi::Color(0.f));
     samplerDesc.setAllFilters(true);
     samplerDesc.setMipFilter(true);
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
     m_linearSampler = m_device->createSampler(samplerDesc);
 
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Clamp);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Clamp);
     m_linearClampSampler = m_device->createSampler(samplerDesc);
 
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
     samplerDesc.setAllFilters(false);
     m_pointSampler = m_device->createSampler(samplerDesc);
 
-    samplerDesc = nvrhi::SamplerDesc();
-    samplerDesc.setAddressU(nvrhi::SamplerAddressMode::Wrap);
+    samplerDesc = caustica::rhi::SamplerDesc();
+    samplerDesc.setAddressU(caustica::rhi::SamplerAddressMode::Wrap);
     samplerDesc.setAllFilters(true);
     m_equiRectSampler = m_device->createSampler(samplerDesc);
 
@@ -163,19 +163,19 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     {
         std::vector<caustica::ShaderMacro> smQ0 = { caustica::ShaderMacro({ "QUALITY", "0" }) };
         std::vector<caustica::ShaderMacro> smQ1 = { caustica::ShaderMacro({ "QUALITY", "1" }) };
-        m_BC6UCompressLowCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ0, nvrhi::ShaderType::Compute);
-        m_BC6UCompressHighCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ1, nvrhi::ShaderType::Compute);
+        m_BC6UCompressLowCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ0, caustica::rhi::ShaderType::Compute);
+        m_BC6UCompressHighCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BC6UCompress.hlsl", "CSMain", &smQ1, caustica::rhi::ShaderType::Compute);
 
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Sampler(0)
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0)
         };
         m_BC6UCompressBindingLayout = m_device->createBindingLayout(layoutDesc);
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { m_BC6UCompressBindingLayout };
         pipelineDesc.CS = m_BC6UCompressLowCS;
         m_BC6UCompressLowPSO = m_device->createComputePipeline(pipelineDesc);
@@ -186,33 +186,33 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     // === BRDF LUT Generation ===
     if (m_enableRasterPrecompute)
     {
-        m_brdfLUTCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BRDFLUTGenerator.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+        m_brdfLUTCS = shaderFactory->createShader("caustica/shaders/render/lighting/distant/BRDFLUTGenerator.hlsl", "main", nullptr, caustica::rhi::ShaderType::Compute);
         
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0)
         };
         m_brdfLUTBindingLayout = m_device->createBindingLayout(layoutDesc);
         
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { m_brdfLUTBindingLayout };
         pipelineDesc.CS = m_brdfLUTCS;
         m_brdfLUTPSO = m_device->createComputePipeline(pipelineDesc);
         
-        m_brdfLUTConstantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+        m_brdfLUTConstantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
             sizeof(BRDFLUTConstants), "BRDFLUTConstants", caustica::c_MaxRenderPassConstantBufferVersions));
         
         // create BRDF LUT texture
-        nvrhi::TextureDesc lutDesc;
+        caustica::rhi::TextureDesc lutDesc;
         lutDesc.width = c_BRDFLUTSize;
         lutDesc.height = c_BRDFLUTSize;
-        lutDesc.format = nvrhi::Format::RG16_FLOAT;
-        lutDesc.dimension = nvrhi::TextureDimension::Texture2D;
+        lutDesc.format = caustica::rhi::Format::RG16_FLOAT;
+        lutDesc.dimension = caustica::rhi::TextureDimension::Texture2D;
         lutDesc.debugName = "BRDF_LUT";
         lutDesc.isUAV = true;
-        lutDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        lutDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
         lutDesc.keepInitialState = true;
         m_brdfLUT = m_device->createTexture(lutDesc);
     }
@@ -220,13 +220,13 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     // === GGX Pre-filtering ===
     if (m_enableRasterPrecompute)
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::PushConstants(0, sizeof(GGXPrefilterConstants)),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Sampler(0)
+            caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(GGXPrefilterConstants)),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0)
         };
         m_ggxPrefilterBindingLayout = m_device->createBindingLayout(layoutDesc);
                 
@@ -244,13 +244,13 @@ void EnvMapProcessor::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebu
     // === Diffuse Irradiance Convolution ===
     if (m_enableRasterPrecompute)
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::PushConstants(0, sizeof(IrradianceConvolveConstants)),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Sampler(0)
+            caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(IrradianceConvolveConstants)),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0)
         };
         m_irradianceConvolveBindingLayout = m_device->createBindingLayout(layoutDesc);
                 
@@ -286,12 +286,12 @@ void EnvMapProcessor::initBuffers(uint cubeDim)
     m_cubeDim = cubeDim;
 
     // Main constant buffer
-    m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+    m_constantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
         sizeof(EnvMapProcessorConstants), "EnvMapProcessorConstants", caustica::c_MaxRenderPassConstantBufferVersions * 5));	// *5 we could be updating few times per frame
 
     // Main cubemap texture
     {
-        nvrhi::TextureDesc desc;
+        caustica::rhi::TextureDesc desc;
 
         uint mipLevels = uint(std::log2( (float)m_cubeDim / c_BlockCompressionBlockSize ) + 0.5f );  // stop at the BC block min size (4x4)
 
@@ -300,12 +300,12 @@ void EnvMapProcessor::initBuffers(uint cubeDim)
         desc.depth  = 1;
         desc.arraySize = 6;
         desc.mipLevels = mipLevels;
-        desc.format = nvrhi::Format::RGBA16_FLOAT; //(m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)?nvrhi::Format::RGBA32_FLOAT:nvrhi::Format::RGBA16_FLOAT;
-        desc.dimension = nvrhi::TextureDimension::TextureCube;
+        desc.format = caustica::rhi::Format::RGBA16_FLOAT; //(m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN)?caustica::rhi::Format::RGBA32_FLOAT:caustica::rhi::Format::RGBA16_FLOAT;
+        desc.dimension = caustica::rhi::TextureDimension::TextureCube;
         desc.debugName = "EnvMapProcessorMainCube";
         desc.isUAV = true;
-        desc.sharedResourceFlags = nvrhi::SharedResourceFlags::None;
-        desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        desc.sharedResourceFlags = caustica::rhi::SharedResourceFlags::None;
+        desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
         desc.keepInitialState = true;
 
         m_cubemap = m_device->createTexture(desc);
@@ -316,14 +316,14 @@ void EnvMapProcessor::initBuffers(uint cubeDim)
         {
             // BC6H compression resources: final compressed
             desc = m_cubemapDesc; // restore original cubemap settings
-            desc.format = nvrhi::Format::BC6H_UFLOAT;
-            desc.initialState = nvrhi::ResourceStates::CopyDest;
+            desc.format = caustica::rhi::Format::BC6H_UFLOAT;
+            desc.initialState = caustica::rhi::ResourceStates::CopyDest;
             desc.debugName = "EnvMapProcessorMainCubeBC6H";
             desc.isUAV = false;
             m_cubemapBC6H = m_device->createTexture(desc);
             // BC6H compression resources: compression scratch (UAV target)
-            desc.format = nvrhi::Format::RGBA32_UINT;
-            desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+            desc.format = caustica::rhi::Format::RGBA32_UINT;
+            desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
             desc.isUAV = true;
             desc.width = m_cubeDim / c_BlockCompressionBlockSize;
             desc.height = m_cubeDim / c_BlockCompressionBlockSize;
@@ -350,9 +350,9 @@ int EnvMapProcessor::getTargetCubeResolution() const
     return m_targetResolution; 
 }
 
-void EnvMapProcessor::preUpdate(nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
+void EnvMapProcessor::preUpdate(caustica::rhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
 {
-    if( m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
+    if( m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN && m_BC6UCompressionEnabled )
     {
         caustica::warning("There is an unresolved bug in BC6U cubemap compression on Vulkan. Disabling compression until it is fixed.");
         m_BC6UCompressionEnabled = false;
@@ -394,7 +394,7 @@ void EnvMapProcessor::preUpdate(nvrhi::ICommandList* commandList, caustica::rend
             m_device->waitForIdle();
             commandList->open();
 
-            if (image && image->format != nvrhi::Format::UNKNOWN)
+            if (image && image->format != caustica::rhi::Format::UNKNOWN)
             {
                 if (image->arraySize == 6)
                     m_loadedSourceBackgroundTextureCubemap = image;
@@ -415,7 +415,7 @@ void EnvMapProcessor::preUpdate(nvrhi::ICommandList* commandList, caustica::rend
     }
 }
 
-bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
+bool EnvMapProcessor::update(caustica::rhi::ICommandList* commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & _settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate)
 {
     UpdateSettings settings = _settings;
 
@@ -480,39 +480,39 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
     }
 
     // Bindings
-    nvrhi::BindingSetItem sourceCubemapBinding = nvrhi::BindingSetItem::Texture_SRV(
+    caustica::rhi::BindingSetItem sourceCubemapBinding = caustica::rhi::BindingSetItem::Texture_SRV(
         1,
         (m_loadedSourceBackgroundTextureCubemap != nullptr)
             ? m_loadedSourceBackgroundTextureCubemap->gpu.texture
-            : (nvrhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get(),
-        nvrhi::Format::UNKNOWN,
-        nvrhi::AllSubresources,
-        nvrhi::TextureDimension::TextureCubeArray);
-    nvrhi::BindingSetDesc bindingSetDesc;
+            : (caustica::rhi::TextureHandle)renderDevice.builtins().blackCubeMapArray().Get(),
+        caustica::rhi::Format::UNKNOWN,
+        caustica::rhi::AllSubresources,
+        caustica::rhi::TextureDimension::TextureCubeArray);
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-            //nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-            nvrhi::BindingSetItem::Texture_UAV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+            //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+            caustica::rhi::BindingSetItem::Texture_UAV(1, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(1, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, (m_loadedSourceBackgroundTextureEquirect != nullptr) ? (m_loadedSourceBackgroundTextureEquirect->gpu.texture) : ((caustica::rhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
             sourceCubemapBinding,
-            nvrhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getTransmittanceTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            nvrhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getSkyViewTexture()) : ((nvrhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
-            //nvrhi::BindingSetItem::Texture_UAV(0, m_Cubemap),
-            nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
-            nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
-            nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
-            nvrhi::BindingSetItem::Sampler(3, m_linearClampSampler),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
+            caustica::rhi::BindingSetItem::Texture_SRV(10, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getTransmittanceTexture()) : ((caustica::rhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            caustica::rhi::BindingSetItem::Texture_SRV(12, (m_proceduralSky != nullptr && proceduralSkyEnabled) ? (m_proceduralSky->getSkyViewTexture()) : ((caustica::rhi::TextureHandle)renderDevice.builtins().blackTexture().Get())),
+            //caustica::rhi::BindingSetItem::Texture_UAV(0, m_Cubemap),
+            caustica::rhi::BindingSetItem::Sampler(0, m_pointSampler),
+            caustica::rhi::BindingSetItem::Sampler(1, m_linearSampler),
+            caustica::rhi::BindingSetItem::Sampler(2, m_equiRectSampler),
+            caustica::rhi::BindingSetItem::Sampler(3, m_linearClampSampler),
+            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            caustica::rhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
     };
-    nvrhi::BindingSetHandle bindingSetBake = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSetBake = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
 
     {
         // Base bake
         {
             RAII_SCOPE(commandList->beginMarker("ProcSkyBaseBake");, commandList->endMarker(); );
-            nvrhi::ComputeState state;
+            caustica::rhi::ComputeState state;
             state.bindings = { bindingSetBake };
             state.pipeline = m_baseLayerPSO;
 
@@ -525,7 +525,7 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
             commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
         }
 
-        commandList->setTextureState(m_cubemap, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_cubemap, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
     }
 
     {
@@ -535,21 +535,21 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
         uint mipLevels = m_cubemap->getDesc().mipLevels;
         for (uint i = 2; i < mipLevels; i++)
         {
-            nvrhi::BindingSetDesc localBindingSetDesc;
+            caustica::rhi::BindingSetDesc localBindingSetDesc;
             localBindingSetDesc.bindings = {
-                    nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-                    //nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-                    nvrhi::BindingSetItem::Texture_UAV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-                    nvrhi::BindingSetItem::Texture_UAV(1, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i - 1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-                    nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
-                    nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
-                    nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
-                    nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-                    nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
+                    caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+                    //caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+                    caustica::rhi::BindingSetItem::Texture_UAV(0, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+                    caustica::rhi::BindingSetItem::Texture_UAV(1, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i - 1, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+                    caustica::rhi::BindingSetItem::Sampler(0, m_pointSampler),
+                    caustica::rhi::BindingSetItem::Sampler(1, m_linearSampler),
+                    caustica::rhi::BindingSetItem::Sampler(2, m_equiRectSampler),
+                    caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+                    caustica::rhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
             };
-            nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
+            caustica::rhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
-            nvrhi::ComputeState state;
+            caustica::rhi::ComputeState state;
             state.bindings = { localBindingSet };
             state.pipeline = m_MIPReducePSO;
 
@@ -562,7 +562,7 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
             //commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
             commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
 
-            commandList->setTextureState(m_cubemap, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            commandList->setTextureState(m_cubemap, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
         }
     }
 
@@ -573,15 +573,15 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
         uint mipLevels = m_cubemap->getDesc().mipLevels; assert( mipLevels == m_cubemapBC6HScratch->getDesc().mipLevels );
         for (uint i = 0; i < mipLevels; i++)
         {
-            nvrhi::BindingSetDesc localBindingSetDesc;
+            caustica::rhi::BindingSetDesc localBindingSetDesc;
             localBindingSetDesc.bindings = {
-                    nvrhi::BindingSetItem::Texture_UAV(0, m_cubemapBC6HScratch, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-                    nvrhi::BindingSetItem::Texture_SRV(0, m_cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-                    nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
+                    caustica::rhi::BindingSetItem::Texture_UAV(0, m_cubemapBC6HScratch, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+                    caustica::rhi::BindingSetItem::Texture_SRV(0, m_cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+                    caustica::rhi::BindingSetItem::Sampler(0, m_pointSampler),
             };
-            nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_BC6UCompressBindingLayout);
+            caustica::rhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_BC6UCompressBindingLayout);
 
-            nvrhi::ComputeState state;
+            caustica::rhi::ComputeState state;
             state.bindings = { localBindingSet };
             state.pipeline = m_compressionQuality==1?m_BC6UCompressLowPSO:m_BC6UCompressHighPSO;
 
@@ -599,7 +599,7 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
         for (uint im = 0; im < mipLevels; im++)
             for( uint ia = 0; ia < 6; ia++)
             {
-                nvrhi::TextureSlice slice; slice.setArraySlice(ia); slice.setMipLevel(im);
+                caustica::rhi::TextureSlice slice; slice.setArraySlice(ia); slice.setMipLevel(im);
                 commandList->copyTexture(m_cubemapBC6H, slice, m_cubemapBC6HScratch, slice);
             }
 
@@ -614,14 +614,14 @@ bool EnvMapProcessor::update(nvrhi::ICommandList* commandList, caustica::Binding
 
     if (m_dbgSaveBaked != "")
     {
-        nvrhi::TextureDesc outCubemapDesc = m_cubemapDesc;
+        caustica::rhi::TextureDesc outCubemapDesc = m_cubemapDesc;
         outCubemapDesc.mipLevels = 1; // remove this if you want to export all MIPs; not needed here because we regenerate them anyway on load
-        nvrhi::StagingTextureHandle cubemapStaging = m_device->createStagingTexture(outCubemapDesc, nvrhi::CpuAccessMode::Read);
+        caustica::rhi::StagingTextureHandle cubemapStaging = m_device->createStagingTexture(outCubemapDesc, caustica::rhi::CpuAccessMode::Read);
 
         for (int m = 0; m < (int)outCubemapDesc.mipLevels; m++)
             for( int i = 0; i < 6; i++ )
             {
-                nvrhi::TextureSlice slice; 
+                caustica::rhi::TextureSlice slice; 
                 slice.arraySlice = i;
                 slice.mipLevel = m;
                 commandList->copyTexture(cubemapStaging, slice, m_cubemap, slice);
@@ -712,7 +712,7 @@ bool EnvMapProcessor::debugGUI(float indent)
     return resetAccumulation;
 }
 
-bool EnvMapProcessor::generateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
+bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache)
 {
     if (!m_enableRasterPrecompute || m_brdfLUTGenerated)
         return false;
@@ -726,14 +726,14 @@ bool EnvMapProcessor::generateBRDFLUT(nvrhi::ICommandList* commandList, caustica
     consts.Padding1 = 0;
     commandList->writeBuffer(m_brdfLUTConstantBuffer, &consts, sizeof(consts));
     
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_brdfLUTConstantBuffer),
-        nvrhi::BindingSetItem::Texture_UAV(0, m_brdfLUT)
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, m_brdfLUTConstantBuffer),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, m_brdfLUT)
     };
-    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_brdfLUTBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_brdfLUTBindingLayout);
     
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { bindingSet };
     state.pipeline = m_brdfLUTPSO;
     commandList->setComputeState(state);
@@ -746,8 +746,8 @@ bool EnvMapProcessor::generateBRDFLUT(nvrhi::ICommandList* commandList, caustica
     return true;
 }
 
-void EnvMapProcessor::ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
-    nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
+void EnvMapProcessor::ggxPrefilterCubemap(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
         return;
@@ -779,16 +779,16 @@ void EnvMapProcessor::ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caus
         consts.Padding1 = 0;
         consts.Padding2 = 0;
         
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::PushConstants(0, sizeof(GGXPrefilterConstants)),
-            nvrhi::BindingSetItem::Texture_SRV(0, srcCubemap),
-            nvrhi::BindingSetItem::Texture_UAV(0, dstCubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(mip, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Sampler(0, m_linearSampler)
+            caustica::rhi::BindingSetItem::PushConstants(0, sizeof(GGXPrefilterConstants)),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, srcCubemap),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, dstCubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(mip, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+            caustica::rhi::BindingSetItem::Sampler(0, m_linearSampler)
         };
-        nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_ggxPrefilterBindingLayout);
+        caustica::rhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_ggxPrefilterBindingLayout);
         
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { bindingSet };
         state.pipeline = pipeline;
         commandList->setComputeState(state);
@@ -799,12 +799,12 @@ void EnvMapProcessor::ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caus
         commandList->dispatch(dispatchSize.x, dispatchSize.y, 6);
         
         // UAV barrier between mips
-        commandList->setTextureState(dstCubemap, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(dstCubemap, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
     }
 }
 
-void EnvMapProcessor::convolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
-    nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap)
+void EnvMapProcessor::convolveDiffuseIrradiance(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+    caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap)
 {
     if (!m_enableRasterPrecompute)
         return;
@@ -822,16 +822,16 @@ void EnvMapProcessor::convolveDiffuseIrradiance(nvrhi::ICommandList* commandList
     consts.SampleCount = 1024;
     consts.Padding = 0;
     
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::PushConstants(0, sizeof(IrradianceConvolveConstants)),
-        nvrhi::BindingSetItem::Texture_SRV(0, srcCubemap),
-        nvrhi::BindingSetItem::Texture_UAV(0, dstCubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-        nvrhi::BindingSetItem::Sampler(0, m_linearSampler)
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(IrradianceConvolveConstants)),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, srcCubemap),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, dstCubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(0, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+        caustica::rhi::BindingSetItem::Sampler(0, m_linearSampler)
     };
-    nvrhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_irradianceConvolveBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_irradianceConvolveBindingLayout);
     
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { bindingSet };
     state.pipeline = pipeline;
     commandList->setComputeState(state);
@@ -841,8 +841,8 @@ void EnvMapProcessor::convolveDiffuseIrradiance(nvrhi::ICommandList* commandList
     commandList->dispatch(1, 1, 6);
 }
 
-void EnvMapProcessor::generateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
-    nvrhi::TextureHandle cubemap)
+void EnvMapProcessor::generateCubemapMips(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+    caustica::rhi::TextureHandle cubemap)
 {
     // Reuse the existing MIPReduceCS for solid-angle weighted mip generation
     RAII_SCOPE(commandList->beginMarker("generateCubemapMips");, commandList->endMarker(););
@@ -856,20 +856,20 @@ void EnvMapProcessor::generateCubemapMips(nvrhi::ICommandList* commandList, caus
     
     for (uint i = 1; i < mipLevels; i++)
     {
-        nvrhi::BindingSetDesc localBindingSetDesc;
+        caustica::rhi::BindingSetDesc localBindingSetDesc;
         localBindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-            nvrhi::BindingSetItem::Texture_UAV(0, cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Texture_UAV(1, cubemap, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(i - 1, 1, 0, 6)).setDimension(nvrhi::TextureDimension::Texture2DArray),
-            nvrhi::BindingSetItem::Sampler(0, m_pointSampler),
-            nvrhi::BindingSetItem::Sampler(1, m_linearSampler),
-            nvrhi::BindingSetItem::Sampler(2, m_equiRectSampler),
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-            nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+            caustica::rhi::BindingSetItem::Texture_UAV(1, cubemap, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i - 1, 1, 0, 6)).setDimension(caustica::rhi::TextureDimension::Texture2DArray),
+            caustica::rhi::BindingSetItem::Sampler(0, m_pointSampler),
+            caustica::rhi::BindingSetItem::Sampler(1, m_linearSampler),
+            caustica::rhi::BindingSetItem::Sampler(2, m_equiRectSampler),
+            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            caustica::rhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture()),
         };
-        nvrhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
+        caustica::rhi::BindingSetHandle localBindingSet = bindingCache.getOrCreateBindingSet(localBindingSetDesc, m_reduceBindingLayout);
         
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { localBindingSet };
         state.pipeline = m_MIPReducePSO;
         commandList->setComputeState(state);
@@ -883,9 +883,9 @@ void EnvMapProcessor::generateCubemapMips(nvrhi::ICommandList* commandList, caus
 }
 
 void EnvMapProcessor::processCubemap(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     caustica::BindingCache& bindingCache,
-    nvrhi::TextureHandle sourceCubemap,
+    caustica::rhi::TextureHandle sourceCubemap,
     const CubemapProcessingOptions& options,
     const CubemapProcessingResults& results)
 {

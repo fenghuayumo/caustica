@@ -60,14 +60,14 @@ namespace
         const ICompositeView& compositeView)
     {
         const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
-        const nvrhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
-        const nvrhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
-        return rg::fromNvrhiFormat(nativeFormat);
+        const caustica::rhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+        const caustica::rhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
+        return rg::fromNativeFormat(nativeFormat);
     }
 }
 
 BloomPass::BloomPass(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     const std::shared_ptr<ShaderFactory>& shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
@@ -76,9 +76,9 @@ BloomPass::BloomPass(
     , m_FramebufferFactory(std::move(framebufferFactory))
     , m_device(device)
 {
-    m_BloomBlurPixelShader = shaderFactory->createAutoShader("engine/passes/bloom_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_bloom_ps), nullptr, nvrhi::ShaderType::Pixel);
+    m_BloomBlurPixelShader = shaderFactory->createAutoShader("engine/passes/bloom_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_bloom_ps), nullptr, caustica::rhi::ShaderType::Pixel);
 
-    nvrhi::BufferDesc constantBufferDesc;
+    caustica::rhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(BloomConstants);
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
@@ -88,27 +88,27 @@ BloomPass::BloomPass(
     constantBufferDesc.debugName = "BloomConstantsV";
     m_BloomVBlurCB = device->createBuffer(constantBufferDesc);
 
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Pixel;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Pixel;
     layoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        nvrhi::BindingLayoutItem::Sampler(0),
-        nvrhi::BindingLayoutItem::Texture_SRV(0)
+        caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+        caustica::rhi::BindingLayoutItem::Sampler(0),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(0)
     };
     m_BloomBlurBindingLayout = device->createBindingLayout(layoutDesc);
 
     m_PerViewData.resize(compositeView.getNumChildViews(ViewType::PLANAR));
 }
 
-void BloomPass::ensureBlurPso(uint32_t viewIndex, nvrhi::IFramebuffer* framebuffer)
+void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::IFramebuffer* framebuffer)
 {
     PerViewData& perViewData = m_PerViewData[viewIndex];
-    const nvrhi::Format colorFormat = framebuffer->getFramebufferInfo().colorFormats[0];
+    const caustica::rhi::Format colorFormat = framebuffer->getFramebufferInfo().colorFormats[0];
     if (perViewData.bloomBlurPso && perViewData.psoColorFormat == colorFormat)
         return;
 
-    nvrhi::GraphicsPipelineDesc graphicsPipelineDesc;
-    graphicsPipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+    caustica::rhi::GraphicsPipelineDesc graphicsPipelineDesc;
+    graphicsPipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleStrip;
     graphicsPipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
     graphicsPipelineDesc.PS = m_BloomBlurPixelShader;
     graphicsPipelineDesc.bindingLayouts = { m_BloomBlurBindingLayout };
@@ -120,14 +120,14 @@ void BloomPass::ensureBlurPso(uint32_t viewIndex, nvrhi::IFramebuffer* framebuff
 }
 
 void BloomPass::renderInternal(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,
-    nvrhi::ITexture* sourceDestTexture,
-    nvrhi::ITexture* textureDownscale1,
-    nvrhi::ITexture* textureDownscale2,
-    nvrhi::ITexture* texturePass1Blur,
-    nvrhi::ITexture* texturePass2Blur,
+    caustica::rhi::ITexture* sourceDestTexture,
+    caustica::rhi::ITexture* textureDownscale1,
+    caustica::rhi::ITexture* textureDownscale2,
+    caustica::rhi::ITexture* texturePass1Blur,
+    caustica::rhi::ITexture* texturePass2Blur,
     float sigmaInPixels,
     float blendFactor)
 {
@@ -135,45 +135,45 @@ void BloomPass::renderInternal(
 
     commandList->beginMarker("Bloom");
 
-    nvrhi::DrawArguments fullscreenquadargs;
+    caustica::rhi::DrawArguments fullscreenquadargs;
     fullscreenquadargs.instanceCount = 1;
     fullscreenquadargs.vertexCount = 4;
 
-    const nvrhi::FramebufferHandle framebufferDownscale1 = m_device->createFramebuffer(
-        nvrhi::FramebufferDesc().addColorAttachment(textureDownscale1));
-    const nvrhi::FramebufferHandle framebufferDownscale2 = m_device->createFramebuffer(
-        nvrhi::FramebufferDesc().addColorAttachment(textureDownscale2));
-    const nvrhi::FramebufferHandle framebufferPass1Blur = m_device->createFramebuffer(
-        nvrhi::FramebufferDesc().addColorAttachment(texturePass1Blur));
-    const nvrhi::FramebufferHandle framebufferPass2Blur = m_device->createFramebuffer(
-        nvrhi::FramebufferDesc().addColorAttachment(texturePass2Blur));
+    const caustica::rhi::FramebufferHandle framebufferDownscale1 = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(textureDownscale1));
+    const caustica::rhi::FramebufferHandle framebufferDownscale2 = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(textureDownscale2));
+    const caustica::rhi::FramebufferHandle framebufferPass1Blur = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(texturePass1Blur));
+    const caustica::rhi::FramebufferHandle framebufferPass2Blur = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(texturePass2Blur));
 
     for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
         const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-        nvrhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+        caustica::rhi::IFramebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
         ensureBlurPso(viewIndex, framebufferPass1Blur);
 
-        nvrhi::ViewportState viewportState = toNvrhi(view->getViewportState());
-        const nvrhi::Rect& scissorRect = viewportState.scissorRects[0];
-        const nvrhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
+        caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+        const caustica::rhi::Rect& scissorRect = viewportState.scissorRects[0];
+        const caustica::rhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
 
-        nvrhi::BindingSetDesc bindingSetDescPass1;
+        caustica::rhi::BindingSetDesc bindingSetDescPass1;
         bindingSetDescPass1.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomHBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
-            nvrhi::BindingSetItem::Texture_SRV(0, textureDownscale2),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_BloomHBlurCB),
+            caustica::rhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, textureDownscale2),
         };
-        const nvrhi::BindingSetHandle bloomBlurBindingSetPass1 =
+        const caustica::rhi::BindingSetHandle bloomBlurBindingSetPass1 =
             m_device->createBindingSet(bindingSetDescPass1, m_BloomBlurBindingLayout);
 
-        nvrhi::BindingSetDesc bindingSetDescPass2;
+        caustica::rhi::BindingSetDesc bindingSetDescPass2;
         bindingSetDescPass2.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_BloomVBlurCB),
-            nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
-            nvrhi::BindingSetItem::Texture_SRV(0, texturePass1Blur),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_BloomVBlurCB),
+            caustica::rhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, texturePass1Blur),
         };
-        const nvrhi::BindingSetHandle bloomBlurBindingSetPass2 =
+        const caustica::rhi::BindingSetHandle bloomBlurBindingSetPass2 =
             m_device->createBindingSet(bindingSetDescPass2, m_BloomBlurBindingLayout);
 
         {
@@ -204,13 +204,13 @@ void BloomPass::renderInternal(
 
         {
             commandList->beginMarker("Blur");
-            nvrhi::Viewport viewport;
+            caustica::rhi::Viewport viewport;
 
-            nvrhi::GraphicsState state;
+            caustica::rhi::GraphicsState state;
             state.pipeline = m_PerViewData[viewIndex].bloomBlurPso;
-            viewport = nvrhi::Viewport(float(texturePass1Blur->getDesc().width), float(texturePass1Blur->getDesc().height));
+            viewport = caustica::rhi::Viewport(float(texturePass1Blur->getDesc().width), float(texturePass1Blur->getDesc().height));
             state.viewport.addViewport(viewport);
-            state.viewport.addScissorRect(nvrhi::Rect(viewport));
+            state.viewport.addScissorRect(caustica::rhi::Rect(viewport));
             state.framebuffer = framebufferPass1Blur;
             state.bindings = { bloomBlurBindingSetPass1 };
 
@@ -229,9 +229,9 @@ void BloomPass::renderInternal(
             commandList->setGraphicsState(state);
             commandList->draw(fullscreenquadargs);
 
-            viewport = nvrhi::Viewport(float(texturePass2Blur->getDesc().width), float(texturePass2Blur->getDesc().height));
+            viewport = caustica::rhi::Viewport(float(texturePass2Blur->getDesc().width), float(texturePass2Blur->getDesc().height));
             state.viewport.viewports[0] = viewport;
-            state.viewport.scissorRects[0] = nvrhi::Rect(viewport);
+            state.viewport.scissorRects[0] = caustica::rhi::Rect(viewport);
             state.framebuffer = framebufferPass2Blur;
             state.bindings = { bloomBlurBindingSetPass2 };
 
@@ -249,11 +249,11 @@ void BloomPass::renderInternal(
             blitParams3.targetViewport = viewportState.viewports[0];
             blitParams3.sourceTexture = texturePass2Blur;
             blitParams3.blendState.setBlendEnable(true)
-                .setSrcBlend(nvrhi::BlendFactor::ConstantColor)
-                .setDestBlend(nvrhi::BlendFactor::InvConstantColor)
-                .setSrcBlendAlpha(nvrhi::BlendFactor::Zero)
-                .setDestBlendAlpha(nvrhi::BlendFactor::One);
-            blitParams3.blendConstantColor = nvrhi::Color(blendFactor);
+                .setSrcBlend(caustica::rhi::BlendFactor::ConstantColor)
+                .setDestBlend(caustica::rhi::BlendFactor::InvConstantColor)
+                .setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero)
+                .setDestBlendAlpha(caustica::rhi::BlendFactor::One);
+            blitParams3.blendConstantColor = caustica::rhi::Color(blendFactor);
             m_renderDevice.blit().blitTexture(commandList, blitParams3, nullptr);
 
             commandList->endMarker();
@@ -264,10 +264,10 @@ void BloomPass::renderInternal(
 }
 
 void BloomPass::render(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     const ICompositeView& compositeView,
-    nvrhi::ITexture* sourceDestTexture,
+    caustica::rhi::ITexture* sourceDestTexture,
     float sigmaInPixels,
     float blendFactor)
 {
@@ -279,25 +279,25 @@ void BloomPass::render(
     const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
     computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
-    nvrhi::TextureDesc nativeDesc;
-    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(colorFormat);
+    caustica::rhi::TextureDesc nativeDesc;
+    nativeDesc.format = rg::toNativeFormat(colorFormat);
     nativeDesc.width = mip1W;
     nativeDesc.height = mip1H;
     nativeDesc.mipLevels = 1;
     nativeDesc.isRenderTarget = true;
-    nativeDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    nativeDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     nativeDesc.keepInitialState = true;
 
     nativeDesc.debugName = "bloom src mip1";
-    const nvrhi::TextureHandle textureDownscale1 = m_device->createTexture(nativeDesc);
+    const caustica::rhi::TextureHandle textureDownscale1 = m_device->createTexture(nativeDesc);
     nativeDesc.debugName = "bloom src mip2";
     nativeDesc.width = mip2W;
     nativeDesc.height = mip2H;
-    const nvrhi::TextureHandle textureDownscale2 = m_device->createTexture(nativeDesc);
+    const caustica::rhi::TextureHandle textureDownscale2 = m_device->createTexture(nativeDesc);
     nativeDesc.debugName = "bloom accumulation pass1";
-    const nvrhi::TextureHandle texturePass1Blur = m_device->createTexture(nativeDesc);
+    const caustica::rhi::TextureHandle texturePass1Blur = m_device->createTexture(nativeDesc);
     nativeDesc.debugName = "bloom accumulation pass2";
-    const nvrhi::TextureHandle texturePass2Blur = m_device->createTexture(nativeDesc);
+    const caustica::rhi::TextureHandle texturePass2Blur = m_device->createTexture(nativeDesc);
 
     renderInternal(
         commandList,

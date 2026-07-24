@@ -137,7 +137,7 @@ bool SceneRayTracingResources::ensureFeaturePresetReady(PtFeaturePresetId id, bo
 }
 
 void SceneRayTracingResources::createBlases(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
@@ -145,20 +145,20 @@ void SceneRayTracingResources::createBlases(
     m_accelStructs->createBlases(commandList, renderData.meshSnapshots, settings);
 }
 
-void SceneRayTracingResources::uploadSubInstanceData(nvrhi::ICommandList* commandList)
+void SceneRayTracingResources::uploadSubInstanceData(caustica::rhi::ICommandList* commandList)
 {
     m_accelStructs->uploadSubInstanceData(commandList);
 }
 
 void SceneRayTracingResources::createTlas(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     m_accelStructs->createTlas(commandList, renderData);
 }
 
 void SceneRayTracingResources::createAccelStructs(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData* renderData)
 {
@@ -173,7 +173,7 @@ void SceneRayTracingResources::createAccelStructs(
 }
 
 void SceneRayTracingResources::recreateAccelStructs(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData* renderData)
 {
@@ -246,8 +246,8 @@ void SceneRayTracingResources::recreateBindingSet(
     m_worldRenderer->recreateBindingSet(renderData);
 }
 
-void SceneRayTracingResources::sampleRenderCode(nvrhi::IFramebuffer* framebuffer,
-    nvrhi::CommandListHandle commandList,
+void SceneRayTracingResources::sampleRenderCode(caustica::rhi::IFramebuffer* framebuffer,
+    caustica::rhi::CommandListHandle commandList,
     const SampleConstants& constants)
 {
     (void)framebuffer;

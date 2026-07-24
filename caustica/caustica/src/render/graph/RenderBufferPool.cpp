@@ -32,11 +32,11 @@ int RenderBufferPool::findFreeSlot(const BufferDesc& desc) const
     return bestSlot;
 }
 
-nvrhi::BufferHandle RenderBufferPool::createPooledBuffer(const BufferDesc& desc)
+caustica::rhi::BufferHandle RenderBufferPool::createPooledBuffer(const BufferDesc& desc)
 {
     assert(m_device);
 
-    nvrhi::BufferDesc nativeDesc;
+    caustica::rhi::BufferDesc nativeDesc;
     nativeDesc.debugName = desc.name.empty() ? "rg_buffer_pool" : desc.name.c_str();
     nativeDesc.byteSize = desc.byteSize;
     nativeDesc.structStride = desc.isStructuredBuffer ? desc.structuredStride : 0;
@@ -47,14 +47,14 @@ nvrhi::BufferHandle RenderBufferPool::createPooledBuffer(const BufferDesc& desc)
     nativeDesc.isDrawIndirectArgs = desc.isDrawIndirectArgs;
     nativeDesc.canHaveRawViews = desc.canHaveRawViews;
     nativeDesc.canHaveTypedViews = desc.canHaveTypedViews;
-    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
-    nativeDesc.initialState = nvrhi::ResourceStates::Common;
+    nativeDesc.format = toNativeFormat(desc.format);
+    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createBuffer(nativeDesc);
 }
 
-nvrhi::BufferHandle RenderBufferPool::tryAcquireBuffer(const BufferDesc& desc)
+caustica::rhi::BufferHandle RenderBufferPool::tryAcquireBuffer(const BufferDesc& desc)
 {
     assert(m_device);
 
@@ -69,11 +69,11 @@ nvrhi::BufferHandle RenderBufferPool::tryAcquireBuffer(const BufferDesc& desc)
     return nullptr;
 }
 
-nvrhi::BufferHandle RenderBufferPool::acquireBuffer(const BufferDesc& desc)
+caustica::rhi::BufferHandle RenderBufferPool::acquireBuffer(const BufferDesc& desc)
 {
     assert(m_device);
 
-    if (nvrhi::BufferHandle existing = tryAcquireBuffer(desc))
+    if (caustica::rhi::BufferHandle existing = tryAcquireBuffer(desc))
         return existing;
 
     PooledBuffer entry{};

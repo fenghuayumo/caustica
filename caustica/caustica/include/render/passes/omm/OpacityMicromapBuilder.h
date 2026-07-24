@@ -8,7 +8,7 @@
 
 #include <render/core/BindingCache.h>
 #include <render/core/DescriptorTableManager.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <scene/SceneRenderData.h>
 
@@ -49,8 +49,8 @@ struct OpacityMicroMapUIData
         int MaxSubdivisionLevel = 12;
         bool EnableDynamicSubdivision = true;
         float DynamicSubdivisionScale = 1.f;
-        nvrhi::rt::OpacityMicromapBuildFlags Flag = nvrhi::rt::OpacityMicromapBuildFlags::FastTrace;
-        nvrhi::rt::OpacityMicromapFormat Format = nvrhi::rt::OpacityMicromapFormat::OC1_4_State;
+        caustica::rhi::rt::OpacityMicromapBuildFlags Flag = caustica::rhi::rt::OpacityMicromapBuildFlags::FastTrace;
+        caustica::rhi::rt::OpacityMicromapFormat Format = caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State;
         int AlphaCutoffGT = 1 /*Opaque*/;
         int AlphaCutoffLE = 0 /*Transparent*/;
 
@@ -86,16 +86,16 @@ struct OpacityMicroMapUIData
 class OpacityMicromapBuilder
 {
 public:
-    OpacityMicromapBuilder(nvrhi::DeviceHandle device,
+    OpacityMicromapBuilder(caustica::rhi::DeviceHandle device,
         std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
         std::shared_ptr<caustica::TextureLoader> textureCache,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~OpacityMicromapBuilder();
 
-    void                            createRenderPasses(nvrhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
+    void                            createRenderPasses(caustica::rhi::BindingLayoutHandle bindlessLayout, caustica::render::RenderDevice& renderDevice);
     void                            setMaterialGpuCache(MaterialGpuCache* materials);
 
-    bool                            update(nvrhi::ICommandList& commandList,
+    bool                            update(caustica::rhi::ICommandList& commandList,
                                            const caustica::scene::SceneRenderData& renderData);
 
     OpacityMicroMapUIData &         uiData()    { return m_uiData; }
@@ -105,16 +105,16 @@ public:
     void                            sceneUnloading();
 
     void                            createOpacityMicromaps(const caustica::scene::SceneRenderData& renderData);
-    void                            destroyOpacityMicromaps(nvrhi::ICommandList& commandList,
+    void                            destroyOpacityMicromaps(caustica::rhi::ICommandList& commandList,
                                                             const caustica::scene::SceneRenderData& renderData);
-    void                            buildOpacityMicromaps(nvrhi::ICommandList& commandList,
+    void                            buildOpacityMicromaps(caustica::rhi::ICommandList& commandList,
                                                           const caustica::scene::SceneRenderData& renderData);
-    void                            writeGeometryDebugBuffer(nvrhi::ICommandList& commandList);
+    void                            writeGeometryDebugBuffer(caustica::rhi::ICommandList& commandList);
     void                            updateDebugGeometry(
                                         const caustica::scene::MeshRenderResourceSnapshot& mesh,
                                         const caustica::render::MeshGpuRecord& meshGpu);
 
-    [[nodiscard]] nvrhi::IBuffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
+    [[nodiscard]] caustica::rhi::IBuffer*   getGeometryDebugBuffer() const { return m_geometryDebugBuffer; }
     [[nodiscard]] bool              shouldUseRayTracingOpacityMicromaps() const { return m_uiData.Enable; }
 
     void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
@@ -123,7 +123,7 @@ public:
 private:
     void                            ensureGeometryDebugCapacity(size_t geometryCount);
 
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
     MaterialGpuCache*               m_materialGpuCache = nullptr;
     uint64_t                        m_materialStateRevision = 0;
@@ -133,8 +133,8 @@ private:
     std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTableManager;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 
-    nvrhi::BindingLayoutHandle      m_commonBindingLayout;
-    nvrhi::BindingLayoutHandle      m_bindlessLayout;
+    caustica::rhi::BindingLayoutHandle      m_commonBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_bindlessLayout;
     caustica::BindingCache     m_bindingCache;
 
     ComputePass                     m_examplePass;
@@ -144,5 +144,5 @@ private:
     OpacityMicroMapUIData           m_uiData;
 
     std::vector<class GeometryDebugData> m_geometryDebugDataPtr;
-    nvrhi::BufferHandle             m_geometryDebugBuffer;
+    caustica::rhi::BufferHandle             m_geometryDebugBuffer;
 };

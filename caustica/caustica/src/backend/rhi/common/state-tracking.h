@@ -1,10 +1,10 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 #include <memory>
 #include <unordered_map>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     struct BufferStateExtension
     {
@@ -116,4 +116,4 @@ namespace nvrhi
 
     bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, IMessageCallback* messageCallback);
 
-} // namespace nvrhi
+} // namespace caustica::rhi

@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
     ComputePipelineHandle Device::createComputePipeline(const ComputePipelineDesc& desc)
     {
@@ -162,4 +162,4 @@ namespace nvrhi::vulkan
         m_CurrentCmdBuf->cmdBuf.dispatchIndirect(indirectParams->buffer, offsetBytes);
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

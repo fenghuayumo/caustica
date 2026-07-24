@@ -5,12 +5,12 @@
 
 #define ENABLE_SHORTCUT_CONVERSIONS 1
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     struct FormatMapping
     {
-        nvrhi::Format rhiFormat;
+        caustica::rhi::Format rhiFormat;
         VkFormat vkFormat;
     };
 
@@ -88,9 +88,9 @@ namespace nvrhi::vulkan
 
     } };
 
-    VkFormat convertFormat(nvrhi::Format format)
+    VkFormat convertFormat(caustica::rhi::Format format)
     {
-        assert(format < nvrhi::Format::COUNT);
+        assert(format < caustica::rhi::Format::COUNT);
         assert(c_FormatMap[uint32_t(format)].rhiFormat == format);
 
         return c_FormatMap[uint32_t(format)].vkFormat;
@@ -308,7 +308,7 @@ namespace nvrhi::vulkan
             {
                 const ResourceStateMapping& mapping = g_ResourceStateMap[bitIndex];
 
-                assert(uint32_t(mapping.nvrhiState) == bit);
+                assert(uint32_t(mapping.rhiState) == bit);
                 if (isImage)
                 {
                     // If we're converting the state for an image, make sure that the requested state bits
@@ -319,7 +319,7 @@ namespace nvrhi::vulkan
                         || result.imageLayout == mapping.imageLayout);
                 }
 
-                result.nvrhiState = ResourceStates(result.nvrhiState | mapping.nvrhiState);
+                result.rhiState = ResourceStates(result.rhiState | mapping.rhiState);
                 result.accessMask |= mapping.accessMask;
                 result.stageFlags |= mapping.stageFlags;
                 if (isImage && mapping.imageLayout != vk::ImageLayout::eUndefined)
@@ -333,7 +333,7 @@ namespace nvrhi::vulkan
             bitIndex++;
         }
 
-        assert(result.nvrhiState == state);
+        assert(result.rhiState == state);
 
         return result;
     }
@@ -924,4 +924,4 @@ namespace nvrhi::vulkan
             return vk::CooperativeVectorMatrixLayoutNV::eRowMajor;
         }
     }
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

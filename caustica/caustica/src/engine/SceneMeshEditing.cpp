@@ -309,7 +309,7 @@ void UpdateMeshBoundsFromPositions(const std::shared_ptr<MeshInfo>& mesh)
 }
 
 bool UploadMeshDeformationToGpu(
-    nvrhi::IDevice* /*device*/,
+    caustica::rhi::IDevice* /*device*/,
     render::SceneGpuResources* gpuResources,
     const std::shared_ptr<MeshInfo>& mesh,
     size_t renderVertexCount,
@@ -342,7 +342,7 @@ bool UploadMeshDeformationToGpu(
 
 // Copy current Position → PrevPosition so held keyframes report zero object motion.
 bool SyncMeshPrevPositionFromCurrent(
-    nvrhi::IDevice* /*device*/,
+    caustica::rhi::IDevice* /*device*/,
     render::SceneGpuResources* gpuResources,
     const std::shared_ptr<MeshInfo>& mesh)
 {

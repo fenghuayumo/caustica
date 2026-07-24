@@ -37,7 +37,7 @@ caustica::DescriptorIndex caustica::DescriptorHandle::getIndexInHeap() const
     return -1;
 }
 
-caustica::DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout)
+caustica::DescriptorTableManager::DescriptorTableManager(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout)
     : m_device(device)
 {
     m_descriptorTable = m_device->createDescriptorTable(layout);
@@ -45,10 +45,10 @@ caustica::DescriptorTableManager::DescriptorTableManager(nvrhi::IDevice* device,
     size_t capacity = m_descriptorTable->getCapacity();
     m_allocatedDescriptors.resize(capacity);
     m_descriptors.resize(capacity);
-    memset(m_descriptors.data(), 0, sizeof(nvrhi::BindingSetItem) * capacity);
+    memset(m_descriptors.data(), 0, sizeof(caustica::rhi::BindingSetItem) * capacity);
 }
 
-caustica::DescriptorIndex caustica::DescriptorTableManager::createDescriptor(nvrhi::BindingSetItem item)
+caustica::DescriptorIndex caustica::DescriptorTableManager::createDescriptor(caustica::rhi::BindingSetItem item)
 {
     const auto& found = m_descriptorIndexMap.find(item);
     if (found != m_descriptorIndexMap.end())
@@ -74,7 +74,7 @@ caustica::DescriptorIndex caustica::DescriptorTableManager::createDescriptor(nvr
         m_descriptors.resize(newCapacity);
 
         // zero-fill the new descriptors
-        memset(&m_descriptors[capacity], 0, sizeof(nvrhi::BindingSetItem) * (newCapacity - capacity));
+        memset(&m_descriptors[capacity], 0, sizeof(caustica::rhi::BindingSetItem) * (newCapacity - capacity));
         
         index = capacity;
         capacity = newCapacity;
@@ -93,23 +93,23 @@ caustica::DescriptorIndex caustica::DescriptorTableManager::createDescriptor(nvr
     return index;
 }
 
-caustica::DescriptorHandle caustica::DescriptorTableManager::createDescriptorHandle(nvrhi::BindingSetItem item)
+caustica::DescriptorHandle caustica::DescriptorTableManager::createDescriptorHandle(caustica::rhi::BindingSetItem item)
 {
     DescriptorIndex index = createDescriptor(item);
     return DescriptorHandle(shared_from_this(), index);
 }
 
-nvrhi::BindingSetItem caustica::DescriptorTableManager::getDescriptor(DescriptorIndex index)
+caustica::rhi::BindingSetItem caustica::DescriptorTableManager::getDescriptor(DescriptorIndex index)
 {
     if (size_t(index) >= m_descriptors.size())
-        return nvrhi::BindingSetItem::None(0);
+        return caustica::rhi::BindingSetItem::None(0);
 
     return m_descriptors[index];
 }
 
 void caustica::DescriptorTableManager::releaseDescriptor(DescriptorIndex index)
 {
-    nvrhi::BindingSetItem& descriptor = m_descriptors[index];
+    caustica::rhi::BindingSetItem& descriptor = m_descriptors[index];
 
     if (descriptor.resourceHandle)
         descriptor.resourceHandle->Release();
@@ -119,7 +119,7 @@ void caustica::DescriptorTableManager::releaseDescriptor(DescriptorIndex index)
     if (indexMapEntry != m_descriptorIndexMap.end())
         m_descriptorIndexMap.erase(indexMapEntry);
 
-    descriptor = nvrhi::BindingSetItem::None(index);
+    descriptor = caustica::rhi::BindingSetItem::None(index);
 
     m_device->writeDescriptorTable(m_descriptorTable, descriptor);
 

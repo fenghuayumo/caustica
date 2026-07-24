@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     std::shared_ptr<BufferChunk> UploadManager::CreateChunk(uint64_t size)

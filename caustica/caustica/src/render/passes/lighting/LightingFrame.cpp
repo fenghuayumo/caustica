@@ -25,10 +25,10 @@ namespace
 
 void caustica::render::createLightingRenderPasses(
     PathTracingContext& context,
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
-    nvrhi::BindingLayoutHandle bindlessLayout,
-    nvrhi::CommandListHandle initializeCommandList,
+    caustica::rhi::BindingLayoutHandle bindlessLayout,
+    caustica::rhi::CommandListHandle initializeCommandList,
     dm::uint2 screenResolution)
 {
     if (context.scenePasses.lighting.environment() == nullptr)
@@ -51,7 +51,7 @@ void caustica::render::createLightingRenderPasses(
 
 void caustica::render::preUpdateLightingFrame(
     PathTracingContext& context,
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     bool& needNewBindings)
 {
     std::filesystem::path sceneDirectory;
@@ -83,7 +83,7 @@ void caustica::render::preUpdateLightingFrame(
 
 void caustica::render::updateLightingFrame(
     PathTracingContext& context,
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     uint64_t frameIndex,
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
 {

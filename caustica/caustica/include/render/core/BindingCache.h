@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <shared_mutex>
 #include <unordered_map>
@@ -20,18 +20,18 @@ All BindingCache methods are thread-safe.
 class BindingCache
 {
 public:
-    explicit BindingCache(nvrhi::IDevice* device)
+    explicit BindingCache(caustica::rhi::IDevice* device)
         : m_device(device)
     {
     }
 
-    nvrhi::BindingSetHandle getCachedBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout);
-    nvrhi::BindingSetHandle getOrCreateBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout);
+    caustica::rhi::BindingSetHandle getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout);
+    caustica::rhi::BindingSetHandle getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout);
     void clear();
 
 private:
-    nvrhi::DeviceHandle m_device;
-    std::unordered_map<size_t, nvrhi::BindingSetHandle> m_bindingSets;
+    caustica::rhi::DeviceHandle m_device;
+    std::unordered_map<size_t, caustica::rhi::BindingSetHandle> m_bindingSets;
     std::shared_mutex m_mutex;
 };
 

@@ -34,13 +34,13 @@ bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
 
 void preUpdateLighting(PreUpdateLightingParams& params)
 {
-    nvrhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr)
         return;
 
     RAII_SCOPE(commandList->beginMarker("PreUpdateLighting");, commandList->endMarker(););
 
-    nvrhi::TextureHandle preUpdateCube = params.environment->getEnvMapCube();
+    caustica::rhi::TextureHandle preUpdateCube = params.environment->getEnvMapCube();
     params.environment->preUpdate(
         commandList, params.renderDevice, params.envMapActualPath, params.sceneDirectory);
 
@@ -50,7 +50,7 @@ void preUpdateLighting(PreUpdateLightingParams& params)
 
 void updateLighting(CameraController& camera, AccelStructManager& accelStructs, UpdateLightingParams& params)
 {
-    nvrhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::ICommandList* commandList = params.commandList;
     if (commandList == nullptr || params.environment == nullptr || params.lightSampling == nullptr
         || params.bindingCache == nullptr || params.sceneData == nullptr || !params.gpuHandles.valid())
     {

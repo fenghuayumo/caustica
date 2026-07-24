@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     extern vk::ImageAspectFlags guessImageAspectFlags(vk::Format format);
@@ -257,4 +257,4 @@ namespace nvrhi::vulkan
                                       1, &imageCopy);
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

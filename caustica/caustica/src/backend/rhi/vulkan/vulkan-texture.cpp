@@ -3,7 +3,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     static vk::ImageType textureDimensionToImageType(TextureDimension dimension)
@@ -264,7 +264,7 @@ namespace nvrhi::vulkan
 
         view.subresource = subresource;
 
-        auto vkFormat = nvrhi::vulkan::convertFormat(format);
+        auto vkFormat = caustica::rhi::vulkan::convertFormat(format);
 
         vk::ImageAspectFlags aspectFlags = guessSubresourceImageAspectFlags(vk::Format(vkFormat), viewtype);
         view.subresourceRange = vk::ImageSubresourceRange()
@@ -387,16 +387,16 @@ namespace nvrhi::vulkan
             resolvedSrcSlice.arraySlice, 1
         );
 
-        auto srcFormat = nvrhi::vulkan::convertFormat(src->desc.format);
-        vk::ImageAspectFlags srcAspectFlags = guessSubresourceImageAspectFlags(vk::Format(srcFormat), nvrhi::vulkan::Texture::TextureSubresourceViewType::AllAspects);
+        auto srcFormat = caustica::rhi::vulkan::convertFormat(src->desc.format);
+        vk::ImageAspectFlags srcAspectFlags = guessSubresourceImageAspectFlags(vk::Format(srcFormat), caustica::rhi::vulkan::Texture::TextureSubresourceViewType::AllAspects);
 
         TextureSubresourceSet dstSubresource = TextureSubresourceSet(
             resolvedDstSlice.mipLevel, 1,
             resolvedDstSlice.arraySlice, 1
         );
 
-        auto dstFormat = nvrhi::vulkan::convertFormat(dst->desc.format);
-        vk::ImageAspectFlags dstAspectFlags = guessSubresourceImageAspectFlags(vk::Format(dstFormat), nvrhi::vulkan::Texture::TextureSubresourceViewType::AllAspects);
+        auto dstFormat = caustica::rhi::vulkan::convertFormat(dst->desc.format);
+        vk::ImageAspectFlags dstAspectFlags = guessSubresourceImageAspectFlags(vk::Format(dstFormat), caustica::rhi::vulkan::Texture::TextureSubresourceViewType::AllAspects);
 
 
         // When copying between block-compressed and uint textures, the extents and offsets are scaled by the block size.
@@ -658,7 +658,7 @@ namespace nvrhi::vulkan
         utils::NotSupported();
     }
 
-    void CommandList::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, nvrhi::Format format)
+    void CommandList::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
         (void)buffer;
         (void)texture;
@@ -854,4 +854,4 @@ namespace nvrhi::vulkan
         m_Context.device.destroySampler(sampler);
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

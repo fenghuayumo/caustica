@@ -18,17 +18,17 @@
 class GpuDevice_VK : public caustica::GpuDevice
 {
 public:
-    [[nodiscard]] nvrhi::IDevice* getDevice() const override
+    [[nodiscard]] caustica::rhi::IDevice* getDevice() const override
     {
         if (m_ValidationLayer)
             return m_ValidationLayer;
 
-        return m_NvrhiDevice;
+        return m_RhiDevice;
     }
     
-    [[nodiscard]] nvrhi::GraphicsAPI getGraphicsAPI() const override
+    [[nodiscard]] caustica::rhi::GraphicsAPI getGraphicsAPI() const override
     {
-        return nvrhi::GraphicsAPI::VULKAN;
+        return caustica::rhi::GraphicsAPI::VULKAN;
     }
 
     bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
@@ -52,14 +52,14 @@ protected:
         }
     }
 
-    nvrhi::ITexture* getCurrentBackBuffer() override
+    caustica::rhi::ITexture* getCurrentBackBuffer() override
     {
         if (m_DeviceParams.headlessDevice)
             return getHeadlessBackBuffer(getCurrentHeadlessBackBufferIndex());
 
         return m_SwapChainImages[m_SwapChainIndex].rhiHandle;
     }
-    nvrhi::ITexture* getBackBuffer(uint32_t index) override
+    caustica::rhi::ITexture* getBackBuffer(uint32_t index) override
     {
         if (m_DeviceParams.headlessDevice)
             return getHeadlessBackBuffer(index);
@@ -212,21 +212,21 @@ protected:
     struct SwapChainImage
     {
         vk::Image image;
-        nvrhi::TextureHandle rhiHandle;
+        caustica::rhi::TextureHandle rhiHandle;
     };
 
     std::vector<SwapChainImage> m_SwapChainImages;
     uint32_t m_SwapChainIndex = uint32_t(-1);
 
-    nvrhi::vulkan::DeviceHandle m_NvrhiDevice;
-    nvrhi::DeviceHandle m_ValidationLayer;
+    caustica::rhi::DeviceHandle m_RhiDevice;
+    caustica::rhi::DeviceHandle m_ValidationLayer;
 
     std::vector<vk::Semaphore> m_AcquireSemaphores;
     std::vector<vk::Semaphore> m_PresentSemaphores;
     uint32_t m_AcquireSemaphoreIndex = 0;
 
-    std::queue<nvrhi::EventQueryHandle> m_FramesInFlight;
-    std::vector<nvrhi::EventQueryHandle> m_QueryPool;
+    std::queue<caustica::rhi::EventQueryHandle> m_FramesInFlight;
+    std::vector<caustica::rhi::EventQueryHandle> m_QueryPool;
 
     bool m_BufferDeviceAddressSupported = false;
 

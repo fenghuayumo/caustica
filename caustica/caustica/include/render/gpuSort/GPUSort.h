@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/core/BindingCache.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <memory>
 
@@ -25,7 +25,7 @@ class ShaderDebug;
 class GPUSort
 {
 public:
-    GPUSort(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    GPUSort(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~GPUSort();
 
     void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug);
@@ -35,44 +35,44 @@ public:
     // Provide indices in the indices buffer (uint32). These have to be already initialized to [1, 2, 3, 4, 5, ..., itemCount-1] and will be sorted in-place. Also known as the "payload". If you do not want to pre-initialize them, use `resetIndices`
     // Provide maxItemCount as the maximum possible itemCount - this will be used to create needed scratch buffers at runtime.
     // Do all necessary resource barriers before and after the call to sort.
-    void                            sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle controlBuffer, uint itemCountByteOffset, nvrhi::BufferHandle bufferKeys, nvrhi::BufferHandle bufferIndices, uint maxItemCount, bool resetIndices);
+    void                            sort(caustica::rhi::ICommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint maxItemCount, bool resetIndices);
 
 private:
     void                            reCreateWorkingBuffers(uint32_t maxItemCount);
 
 private:
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
     std::shared_ptr<ShaderDebug>   m_shaderDebug;
 
-    nvrhi::ShaderHandle             m_CSSetupIndirect;
-    nvrhi::ComputePipelineHandle    m_PSOSetupIndirect;
-    nvrhi::ShaderHandle             m_CSCount;
-    nvrhi::ComputePipelineHandle    m_PSOCount;
-    nvrhi::ShaderHandle             m_CSCountIIFP;      // init indices first pass
-    nvrhi::ComputePipelineHandle    m_PSOCountIIFP;     // init indices first pass
-    nvrhi::ShaderHandle             m_CSCountReduce;
-    nvrhi::ComputePipelineHandle    m_PSOCountReduce;
-    nvrhi::ShaderHandle             m_CSScanPrefix;
-    nvrhi::ComputePipelineHandle    m_PSOScanPrefix;
-    nvrhi::ShaderHandle             m_CSScanAdd;
-    nvrhi::ComputePipelineHandle    m_PSOScanAdd;
-    nvrhi::ShaderHandle             m_CSScatter;
-    nvrhi::ComputePipelineHandle    m_PSOScatter;
-    nvrhi::ShaderHandle             m_CSScatterIIFP;    // init indices first pass
-    nvrhi::ComputePipelineHandle    m_PSOScatterIIFP;   // init indices first pass
-    nvrhi::ShaderHandle             m_CSValidate;
-    nvrhi::ComputePipelineHandle    m_PSOValidate;
+    caustica::rhi::ShaderHandle             m_CSSetupIndirect;
+    caustica::rhi::ComputePipelineHandle    m_PSOSetupIndirect;
+    caustica::rhi::ShaderHandle             m_CSCount;
+    caustica::rhi::ComputePipelineHandle    m_PSOCount;
+    caustica::rhi::ShaderHandle             m_CSCountIIFP;      // init indices first pass
+    caustica::rhi::ComputePipelineHandle    m_PSOCountIIFP;     // init indices first pass
+    caustica::rhi::ShaderHandle             m_CSCountReduce;
+    caustica::rhi::ComputePipelineHandle    m_PSOCountReduce;
+    caustica::rhi::ShaderHandle             m_CSScanPrefix;
+    caustica::rhi::ComputePipelineHandle    m_PSOScanPrefix;
+    caustica::rhi::ShaderHandle             m_CSScanAdd;
+    caustica::rhi::ComputePipelineHandle    m_PSOScanAdd;
+    caustica::rhi::ShaderHandle             m_CSScatter;
+    caustica::rhi::ComputePipelineHandle    m_PSOScatter;
+    caustica::rhi::ShaderHandle             m_CSScatterIIFP;    // init indices first pass
+    caustica::rhi::ComputePipelineHandle    m_PSOScatterIIFP;   // init indices first pass
+    caustica::rhi::ShaderHandle             m_CSValidate;
+    caustica::rhi::ComputePipelineHandle    m_PSOValidate;
 
-    nvrhi::BindingLayoutHandle      m_initBindingLayout;
-    nvrhi::BindingLayoutHandle      m_commonBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_initBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_commonBindingLayout;
     caustica::BindingCache     m_bindingCache;
 
-    nvrhi::BufferHandle             m_controlBuffer;
-    nvrhi::BufferHandle             m_dispatchIndirectBuffer;
-    nvrhi::BufferHandle             m_scratchBuffer;
-    nvrhi::BufferHandle             m_reducedScratchBuffer;
-    nvrhi::BufferHandle             m_scratchIndicesBuffer;
+    caustica::rhi::BufferHandle             m_controlBuffer;
+    caustica::rhi::BufferHandle             m_dispatchIndirectBuffer;
+    caustica::rhi::BufferHandle             m_scratchBuffer;
+    caustica::rhi::BufferHandle             m_reducedScratchBuffer;
+    caustica::rhi::BufferHandle             m_scratchIndicesBuffer;
 
     uint32_t                        m_scratchMaxItemCountSize = 0;
 };

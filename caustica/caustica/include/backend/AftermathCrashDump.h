@@ -13,7 +13,7 @@ namespace caustica
     {
     public:
         static void waitForCrashDump(uint32_t maxTimeoutSeconds = 60);
-        static uint64_t getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api);
+        static uint64_t getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, caustica::rhi::GraphicsAPI api);
 
         AftermathCrashDump(GpuDevice& deviceManager);
 

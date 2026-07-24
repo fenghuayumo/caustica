@@ -2,7 +2,7 @@
 
 #include <ecs/Entity.h>
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <functional>
@@ -24,7 +24,7 @@ struct GeometrySequenceComponent;
 
 struct SetSceneMeshVerticesParams
 {
-    nvrhi::IDevice* device = nullptr;
+    caustica::rhi::IDevice* device = nullptr;
     IDescriptorTableManager* descriptorTable = nullptr;
     render::SceneGpuResources* gpuResources = nullptr;
     std::shared_ptr<Scene> scene;

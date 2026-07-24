@@ -256,7 +256,7 @@ def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
 
 
 def vulkan_binding_shift_args() -> list[str]:
-    # Matches nvrhi::VulkanBindingOffsets defaults used in ShaderCompilerUtils.cpp
+    # Matches caustica::rhi::VulkanBindingOffsets defaults used in ShaderCompilerUtils.cpp
     sampler, t, b, u = 128, 0, 256, 384
     args: list[str] = []
     for space in range(7):

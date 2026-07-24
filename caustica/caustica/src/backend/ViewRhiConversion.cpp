@@ -3,29 +3,29 @@
 namespace caustica
 {
 
-nvrhi::Viewport toNvrhi(const ViewportDesc& viewport)
+caustica::rhi::Viewport toRhi(const ViewportDesc& viewport)
 {
-    return nvrhi::Viewport(viewport.minX, viewport.maxX, viewport.minY, viewport.maxY, viewport.minZ, viewport.maxZ);
+    return caustica::rhi::Viewport(viewport.minX, viewport.maxX, viewport.minY, viewport.maxY, viewport.minZ, viewport.maxZ);
 }
 
-nvrhi::Rect toNvrhi(const ScissorDesc& scissor)
+caustica::rhi::Rect toRhi(const ScissorDesc& scissor)
 {
-    return nvrhi::Rect(scissor.minX, scissor.maxX, scissor.minY, scissor.maxY);
+    return caustica::rhi::Rect(scissor.minX, scissor.maxX, scissor.minY, scissor.maxY);
 }
 
-nvrhi::ViewportState toNvrhi(const ViewportStateDesc& state)
+caustica::rhi::ViewportState toRhi(const ViewportStateDesc& state)
 {
-    nvrhi::ViewportState result;
+    caustica::rhi::ViewportState result;
     for (const ViewportDesc& viewport : state.viewports)
-        result.addViewport(toNvrhi(viewport));
+        result.addViewport(toRhi(viewport));
     for (const ScissorDesc& scissor : state.scissorRects)
-        result.addScissorRect(toNvrhi(scissor));
+        result.addScissorRect(toRhi(scissor));
     return result;
 }
 
-nvrhi::TextureSubresourceSet toNvrhi(const TextureSubresourceDesc& subresources)
+caustica::rhi::TextureSubresourceSet toRhi(const TextureSubresourceDesc& subresources)
 {
-    return nvrhi::TextureSubresourceSet(
+    return caustica::rhi::TextureSubresourceSet(
         subresources.baseMipLevel,
         subresources.numMipLevels,
         subresources.baseArraySlice,

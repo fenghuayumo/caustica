@@ -1,6 +1,6 @@
 #include <rhi/common/aftermath.h>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     AftermathMarkerTracker::AftermathMarkerTracker() :
         m_EventStack{},
@@ -113,4 +113,4 @@ namespace nvrhi
 
 
 
-} // namespace nvrhi
+} // namespace caustica::rhi

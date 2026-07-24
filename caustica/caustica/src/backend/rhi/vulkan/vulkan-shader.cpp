@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     ShaderHandle Device::createShader(const ShaderDesc& desc, const void *binary, const size_t binarySize)
@@ -191,4 +191,4 @@ namespace nvrhi::vulkan
             return nullptr;
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

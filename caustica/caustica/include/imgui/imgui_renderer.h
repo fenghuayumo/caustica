@@ -2,7 +2,7 @@
 
 #include <backend/GpuDevice.h>
 #include <backend/renderContext.h>
-#include <imgui/imgui_nvrhi.h>
+#include <imgui/imgui_rhi.h>
 
 #include <filesystem>
 #include <memory>
@@ -89,12 +89,12 @@ namespace caustica
         ImFont* getScaledFont() { return m_imFont; }
     };
 
-    // Base class for ImGui UIs rendered through NVRHI.
+    // Base class for ImGui UIs rendered through the RHI.
     class ImGui_Renderer : public renderContext
     {
     protected:
 
-        std::unique_ptr<ImGui_NVRHI> imgui_nvrhi;
+        std::unique_ptr<ImGui_RHI> m_imguiRhi;
 
         std::vector<std::shared_ptr<RegisteredFont>> m_fonts;
 
@@ -134,7 +134,7 @@ namespace caustica
         void setDefaultFont(std::shared_ptr<RegisteredFont> font);
 
         virtual void animate(float elapsedTimeSeconds);
-        virtual void render(nvrhi::IFramebuffer* framebuffer);
+        virtual void render(caustica::rhi::IFramebuffer* framebuffer);
         virtual void backBufferResizing();
         virtual void backBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) {}
         virtual void displayScaleChanged(float scaleX, float scaleY);

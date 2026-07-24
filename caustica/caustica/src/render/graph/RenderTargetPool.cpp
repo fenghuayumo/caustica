@@ -41,29 +41,29 @@ int RenderTargetPool::findFreeSlot(const TextureDesc& desc) const
     return bestSlot;
 }
 
-nvrhi::TextureHandle RenderTargetPool::createPooledTexture(const TextureDesc& desc)
+caustica::rhi::TextureHandle RenderTargetPool::createPooledTexture(const TextureDesc& desc)
 {
     assert(m_device);
 
     const FormatInfo formatInfo = getFormatInfo(desc.format);
-    nvrhi::TextureDesc nativeDesc;
+    caustica::rhi::TextureDesc nativeDesc;
     nativeDesc.debugName = desc.name.empty() ? "rg_pool" : desc.name.c_str();
     nativeDesc.width = desc.width;
     nativeDesc.height = desc.height;
     nativeDesc.depth = desc.depth;
     nativeDesc.mipLevels = desc.mipLevels;
     nativeDesc.arraySize = desc.arraySize;
-    nativeDesc.format = nvrhi::caustica::toNvrhiFormat(desc.format);
+    nativeDesc.format = toNativeFormat(desc.format);
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
-    nativeDesc.initialState = nvrhi::ResourceStates::Common;
+    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createTexture(nativeDesc);
 }
 
-nvrhi::TextureHandle RenderTargetPool::tryAcquireTexture(const TextureDesc& desc)
+caustica::rhi::TextureHandle RenderTargetPool::tryAcquireTexture(const TextureDesc& desc)
 {
     assert(m_device);
 
@@ -78,11 +78,11 @@ nvrhi::TextureHandle RenderTargetPool::tryAcquireTexture(const TextureDesc& desc
     return nullptr;
 }
 
-nvrhi::TextureHandle RenderTargetPool::acquireTexture(const TextureDesc& desc)
+caustica::rhi::TextureHandle RenderTargetPool::acquireTexture(const TextureDesc& desc)
 {
     assert(m_device);
 
-    if (nvrhi::TextureHandle existing = tryAcquireTexture(desc))
+    if (caustica::rhi::TextureHandle existing = tryAcquireTexture(desc))
         return existing;
 
     PooledTexture entry{};

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <scene/GaussianSplatData.h>
 
 #include <cstdint>
@@ -22,31 +22,31 @@ struct GaussianSplatAccelBuildParams
 class GaussianSplatAccelBuilder
 {
 public:
-    explicit GaussianSplatAccelBuilder(nvrhi::IDevice* device);
+    explicit GaussianSplatAccelBuilder(caustica::rhi::IDevice* device);
 
     void invalidate();
     void release(bool markBuildPending = true);
 
     void build(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const GaussianSplatAccelBuildParams& params,
         const std::vector<caustica::GaussianSplatData>& splats,
         uint32_t splatCount,
-        nvrhi::IBuffer* aabbBuffer);
+        caustica::rhi::IBuffer* aabbBuffer);
 
-    [[nodiscard]] nvrhi::rt::IAccelStruct* getTopLevelAS() const { return m_topLevelAS.Get(); }
-    [[nodiscard]] nvrhi::rt::IAccelStruct* getBottomLevelAS() const { return m_bottomLevelAS.Get(); }
+    [[nodiscard]] caustica::rhi::rt::IAccelStruct* getTopLevelAS() const { return m_topLevelAS.Get(); }
+    [[nodiscard]] caustica::rhi::rt::IAccelStruct* getBottomLevelAS() const { return m_bottomLevelAS.Get(); }
     [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_shadowPrimitiveCountPerSplat; }
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_lastUseTLASInstances; }
     [[nodiscard]] bool isBuildPending() const { return m_buildPending; }
 
 private:
-    nvrhi::DeviceHandle m_device;
+    caustica::rhi::DeviceHandle m_device;
 
-    nvrhi::BufferHandle m_triangleVertexBuffer;
-    nvrhi::BufferHandle m_triangleIndexBuffer;
-    nvrhi::rt::AccelStructHandle m_bottomLevelAS;
-    nvrhi::rt::AccelStructHandle m_topLevelAS;
+    caustica::rhi::BufferHandle m_triangleVertexBuffer;
+    caustica::rhi::BufferHandle m_triangleIndexBuffer;
+    caustica::rhi::rt::AccelStructHandle m_bottomLevelAS;
+    caustica::rhi::rt::AccelStructHandle m_topLevelAS;
 
     bool m_buildPending = false;
     bool m_lastBlasCompaction = false;

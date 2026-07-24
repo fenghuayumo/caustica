@@ -18,26 +18,26 @@
 class GpuDevice_DX12 : public caustica::GpuDevice
 {
 protected:
-    nvrhi::RefCountPtr<IDXGIFactory2>               m_DxgiFactory2;
-    nvrhi::RefCountPtr<ID3D12Device>                m_Device12;
-    nvrhi::RefCountPtr<ID3D12CommandQueue>          m_GraphicsQueue;
-    nvrhi::RefCountPtr<ID3D12CommandQueue>          m_ComputeQueue;
-    nvrhi::RefCountPtr<ID3D12CommandQueue>          m_CopyQueue;
-    nvrhi::RefCountPtr<IDXGISwapChain3>             m_SwapChain;
+    caustica::rhi::RefCountPtr<IDXGIFactory2>               m_DxgiFactory2;
+    caustica::rhi::RefCountPtr<ID3D12Device>                m_Device12;
+    caustica::rhi::RefCountPtr<ID3D12CommandQueue>          m_GraphicsQueue;
+    caustica::rhi::RefCountPtr<ID3D12CommandQueue>          m_ComputeQueue;
+    caustica::rhi::RefCountPtr<ID3D12CommandQueue>          m_CopyQueue;
+    caustica::rhi::RefCountPtr<IDXGISwapChain3>             m_SwapChain;
     DXGI_SWAP_CHAIN_DESC1                           m_SwapChainDesc{};
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC                 m_FullScreenDesc{};
-    nvrhi::RefCountPtr<IDXGIAdapter>                m_DxgiAdapter;
+    caustica::rhi::RefCountPtr<IDXGIAdapter>                m_DxgiAdapter;
     HWND                                            m_hWnd = nullptr;
     bool                                            m_TearingSupported = false;
 
-    std::vector<nvrhi::RefCountPtr<ID3D12Resource>> m_SwapChainBuffers;
-    std::vector<nvrhi::TextureHandle>               m_RhiSwapChainBuffers;
-    nvrhi::RefCountPtr<ID3D12Fence>                 m_FrameFence;
+    std::vector<caustica::rhi::RefCountPtr<ID3D12Resource>> m_SwapChainBuffers;
+    std::vector<caustica::rhi::TextureHandle>               m_RhiSwapChainBuffers;
+    caustica::rhi::RefCountPtr<ID3D12Fence>                 m_FrameFence;
     std::vector<HANDLE>                             m_FrameFenceEvents;
 
     UINT64                                          m_FrameCount = 1;
 
-    nvrhi::DeviceHandle                             m_NvrhiDevice;
+    caustica::rhi::DeviceHandle                             m_RhiDevice;
 
     std::string                                     m_RendererString;
 
@@ -62,18 +62,18 @@ public:
         return m_RendererString.c_str();
     }
 
-    nvrhi::IDevice *getDevice() const override
+    caustica::rhi::IDevice *getDevice() const override
     {
-        return m_NvrhiDevice;
+        return m_RhiDevice;
     }
 
     void reportLiveObjects() override;
     bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
     [[nodiscard]] bool queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
 
-    nvrhi::GraphicsAPI getGraphicsAPI() const override
+    caustica::rhi::GraphicsAPI getGraphicsAPI() const override
     {
-        return nvrhi::GraphicsAPI::D3D12;
+        return caustica::rhi::GraphicsAPI::D3D12;
     }
     
 protected:
@@ -82,8 +82,8 @@ protected:
     bool createSwapChain() override;
     void destroyDeviceAndSwapChain() override;
     void resizeSwapChain() override;
-    nvrhi::ITexture* getCurrentBackBuffer() override;
-    nvrhi::ITexture* getBackBuffer(uint32_t index) override;
+    caustica::rhi::ITexture* getCurrentBackBuffer() override;
+    caustica::rhi::ITexture* getBackBuffer(uint32_t index) override;
     uint32_t getCurrentBackBufferIndex() override;
     uint32_t getBackBufferCount() override;
     bool beginFrame() override;

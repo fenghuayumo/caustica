@@ -4,7 +4,7 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/core/PtPipelineFeaturePresets.h>
 #include <render/RenderRuntimeState.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <shaders/SampleConstantBuffer.h>
 
 #include <functional>
@@ -36,7 +36,7 @@ namespace caustica::render
 class SceneLightingPasses;
 struct ScenePassWireParams;
 
-using AdditionalAccelStructBuilder = std::function<void(nvrhi::ICommandList*)>;
+using AdditionalAccelStructBuilder = std::function<void(caustica::rhi::ICommandList*)>;
 
 // RT pipeline variants, shader macros, and acceleration-structure lifecycle.
 class SceneRayTracingResources
@@ -56,14 +56,14 @@ public:
     // Ensure CreateStateObject for a preset (blocking for that preset only), then bind.
     bool ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress = false);
 
-    void uploadSubInstanceData(nvrhi::ICommandList* commandList);
+    void uploadSubInstanceData(caustica::rhi::ICommandList* commandList);
     // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.
     void createAccelStructs(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         caustica::Scene& scene,
         const caustica::scene::SceneRenderData* renderData = nullptr);
     void recreateAccelStructs(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         caustica::Scene& scene,
         const caustica::scene::SceneRenderData* renderData = nullptr);
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
@@ -74,8 +74,8 @@ public:
     void invalidateBindingSet();
     void recreateBindingSet(const caustica::scene::SceneRenderData* renderData = nullptr);
 
-    void sampleRenderCode(nvrhi::IFramebuffer* framebuffer,
-        nvrhi::CommandListHandle commandList,
+    void sampleRenderCode(caustica::rhi::IFramebuffer* framebuffer,
+        caustica::rhi::CommandListHandle commandList,
         const SampleConstants& constants);
 
     bool consumeShaderReloadRequest();
@@ -91,10 +91,10 @@ public:
 private:
     void wireSession(const ScenePassWireParams& params);
     void createBlases(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
     void createTlas(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;

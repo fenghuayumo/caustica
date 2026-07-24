@@ -126,7 +126,7 @@ void GpuRenderSubsystem::shutdown()
     if (m_gpuDevice)
     {
         m_gpuDevice->waitForRenderThreadIdle();
-        if (nvrhi::IDevice* device = m_gpuDevice->getDevice())
+        if (caustica::rhi::IDevice* device = m_gpuDevice->getDevice())
             device->waitForIdle();
     }
 
@@ -140,7 +140,7 @@ void GpuRenderSubsystem::shutdown()
 
     if (m_gpuDevice)
     {
-        if (nvrhi::IDevice* device = m_gpuDevice->getDevice())
+        if (caustica::rhi::IDevice* device = m_gpuDevice->getDevice())
         {
             device->waitForIdle();
             device->runGarbageCollection();

@@ -1075,7 +1075,7 @@ std::filesystem::path MaterialGpuCache::getMaterialStoragePath(StandardMaterialB
     return matPath;
 }
 
-MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+MaterialGpuCache::MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_relativeShaderSourcePath(relativeShaderSourcePath)
     , m_device(device)
     , m_textureCache(textureCache)
@@ -1572,7 +1572,7 @@ MaterialGpuCache::RayTracingState MaterialGpuCache::resolveRayTracingState(
     };
 }
 
-void MaterialGpuCache::completeDeferredTexturesLoad(nvrhi::ICommandList* commandList)
+void MaterialGpuCache::completeDeferredTexturesLoad(caustica::rhi::ICommandList* commandList)
 {
     if (m_deferredTextureLoadInProgress)
     {
@@ -1646,10 +1646,10 @@ static void InitializeStableShaderIdentity(MaterialShaderPermutation& msp)
 }
 
 caustica::ShaderKey MaterialShaderPermutation::makeShaderKey(
-    nvrhi::GraphicsAPI api,
+    caustica::rhi::GraphicsAPI api,
     ShaderCompilerUtils::ShaderProfile profile) const
 {
-    return caustica::makeShaderLibraryKey(shaderFilePath, caustica::shader::fromNvrhiGraphicsApi(api), macros, profile);
+    return caustica::makeShaderLibraryKey(shaderFilePath, caustica::shader::fromRhiGraphicsApi(api), macros, profile);
 }
 
 // MaterialShaderPermutation::MaterialShaderPermutation(const std::string & shaderFilePath, const std::string & closestHitName, const std::string & anyHitName, const std::vector<std::pair<std::string, std::string>> & macros )
@@ -1702,7 +1702,7 @@ void MaterialGpuCache::bakeShaderPermutations()
     }
 }
 
-void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
+void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
@@ -1714,8 +1714,8 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout*
         "PtPipelineFeaturePresets.cpp, MaterialFeatureMask.cpp, and precompile_pt_shader_bins.py");
 
     {
-        nvrhi::BufferDesc bufferDesc;
-        bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+        caustica::rhi::BufferDesc bufferDesc;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
         bufferDesc.keepInitialState = true;
         bufferDesc.canHaveUAVs = true;
         bufferDesc.byteSize = sizeof(StandardMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
@@ -1867,7 +1867,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
 }
 
-void MaterialGpuCache::update(nvrhi::ICommandList* commandList,
+void MaterialGpuCache::update(caustica::rhi::ICommandList* commandList,
     const caustica::scene::SceneRenderData& renderData,
     const caustica::render::SceneGpuResources* gpuResources,
     std::vector<SubInstanceData>& subInstanceData)

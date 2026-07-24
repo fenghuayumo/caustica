@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <shaders/PathTracer/Config.h>
 
 #include <memory>
@@ -47,48 +47,48 @@ public:
 
     void createGuides(
         PathTracingContext* context,
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         const std::unique_ptr<RenderTargets>& renderTargets,
         const std::shared_ptr<ShaderDebug>& shaderDebug,
-        nvrhi::BindingLayoutHandle bindingLayout);
+        caustica::rhi::BindingLayoutHandle bindingLayout);
 
     // Sync per-frame handles from the graph context (replaces mega FrameBindings copy).
     void bindFrame(const FrameGraphContext& ctx);
 
-    void prepareGuides(nvrhi::ICommandList* commandList);
-    void denoiseSpecHitT(nvrhi::ICommandList* commandList);
-    void computeAvgLayerRadiance(nvrhi::ICommandList* commandList);
-    void stablePlanesDebugViz(nvrhi::ICommandList* commandList);
+    void prepareGuides(caustica::rhi::ICommandList* commandList);
+    void denoiseSpecHitT(caustica::rhi::ICommandList* commandList);
+    void computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList);
+    void stablePlanesDebugViz(caustica::rhi::ICommandList* commandList);
     void ensureNrdIntegrations();
-    void prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIndex);
-    void runNrd(nvrhi::ICommandList* commandList, int planeIndex);
-    void mergeNrdOutputs(nvrhi::ICommandList* commandList, int planeIndex);
-    void denoiseStablePlane(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer, int planeIndex);
-    void denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer);
-    void runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList);
-    void runDlssUpscale(nvrhi::ICommandList* commandList, bool reset);
+    void prepareNrdInputs(caustica::rhi::ICommandList* commandList, int planeIndex);
+    void runNrd(caustica::rhi::ICommandList* commandList, int planeIndex);
+    void mergeNrdOutputs(caustica::rhi::ICommandList* commandList, int planeIndex);
+    void denoiseStablePlane(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer, int planeIndex);
+    void denoise(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer);
+    void runNoDenoiserFinalMerge(caustica::rhi::ICommandList* commandList);
+    void runDlssUpscale(caustica::rhi::ICommandList* commandList, bool reset);
 
     void resetReferenceOIDN();
-    void applyReferenceOIDN(nvrhi::ICommandList* commandList);
+    void applyReferenceOIDN(caustica::rhi::ICommandList* commandList);
     void invalidateNrdIntegrations();
     void invalidateOidnOutput();
 
 private:
 #if CAUSTICA_WITH_NATIVE_DLSS
-    bool evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool reset);
+    bool evaluateNativeDLSS(caustica::rhi::ICommandList* commandList, bool reset);
 #endif
 
     PathTracingContext* m_context = nullptr;
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::IDevice* m_device = nullptr;
 
     // Per-frame snapshot filled by bindFrame from FrameGraphContext.
     RenderTargets* m_renderTargets = nullptr;
     PostProcess* m_postProcess = nullptr;
-    nvrhi::BindingSetHandle m_bindingSet;
-    nvrhi::BindingLayoutHandle m_bindingLayout;
-    nvrhi::BufferHandle m_constantBuffer;
-    nvrhi::ICommandList* m_commandList = nullptr;
+    caustica::rhi::BindingSetHandle m_bindingSet;
+    caustica::rhi::BindingLayoutHandle m_bindingLayout;
+    caustica::rhi::BufferHandle m_constantBuffer;
+    caustica::rhi::ICommandList* m_commandList = nullptr;
     dm::uint2 m_renderSize{};
     dm::uint2 m_displaySize{};
     float m_displayAspectRatio = 1.f;
@@ -112,7 +112,7 @@ private:
     std::unique_ptr<NrdIntegration> m_nrd[cStablePlaneCount];
     std::shared_ptr<DenoisingGuidesPass> m_denoisingGuidesPass;
     std::unique_ptr<OidnDenoiser> m_oidnDenoiser;
-    nvrhi::TextureHandle m_oidnDenoisedOutput;
+    caustica::rhi::TextureHandle m_oidnDenoisedOutput;
     bool m_oidnDenoisedOutputValid = false;
     bool m_oidnDenoiserFailed = false;
 };

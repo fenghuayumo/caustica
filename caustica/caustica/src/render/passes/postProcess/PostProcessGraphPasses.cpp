@@ -79,11 +79,11 @@ namespace
                 PTPipelineVariant* pipeline = ctx.ptTestRaygenPPHDR;
                 assert(pipeline);
 
-                nvrhi::rt::DispatchRaysArguments args;
+                caustica::rhi::rt::DispatchRaysArguments args;
                 args.width = ctx.extractedView->displaySize.x;
                 args.height = ctx.extractedView->displaySize.y;
 
-                nvrhi::rt::State state;
+                caustica::rhi::rt::State state;
                 state.shaderTable = pipeline->getShaderTable();
                 state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
@@ -113,9 +113,9 @@ namespace
             [ldrColor, ldrColorScratch](rg::RenderPassContext& passCtx) {
                 passCtx.commandList()->copyTexture(
                     passCtx.texture(ldrColorScratch),
-                    nvrhi::TextureSlice(),
+                    caustica::rhi::TextureSlice(),
                     passCtx.texture(ldrColor),
-                    nvrhi::TextureSlice());
+                    caustica::rhi::TextureSlice());
             },
             rg::PassOptions{ .enabled = enabled });
 
@@ -130,11 +130,11 @@ namespace
                 PTPipelineVariant* pipeline = ctx.ptEdgeDetection;
                 assert(pipeline);
 
-                nvrhi::rt::DispatchRaysArguments args;
+                caustica::rhi::rt::DispatchRaysArguments args;
                 args.width = ctx.extractedView->displaySize.x;
                 args.height = ctx.extractedView->displaySize.y;
 
-                nvrhi::rt::State state;
+                caustica::rhi::rt::State state;
                 state.shaderTable = pipeline->getShaderTable();
                 state.bindings = { ctx.bindingSet, ctx.descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
@@ -163,13 +163,13 @@ void registerPostProcess(FrameGraphContext ctx)
 
     const rg::TextureHandle processedOutputColor = ctx.graph->importTexture(
         targets.processedOutputColor,
-        nvrhi::ResourceStates::UnorderedAccess);
+        caustica::rhi::ResourceStates::UnorderedAccess);
     const rg::TextureHandle ldrColor = ctx.graph->importTexture(
         targets.ldrColor,
-        nvrhi::ResourceStates::ShaderResource);
+        caustica::rhi::ResourceStates::ShaderResource);
     const rg::TextureHandle ldrColorScratch = ctx.graph->importTexture(
         targets.ldrColorScratch,
-        nvrhi::ResourceStates::Common);
+        caustica::rhi::ResourceStates::Common);
     ctx.graph->extractTexture(processedOutputColor, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(ldrColor, rg::TextureAccess::ShaderResource);
     ctx.graph->extractTexture(ldrColorScratch, rg::TextureAccess::ShaderResource);
@@ -219,9 +219,9 @@ void registerCompositeGraphPasses(FrameGraphContext ctx)
 
     const rg::TextureHandle ldrColor = ctx.graph->importTexture(
         ctx.renderTargets->ldrColor,
-        nvrhi::ResourceStates::ShaderResource);
+        caustica::rhi::ResourceStates::ShaderResource);
 
-    nvrhi::ITexture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
+    caustica::rhi::ITexture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
     assert(targetColor);
 
     const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(targetColor, rg::TextureAccess::RenderTarget);

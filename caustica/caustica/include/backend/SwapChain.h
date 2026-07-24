@@ -1,18 +1,18 @@
 #pragma once
 
 #include <vector>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica {
 
 // =============================================================================
-// SwapChain — Backend layer: swapchain framebuffers and depth buffer state.
+// SwapChain - Backend layer: swapchain framebuffers and depth buffer state.
 // =============================================================================
 struct SwapChain
 {
-    std::vector<nvrhi::FramebufferHandle> framebuffers;
-    std::vector<nvrhi::FramebufferHandle> framebuffersWithDepth;
-    nvrhi::TextureHandle depthBuffer;
+    std::vector<caustica::rhi::FramebufferHandle> framebuffers;
+    std::vector<caustica::rhi::FramebufferHandle> framebuffersWithDepth;
+    caustica::rhi::TextureHandle depthBuffer;
 
     uint32_t currentBackBufferIndex = 0;
     uint32_t backBufferCount = 0;

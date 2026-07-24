@@ -205,7 +205,7 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     ensureDirectoryExists(std::filesystem::path(compiledFullPath).parent_path());
 
     const std::filesystem::path pdbPath =
-        compiler.getDevice()->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN || c_PTEmbedPdbs
+        compiler.getDevice()->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN || c_PTEmbedPdbs
         ? std::filesystem::path{}
         : std::filesystem::path(compiledFullPath).replace_extension(".pdb");
 
@@ -349,7 +349,7 @@ void PTPipelineVariant::rebuildShaderTableOnly()
 
     // Always allocate a new table. In-place clearHitShaders races with in-flight
     // DispatchRays that still reference the live ShaderTable (intermittent GPU hang/TDR).
-    nvrhi::rt::ShaderTableHandle newTable = m_pipeline->createShaderTable();
+    caustica::rhi::rt::ShaderTableHandle newTable = m_pipeline->createShaderTable();
     if (!newTable)
     {
         assert(false);
@@ -402,10 +402,10 @@ void PTPipelineVariant::updateFinalize()
         std::string rayGenName  = ("RayGen_"+m_shortUniqueDebugID);
         std::string missName    = ("Miss_"+m_shortUniqueDebugID);
 
-        nvrhi::rt::PipelineDesc pipelineDesc;
+        caustica::rhi::rt::PipelineDesc pipelineDesc;
         pipelineDesc.globalBindingLayouts = { baker->getBindingLayout(), baker->getBindlessLayout() };
-        pipelineDesc.shaders.push_back({ "", m_raygen.shaderLibrary->getShader(rayGenName.c_str(), nvrhi::ShaderType::RayGeneration), nullptr });
-        pipelineDesc.shaders.push_back({ "", m_raygen.shaderLibrary->getShader(missName.c_str(), nvrhi::ShaderType::Miss), nullptr });
+        pipelineDesc.shaders.push_back({ "", m_raygen.shaderLibrary->getShader(rayGenName.c_str(), caustica::rhi::ShaderType::RayGeneration), nullptr });
+        pipelineDesc.shaders.push_back({ "", m_raygen.shaderLibrary->getShader(missName.c_str(), caustica::rhi::ShaderType::Miss), nullptr });
         pipelineDesc.allowOpacityMicromaps = false;
         for (const auto& macro : m_combinedMacros)
         {
@@ -450,8 +450,8 @@ void PTPipelineVariant::updateFinalize()
             pipelineDesc.hitGroups.push_back(
                 {
                     .exportName = effectiveHitGroup.getExportName(),
-                    .closestHitShader = permutation.shaderLibrary->getShader(closestHit.c_str(), nvrhi::ShaderType::ClosestHit),
-                    .anyHitShader = (anyHit != "") ? (permutation.shaderLibrary->getShader(anyHit.c_str(), nvrhi::ShaderType::AnyHit)) : (nullptr),
+                    .closestHitShader = permutation.shaderLibrary->getShader(closestHit.c_str(), caustica::rhi::ShaderType::ClosestHit),
+                    .anyHitShader = (anyHit != "") ? (permutation.shaderLibrary->getShader(anyHit.c_str(), caustica::rhi::ShaderType::AnyHit)) : (nullptr),
                     .intersectionShader = nullptr,
                     .bindingLayout = nullptr,
                     .isProceduralPrimitive = false
@@ -516,12 +516,12 @@ void PTPipelineVariant::updateFinalize()
 }
 
 
-PathTracingShaderCompiler::PathTracingShaderCompiler(nvrhi::IDevice* device, std::shared_ptr<MaterialGpuCache>& materialGpuCache, nvrhi::BindingLayoutHandle bindingLayout, nvrhi::BindingLayoutHandle bindlessLayout)
+PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::IDevice* device, std::shared_ptr<MaterialGpuCache>& materialGpuCache, caustica::rhi::BindingLayoutHandle bindingLayout, caustica::rhi::BindingLayoutHandle bindlessLayout)
     : m_device(device)
     , m_materialGpuCache(materialGpuCache)
     , m_bindingLayout(bindingLayout)
     , m_bindlessLayout(bindlessLayout)
-    , m_enableNVAPIShaderExtension(device->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
+    , m_enableNVAPIShaderExtension(device->queryFeatureSupport(caustica::rhi::Feature::HlslExtensionUAV))
 {
     if (!m_compilerConfig.initialize(device, c_PTShaderBinariesRoot))
         caustica::fatal("Failed to initialize shader compiler configuration");

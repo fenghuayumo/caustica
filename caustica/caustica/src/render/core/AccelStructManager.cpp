@@ -16,12 +16,12 @@
 namespace caustica
 {
 
-AccelStructManager::AccelStructManager(nvrhi::IDevice* device)
+AccelStructManager::AccelStructManager(caustica::rhi::IDevice* device)
     : m_device(device)
 {
 }
 
-void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
+void AccelStructManager::createBlases(caustica::rhi::ICommandList* commandList,
                                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                                       const AccelStructBuildSettings& settings)
 {
@@ -42,16 +42,16 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
 
-        nvrhi::rt::AccelStructDesc blasDesc =
+        caustica::rhi::rt::AccelStructDesc blasDesc =
             bvh::getMeshBlasDesc(cfg, mesh, meshGpu, nullptr, false, m_materialGpuCache);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
 
         uint64_t meshTriangleCount = 0;
-        for (const nvrhi::rt::GeometryDesc& geometry : blasDesc.bottomLevelGeometries)
+        for (const caustica::rhi::rt::GeometryDesc& geometry : blasDesc.bottomLevelGeometries)
         {
-            if (geometry.geometryType == nvrhi::rt::GeometryType::Triangles)
+            if (geometry.geometryType == caustica::rhi::rt::GeometryType::Triangles)
                 meshTriangleCount += geometry.geometryData.triangles.indexCount / 3;
         }
         builtMeshCount++;
@@ -63,7 +63,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
             maxMeshName = mesh.debugName;
         }
 
-        nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+        caustica::rhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
         if (!as)
         {
             error("Failed to create BLAS for mesh '%s' (triangles=%llu). Skipping mesh AS.",
@@ -71,7 +71,7 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
                 static_cast<unsigned long long>(meshTriangleCount));
             continue;
         }
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
+        caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
         meshGpu.accelStruct = as;
     }
     m_materialStateRevision = m_materialGpuCache
@@ -86,13 +86,13 @@ void AccelStructManager::createBlases(nvrhi::ICommandList* commandList,
         maxMeshName.c_str());
 }
 
-void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData)
+void AccelStructManager::createTlas(caustica::rhi::ICommandList* commandList, const scene::SceneRenderData& renderData)
 {
     (void)commandList;
 
-    nvrhi::rt::AccelStructDesc tlasDesc;
+    caustica::rhi::rt::AccelStructDesc tlasDesc;
     tlasDesc.isTopLevel = true;
-    tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
+    tlasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace;
 
     m_subInstanceCount = 0;
     for (const scene::MeshInstanceRenderProxy& proxy : renderData.meshInstances)
@@ -109,14 +109,14 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const scen
         return;
     }
 
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(SubInstanceData) * std::max(1u, m_subInstanceCount);
     bufferDesc.debugName = "Instances";
     bufferDesc.structStride = sizeof(SubInstanceData);
     bufferDesc.canHaveRawViews = false;
     bufferDesc.canHaveUAVs = true;
     bufferDesc.isVertexBuffer = false;
-    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.keepInitialState = true;
     m_subInstanceBuffer = m_device->createBuffer(bufferDesc);
 
@@ -124,7 +124,7 @@ void AccelStructManager::createTlas(nvrhi::ICommandList* commandList, const scen
     m_subInstanceData.assign(m_subInstanceCount, SubInstanceData{});
 }
 
-void AccelStructManager::uploadSubInstanceData(nvrhi::ICommandList* commandList) const
+void AccelStructManager::uploadSubInstanceData(caustica::rhi::ICommandList* commandList) const
 {
     assert(m_subInstanceCount == m_subInstanceData.size());
     if (m_subInstanceData.empty())
@@ -168,7 +168,7 @@ void AccelStructManager::requestMeshRebuild(scene::MeshRenderResourceId meshId)
         m_meshesPendingAccelRebuild.push_back(meshId);
 }
 
-void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
+void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::ICommandList*            commandList,
                                             const scene::SceneRenderData&   renderData,
                                             const AccelStructBuildSettings& settings,
                                             bool&                           fullRebuildRequested)
@@ -218,26 +218,26 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
         // Geometry-sequence / point-cache meshes keep fixed topology; rebuild like skinned
         // meshes via AllowUpdate + PerformUpdate so we do not allocate a new BLAS every frame.
-        nvrhi::rt::AccelStructDesc blasDesc =
+        caustica::rhi::rt::AccelStructDesc blasDesc =
             bvh::getMeshBlasDesc(cfg, mesh, meshGpu, nullptr, true, m_materialGpuCache);
         assert((int)blasDesc.bottomLevelGeometries.size() < (1 << 12));
         if (blasDesc.bottomLevelGeometries.empty())
             continue;
 
         const bool canUpdateInPlace = meshGpu.accelStruct
-            && (meshGpu.accelStruct->getDesc().buildFlags & nvrhi::rt::AccelStructBuildFlags::AllowUpdate) != 0;
+            && (meshGpu.accelStruct->getDesc().buildFlags & caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate) != 0;
 
         if (canUpdateInPlace)
         {
-            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
-                | nvrhi::rt::AccelStructBuildFlags::PerformUpdate;
-            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshGpu.accelStruct, blasDesc);
+            blasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastBuild
+                | caustica::rhi::rt::AccelStructBuildFlags::PerformUpdate;
+            caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, meshGpu.accelStruct, blasDesc);
         }
         else
         {
-            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
-                | nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
-            nvrhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
+            blasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastBuild
+                | caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate;
+            caustica::rhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
             if (!as)
             {
                 error("Failed to create updatable BLAS for mesh '%s'. Deferring full rebuild.",
@@ -245,7 +245,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
                 fullRebuildRequested = true;
                 continue;
             }
-            nvrhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
+            caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
             meshGpu.accelStruct = as;
         }
 
@@ -259,7 +259,7 @@ void AccelStructManager::rebuildDirtyMeshes(nvrhi::ICommandList*            comm
     }
 }
 
-void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            commandList,
+void AccelStructManager::updateSkinnedBlases(caustica::rhi::ICommandList*            commandList,
                                              const scene::SceneRenderData&   renderData,
                                              const AccelStructBuildSettings& settings,
                                              uint32_t                        /*frameIndex*/) const
@@ -289,9 +289,9 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         if (!preparedSkinnedMeshes.insert(proxy.meshId).second)
             continue;
 
-        commandList->setAccelStructState(meshGpu.accelStruct, nvrhi::ResourceStates::AccelStructWrite);
+        commandList->setAccelStructState(meshGpu.accelStruct, caustica::rhi::ResourceStates::AccelStructWrite);
         commandList->setBufferState(meshGpu.vertexBuffer,
-                                    nvrhi::ResourceStates::AccelStructBuildInput);
+                                    caustica::rhi::ResourceStates::AccelStructBuildInput);
     }
     commandList->commitBarriers();
 
@@ -315,14 +315,14 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
         }
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
-        nvrhi::rt::AccelStructDesc blasDesc =
+        caustica::rhi::rt::AccelStructDesc blasDesc =
             bvh::getMeshBlasDesc(cfg, *mesh, meshGpu, nullptr, true, m_materialGpuCache);
         if (blasDesc.bottomLevelGeometries.empty())
         {
             skippedEmptySkinnedUpdateCount++;
             continue;
         }
-        nvrhi::utils::BuildBottomLevelAccelStruct(commandList, meshGpu.accelStruct, blasDesc);
+        caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, meshGpu.accelStruct, blasDesc);
         // OMM data was baked for the previous vertex positions.
         meshGpu.accelStructOmm = nullptr;
         meshGpu.opacityMicromaps.clear();
@@ -348,13 +348,13 @@ void AccelStructManager::updateSkinnedBlases(nvrhi::ICommandList*            com
     commandList->endMarker();
 }
 
-void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
+void AccelStructManager::buildTlas(caustica::rhi::ICommandList*            commandList,
                                    const scene::SceneRenderData&   renderData,
                                    const AccelStructBuildSettings& settings,
                                    const OmmAccelStructState&      ommState,
                                    OpacityMicromapBuilder*                       opacityMicromapBuilder) const
 {
-    std::vector<nvrhi::rt::InstanceDesc> instances;
+    std::vector<caustica::rhi::rt::InstanceDesc> instances;
 
     uint subInstanceCount = 0;
     instances.reserve(renderData.meshInstances.size());
@@ -391,10 +391,10 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         const bool validTransform =
             finiteTransform && std::abs(dm::determinant(transform.m_linear)) > 1e-12f;
 
-        nvrhi::rt::InstanceDesc instanceDesc;
+        caustica::rhi::rt::InstanceDesc instanceDesc;
         instanceDesc.instanceID = compactedGeometryInstanceIndex;
         instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
-        instanceDesc.flags = nvrhi::rt::InstanceFlags::None;
+        instanceDesc.flags = caustica::rhi::rt::InstanceFlags::None;
         dm::affineToColumnMajor(
             validTransform ? transform : dm::affine3::identity(),
             instanceDesc.transform);
@@ -470,9 +470,9 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
 
         instanceDesc.bottomLevelAS = bottomLevelAS;
         instanceDesc.instanceMask = (ommState.onlyOMMs && !hasAttachementOMM) ? 0 : 1;
-        instanceDesc.flags = ommState.force2State ? nvrhi::rt::InstanceFlags::ForceOMM2State : nvrhi::rt::InstanceFlags::None;
+        instanceDesc.flags = ommState.force2State ? caustica::rhi::rt::InstanceFlags::ForceOMM2State : caustica::rhi::rt::InstanceFlags::None;
         if (settings.forceOpaque || ommState.debugViewEnabled)
-            instanceDesc.flags = (nvrhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)nvrhi::rt::InstanceFlags::ForceOpaque);
+            instanceDesc.flags = (caustica::rhi::rt::InstanceFlags)((uint32_t)instanceDesc.flags | (uint32_t)caustica::rhi::rt::InstanceFlags::ForceOpaque);
 
         subInstanceCount += meshSubInstanceCount;
         instances.push_back(instanceDesc);
@@ -507,7 +507,7 @@ void AccelStructManager::buildTlas(nvrhi::ICommandList*            commandList,
         m_topLevelAS,
         instances.empty() ? nullptr : instances.data(),
         instances.size(),
-        nvrhi::rt::AccelStructBuildFlags::AllowEmptyInstances);
+        caustica::rhi::rt::AccelStructBuildFlags::AllowEmptyInstances);
     commandList->endMarker();
 }
 

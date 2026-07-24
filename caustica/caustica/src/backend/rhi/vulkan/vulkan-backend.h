@@ -11,12 +11,12 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
 #include <rtxmu/VkAccelStructManager.h>
 #endif
 
 #if (VK_HEADER_VERSION < 318)
-#error "Vulkan SDK version 1.4.318 or later is required to compile NVRHI"
+#error "Vulkan SDK version 1.4.318 or later is required to compile Caustica RHI"
 #endif
 
 #define CHECK_VK_RETURN(res) if ((res) != vk::Result::eSuccess) { return res; }
@@ -27,7 +27,7 @@
 #define ASSERT_VK_OK(res) do {(void)(res);} while(0)
 #endif // _DEBUG
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
     class Texture;
     class StagingTexture;
@@ -46,7 +46,7 @@ namespace nvrhi::vulkan
 
     struct ResourceStateMapping
     {
-        ResourceStates nvrhiState;
+        ResourceStates rhiState;
         vk::PipelineStageFlags2 stageFlags;
         vk::AccessFlags2 accessMask;
         vk::ImageLayout imageLayout;
@@ -87,7 +87,7 @@ namespace nvrhi::vulkan
         std::vector<vk::SpecializationMapEntry>& specMapEntries,
         std::vector<uint32_t>& specData);
 
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
     struct RtxMuResources
     {
         std::vector<uint64_t> asBuildsCompleted;
@@ -132,7 +132,7 @@ namespace nvrhi::vulkan
             bool EXT_debug_utils = false;
             bool NV_cooperative_vector = false;
             bool NV_ray_tracing_linear_swept_spheres = false;
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
             bool NV_device_diagnostic_checkpoints = false;
             bool NV_device_diagnostics_config= false;
 #endif
@@ -153,7 +153,7 @@ namespace nvrhi::vulkan
         vk::PhysicalDeviceSubgroupProperties subgroupProperties;
         IMessageCallback* messageCallback = nullptr;
         bool logBufferLifetime = false;
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         std::unique_ptr<rtxmu::VkAccelStructManager> rtxMemUtil;
         std::unique_ptr<RtxMuResources> rtxMuResources;
 #endif
@@ -181,7 +181,7 @@ namespace nvrhi::vulkan
         uint64_t recordingID = 0;
         uint64_t submissionID = 0;
 
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         std::vector<uint64_t> rtxmuBuildIds;
         std::vector<uint64_t> rtxmuCompactionIds;
 #endif
@@ -456,7 +456,7 @@ namespace nvrhi::vulkan
             command list;
 
         - (queue & c_VersionQueueMask << c_VersionQueueShift) is the queue index, 
-            see nvrhi::CommandQueue for values;
+            see caustica::rhi::CommandQueue for values;
 
         - (id & c_VersionIDMask) is the instance ID of the command list, either 
             pending or submitted. If pending, it matches the recordingID field of 
@@ -1031,7 +1031,7 @@ namespace nvrhi::vulkan
         uint64_t getDeviceAddress() const override;
     };
 
-    class Device : public RefCounter<nvrhi::vulkan::IDevice>
+    class Device : public RefCounter<caustica::rhi::vulkan::IDevice>
     {
     public:
         // Internal backend methods
@@ -1227,7 +1227,7 @@ namespace nvrhi::vulkan
         void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
         void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, nvrhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
@@ -1279,7 +1279,7 @@ namespace nvrhi::vulkan
         // current internal command buffer
         TrackedCommandBufferPtr m_CurrentCmdBuf = nullptr;
 
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         AftermathMarkerTracker m_AftermathTracker;
 #endif
 
@@ -1304,7 +1304,7 @@ namespace nvrhi::vulkan
 
         void bindBindingSets(vk::PipelineBindPoint bindPoint, vk::PipelineLayout pipelineLayout, const BindingSetVector& bindings, BindingVector<uint32_t> const& descriptorSetIdxToBindingIdx);
 
-        void beginRenderPass(nvrhi::IFramebuffer* framebuffer);
+        void beginRenderPass(caustica::rhi::IFramebuffer* framebuffer);
         void endRenderPass();
 
         void insertGraphicsResourceBarriers(const GraphicsState& state);
@@ -1331,4 +1331,4 @@ namespace nvrhi::vulkan
         void commitBarriersInternal();
     };
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

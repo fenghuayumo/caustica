@@ -2,7 +2,7 @@
 
 #include <rhi/common/misc.h>
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
 
     ComputePipelineHandle Device::createComputePipeline(const ComputePipelineDesc& desc)
@@ -65,4 +65,4 @@ namespace nvrhi::d3d11
         }
     }
 
-} // nanmespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

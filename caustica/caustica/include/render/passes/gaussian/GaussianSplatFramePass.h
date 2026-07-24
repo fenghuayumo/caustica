@@ -3,7 +3,7 @@
 #include <math/math.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <memory>
@@ -39,14 +39,14 @@ public:
     GaussianSplatFramePass& operator=(const GaussianSplatFramePass&) = delete;
 
     void createTemporalResources(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
         RenderTargets* renderTargets);
 
     // Bind stable context + scene pass pointers once at create/prepare.
     void bindStable(
         PathTracingContext* context,
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         caustica::AccelStructManager* accelStructs,
         SceneGaussianSplatPasses* scenePasses);
 
@@ -62,21 +62,21 @@ public:
     [[nodiscard]] bool hasActiveSplats() const;
     [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGraphResources(bool renderToOutputColor);
 
-    void executeAccelBuild(nvrhi::ICommandList* commandList);
-    void executeUpload(nvrhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeSort(nvrhi::ICommandList* commandList);
-    void executeRaster(nvrhi::ICommandList* commandList, bool renderToOutputColor);
-    void executeAccumulate(nvrhi::ICommandList* commandList);
+    void executeAccelBuild(caustica::rhi::ICommandList* commandList);
+    void executeUpload(caustica::rhi::ICommandList* commandList, bool renderToOutputColor);
+    void executeSort(caustica::rhi::ICommandList* commandList);
+    void executeRaster(caustica::rhi::ICommandList* commandList, bool renderToOutputColor);
+    void executeAccumulate(caustica::rhi::ICommandList* commandList);
 
-    [[nodiscard]] nvrhi::ITexture* currentColor() const { return m_currentColor.Get(); }
-    [[nodiscard]] nvrhi::ITexture* accumulatedColor() const { return m_accumulatedColor.Get(); }
+    [[nodiscard]] caustica::rhi::ITexture* currentColor() const { return m_currentColor.Get(); }
+    [[nodiscard]] caustica::rhi::ITexture* accumulatedColor() const { return m_accumulatedColor.Get(); }
 
     [[nodiscard]] std::shared_ptr<GPUSort>& gpuSort() { return m_gpuSort; }
     [[nodiscard]] const std::shared_ptr<GPUSort>& gpuSort() const { return m_gpuSort; }
 
 private:
     PathTracingContext* m_context = nullptr;
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::IDevice* m_device = nullptr;
     RenderTargets* m_renderTargets = nullptr;
     caustica::AccelStructManager* m_accelStructs = nullptr;
     SceneGaussianSplatPasses* m_scenePasses = nullptr;
@@ -87,8 +87,8 @@ private:
     bool* m_frameTemporalReset = nullptr;
     bool* m_temporalReset = nullptr;
 
-    nvrhi::TextureHandle m_currentColor;
-    nvrhi::TextureHandle m_accumulatedColor;
+    caustica::rhi::TextureHandle m_currentColor;
+    caustica::rhi::TextureHandle m_accumulatedColor;
     std::unique_ptr<AccumulationPass> m_accumulationPass;
     std::shared_ptr<GPUSort> m_gpuSort;
     bool m_compositeRendered = false;

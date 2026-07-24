@@ -11,47 +11,47 @@ using namespace caustica::math;
 using namespace caustica;
 
 
-AccumulationPass::AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
+AccumulationPass::AccumulationPass(caustica::rhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(shaderFactory)
 {
-    nvrhi::BindingLayoutDesc bindingLayoutDesc;
-    bindingLayoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc bindingLayoutDesc;
+    bindingLayoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     bindingLayoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::Texture_SRV(0),
-        nvrhi::BindingLayoutItem::Texture_UAV(0),
-        nvrhi::BindingLayoutItem::Texture_UAV(1),
-        nvrhi::BindingLayoutItem::Sampler(0),
-        nvrhi::BindingLayoutItem::PushConstants(0, sizeof(AccumulationConstants))
+        caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(1),
+        caustica::rhi::BindingLayoutItem::Sampler(0),
+        caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(AccumulationConstants))
     };
 
     m_bindingLayout = m_device->createBindingLayout(bindingLayoutDesc);
 
-    auto samplerDesc = nvrhi::SamplerDesc().setAllFilters(true);
+    auto samplerDesc = caustica::rhi::SamplerDesc().setAllFilters(true);
 
     m_sampler = m_device->createSampler(samplerDesc);
 }
 
 void AccumulationPass::createPipeline()
 {
-    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/AccumulationPass.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/AccumulationPass.hlsl", "main", nullptr, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout };
     pipelineDesc.CS = m_computeShader;
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void AccumulationPass::createBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture)
+void AccumulationPass::createBindingSet(caustica::rhi::ITexture* inputTexture, caustica::rhi::ITexture* outputTexture, caustica::rhi::ITexture* renderOutputTexture)
 {
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
 
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::Texture_SRV(0, inputTexture),
-        nvrhi::BindingSetItem::Texture_UAV(0, outputTexture),
-        nvrhi::BindingSetItem::Texture_UAV(1, renderOutputTexture),
-        nvrhi::BindingSetItem::Sampler(0, m_sampler),
-        nvrhi::BindingSetItem::PushConstants(0, sizeof(AccumulationConstants))
+        caustica::rhi::BindingSetItem::Texture_SRV(0, inputTexture),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, outputTexture),
+        caustica::rhi::BindingSetItem::Texture_UAV(1, renderOutputTexture),
+        caustica::rhi::BindingSetItem::Sampler(0, m_sampler),
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(AccumulationConstants))
     };
 
     m_bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -60,7 +60,7 @@ void AccumulationPass::createBindingSet(nvrhi::ITexture* inputTexture, nvrhi::IT
 }
 
 void AccumulationPass::render(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const caustica::IView& sourceView,
     const caustica::IView& upscaledView,
     float accumulationWeight)
@@ -79,7 +79,7 @@ void AccumulationPass::render(
     constants.pixelOffset = sourceView.getPixelOffset();
     constants.blendFactor = accumulationWeight;
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { m_bindingSet };
     state.pipeline = m_computePipeline;
     commandList->setComputeState(state);

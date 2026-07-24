@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <memory>
 #include <unordered_map>
@@ -56,10 +56,10 @@ class RtxdiPass
 {
 public:
 	RtxdiPass(
-		nvrhi::IDevice* device,
+		caustica::rhi::IDevice* device,
 		std::shared_ptr<caustica::ShaderFactory> shaderFactory,
 		caustica::render::RenderDevice& renderDevice,
-		nvrhi::BindingLayoutHandle bindlessLayout);
+		caustica::rhi::BindingLayoutHandle bindlessLayout);
 	~RtxdiPass();
 
 	void reset();
@@ -67,17 +67,17 @@ public:
 	// Per-frame RTXDI resource prep (formerly WorldRenderer::rtxdiSetupFrame).
 	struct SetupParams
 	{
-		nvrhi::CommandListHandle commandList;
+		caustica::rhi::CommandListHandle commandList;
 		const RenderTargets* renderTargets = nullptr;
 		EnvMapProcessor* environment = nullptr;
 		EnvMapSceneParams envMapSceneParams{};
 		const caustica::scene::SceneRenderData* renderData = nullptr;
-		nvrhi::IDescriptorTable* descriptorTable = nullptr;
+		caustica::rhi::IDescriptorTable* descriptorTable = nullptr;
 		caustica::render::SceneGpuFrameHandles gpuHandles{};
 		std::shared_ptr<class MaterialGpuCache> materials;
 		std::shared_ptr<class OpacityMicromapBuilder> opacityMaps;
-		nvrhi::BufferHandle subInstanceDataBuffer;
-		nvrhi::BindingLayoutHandle bindingLayout;
+		caustica::rhi::BufferHandle subInstanceDataBuffer;
+		caustica::rhi::BindingLayoutHandle bindingLayout;
 		std::shared_ptr<ShaderDebug> shaderDebug;
 
 		uint32_t frameIndex = 0;
@@ -97,57 +97,57 @@ public:
 	void setupFrame(const SetupParams& params);
 
     void prepareResources(
-        nvrhi::CommandListHandle commandList,
+        caustica::rhi::CommandListHandle commandList,
         const RenderTargets& renderTargets,
         EnvMapProcessor* envMap,
         EnvMapSceneParams envMapSceneParams,
         const caustica::scene::SceneRenderData* renderData,
         size_t geometryInstanceCount,
-        nvrhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::IDescriptorTable* descriptorTable,
         const caustica::render::SceneGpuFrameHandles& gpuHandles,
         std::shared_ptr<class MaterialGpuCache> materialGpuCache,
         std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
-        nvrhi::BufferHandle subInstanceDataBuffer,
+        caustica::rhi::BufferHandle subInstanceDataBuffer,
         const RtxdiBridgeParameters& bridgeParams,
-        const nvrhi::BindingLayoutHandle extraBindingLayout,
+        const caustica::rhi::BindingLayoutHandle extraBindingLayout,
         std::shared_ptr<ShaderDebug> shaderDebug);
 	void beginFrame(
-		nvrhi::CommandListHandle commandList,
+		caustica::rhi::CommandListHandle commandList,
 		const RenderTargets& renderTargets,
-		const nvrhi::BindingLayoutHandle extraBindingLayout,
-		nvrhi::BindingSetHandle extraBindingSet);
+		const caustica::rhi::BindingLayoutHandle extraBindingLayout,
+		caustica::rhi::BindingSetHandle extraBindingSet);
 
 	// Fine-grained begin-frame stages (also composed by beginFrame).
-	void prepareLights(nvrhi::CommandListHandle commandList);
-	void writeBridgeConstants(nvrhi::CommandListHandle commandList);
-	void generatePdfMips(nvrhi::CommandListHandle commandList);
-	void presampleLights(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
-	void presampleEnvMap(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
-	void presampleReGIR(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet);
+	void prepareLights(caustica::rhi::CommandListHandle commandList);
+	void writeBridgeConstants(caustica::rhi::CommandListHandle commandList);
+	void generatePdfMips(caustica::rhi::CommandListHandle commandList);
+	void presampleLights(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet);
+	void presampleEnvMap(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet);
+	void presampleReGIR(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet);
 
 	void execute(
-		nvrhi::CommandListHandle commandList,
-		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);
-	void executeGI(nvrhi::CommandListHandle commandList,
-		nvrhi::BindingSetHandle extraBindingSet, bool skipFinal);
-    void executeFusedDIGIFinal(nvrhi::CommandListHandle commandList,
-        nvrhi::BindingSetHandle extraBindingSet);
-    void executePT(nvrhi::CommandListHandle commandList,
-        nvrhi::BindingSetHandle extraBindingSet);
+		caustica::rhi::CommandListHandle commandList,
+		caustica::rhi::BindingSetHandle extraBindingSet, bool skipFinal);
+	void executeGI(caustica::rhi::CommandListHandle commandList,
+		caustica::rhi::BindingSetHandle extraBindingSet, bool skipFinal);
+    void executeFusedDIGIFinal(caustica::rhi::CommandListHandle commandList,
+        caustica::rhi::BindingSetHandle extraBindingSet);
+    void executePT(caustica::rhi::CommandListHandle commandList,
+        caustica::rhi::BindingSetHandle extraBindingSet);
 	// Fused DIGI / GI / PT sequence for one frame. No WorldRenderer command-list swap.
 	void executeFrame(
-		nvrhi::ICommandList* commandList,
-		nvrhi::BindingSetHandle globalBindingSet,
+		caustica::rhi::ICommandList* commandList,
+		caustica::rhi::BindingSetHandle globalBindingSet,
 		const PathTracerSettings& settings);
 	void endFrame();
 	
 	std::shared_ptr<RtxdiResources> getRTXDIResources() { return m_rtxdiResources; }
-	nvrhi::BufferHandle getRTXDIConstants() { return m_rtxdiConstantBuffer; }
+	caustica::rhi::BufferHandle getRTXDIConstants() { return m_rtxdiConstantBuffer; }
 
 private:
 	void checkContextStaticParameters();
 	void updateContextDynamicParameters();
-	void createPipelines(nvrhi::BindingLayoutHandle extraBindingLayout = nullptr, bool useRayQuery = true);
+	void createPipelines(caustica::rhi::BindingLayoutHandle extraBindingLayout = nullptr, bool useRayQuery = true);
 	void createBindingSet(const RenderTargets& renderTargets);
 
 	std::unique_ptr<rtxdi::ImportanceSamplingContext> m_ImportanceSamplingContext;
@@ -156,15 +156,15 @@ private:
 	std::unique_ptr<PrepareLightsPass> m_PrepareLightsPass;
 	std::unique_ptr<GenerateMipsPass> m_LocalLightPdfMipmapPass;
 
-	nvrhi::DeviceHandle m_device;
+	caustica::rhi::DeviceHandle m_device;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 	caustica::render::RenderDevice& m_renderDevice;
-	nvrhi::IDescriptorTable* m_descriptorTable = nullptr;
-	nvrhi::BindingLayoutHandle m_bindingLayout;
-	nvrhi::BindingLayoutHandle m_bindlessLayout;
-	nvrhi::BindingSetHandle m_bindingSet;
-	nvrhi::BindingSetHandle m_PrevBindingSet;
-	nvrhi::BufferHandle m_rtxdiConstantBuffer;
+	caustica::rhi::IDescriptorTable* m_descriptorTable = nullptr;
+	caustica::rhi::BindingLayoutHandle m_bindingLayout;
+	caustica::rhi::BindingLayoutHandle m_bindlessLayout;
+	caustica::rhi::BindingSetHandle m_bindingSet;
+	caustica::rhi::BindingSetHandle m_PrevBindingSet;
+	caustica::rhi::BufferHandle m_rtxdiConstantBuffer;
 
 	ComputePass m_PresampleLightsPass;
 	ComputePass m_PresampleEnvMapPass;
@@ -185,23 +185,23 @@ private:
     RayTracingPass m_PTFinalShadingPass;
 
 	void executeComputePass(
-		nvrhi::CommandListHandle& commandList, 
+		caustica::rhi::CommandListHandle& commandList, 
 		ComputePass& pass, 
 		const char* passName, 
 		dm::int3 dispatchSize, 
-		nvrhi::BindingSetHandle extraBindingSet = nullptr);
+		caustica::rhi::BindingSetHandle extraBindingSet = nullptr);
 
 	void executeRayTracingPass(
-		nvrhi::CommandListHandle& commandList,
+		caustica::rhi::CommandListHandle& commandList,
 		RayTracingPass& pass,
 		const char* passName,
 		dm::int2 dispatchSize, 
-		nvrhi::IBindingSet* extraBindingSet = nullptr
+		caustica::rhi::IBindingSet* extraBindingSet = nullptr
 	);
 
 	caustica::ShaderMacro getReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
 
-	void fillConstants(nvrhi::CommandListHandle commandList);
+	void fillConstants(caustica::rhi::CommandListHandle commandList);
 	void fillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const;
 	void fillDIConstants(ReSTIRDI_Parameters& diParams);
 	void fillGIConstants(ReSTIRGI_Parameters& giParams);

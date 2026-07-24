@@ -266,7 +266,7 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     vp.DesiredHeight = static_cast<uint32_t>(canvasSize.y + 0.5f);
     vp.RectValid = true;
 
-    nvrhi::ITexture* color = m_viewportColor;
+    caustica::rhi::ITexture* color = m_viewportColor;
     // Do NOT cover the canvas with InvisibleButton/Dummy: ImGuizmo::CanActivate()
     // rejects grabs while any item is hovered/active. Hover comes from the window.
     vp.Hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);

@@ -161,7 +161,7 @@ bool GpuDevice_VK::createInstance()
 
     if (res != vk::Result::eSuccess)
     {
-        caustica::error("Call to vkEnumerateInstanceVersion failed, error code = %s", nvrhi::vulkan::resultToString(VkResult(res)));
+        caustica::error("Call to vkEnumerateInstanceVersion failed, error code = %s", caustica::rhi::vulkan::resultToString(VkResult(res)));
         return false;
     }
 
@@ -192,7 +192,7 @@ bool GpuDevice_VK::createInstance()
     res = vk::createInstance(&info, nullptr, &m_VulkanInstance);
     if (res != vk::Result::eSuccess)
     {
-        caustica::error("Failed to create a Vulkan instance, error code = %s", nvrhi::vulkan::resultToString(VkResult(res)));
+        caustica::error("Failed to create a Vulkan instance, error code = %s", caustica::rhi::vulkan::resultToString(VkResult(res)));
         return false;
     }
 
@@ -247,7 +247,7 @@ void GpuDevice_VK::installDebugCallback()
 
 bool GpuDevice_VK::pickPhysicalDevice()
 {
-    VkFormat requestedFormat = nvrhi::vulkan::convertFormat(m_DeviceParams.swapChainFormat);
+    VkFormat requestedFormat = caustica::rhi::vulkan::convertFormat(m_DeviceParams.swapChainFormat);
     vk::Extent2D requestedExtent(m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight);
 
     auto devices = m_VulkanInstance.enumeratePhysicalDevices();
@@ -732,7 +732,7 @@ bool GpuDevice_VK::createDevice()
     const vk::Result res = m_VulkanPhysicalDevice.createDevice(&deviceDesc, nullptr, &m_VulkanDevice);
     if (res != vk::Result::eSuccess)
     {
-        caustica::error("Failed to create a Vulkan physical device, error code = %s", nvrhi::vulkan::resultToString(VkResult(res)));
+        caustica::error("Failed to create a Vulkan physical device, error code = %s", caustica::rhi::vulkan::resultToString(VkResult(res)));
         return false;
     }
 
@@ -759,7 +759,7 @@ bool GpuDevice_VK::createWindowSurface()
     const VkResult res = glfwCreateWindowSurface(m_VulkanInstance, m_Window, nullptr, (VkSurfaceKHR *)&m_WindowSurface);
     if (res != VK_SUCCESS)
     {
-        caustica::error("Failed to create a GLFW window surface, error code = %s", nvrhi::vulkan::resultToString(res));
+        caustica::error("Failed to create a GLFW window surface, error code = %s", caustica::rhi::vulkan::resultToString(res));
         return false;
     }
 
@@ -787,7 +787,7 @@ bool GpuDevice_VK::createSwapChain()
     destroySwapChain();
 
     m_SwapChainFormat = {
-        vk::Format(nvrhi::vulkan::convertFormat(m_DeviceParams.swapChainFormat)),
+        vk::Format(caustica::rhi::vulkan::convertFormat(m_DeviceParams.swapChainFormat)),
         vk::ColorSpaceKHR::eSrgbNonlinear
     };
 
@@ -847,7 +847,7 @@ bool GpuDevice_VK::createSwapChain()
     const vk::Result res = m_VulkanDevice.createSwapchainKHR(&desc, nullptr, &m_SwapChain);
     if (res != vk::Result::eSuccess)
     {
-        caustica::error("Failed to create a Vulkan swap chain, error code = %s", nvrhi::vulkan::resultToString(VkResult(res)));
+        caustica::error("Failed to create a Vulkan swap chain, error code = %s", caustica::rhi::vulkan::resultToString(VkResult(res)));
         return false;
     }
 
@@ -858,16 +858,16 @@ bool GpuDevice_VK::createSwapChain()
         SwapChainImage sci;
         sci.image = image;
         
-        nvrhi::TextureDesc textureDesc;
+        caustica::rhi::TextureDesc textureDesc;
         textureDesc.width = m_DeviceParams.backBufferWidth;
         textureDesc.height = m_DeviceParams.backBufferHeight;
         textureDesc.format = m_DeviceParams.swapChainFormat;
         textureDesc.debugName = "Swap chain image";
-        textureDesc.initialState = nvrhi::ResourceStates::Present;
+        textureDesc.initialState = caustica::rhi::ResourceStates::Present;
         textureDesc.keepInitialState = true;
         textureDesc.isRenderTarget = true;
 
-        sci.rhiHandle = m_NvrhiDevice->createHandleForNativeTexture(nvrhi::ObjectTypes::VK_Image, nvrhi::Object(sci.image), textureDesc);
+        sci.rhiHandle = m_RhiDevice->createHandleForNativeTexture(caustica::rhi::ObjectTypes::VK_Image, caustica::rhi::Object(sci.image), textureDesc);
         m_SwapChainImages.push_back(sci);
     }
 
@@ -882,7 +882,7 @@ bool GpuDevice_VK::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
-        StreamlineIntegration::Get().initializePreDevice(nvrhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+        StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (m_DeviceParams.enableDebugRuntime)
@@ -979,10 +979,10 @@ bool GpuDevice_VK::createDevice()
     if (!m_DeviceParams.headlessDevice)
     {
         // Need to adjust the swap chain format before creating the device because it affects physical device selection
-        if (m_DeviceParams.swapChainFormat == nvrhi::Format::SRGBA8_UNORM)
-            m_DeviceParams.swapChainFormat = nvrhi::Format::SBGRA8_UNORM;
-        else if (m_DeviceParams.swapChainFormat == nvrhi::Format::RGBA8_UNORM)
-            m_DeviceParams.swapChainFormat = nvrhi::Format::BGRA8_UNORM;
+        if (m_DeviceParams.swapChainFormat == caustica::rhi::Format::SRGBA8_UNORM)
+            m_DeviceParams.swapChainFormat = caustica::rhi::Format::SBGRA8_UNORM;
+        else if (m_DeviceParams.swapChainFormat == caustica::rhi::Format::RGBA8_UNORM)
+            m_DeviceParams.swapChainFormat = caustica::rhi::Format::BGRA8_UNORM;
 
         CHECK(createWindowSurface())
     }
@@ -994,7 +994,7 @@ bool GpuDevice_VK::createDevice()
     auto vecLayers = stringSetToVector(enabledExtensions.layers);
     auto vecDeviceExt = stringSetToVector(enabledExtensions.device);
 
-    nvrhi::vulkan::DeviceDesc deviceDesc;
+    caustica::rhi::vulkan::DeviceDesc deviceDesc;
     deviceDesc.errorCB = &DefaultMessageCallback::getInstance();
     deviceDesc.instance = m_VulkanInstance;
     deviceDesc.physicalDevice = m_VulkanPhysicalDevice;
@@ -1022,11 +1022,11 @@ bool GpuDevice_VK::createDevice()
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
 
-    m_NvrhiDevice = m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
+    m_RhiDevice = m_RhiDevice = caustica::rhi::vulkan::createDevice(deviceDesc);
 
-    if (m_DeviceParams.enableNvrhiValidationLayer)
+    if (m_DeviceParams.enableRhiValidationLayer)
     {
-        m_ValidationLayer = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+        m_ValidationLayer = caustica::rhi::validation::createValidationLayer(m_RhiDevice);
     }
 
 #if CAUSTICA_WITH_STREAMLINE
@@ -1041,7 +1041,7 @@ bool GpuDevice_VK::createDevice()
         vulkanInfo.graphicsQueueIndex = kGraphicsQueueIndex;
         vulkanInfo.graphicsQueueFamily = m_GraphicsQueueFamily;
         
-        StreamlineIntegration::Get().initializeDeviceVK(m_NvrhiDevice, vulkanInfo);
+        StreamlineIntegration::Get().initializeDeviceVK(m_RhiDevice, vulkanInfo);
     }
 #endif
 
@@ -1093,8 +1093,8 @@ void GpuDevice_VK::destroyDeviceAndSwapChain()
         }
     }
 
-    m_NvrhiDevice = nullptr;
-    m_NvrhiDevice = nullptr;
+    m_RhiDevice = nullptr;
+    m_RhiDevice = nullptr;
     m_ValidationLayer = nullptr;
     m_RendererString.clear();
     
@@ -1162,7 +1162,7 @@ bool GpuDevice_VK::beginFrame()
     if (res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR) // Suboptimal is considered a success
     {
         // Schedule the wait. The actual wait operation will be submitted when the app executes any command list.
-        m_NvrhiDevice->queueWaitForSemaphore(nvrhi::CommandQueue::Graphics, semaphore, 0);
+        m_RhiDevice->queueWaitForSemaphore(caustica::rhi::CommandQueue::Graphics, semaphore, 0);
         return true;
     }
 
@@ -1176,11 +1176,11 @@ bool GpuDevice_VK::present()
 
     const auto& semaphore = m_PresentSemaphores[m_SwapChainIndex];
 
-    m_NvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, semaphore, 0);
+    m_RhiDevice->queueSignalSemaphore(caustica::rhi::CommandQueue::Graphics, semaphore, 0);
 
-    // NVRHI buffers the semaphores and signals them when something is submitted to a queue.
+    // Caustica RHI buffers the semaphores and signals them when something is submitted to a queue.
     // Call 'executeCommandLists' with no command lists to actually signal the semaphore.
-    m_NvrhiDevice->executeCommandLists(nullptr, 0);
+    m_RhiDevice->executeCommandLists(nullptr, 0);
 
     vk::PresentInfoKHR info = vk::PresentInfoKHR()
                                 .setWaitSemaphoreCount(1)
@@ -1209,12 +1209,12 @@ bool GpuDevice_VK::present()
         auto query = m_FramesInFlight.front();
         m_FramesInFlight.pop();
 
-        m_NvrhiDevice->waitEventQuery(query);
+        m_RhiDevice->waitEventQuery(query);
 
         m_QueryPool.push_back(query);
     }
 
-    nvrhi::EventQueryHandle query;
+    caustica::rhi::EventQueryHandle query;
     if (!m_QueryPool.empty())
     {
         query = m_QueryPool.back();
@@ -1222,11 +1222,11 @@ bool GpuDevice_VK::present()
     }
     else
     {
-        query = m_NvrhiDevice->createEventQuery();
+        query = m_RhiDevice->createEventQuery();
     }
 
-    m_NvrhiDevice->resetEventQuery(query);
-    m_NvrhiDevice->setEventQuery(query, nvrhi::CommandQueue::Graphics);
+    m_RhiDevice->resetEventQuery(query);
+    m_RhiDevice->setEventQuery(query, caustica::rhi::CommandQueue::Graphics);
     m_FramesInFlight.push(query);
     return true;
 }

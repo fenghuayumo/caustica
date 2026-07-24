@@ -1,8 +1,9 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
-namespace nvrhi::validation
+namespace caustica::rhi::validation
 {
-    NVRHI_API DeviceHandle createValidationLayer(IDevice* underlyingDevice);
+    CAUSTICA_RHI_API DeviceHandle createValidationLayer(IDevice* underlyingDevice);
 }
+

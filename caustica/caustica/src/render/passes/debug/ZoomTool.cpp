@@ -27,25 +27,25 @@ using namespace caustica::math;
 #include <shaders/render/misc/ZoomTool.hlsl>
 
 
-ZoomTool::ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
+ZoomTool::ZoomTool( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory )
     : m_device(device)
     , m_bindingCache(device)
 { 
 
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     layoutDesc.bindings = { 
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        nvrhi::BindingLayoutItem::Texture_UAV(0) };
+        caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(0) };
     m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
     m_CSZoomTool.init(m_device, *shaderFactory, "caustica/shaders/render/misc/ZoomTool.hlsl", "main", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
-    m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", caustica::c_MaxRenderPassConstantBufferVersions));
+    m_constantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(sizeof(ZoomToolShaderConstants), "ZoomToolShaderConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
 
 ZoomTool::~ZoomTool( )
@@ -82,7 +82,7 @@ bool ZoomTool::mouseButtonUpdate(int button, int action, int mods)
     return false;
 }
 
-void ZoomTool::render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut )
+void ZoomTool::render( caustica::rhi::ICommandList * commandList, caustica::rhi::TextureHandle colorInOut )
 {
     if( !m_settings.enabled )
         return;
@@ -96,11 +96,11 @@ void ZoomTool::render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle c
         RAII_SCOPE(commandList->beginMarker("ZoomTool");, commandList->endMarker(); );
 
         commandList->writeBuffer(m_constantBuffer, &consts, sizeof(consts));
-        nvrhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-            nvrhi::BindingSetItem::Texture_UAV(0, colorInOut, nvrhi::Format::RGBA8_UNORM) };
+        caustica::rhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, colorInOut, caustica::rhi::Format::RGBA8_UNORM) };
 
-        nvrhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayout);
+        caustica::rhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayout);
 
         int threadGroupCountX = (colorInOut->getDesc().width + 16 - 1) / 16;
         int threadGroupCountY = (colorInOut->getDesc().height + 16 - 1) / 16;

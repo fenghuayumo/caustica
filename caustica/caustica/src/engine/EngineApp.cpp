@@ -70,19 +70,19 @@ std::filesystem::path ResolveDefaultResourceRoot(const std::filesystem::path& ru
     return getDirectoryWithExecutable();
 }
 
-nvrhi::GraphicsAPI ResolveGraphicsApi(const EngineAppDesc& desc)
+caustica::rhi::GraphicsAPI ResolveGraphicsApi(const EngineAppDesc& desc)
 {
 #if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_VULKAN
-    return desc.useVulkan ? nvrhi::GraphicsAPI::VULKAN : nvrhi::GraphicsAPI::D3D12;
+    return desc.useVulkan ? caustica::rhi::GraphicsAPI::VULKAN : caustica::rhi::GraphicsAPI::D3D12;
 #elif CAUSTICA_WITH_VULKAN
     (void)desc;
-    return nvrhi::GraphicsAPI::VULKAN;
+    return caustica::rhi::GraphicsAPI::VULKAN;
 #elif CAUSTICA_WITH_DX12
     (void)desc;
-    return nvrhi::GraphicsAPI::D3D12;
+    return caustica::rhi::GraphicsAPI::D3D12;
 #elif CAUSTICA_WITH_DX11
     (void)desc;
-    return nvrhi::GraphicsAPI::D3D11;
+    return caustica::rhi::GraphicsAPI::D3D11;
 #else
 #error "No graphics API enabled"
 #endif
@@ -359,7 +359,7 @@ bool EngineApp::accumulationCompleted() const
     return m_app && caustica::accumulationCompleted(*m_app);
 }
 
-nvrhi::ITexture* EngineApp::ldrColorTexture() const
+caustica::rhi::ITexture* EngineApp::ldrColorTexture() const
 {
     return m_app ? caustica::ldrColorTexture(*m_app) : nullptr;
 }

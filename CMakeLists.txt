@@ -67,7 +67,7 @@ else()
 endif()
 option(CAUSTICA_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${CAUSTICA_DEFAULT_WITH_VULKAN})
 
-option(CAUSTICA_WITH_NVRHI "Enable NVRHI and related projects" ON)
+option(CAUSTICA_WITH_RHI "Enable Caustica RHI and related projects" ON)
 option(CAUSTICA_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
 
 # we want shader PDBs always embedded
@@ -315,7 +315,7 @@ if (WIN32)
 else()
     set(CAUSTICA_DEFAULT_WITH_NVAPI OFF)
 endif()
-option(NVRHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ${CAUSTICA_DEFAULT_WITH_NVAPI})
+option(CAUSTICA_RHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ${CAUSTICA_DEFAULT_WITH_NVAPI})
 set(NVAPI_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/External/nvapi/" CACHE STRING "Path to NVAPI include headers/shaders" )
 set(NVAPI_LIBRARY "${CMAKE_SOURCE_DIR}/External/nvapi/amd64/nvapi64.lib" CACHE STRING "Path to NVAPI .lib file")
 
@@ -344,27 +344,27 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_RUNTIME_OUTPUT_DIRECT
 set(CAUSTICA_SHADERS_OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/engine")
 option(CAUSTICA_WITH_LZ4 "Include LZ4" OFF)
 
-if (CAUSTICA_WITH_NVRHI)
-    # NVRHI backend variables: forwarded from the project-wide CAUSTICA settings.
-    set(NVRHI_WITH_DX11 "${CAUSTICA_WITH_DX11}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_DX12 "${CAUSTICA_WITH_DX12}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_VULKAN "${CAUSTICA_WITH_VULKAN}" CACHE BOOL "" FORCE)
-    set(NVRHI_WITH_AFTERMATH "${CAUSTICA_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
+if (CAUSTICA_WITH_RHI)
+    # Caustica RHI backend variables: forwarded from the project-wide CAUSTICA settings.
+    set(CAUSTICA_RHI_WITH_DX11 "${CAUSTICA_WITH_DX11}" CACHE BOOL "" FORCE)
+    set(CAUSTICA_RHI_WITH_DX12 "${CAUSTICA_WITH_DX12}" CACHE BOOL "" FORCE)
+    set(CAUSTICA_RHI_WITH_VULKAN "${CAUSTICA_WITH_VULKAN}" CACHE BOOL "" FORCE)
+    set(CAUSTICA_RHI_WITH_AFTERMATH "${CAUSTICA_WITH_AFTERMATH}" CACHE BOOL "" FORCE)
 
-    # Engine RHI backend (moved from External/nvrhi to caustica/backend/nvrhi)
+    # Engine RHI backend (built from caustica/backend/rhi)
     add_subdirectory(caustica/caustica/src/backend/rhi ${CMAKE_BINARY_DIR}/caustica/caustica/backend)
 endif()
 
 add_subdirectory("External")
 
 # Default to using DXR OMMs if we can
-if(NVRHI_WITH_DX12 AND CAUSTICA_D3D_AGILITY_SDK_VERSION AND (CAUSTICA_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
-    set(NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP ON CACHE BOOL "" FORCE)
+if(CAUSTICA_RHI_WITH_DX12 AND CAUSTICA_D3D_AGILITY_SDK_VERSION AND (CAUSTICA_D3D_AGILITY_SDK_VERSION GREATER_EQUAL "619"))
+    set(CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP ON CACHE BOOL "" FORCE)
 else()
-    set(NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP OFF CACHE BOOL "" FORCE)
+    set(CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP OFF CACHE BOOL "" FORCE)
 endif()
 
-if (NVRHI_WITH_VULKAN OR NVRHI_WITH_DX12)
+if (CAUSTICA_RHI_WITH_VULKAN OR CAUSTICA_RHI_WITH_DX12)
 	add_subdirectory(caustica)
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT caustica)
 endif()

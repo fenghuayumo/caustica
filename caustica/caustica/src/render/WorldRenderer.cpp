@@ -169,117 +169,117 @@ void caustica::render::WorldRenderer::destroy()
     m_scenePasses = {};
 }
 
-nvrhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindlessLayout(nvrhi::IDevice* device)
+caustica::rhi::BindingLayoutHandle caustica::render::WorldRenderer::createBindlessLayout(caustica::rhi::IDevice* device)
 {
-    nvrhi::BindlessLayoutDesc bindlessLayoutDesc;
-    bindlessLayoutDesc.visibility = nvrhi::ShaderType::All;
+    caustica::rhi::BindlessLayoutDesc bindlessLayoutDesc;
+    bindlessLayoutDesc.visibility = caustica::rhi::ShaderType::All;
     bindlessLayoutDesc.firstSlot = 0;
     bindlessLayoutDesc.maxCapacity = 1024;
     bindlessLayoutDesc.registerSpaces = {
-        nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::Texture_SRV(2)
+        caustica::rhi::BindingLayoutItem::RawBuffer_SRV(1),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(2)
     };
     return device->createBindlessLayout(bindlessLayoutDesc);
 }
 
-void caustica::render::WorldRenderer::createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless)
+void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::IBindingLayout* precreatedBindless)
 {
-    nvrhi::IDevice* const gpuDevice = device();
+    caustica::rhi::IDevice* const gpuDevice = device();
     m_bindlessLayout = precreatedBindless
-        ? nvrhi::BindingLayoutHandle(precreatedBindless)
+        ? caustica::rhi::BindingLayoutHandle(precreatedBindless)
         : createBindlessLayout(gpuDevice);
 
-    nvrhi::BindingLayoutDesc globalBindingLayoutDesc;
-    globalBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
+    caustica::rhi::BindingLayoutDesc globalBindingLayoutDesc;
+    globalBindingLayoutDesc.visibility = caustica::rhi::ShaderType::All;
     globalBindingLayoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        nvrhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
-        nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
-        nvrhi::BindingLayoutItem::Texture_SRV(6),
-        nvrhi::BindingLayoutItem::RayTracingAccelStruct(7),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(8),
-        nvrhi::BindingLayoutItem::Texture_SRV(10),
-        nvrhi::BindingLayoutItem::Texture_SRV(11),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(12),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(13),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(14),
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(15),
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(16),
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(17),
-        nvrhi::BindingLayoutItem::Texture_SRV(18),
-        nvrhi::BindingLayoutItem::Texture_UAV(20),
-        nvrhi::BindingLayoutItem::Texture_UAV(21),
-        nvrhi::BindingLayoutItem::Sampler(0),
-        nvrhi::BindingLayoutItem::Sampler(1),
-        nvrhi::BindingLayoutItem::Sampler(2),
-        nvrhi::BindingLayoutItem::Texture_UAV(0),
-        nvrhi::BindingLayoutItem::Texture_UAV(1),
-        nvrhi::BindingLayoutItem::Texture_UAV(2),
-        nvrhi::BindingLayoutItem::Texture_UAV(4),
-        nvrhi::BindingLayoutItem::Texture_UAV(5),
-        nvrhi::BindingLayoutItem::Texture_UAV(6),
-        nvrhi::BindingLayoutItem::Texture_UAV(7),
-        nvrhi::BindingLayoutItem::Texture_UAV(8),
-        nvrhi::BindingLayoutItem::Texture_UAV(31),
-        nvrhi::BindingLayoutItem::Texture_UAV(32),
-        nvrhi::BindingLayoutItem::Texture_UAV(33),
-        nvrhi::BindingLayoutItem::Texture_UAV(34),
-        nvrhi::BindingLayoutItem::Texture_UAV(35),
-        nvrhi::BindingLayoutItem::Texture_UAV(36),
-        nvrhi::BindingLayoutItem::Texture_UAV(37),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(51),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(52),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(53),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(54),
-        nvrhi::BindingLayoutItem::Texture_UAV(60),
-        nvrhi::BindingLayoutItem::Texture_UAV(61),
-        nvrhi::BindingLayoutItem::Texture_UAV(70),
-        nvrhi::BindingLayoutItem::Texture_UAV(71),
-        nvrhi::BindingLayoutItem::Texture_UAV(72),
-        nvrhi::BindingLayoutItem::Texture_UAV(73),
-        nvrhi::BindingLayoutItem::Texture_UAV(74),
-        nvrhi::BindingLayoutItem::Texture_UAV(75),
-        nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
-        nvrhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
+        caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+        caustica::rhi::BindingLayoutItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(0),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(2),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(3),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(4),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(5),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(6),
+        caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(7),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(8),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(10),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(11),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(12),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(13),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(14),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(15),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(16),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(17),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(18),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(20),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(21),
+        caustica::rhi::BindingLayoutItem::Sampler(0),
+        caustica::rhi::BindingLayoutItem::Sampler(1),
+        caustica::rhi::BindingLayoutItem::Sampler(2),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(1),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(2),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(4),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(5),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(6),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(7),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(8),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(31),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(32),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(33),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(34),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(35),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(36),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(37),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(51),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(52),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(53),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(54),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(60),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(61),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(70),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(71),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(72),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(73),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(74),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(75),
+        caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX)
     };
 
-    if (gpuDevice->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
+    if (gpuDevice->queryFeatureSupport(caustica::rhi::Feature::HlslExtensionUAV))
     {
         globalBindingLayoutDesc.bindings.push_back(
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM));
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM));
     }
 
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(40));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(42));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(44));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(45));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(40));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(42));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(44));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(45));
 
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(100));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(101));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(102));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(103));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(10));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(80));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(81));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(82));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(83));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(84));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::VolatileConstantBuffer(10));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_UAV(85));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(86));
-    globalBindingLayoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(87));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(100));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(101));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(102));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(103));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(10));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(80));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(81));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(82));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(83));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(84));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(10));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(85));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(86));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(87));
 
     m_bindingLayout = gpuDevice->createBindingLayout(globalBindingLayoutDesc);
 }
 
 void caustica::render::WorldRenderer::createDeviceResources()
 {
-    nvrhi::IDevice* device = this->device();
+    caustica::rhi::IDevice* device = this->device();
 
     m_renderTargetPool.setDevice(device);
     m_renderBufferPool.setDevice(device);
@@ -307,49 +307,49 @@ void caustica::render::WorldRenderer::createDeviceResources()
 
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS_OLD", "1") };
-        m_linesVertexShader = m_context->shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_context->shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_context->shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_vs", &drawLinesMacro, caustica::rhi::ShaderType::Vertex);
+        m_linesPixelShader = m_context->shaderFactory->createShader("caustica/shaders/render/misc/DebugLines.hlsl", "main_ps", &drawLinesMacro, caustica::rhi::ShaderType::Pixel);
 
-        nvrhi::VertexAttributeDesc attributes[] = {
-            nvrhi::VertexAttributeDesc()
+        caustica::rhi::VertexAttributeDesc attributes[] = {
+            caustica::rhi::VertexAttributeDesc()
                 .setName("POSITION")
-                .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                .setFormat(caustica::rhi::Format::RGBA32_FLOAT)
                 .setOffset(0)
                 .setElementStride(sizeof(DebugLineStruct)),
-            nvrhi::VertexAttributeDesc()
+            caustica::rhi::VertexAttributeDesc()
                 .setName("COLOR")
-                .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                .setFormat(caustica::rhi::Format::RGBA32_FLOAT)
                 .setOffset(offsetof(DebugLineStruct, col))
                 .setElementStride(sizeof(DebugLineStruct)),
         };
         m_linesInputLayout = device->createInputLayout(attributes, uint32_t(std::size(attributes)), m_linesVertexShader);
 
-        nvrhi::BindingLayoutDesc linesBindingLayoutDesc;
-        linesBindingLayoutDesc.visibility = nvrhi::ShaderType::All;
+        caustica::rhi::BindingLayoutDesc linesBindingLayoutDesc;
+        linesBindingLayoutDesc.visibility = caustica::rhi::ShaderType::All;
         linesBindingLayoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0)
         };
         m_linesBindingLayout = device->createBindingLayout(linesBindingLayoutDesc);
 
-        nvrhi::BufferDesc bufferDesc;
+        caustica::rhi::BufferDesc bufferDesc;
         bufferDesc.byteSize = sizeof(DebugFeedbackStruct) * 1;
         bufferDesc.isConstantBuffer = false;
         bufferDesc.isVolatile = false;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
         bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
         bufferDesc.structStride = sizeof(DebugFeedbackStruct);
         bufferDesc.keepInitialState = true;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
         bufferDesc.debugName = "Feedback_Buffer_Gpu";
         m_feedback_Buffer_Gpu = device->createBuffer(bufferDesc);
 
         bufferDesc.canHaveUAVs = false;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
         bufferDesc.structStride = 0;
         bufferDesc.keepInitialState = false;
-        bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Unknown;
         bufferDesc.debugName = "Feedback_Buffer_Cpu";
         m_feedback_Buffer_Cpu = device->createBuffer(bufferDesc);
 
@@ -358,10 +358,10 @@ void caustica::render::WorldRenderer::createDeviceResources()
         bufferDesc.isConstantBuffer = false;
         bufferDesc.isVolatile = false;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
         bufferDesc.structStride = sizeof(DebugLineStruct);
         bufferDesc.keepInitialState = true;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
         bufferDesc.debugName = "DebugLinesCapture";
         m_debugLineBufferCapture = device->createBuffer(bufferDesc);
         bufferDesc.debugName = "DebugLinesDisplay";
@@ -371,19 +371,19 @@ void caustica::render::WorldRenderer::createDeviceResources()
         bufferDesc.isConstantBuffer = false;
         bufferDesc.isVolatile = false;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
         bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
         bufferDesc.structStride = sizeof(DeltaTreeVizPathVertex);
         bufferDesc.keepInitialState = true;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
         bufferDesc.debugName = "Feedback_PathDecomp_Gpu";
         m_debugDeltaPathTree_Gpu = device->createBuffer(bufferDesc);
 
         bufferDesc.canHaveUAVs = false;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
         bufferDesc.structStride = 0;
         bufferDesc.keepInitialState = false;
-        bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Unknown;
         bufferDesc.debugName = "Feedback_PathDecomp_Cpu";
         m_debugDeltaPathTree_Cpu = device->createBuffer(bufferDesc);
 
@@ -391,16 +391,16 @@ void caustica::render::WorldRenderer::createDeviceResources()
         bufferDesc.isConstantBuffer = false;
         bufferDesc.isVolatile = false;
         bufferDesc.canHaveUAVs = true;
-        bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
         bufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
         bufferDesc.structStride = sizeof(PathPayload);
         bufferDesc.keepInitialState = true;
-        bufferDesc.initialState = nvrhi::ResourceStates::Common;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
         bufferDesc.debugName = "DebugDeltaPathTreeSearchStack";
         m_debugDeltaPathTreeSearchStack = device->createBuffer(bufferDesc);
     }
 
-    m_constantBuffer = device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+    m_constantBuffer = device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
         sizeof(SampleConstants), "SampleConstants", caustica::c_MaxRenderPassConstantBufferVersions * 2));
 
     m_commandList = device->createCommandList();
@@ -549,7 +549,7 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
     return ret;
 }
 
-void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList )
+void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList )
 {
     (void)exposureResetRequired;
     m_context->bindingCache.clear();
@@ -648,7 +648,7 @@ void caustica::render::WorldRenderer::preRender()
 }
 
 
-void caustica::render::WorldRenderer::render(nvrhi::IFramebuffer* framebuffer)
+void caustica::render::WorldRenderer::render(caustica::rhi::IFramebuffer* framebuffer)
 {
     m_displaySize = m_renderSize = uint2(
         framebuffer->getFramebufferInfo().width,
@@ -740,8 +740,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     if (!gpuHandles.valid())
         return;
 
-    nvrhi::rt::IAccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
-    nvrhi::IBuffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
+    caustica::rhi::rt::IAccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
+    caustica::rhi::IBuffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
@@ -759,116 +759,116 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     }
 
     // Fixed resources that do not change between binding sets
-    nvrhi::BindingSetDesc bindingSetDescBase;
+    caustica::rhi::BindingSetDesc bindingSetDescBase;
     bindingSetDescBase.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-        nvrhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
-        //nvrhi::BindingSetItem::ConstantBuffer(2, m_context->scenePasses.lighting.lightSampling()->GetLightingConstants()),
-        nvrhi::BindingSetItem::RayTracingAccelStruct(0, m_context->accelStructs.getTopLevelAS()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_context->accelStructs.getSubInstanceBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, gpuHandles.instanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(4, m_context->scenePasses.lighting.opacityMaps() ?(m_context->scenePasses.lighting.opacityMaps()->getGeometryDebugBuffer()):(m_context->scenePasses.lighting.materials()->getMaterialDataBuffer().Get()) ),   // YUCK
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_context->scenePasses.lighting.materials()->getMaterialDataBuffer()),
-        nvrhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, nvrhi::Format::SRGBA8_UNORM),
-        nvrhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(10, m_context->scenePasses.lighting.environment()->getEnvMapCube()),
-        nvrhi::BindingSetItem::Texture_SRV(11, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapOnly()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(12, m_context->scenePasses.lighting.lightSampling()->getControlBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(13, m_context->scenePasses.lighting.lightSampling()->getLightBuffer()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(14, m_context->scenePasses.lighting.lightSampling()->getLightExBuffer()),
-        nvrhi::BindingSetItem::TypedBuffer_SRV(15, m_context->scenePasses.lighting.lightSampling()->getLightProxyCounters()),     // t_tightProxyCounters
-        nvrhi::BindingSetItem::TypedBuffer_SRV(16, m_context->scenePasses.lighting.lightSampling()->getLightSamplingProxies()),   // t_LightProxyIndices
-        nvrhi::BindingSetItem::TypedBuffer_SRV(17, m_context->scenePasses.lighting.lightSampling()->getLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
-        nvrhi::BindingSetItem::Texture_SRV(18, m_context->scenePasses.lighting.lightSampling()->getEnvLightLookupMap()),          // t_EnvLookupMap
-        //nvrhi::BindingSetItem::TypedBuffer_SRV(19, ),
-        nvrhi::BindingSetItem::Texture_UAV(20, m_context->scenePasses.lighting.lightSampling()->getFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
-        nvrhi::BindingSetItem::Texture_UAV(21, m_context->scenePasses.lighting.lightSampling()->getFeedbackCandidates()),         // u_LightFeedbackCandidates
-        nvrhi::BindingSetItem::Sampler(0, m_context->renderDevice.samplers().anisotropicWrap()),
-        nvrhi::BindingSetItem::Sampler(1, m_context->scenePasses.lighting.environment()->getEnvMapCubeSampler()),
-        nvrhi::BindingSetItem::Sampler(2, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapSampler()),
-        nvrhi::BindingSetItem::Texture_UAV(0, m_renderTargets->outputColor),
-        nvrhi::BindingSetItem::Texture_UAV(1, m_renderTargets->processedOutputColor),
-        nvrhi::BindingSetItem::Texture_UAV(2, m_renderTargets->ldrColor, nvrhi::Format::RGBA8_UNORM),
-        nvrhi::BindingSetItem::Texture_UAV(4, m_renderTargets->throughput),
-        nvrhi::BindingSetItem::Texture_UAV(5, m_renderTargets->screenMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(6, m_renderTargets->depth),
-        nvrhi::BindingSetItem::Texture_UAV(7, m_renderTargets->specularHitT), 
-        nvrhi::BindingSetItem::Texture_UAV(8, m_renderTargets->scratchFloat1), 
-        nvrhi::BindingSetItem::Texture_UAV(31, m_renderTargets->denoiserViewspaceZ),
-        nvrhi::BindingSetItem::Texture_UAV(32, m_renderTargets->denoiserMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(33, m_renderTargets->denoiserNormalRoughness),
-        nvrhi::BindingSetItem::Texture_UAV(34, m_renderTargets->denoiserDiffRadianceHitDist),
-        nvrhi::BindingSetItem::Texture_UAV(35, m_renderTargets->denoiserSpecRadianceHitDist),
-        nvrhi::BindingSetItem::Texture_UAV(36, m_renderTargets->denoiserDisocclusionThresholdMix),
-        nvrhi::BindingSetItem::Texture_UAV(37, m_renderTargets->combinedHistoryClampRelax),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(51, m_feedback_Buffer_Gpu),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(52, m_debugLineBufferCapture),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(53, m_debugDeltaPathTree_Gpu),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(54, m_debugDeltaPathTreeSearchStack),
-        nvrhi::BindingSetItem::Texture_UAV(60, m_renderTargets->secondarySurfacePositionNormal),
-        nvrhi::BindingSetItem::Texture_UAV(61, m_renderTargets->secondarySurfaceRadiance),
-        nvrhi::BindingSetItem::Texture_UAV(70, m_renderTargets->rrDiffuseAlbedo),
-        nvrhi::BindingSetItem::Texture_UAV(71, m_renderTargets->rrSpecAlbedo),
-        nvrhi::BindingSetItem::Texture_UAV(72, m_renderTargets->rrNormalsAndRoughness),
-        nvrhi::BindingSetItem::Texture_UAV(73, m_renderTargets->rrSpecMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(74, (m_renderTargets->rrTransparencyLayer!=nullptr)?m_renderTargets->rrTransparencyLayer:m_renderTargets->rrSpecMotionVectors),
-        nvrhi::BindingSetItem::Texture_UAV(75, m_renderTargets->denoiserAvgLayerRadianceHalfRes),
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+        caustica::rhi::BindingSetItem::PushConstants(1, sizeof(SampleMiniConstants)),
+        //caustica::rhi::BindingSetItem::ConstantBuffer(2, m_context->scenePasses.lighting.lightSampling()->GetLightingConstants()),
+        caustica::rhi::BindingSetItem::RayTracingAccelStruct(0, m_context->accelStructs.getTopLevelAS()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(1, m_context->accelStructs.getSubInstanceBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(2, gpuHandles.instanceBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, m_context->scenePasses.lighting.opacityMaps() ?(m_context->scenePasses.lighting.opacityMaps()->getGeometryDebugBuffer()):(m_context->scenePasses.lighting.materials()->getMaterialDataBuffer().Get()) ),   // YUCK
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, m_context->scenePasses.lighting.materials()->getMaterialDataBuffer()),
+        caustica::rhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, caustica::rhi::Format::SRGBA8_UNORM),
+        caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
+        caustica::rhi::BindingSetItem::Texture_SRV(10, m_context->scenePasses.lighting.environment()->getEnvMapCube()),
+        caustica::rhi::BindingSetItem::Texture_SRV(11, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapOnly()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(12, m_context->scenePasses.lighting.lightSampling()->getControlBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(13, m_context->scenePasses.lighting.lightSampling()->getLightBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(14, m_context->scenePasses.lighting.lightSampling()->getLightExBuffer()),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(15, m_context->scenePasses.lighting.lightSampling()->getLightProxyCounters()),     // t_tightProxyCounters
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(16, m_context->scenePasses.lighting.lightSampling()->getLightSamplingProxies()),   // t_LightProxyIndices
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(17, m_context->scenePasses.lighting.lightSampling()->getLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
+        caustica::rhi::BindingSetItem::Texture_SRV(18, m_context->scenePasses.lighting.lightSampling()->getEnvLightLookupMap()),          // t_EnvLookupMap
+        //caustica::rhi::BindingSetItem::TypedBuffer_SRV(19, ),
+        caustica::rhi::BindingSetItem::Texture_UAV(20, m_context->scenePasses.lighting.lightSampling()->getFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
+        caustica::rhi::BindingSetItem::Texture_UAV(21, m_context->scenePasses.lighting.lightSampling()->getFeedbackCandidates()),         // u_LightFeedbackCandidates
+        caustica::rhi::BindingSetItem::Sampler(0, m_context->renderDevice.samplers().anisotropicWrap()),
+        caustica::rhi::BindingSetItem::Sampler(1, m_context->scenePasses.lighting.environment()->getEnvMapCubeSampler()),
+        caustica::rhi::BindingSetItem::Sampler(2, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapSampler()),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, m_renderTargets->outputColor),
+        caustica::rhi::BindingSetItem::Texture_UAV(1, m_renderTargets->processedOutputColor),
+        caustica::rhi::BindingSetItem::Texture_UAV(2, m_renderTargets->ldrColor, caustica::rhi::Format::RGBA8_UNORM),
+        caustica::rhi::BindingSetItem::Texture_UAV(4, m_renderTargets->throughput),
+        caustica::rhi::BindingSetItem::Texture_UAV(5, m_renderTargets->screenMotionVectors),
+        caustica::rhi::BindingSetItem::Texture_UAV(6, m_renderTargets->depth),
+        caustica::rhi::BindingSetItem::Texture_UAV(7, m_renderTargets->specularHitT), 
+        caustica::rhi::BindingSetItem::Texture_UAV(8, m_renderTargets->scratchFloat1), 
+        caustica::rhi::BindingSetItem::Texture_UAV(31, m_renderTargets->denoiserViewspaceZ),
+        caustica::rhi::BindingSetItem::Texture_UAV(32, m_renderTargets->denoiserMotionVectors),
+        caustica::rhi::BindingSetItem::Texture_UAV(33, m_renderTargets->denoiserNormalRoughness),
+        caustica::rhi::BindingSetItem::Texture_UAV(34, m_renderTargets->denoiserDiffRadianceHitDist),
+        caustica::rhi::BindingSetItem::Texture_UAV(35, m_renderTargets->denoiserSpecRadianceHitDist),
+        caustica::rhi::BindingSetItem::Texture_UAV(36, m_renderTargets->denoiserDisocclusionThresholdMix),
+        caustica::rhi::BindingSetItem::Texture_UAV(37, m_renderTargets->combinedHistoryClampRelax),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(51, m_feedback_Buffer_Gpu),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(52, m_debugLineBufferCapture),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(53, m_debugDeltaPathTree_Gpu),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(54, m_debugDeltaPathTreeSearchStack),
+        caustica::rhi::BindingSetItem::Texture_UAV(60, m_renderTargets->secondarySurfacePositionNormal),
+        caustica::rhi::BindingSetItem::Texture_UAV(61, m_renderTargets->secondarySurfaceRadiance),
+        caustica::rhi::BindingSetItem::Texture_UAV(70, m_renderTargets->rrDiffuseAlbedo),
+        caustica::rhi::BindingSetItem::Texture_UAV(71, m_renderTargets->rrSpecAlbedo),
+        caustica::rhi::BindingSetItem::Texture_UAV(72, m_renderTargets->rrNormalsAndRoughness),
+        caustica::rhi::BindingSetItem::Texture_UAV(73, m_renderTargets->rrSpecMotionVectors),
+        caustica::rhi::BindingSetItem::Texture_UAV(74, (m_renderTargets->rrTransparencyLayer!=nullptr)?m_renderTargets->rrTransparencyLayer:m_renderTargets->rrSpecMotionVectors),
+        caustica::rhi::BindingSetItem::Texture_UAV(75, m_renderTargets->denoiserAvgLayerRadianceHalfRes),
 
         ///***
-        nvrhi::BindingSetItem::Texture_UAV(100, m_renderTargets->baseColor),
-        nvrhi::BindingSetItem::Texture_UAV(101, m_renderTargets->specNormal),
-        nvrhi::BindingSetItem::Texture_UAV(102, m_renderTargets->roughnessMetal),
-        nvrhi::BindingSetItem::Texture_UAV(103, m_renderTargets->materialInfo),
-        nvrhi::BindingSetItem::Texture_UAV(10, m_renderTargets->localCubemap),  // u_LocalCubemap for RT pass
+        caustica::rhi::BindingSetItem::Texture_UAV(100, m_renderTargets->baseColor),
+        caustica::rhi::BindingSetItem::Texture_UAV(101, m_renderTargets->specNormal),
+        caustica::rhi::BindingSetItem::Texture_UAV(102, m_renderTargets->roughnessMetal),
+        caustica::rhi::BindingSetItem::Texture_UAV(103, m_renderTargets->materialInfo),
+        caustica::rhi::BindingSetItem::Texture_UAV(10, m_renderTargets->localCubemap),  // u_LocalCubemap for RT pass
         ///***
 
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-        nvrhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture())
+        caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+        caustica::rhi::BindingSetItem::Texture_UAV(SHADER_DEBUG_VIZ_TEXTURE_UAV_INDEX, m_shaderDebug->getDebugVizTexture())
     };
 
     // NV HLSL extensions - DX12 only - we should probably expose some form of GetNvapiIsInitialized instead
-    if (device()->queryFeatureSupport(nvrhi::Feature::HlslExtensionUAV))
+    if (device()->queryFeatureSupport(caustica::rhi::Feature::HlslExtensionUAV))
     {
         bindingSetDescBase.bindings.push_back(
-            nvrhi::BindingSetItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM, nullptr));
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(NV_SHADER_EXTN_SLOT_NUM, nullptr));
     }
 
     // Main raytracing & etc binding set
     {
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
 
         bindingSetDesc.bindings = bindingSetDescBase.bindings;
 
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(40, m_renderTargets->stablePlanesHeader));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(42, m_renderTargets->stablePlanesBuffer));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(44, m_renderTargets->stableRadiance));
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::StructuredBuffer_UAV(45, m_renderTargets->surfaceDataBuffer));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(40, m_renderTargets->stablePlanesHeader));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::StructuredBuffer_UAV(42, m_renderTargets->stablePlanesBuffer));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(44, m_renderTargets->stableRadiance));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::StructuredBuffer_UAV(45, m_renderTargets->surfaceDataBuffer));
 
         // Reflection system bindings (t80-t83, b3)
         // Derived classes can override AddCustomBindings to provide actual textures
-        // Default to black texture fallbacks (NVRHI doesn't allow null textures)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(80, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_LocalCubemapGGX
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(81, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_DiffuseIrradianceCube
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(82, m_context->renderDevice.builtins().blackTexture()));  // t_SSRBlurChain
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(83, (m_context->scenePasses.lighting.environment()->getBRDFLUT()!=nullptr)?m_context->scenePasses.lighting.environment()->getBRDFLUT():m_context->renderDevice.builtins().blackTexture() ));  // t_BRDFLUT
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(84, m_context->renderDevice.builtins().blackTexture()));  // t_DepthHierarchy placeholder
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
+        // Default to black texture fallbacks (RHI doesn't allow null textures)
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(80, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_LocalCubemapGGX
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(81, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_DiffuseIrradianceCube
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(82, m_context->renderDevice.builtins().blackTexture()));  // t_SSRBlurChain
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(83, (m_context->scenePasses.lighting.environment()->getBRDFLUT()!=nullptr)?m_context->scenePasses.lighting.environment()->getBRDFLUT():m_context->renderDevice.builtins().blackTexture() ));  // t_BRDFLUT
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(84, m_context->renderDevice.builtins().blackTexture()));  // t_DepthHierarchy placeholder
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
         // SSR result UAV placeholder
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(85, m_renderTargets->depth));   // u_SSRResult placeholder
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(85, m_renderTargets->depth));   // u_SSRResult placeholder
 
         // GTAO output (default to white = no occlusion; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(86, m_context->renderDevice.builtins().whiteTexture()));  // t_GTAOOutput placeholder
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(86, m_context->renderDevice.builtins().whiteTexture()));  // t_GTAOOutput placeholder
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
 
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
     }
 }
 
-void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const
+void caustica::render::WorldRenderer::denoisedScreenshot(caustica::rhi::ITexture* framebufferTexture) const
 {
     std::string noisyImagePath = (caustica::getDirectoryWithExecutable() / "photo.bmp").string();
 
@@ -887,7 +887,7 @@ void caustica::render::WorldRenderer::denoisedScreenshot(nvrhi::ITexture* frameb
             return;
         }
 
-        if (!saveTextureToFile(device(), m_context->renderDevice, framebufferTexture, nvrhi::ResourceStates::Common, noisyImagePath.c_str()))
+        if (!saveTextureToFile(device(), m_context->renderDevice, framebufferTexture, caustica::rhi::ResourceStates::Common, noisyImagePath.c_str()))
         {
             assert(false);
             return;
@@ -960,7 +960,7 @@ void caustica::render::WorldRenderer::createPostProcessRenderPasses()
     }
 }
 
-void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, nvrhi::CommandListHandle commandList )
+void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, caustica::rhi::CommandListHandle commandList )
 {
     const bool resetReferenceOidn = !m_context->activeSettings().RealtimeMode && (resetAccum || m_context->activeSettings().ResetAccumulation || m_context->activeSettings().ReferenceOIDNDenoiserChanged);
     if (resetReferenceOidn || m_context->activeSettings().ReferenceOIDNDenoiserChanged)

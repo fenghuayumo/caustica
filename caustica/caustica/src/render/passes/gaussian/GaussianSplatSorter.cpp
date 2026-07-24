@@ -40,7 +40,7 @@ void GaussianSplatSorter::onSplatCountChanged(uint32_t splatCount)
 }
 
 void GaussianSplatSorter::uploadStochasticSplatIndices(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const GaussianSplatSortResources& resources)
 {
     if (!resources.indexBuffer || resources.splatCount == 0)
@@ -63,7 +63,7 @@ void GaussianSplatSorter::uploadStochasticSplatIndices(
 }
 
 void GaussianSplatSorter::buildDistanceCulledSplatList(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     GaussianSplatSortMode sortMode,
     const GaussianSplatSortResources& resources)
 {
@@ -71,20 +71,20 @@ void GaussianSplatSorter::buildDistanceCulledSplatList(
         return;
 
     const uint32_t zero = 0;
-    nvrhi::DrawIndirectArguments drawArgs = {};
+    caustica::rhi::DrawIndirectArguments drawArgs = {};
     drawArgs.instanceCount = 1;
     commandList->writeBuffer(resources.sortControlBuffer, &zero, sizeof(zero));
     commandList->writeBuffer(resources.drawIndirectBuffer, &drawArgs, sizeof(drawArgs));
 
     {
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = resources.sortKeyPipeline;
         state.bindings = { resources.sortKeyBindingSet };
 
-        commandList->setBufferState(resources.sortKeyBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.drawIndirectBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.sortKeyBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.indexBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.sortControlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.drawIndirectBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
         commandList->commitBarriers();
 
         commandList->setComputeState(state);
@@ -93,9 +93,9 @@ void GaussianSplatSorter::buildDistanceCulledSplatList(
 
     if (sortMode == GaussianSplatSortMode::GpuSort && resources.gpuSort)
     {
-        commandList->setBufferState(resources.sortKeyBuffer, nvrhi::ResourceStates::ShaderResource);
-        commandList->setBufferState(resources.indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::CopySource);
+        commandList->setBufferState(resources.sortKeyBuffer, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setBufferState(resources.indexBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.sortControlBuffer, caustica::rhi::ResourceStates::CopySource);
         commandList->commitBarriers();
 
         resources.gpuSort->sort(
@@ -124,7 +124,7 @@ bool GaussianSplatSorter::canReuseSort(
 }
 
 void GaussianSplatSorter::updateIndices(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const GaussianSplatConstants& constants,
     GaussianSplatSortMode sortMode,
     const GaussianSplatSortResources& resources)
@@ -156,14 +156,14 @@ void GaussianSplatSorter::updateIndices(
         return;
 
     {
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = resources.sortKeyPipeline;
         state.bindings = { resources.sortKeyBindingSet };
 
-        commandList->setBufferState(resources.sortKeyBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(resources.drawIndirectBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.sortKeyBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.indexBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.sortControlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(resources.drawIndirectBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
         commandList->commitBarriers();
 
         commandList->setComputeState(state);
@@ -172,9 +172,9 @@ void GaussianSplatSorter::updateIndices(
 
     commandList->writeBuffer(resources.sortControlBuffer, &resources.splatCount, sizeof(resources.splatCount));
 
-    commandList->setBufferState(resources.sortKeyBuffer, nvrhi::ResourceStates::ShaderResource);
-    commandList->setBufferState(resources.indexBuffer, nvrhi::ResourceStates::UnorderedAccess);
-    commandList->setBufferState(resources.sortControlBuffer, nvrhi::ResourceStates::CopySource);
+    commandList->setBufferState(resources.sortKeyBuffer, caustica::rhi::ResourceStates::ShaderResource);
+    commandList->setBufferState(resources.indexBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+    commandList->setBufferState(resources.sortControlBuffer, caustica::rhi::ResourceStates::CopySource);
     commandList->commitBarriers();
 
     resources.gpuSort->sort(

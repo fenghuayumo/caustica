@@ -1,14 +1,14 @@
 #pragma once
 
 #include <cstring>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
 
 // Parse -d3d11/-dx11, -d3d12/-dx12, -vk/-vulkan flags from argv.
 // Returns the detected API, or a build-time default.
-inline nvrhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const char* const* argv)
+inline caustica::rhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
     for (int n = 1; n < argc; n++)
     {
@@ -16,27 +16,27 @@ inline nvrhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const char* co
 
         if (!strcmp(arg, "-d3d11") || !strcmp(arg, "-dx11") ||
             !strcmp(arg, "--d3d11") || !strcmp(arg, "--dx11"))
-            return nvrhi::GraphicsAPI::D3D11;
+            return caustica::rhi::GraphicsAPI::D3D11;
         else if (!strcmp(arg, "-d3d12") || !strcmp(arg, "-dx12") ||
                  !strcmp(arg, "--d3d12") || !strcmp(arg, "--dx12"))
-            return nvrhi::GraphicsAPI::D3D12;
+            return caustica::rhi::GraphicsAPI::D3D12;
         else if (!strcmp(arg, "-vk") || !strcmp(arg, "-vulkan") ||
                  !strcmp(arg, "--vk") || !strcmp(arg, "--vulkan"))
-            return nvrhi::GraphicsAPI::VULKAN;
+            return caustica::rhi::GraphicsAPI::VULKAN;
     }
 
 #if CAUSTICA_WITH_DX12
-    return nvrhi::GraphicsAPI::D3D12;
+    return caustica::rhi::GraphicsAPI::D3D12;
 #elif CAUSTICA_WITH_VULKAN
-    return nvrhi::GraphicsAPI::VULKAN;
+    return caustica::rhi::GraphicsAPI::VULKAN;
 #elif CAUSTICA_WITH_DX11
-    return nvrhi::GraphicsAPI::D3D11;
+    return caustica::rhi::GraphicsAPI::D3D11;
 #else
     #error "No Graphics API defined"
 #endif
 }
 
 // Extended parser that also accepts --backend= / --api= style overrides.
-nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv);
+caustica::rhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv);
 
 } // namespace caustica

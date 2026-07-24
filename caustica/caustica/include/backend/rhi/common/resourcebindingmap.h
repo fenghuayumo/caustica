@@ -1,10 +1,10 @@
 #pragma once
 
 #include <rhi/common/containers.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 #include <unordered_map>
 
-namespace nvrhi {
+namespace caustica::rhi {
 
 // describes a texture binding --- used to manage SRV / VkImageView per texture
 struct TextureBindingKey : public TextureSubresourceSet
@@ -56,26 +56,26 @@ struct BufferBindingKey : public BufferRange
     }
 };
 
-} // namespace nvrhi
+} // namespace caustica::rhi
 
 namespace std
 {
-    template<> struct hash<nvrhi::TextureBindingKey>
+    template<> struct hash<caustica::rhi::TextureBindingKey>
     {
-        std::size_t operator()(nvrhi::TextureBindingKey const& s) const noexcept
+        std::size_t operator()(caustica::rhi::TextureBindingKey const& s) const noexcept
         {
-            return std::hash<nvrhi::Format>()(s.format)
-                ^ std::hash<nvrhi::TextureSubresourceSet>()(s)
+            return std::hash<caustica::rhi::Format>()(s.format)
+                ^ std::hash<caustica::rhi::TextureSubresourceSet>()(s)
                 ^ std::hash<bool>()(s.isReadOnlyDSV);
         }
     };
 
-    template<> struct hash<nvrhi::BufferBindingKey>
+    template<> struct hash<caustica::rhi::BufferBindingKey>
     {
-        std::size_t operator()(nvrhi::BufferBindingKey const& s) const noexcept
+        std::size_t operator()(caustica::rhi::BufferBindingKey const& s) const noexcept
         {
-            return std::hash<nvrhi::Format>()(s.format)
-                ^ std::hash<nvrhi::BufferRange>()(s);
+            return std::hash<caustica::rhi::Format>()(s.format)
+                ^ std::hash<caustica::rhi::BufferRange>()(s);
         }
     };
 }

@@ -479,9 +479,9 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
                 [outputColor, processedOutputColor](rg::RenderPassContext& passCtx) {
                     passCtx.commandList()->copyTexture(
                         passCtx.texture(processedOutputColor),
-                        nvrhi::TextureSlice(),
+                        caustica::rhi::TextureSlice(),
                         passCtx.texture(outputColor),
-                        nvrhi::TextureSlice());
+                        caustica::rhi::TextureSlice());
                 });
         }
     }

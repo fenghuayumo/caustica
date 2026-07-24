@@ -1,4 +1,4 @@
-﻿#ifndef __PATH_TRACER_BRIDGE_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
+#ifndef __PATH_TRACER_BRIDGE_HLSLI__ // using instead of "#pragma once" due to https://github.com/microsoft/DirectXShaderCompiler/issues/3943
 #define __PATH_TRACER_BRIDGE_HLSLI__
 
 #include "PathTracer/Config.h"
@@ -12,7 +12,7 @@
 #define CAUSTICA_ENABLE_OPACITY_MICROMAPS 0
 #endif
 
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP && CAUSTICA_ENABLE_OPACITY_MICROMAPS
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP && CAUSTICA_ENABLE_OPACITY_MICROMAPS
 #define CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS
 #else
 #define CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS 0

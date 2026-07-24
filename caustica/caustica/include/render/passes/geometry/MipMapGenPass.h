@@ -2,7 +2,7 @@
 
 #include <render/core/BindingCache.h>
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 #include <vector>
 
@@ -30,31 +30,31 @@ namespace caustica::render
 
         // note : 'texture' must have been allocated with some mip levels
         MipMapGenPass(
-            nvrhi::IDevice* device,
+            caustica::rhi::IDevice* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-            nvrhi::TextureHandle texture,
+            caustica::rhi::TextureHandle texture,
             Mode mode = Mode::MODE_MAX);
 
         // Dispatches reduction kernel : reads LOD 0 and populates
         // LOD 1 and up
-        void dispatch(nvrhi::ICommandList* commandList, int maxLOD=-1);
+        void dispatch(caustica::rhi::ICommandList* commandList, int maxLOD=-1);
 
         // debug : blits mip-map levels in spiral pattern to 'target'
         // (assumes 'target' texture resolution is high enough...)
         void display(
             caustica::render::RenderDevice& renderDevice,
-            nvrhi::ICommandList* commandList, 
-            nvrhi::IFramebuffer* target);
+            caustica::rhi::ICommandList* commandList, 
+            caustica::rhi::IFramebuffer* target);
 
     private:
 
-        nvrhi::DeviceHandle m_device;
-        nvrhi::ShaderHandle m_Shader;
-        nvrhi::TextureHandle m_Texture;
-        nvrhi::BufferHandle m_ConstantBuffer;
-        nvrhi::BindingLayoutHandle m_BindingLayout;
-        std::vector<nvrhi::BindingSetHandle> m_BindingSets;
-        nvrhi::ComputePipelineHandle m_Pso;
+        caustica::rhi::DeviceHandle m_device;
+        caustica::rhi::ShaderHandle m_Shader;
+        caustica::rhi::TextureHandle m_Texture;
+        caustica::rhi::BufferHandle m_ConstantBuffer;
+        caustica::rhi::BindingLayoutHandle m_BindingLayout;
+        std::vector<caustica::rhi::BindingSetHandle> m_BindingSets;
+        caustica::rhi::ComputePipelineHandle m_Pso;
 
         // Set of unique dummy textures - see details in class implementation
         struct NullTextures;

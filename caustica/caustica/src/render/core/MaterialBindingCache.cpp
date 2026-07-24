@@ -7,13 +7,13 @@ namespace caustica
 {
 
 MaterialBindingCache::MaterialBindingCache(
-    nvrhi::IDevice* device,
-    nvrhi::ShaderType shaderType,
+    caustica::rhi::IDevice* device,
+    caustica::rhi::ShaderType shaderType,
     uint32_t registerSpace,
     bool registerSpaceIsDescriptorSet,
     const std::vector<MaterialResourceBinding>& bindings,
-    nvrhi::ISampler* sampler,
-    nvrhi::ITexture* fallbackTexture,
+    caustica::rhi::ISampler* sampler,
+    caustica::rhi::ITexture* fallbackTexture,
     render::SceneGpuResources* sceneGpuResources,
     bool trackLiveness)
     : m_device(device)
@@ -23,21 +23,21 @@ MaterialBindingCache::MaterialBindingCache(
     , m_sceneGpuResources(sceneGpuResources)
     , m_trackLiveness(trackLiveness)
 {
-    nvrhi::BindingLayoutDesc layoutDesc;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = shaderType;
     layoutDesc.registerSpace = registerSpace;
     layoutDesc.registerSpaceIsDescriptorSet = registerSpaceIsDescriptorSet;
 
     for (const auto& item : bindings)
     {
-        nvrhi::BindingLayoutItem layoutItem{};
+        caustica::rhi::BindingLayoutItem layoutItem{};
         layoutItem.slot = item.slot;
         layoutItem.size = 1;
 
         switch (item.resource)
         {
         case MaterialResource::ConstantBuffer:
-            layoutItem.type = nvrhi::ResourceType::ConstantBuffer;
+            layoutItem.type = caustica::rhi::ResourceType::ConstantBuffer;
             break;
         case MaterialResource::DiffuseTexture:
         case MaterialResource::SpecularTexture:
@@ -46,10 +46,10 @@ MaterialBindingCache::MaterialBindingCache(
         case MaterialResource::OcclusionTexture:
         case MaterialResource::transmissionTexture:
         case MaterialResource::OpacityTexture:
-            layoutItem.type = nvrhi::ResourceType::Texture_SRV;
+            layoutItem.type = caustica::rhi::ResourceType::Texture_SRV;
             break;
         case MaterialResource::Sampler:
-            layoutItem.type = nvrhi::ResourceType::Sampler;
+            layoutItem.type = caustica::rhi::ResourceType::Sampler;
             break;
         default:
             error("MaterialBindingCache: unknown MaterialResource value (%d)", item.resource);
@@ -62,16 +62,16 @@ MaterialBindingCache::MaterialBindingCache(
     m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 }
 
-nvrhi::IBindingLayout* MaterialBindingCache::getLayout() const
+caustica::rhi::IBindingLayout* MaterialBindingCache::getLayout() const
 {
     return m_bindingLayout;
 }
 
-nvrhi::IBindingSet* MaterialBindingCache::getMaterialBindingSet(const Material* material)
+caustica::rhi::IBindingSet* MaterialBindingCache::getMaterialBindingSet(const Material* material)
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    nvrhi::BindingSetHandle& bindingSet = m_bindingSets[material];
+    caustica::rhi::BindingSetHandle& bindingSet = m_bindingSets[material];
 
     if (bindingSet)
         return bindingSet;
@@ -88,19 +88,19 @@ void MaterialBindingCache::clear()
     m_bindingSets.clear();
 }
 
-nvrhi::BindingSetItem MaterialBindingCache::getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const
+caustica::rhi::BindingSetItem MaterialBindingCache::getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const
 {
-    return nvrhi::BindingSetItem::Texture_SRV(slot, texture && texture->gpu.texture ? texture->gpu.texture.Get() : m_fallbackTexture.Get());
+    return caustica::rhi::BindingSetItem::Texture_SRV(slot, texture && texture->gpu.texture ? texture->gpu.texture.Get() : m_fallbackTexture.Get());
 }
 
-nvrhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Material* material)
+caustica::rhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Material* material)
 {
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.trackLiveness = m_trackLiveness;
 
     for (const auto& item : m_bindingDesc)
     {
-        nvrhi::BindingSetItem setItem;
+        caustica::rhi::BindingSetItem setItem;
 
         switch (item.resource)
         {
@@ -115,14 +115,14 @@ nvrhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(const Mat
             {
                 return nullptr;
             }
-            setItem = nvrhi::BindingSetItem::ConstantBuffer(
+            setItem = caustica::rhi::BindingSetItem::ConstantBuffer(
                 item.slot,
                 materialGpuIt->second.constantsBuffer);
             break;
         }
 
         case MaterialResource::Sampler:
-            setItem = nvrhi::BindingSetItem::Sampler(
+            setItem = caustica::rhi::BindingSetItem::Sampler(
                 item.slot,
                 m_sampler);
             break;

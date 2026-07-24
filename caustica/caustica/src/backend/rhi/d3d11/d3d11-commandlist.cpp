@@ -1,7 +1,7 @@
 #include "d3d11-backend.h"
 #include <rhi/utils.h>
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
     CommandList::CommandList(const Context& context, IDevice* device, const CommandListParameters& params)
         : m_Context(context)
@@ -9,7 +9,7 @@ namespace nvrhi::d3d11
         , m_Desc(params)
     {
         m_Context.immediateContext->QueryInterface(IID_PPV_ARGS(&m_UserDefinedAnnotation));
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
             m_Device->getAftermathCrashDumpHelper().registerAftermathMarkerTracker(&m_AftermathTracker);
 #endif
@@ -17,7 +17,7 @@ namespace nvrhi::d3d11
 
     CommandList::~CommandList()
     {
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
             m_Device->getAftermathCrashDumpHelper().unRegisterAftermathMarkerTracker(&m_AftermathTracker);
 #endif
@@ -51,7 +51,7 @@ namespace nvrhi::d3d11
     {
         m_Context.immediateContext->ClearState();
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
         if (m_CurrentGraphicsStateValid && m_CurrentSinglePassStereoState.enabled)
         {
             NvAPI_D3D_SetSinglePassStereoMode(m_Context.immediateContext, 1, 0, 0);
@@ -94,7 +94,7 @@ namespace nvrhi::d3d11
 
     void CommandList::enterUAVOverlapSection()
     {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
         if (m_NumUAVOverlapCommands == 0)
             NvAPI_D3D11_BeginUAVOverlap(m_Context.immediateContext);
 #endif
@@ -104,7 +104,7 @@ namespace nvrhi::d3d11
 
     void CommandList::leaveUAVOverlapSection()
     {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
         if (m_NumUAVOverlapCommands == 1)
             NvAPI_D3D11_EndUAVOverlap(m_Context.immediateContext);
 #endif
@@ -121,7 +121,7 @@ namespace nvrhi::d3d11
 
             m_UserDefinedAnnotation->BeginEvent(bufW);
         }
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
         {
             const size_t aftermathMarker = m_AftermathTracker.pushEvent(name);
@@ -136,7 +136,7 @@ namespace nvrhi::d3d11
         {
             m_UserDefinedAnnotation->EndEvent();
         }
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         if (m_Device->isAftermathEnabled())
             m_AftermathTracker.popEvent();
 #endif
@@ -196,7 +196,7 @@ namespace nvrhi::d3d11
         utils::NotSupported();
     }
 
-    void CommandList::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct*, nvrhi::IBuffer*, uint64_t, size_t, rt::AccelStructBuildFlags)
+    void CommandList::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct*, caustica::rhi::IBuffer*, uint64_t, size_t, rt::AccelStructBuildFlags)
     {
         utils::NotSupported();
     }
@@ -211,4 +211,4 @@ namespace nvrhi::d3d11
         utils::NotSupported();
     }
 
-} // namespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <scene/GaussianSplatData.h>
 
 #include <array>
@@ -16,20 +16,20 @@ caustica::math::float3 gaussianAabbExtent(
     uint32_t kernelDegree,
     bool adaptiveClamp);
 
-nvrhi::rt::GeometryAABB gaussianAabbFromSplat(
+caustica::rhi::rt::GeometryAABB gaussianAabbFromSplat(
     const caustica::GaussianSplatData& splat,
     float splatScale,
     uint32_t kernelDegree,
     bool adaptiveClamp);
 
-std::vector<nvrhi::rt::GeometryAABB> buildGaussianAabbs(
+std::vector<caustica::rhi::rt::GeometryAABB> buildGaussianAabbs(
     const std::vector<caustica::GaussianSplatData>& splats,
     float splatScale,
     uint32_t kernelDegree,
     bool adaptiveClamp);
 
 void fillScaleTranslateTransform(
-    nvrhi::rt::AffineTransform& transform,
+    caustica::rhi::rt::AffineTransform& transform,
     const caustica::math::float3& center,
     const caustica::math::float3& extent);
 

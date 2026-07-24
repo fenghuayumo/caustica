@@ -154,7 +154,7 @@ void ImGuiManager::configureExtensions(int graphicsAPI)
     m_extensionsConfigured = true;
 
 #if CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619
-    const bool isDX12 = (graphicsAPI == 2); // nvrhi::GraphicsAPI::D3D12
+    const bool isDX12 = (graphicsAPI == 2); // caustica::rhi::GraphicsAPI::D3D12
     m_uiData.render.settings.DXHitObjectExtension = isDX12;
     m_uiData.render.settings.NVAPIHitObjectExtension &= !isDX12 && m_nvapiSERSupported;
 #else

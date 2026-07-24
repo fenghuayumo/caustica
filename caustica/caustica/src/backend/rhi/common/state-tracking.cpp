@@ -4,7 +4,7 @@
 
 #include <sstream>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     bool verifyPermanentResourceState(ResourceStates permanentState, ResourceStates requiredState, bool isTexture, const std::string& debugName, IMessageCallback* messageCallback)
     {
@@ -429,4 +429,4 @@ namespace nvrhi
 
         return tracking;
     }
-} // namespace nvrhi
+} // namespace caustica::rhi

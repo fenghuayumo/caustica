@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ecs/Entity.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <scene/SceneRenderResourceIds.h>
 #include <vector>
 
@@ -27,7 +27,7 @@ namespace caustica::scene
         const caustica::MeshGeometry* geometry = nullptr;
         const caustica::Material* material = nullptr;
         float distanceToCamera = 0.f;
-        nvrhi::RasterCullMode cullMode = nvrhi::RasterCullMode::Back;
+        caustica::rhi::RasterCullMode cullMode = caustica::rhi::RasterCullMode::Back;
     };
 
     enum class MeshDrawDomain : uint8_t

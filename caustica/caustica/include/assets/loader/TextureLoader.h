@@ -7,7 +7,7 @@
 #include <backend/IDescriptorTableManager.h>
 #include <core/log.h>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -26,7 +26,7 @@ class TextureLoader
 {
 public:
     TextureLoader(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<IFileSystem> fs,
         std::shared_ptr<IDescriptorTableManager> descriptorTable,
         AssetRegistry& registry,
@@ -39,7 +39,7 @@ public:
         const std::filesystem::path& path,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        nvrhi::ICommandList* commandList);
+        caustica::rhi::ICommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromFileDeferred(
         const std::filesystem::path& path,
@@ -63,7 +63,7 @@ public:
         const std::string& mimeType,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        nvrhi::ICommandList* commandList);
+        caustica::rhi::ICommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromMemoryDeferred(
         const std::shared_ptr<IBlob>& data,
@@ -91,8 +91,8 @@ public:
     std::shared_ptr<ImageAsset> getImage(const Handle<ImageAsset>& image) const { return image.shared(); }
 
 private:
-    nvrhi::DeviceHandle m_Device;
-    nvrhi::CommandListHandle m_CommandList;
+    caustica::rhi::DeviceHandle m_Device;
+    caustica::rhi::CommandListHandle m_CommandList;
 
     std::queue<std::shared_ptr<ImageAsset>> m_TexturesToFinalize;
     std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
@@ -124,7 +124,7 @@ private:
     void finalizeTexture(
         std::shared_ptr<ImageAsset> texture,
         render::RenderDevice* renderDevice,
-        nvrhi::ICommandList* commandList);
+        caustica::rhi::ICommandList* commandList);
 
     void textureLoaded(std::shared_ptr<ImageAsset> texture);
     std::shared_ptr<ImageAsset> createTextureData();
@@ -133,10 +133,10 @@ private:
 };
 
 bool saveTextureToFile(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     render::RenderDevice& renderDevice,
-    nvrhi::ITexture* texture,
-    nvrhi::ResourceStates textureState,
+    caustica::rhi::ITexture* texture,
+    caustica::rhi::ResourceStates textureState,
     const char* fileName,
     bool saveAlphaChannel = true);
 

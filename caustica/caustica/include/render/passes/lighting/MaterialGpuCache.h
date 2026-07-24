@@ -9,7 +9,7 @@
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderKey.h>
 #include <render/core/BindingCache.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneRenderData.h>
@@ -69,7 +69,7 @@ struct MaterialShaderPermutation
     uint32_t            featureTier             = 0;
 
     [[nodiscard]] caustica::ShaderKey makeShaderKey(
-        nvrhi::GraphicsAPI api,
+        caustica::rhi::GraphicsAPI api,
         ShaderCompilerUtils::ShaderProfile profile = ShaderCompilerUtils::ShaderProfile::Library_6_6) const;
 };
 
@@ -310,18 +310,18 @@ public:
         bool transmission = false;
     };
 
-    MaterialGpuCache(const std::string & relativeShaderSourcePath, nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    MaterialGpuCache(const std::string & relativeShaderSourcePath, caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
     ~MaterialGpuCache();
 
-    void                            createRenderPassesAndLoadMaterials(nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
+    void                            createRenderPassesAndLoadMaterials(caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
-    void                            update(nvrhi::ICommandList* commandList,
+    void                            update(caustica::rhi::ICommandList* commandList,
                                            const caustica::scene::SceneRenderData& renderData,
                                            const caustica::render::SceneGpuResources* gpuResources,
                                            std::vector<SubInstanceData>& subInstanceData);
 
-    nvrhi::BufferHandle             getMaterialDataBuffer() const           { return m_materialData; }
+    caustica::rhi::BufferHandle             getMaterialDataBuffer() const           { return m_materialData; }
     uint                            getMaterialDataCount() const            { return m_materialsGPU.size(); }
 
     const std::unordered_map<std::string, StandardMaterialTexture> &
@@ -368,7 +368,7 @@ private:
     std::shared_ptr<StandardMaterial> importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
     void                            saveAll();
 
-    void                            completeDeferredTexturesLoad(nvrhi::ICommandList* commandList);
+    void                            completeDeferredTexturesLoad(caustica::rhi::ICommandList* commandList);
     void                            recordTexture(const StandardMaterialTexture& texture);
     bool                            reconcileLiveMaterials(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
     void                            rebuildActiveTextureIndex();
@@ -378,7 +378,7 @@ private:
     void                            initializeUniqueDeterministicName(const std::shared_ptr<StandardMaterialBase> & material);
 
 private:
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     std::string                     m_relativeShaderSourcePath;         // this is the path for the shader file containing material specializations for ClosestHit and (if enabled) AnyHit; it is currently 1 for all materials, but could be per-material
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
     caustica::render::RenderDevice* m_renderDevice = nullptr;
@@ -387,7 +387,7 @@ private:
 
     caustica::BindingCache     m_bindingCache;
 
-    nvrhi::BufferHandle             m_materialData;
+    caustica::rhi::BufferHandle             m_materialData;
     bool                            m_materialDataWasReset = true;
     bool                            m_deferredTextureLoadInProgress = false;
 

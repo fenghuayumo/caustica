@@ -2,7 +2,7 @@
 
 #include <core/log.h>
 #include <scene/SceneTypes.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <scene/SceneRenderData.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/SceneGpuResources.h>
@@ -16,12 +16,12 @@ namespace bvh
 
     struct OmmAttachment
     {
-        nvrhi::rt::OpacityMicromapHandle ommBuffer;
-        nvrhi::Format ommIndexFormat = nvrhi::Format::UNKNOWN;
-        std::vector<nvrhi::rt::OpacityMicromapUsageCount> ommIndexHistogram;
-        nvrhi::BufferHandle ommIndexBuffer;
+        caustica::rhi::rt::OpacityMicromapHandle ommBuffer;
+        caustica::rhi::Format ommIndexFormat = caustica::rhi::Format::UNKNOWN;
+        std::vector<caustica::rhi::rt::OpacityMicromapUsageCount> ommIndexHistogram;
+        caustica::rhi::BufferHandle ommIndexBuffer;
         uint32_t ommIndexBufferOffset = 0;
-        nvrhi::BufferHandle ommArrayDataBuffer;
+        caustica::rhi::BufferHandle ommArrayDataBuffer;
         uint32_t ommArrayDataBufferOffset = 0;
     };
 
@@ -46,9 +46,9 @@ namespace bvh
         if (!mesh.upload || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return false;
 
-        const nvrhi::BufferDesc& indexBufferDesc = meshGpu.indexBuffer->getDesc();
-        const nvrhi::BufferDesc& vertexBufferDesc = meshGpu.vertexBuffer->getDesc();
-        const nvrhi::BufferRange& positionRange =
+        const caustica::rhi::BufferDesc& indexBufferDesc = meshGpu.indexBuffer->getDesc();
+        const caustica::rhi::BufferDesc& vertexBufferDesc = meshGpu.vertexBuffer->getDesc();
+        const caustica::rhi::BufferRange& positionRange =
             meshGpu.vertexBufferRange(caustica::VertexAttribute::Position);
 
         if (positionRange.byteSize == 0)
@@ -103,7 +103,7 @@ namespace bvh
         return true;
     }
 
-    static nvrhi::rt::AccelStructDesc getMeshBlasDesc(
+    static caustica::rhi::rt::AccelStructDesc getMeshBlasDesc(
         const Config& cfg,
         const caustica::scene::MeshRenderResourceSnapshot& mesh,
         const caustica::render::MeshGpuRecord& meshGpu,
@@ -111,7 +111,7 @@ namespace bvh
         bool updateSkinMeshes,
         const MaterialGpuCache* materialGpuCache)
     {
-        nvrhi::rt::AccelStructDesc blasDesc;
+        caustica::rhi::rt::AccelStructDesc blasDesc;
         blasDesc.isTopLevel = false;
         blasDesc.debugName = mesh.debugName;
 
@@ -124,16 +124,16 @@ namespace bvh
             if (!isValidTriangleGeometryForBlas(mesh, meshGpu, *geometry))
                 continue;
 
-            nvrhi::rt::GeometryDesc geometryDesc;
+            caustica::rhi::rt::GeometryDesc geometryDesc;
             auto& triangles = geometryDesc.geometryData.triangles;
             triangles.indexBuffer = meshGpu.indexBuffer;
             triangles.indexOffset = (mesh.indexOffset + geometry->indexOffsetInMesh) * sizeof(uint32_t);
-            triangles.indexFormat = nvrhi::Format::R32_UINT;
+            triangles.indexFormat = caustica::rhi::Format::R32_UINT;
             triangles.indexCount = geometry->numIndices;
             triangles.vertexBuffer = meshGpu.vertexBuffer;
             triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(dm::float3)
                 + meshGpu.vertexBufferRange(caustica::VertexAttribute::Position).byteOffset;
-            triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
+            triangles.vertexFormat = caustica::rhi::Format::RGB32_FLOAT;
             triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;
 
@@ -157,12 +157,12 @@ namespace bvh
                 triangles.numOmmUsageCounts = (uint32_t)omm.ommIndexHistogram.size();
             }
 
-            geometryDesc.geometryType = nvrhi::rt::GeometryType::Triangles;
+            geometryDesc.geometryType = caustica::rhi::rt::GeometryType::Triangles;
             
             // Alpha testing, NEE exclusion, and transparent shadow tinting require custom shader handling.
             const bool needsCustomShader =
                 materialState.alphaTest || materialState.excludeFromNEE || materialState.transmission;
-            geometryDesc.flags = needsCustomShader ? nvrhi::rt::GeometryFlags::None : nvrhi::rt::GeometryFlags::Opaque;
+            geometryDesc.flags = needsCustomShader ? caustica::rhi::rt::GeometryFlags::None : caustica::rhi::rt::GeometryFlags::Opaque;
             blasDesc.bottomLevelGeometries.push_back(geometryDesc);
         }
 
@@ -174,18 +174,18 @@ namespace bvh
             || mesh.hasDeformationSourcePositions;
         if (needsDynamicUpdate)
         {
-            const nvrhi::rt::AccelStructBuildFlags quality =
+            const caustica::rhi::rt::AccelStructBuildFlags quality =
                 mesh.hasDeformationSourcePositions
-                    ? nvrhi::rt::AccelStructBuildFlags::PreferFastBuild
-                    : nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
+                    ? caustica::rhi::rt::AccelStructBuildFlags::PreferFastBuild
+                    : caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace;
             blasDesc.buildFlags = quality
                 | (updateSkinMeshes
-                    ? nvrhi::rt::AccelStructBuildFlags::PerformUpdate
-                    : nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
+                    ? caustica::rhi::rt::AccelStructBuildFlags::PerformUpdate
+                    : caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate);
         }
         else
         {
-            blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace; // | nvrhi::rt::AccelStructBuildFlags::MinimizeMemory;
+            blasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace; // | caustica::rhi::rt::AccelStructBuildFlags::MinimizeMemory;
         }
 
         return blasDesc;

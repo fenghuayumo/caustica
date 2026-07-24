@@ -27,7 +27,7 @@
 #   assets/     — Asset system (loaders, cache, registry)
 #   render/     — Render passes, world renderer, GPU utilities
 #   engine/     — Application framework, console, splash screen
-#   imgui/      — Dear ImGui integration (nvrhi backend)
+#   imgui/      — Dear ImGui integration (caustica::rhi backend)
 #   audio/      — Audio engine
 # ============================================================================
 
@@ -44,7 +44,6 @@ set(CAUSTICA_COMMON_INCLUDE_PRIVATE
     "${CMAKE_SOURCE_DIR}/External/Nrd/Include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtxdi/Include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-gpu-nvrhi"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include"
 )
 
@@ -191,13 +190,13 @@ target_link_libraries(causPlatform
 )
 
 # ── causBackend ───────────────────────────────────────────────────────────
-# GPU device wrappers (DX11/DX12/Vulkan) + nvrhi integration.
-# Does NOT include the nvrhi RHI implementation itself (separate CMake build).
+# GPU device wrappers (DX11/DX12/Vulkan) + RHI integration.
+# Does NOT include the RHI implementation itself (separate CMake build).
 
 # Core backend files
 file(GLOB caus_backend_headers_base include/backend/*.h)
 file(GLOB caus_backend_sources_base src/backend/*.cpp)
-# Exclude nvrhi implementation (built separately)
+# Exclude RHI implementation (built separately)
 list(FILTER caus_backend_headers_base EXCLUDE REGEX ".*/backend/rhi/")
 list(FILTER caus_backend_sources_base EXCLUDE REGEX ".*/backend/rhi/")
 
@@ -237,18 +236,18 @@ add_library(causBackend STATIC ${caus_backend_headers} ${caus_backend_sources})
 caus_configure_static(causBackend)
 target_link_libraries(causBackend
     PUBLIC causCore causMath causPlatform
-    PUBLIC nvrhi
+    PUBLIC caustica_rhi
 )
 # Backend-specific link deps
 if (CAUSTICA_WITH_DX11)
-    if (NOT NVRHI_BUILD_SHARED)
-        target_link_libraries(causBackend PUBLIC nvrhi_d3d11)
+    if (NOT CAUSTICA_RHI_BUILD_SHARED)
+        target_link_libraries(causBackend PUBLIC caustica_rhi_d3d11)
     endif()
     target_link_libraries(causBackend PUBLIC d3d11 dxgi dxguid)
 endif()
 if (CAUSTICA_WITH_DX12)
-    if (NOT NVRHI_BUILD_SHARED)
-        target_link_libraries(causBackend PUBLIC nvrhi_d3d12)
+    if (NOT CAUSTICA_RHI_BUILD_SHARED)
+        target_link_libraries(causBackend PUBLIC caustica_rhi_d3d12)
     endif()
     target_link_libraries(causBackend PUBLIC d3d12 dxgi dxguid)
     if (CAUSTICA_D3D_AGILITY_SDK_PATH AND CAUSTICA_D3D_AGILITY_SDK_VERSION)
@@ -257,8 +256,8 @@ if (CAUSTICA_WITH_DX12)
     endif()
 endif()
 if (CAUSTICA_WITH_VULKAN)
-    if (NOT NVRHI_BUILD_SHARED)
-        target_link_libraries(causBackend PUBLIC nvrhi_vk)
+    if (NOT CAUSTICA_RHI_BUILD_SHARED)
+        target_link_libraries(causBackend PUBLIC caustica_rhi_vk)
     endif()
     if (TARGET Vulkan-Headers)
         target_link_libraries(causBackend PUBLIC Vulkan-Headers)
@@ -274,7 +273,7 @@ if (CAUSTICA_WITH_STREAMLINE)
 endif()
 
 # ── causImgui ─────────────────────────────────────────────────────────────
-# Dear ImGui integration (nvrhi backend, console, renderer).
+# Dear ImGui integration (RHI backend, console, renderer).
 
 file(GLOB caus_imgui_headers include/imgui/*.h)
 file(GLOB caus_imgui_sources src/imgui/*.cpp)
@@ -388,7 +387,7 @@ add_library(causRender STATIC ${caus_render_headers} ${caus_render_sources})
 caus_configure_static(causRender)
 target_link_libraries(causRender
     PUBLIC causScene causBackend causImgui causAssets causEcs
-    PUBLIC jsoncpp_static NRD Rtxdi omm-lib omm-gpu-nvrhi
+    PUBLIC jsoncpp_static NRD Rtxdi omm-lib
 )
 
 option(CAUSTICA_CHECK_RENDER_ECS

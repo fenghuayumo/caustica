@@ -29,13 +29,13 @@ using namespace caustica;
 
 
 PrepareLightsPass::PrepareLightsPass(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<MaterialGpuCache> materialGpuCache,
     std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder,
-    nvrhi::BufferHandle subInstanceData,
-    nvrhi::IBindingLayout* bindlessLayout,
+    caustica::rhi::BufferHandle subInstanceData,
+    caustica::rhi::IBindingLayout* bindlessLayout,
     std::shared_ptr<ShaderDebug> shaderDebug)
     : m_device(device)
     , m_bindlessLayout(bindlessLayout)
@@ -46,34 +46,34 @@ PrepareLightsPass::PrepareLightsPass(
     , m_subInstanceData(subInstanceData)
     , m_shaderDebug(shaderDebug)
 {
-    nvrhi::BindingLayoutDesc bindingLayoutDesc;
-    bindingLayoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc bindingLayoutDesc;
+    bindingLayoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     bindingLayoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0), //PushConstants(0, sizeof(PrepareLightsConstants)),
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(0),
-        nvrhi::BindingLayoutItem::TypedBuffer_UAV(1),
-        nvrhi::BindingLayoutItem::Texture_UAV(2),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
-        //nvrhi::BindingLayoutItem::StructuredBuffer_SRV(4),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
-        nvrhi::BindingLayoutItem::Texture_SRV(6),
-        nvrhi::BindingLayoutItem::Texture_SRV(7),
-        nvrhi::BindingLayoutItem::StructuredBuffer_SRV(8),
-        nvrhi::BindingLayoutItem::Texture_UAV(50),
+        caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0), //PushConstants(0, sizeof(PrepareLightsConstants)),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(0),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(1),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(2),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(0),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(1),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(2),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(3),
+        //caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(4),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(5),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(6),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(7),
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(8),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(50),
 
-        nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+        caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
 
-        nvrhi::BindingLayoutItem::Sampler(0),
-        nvrhi::BindingLayoutItem::Sampler(1),
-        nvrhi::BindingLayoutItem::Sampler(2)
+        caustica::rhi::BindingLayoutItem::Sampler(0),
+        caustica::rhi::BindingLayoutItem::Sampler(1),
+        caustica::rhi::BindingLayoutItem::Sampler(2)
     };
 
     m_bindingLayout = m_device->createBindingLayout(bindingLayoutDesc);
 
-    nvrhi::BufferDesc constBufferDesc;
+    caustica::rhi::BufferDesc constBufferDesc;
     constBufferDesc.byteSize = sizeof(PrepareLightsConstants);
     constBufferDesc.debugName = "PrepareLightsConstants";
     constBufferDesc.isConstantBuffer = true;
@@ -86,7 +86,7 @@ PrepareLightsPass::PrepareLightsPass(
 void PrepareLightsPass::setFrameInputs(
     const scene::SceneRenderData* renderData,
     size_t geometryInstanceCount,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     const caustica::render::SceneGpuFrameHandles& gpuHandles,
     EnvMapProcessor* environmentMap,
     EnvMapSceneParams envMapSceneParams)
@@ -113,9 +113,9 @@ void PrepareLightsPass::createPipeline()
 {
     caustica::debug("Initializing PrepareLightsPass...");
 
-    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/rtxdi/prepareLights.hlsl", "main", nullptr, nvrhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->createShader("caustica/shaders/render/rtxdi/prepareLights.hlsl", "main", nullptr, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_bindingLayout, m_bindlessLayout };
     pipelineDesc.CS = m_computeShader;
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
@@ -126,28 +126,28 @@ void PrepareLightsPass::createBindingSet(RtxdiResources& resources, const Render
     if (!m_gpuHandles.valid())
         return;
 
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),// PushConstants(0, sizeof(PrepareLightsConstants)),
-        nvrhi::BindingSetItem::StructuredBuffer_UAV(0, resources.LightDataBuffer),
-        nvrhi::BindingSetItem::TypedBuffer_UAV(1, resources.LightIndexMappingBuffer),
-        nvrhi::BindingSetItem::Texture_UAV(2, resources.LocalLightPdfTexture),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(0, resources.TaskBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_gpuHandles.instanceBuffer),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_gpuHandles.geometryBuffer),
-        //nvrhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->getGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->getMaterialDataBuffer()),
-        nvrhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),
-        nvrhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapOnly() : m_renderDevice.builtins().blackTexture()),
-        nvrhi::BindingSetItem::StructuredBuffer_SRV(8, resources.PrimitiveLightBuffer),
-        nvrhi::BindingSetItem::Texture_UAV(50, m_shaderDebug->getDebugVizTexture()), // TODO: move to shader debug uav
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),// PushConstants(0, sizeof(PrepareLightsConstants)),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(0, resources.LightDataBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, resources.LightIndexMappingBuffer),
+        caustica::rhi::BindingSetItem::Texture_UAV(2, resources.LocalLightPdfTexture),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(0, resources.TaskBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(1, m_subInstanceData),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(2, m_gpuHandles.instanceBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(3, m_gpuHandles.geometryBuffer),
+        //caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, (m_opacityMicromapBuilder!=nullptr)?(m_opacityMicromapBuilder->getGeometryDebugBuffer()):(resources.LightDataBuffer.Get())), // yuck
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, m_materialGpuCache->getMaterialDataBuffer()),
+        caustica::rhi::BindingSetItem::Texture_SRV(6, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : m_renderDevice.builtins().blackCubeMapArray()),
+        caustica::rhi::BindingSetItem::Texture_SRV(7, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapOnly() : m_renderDevice.builtins().blackTexture()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, resources.PrimitiveLightBuffer),
+        caustica::rhi::BindingSetItem::Texture_UAV(50, m_shaderDebug->getDebugVizTexture()), // TODO: move to shader debug uav
 
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+        caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
 
-        nvrhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().anisotropicWrap()),
-        nvrhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCubeSampler() : m_renderDevice.samplers().anisotropicWrap()),
-        nvrhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapSampler() : m_renderDevice.samplers().anisotropicWrap())
+        caustica::rhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().anisotropicWrap()),
+        caustica::rhi::BindingSetItem::Sampler(1, m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCubeSampler() : m_renderDevice.samplers().anisotropicWrap()),
+        caustica::rhi::BindingSetItem::Sampler(2, m_EnvironmentMap ? m_EnvironmentMap->getImportanceSampling()->getImportanceMapSampler() : m_renderDevice.samplers().anisotropicWrap())
     };
 
     m_bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -395,7 +395,7 @@ static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
 }
 
 
-RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* commandList)
+RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::ICommandList* commandList)
 {
     RTXDI_LightBufferParameters lightBufferParams = {};
 
@@ -434,8 +434,8 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
             }
 
             size_t instanceHash = 0;
-            nvrhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
-            nvrhi::hash_combine(instanceHash, geometryIndex);
+            caustica::rhi::hash_combine(instanceHash, static_cast<uint32_t>(meshProxy.entity));
+            caustica::rhi::hash_combine(instanceHash, geometryIndex);
 
             std::shared_ptr<StandardMaterial> standardMaterialPtr =
                 m_materialGpuCache->findByResourceId(geometry.materialId);
@@ -563,10 +563,10 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
 
     // clear the PDF texture mip 0 - not all of it might be written by this shader
     commandList->clearTextureFloat(m_LocalLightPdfTexture, 
-        nvrhi::TextureSubresourceSet(0, 1, 0, 1), 
-        nvrhi::Color(0.f));
+        caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), 
+        caustica::rhi::Color(0.f));
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.pipeline = m_computePipeline;
     state.bindings = { m_bindingSet, m_descriptorTable };
 
@@ -602,7 +602,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(nvrhi::ICommandList* comm
     return lightBufferParams;
 }
 
-nvrhi::TextureHandle PrepareLightsPass::getEnvironmentMapTexture()
+caustica::rhi::TextureHandle PrepareLightsPass::getEnvironmentMapTexture()
 {
     return m_EnvironmentMap ? m_EnvironmentMap->getEnvMapCube() : nullptr;
 }

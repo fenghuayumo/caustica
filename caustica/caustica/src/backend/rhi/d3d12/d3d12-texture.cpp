@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
 
     Object Texture::getNativeObject(ObjectType objectType)
@@ -27,7 +27,7 @@ namespace nvrhi::d3d12
         
         switch (objectType)
         {
-        case nvrhi::ObjectTypes::D3D12_ShaderResourceViewGpuDescripror: {
+        case caustica::rhi::ObjectTypes::D3D12_ShaderResourceViewGpuDescripror: {
             TextureBindingKey key = TextureBindingKey(subresources, format);
             DescriptorIndex descriptorIndex;
             auto found = m_CustomSRVs.find(key);
@@ -48,7 +48,7 @@ namespace nvrhi::d3d12
             return Object(m_Resources.shaderResourceViewHeap.getGpuHandle(descriptorIndex).ptr);
         }
 
-        case nvrhi::ObjectTypes::D3D12_UnorderedAccessViewGpuDescripror: {
+        case caustica::rhi::ObjectTypes::D3D12_UnorderedAccessViewGpuDescripror: {
             TextureBindingKey key = TextureBindingKey(subresources, format);
             DescriptorIndex descriptorIndex;
             auto found = m_CustomUAVs.find(key);
@@ -68,7 +68,7 @@ namespace nvrhi::d3d12
 
             return Object(m_Resources.shaderResourceViewHeap.getGpuHandle(descriptorIndex).ptr);
         }
-        case nvrhi::ObjectTypes::D3D12_RenderTargetViewDescriptor: {
+        case caustica::rhi::ObjectTypes::D3D12_RenderTargetViewDescriptor: {
             TextureBindingKey key = TextureBindingKey(subresources, format);
             DescriptorIndex descriptorIndex;
 
@@ -89,7 +89,7 @@ namespace nvrhi::d3d12
             return Object(m_Resources.renderTargetViewHeap.getCpuHandle(descriptorIndex).ptr);
         }
 
-        case nvrhi::ObjectTypes::D3D12_DepthStencilViewDescriptor: {
+        case caustica::rhi::ObjectTypes::D3D12_DepthStencilViewDescriptor: {
             TextureBindingKey key = TextureBindingKey(subresources, format, isReadOnlyDSV);
             DescriptorIndex descriptorIndex;
 
@@ -449,7 +449,7 @@ namespace nvrhi::d3d12
         {
             std::wstring wname(desc.debugName.begin(), desc.debugName.end());
             resource->SetName(wname.c_str());
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
             // the driver will track the resource internally so don't need to keep the handle around
             GFSDK_Aftermath_ResourceHandle resourceHandle = {};
             GFSDK_Aftermath_DX12_RegisterResource(resource, &resourceHandle);
@@ -1131,7 +1131,7 @@ namespace nvrhi::d3d12
             texture->resource, clearValue, 0, nullptr);
     }
 
-    void CommandList::decodeSamplerFeedbackTexture(IBuffer* _buffer, ISamplerFeedbackTexture* _texture, nvrhi::Format format)
+    void CommandList::decodeSamplerFeedbackTexture(IBuffer* _buffer, ISamplerFeedbackTexture* _texture, caustica::rhi::Format format)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
         SamplerFeedbackTexture* texture = checked_cast<SamplerFeedbackTexture*>(_texture);
@@ -1401,4 +1401,4 @@ namespace nvrhi::d3d12
         return MipSlice + (ArraySlice * MipLevels) + (PlaneSlice * MipLevels * ArraySize);
     }
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

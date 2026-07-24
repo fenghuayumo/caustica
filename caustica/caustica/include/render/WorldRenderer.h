@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <render/AppDiagnostics.h>
 #include <render/RenderRuntimeState.h>
@@ -111,12 +111,12 @@ public:
     [[nodiscard]] SceneGpuResources& sceneGpuResources() { return m_context->sceneGpuResources; }
     [[nodiscard]] const SceneGpuResources& sceneGpuResources() const { return m_context->sceneGpuResources; }
 
-    static nvrhi::BindingLayoutHandle createBindlessLayout(nvrhi::IDevice* device);
-    void createBindingLayouts(nvrhi::IBindingLayout* precreatedBindless = nullptr);
+    static caustica::rhi::BindingLayoutHandle createBindlessLayout(caustica::rhi::IDevice* device);
+    void createBindingLayouts(caustica::rhi::IBindingLayout* precreatedBindless = nullptr);
     void createDeviceResources();
     void onBackBufferResizing();
     void preRender();
-    void render(nvrhi::IFramebuffer* framebuffer);
+    void render(caustica::rhi::IFramebuffer* framebuffer);
 
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
@@ -146,9 +146,9 @@ public:
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
-    nvrhi::BindingLayoutHandle getBindingLayout() const { return m_bindingLayout; }
-    nvrhi::BindingLayoutHandle getBindlessLayout() const { return m_bindlessLayout; }
-    nvrhi::BindingSetHandle getBindingSet() const { return m_bindingSet; }
+    caustica::rhi::BindingLayoutHandle getBindingLayout() const { return m_bindingLayout; }
+    caustica::rhi::BindingLayoutHandle getBindlessLayout() const { return m_bindlessLayout; }
+    caustica::rhi::BindingSetHandle getBindingSet() const { return m_bindingSet; }
 
     RtxdiPass* getRtxdiPass() { return m_rtxdiPass.get(); }
     const RtxdiPass* getRtxdiPass() const { return m_rtxdiPass.get(); }
@@ -169,8 +169,8 @@ public:
     std::shared_ptr<PTPipelineVariant>& ptPipelineTestRaygenPPHDR() { return m_ptPipelineTestRaygenPPHDR; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineEdgeDetection() { return m_ptPipelineEdgeDetection; }
 
-    nvrhi::CommandListHandle getCommandList() const { return m_commandList; }
-    nvrhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
+    caustica::rhi::CommandListHandle getCommandList() const { return m_commandList; }
+    caustica::rhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
 
     TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
     AccumulationPass* getAccumulationPass() { return m_accumulationPass.get(); }
@@ -208,7 +208,7 @@ public:
     DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
 #endif
 
-    void denoisedScreenshot(nvrhi::ITexture* framebufferTexture) const;
+    void denoisedScreenshot(caustica::rhi::ITexture* framebufferTexture) const;
 
     void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
@@ -222,13 +222,13 @@ private:
     friend class PathTracingPipelinePlugin;
     friend class RenderPipelineRegistry;
 
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_context->gpuDevice.getDevice(); }
+    [[nodiscard]] caustica::rhi::IDevice* device() const { return m_context->gpuDevice.getDevice(); }
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
     [[nodiscard]] dm::float2 computeCameraJitter() const;
 
-    void populateRenderFrameContext(nvrhi::IFramebuffer* framebuffer, RenderFrameContext& ctx);
+    void populateRenderFrameContext(caustica::rhi::IFramebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
     [[nodiscard]] FrameGraphContext makeFrameGraphContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);
@@ -242,9 +242,9 @@ private:
     void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
     void framePassFinalize(PathTracingFrameContext& ctx);
 
-    void createRenderPasses(bool& exposureResetRequired, nvrhi::CommandListHandle initializeCommandList);
+    void createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
     void createPostProcessRenderPasses();
-    void preUpdatePathTracing(bool resetAccum, nvrhi::CommandListHandle commandList);
+    void preUpdatePathTracing(bool resetAccum, caustica::rhi::CommandListHandle commandList);
     void postUpdatePathTracing();
 
     PathTracerScenePasses        m_scenePasses;
@@ -264,9 +264,9 @@ private:
     std::unique_ptr<DenoisePass>                m_denoisePass;
     std::unique_ptr<GaussianSplatFramePass>     m_gaussianFramePass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
-    nvrhi::BindingLayoutHandle                  m_bindingLayout;
-    nvrhi::BindingLayoutHandle                  m_bindlessLayout;
-    nvrhi::BindingSetHandle                     m_bindingSet;
+    caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
+    caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
+    caustica::rhi::BindingSetHandle                     m_bindingSet;
 
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineReference;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineBuildStablePlanes;
@@ -276,8 +276,8 @@ private:
     std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
     std::shared_ptr<RtPipelineCache>                      m_rtPipelineCache;
 
-    nvrhi::CommandListHandle                    m_commandList;
-    nvrhi::BufferHandle                         m_constantBuffer;
+    caustica::rhi::CommandListHandle                    m_commandList;
+    caustica::rhi::BufferHandle                         m_constantBuffer;
 
     std::unique_ptr<TemporalAntiAliasingPass>    m_temporalAntiAliasingPass;
     std::unique_ptr<BloomPass>                  m_bloomPass;
@@ -318,23 +318,23 @@ private:
     RenderPickState                             m_lastRenderedPicking{};
     bool                                        m_frameGaussianSplatTemporalReset = false;
 
-    nvrhi::BufferHandle                         m_feedback_Buffer_Gpu;
-    nvrhi::BufferHandle                         m_feedback_Buffer_Cpu;
-    nvrhi::BufferHandle                         m_debugLineBufferCapture;
-    nvrhi::BufferHandle                         m_debugLineBufferDisplay;
-    nvrhi::ShaderHandle                         m_linesVertexShader;
-    nvrhi::ShaderHandle                         m_linesPixelShader;
+    caustica::rhi::BufferHandle                         m_feedback_Buffer_Gpu;
+    caustica::rhi::BufferHandle                         m_feedback_Buffer_Cpu;
+    caustica::rhi::BufferHandle                         m_debugLineBufferCapture;
+    caustica::rhi::BufferHandle                         m_debugLineBufferDisplay;
+    caustica::rhi::ShaderHandle                         m_linesVertexShader;
+    caustica::rhi::ShaderHandle                         m_linesPixelShader;
     std::vector<DebugLineStruct>                m_cpuSideDebugLines;
-    nvrhi::InputLayoutHandle                    m_linesInputLayout;
-    nvrhi::GraphicsPipelineHandle               m_linesPipeline;
-    nvrhi::BindingLayoutHandle                  m_linesBindingLayout;
-    nvrhi::BindingSetHandle                     m_linesBindingSet;
+    caustica::rhi::InputLayoutHandle                    m_linesInputLayout;
+    caustica::rhi::GraphicsPipelineHandle               m_linesPipeline;
+    caustica::rhi::BindingLayoutHandle                  m_linesBindingLayout;
+    caustica::rhi::BindingSetHandle                     m_linesBindingSet;
 
     DebugFeedbackStruct                         m_feedbackData{};
     DeltaTreeVizPathVertex                      m_debugDeltaPathTree[cDeltaTreeVizMaxVertices]{};
-    nvrhi::BufferHandle                         m_debugDeltaPathTree_Gpu;
-    nvrhi::BufferHandle                         m_debugDeltaPathTree_Cpu;
-    nvrhi::BufferHandle                         m_debugDeltaPathTreeSearchStack;
+    caustica::rhi::BufferHandle                         m_debugDeltaPathTree_Gpu;
+    caustica::rhi::BufferHandle                         m_debugDeltaPathTree_Cpu;
+    caustica::rhi::BufferHandle                         m_debugDeltaPathTreeSearchStack;
 };
 
 } // namespace render

@@ -10,10 +10,10 @@ using namespace caustica::math;
 #include <shaders/render/rtxdi/ShaderParameters.h>
 
 GenerateMipsPass::GenerateMipsPass(
-    nvrhi::IDevice* device, 
+    caustica::rhi::IDevice* device, 
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-    nvrhi::ITexture* sourceEnvironmentMap,
-    nvrhi::ITexture* destinationTexture)
+    caustica::rhi::ITexture* sourceEnvironmentMap,
+    caustica::rhi::ITexture* destinationTexture)
     : m_sourceTexture(sourceEnvironmentMap)
     , m_destinationTexture(destinationTexture)
 {
@@ -21,42 +21,42 @@ GenerateMipsPass::GenerateMipsPass(
 
     const auto& destinationDesc = m_destinationTexture->getDesc();
 
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.setBorderColor(nvrhi::Color(0.f));
+    caustica::rhi::SamplerDesc samplerDesc;
+    samplerDesc.setBorderColor(caustica::rhi::Color(0.f));
     samplerDesc.setAllFilters(true);
     samplerDesc.setMipFilter(true);
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
     m_linearSampler = device->createSampler(samplerDesc);
 
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::PushConstants(0, sizeof(PreprocessEnvironmentMapConstants)),
-        nvrhi::BindingSetItem::Sampler(0, m_linearSampler)
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(PreprocessEnvironmentMapConstants)),
+        caustica::rhi::BindingSetItem::Sampler(0, m_linearSampler)
     };
 
     if (sourceEnvironmentMap) 
     {
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(0, sourceEnvironmentMap));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(0, sourceEnvironmentMap));
     };
 
     for (uint32_t mipLevel = 0; mipLevel < destinationDesc.mipLevels; mipLevel++)
     {
-        bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_UAV(
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(
             mipLevel, 
             m_destinationTexture,
-            nvrhi::Format::UNKNOWN, 
-            nvrhi::TextureSubresourceSet(mipLevel, 1, 0, 1)));
+            caustica::rhi::Format::UNKNOWN, 
+            caustica::rhi::TextureSubresourceSet(mipLevel, 1, 0, 1)));
     }
 
-    nvrhi::BindingLayoutHandle bindingLayout;
-    nvrhi::utils::CreateBindingSetAndLayout(device, nvrhi::ShaderType::Compute, 0,
+    caustica::rhi::BindingLayoutHandle bindingLayout;
+    caustica::rhi::utils::CreateBindingSetAndLayout(device, caustica::rhi::ShaderType::Compute, 0,
         bindingSetDesc, bindingLayout, m_bindingSet);
 
     std::vector<caustica::ShaderMacro> macros = { { "INPUT_ENVIRONMENT_MAP", sourceEnvironmentMap ? "1" : "0" } };
 
-    nvrhi::ShaderHandle shader = shaderFactory->createShader("caustica/shaders/render/rtxdi/PreprocessEnvironmentMap.hlsl", "main", &macros, nvrhi::ShaderType::Compute);
+    caustica::rhi::ShaderHandle shader = shaderFactory->createShader("caustica/shaders/render/rtxdi/PreprocessEnvironmentMap.hlsl", "main", &macros, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { bindingLayout };
     pipelineDesc.CS = shader;
     n_pipeline = device->createComputePipeline(pipelineDesc);
@@ -64,7 +64,7 @@ GenerateMipsPass::GenerateMipsPass(
 
 GenerateMipsPass::~GenerateMipsPass(){}
 
-void GenerateMipsPass::process(nvrhi::ICommandList* commandList)
+void GenerateMipsPass::process(caustica::rhi::ICommandList* commandList)
 {
     commandList->beginMarker("generateMips");
     
@@ -76,7 +76,7 @@ void GenerateMipsPass::process(nvrhi::ICommandList* commandList)
 
     for (uint32_t sourceMipLevel = 0; sourceMipLevel < destDesc.mipLevels; sourceMipLevel += mipLevelsPerPass)
     {
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = n_pipeline;
         state.bindings = { m_bindingSet };
         commandList->setComputeState(state);
@@ -92,7 +92,7 @@ void GenerateMipsPass::process(nvrhi::ICommandList* commandList)
         width = std::max(1u, width >> mipLevelsPerPass);
         height = std::max(1u, height >> mipLevelsPerPass);
         
-        commandList->clearState(); // make sure nvrhi inserts a barrier
+        commandList->clearState(); // make sure RHI inserts a barrier
     }
 
     commandList->endMarker();

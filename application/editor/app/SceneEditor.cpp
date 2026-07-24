@@ -1037,20 +1037,20 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         m_renderState.Picking.InstanceRequested = false;
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
-        nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
+        caustica::rhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
         if (!framebuffer || !infra || !infra->renderDevice)
             return false;
-        nvrhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
+        caustica::rhi::ITexture* texture = framebuffer->getDesc().colorAttachments[0].texture;
         auto* renderDevice = infra->renderDevice.get();
         return saveTextureToFile(
-            gpuDevice.getDevice(), *renderDevice, texture, nvrhi::ResourceStates::Common, fileName);
+            gpuDevice.getDevice(), *renderDevice, texture, caustica::rhi::ResourceStates::Common, fileName);
     };
     captureScriptPostRender(saveFramebuffer);
 
     if (consumeExperimentalPhotoScreenshot())
     {
-        nvrhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
+        caustica::rhi::IFramebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (framebuffer)
             wr->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
     }

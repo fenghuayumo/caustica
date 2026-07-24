@@ -23,7 +23,7 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
             ("s,scene", "Preferred scene to load (.scene.json)", value(scene))
             ("nonInteractive", "start in non-interactive mode, disabling popups", value(nonInteractive))
             ("noWindow", "start without a window (headless)", value(noWindow))
-            ("d,debug", "Enable D3D12/VK debug layer and NVRHI validation", value(debug))
+            ("d,debug", "Enable D3D12/VK debug layer and RHI validation", value(debug))
             ("width", "Window width", value(width))
             ("height", "Window height", value(height))
             ("f,fullscreen", "Run in fullscreen mode", value(fullscreen))

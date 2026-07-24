@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -8,12 +8,12 @@
 
 #include <d3d11.h>
 
-namespace nvrhi::ObjectTypes
+namespace caustica::rhi::ObjectTypes
 {
-    constexpr ObjectType Nvrhi_D3D11_Device = 0x00010101;
+    constexpr ObjectType CAUSTICA_RHI_D3D11_Device = 0x00010101;
 };
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
     struct DeviceDesc
     {
@@ -22,7 +22,8 @@ namespace nvrhi::d3d11
         bool aftermathEnabled = false;
     };
 
-    NVRHI_API DeviceHandle createDevice(const DeviceDesc& desc);
+    CAUSTICA_RHI_API DeviceHandle createDevice(const DeviceDesc& desc);
 
-    NVRHI_API DXGI_FORMAT convertFormat(nvrhi::Format format);
+    CAUSTICA_RHI_API DXGI_FORMAT convertFormat(caustica::rhi::Format format);
 }
+

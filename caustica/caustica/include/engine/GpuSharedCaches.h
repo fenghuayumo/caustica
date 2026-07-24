@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -32,7 +32,7 @@ struct GpuSharedCaches
     GpuSharedCaches(GpuSharedCaches&&) noexcept;
     GpuSharedCaches& operator=(GpuSharedCaches&&) noexcept;
 
-    nvrhi::BindingLayoutHandle bindlessLayout;
+    caustica::rhi::BindingLayoutHandle bindlessLayout;
     std::shared_ptr<ShaderFactory> shaderFactory;
     std::unique_ptr<render::RenderDevice> renderDevice;
     std::unique_ptr<BindingCache> bindingCache;

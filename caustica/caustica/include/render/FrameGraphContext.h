@@ -4,7 +4,7 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/ecs/RenderFrameContext.h>
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <shaders/PathTracer/Config.h>
 #include <shaders/SampleConstantBuffer.h>
 
@@ -69,7 +69,7 @@ struct FrameGraphContext
     PathTracerSettings* settings = nullptr;
     SampleConstants* sampleConstants = nullptr;
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
-    nvrhi::IFramebuffer* targetFramebuffer = nullptr;
+    caustica::rhi::IFramebuffer* targetFramebuffer = nullptr;
     const ExtractedFrameView* extractedView = nullptr;
 
     caustica::BindingCache* bindingCache = nullptr;
@@ -84,17 +84,17 @@ struct FrameGraphContext
     // teardown and can unload textures after TextureLoader is already gone.
     EnvMapProcessor* environment = nullptr;
 
-    nvrhi::BindingLayoutHandle bindingLayout;
-    nvrhi::BindingSetHandle bindingSet;
-    nvrhi::IDescriptorTable* descriptorTable = nullptr;
-    nvrhi::BufferHandle constantBuffer;
+    caustica::rhi::BindingLayoutHandle bindingLayout;
+    caustica::rhi::BindingSetHandle bindingSet;
+    caustica::rhi::IDescriptorTable* descriptorTable = nullptr;
+    caustica::rhi::BufferHandle constantBuffer;
 
     PTPipelineVariant* ptBuildStablePlanes = nullptr;
     PTPipelineVariant* ptFillStablePlanes = nullptr;
     PTPipelineVariant* ptReference = nullptr;
     PTPipelineVariant* ptTestRaygenPPHDR = nullptr;
     PTPipelineVariant* ptEdgeDetection = nullptr;
-    nvrhi::ComputePipelineHandle exportVBufferPSO;
+    caustica::rhi::ComputePipelineHandle exportVBufferPSO;
 
     ToneMappingPass* toneMapping = nullptr;
     BloomPass* bloom = nullptr;
@@ -107,11 +107,11 @@ struct FrameGraphContext
     MaterialGpuCache* materials = nullptr;
     OpacityMicromapBuilder* opacityMaps = nullptr;
     SceneGpuFrameHandles gpuHandles{};
-    nvrhi::BufferHandle subInstanceDataBuffer;
+    caustica::rhi::BufferHandle subInstanceDataBuffer;
 
     PathTracingContext* pathTracingContext = nullptr;
-    nvrhi::IDevice* device = nullptr;
-    nvrhi::ICommandList* commandList = nullptr;
+    caustica::rhi::IDevice* device = nullptr;
+    caustica::rhi::ICommandList* commandList = nullptr;
     caustica::AccelStructManager* accelStructs = nullptr;
     SceneGaussianSplatPasses* gaussianScenePasses = nullptr;
     caustica::CameraController* camera = nullptr;
@@ -146,14 +146,14 @@ struct FrameGraphContext
     bool copyDebugFeedback = false;
     uint32_t capturedLineVertexCount = 0;
     std::vector<DebugLineStruct>* cpuSideDebugLines = nullptr;
-    nvrhi::BufferHandle debugLineBufferCapture;
-    nvrhi::BufferHandle debugLineBufferDisplay;
-    nvrhi::BufferHandle feedbackBufferCpu;
-    nvrhi::BufferHandle feedbackBufferGpu;
-    nvrhi::BufferHandle debugDeltaPathTreeCpu;
-    nvrhi::BufferHandle debugDeltaPathTreeGpu;
-    nvrhi::BindingSetHandle linesBindingSet;
-    nvrhi::GraphicsPipelineHandle linesPipeline;
+    caustica::rhi::BufferHandle debugLineBufferCapture;
+    caustica::rhi::BufferHandle debugLineBufferDisplay;
+    caustica::rhi::BufferHandle feedbackBufferCpu;
+    caustica::rhi::BufferHandle feedbackBufferGpu;
+    caustica::rhi::BufferHandle debugDeltaPathTreeCpu;
+    caustica::rhi::BufferHandle debugDeltaPathTreeGpu;
+    caustica::rhi::BindingSetHandle linesBindingSet;
+    caustica::rhi::GraphicsPipelineHandle linesPipeline;
 };
 
 } // namespace caustica::render

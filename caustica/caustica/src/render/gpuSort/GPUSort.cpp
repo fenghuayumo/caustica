@@ -27,7 +27,7 @@ using namespace caustica::math;
 using namespace caustica;
 
 
-GPUSort::GPUSort(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+GPUSort::GPUSort(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_bindingCache(device)
     , m_shaderFactory(shaderFactory)
@@ -44,40 +44,40 @@ void GPUSort::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
     m_shaderDebug = shaderDebug;
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            //nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::PushConstants(1, 4*sizeof(uint32_t)),
-            nvrhi::BindingLayoutItem::TypedBuffer_SRV(0),       // SrcKeys
-            nvrhi::BindingLayoutItem::TypedBuffer_SRV(1),       // SrcIndices
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),       // ScratchBuffer
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(1),       // ReducedScratchBuffer
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(2),       // DstIndices
-            nvrhi::BindingLayoutItem::StructuredBuffer_UAV(3),  // ConstsUAV
-            //nvrhi::BindingLayoutItem::StructuredBuffer_UAV(4),  // DispIndUAV
-            nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+            //caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::PushConstants(1, 4*sizeof(uint32_t)),
+            caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(0),       // SrcKeys
+            caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(1),       // SrcIndices
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(0),       // ScratchBuffer
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(1),       // ReducedScratchBuffer
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(2),       // DstIndices
+            caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(3),  // ConstsUAV
+            //caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(4),  // DispIndUAV
+            caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
         };
         m_commonBindingLayout = m_device->createBindingLayout(layoutDesc);
 
 
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::StructuredBuffer_UAV(3),  // ConstsUAV
-            nvrhi::BindingLayoutItem::StructuredBuffer_UAV(4),  // DispIndUAV
-            //nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+            caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(3),  // ConstsUAV
+            caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(4),  // DispIndUAV
+            //caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
         };
         m_initBindingLayout = m_device->createBindingLayout(layoutDesc);
     }
 
-    auto CreateCSPSOPair = [&]( nvrhi::ShaderHandle & shaderHandle, nvrhi::ComputePipelineHandle & psoHandle, const std::string & name, bool initOnly, bool specialInitIndicesFirstPass )
+    auto CreateCSPSOPair = [&]( caustica::rhi::ShaderHandle & shaderHandle, caustica::rhi::ComputePipelineHandle & psoHandle, const std::string & name, bool initOnly, bool specialInitIndicesFirstPass )
     {
         std::vector<caustica::ShaderMacro> shaderMacros;
 
         if( specialInitIndicesFirstPass )
             shaderMacros.push_back(caustica::ShaderMacro({ "CAUSTICA_GPUSORT_FIRST_PASS_INIT_INDICES", "1" }));
 
-        shaderHandle = m_shaderFactory->createShader("caustica/shaders/render/gpuSort/GPUSort.hlsl", name.c_str(), &shaderMacros, nvrhi::ShaderType::Compute);
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        shaderHandle = m_shaderFactory->createShader("caustica/shaders/render/gpuSort/GPUSort.hlsl", name.c_str(), &shaderMacros, caustica::rhi::ShaderType::Compute);
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { (initOnly)?(m_initBindingLayout):(m_commonBindingLayout) };
         pipelineDesc.CS = shaderHandle;
         psoHandle = m_device->createComputePipeline(pipelineDesc);
@@ -96,8 +96,8 @@ void GPUSort::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
     CREATE_CS_PSO_PAIR(Validate, false, false);
 
     {
-        nvrhi::BufferDesc bufferDesc;
-        bufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        caustica::rhi::BufferDesc bufferDesc;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
         bufferDesc.keepInitialState = true;
         bufferDesc.canHaveUAVs = true;
         
@@ -142,11 +142,11 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
         m_reducedScratchBuffer = nullptr;
     }
 
-    nvrhi::BufferDesc bufferDesc;
-    bufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    caustica::rhi::BufferDesc bufferDesc;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     bufferDesc.keepInitialState = true;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.format = nvrhi::Format::R32_UINT;
+    bufferDesc.format = caustica::rhi::Format::R32_UINT;
     bufferDesc.structStride = 0;
     bufferDesc.canHaveTypedViews = true;
 
@@ -166,7 +166,7 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
 uint32_t FloorLog2(uint32_t n)  { assert(n > 0); return n == 1 ? 0 : 1 + FloorLog2(n >> 1); }
 uint32_t CeilLog2(uint32_t n)   { assert(n > 0); return n == 1 ? 0 : FloorLog2(n - 1) + 1; };
 
-void GPUSort::sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, nvrhi::BufferHandle bufferKeys, nvrhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
+void GPUSort::sort(caustica::rhi::ICommandList * commandList, caustica::rhi::BufferHandle controlBuffer, uint32_t itemCountByteOffset, caustica::rhi::BufferHandle bufferKeys, caustica::rhi::BufferHandle bufferIndices, uint32_t maxItemCount, bool resetIndices)
 {
     RAII_SCOPE( commandList->beginMarker("GPUSort");, commandList->endMarker(); );
 
@@ -175,50 +175,50 @@ void GPUSort::sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
     commandList->copyBuffer( m_controlBuffer, 0, controlBuffer, itemCountByteOffset, sizeof(uint32_t) );
 
     // // implicit copy barrier should deal with this automatically so not needed
-    // commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);
+    // commandList->setBufferState(m_controlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
     // commandList->commitBarriers();
 
     // Bindings
-    nvrhi::BindingSetDesc bindingSetDescInit, bindingSetDescPing, bindingSetDescPong;
+    caustica::rhi::BindingSetDesc bindingSetDescInit, bindingSetDescPing, bindingSetDescPong;
     bindingSetDescInit.bindings = { 
-            nvrhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            nvrhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            //nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
+            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
+            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
+            //caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
     };
     bindingSetDescPing.bindings = {
-            nvrhi::BindingSetItem::PushConstants(1, 4*sizeof(uint32_t)), 
-            nvrhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
-            nvrhi::BindingSetItem::TypedBuffer_SRV(1, bufferIndices),                   // SrcIndices
-            nvrhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
-            nvrhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
-            nvrhi::BindingSetItem::TypedBuffer_UAV(2, m_scratchIndicesBuffer),          // DstIndices
-            nvrhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            //nvrhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            caustica::rhi::BindingSetItem::PushConstants(1, 4*sizeof(uint32_t)), 
+            caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
+            caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, bufferIndices),                   // SrcIndices
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, m_scratchIndicesBuffer),          // DstIndices
+            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
+            //caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
+            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
         };
     bindingSetDescPong.bindings = {
-            nvrhi::BindingSetItem::PushConstants(1, 4 * sizeof(uint32_t)),
-            nvrhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
-            nvrhi::BindingSetItem::TypedBuffer_SRV(1, m_scratchIndicesBuffer),          // SrcIndices
-            nvrhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
-            nvrhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
-            nvrhi::BindingSetItem::TypedBuffer_UAV(2, bufferIndices),                   // DstIndices
-            nvrhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            //nvrhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+            caustica::rhi::BindingSetItem::PushConstants(1, 4 * sizeof(uint32_t)),
+            caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
+            caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, m_scratchIndicesBuffer),          // SrcIndices
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
+            caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, bufferIndices),                   // DstIndices
+            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
+            //caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
+            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
     };
 
-    nvrhi::BindingSetHandle bindingSetInit = m_bindingCache.getOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);
-    nvrhi::BindingSetHandle bindingSetPing = m_bindingCache.getOrCreateBindingSet(bindingSetDescPing, m_commonBindingLayout);
-    nvrhi::BindingSetHandle bindingSetPong = m_bindingCache.getOrCreateBindingSet(bindingSetDescPong, m_commonBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSetInit = m_bindingCache.getOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSetPing = m_bindingCache.getOrCreateBindingSet(bindingSetDescPing, m_commonBindingLayout);
+    caustica::rhi::BindingSetHandle bindingSetPong = m_bindingCache.getOrCreateBindingSet(bindingSetDescPong, m_commonBindingLayout);
 
-    auto RunCSPass = [ & ]( const char * markerName, const nvrhi::ComputePipelineHandle & pso, uint dispatchSizeX, uint indirectDispatchArgOffset, bool pong, uint rootConst, bool initOnly = false )
+    auto RunCSPass = [ & ]( const char * markerName, const caustica::rhi::ComputePipelineHandle & pso, uint dispatchSizeX, uint indirectDispatchArgOffset, bool pong, uint rootConst, bool initOnly = false )
     {
 #if 0 // enable for markers for each pass!
         RAII_SCOPE( commandList->beginMarker(markerName);, commandList->endMarker(); );
 #endif
 
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { (!pong)?(bindingSetPing):(bindingSetPong) };
         if( initOnly )
             state.bindings = {bindingSetInit};
@@ -240,15 +240,15 @@ void GPUSort::sort(nvrhi::ICommandList * commandList, nvrhi::BufferHandle contro
 
     auto ScratchBarriers = [ & ]()
     {
-        commandList->setBufferState(m_scratchBuffer, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setBufferState(m_reducedScratchBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(m_scratchBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setBufferState(m_reducedScratchBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
         commandList->commitBarriers();
     };
 
     RunCSPass( "SetupIndirect", m_PSOSetupIndirect, 1, 0, false, 0, true );
 
     // add barrier to make sure no race condition with subsequent passes 
-    commandList->setBufferState(m_controlBuffer, nvrhi::ResourceStates::UnorderedAccess);
+    commandList->setBufferState(m_controlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
     commandList->commitBarriers();
 
     uint32_t maxKeyValue = 0xFFFFFFFF;  // optimization - sorting smaller keys can be faster! not exposed now, but should work just fine!

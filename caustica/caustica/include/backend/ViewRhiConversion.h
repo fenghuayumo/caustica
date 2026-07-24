@@ -1,14 +1,14 @@
 #pragma once
 
 #include <scene/ViewDesc.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
 
-[[nodiscard]] nvrhi::Viewport toNvrhi(const ViewportDesc& viewport);
-[[nodiscard]] nvrhi::Rect toNvrhi(const ScissorDesc& scissor);
-[[nodiscard]] nvrhi::ViewportState toNvrhi(const ViewportStateDesc& state);
-[[nodiscard]] nvrhi::TextureSubresourceSet toNvrhi(const TextureSubresourceDesc& subresources);
+[[nodiscard]] caustica::rhi::Viewport toRhi(const ViewportDesc& viewport);
+[[nodiscard]] caustica::rhi::Rect toRhi(const ScissorDesc& scissor);
+[[nodiscard]] caustica::rhi::ViewportState toRhi(const ViewportStateDesc& state);
+[[nodiscard]] caustica::rhi::TextureSubresourceSet toRhi(const TextureSubresourceDesc& subresources);
 
 } // namespace caustica

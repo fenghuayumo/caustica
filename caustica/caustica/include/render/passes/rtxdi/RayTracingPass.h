@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -11,33 +11,33 @@ namespace caustica
 
 struct RayTracingPass
 {
-    nvrhi::ShaderHandle ComputeShader;
-    nvrhi::ComputePipelineHandle ComputePipeline;
+    caustica::rhi::ShaderHandle ComputeShader;
+    caustica::rhi::ComputePipelineHandle ComputePipeline;
 
-    nvrhi::ShaderLibraryHandle ShaderLibrary;
-    nvrhi::rt::PipelineHandle RayTracingPipeline;
-    nvrhi::rt::ShaderTableHandle ShaderTable;
+    caustica::rhi::ShaderLibraryHandle ShaderLibrary;
+    caustica::rhi::rt::PipelineHandle RayTracingPipeline;
+    caustica::rhi::rt::ShaderTableHandle ShaderTable;
 
     uint32_t ComputeGroupSize = 0;
 
     bool init(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         caustica::ShaderFactory& shaderFactory,
         const char* shaderName,
         const std::vector<caustica::ShaderMacro>& extraMacros,
         bool useRayQuery,
         uint32_t computeGroupSize,
-        nvrhi::IBindingLayout* bindingLayout,
-        nvrhi::IBindingLayout* extraBindingLayout = nullptr,
-        nvrhi::IBindingLayout* bindlessLayout = nullptr);
+        caustica::rhi::IBindingLayout* bindingLayout,
+        caustica::rhi::IBindingLayout* extraBindingLayout = nullptr,
+        caustica::rhi::IBindingLayout* bindlessLayout = nullptr);
 
     void execute(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         int width,
         int height,
-        nvrhi::IBindingSet* bindingSet,
-        nvrhi::IBindingSet* extraBindingSet,
-        nvrhi::IDescriptorTable* descriptorTable,
+        caustica::rhi::IBindingSet* bindingSet,
+        caustica::rhi::IBindingSet* extraBindingSet,
+        caustica::rhi::IDescriptorTable* descriptorTable,
         const void* pushConstants = nullptr,
         size_t pushConstantSize = 0);
 };

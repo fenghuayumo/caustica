@@ -1,13 +1,13 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
-// GPU performance marker using NVRHI command list begin/end marker.
+// GPU performance marker using RHI command list begin/end marker.
 // Moved from editor/SampleCommon/SampleCommon.h
 class ScopedPerfMarker
 {
 public:
-    ScopedPerfMarker(const char* label, nvrhi::CommandListHandle cmdList)
+    ScopedPerfMarker(const char* label, caustica::rhi::CommandListHandle cmdList)
         : m_cmdList(cmdList)
     {
         cmdList->beginMarker(label);
@@ -17,5 +17,5 @@ public:
         m_cmdList->endMarker();
     }
 private:
-    nvrhi::CommandListHandle m_cmdList;
+    caustica::rhi::CommandListHandle m_cmdList;
 };

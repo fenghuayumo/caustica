@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/graph/GpuTypes.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <vector>
@@ -13,11 +13,11 @@ namespace caustica::rg
 class RenderTargetPool
 {
 public:
-    void setDevice(nvrhi::IDevice* device) { m_device = device; }
-    [[nodiscard]] nvrhi::IDevice* device() const { return m_device; }
+    void setDevice(caustica::rhi::IDevice* device) { m_device = device; }
+    [[nodiscard]] caustica::rhi::IDevice* device() const { return m_device; }
 
-    [[nodiscard]] nvrhi::TextureHandle acquireTexture(const TextureDesc& desc);
-    [[nodiscard]] nvrhi::TextureHandle tryAcquireTexture(const TextureDesc& desc);
+    [[nodiscard]] caustica::rhi::TextureHandle acquireTexture(const TextureDesc& desc);
+    [[nodiscard]] caustica::rhi::TextureHandle tryAcquireTexture(const TextureDesc& desc);
     void endFrame();
 
     void reset();
@@ -25,16 +25,16 @@ public:
 private:
     struct PooledTexture
     {
-        nvrhi::TextureHandle handle;
+        caustica::rhi::TextureHandle handle;
         TextureDesc desc;
         uint64_t lastUsedFrame = 0;
         bool inUse = false;
     };
 
     [[nodiscard]] int findFreeSlot(const TextureDesc& desc) const;
-    [[nodiscard]] nvrhi::TextureHandle createPooledTexture(const TextureDesc& desc);
+    [[nodiscard]] caustica::rhi::TextureHandle createPooledTexture(const TextureDesc& desc);
 
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::IDevice* m_device = nullptr;
     uint64_t m_frameIndex = 0;
     std::vector<PooledTexture> m_textures;
 };

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <shaders/SubInstanceData.h>
 #include <scene/SceneRenderData.h>
@@ -44,33 +44,33 @@ class AccelStructManager
 {
 public:
     AccelStructManager() = default;
-    explicit AccelStructManager(nvrhi::IDevice* device);
+    explicit AccelStructManager(caustica::rhi::IDevice* device);
     void bindSceneGpuResources(render::SceneGpuResources* resources) { m_sceneGpuResources = resources; }
     void bindMaterialGpuCache(MaterialGpuCache* materials) { m_materialGpuCache = materials; }
 
-    void createBlases(nvrhi::ICommandList* commandList,
+    void createBlases(caustica::rhi::ICommandList* commandList,
                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                       const AccelStructBuildSettings& settings);
 
-    void createTlas(nvrhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
+    void createTlas(caustica::rhi::ICommandList* commandList, const scene::SceneRenderData& renderData);
 
-    void uploadSubInstanceData(nvrhi::ICommandList* commandList) const;
+    void uploadSubInstanceData(caustica::rhi::ICommandList* commandList) const;
 
     void clearMeshAccelStructs(std::span<const scene::MeshRenderResourceSnapshot> meshes);
 
     void requestMeshRebuild(scene::MeshRenderResourceId meshId);
 
-    void rebuildDirtyMeshes(nvrhi::ICommandList*            commandList,
+    void rebuildDirtyMeshes(caustica::rhi::ICommandList*            commandList,
                             const scene::SceneRenderData&   renderData,
                             const AccelStructBuildSettings& settings,
                             bool&                           fullRebuildRequested);
 
-    void updateSkinnedBlases(nvrhi::ICommandList*            commandList,
+    void updateSkinnedBlases(caustica::rhi::ICommandList*            commandList,
                              const scene::SceneRenderData&   renderData,
                              const AccelStructBuildSettings& settings,
                              uint32_t                        frameIndex) const;
 
-    void buildTlas(nvrhi::ICommandList*            commandList,
+    void buildTlas(caustica::rhi::ICommandList*            commandList,
                    const scene::SceneRenderData&   renderData,
                    const AccelStructBuildSettings& settings,
                    const OmmAccelStructState&      ommState,
@@ -78,8 +78,8 @@ public:
 
     void releaseGpuResources();
 
-    [[nodiscard]] nvrhi::rt::AccelStructHandle getTopLevelAS() const { return m_topLevelAS; }
-    [[nodiscard]] nvrhi::BufferHandle          getSubInstanceBuffer() const { return m_subInstanceBuffer; }
+    [[nodiscard]] caustica::rhi::rt::AccelStructHandle getTopLevelAS() const { return m_topLevelAS; }
+    [[nodiscard]] caustica::rhi::BufferHandle          getSubInstanceBuffer() const { return m_subInstanceBuffer; }
     [[nodiscard]] std::vector<SubInstanceData>& getSubInstanceData() { return m_subInstanceData; }
     [[nodiscard]] const std::vector<SubInstanceData>& getSubInstanceData() const { return m_subInstanceData; }
     [[nodiscard]] uint32_t                       getSubInstanceCount() const { return m_subInstanceCount; }
@@ -87,13 +87,13 @@ public:
     [[nodiscard]] bool                           hasTopLevelAS() const { return m_topLevelAS != nullptr; }
 
 private:
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::IDevice* m_device = nullptr;
     render::SceneGpuResources* m_sceneGpuResources = nullptr;
     MaterialGpuCache* m_materialGpuCache = nullptr;
     uint64_t m_materialStateRevision = 0;
 
-    nvrhi::rt::AccelStructHandle                 m_topLevelAS;
-    nvrhi::BufferHandle                          m_subInstanceBuffer;
+    caustica::rhi::rt::AccelStructHandle                 m_topLevelAS;
+    caustica::rhi::BufferHandle                          m_subInstanceBuffer;
     std::vector<SubInstanceData>                 m_subInstanceData;
     uint32_t                                         m_subInstanceCount = 0;
     std::vector<scene::MeshRenderResourceId>     m_meshesPendingAccelRebuild;

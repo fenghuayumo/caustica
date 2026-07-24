@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 
 namespace caustica
@@ -12,20 +12,20 @@ namespace caustica
 class AccumulationPass
 {
 public:
-    AccumulationPass(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+    AccumulationPass(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void createPipeline();
-    void createBindingSet(nvrhi::ITexture* inputTexture, nvrhi::ITexture* outputTexture, nvrhi::ITexture* renderOutputTexture);
-    void render(nvrhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
+    void createBindingSet(caustica::rhi::ITexture* inputTexture, caustica::rhi::ITexture* outputTexture, caustica::rhi::ITexture* renderOutputTexture);
+    void render(caustica::rhi::ICommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
 
 private:
-    nvrhi::DeviceHandle m_device;
-    nvrhi::ShaderHandle m_computeShader;
-    nvrhi::ComputePipelineHandle m_computePipeline;
-    nvrhi::BindingLayoutHandle m_bindingLayout;
-    nvrhi::BindingSetHandle m_bindingSet;
-    nvrhi::SamplerHandle m_sampler;
-    nvrhi::TextureHandle m_compositedColor;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::ShaderHandle m_computeShader;
+    caustica::rhi::ComputePipelineHandle m_computePipeline;
+    caustica::rhi::BindingLayoutHandle m_bindingLayout;
+    caustica::rhi::BindingSetHandle m_bindingSet;
+    caustica::rhi::SamplerHandle m_sampler;
+    caustica::rhi::TextureHandle m_compositedColor;
 
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
 };

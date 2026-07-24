@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 #include <unordered_map>
 #include <string>
@@ -37,24 +37,24 @@ class ToneMappingPass
 {
 private:
 
-    nvrhi::DeviceHandle m_device;
-    nvrhi::ShaderHandle m_LuminanceShader;
-    nvrhi::ShaderHandle m_ToneMapShader;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::ShaderHandle m_LuminanceShader;
+    caustica::rhi::ShaderHandle m_ToneMapShader;
 
     struct PerViewData
     {
-        nvrhi::TextureHandle luminanceTexture;
-		nvrhi::FramebufferHandle luminanceFrameBuffer;
+        caustica::rhi::TextureHandle luminanceTexture;
+		caustica::rhi::FramebufferHandle luminanceFrameBuffer;
         std::unique_ptr<caustica::render::MipMapGenPass> mipMapPass;
-        nvrhi::BindingSetHandle luminanceBindingSet;
-        nvrhi::BindingSetHandle colorBindingSet;
-        nvrhi::TextureHandle sourceTexture;
+        caustica::rhi::BindingSetHandle luminanceBindingSet;
+        caustica::rhi::BindingSetHandle colorBindingSet;
+        caustica::rhi::TextureHandle sourceTexture;
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
         // used for readback
         static constexpr int cReadbackLag = 3;  // if used once per frame then it should be backbuffer (swapchain) count + 1 to ensure it never blocks
-        nvrhi::BufferHandle avgLuminanceBufferGPU;
-        nvrhi::BufferHandle avgLuminanceBufferReadback[cReadbackLag];
+        caustica::rhi::BufferHandle avgLuminanceBufferGPU;
+        caustica::rhi::BufferHandle avgLuminanceBufferReadback[cReadbackLag];
         int                 avgLuminanceLastWritten     = -1;
         float               avgLuminanceLastCaptured    = 0.0;
 #endif
@@ -62,22 +62,22 @@ private:
         
     std::vector<PerViewData> m_PerView;
 
-    nvrhi::BufferHandle m_ToneMappingCB;
+    caustica::rhi::BufferHandle m_ToneMappingCB;
 
-    nvrhi::SamplerHandle m_linearSampler;
-    nvrhi::SamplerHandle m_pointSampler;
+    caustica::rhi::SamplerHandle m_linearSampler;
+    caustica::rhi::SamplerHandle m_pointSampler;
 
     float m_FrameTime = 0.f;
 
-	nvrhi::BindingLayoutHandle m_LuminanceBindingLayout;
-	nvrhi::GraphicsPipelineHandle m_LuminancePso;
+	caustica::rhi::BindingLayoutHandle m_LuminanceBindingLayout;
+	caustica::rhi::GraphicsPipelineHandle m_LuminancePso;
 
-    nvrhi::BindingLayoutHandle m_ToneMapBindingLayout;
-    nvrhi::GraphicsPipelineHandle m_ToneMapPso;
+    caustica::rhi::BindingLayoutHandle m_ToneMapBindingLayout;
+    caustica::rhi::GraphicsPipelineHandle m_ToneMapPso;
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-    nvrhi::ShaderHandle m_CaptureLuminanceShader;
-    nvrhi::BindingLayoutHandle m_CaptureLumBindingLayout;
-    nvrhi::ComputePipelineHandle m_CaptureLumPso;
+    caustica::rhi::ShaderHandle m_CaptureLuminanceShader;
+    caustica::rhi::BindingLayoutHandle m_CaptureLumBindingLayout;
+    caustica::rhi::ComputePipelineHandle m_CaptureLumPso;
 #endif
 
     caustica::render::RenderDevice& m_renderDevice;
@@ -111,33 +111,33 @@ private:
     void updateExposureValue();
 	void updateWhiteBalanceTransform();
 	void updateColorTransform();
-    void generateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews);
+    void generateMips(caustica::rhi::ICommandList* commandList, uint32_t numberOfViews);
 public:
     struct CreateParameters
     {
         bool isTextureArray = false;
         uint32_t histogramBins = 256;
         uint32_t numConstantBufferVersions = 16;
-        nvrhi::IBuffer* exposureBufferOverride = nullptr;
-        nvrhi::ITexture* colorLUT = nullptr;
+        caustica::rhi::IBuffer* exposureBufferOverride = nullptr;
+        caustica::rhi::ITexture* colorLUT = nullptr;
     };
 
     ToneMappingPass(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
         const caustica::ICompositeView& compositeView,
-        nvrhi::TextureHandle sourceTexture
+        caustica::rhi::TextureHandle sourceTexture
         );
 
     void preRender(const ToneMappingParameters& params);
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
-    bool render(nvrhi::ICommandList* commandList,
+    bool render(caustica::rhi::ICommandList* commandList,
         const caustica::ICompositeView& compositeView,
-        nvrhi::ITexture* sourceTexture,
-        nvrhi::IBuffer* constantsBuffer,
+        caustica::rhi::ITexture* sourceTexture,
+        caustica::rhi::IBuffer* constantsBuffer,
         bool enabled);
 
     // R1 pilot — registers ToneMapping as a render-graph pass with automatic barriers.
@@ -155,6 +155,6 @@ public:
 
     void advanceFrame(float frameTime);
 
-    nvrhi::TextureHandle getLuminanceTexture(uint viewIndex)    { return m_PerView[viewIndex].luminanceTexture; }
+    caustica::rhi::TextureHandle getLuminanceTexture(uint viewIndex)    { return m_PerView[viewIndex].luminanceTexture; }
 };
 //}

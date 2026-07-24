@@ -3,7 +3,7 @@
 #include <rhi/common/misc.h>
 #include <sstream>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     void CommandList::setResourceStatesForBindingSet(IBindingSet* _bindingSet)
     {
@@ -305,4 +305,4 @@ namespace nvrhi::d3d12
         return m_StateTracker.getBufferState(buffer);
     }
     
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

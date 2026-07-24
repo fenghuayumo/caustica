@@ -29,10 +29,10 @@ namespace caustica::render
 {
 
 bool PathTracePass::createExportPipeline(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     caustica::ShaderFactory* shaderFactory,
-    nvrhi::BindingLayoutHandle bindingLayout,
-    nvrhi::BindingLayoutHandle bindlessLayout)
+    caustica::rhi::BindingLayoutHandle bindingLayout,
+    caustica::rhi::BindingLayoutHandle bindlessLayout)
 {
     assert(device);
     assert(shaderFactory);
@@ -42,9 +42,9 @@ bool PathTracePass::createExportPipeline(
         "caustica/shaders/render/processingPasses/ExportVisibilityBuffer.hlsl",
         "main",
         &shaderMacros,
-        nvrhi::ShaderType::Compute);
+        caustica::rhi::ShaderType::Compute);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { bindingLayout, bindlessLayout };
     pipelineDesc.CS = m_exportVBufferCS;
     m_exportVBufferPSO = device->createComputePipeline(pipelineDesc);
@@ -172,9 +172,9 @@ void PathTracePass::fillConstants(
 }
 
 void PathTracePass::prePass(
-    nvrhi::ICommandList* commandList,
-    nvrhi::BindingSetHandle bindingSet,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::BindingSetHandle bindingSet,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     dm::uint2 viewSize,
     PTPipelineVariant* pipeline)
 {
@@ -183,8 +183,8 @@ void PathTracePass::prePass(
     assert(bindingSet);
     assert(descriptorTable);
 
-    nvrhi::rt::State state;
-    nvrhi::rt::DispatchRaysArguments args;
+    caustica::rhi::rt::State state;
+    caustica::rhi::rt::DispatchRaysArguments args;
     args.width = viewSize.x;
     args.height = viewSize.y;
 
@@ -200,11 +200,11 @@ void PathTracePass::prePass(
 }
 
 void PathTracePass::exportVBuffer(
-    nvrhi::ICommandList* commandList,
-    nvrhi::BindingSetHandle bindingSet,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::BindingSetHandle bindingSet,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     dm::uint2 viewSize,
-    nvrhi::IComputePipeline* pipeline)
+    caustica::rhi::IComputePipeline* pipeline)
 {
     assert(commandList);
     assert(pipeline);
@@ -215,7 +215,7 @@ void PathTracePass::exportVBuffer(
 
     RAII_SCOPE(commandList->beginMarker("VBufferExport");, commandList->endMarker(););
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { bindingSet, descriptorTable };
     state.pipeline = pipeline;
     commandList->setComputeState(state);
@@ -228,9 +228,9 @@ void PathTracePass::exportVBuffer(
 }
 
 void PathTracePass::mainPass(
-    nvrhi::ICommandList* commandList,
-    nvrhi::BindingSetHandle bindingSet,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::BindingSetHandle bindingSet,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     dm::uint2 viewSize,
     PTPipelineVariant* pipeline,
     uint32_t samplesPerPixel)
@@ -241,8 +241,8 @@ void PathTracePass::mainPass(
     assert(descriptorTable);
     assert(samplesPerPixel > 0);
 
-    nvrhi::rt::State state;
-    nvrhi::rt::DispatchRaysArguments args;
+    caustica::rhi::rt::State state;
+    caustica::rhi::rt::DispatchRaysArguments args;
     args.width = viewSize.x;
     args.height = viewSize.y;
 

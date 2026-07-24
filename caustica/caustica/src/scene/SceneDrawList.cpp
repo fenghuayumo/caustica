@@ -61,7 +61,7 @@ void AppendOpaqueGeometryCommands(
         item.mesh = mesh;
         item.geometry = geometry.get();
         item.material = geometry->material.get();
-        item.cullMode = item.material->doubleSided ? nvrhi::RasterCullMode::None : nvrhi::RasterCullMode::Back;
+        item.cullMode = item.material->doubleSided ? caustica::rhi::RasterCullMode::None : caustica::rhi::RasterCullMode::Back;
         item.distanceToCamera = 0.f;
     }
 }
@@ -108,20 +108,20 @@ void AppendTransparentGeometryCommands(
         {
             if (options.drawDoubleSidedMaterialsSeparately)
             {
-                item.cullMode = nvrhi::RasterCullMode::Front;
+                item.cullMode = caustica::rhi::RasterCullMode::Front;
                 out.push_back(item);
-                item.cullMode = nvrhi::RasterCullMode::Back;
+                item.cullMode = caustica::rhi::RasterCullMode::Back;
                 out.push_back(item);
             }
             else
             {
-                item.cullMode = nvrhi::RasterCullMode::None;
+                item.cullMode = caustica::rhi::RasterCullMode::None;
                 out.push_back(item);
             }
         }
         else
         {
-            item.cullMode = nvrhi::RasterCullMode::Back;
+            item.cullMode = caustica::rhi::RasterCullMode::Back;
             out.push_back(item);
         }
     }

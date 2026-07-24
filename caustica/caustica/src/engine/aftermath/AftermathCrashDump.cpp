@@ -35,8 +35,8 @@ static void DumpFileCallback(const void* pGpuCrashDump, const uint32_t gpuCrashD
             {
                 GFSDK_Aftermath_ShaderBinaryHash shaderHash = {};
                 GFSDK_Aftermath_GetShaderHashForShaderInfo(decoder, &shaderInfo, &shaderHash);
-                nvrhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->getGpuDevice().getDevice()->getAftermathCrashDumpHelper();
-                nvrhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::getShaderHashForBinary);
+                caustica::rhi::AftermathCrashDumpHelper& crashDumpHelper = dumper->getGpuDevice().getDevice()->getAftermathCrashDumpHelper();
+                caustica::rhi::BinaryBlob shaderLookupResult = crashDumpHelper.findShaderBinary(shaderHash.hash, caustica::AftermathCrashDump::getShaderHashForBinary);
                 if (shaderLookupResult.second > 0)
                 {
                     std::stringstream ss;
@@ -73,7 +73,7 @@ static void DescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription a
     addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->getGpuDevice().getWindowTitle());
 }
 
-// this callback should call into the nvrhi device which has the necessary information
+// this callback should call into the RHI device which has the necessary information
 static void ResolveMarkerCallback(const void* pMarkerData, const uint32_t markerDataSize, void* pUserData, void** ppResolvedMarkerData, uint32_t* pResolvedMarkerDataSize)
 {
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
@@ -101,10 +101,10 @@ void caustica::AftermathCrashDump::waitForCrashDump(uint32_t maxTimeoutSeconds)
     }
 }
 
-uint64_t caustica::AftermathCrashDump::getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, nvrhi::GraphicsAPI api)
+uint64_t caustica::AftermathCrashDump::getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, caustica::rhi::GraphicsAPI api)
 {
 #if CAUSTICA_WITH_VULKAN
-    if (api == nvrhi::GraphicsAPI::VULKAN)
+    if (api == caustica::rhi::GraphicsAPI::VULKAN)
     {
         GFSDK_Aftermath_SpirvCode spirv = {};
         spirv.pData = shaderBinary.first;
@@ -115,7 +115,7 @@ uint64_t caustica::AftermathCrashDump::getShaderHashForBinary(std::pair<const vo
     }
 #endif
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-    if (api == nvrhi::GraphicsAPI::D3D11 || api == nvrhi::GraphicsAPI::D3D12)
+    if (api == caustica::rhi::GraphicsAPI::D3D11 || api == caustica::rhi::GraphicsAPI::D3D12)
     {
         D3D12_SHADER_BYTECODE dxil = {};
         dxil.pShaderBytecode = shaderBinary.first;

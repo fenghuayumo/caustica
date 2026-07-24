@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 #include <math/math.h>
 
@@ -11,35 +11,35 @@
 //
 // 1.) In your render pass C++ side, #include "../../ShaderDebug.h"
 // 2.) You also need access to the global shared_ptr<ShaderDebug> 
-// 3.) Add " nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX), " to your binding layout(s) and
-// 4.) Add " nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderPrintf->getGPUWriteBuffer()), " to your binding set(s)
+// 3.) Add " caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX), " to your binding layout(s) and
+// 4.) Add " caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderPrintf->getGPUWriteBuffer()), " to your binding set(s)
 // 5.) 
 
 class ShaderDebug
 {
 private:
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
 
     static constexpr int            c_swapchainCount = 3;
-    nvrhi::BufferHandle             m_bufferGPU;                    // write
-    nvrhi::BufferHandle             m_indirectDrawBufferGPU;
-    nvrhi::BufferHandle             m_bufferCPU[c_swapchainCount];  // readback
+    caustica::rhi::BufferHandle             m_bufferGPU;                    // write
+    caustica::rhi::BufferHandle             m_indirectDrawBufferGPU;
+    caustica::rhi::BufferHandle             m_bufferCPU[c_swapchainCount];  // readback
     unsigned int                    m_currentBufferIndex = 0;
 
-    nvrhi::ShaderHandle             m_trianglesVertexShader;
-    nvrhi::ShaderHandle             m_trianglesPixelShader;
-    nvrhi::GraphicsPipelineHandle   m_trianglesPipeline;
-    nvrhi::ShaderHandle             m_linesVertexShader;
-    nvrhi::ShaderHandle             m_linesPixelShader;
-    nvrhi::GraphicsPipelineHandle   m_linesPipeline;
-    nvrhi::BindingLayoutHandle      m_geometryBindingLayout;
-    nvrhi::BindingSetHandle         m_geometryBindingSet;
+    caustica::rhi::ShaderHandle             m_trianglesVertexShader;
+    caustica::rhi::ShaderHandle             m_trianglesPixelShader;
+    caustica::rhi::GraphicsPipelineHandle   m_trianglesPipeline;
+    caustica::rhi::ShaderHandle             m_linesVertexShader;
+    caustica::rhi::ShaderHandle             m_linesPixelShader;
+    caustica::rhi::GraphicsPipelineHandle   m_linesPipeline;
+    caustica::rhi::BindingLayoutHandle      m_geometryBindingLayout;
+    caustica::rhi::BindingSetHandle         m_geometryBindingSet;
 
-    nvrhi::TextureHandle            m_debugVizOutput;
+    caustica::rhi::TextureHandle            m_debugVizOutput;
     bool                            m_hasReadbackHistory = false;
 
-    nvrhi::ShaderHandle             m_blendDebugVizPS;
-    nvrhi::GraphicsPipelineHandle   m_blendDebugVizPSO;
+    caustica::rhi::ShaderHandle             m_blendDebugVizPS;
+    caustica::rhi::GraphicsPipelineHandle   m_blendDebugVizPSO;
 
 
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
@@ -49,21 +49,21 @@ private:
     std::array<char, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES> m_lastBuffer;
 
 public:
-    ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
+    ShaderDebug( caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice );
 
-    void                    createRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer );
+    void                    createRenderPasses( caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer );
 
-    void                    beginFrame( nvrhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
-    void                    clearDebugVizTexture(nvrhi::CommandListHandle commandList); // not merged with beginFrame since sometimes you want it to persist between frames
+    void                    beginFrame( caustica::rhi::ICommandList* commandList, const caustica::math::float4x4 & matWorldToClip );
+    void                    clearDebugVizTexture(caustica::rhi::CommandListHandle commandList); // not merged with beginFrame since sometimes you want it to persist between frames
 
-    void                    endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport );
+    void                    endFrameAndOutput( caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport );
 
-    nvrhi::BufferHandle     getGPUWriteBuffer()         { return m_bufferGPU; };
-    nvrhi::TextureHandle    getDebugVizTexture()        { return m_debugVizOutput; };
+    caustica::rhi::BufferHandle     getGPUWriteBuffer()         { return m_bufferGPU; };
+    caustica::rhi::TextureHandle    getDebugVizTexture()        { return m_debugVizOutput; };
 
     //void                    DrawLastBuffer( view? Frame buffer? Depth buffer? See line drawing! )
 
 private:
     void                    outputLastBufferPrints();
-    void                    drawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport);
+    void                    drawCurrentBufferGeometry(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport);
 };

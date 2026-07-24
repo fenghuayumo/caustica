@@ -92,7 +92,7 @@ caustica::math::float3 gaussianAabbExtent(
         std::sqrt(variance.z)) * (std::max(splatScale, 1e-4f) * std::max(kernelScale, 1e-3f));
 }
 
-nvrhi::rt::GeometryAABB gaussianAabbFromSplat(
+caustica::rhi::rt::GeometryAABB gaussianAabbFromSplat(
     const caustica::GaussianSplatData& splat,
     float splatScale,
     uint32_t kernelDegree,
@@ -101,7 +101,7 @@ nvrhi::rt::GeometryAABB gaussianAabbFromSplat(
     const caustica::math::float3 center = splat.centerOpacity.xyz();
     const caustica::math::float3 extent = gaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
 
-    nvrhi::rt::GeometryAABB aabb = {};
+    caustica::rhi::rt::GeometryAABB aabb = {};
     aabb.minX = center.x - extent.x;
     aabb.minY = center.y - extent.y;
     aabb.minZ = center.z - extent.z;
@@ -111,13 +111,13 @@ nvrhi::rt::GeometryAABB gaussianAabbFromSplat(
     return aabb;
 }
 
-std::vector<nvrhi::rt::GeometryAABB> buildGaussianAabbs(
+std::vector<caustica::rhi::rt::GeometryAABB> buildGaussianAabbs(
     const std::vector<caustica::GaussianSplatData>& splats,
     float splatScale,
     uint32_t kernelDegree,
     bool adaptiveClamp)
 {
-    std::vector<nvrhi::rt::GeometryAABB> aabbs;
+    std::vector<caustica::rhi::rt::GeometryAABB> aabbs;
     aabbs.reserve(splats.size());
 
     for (const caustica::GaussianSplatData& splat : splats)
@@ -127,7 +127,7 @@ std::vector<nvrhi::rt::GeometryAABB> buildGaussianAabbs(
 }
 
 void fillScaleTranslateTransform(
-    nvrhi::rt::AffineTransform& transform,
+    caustica::rhi::rt::AffineTransform& transform,
     const caustica::math::float3& center,
     const caustica::math::float3& extent)
 {

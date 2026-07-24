@@ -3,15 +3,15 @@
 namespace caustica
 {
 
-nvrhi::BindingSetHandle BindingCache::getCachedBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
+caustica::rhi::BindingSetHandle BindingCache::getCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
 {
     size_t hash = 0;
-    nvrhi::hash_combine(hash, desc);
-    nvrhi::hash_combine(hash, layout);
+    caustica::rhi::hash_combine(hash, desc);
+    caustica::rhi::hash_combine(hash, layout);
 
     m_mutex.lock_shared();
 
-    nvrhi::BindingSetHandle result = nullptr;
+    caustica::rhi::BindingSetHandle result = nullptr;
     auto it = m_bindingSets.find(hash);
     if (it != m_bindingSets.end())
         result = it->second;
@@ -27,15 +27,15 @@ nvrhi::BindingSetHandle BindingCache::getCachedBindingSet(const nvrhi::BindingSe
     return result;
 }
 
-nvrhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const nvrhi::BindingSetDesc& desc, nvrhi::IBindingLayout* layout)
+caustica::rhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::IBindingLayout* layout)
 {
     size_t hash = 0;
-    nvrhi::hash_combine(hash, desc);
-    nvrhi::hash_combine(hash, layout);
+    caustica::rhi::hash_combine(hash, desc);
+    caustica::rhi::hash_combine(hash, layout);
 
     m_mutex.lock_shared();
 
-    nvrhi::BindingSetHandle result;
+    caustica::rhi::BindingSetHandle result;
     auto it = m_bindingSets.find(hash);
     if (it != m_bindingSets.end())
         result = it->second;
@@ -46,7 +46,7 @@ nvrhi::BindingSetHandle BindingCache::getOrCreateBindingSet(const nvrhi::Binding
     {
         m_mutex.lock();
 
-        nvrhi::BindingSetHandle& entry = m_bindingSets[hash];
+        caustica::rhi::BindingSetHandle& entry = m_bindingSets[hash];
         if (!entry)
         {
             result = m_device->createBindingSet(desc, layout);

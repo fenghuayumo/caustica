@@ -17,11 +17,11 @@ static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Lev
 class DLSS_DX11 : public DLSS
 {
 public:
-    DLSS_DX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+    DLSS_DX11(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
-        ID3D11Device* d3ddevice = device->getNativeObject(nvrhi::ObjectTypes::D3D11_Device);
+        ID3D11Device* d3ddevice = device->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Device);
 
         std::wstring executablePathW;
         executablePathW.assign(directoryWithExecutable.begin(), directoryWithExecutable.end());
@@ -77,7 +77,7 @@ public:
             m_dlssInitialized = false;
         }
 
-        ID3D11DeviceContext* d3dcontext = m_device->getNativeObject(nvrhi::ObjectTypes::D3D11_DeviceContext);
+        ID3D11DeviceContext* d3dcontext = m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D11_DeviceContext);
 
         NVSDK_NGX_DLSS_Create_Params dlssParams = {};
         dlssParams.Feature.InWidth = params.inputWidth;
@@ -105,7 +105,7 @@ public:
     }
     
     bool evaluate(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
     {
@@ -121,25 +121,25 @@ public:
             computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
-        ID3D11DeviceContext* d3dcontext = commandList->getNativeObject(nvrhi::ObjectTypes::D3D11_DeviceContext);
+        ID3D11DeviceContext* d3dcontext = commandList->getNativeObject(caustica::rhi::ObjectTypes::D3D11_DeviceContext);
 
-        commandList->setTextureState(params.inputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.outputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setTextureState(params.depthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.motionVectorsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.inputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.outputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(params.depthTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.motionVectorsTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         if (useExposureBuffer)
         {
-            commandList->setTextureState(m_exposureTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(m_exposureTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
         commandList->commitBarriers();
 
         NVSDK_NGX_D3D11_DLSS_Eval_Params evalParams = {};
-        evalParams.Feature.pInColor = params.inputColorTexture->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource);
-        evalParams.Feature.pInOutput = params.outputColorTexture->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource);
+        evalParams.Feature.pInColor = params.inputColorTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource);
+        evalParams.Feature.pInOutput = params.outputColorTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource);
         evalParams.Feature.InSharpness = params.sharpness;
-        evalParams.pInDepth = params.depthTexture->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource);
-        evalParams.pInMotionVectors = params.motionVectorsTexture->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource);
-        evalParams.pInExposureTexture = useExposureBuffer ? m_exposureTexture->getNativeObject(nvrhi::ObjectTypes::D3D11_Resource) : nullptr;
+        evalParams.pInDepth = params.depthTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource);
+        evalParams.pInMotionVectors = params.motionVectorsTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource);
+        evalParams.pInExposureTexture = useExposureBuffer ? m_exposureTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource) : nullptr;
         evalParams.InReset = params.resetHistory;
         evalParams.InMVScaleX = params.motionVectorScaleX;
         evalParams.InMVScaleY = params.motionVectorScaleY;
@@ -177,12 +177,12 @@ public:
             m_parameters = nullptr;
         }
 
-        ID3D11Device* d3ddevice = m_device->getNativeObject(nvrhi::ObjectTypes::D3D11_Device);
+        ID3D11Device* d3ddevice = m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Device);
         NVSDK_NGX_D3D11_Shutdown1(d3ddevice);
     }
 };
 
-std::unique_ptr<DLSS> DLSS::createDX11(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createDX11(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_DX11>(device, shaderFactory, directoryWithExecutable, applicationID);

@@ -136,7 +136,7 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     if (!m_ui)
         return;
 
-    nvrhi::IFramebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
+    caustica::rhi::IFramebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
     // Swapchain FB vectors are cleared during backBufferResizing(); skip UI GPU submit.
     if (!swapchainFb)
     {
@@ -148,9 +148,9 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     // Clear the window back buffer to editor chrome background; scene lives in the viewport texture.
     if (m_viewport && m_viewport->isValid())
     {
-        nvrhi::CommandListHandle cmd = gpuDevice.getDevice()->createCommandList();
+        caustica::rhi::CommandListHandle cmd = gpuDevice.getDevice()->createCommandList();
         cmd->open();
-        nvrhi::utils::ClearColorAttachment(cmd, swapchainFb, 0, nvrhi::Color(0.08f, 0.09f, 0.11f, 1.f));
+        caustica::rhi::utils::ClearColorAttachment(cmd, swapchainFb, 0, caustica::rhi::Color(0.08f, 0.09f, 0.11f, 1.f));
         cmd->close();
         gpuDevice.getDevice()->executeCommandList(cmd);
     }
@@ -159,12 +159,12 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     {
         if (zoom->enabled())
         {
-            nvrhi::ITexture* color = (m_viewport && m_viewport->isValid())
+            caustica::rhi::ITexture* color = (m_viewport && m_viewport->isValid())
                 ? m_viewport->colorTexture()
                 : swapchainFb->getDesc().colorAttachments[0].texture;
             if (color)
             {
-                nvrhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
+                caustica::rhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
                 commandList->open();
                 zoom->render(commandList, color);
                 commandList->close();

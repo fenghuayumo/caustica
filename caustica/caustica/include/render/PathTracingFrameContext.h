@@ -1,7 +1,7 @@
 #pragma once
 
 #include <math/math.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <shaders/SampleConstantBuffer.h>
 
 #include <functional>
@@ -9,14 +9,6 @@
 
 struct PathTracerCameraData;
 class RenderTargets;
-
-namespace nvrhi
-{
-class ICommandList;
-class IFramebuffer;
-class ITexture;
-struct BindingSetDesc;
-} // namespace nvrhi
 
 namespace caustica::render
 {
@@ -27,7 +19,7 @@ class WorldRenderer;
 struct PathTracingFrameContext
 {
     WorldRenderer* renderer = nullptr;
-    nvrhi::IFramebuffer*      framebuffer = nullptr;
+    caustica::rhi::IFramebuffer*      framebuffer = nullptr;
 
     dm::uint2 displaySize{};
     dm::uint2 renderSize{};
@@ -48,11 +40,11 @@ struct PathTracingFrameContext
     // Flushes the command list during renderer initialization stages.
     std::function<bool(const char* stage)> submitInitializationStage;
 
-    nvrhi::ICommandList* commandList = nullptr;
+    caustica::rhi::ICommandList* commandList = nullptr;
     RenderTargets* renderTargets = nullptr;
-    nvrhi::ITexture* ldrColor = nullptr;
+    caustica::rhi::ITexture* ldrColor = nullptr;
 
-    nvrhi::BindingSetDesc* bindingSetDesc = nullptr;
+    caustica::rhi::BindingSetDesc* bindingSetDesc = nullptr;
 };
 
 } // namespace caustica::render

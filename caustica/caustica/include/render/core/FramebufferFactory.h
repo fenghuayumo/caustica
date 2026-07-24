@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <vector>
 #include <unordered_map>
 
@@ -11,19 +11,19 @@ namespace caustica
     class FramebufferFactory
     {
     private:
-        nvrhi::DeviceHandle m_device;
-        std::unordered_map<nvrhi::TextureSubresourceSet, nvrhi::FramebufferHandle> m_framebufferCache;
+        caustica::rhi::DeviceHandle m_device;
+        std::unordered_map<caustica::rhi::TextureSubresourceSet, caustica::rhi::FramebufferHandle> m_framebufferCache;
 
     public:
-        FramebufferFactory(nvrhi::IDevice* device) : m_device(device) {}
+        FramebufferFactory(caustica::rhi::IDevice* device) : m_device(device) {}
         virtual ~FramebufferFactory() = default;
 
-        std::vector<nvrhi::TextureHandle> renderTargets;
-        nvrhi::TextureHandle depthTarget;
-        nvrhi::TextureHandle shadingRateSurface;
+        std::vector<caustica::rhi::TextureHandle> renderTargets;
+        caustica::rhi::TextureHandle depthTarget;
+        caustica::rhi::TextureHandle shadingRateSurface;
 
-        virtual nvrhi::IFramebuffer* getFramebuffer(const nvrhi::TextureSubresourceSet& subresources);
-        nvrhi::IFramebuffer* getFramebuffer(const IView& view);
-        nvrhi::FramebufferInfo getFramebufferInfo();
+        virtual caustica::rhi::IFramebuffer* getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources);
+        caustica::rhi::IFramebuffer* getFramebuffer(const IView& view);
+        caustica::rhi::FramebufferInfo getFramebufferInfo();
     };
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica::render
 {
@@ -8,19 +8,19 @@ namespace caustica::render
 class StandardSamplers
 {
 public:
-    explicit StandardSamplers(nvrhi::IDevice* device);
+    explicit StandardSamplers(caustica::rhi::IDevice* device);
 
-    nvrhi::SamplerHandle pointClamp() const { return m_pointClampSampler; }
-    nvrhi::SamplerHandle linearClamp() const { return m_linearClampSampler; }
-    nvrhi::SamplerHandle linearWrap() const { return m_linearWrapSampler; }
-    nvrhi::SamplerHandle anisotropicWrap() const { return m_anisotropicWrapSampler; }
+    caustica::rhi::SamplerHandle pointClamp() const { return m_pointClampSampler; }
+    caustica::rhi::SamplerHandle linearClamp() const { return m_linearClampSampler; }
+    caustica::rhi::SamplerHandle linearWrap() const { return m_linearWrapSampler; }
+    caustica::rhi::SamplerHandle anisotropicWrap() const { return m_anisotropicWrapSampler; }
 
 private:
-    nvrhi::DeviceHandle m_device;
-    nvrhi::SamplerHandle m_pointClampSampler;
-    nvrhi::SamplerHandle m_linearClampSampler;
-    nvrhi::SamplerHandle m_linearWrapSampler;
-    nvrhi::SamplerHandle m_anisotropicWrapSampler;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::SamplerHandle m_pointClampSampler;
+    caustica::rhi::SamplerHandle m_linearClampSampler;
+    caustica::rhi::SamplerHandle m_linearWrapSampler;
+    caustica::rhi::SamplerHandle m_anisotropicWrapSampler;
 };
 
 } // namespace caustica::render

@@ -22,23 +22,23 @@
 using namespace caustica::math;
 using namespace caustica;
 
-ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice )
+ShaderDebug::ShaderDebug( caustica::rhi::IDevice* device, caustica::rhi::ICommandList* commandList, std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::render::RenderDevice& renderDevice )
     : m_device(device)
     , m_shaderFactory(shaderFactory)
     , m_renderDevice(renderDevice)
 {
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
 
     bufferDesc.byteSize = 4*4;
     bufferDesc.isConstantBuffer = false;
     bufferDesc.isVolatile = false;
     bufferDesc.canHaveUAVs = false;
     bufferDesc.canHaveRawViews = false;
-    bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
     bufferDesc.maxVersions = 0;
     bufferDesc.structStride = 0;
     bufferDesc.keepInitialState = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.isDrawIndirectArgs = true;
     bufferDesc.debugName = "ShaderDebugIndirectDrawBufferGPU";
     m_indirectDrawBufferGPU = m_device->createBuffer(bufferDesc);
@@ -48,11 +48,11 @@ ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandLi
     bufferDesc.isVolatile = false;
     bufferDesc.canHaveUAVs = true;
     bufferDesc.canHaveRawViews = true;
-    bufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::None;
     bufferDesc.maxVersions = 0;
     bufferDesc.structStride = 0;
     bufferDesc.keepInitialState = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.isDrawIndirectArgs = false;
     bufferDesc.debugName = "ShaderDebugBufferGPU";
     m_bufferGPU = m_device->createBuffer(bufferDesc);
@@ -60,10 +60,10 @@ ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandLi
 
     bufferDesc.canHaveUAVs = false;
     bufferDesc.canHaveRawViews = false;
-    bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+    bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
     bufferDesc.structStride = 0;
     bufferDesc.keepInitialState = false;
-    bufferDesc.initialState = nvrhi::ResourceStates::Unknown;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Unknown;
     bufferDesc.isDrawIndirectArgs = false;
     bufferDesc.byteSize = SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES;
     for (int i = 0; i < c_swapchainCount; i++)
@@ -76,29 +76,29 @@ ShaderDebug::ShaderDebug( nvrhi::IDevice* device, nvrhi::ICommandList* commandLi
     reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data())->VertexCountPerInstance = 3;  // needed for indirect draw
 }
 
-void ShaderDebug::createRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer )
+void ShaderDebug::createRenderPasses( caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer )
 {
-    nvrhi::TextureDesc desc;
+    caustica::rhi::TextureDesc desc;
     //desc.width = frameBuffer->getDesc().colorAttachments[0].texture->getDesc().width;
     //desc.height = frameBuffer->getDesc().colorAttachments[0].texture->getDesc().height;
     desc.width  = depthBuffer->getDesc().width;
     desc.height = depthBuffer->getDesc().height;
     desc.debugName = "DebugVizOutput";
-    desc.format = nvrhi::Format::RGBA16_FLOAT;
-    desc.clearValue = nvrhi::Color(0.0f, 0.0f, 0.0f, 0.0f);   // avoid the debug layer warnings... not actually cleared except for debug purposes
+    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+    desc.clearValue = caustica::rhi::Color(0.0f, 0.0f, 0.0f, 0.0f);   // avoid the debug layer warnings... not actually cleared except for debug purposes
     desc.isUAV = true;
     desc.keepInitialState = true;
-    desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     m_debugVizOutput = m_device->createTexture(desc);
 
 
     {
-        nvrhi::BindingLayoutDesc bindingLayoutDesc;
-        bindingLayoutDesc.visibility = nvrhi::ShaderType::All;
+        caustica::rhi::BindingLayoutDesc bindingLayoutDesc;
+        bindingLayoutDesc.visibility = caustica::rhi::ShaderType::All;
         bindingLayoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX)
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX)
         };
 
         m_geometryBindingLayout = m_device->createBindingLayout(bindingLayoutDesc);
@@ -108,64 +108,64 @@ void ShaderDebug::createRenderPasses( nvrhi::IFramebuffer * frameBuffer, nvrhi::
         std::vector<caustica::ShaderMacro> shaderMacros;
         shaderMacros.push_back(caustica::ShaderMacro({              "BLEND_DEBUG_BUFFER", "1" })); 
 
-        m_blendDebugVizPS = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main", &shaderMacros, nvrhi::ShaderType::Pixel);
+        m_blendDebugVizPS = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main", &shaderMacros, caustica::rhi::ShaderType::Pixel);
 
-        nvrhi::GraphicsPipelineDesc pipelineDesc;
+        caustica::rhi::GraphicsPipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { m_geometryBindingLayout };
-        pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+        pipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleStrip;
         pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_blendDebugVizPS;
         pipelineDesc.renderState.rasterState.setCullNone();
         pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
         pipelineDesc.renderState.depthStencilState.stencilEnable = false;
         pipelineDesc.renderState.blendState.targets[0].enableBlend()
-            .setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
-            .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha)
-            .setSrcBlendAlpha(nvrhi::BlendFactor::Zero)
-            .setDestBlendAlpha(nvrhi::BlendFactor::One);
+            .setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
+            .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha)
+            .setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero)
+            .setDestBlendAlpha(caustica::rhi::BlendFactor::One);
         m_blendDebugVizPSO = m_device->createGraphicsPipeline(pipelineDesc, frameBuffer);
     }
 
     // debug triangles and lines...
     {
         std::vector<ShaderMacro> drawTrianglesMacro = { ShaderMacro("DRAW_TRIANGLES_SHADERS", "1") };
-        m_trianglesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawTrianglesMacro, nvrhi::ShaderType::Vertex);
-        m_trianglesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawTrianglesMacro, nvrhi::ShaderType::Pixel);
+        m_trianglesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawTrianglesMacro, caustica::rhi::ShaderType::Vertex);
+        m_trianglesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawTrianglesMacro, caustica::rhi::ShaderType::Pixel);
     }
 
     {
         std::vector<ShaderMacro> drawLinesMacro = { ShaderMacro("DRAW_LINES_SHADERS", "1") };
-        m_linesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawLinesMacro, nvrhi::ShaderType::Vertex);
-        m_linesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawLinesMacro, nvrhi::ShaderType::Pixel);
+        m_linesVertexShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_vs", &drawLinesMacro, caustica::rhi::ShaderType::Vertex);
+        m_linesPixelShader = m_shaderFactory->createShader("caustica/shaders/Libraries/ShaderDebug/ShaderDebug.hlsl", "main_ps", &drawLinesMacro, caustica::rhi::ShaderType::Pixel);
     }
 
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::Texture_SRV(0, depthBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(1, m_debugVizOutput),
-        nvrhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, getGPUWriteBuffer()),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, depthBuffer),
+        caustica::rhi::BindingSetItem::Texture_SRV(1, m_debugVizOutput),
+        caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, getGPUWriteBuffer()),
     };
     m_geometryBindingSet = m_device->createBindingSet(bindingSetDesc, m_geometryBindingLayout);
 
-    nvrhi::GraphicsPipelineDesc psoDesc;
+    caustica::rhi::GraphicsPipelineDesc psoDesc;
     psoDesc.VS = m_trianglesVertexShader;
     psoDesc.PS = m_trianglesPixelShader;
     psoDesc.bindingLayouts = { m_geometryBindingLayout };
-    psoDesc.primType = nvrhi::PrimitiveType::TriangleList;
+    psoDesc.primType = caustica::rhi::PrimitiveType::TriangleList;
     psoDesc.renderState.depthStencilState.depthTestEnable = false;
-    psoDesc.renderState.rasterState.cullMode = nvrhi::RasterCullMode::None;
-    psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
-        .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(nvrhi::BlendFactor::Zero).setDestBlendAlpha(nvrhi::BlendFactor::One);
+    psoDesc.renderState.rasterState.cullMode = caustica::rhi::RasterCullMode::None;
+    psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
+        .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero).setDestBlendAlpha(caustica::rhi::BlendFactor::One);
     m_trianglesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
 
     psoDesc.VS = m_linesVertexShader;
     psoDesc.PS = m_linesPixelShader;
     psoDesc.bindingLayouts = { m_geometryBindingLayout };
-    psoDesc.primType = nvrhi::PrimitiveType::LineList;
+    psoDesc.primType = caustica::rhi::PrimitiveType::LineList;
     m_linesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
 }
 
-void ShaderDebug::beginFrame( nvrhi::ICommandList* commandList, const float4x4& matWorldToClip )
+void ShaderDebug::beginFrame( caustica::rhi::ICommandList* commandList, const float4x4& matWorldToClip )
 {
     ShaderDebugHeader* header = reinterpret_cast<ShaderDebugHeader*>(m_initHeader.data());
     memcpy( header->WorldViewProjectionMatrix, matWorldToClip.m_data, sizeof(float)*16 );
@@ -173,12 +173,12 @@ void ShaderDebug::beginFrame( nvrhi::ICommandList* commandList, const float4x4& 
     commandList->writeBuffer(m_bufferGPU, m_initHeader.data(), m_initHeader.size());   // only need to clear the counters
 }
     
-void ShaderDebug::clearDebugVizTexture(nvrhi::CommandListHandle commandList)
+void ShaderDebug::clearDebugVizTexture(caustica::rhi::CommandListHandle commandList)
 {
-    commandList->clearTextureFloat(m_debugVizOutput, nvrhi::AllSubresources, nvrhi::Color(0, 0, 0, 0));
+    commandList->clearTextureFloat(m_debugVizOutput, caustica::rhi::AllSubresources, caustica::rhi::Color(0, 0, 0, 0));
 }
 
-void ShaderDebug::endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport )
+void ShaderDebug::endFrameAndOutput( caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport )
 {
     RAII_SCOPE( commandList->beginMarker("ShaderDebug");, commandList->endMarker(); );
 
@@ -186,7 +186,7 @@ void ShaderDebug::endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IF
     if (hadReadbackHistory)
     {
         // map and copy CPU side buffer so we can process it (later)
-        void* pData = m_device->mapBuffer(m_bufferCPU[m_currentBufferIndex], nvrhi::CpuAccessMode::Read);
+        void* pData = m_device->mapBuffer(m_bufferCPU[m_currentBufferIndex], caustica::rhi::CpuAccessMode::Read);
         memcpy(&m_lastBuffer, pData, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES); assert( m_lastBuffer.size() == SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
         m_device->unmapBuffer(m_bufferCPU[m_currentBufferIndex]);
     }
@@ -203,17 +203,17 @@ void ShaderDebug::endFrameAndOutput( nvrhi::ICommandList* commandList, nvrhi::IF
 
     // Draw debug viz overlay with blending
     {
-        nvrhi::BindingSetHandle bindingSet = m_geometryBindingSet; //m_bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_BindingLayoutPS);
+        caustica::rhi::BindingSetHandle bindingSet = m_geometryBindingSet; //m_bindingCache.GetOrCreateBindingSet(bindingSetDesc, m_BindingLayoutPS);
 
-        nvrhi::GraphicsState state;
+        caustica::rhi::GraphicsState state;
         state.pipeline = m_blendDebugVizPSO;
         state.framebuffer = frameBuffer;
         state.bindings = { bindingSet };
-        nvrhi::ViewportState viewportState;
+        caustica::rhi::ViewportState viewportState;
         state.viewport.addViewportAndScissorRect(viewport);
         commandList->setGraphicsState(state);
 
-        nvrhi::DrawArguments args;
+        caustica::rhi::DrawArguments args;
         args.instanceCount = 1;
         args.vertexCount = 4;
         commandList->draw(args);
@@ -369,7 +369,7 @@ void ShaderDebug::outputLastBufferPrints()
     }
 }
 
-void ShaderDebug::drawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer * frameBuffer, nvrhi::TextureHandle depthBuffer, const nvrhi::Viewport & viewport)
+void ShaderDebug::drawCurrentBufferGeometry(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer * frameBuffer, caustica::rhi::TextureHandle depthBuffer, const caustica::rhi::Viewport & viewport)
 {
     RAII_SCOPE(commandList->beginMarker("Tris"); , commandList->endMarker(); );
 
@@ -378,7 +378,7 @@ void ShaderDebug::drawCurrentBufferGeometry(nvrhi::ICommandList* commandList, nv
     // copy args from master buffer to indirect
     commandList->copyBuffer(m_indirectDrawBufferGPU, 0, m_bufferGPU, 4*4, 4*4 );    
     
-    nvrhi::GraphicsState state;
+    caustica::rhi::GraphicsState state;
     state.bindings = { m_geometryBindingSet };
     //state.vertexBuffers = { {0, 0, 0} };
     state.pipeline = m_trianglesPipeline;

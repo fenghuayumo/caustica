@@ -2,7 +2,7 @@
 
 #include <assets/Handle.h>
 #include <assets/ImageAsset.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <memory>
 
@@ -73,8 +73,8 @@ public:
     // Results from processCubemap() - caller provides the destination textures
     struct CubemapProcessingResults
     {
-        nvrhi::TextureHandle filteredCubemap;       // GGX-filtered mip chain (for specular)
-        nvrhi::TextureHandle diffuseIrradianceCube; // Low-res SH-reprojected cubemap (for diffuse)
+        caustica::rhi::TextureHandle filteredCubemap;       // GGX-filtered mip chain (for specular)
+        caustica::rhi::TextureHandle diffuseIrradianceCube; // Low-res SH-reprojected cubemap (for diffuse)
     };
 
     constexpr static uint           c_MaxDirLights  = EMB_MAXDIRLIGHTS;    // Can't have any more than this number of directional lights baked into cubemap, sorry.
@@ -83,18 +83,18 @@ public:
     
 
 public:
-    EnvMapProcessor( nvrhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
+    EnvMapProcessor( caustica::rhi::IDevice* device, std::shared_ptr<caustica::TextureLoader> textureCache, bool enableRasterPrecompute );
     ~EnvMapProcessor();
 
     void                            sceneReloaded()                 { m_targetResolution = 0; } // change default target resolution on each scene load
 
     void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug, std::shared_ptr<caustica::ShaderFactory> shaderFactory, std::shared_ptr<ComputePipelineRegistry> computePipelineRegistry);
 
-    void                            preUpdate( nvrhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
-    bool                            update( nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
+    void                            preUpdate( caustica::rhi::ICommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory = std::filesystem::path() );
+    bool                            update( caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, caustica::render::RenderDevice& renderDevice, const UpdateSettings & settings, double sceneTime, EMB_DirectionalLight const * directionalLights, uint directionaLightCount, bool forceInstantUpdate );
 
-    nvrhi::TextureHandle            getEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
-    nvrhi::SamplerHandle            getEnvMapCubeSampler() const    { return m_linearSampler; }
+    caustica::rhi::TextureHandle            getEnvMapCube() const           { return (m_outputIsCompressed)?(m_cubemapBC6H):(m_cubemap); }
+    caustica::rhi::SamplerHandle            getEnvMapCubeSampler() const    { return m_linearSampler; }
     uint                            getEnvMapCubeDim() const        { return m_cubeDim; }
     uint64_t                        getEnvMapVersion() const        { return m_versionID; }
 
@@ -111,69 +111,69 @@ public:
                                     getImportanceSampling() const   { return m_importanceSamplingCache; }
 
     // BRDF LUT for split-sum IBL approximation (generated once at startup)
-    nvrhi::TextureHandle            getBRDFLUT() const              { return m_brdfLUT; }
+    caustica::rhi::TextureHandle            getBRDFLUT() const              { return m_brdfLUT; }
     bool                            isBRDFLUTReady() const          { return m_brdfLUT != nullptr && m_brdfLUTGenerated; }
 
     // process an external cubemap with the specified options
     // This allows reusing the mip generation, GGX filtering, and SH projection for external cubemaps (e.g., local RT cubemap)
     void                            processCubemap(
-                                        nvrhi::ICommandList* commandList,
+                                        caustica::rhi::ICommandList* commandList,
                                         caustica::BindingCache& bindingCache,
-                                        nvrhi::TextureHandle sourceCubemap,
+                                        caustica::rhi::TextureHandle sourceCubemap,
                                         const CubemapProcessingOptions& options,
                                         const CubemapProcessingResults& results);
     
     // Generate the BRDF integration LUT (should be called once during initialization)
-    bool                            generateBRDFLUT(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
+    bool                            generateBRDFLUT(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache);
     
 private:
-    void                            ggxPrefilterCubemap(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
-                                        nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            convolveDiffuseIrradiance(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
-                                        nvrhi::TextureHandle srcCubemap, nvrhi::TextureHandle dstCubemap);
-    void                            generateCubemapMips(nvrhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
-                                        nvrhi::TextureHandle cubemap);
+    void                            ggxPrefilterCubemap(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+                                        caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap);
+    void                            convolveDiffuseIrradiance(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache,
+                                        caustica::rhi::TextureHandle srcCubemap, caustica::rhi::TextureHandle dstCubemap);
+    void                            generateCubemapMips(caustica::rhi::ICommandList* commandList, caustica::BindingCache& bindingCache, 
+                                        caustica::rhi::TextureHandle cubemap);
 
     void                            initBuffers(uint cubeDim);
     void                            unloadSourceBackgrounds();
 
 private:
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     std::shared_ptr<caustica::TextureLoader> m_textureCache;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
 
-    nvrhi::ShaderHandle             m_baseLayerCS;
-    nvrhi::ComputePipelineHandle    m_baseLayerPSO;
+    caustica::rhi::ShaderHandle             m_baseLayerCS;
+    caustica::rhi::ComputePipelineHandle    m_baseLayerPSO;
 
-    nvrhi::ShaderHandle             m_MIPReduceCS;
-    nvrhi::ComputePipelineHandle    m_MIPReducePSO;
+    caustica::rhi::ShaderHandle             m_MIPReduceCS;
+    caustica::rhi::ComputePipelineHandle    m_MIPReducePSO;
 
-    nvrhi::BindingLayoutHandle      m_commonBindingLayout;
-    nvrhi::BindingLayoutHandle      m_reduceBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_commonBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_reduceBindingLayout;
 
     bool                            m_BC6UCompressionEnabled = true;
-    nvrhi::ShaderHandle             m_BC6UCompressLowCS;
-    nvrhi::ComputePipelineHandle    m_BC6UCompressLowPSO;
-    nvrhi::ShaderHandle             m_BC6UCompressHighCS;
-    nvrhi::ComputePipelineHandle    m_BC6UCompressHighPSO;
-    nvrhi::BindingLayoutHandle      m_BC6UCompressBindingLayout;
+    caustica::rhi::ShaderHandle             m_BC6UCompressLowCS;
+    caustica::rhi::ComputePipelineHandle    m_BC6UCompressLowPSO;
+    caustica::rhi::ShaderHandle             m_BC6UCompressHighCS;
+    caustica::rhi::ComputePipelineHandle    m_BC6UCompressHighPSO;
+    caustica::rhi::BindingLayoutHandle      m_BC6UCompressBindingLayout;
 
-    nvrhi::BufferHandle             m_constantBuffer;
+    caustica::rhi::BufferHandle             m_constantBuffer;
 
-    nvrhi::SamplerHandle            m_pointSampler;
-    nvrhi::SamplerHandle            m_linearSampler;
-    nvrhi::SamplerHandle            m_linearClampSampler;
-    nvrhi::SamplerHandle            m_equiRectSampler;
+    caustica::rhi::SamplerHandle            m_pointSampler;
+    caustica::rhi::SamplerHandle            m_linearSampler;
+    caustica::rhi::SamplerHandle            m_linearClampSampler;
+    caustica::rhi::SamplerHandle            m_equiRectSampler;
 
     std::string                     m_sourceBackgroundPath;
     std::string                     m_loadedSourceBackgroundPath;
     caustica::Handle<caustica::ImageAsset>  m_loadedSourceBackgroundTextureEquirect;
     caustica::Handle<caustica::ImageAsset>  m_loadedSourceBackgroundTextureCubemap;
 
-    nvrhi::TextureHandle            m_cubemap;
-    nvrhi::TextureDesc              m_cubemapDesc;
-    nvrhi::TextureHandle            m_cubemapBC6H;
-    nvrhi::TextureHandle            m_cubemapBC6HScratch;
+    caustica::rhi::TextureHandle            m_cubemap;
+    caustica::rhi::TextureDesc              m_cubemapDesc;
+    caustica::rhi::TextureHandle            m_cubemapBC6H;
+    caustica::rhi::TextureHandle            m_cubemapBC6HScratch;
     uint                            m_cubeDim = 0;
 
     uint                            m_targetResolution = 0;
@@ -201,20 +201,20 @@ private:
     bool                            m_enableRasterPrecompute = false;
 
     // BRDF LUT for split-sum IBL
-    nvrhi::TextureHandle            m_brdfLUT;
-    nvrhi::ShaderHandle             m_brdfLUTCS;
-    nvrhi::ComputePipelineHandle    m_brdfLUTPSO;
-    nvrhi::BindingLayoutHandle      m_brdfLUTBindingLayout;
-    nvrhi::BufferHandle             m_brdfLUTConstantBuffer;
+    caustica::rhi::TextureHandle            m_brdfLUT;
+    caustica::rhi::ShaderHandle             m_brdfLUTCS;
+    caustica::rhi::ComputePipelineHandle    m_brdfLUTPSO;
+    caustica::rhi::BindingLayoutHandle      m_brdfLUTBindingLayout;
+    caustica::rhi::BufferHandle             m_brdfLUTConstantBuffer;
     bool                            m_brdfLUTGenerated = false;
 
     // GGX pre-filtering for specular IBL - managed by ComputePipelineRegistry for hot reload
     std::shared_ptr<ComputeShaderVariant> m_ggxPrefilterVariant;
-    nvrhi::BindingLayoutHandle      m_ggxPrefilterBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_ggxPrefilterBindingLayout;
 
     // Diffuse irradiance convolution (SH-based) - managed by ComputePipelineRegistry for hot reload
     std::shared_ptr<ComputeShaderVariant> m_irradianceConvolveVariant;
-    nvrhi::BindingLayoutHandle      m_irradianceConvolveBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_irradianceConvolveBindingLayout;
 
     // Reference to compute pipeline baker for hot reload support
     std::shared_ptr<ComputePipelineRegistry> m_computePipelineRegistry;

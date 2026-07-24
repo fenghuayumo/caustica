@@ -2,7 +2,7 @@
 
 #include <assets/Handle.h>
 #include <assets/ImageAsset.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <map>
 #include <memory>
 
@@ -17,9 +17,9 @@ enum class TextureCompressionType
 
 // Estimated GPU memory size of a texture.
 // Moved from editor/SampleCommon/SampleCommon.cpp
-inline uint64_t getEstimatedTextureSize(const nvrhi::TextureDesc& desc)
+inline uint64_t getEstimatedTextureSize(const caustica::rhi::TextureDesc& desc)
 {
-    nvrhi::FormatInfo fi = nvrhi::getFormatInfo(desc.format);
+    caustica::rhi::FormatInfo fi = caustica::rhi::getFormatInfo(desc.format);
     uint64_t pixelsCount = 0;
     uint32_t w = desc.width, h = desc.height, d = desc.depth;
     for (uint32_t mip = 0; mip < desc.mipLevels; ++mip)

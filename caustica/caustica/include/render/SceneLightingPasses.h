@@ -64,7 +64,7 @@ public:
         const std::filesystem::path& currentScenePath);
     void setEnvMapOverrideSource(const std::string& envMapOverride);
 
-    void createOpacityMapsIfSupported(nvrhi::IDevice* device,
+    void createOpacityMapsIfSupported(caustica::rhi::IDevice* device,
         const std::shared_ptr<caustica::DescriptorTableManager>& descriptorTable,
         const std::shared_ptr<caustica::TextureLoader>& textureLoader,
         const std::shared_ptr<caustica::ShaderFactory>& shaderFactory);

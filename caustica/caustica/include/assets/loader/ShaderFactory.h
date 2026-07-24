@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <functional>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -54,14 +54,14 @@ struct StaticShader
 class ShaderFactory
 {
 private:
-    nvrhi::DeviceHandle m_Device;
+    caustica::rhi::DeviceHandle m_Device;
     std::shared_ptr<shader::ShaderCompilerService> m_compilerService;
     std::shared_ptr<IFileSystem> m_fs;
     std::filesystem::path m_basePath;
 
 public:
     ShaderFactory(
-        nvrhi::DeviceHandle device,
+        caustica::rhi::DeviceHandle device,
         std::shared_ptr<IFileSystem> fs,
         const std::filesystem::path& basePath);
 
@@ -74,20 +74,20 @@ public:
 
     std::shared_ptr<IBlob> getBytecode(const char* fileName, const char* entryName);
 
-    nvrhi::ShaderHandle createShader(const char* fileName, const char* entryName, const std::vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc);
-    nvrhi::ShaderHandle createShader(const char* fileName, const char* entryName, const std::vector<ShaderMacro>* pDefines, nvrhi::ShaderType shaderType);
-    nvrhi::ShaderLibraryHandle createShaderLibrary(const char* fileName, const std::vector<ShaderMacro>* pDefines);
-    nvrhi::ShaderHandle createStaticShader(StaticShader shader, const std::vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc);
-    nvrhi::ShaderHandle createStaticShader(StaticShader shader, const std::vector<ShaderMacro>* pDefines, nvrhi::ShaderType shaderType);
-    nvrhi::ShaderHandle createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc);
-    nvrhi::ShaderHandle createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, nvrhi::ShaderType shaderType);
-    nvrhi::ShaderLibraryHandle createStaticShaderLibrary(StaticShader shader, const std::vector<ShaderMacro>* pDefines);
-    nvrhi::ShaderLibraryHandle createStaticPlatformShaderLibrary(StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines);
-    nvrhi::ShaderHandle createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const nvrhi::ShaderDesc& desc);
-    nvrhi::ShaderHandle createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, nvrhi::ShaderType shaderType);
-    nvrhi::ShaderLibraryHandle createAutoShaderLibrary(const char* fileName, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines);
+    caustica::rhi::ShaderHandle createShader(const char* fileName, const char* entryName, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc);
+    caustica::rhi::ShaderHandle createShader(const char* fileName, const char* entryName, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType);
+    caustica::rhi::ShaderLibraryHandle createShaderLibrary(const char* fileName, const std::vector<ShaderMacro>* pDefines);
+    caustica::rhi::ShaderHandle createStaticShader(StaticShader shader, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc);
+    caustica::rhi::ShaderHandle createStaticShader(StaticShader shader, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType);
+    caustica::rhi::ShaderHandle createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc);
+    caustica::rhi::ShaderHandle createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType);
+    caustica::rhi::ShaderLibraryHandle createStaticShaderLibrary(StaticShader shader, const std::vector<ShaderMacro>* pDefines);
+    caustica::rhi::ShaderLibraryHandle createStaticPlatformShaderLibrary(StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines);
+    caustica::rhi::ShaderHandle createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc);
+    caustica::rhi::ShaderHandle createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType);
+    caustica::rhi::ShaderLibraryHandle createAutoShaderLibrary(const char* fileName, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines);
 
-    std::pair<const void*, size_t> findShaderFromHash(uint64_t hash, std::function<uint64_t(std::pair<const void*, size_t>, nvrhi::GraphicsAPI)> hashGenerator);
+    std::pair<const void*, size_t> findShaderFromHash(uint64_t hash, std::function<uint64_t(std::pair<const void*, size_t>, caustica::rhi::GraphicsAPI)> hashGenerator);
 };
 
 } // namespace caustica

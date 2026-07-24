@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/core/PathTracerSettings.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 
 class RenderTargets;
@@ -18,7 +18,7 @@ class CameraController;
 struct HdrPostProcessParams
 {
     PathTracerSettings&              settings;
-    nvrhi::ICommandList*             commandList = nullptr;
+    caustica::rhi::ICommandList*             commandList = nullptr;
     RenderTargets*                   renderTargets = nullptr;
     dm::uint2                        displaySize{};
 

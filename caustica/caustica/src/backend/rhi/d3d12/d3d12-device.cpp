@@ -2,7 +2,7 @@
 
 #include <rhi/common/misc.h>
 
-#if NVRHI_D3D12_WITH_NVAPI
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
 #include <nvShaderExtnEnums.h>
 #endif
 
@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <atomic>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     static std::string FormatHRESULT(HRESULT hr)
     {
@@ -227,11 +227,11 @@ namespace nvrhi::d3d12
         {
             m_RayTracingSupported = m_Options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
             m_TraceRayInlineSupported = m_Options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
             m_OpacityMicromapSupported = m_Options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_2;
-#endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+#endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
             if (m_RayTracingSupported)
             {
                 m_Context.rtxMemUtil = std::make_unique<rtxmu::DxAccelStructManager>(m_Context.device5);
@@ -252,7 +252,7 @@ namespace nvrhi::d3d12
             m_SamplerFeedbackSupported = m_Options7.SamplerFeedbackTier >= D3D12_SAMPLER_FEEDBACK_TIER_0_9;
         }
 
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         if (SUCCEEDED(m_Context.device->QueryInterface(&m_Context.devicePreview)))
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS_EXPERIMENTAL experimentalOptions{};
@@ -293,7 +293,7 @@ namespace nvrhi::d3d12
 
         m_CommandListsToExecute.reserve(64);
 
-#if NVRHI_D3D12_WITH_NVAPI
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
         //We need to use NVAPI to set resource hints for SLI
         m_NvapiIsInitialized = NvAPI_Initialize() == NVAPI_OK;
 
@@ -328,13 +328,13 @@ namespace nvrhi::d3d12
                 m_ShaderExecutionReorderingSupported = (ser & NVAPI_D3D12_RAYTRACING_THREAD_REORDERING_CAP_STANDARD) == NVAPI_D3D12_RAYTRACING_THREAD_REORDERING_CAP_STANDARD;
             }
         }
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-    #ifdef NVRHI_WITH_RTXMU
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+    #ifdef CAUSTICA_RHI_WITH_RTXMU
         m_OpacityMicromapSupported = false; // RTXMU does not support OMMs
     #endif
-#endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-#if NVRHI_WITH_NVAPI_OPACITY_MICROMAP
-#ifdef NVRHI_WITH_RTXMU
+#endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+#if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         m_OpacityMicromapSupported = false; // RTXMU does not support OMMs
 #else
         if (m_NvapiIsInitialized)
@@ -344,18 +344,18 @@ namespace nvrhi::d3d12
             m_OpacityMicromapSupported = caps == NVAPI_D3D12_RAYTRACING_OPACITY_MICROMAP_CAP_STANDARD;
         }
 #endif
-#endif // #if NVRHI_WITH_NVAPI_OPACITY_MICROMAPS
+#endif // #if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAPS
 
-#if NVRHI_WITH_NVAPI_CLUSTERS
+#if CAUSTICA_RHI_WITH_NVAPI_CLUSTERS
         if (m_NvapiIsInitialized)
         {
             NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAPS clusterCaps = NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAP_NONE;
             NvAPI_D3D12_GetRaytracingCaps(m_Context.device5, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_CLUSTER_OPERATIONS, &clusterCaps, sizeof(clusterCaps));
             m_RayTracingClustersSupported = clusterCaps == NVAPI_D3D12_RAYTRACING_CLUSTER_OPERATIONS_CAP_STANDARD;
         }
-#endif // #if NVRHI_WITH_NVAPI_CLUSTERS
+#endif // #if CAUSTICA_RHI_WITH_NVAPI_CLUSTERS
 
-#if NVRHI_WITH_NVAPI_LSS
+#if CAUSTICA_RHI_WITH_NVAPI_LSS
         if (m_NvapiIsInitialized)
         {
             NVAPI_D3D12_RAYTRACING_LINEAR_SWEPT_SPHERES_CAPS lssCaps = NVAPI_D3D12_RAYTRACING_LINEAR_SWEPT_SPHERES_CAP_NONE;
@@ -366,21 +366,21 @@ namespace nvrhi::d3d12
             NvAPI_D3D12_GetRaytracingCaps(m_Context.device5, NVAPI_D3D12_RAYTRACING_CAPS_TYPE_SPHERES, &spheresCaps, sizeof(NVAPI_D3D12_RAYTRACING_SPHERES_CAPS));
             m_SpheresSupported = spheresCaps == NVAPI_D3D12_RAYTRACING_SPHERES_CAP_STANDARD;
         }
-#endif // #if NVRHI_WITH_NVAPI_LSS
+#endif // #if CAUSTICA_RHI_WITH_NVAPI_LSS
 
-#if NVRHI_WITH_NVAPI_OPACITY_MICROMAP || NVRHI_WITH_NVAPI_CLUSTERS || NVRHI_WITH_NVAPI_LSS
+#if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP || CAUSTICA_RHI_WITH_NVAPI_CLUSTERS || CAUSTICA_RHI_WITH_NVAPI_LSS
         if (m_OpacityMicromapSupported || m_RayTracingClustersSupported || m_LinearSweptSpheresSupported || m_SpheresSupported)
         {
             NVAPI_D3D12_SET_CREATE_PIPELINE_STATE_OPTIONS_PARAMS params = {};
             params.version = NVAPI_D3D12_SET_CREATE_PIPELINE_STATE_OPTIONS_PARAMS_VER;
             params.flags = 0;
-        #if NVRHI_WITH_NVAPI_OPACITY_MICROMAP
+        #if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP
             params.flags |= (m_OpacityMicromapSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_OMM_SUPPORT : 0);
         #endif
-        #if NVRHI_WITH_NVAPI_CLUSTERS
+        #if CAUSTICA_RHI_WITH_NVAPI_CLUSTERS
             params.flags |= (m_RayTracingClustersSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_CLUSTER_SUPPORT : 0);
         #endif
-        #if NVRHI_WITH_NVAPI_LSS
+        #if CAUSTICA_RHI_WITH_NVAPI_LSS
             params.flags |= (m_LinearSweptSpheresSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_LSS_SUPPORT : 0);
             params.flags |= (m_SpheresSupported ? NVAPI_D3D12_PIPELINE_CREATION_STATE_FLAGS_ENABLE_SPHERE_SUPPORT : 0);
         #endif
@@ -389,9 +389,9 @@ namespace nvrhi::d3d12
         }
 #endif
 
-#endif // #if NVRHI_D3D12_WITH_NVAPI
+#endif // #if CAUSTICA_RHI_D3D12_WITH_NVAPI
 
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         if (desc.aftermathEnabled)
         {
             const uint32_t aftermathFlags = GFSDK_Aftermath_FeatureFlags_EnableMarkers | GFSDK_Aftermath_FeatureFlags_EnableResourceTracking | GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo | GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting;
@@ -525,7 +525,7 @@ namespace nvrhi::d3d12
         {
         case ObjectTypes::D3D12_Device:
             return Object(m_Context.device);
-        case ObjectTypes::Nvrhi_D3D12_Device:
+        case ObjectTypes::CAUSTICA_RHI_D3D12_Device:
             return Object(this);
         case ObjectTypes::D3D12_CommandQueue:
             return Object(getQueue(CommandQueue::Graphics)->queue.Get());
@@ -534,7 +534,7 @@ namespace nvrhi::d3d12
         }
     }
 
-    nvrhi::CommandListHandle Device::createCommandList(const CommandListParameters& params)
+    caustica::rhi::CommandListHandle Device::createCommandList(const CommandListParameters& params)
     {
         if (!getQueue(params.queueType))
             return nullptr;
@@ -542,7 +542,7 @@ namespace nvrhi::d3d12
         return CommandListHandle::Create(new CommandList(this, m_Context, m_Resources, params));
     }
     
-    uint64_t Device::executeCommandLists(nvrhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
+    uint64_t Device::executeCommandLists(caustica::rhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
     {
         m_CommandListsToExecute.resize(numCommandLists);
         for (size_t i = 0; i < numCommandLists; i++)
@@ -571,7 +571,7 @@ namespace nvrhi::d3d12
                 << ", numCommandLists=" << numCommandLists;
             for (size_t i = 0; i < numCommandLists; i++)
             {
-                ss << ", cl[" << i << "] nvrhi=0x" << std::hex << reinterpret_cast<uintptr_t>(pCommandLists[i])
+                ss << ", cl[" << i << "] rhi=0x" << std::hex << reinterpret_cast<uintptr_t>(pCommandLists[i])
                     << " d3d12=0x" << reinterpret_cast<uintptr_t>(m_CommandListsToExecute[i]);
             }
             m_Context.error(ss.str());
@@ -701,7 +701,7 @@ namespace nvrhi::d3d12
                 
                 if (pQueue->lastCompletedInstance >= instance->submittedInstance)
                 {
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
                     if (!instance->rtxmuBuildIds.empty())
                     {
                         std::lock_guard lockGuard(m_Resources.asListMutex);
@@ -858,7 +858,7 @@ namespace nvrhi::d3d12
     coopvec::DeviceFeatures Device::queryCoopVecFeatures()
     {
         coopvec::DeviceFeatures result;
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         // Get the format count
         D3D12_FEATURE_DATA_COOPERATIVE_VECTOR coopVecData{};
         if (m_Context.device->CheckFeatureSupport(D3D12_FEATURE_COOPERATIVE_VECTOR,
@@ -924,7 +924,7 @@ namespace nvrhi::d3d12
 
     size_t Device::getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns)
     {
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         D3D12_LINEAR_ALGEBRA_MATRIX_CONVERSION_DEST_INFO destInfo = {};
         destInfo.DestLayout = convertCoopVecMatrixLayout(layout);
         destInfo.NumRows = rows;
@@ -984,7 +984,7 @@ namespace nvrhi::d3d12
         heapDesc.Alignment = D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
         heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
         heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapDesc.Properties.CreationNodeMask = 1; // no mGPU support in nvrhi so far
+        heapDesc.Properties.CreationNodeMask = 1; // no mGPU support in the RHI so far
         heapDesc.Properties.VisibleNodeMask = 1;
 
         if (m_Options.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1)
@@ -1033,4 +1033,4 @@ namespace nvrhi::d3d12
         return HeapHandle::Create(heap);
     }
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

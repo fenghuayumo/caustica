@@ -2,57 +2,57 @@
 
 #include <rhi/d3d12.h>
 
-#ifndef NVRHI_D3D12_WITH_NVAPI
-#define NVRHI_D3D12_WITH_NVAPI 0
+#ifndef CAUSTICA_RHI_D3D12_WITH_NVAPI
+#define CAUSTICA_RHI_D3D12_WITH_NVAPI 0
 #endif
 
-#if NVRHI_D3D12_WITH_NVAPI
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
 #include <dxgi.h>
 #include <nvapi.h>
 #endif
 
 #include <rhi/common/aftermath.h>
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
 #include <GFSDK_Aftermath.h>
 #endif
 
 // If using the Agility SDK version of OMM, ignore the NVAPI version
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-    #define NVRHI_WITH_NVAPI_OPACITY_MICROMAP (0)
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+    #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (0)
 #else
     // There's no version check available in the nvapi header,
     // instead to check if the NvAPI linked is OMM compatible version (>520) we look for one of the defines it adds...
-    #if NVRHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_OPACITY_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
-        #define NVRHI_WITH_NVAPI_OPACITY_MICROMAP (1)
+    #if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_OPACITY_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
+        #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (1)
     #else
-        #define NVRHI_WITH_NVAPI_OPACITY_MICROMAP (0)
+        #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (0)
     #endif
 #endif
 
 // ... same for DMM compatible versions (>=535) we look for one of the defines it adds
-#if NVRHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_DISPLACEMENT_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
-#define NVRHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (1)
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_DISPLACEMENT_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
+#define CAUSTICA_RHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (1)
 #else
-#define NVRHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (0)
+#define CAUSTICA_RHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (0)
 #endif
 
-#if NVRHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS_VER)
-#define NVRHI_WITH_NVAPI_CLUSTERS (1)
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS_VER)
+#define CAUSTICA_RHI_WITH_NVAPI_CLUSTERS (1)
 #else
-#define NVRHI_WITH_NVAPI_CLUSTERS (0)
+#define CAUSTICA_RHI_WITH_NVAPI_CLUSTERS (0)
 #endif
 
 // Line-Swept Spheres were added in NVAPI SDK 572.18
-#if NVRHI_D3D12_WITH_NVAPI && !NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP && (NVAPI_SDK_VERSION >= 57218)
-#define NVRHI_WITH_NVAPI_LSS (1)
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && !CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP && (NVAPI_SDK_VERSION >= 57218)
+#define CAUSTICA_RHI_WITH_NVAPI_LSS (1)
 #else
-#define NVRHI_WITH_NVAPI_LSS (0)
+#define CAUSTICA_RHI_WITH_NVAPI_LSS (0)
 #endif
 
 #if D3D12_PREVIEW_SDK_VERSION == 717
-#define NVRHI_D3D12_WITH_COOPVEC (1)
+#define CAUSTICA_RHI_D3D12_WITH_COOPVEC (1)
 #else
-#define NVRHI_D3D12_WITH_COOPVEC (0)
+#define CAUSTICA_RHI_D3D12_WITH_COOPVEC (0)
 #endif
 
 #include <bitset>
@@ -69,11 +69,11 @@
 #include "../common/dxgi-format.h"
 #include "../common/versioning.h"
 
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
 #include <rtxmu/D3D12AccelStructManager.h>
 #endif
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     class RootSignature;
     class Buffer;
@@ -98,7 +98,7 @@ namespace nvrhi::d3d12
     UINT convertSamplerReductionType(SamplerReductionType reductionType);
     D3D12_SHADING_RATE convertPixelShadingRate(VariableShadingRate shadingRate);
     D3D12_SHADING_RATE_COMBINER convertShadingRateCombiner(ShadingRateCombiner combiner);
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
     D3D12_LINEAR_ALGEBRA_DATATYPE convertCoopVecDataType(coopvec::DataType type);
     coopvec::DataType convertCoopVecDataType(D3D12_LINEAR_ALGEBRA_DATATYPE type);
     D3D12_LINEAR_ALGEBRA_MATRIX_LAYOUT convertCoopVecMatrixLayout(coopvec::MatrixLayout layout);
@@ -116,10 +116,10 @@ namespace nvrhi::d3d12
         RefCountPtr<ID3D12Device2> device2;
         RefCountPtr<ID3D12Device5> device5;
         RefCountPtr<ID3D12Device8> device8;
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         RefCountPtr<ID3D12DevicePreview> devicePreview;
 #endif
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         std::unique_ptr<rtxmu::DxAccelStructManager> rtxMemUtil;
 #endif
 
@@ -178,7 +178,7 @@ namespace nvrhi::d3d12
         StaticDescriptorHeap shaderResourceViewHeap;
         StaticDescriptorHeap samplerHeap;
         utils::BitSetAllocator timerQueries;
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         std::mutex asListMutex;
         std::vector<uint64_t> asBuildsCompleted;
 #endif
@@ -201,7 +201,7 @@ namespace nvrhi::d3d12
     public:
         ShaderDesc desc;
         std::vector<char> bytecode;
-    #if NVRHI_D3D12_WITH_NVAPI
+    #if CAUSTICA_RHI_D3D12_WITH_NVAPI
         std::vector<NVAPI_D3D12_PSO_EXTENSION_DESC*> extensions;
         std::vector<NV_CUSTOM_SEMANTIC> customSemantics;
         std::vector<uint32_t> coordinateSwizzling;
@@ -756,7 +756,7 @@ namespace nvrhi::d3d12
         bool allowUpdate = false;
         bool compacted = false;
         size_t rtxmuId = ~0ull;
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         D3D12_GPU_VIRTUAL_ADDRESS rtxmuGpuVA = 0;
 #endif
 
@@ -899,11 +899,11 @@ namespace nvrhi::d3d12
         RefCountPtr<ID3D12GraphicsCommandList> commandList;
         RefCountPtr<ID3D12GraphicsCommandList4> commandList4;
         RefCountPtr<ID3D12GraphicsCommandList6> commandList6;
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         RefCountPtr<ID3D12GraphicsCommandListPreview> commandListPreview;
 #endif
         uint64_t lastSubmittedInstance = 0;
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         GFSDK_Aftermath_ContextHandle aftermathContext;
 #endif
     };
@@ -923,13 +923,13 @@ namespace nvrhi::d3d12
         std::vector<RefCountPtr<TimerQuery>> referencedTimerQueries;
         std::vector<std::shared_ptr<BufferChunk>> referencedUploadChunks;
         std::vector<std::shared_ptr<BufferChunk>> referencedScratchChunks;
-#ifdef NVRHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_RTXMU
         std::vector<uint64_t> rtxmuBuildIds;
         std::vector<uint64_t> rtxmuCompactionIds;
 #endif
     };
 
-    class CommandList final : public RefCounter<nvrhi::d3d12::ICommandList>
+    class CommandList final : public RefCounter<caustica::rhi::d3d12::ICommandList>
     {
     public:
 
@@ -993,7 +993,7 @@ namespace nvrhi::d3d12
         void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
         void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, nvrhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
@@ -1028,7 +1028,7 @@ namespace nvrhi::d3d12
         ResourceStates getTextureSubresourceState(ITexture* texture, ArraySlice arraySlice, MipLevel mipLevel) override;
         ResourceStates getBufferState(IBuffer* buffer) override;
 
-        nvrhi::IDevice* getDevice() override;
+        caustica::rhi::IDevice* getDevice() override;
         const CommandListParameters& getDesc() override { return m_Desc; }
 
         // D3D12 specific methods
@@ -1081,7 +1081,7 @@ namespace nvrhi::d3d12
         std::list<std::shared_ptr<InternalCommandList>> m_CommandListPool;
         std::shared_ptr<CommandListInstance> m_Instance;
         uint64_t m_RecordingVersion = 0;
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         AftermathMarkerTracker m_AftermathTracker;
 #endif
 
@@ -1219,8 +1219,8 @@ namespace nvrhi::d3d12
 
         bool bindAccelStructMemory(rt::IAccelStruct* as, IHeap* heap, uint64_t offset) override;
 
-        nvrhi::CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
-        uint64_t executeCommandLists(nvrhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        caustica::rhi::CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
+        uint64_t executeCommandLists(caustica::rhi::ICommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
         bool waitForIdle() override;
         void runGarbageCollection() override;
@@ -1298,4 +1298,4 @@ namespace nvrhi::d3d12
     
     };
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

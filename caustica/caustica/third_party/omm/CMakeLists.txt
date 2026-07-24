@@ -10,7 +10,6 @@ string(REGEX MATCH "VERSION_BUILD ([0-9]*)" _ ${omm_ver_h})
 set(OMM_VERSION_PATCH ${CMAKE_MATCH_1})
 set(PROJECT_VERSION "${OMM_VERSION_MAJOR}.${OMM_VERSION_MINOR}.${OMM_VERSION_PATCH}")
 
-option(OMM_INTEGRATION_LAYER_NVRHI "" ON)
 option(OMM_ENABLE_PRECOMPILED_SHADERS_DXIL "" OFF)
 option(OMM_ENABLE_PRECOMPILED_SHADERS_SPIRV "" OFF)
 option(OMM_ENABLE_BENCHMARK "" OFF)
@@ -21,7 +20,4 @@ set(OMM_LIB_INSTALL OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(external)
 add_subdirectory(libraries/omm-lib)
-
-if (OMM_INTEGRATION_LAYER_NVRHI)
-    add_subdirectory(libraries/omm-gpu-nvrhi)
-endif()
+# GPU bake: caustica::omm::GpuBakeRhi in causRender (not built from this tree).

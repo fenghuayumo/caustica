@@ -49,7 +49,7 @@ public:
 };
 
 TextureLoader::TextureLoader(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<IDescriptorTableManager> descriptorTable,
     AssetRegistry& registry,
@@ -163,12 +163,12 @@ bool TextureLoader::fillTextureData(
             texture->data = std::make_shared<Blob>(data, bytesPerPixel * width * height);
             texture->width = static_cast<uint32_t>(width);
             texture->height = static_cast<uint32_t>(height);
-            texture->format = nvrhi::Format::RGBA32_FLOAT;
+            texture->format = caustica::rhi::Format::RGBA32_FLOAT;
 
             texture->originalBitsPerPixel = channels * 32;
             texture->isRenderTarget = true;
             texture->mipLevels = 1;
-            texture->dimension = nvrhi::TextureDimension::Texture2D;
+            texture->dimension = caustica::rhi::TextureDimension::Texture2D;
 
             texture->dataLayout.resize(1);
             texture->dataLayout[0].resize(1);
@@ -236,7 +236,7 @@ bool TextureLoader::fillTextureData(
         texture->height = static_cast<uint32_t>(height);
         texture->isRenderTarget = true;
         texture->mipLevels = 1;
-        texture->dimension = nvrhi::TextureDimension::Texture2D;
+        texture->dimension = caustica::rhi::TextureDimension::Texture2D;
 
         texture->dataLayout.resize(1);
         texture->dataLayout[0].resize(1);
@@ -249,14 +249,14 @@ bool TextureLoader::fillTextureData(
         switch (channels)
         {
         case 1:
-            texture->format = is_hdr ? nvrhi::Format::R32_FLOAT : nvrhi::Format::R8_UNORM;
+            texture->format = is_hdr ? caustica::rhi::Format::R32_FLOAT : caustica::rhi::Format::R8_UNORM;
             break;
         case 2:
-            texture->format = is_hdr ? nvrhi::Format::RG32_FLOAT : nvrhi::Format::RG8_UNORM;
+            texture->format = is_hdr ? caustica::rhi::Format::RG32_FLOAT : caustica::rhi::Format::RG8_UNORM;
             break;
         case 4:
-            texture->format = is_hdr ? nvrhi::Format::RGBA32_FLOAT :
-                (texture->forceSRGB ? nvrhi::Format::SRGBA8_UNORM : nvrhi::Format::RGBA8_UNORM);
+            texture->format = is_hdr ? caustica::rhi::Format::RGBA32_FLOAT :
+                (texture->forceSRGB ? caustica::rhi::Format::SRGBA8_UNORM : caustica::rhi::Format::RGBA8_UNORM);
             break;
         default:
             texture->data.reset();
@@ -286,7 +286,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     std::shared_ptr<ImageAsset> texture;
 
@@ -409,7 +409,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemory(
     const std::string& mimeType,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     std::shared_ptr<ImageAsset> texture = createTextureData();
 

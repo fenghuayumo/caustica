@@ -2,7 +2,7 @@
 
 #include <math/math.h>
 #include <core/DescriptorHandle.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <scene/SceneRenderResourceIds.h>
 #include <scene/SceneTypes.h>
 
@@ -25,8 +25,8 @@ namespace caustica::render
 // Per-skinned-mesh GPU state owned by the render side (not ECS).
 struct SkinnedMeshGpuState
 {
-    nvrhi::BufferHandle jointBuffer;
-    nvrhi::BindingSetHandle skinningBindingSet;
+    caustica::rhi::BufferHandle jointBuffer;
+    caustica::rhi::BindingSetHandle skinningBindingSet;
     bool skinningInitialized = false;
 };
 
@@ -35,9 +35,9 @@ struct MeshGpuDebugData
     std::shared_ptr<DescriptorHandle> ommArrayDataBufferDescriptor;
     std::shared_ptr<DescriptorHandle> ommDescBufferDescriptor;
     std::shared_ptr<DescriptorHandle> ommIndexBufferDescriptor;
-    nvrhi::BufferHandle ommArrayDataBuffer;
-    nvrhi::BufferHandle ommDescBuffer;
-    nvrhi::BufferHandle ommIndexBuffer;
+    caustica::rhi::BufferHandle ommArrayDataBuffer;
+    caustica::rhi::BufferHandle ommDescBuffer;
+    caustica::rhi::BufferHandle ommIndexBuffer;
 };
 
 struct MeshGeometryGpuDebugData
@@ -45,25 +45,25 @@ struct MeshGeometryGpuDebugData
     uint32_t ommArrayDataOffset = 0xFFFFFFFF;
     uint32_t ommDescBufferOffset = 0xFFFFFFFF;
     uint32_t ommIndexBufferOffset = 0xFFFFFFFF;
-    nvrhi::Format ommIndexBufferFormat = nvrhi::Format::R32_UINT;
+    caustica::rhi::Format ommIndexBufferFormat = caustica::rhi::Format::R32_UINT;
     uint64_t ommStatsTotalKnown = 0;
     uint64_t ommStatsTotalUnknown = 0;
 };
 
 struct MeshGpuRecord
 {
-    nvrhi::BufferHandle indexBuffer;
-    nvrhi::BufferHandle vertexBuffer;
-    nvrhi::BufferHandle instanceBuffer;
+    caustica::rhi::BufferHandle indexBuffer;
+    caustica::rhi::BufferHandle vertexBuffer;
+    caustica::rhi::BufferHandle instanceBuffer;
     std::shared_ptr<DescriptorHandle> indexBufferDescriptor;
     std::shared_ptr<DescriptorHandle> vertexBufferDescriptor;
     std::shared_ptr<DescriptorHandle> instanceBufferDescriptor;
-    std::array<nvrhi::BufferRange, size_t(VertexAttribute::Count)> vertexBufferRanges{};
-    std::vector<nvrhi::BufferRange> morphTargetBufferRanges;
+    std::array<caustica::rhi::BufferRange, size_t(VertexAttribute::Count)> vertexBufferRanges{};
+    std::vector<caustica::rhi::BufferRange> morphTargetBufferRanges;
 
-    nvrhi::rt::AccelStructHandle accelStruct;
-    nvrhi::rt::AccelStructHandle accelStructOmm;
-    std::vector<nvrhi::rt::OpacityMicromapHandle> opacityMicromaps;
+    caustica::rhi::rt::AccelStructHandle accelStruct;
+    caustica::rhi::rt::AccelStructHandle accelStructOmm;
+    std::vector<caustica::rhi::rt::OpacityMicromapHandle> opacityMicromaps;
     std::unique_ptr<MeshGpuDebugData> debugData;
     std::vector<MeshGeometryGpuDebugData> geometryDebugData;
     bool debugDataDirty = true;
@@ -73,12 +73,12 @@ struct MeshGpuRecord
         return vertexBufferRanges[size_t(attribute)].byteSize != 0;
     }
 
-    [[nodiscard]] nvrhi::BufferRange& vertexBufferRange(VertexAttribute attribute)
+    [[nodiscard]] caustica::rhi::BufferRange& vertexBufferRange(VertexAttribute attribute)
     {
         return vertexBufferRanges[size_t(attribute)];
     }
 
-    [[nodiscard]] const nvrhi::BufferRange& vertexBufferRange(VertexAttribute attribute) const
+    [[nodiscard]] const caustica::rhi::BufferRange& vertexBufferRange(VertexAttribute attribute) const
     {
         return vertexBufferRanges[size_t(attribute)];
     }
@@ -86,7 +86,7 @@ struct MeshGpuRecord
 
 struct MaterialGpuRecord
 {
-    nvrhi::BufferHandle constantsBuffer;
+    caustica::rhi::BufferHandle constantsBuffer;
     uint64_t uploadedContentHash = 0;
 };
 
@@ -104,8 +104,8 @@ struct MeshGpuUploadCommand
 // Filled at beginGpuReadFrame; prefer these over Scene::getGpuResources() digs.
 struct SceneGpuFrameHandles
 {
-    nvrhi::BufferHandle instanceBuffer;
-    nvrhi::BufferHandle geometryBuffer;
+    caustica::rhi::BufferHandle instanceBuffer;
+    caustica::rhi::BufferHandle geometryBuffer;
 
     [[nodiscard]] bool valid() const
     {
@@ -120,14 +120,14 @@ struct SceneGpuResources
     std::vector<GeometryData> geometryData;
     std::vector<InstanceData> instanceData;
 
-    nvrhi::BufferHandle materialBuffer;
-    nvrhi::BufferHandle geometryBuffer;
-    nvrhi::BufferHandle instanceBuffer;
+    caustica::rhi::BufferHandle materialBuffer;
+    caustica::rhi::BufferHandle geometryBuffer;
+    caustica::rhi::BufferHandle instanceBuffer;
 
-    nvrhi::DeviceHandle device;
-    nvrhi::ShaderHandle skinningShader;
-    nvrhi::ComputePipelineHandle skinningPipeline;
-    nvrhi::BindingLayoutHandle skinningBindingLayout;
+    caustica::rhi::DeviceHandle device;
+    caustica::rhi::ShaderHandle skinningShader;
+    caustica::rhi::ComputePipelineHandle skinningPipeline;
+    caustica::rhi::BindingLayoutHandle skinningBindingLayout;
 
     // Keyed by ecs::Entity raw id. render thread only.
     std::unordered_map<uint32_t, SkinnedMeshGpuState> skinnedGpuByEntity;

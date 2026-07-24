@@ -5,7 +5,7 @@
 namespace caustica::render
 {
 
-RenderDevice::RenderDevice(nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+RenderDevice::RenderDevice(caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_builtins(std::make_unique<BuiltinTextures>(device))
     , m_samplers(std::make_unique<StandardSamplers>(device))

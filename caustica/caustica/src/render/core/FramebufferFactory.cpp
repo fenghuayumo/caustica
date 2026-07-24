@@ -4,13 +4,13 @@
 
 using namespace caustica;
 
-nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const nvrhi::TextureSubresourceSet& subresources)
+caustica::rhi::IFramebuffer* FramebufferFactory::getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources)
 {
-    nvrhi::FramebufferHandle& item = m_framebufferCache[subresources];
+    caustica::rhi::FramebufferHandle& item = m_framebufferCache[subresources];
 
     if (!item)
     {
-        nvrhi::FramebufferDesc desc;
+        caustica::rhi::FramebufferDesc desc;
         for (auto renderTarget : renderTargets)
             desc.addColorAttachment(renderTarget, subresources);
 
@@ -26,14 +26,14 @@ nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const nvrhi::TextureSubr
     return item;
 }
 
-nvrhi::IFramebuffer* FramebufferFactory::getFramebuffer(const IView& view)
+caustica::rhi::IFramebuffer* FramebufferFactory::getFramebuffer(const IView& view)
 {
-    return getFramebuffer(caustica::toNvrhi(view.getSubresources()));
+    return getFramebuffer(caustica::toRhi(view.getSubresources()));
 }
 
-nvrhi::FramebufferInfo FramebufferFactory::getFramebufferInfo()
+caustica::rhi::FramebufferInfo FramebufferFactory::getFramebufferInfo()
 {
-    nvrhi::FramebufferInfo info;
+    caustica::rhi::FramebufferInfo info;
 
     for (auto rt : renderTargets)
     {

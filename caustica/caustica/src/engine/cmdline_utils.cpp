@@ -28,32 +28,32 @@ namespace
             || value == "on";
     }
 
-    bool TryParseBackendName(const std::string& value, nvrhi::GraphicsAPI& api)
+    bool TryParseBackendName(const std::string& value, caustica::rhi::GraphicsAPI& api)
     {
         const std::string backend = LowerAscii(value);
         if (backend == "vk" || backend == "vulkan")
         {
-            api = nvrhi::GraphicsAPI::VULKAN;
+            api = caustica::rhi::GraphicsAPI::VULKAN;
             return true;
         }
         if (backend == "dx12" || backend == "d3d12" || backend == "directx12" || backend == "directx")
         {
-            api = nvrhi::GraphicsAPI::D3D12;
+            api = caustica::rhi::GraphicsAPI::D3D12;
             return true;
         }
         if (backend == "dx11" || backend == "d3d11" || backend == "directx11")
         {
-            api = nvrhi::GraphicsAPI::D3D11;
+            api = caustica::rhi::GraphicsAPI::D3D11;
             return true;
         }
         return false;
     }
 } // namespace
 
-nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv)
+caustica::rhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
 #if defined(_WIN32)
-    nvrhi::GraphicsAPI api = getGraphicsAPIFromCommandLine(argc, argv);
+    caustica::rhi::GraphicsAPI api = getGraphicsAPIFromCommandLine(argc, argv);
 
     for (int n = 1; n < argc; ++n)
     {
@@ -73,12 +73,12 @@ nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const
         if (key == "-vk" || key == "--vk" || key == "-vulkan" || key == "--vulkan")
         {
             if (IsTrueOptionValue(value))
-                api = nvrhi::GraphicsAPI::VULKAN;
+                api = caustica::rhi::GraphicsAPI::VULKAN;
         }
         else if (key == "-d3d12" || key == "--d3d12" || key == "-dx12" || key == "--dx12")
         {
             if (IsTrueOptionValue(value))
-                api = nvrhi::GraphicsAPI::D3D12;
+                api = caustica::rhi::GraphicsAPI::D3D12;
         }
         else if (key == "--backend" || key == "--api" || key == "--graphicsapi")
         {
@@ -86,7 +86,7 @@ nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const
             if (backend.empty() && n + 1 < argc)
                 backend = argv[++n] ? argv[n] : "";
 
-            nvrhi::GraphicsAPI parsedApi;
+            caustica::rhi::GraphicsAPI parsedApi;
             if (TryParseBackendName(backend, parsedApi))
                 api = parsedApi;
             else
@@ -98,7 +98,7 @@ nvrhi::GraphicsAPI resolveGraphicsAPIFromCommandLine(int argc, const char* const
 #else
     (void)argc;
     (void)argv;
-    return nvrhi::GraphicsAPI::VULKAN;
+    return caustica::rhi::GraphicsAPI::VULKAN;
 #endif
 }
 

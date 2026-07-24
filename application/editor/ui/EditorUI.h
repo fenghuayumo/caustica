@@ -111,7 +111,7 @@ private:
     void BuildViewportPanel(const PanelLayout& layout);
 
 public:
-    void setViewportColorTexture(nvrhi::ITexture* texture) { m_viewportColor = texture; }
+    void setViewportColorTexture(caustica::rhi::ITexture* texture) { m_viewportColor = texture; }
 
 private:
     SceneEditor& m_sceneEditor;
@@ -126,7 +126,7 @@ private:
     std::string                 m_pythonOutputLog;      // Captured stdout/stderr from scripts
 
     float                       m_showSceneWidgets = 0.0f;
-    nvrhi::ITexture*            m_viewportColor = nullptr;
+    caustica::rhi::ITexture*            m_viewportColor = nullptr;
 
     std::unique_ptr<caustica::ImGui_Console> m_console;
 
@@ -136,7 +136,7 @@ private:
     PathTracerSettings& m_settings;
     caustica::render::RenderRuntimeState& m_runtime;
     EditorUIState& m_editorUI;
-    nvrhi::CommandListHandle m_commandList;
+    caustica::rhi::CommandListHandle m_commandList;
 
     const bool m_NVAPI_SERSupported;
 

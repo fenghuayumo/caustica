@@ -5,8 +5,8 @@
 #include <assets/loader/TextureLoader.h>
 #include <render/core/AccelerationStructureUtil.h>
 
-#include <rhi/nvrhi.h>
-#include <omm-gpu-nvrhi.h>
+#include <rhi/rhi.h>
+#include <render/omm/GpuBakeRhi.h>
 #include <unordered_map>
 #include <list>
 
@@ -30,8 +30,8 @@ public:
 			// settings
 			uint32_t maxSubdivisionLevel = 5;
 			float dynamicSubdivisionScale = 2.f;
-			nvrhi::rt::OpacityMicromapFormat format = nvrhi::rt::OpacityMicromapFormat::OC1_4_State;
-			nvrhi::rt::OpacityMicromapBuildFlags flags = nvrhi::rt::OpacityMicromapBuildFlags::FastTrace;
+			caustica::rhi::rt::OpacityMicromapFormat format = caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State;
+			caustica::rhi::rt::OpacityMicromapBuildFlags flags = caustica::rhi::rt::OpacityMicromapBuildFlags::FastTrace;
 			uint32_t maxOmmArrayDataSizeInMB; // Limit OMM memory footprint to this value.
 			omm::OpacityState alphaCutoffGT = omm::OpacityState::Opaque;
 			omm::OpacityState alphaCutoffLE = omm::OpacityState::Transparent;
@@ -51,13 +51,13 @@ public:
 	};
 
 	OmmBuildQueue(
-		nvrhi::DeviceHandle& device, 
+		caustica::rhi::DeviceHandle& device, 
 		std::shared_ptr<caustica::DescriptorTableManager>,
 		std::shared_ptr<caustica::ShaderFactory> shaderFactory
 	);
 	~OmmBuildQueue();
 
-	void update(nvrhi::ICommandList& commandList);
+	void update(caustica::rhi::ICommandList& commandList);
 	void setSceneGpuResources(caustica::render::SceneGpuResources* resources)
 	{
 		m_sceneGpuResources = resources;
@@ -81,7 +81,7 @@ private:
 
 	struct BufferInfo
 	{
-		nvrhi::Format	ommIndexFormat;
+		caustica::rhi::Format	ommIndexFormat;
 		uint32_t		ommIndexCount;
 		size_t			ommIndexOffset;
 		size_t			ommDescArrayOffset;
@@ -96,19 +96,19 @@ private:
 
 		// below will be populated after Setup pass has finished.
 		uint32_t		ommArrayDataOffset;
-		std::vector<nvrhi::rt::OpacityMicromapUsageCount> ommIndexHistogram;
-		std::vector<nvrhi::rt::OpacityMicromapUsageCount> ommArrayHistogram;
+		std::vector<caustica::rhi::rt::OpacityMicromapUsageCount> ommIndexHistogram;
+		std::vector<caustica::rhi::rt::OpacityMicromapUsageCount> ommArrayHistogram;
 	};           
 
 	struct Buffers
 	{
-		nvrhi::BufferHandle ommArrayDataBuffer;
-		nvrhi::BufferHandle ommIndexBuffer;
-		nvrhi::BufferHandle ommDescBuffer;
-		nvrhi::BufferHandle ommDescArrayHistogramBuffer;
-		nvrhi::BufferHandle ommIndexArrayHistogramBuffer;
-		nvrhi::BufferHandle ommPostDispatchInfoBuffer;
-		nvrhi::BufferHandle ommReadbackBuffer;
+		caustica::rhi::BufferHandle ommArrayDataBuffer;
+		caustica::rhi::BufferHandle ommIndexBuffer;
+		caustica::rhi::BufferHandle ommDescBuffer;
+		caustica::rhi::BufferHandle ommDescArrayHistogramBuffer;
+		caustica::rhi::BufferHandle ommIndexArrayHistogramBuffer;
+		caustica::rhi::BufferHandle ommPostDispatchInfoBuffer;
+		caustica::rhi::BufferHandle ommReadbackBuffer;
 	};
 
 	struct BuildTask
@@ -123,30 +123,30 @@ private:
 		void reset();
 	};
 
-	void consumeOneTask(nvrhi::ICommandList& commandList, BuildState taskState);
-	bool executeTask(nvrhi::ICommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
+	void consumeOneTask(caustica::rhi::ICommandList& commandList, BuildState taskState);
+	bool executeTask(caustica::rhi::ICommandList& commandList, BuildTask& taskState); // Returns whether the task is finished and can be removed from the queue
 
-	void runSetup(nvrhi::ICommandList& commandList, BuildTask& task);
-	void runBakeAndBuild(nvrhi::ICommandList& commandList, BuildTask& task);
-	void finalize(nvrhi::ICommandList& commandList, BuildTask& task);
+	void runSetup(caustica::rhi::ICommandList& commandList, BuildTask& task);
+	void runBakeAndBuild(caustica::rhi::ICommandList& commandList, BuildTask& task);
+	void finalize(caustica::rhi::ICommandList& commandList, BuildTask& task);
 	
 	void allocateOMMArrayDataBuffer(BuildTask& task);
-	void bakeOmmArrayData(nvrhi::ICommandList& commandList, BuildTask& task);
-	std::vector<bvh::OmmAttachment> buildOMMAttachments(nvrhi::ICommandList& commandList, BuildTask& task);
-	void buildBLASWithOMM(nvrhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
+	void bakeOmmArrayData(caustica::rhi::ICommandList& commandList, BuildTask& task);
+	std::vector<bvh::OmmAttachment> buildOMMAttachments(caustica::rhi::ICommandList& commandList, BuildTask& task);
+	void buildBLASWithOMM(caustica::rhi::ICommandList& commandList, BuildTask& task, const std::vector<bvh::OmmAttachment>& ommAttachment);
 	caustica::render::MeshGpuRecord* findMeshGpu(
 		const caustica::scene::MeshRenderResourceSnapshot& mesh) const;
 
 	bool readyToRecordWork();
-	void submitAndSubscribeQuery(nvrhi::ICommandList& commandList);
+	void submitAndSubscribeQuery(caustica::rhi::ICommandList& commandList);
 
 	std::vector<BuildTask> m_pending;
-	nvrhi::EventQueryHandle m_InFlightQuery;
+	caustica::rhi::EventQueryHandle m_InFlightQuery;
 
-	nvrhi::DeviceHandle m_device;
+	caustica::rhi::DeviceHandle m_device;
 	caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
 	MaterialGpuCache* m_materialGpuCache = nullptr;
 	std::shared_ptr<caustica::DescriptorTableManager> m_descriptorTable;
 	std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-	std::unique_ptr<omm::GpuBakeNvrhi> m_baker;
+	std::unique_ptr<caustica::omm::GpuBakeRhi> m_baker;
 };

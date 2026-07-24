@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/core/PathTracerSettings.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 
 #if CAUSTICA_WITH_STREAMLINE
@@ -25,7 +25,7 @@ class TemporalAntiAliasingPass;
 struct PostProcessAAParams
 {
     PathTracerSettings&                     settings;
-    nvrhi::ICommandList*                    commandList = nullptr;
+    caustica::rhi::ICommandList*                    commandList = nullptr;
     RenderTargets*                          renderTargets = nullptr;
     GpuDevice*                              gpuDevice = nullptr;
 
@@ -42,9 +42,9 @@ struct PostProcessAAParams
     AccumulationPass*                       accumulationPass = nullptr;
     PostProcess*                            postProcess = nullptr;
 
-    nvrhi::BindingSetHandle                 bindingSet;
-    nvrhi::BindingLayoutHandle              bindingLayout;
-    nvrhi::BufferHandle                     constantBuffer;
+    caustica::rhi::BindingSetHandle                 bindingSet;
+    caustica::rhi::BindingLayoutHandle              bindingLayout;
+    caustica::rhi::BufferHandle                     constantBuffer;
 
     int                                     accumulationSampleIndex = 0;
     int*                                    gaussianSplatTemporalSampleIndex = nullptr;

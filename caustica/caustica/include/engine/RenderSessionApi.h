@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 struct DebugFeedbackStruct;
 struct DeltaTreeVizPathVertex;
@@ -35,7 +35,7 @@ bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh);
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation);
 
-[[nodiscard]] nvrhi::ITexture* ldrColorTexture(const App& app);
+[[nodiscard]] caustica::rhi::ITexture* ldrColorTexture(const App& app);
 [[nodiscard]] const DebugFeedbackStruct& feedbackData(const App& app);
 [[nodiscard]] const DeltaTreeVizPathVertex* debugDeltaPathTree(const App& app);
 [[nodiscard]] int accumulationSampleIndex(const App& app);

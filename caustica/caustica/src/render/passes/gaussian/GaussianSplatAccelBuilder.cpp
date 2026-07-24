@@ -10,7 +10,7 @@ using namespace caustica::math;
 namespace caustica::render
 {
 
-GaussianSplatAccelBuilder::GaussianSplatAccelBuilder(nvrhi::IDevice* device)
+GaussianSplatAccelBuilder::GaussianSplatAccelBuilder(caustica::rhi::IDevice* device)
     : m_device(device)
 {
 }
@@ -30,11 +30,11 @@ void GaussianSplatAccelBuilder::release(bool markBuildPending)
 }
 
 void GaussianSplatAccelBuilder::build(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const GaussianSplatAccelBuildParams& params,
     const std::vector<caustica::GaussianSplatData>& splats,
     uint32_t splatCount,
-    nvrhi::IBuffer* aabbBuffer)
+    caustica::rhi::IBuffer* aabbBuffer)
 {
     if (splatCount == 0 || aabbBuffer == nullptr)
         return;
@@ -52,14 +52,14 @@ void GaussianSplatAccelBuilder::build(
         return;
     }
 
-    nvrhi::rt::GeometryDesc geometryDesc;
+    caustica::rhi::rt::GeometryDesc geometryDesc;
     m_shadowPrimitiveCountPerSplat = params.useAABBs
         ? 1u
         : uint32_t(kGaussianSplatUnitIcosahedronIndices.size() / 3u);
 
     if (params.useAABBs)
     {
-        std::vector<nvrhi::rt::GeometryAABB> aabbs;
+        std::vector<caustica::rhi::rt::GeometryAABB> aabbs;
         if (params.useTLASInstances)
         {
             aabbs.push_back({ -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f });
@@ -69,17 +69,17 @@ void GaussianSplatAccelBuilder::build(
             aabbs = buildGaussianAabbs(splats, params.splatScale, params.kernelDegree, params.adaptiveClamp);
         }
 
-        commandList->writeBuffer(aabbBuffer, aabbs.data(), aabbs.size() * sizeof(nvrhi::rt::GeometryAABB));
-        commandList->setBufferState(aabbBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+        commandList->writeBuffer(aabbBuffer, aabbs.data(), aabbs.size() * sizeof(caustica::rhi::rt::GeometryAABB));
+        commandList->setBufferState(aabbBuffer, caustica::rhi::ResourceStates::AccelStructBuildInput);
         commandList->commitBarriers();
 
-        nvrhi::rt::GeometryAABBs aabbGeometry;
+        caustica::rhi::rt::GeometryAABBs aabbGeometry;
         aabbGeometry.buffer = aabbBuffer;
         aabbGeometry.offset = 0;
         aabbGeometry.count = uint32_t(aabbs.size());
-        aabbGeometry.stride = sizeof(nvrhi::rt::GeometryAABB);
+        aabbGeometry.stride = sizeof(caustica::rhi::rt::GeometryAABB);
         geometryDesc.setAABBs(aabbGeometry);
-        geometryDesc.flags = nvrhi::rt::GeometryFlags::NoDuplicateAnyHitInvocation;
+        geometryDesc.flags = caustica::rhi::rt::GeometryFlags::NoDuplicateAnyHitInvocation;
     }
     else
     {
@@ -107,77 +107,77 @@ void GaussianSplatAccelBuilder::build(
             }
         }
 
-        nvrhi::BufferDesc vertexDesc;
+        caustica::rhi::BufferDesc vertexDesc;
         vertexDesc.byteSize = uint64_t(vertices.size()) * sizeof(float3);
         vertexDesc.structStride = sizeof(float3);
-        vertexDesc.format = nvrhi::Format::RGB32_FLOAT;
+        vertexDesc.format = caustica::rhi::Format::RGB32_FLOAT;
         vertexDesc.isVertexBuffer = true;
         vertexDesc.isAccelStructBuildInput = true;
-        vertexDesc.initialState = nvrhi::ResourceStates::AccelStructBuildInput;
+        vertexDesc.initialState = caustica::rhi::ResourceStates::AccelStructBuildInput;
         vertexDesc.keepInitialState = true;
         vertexDesc.debugName = "GaussianSplatIcosahedronVertexBuffer";
         m_triangleVertexBuffer = m_device->createBuffer(vertexDesc);
 
-        nvrhi::BufferDesc indexDesc;
+        caustica::rhi::BufferDesc indexDesc;
         indexDesc.byteSize = uint64_t(indices.size()) * sizeof(uint32_t);
-        indexDesc.format = nvrhi::Format::R32_UINT;
+        indexDesc.format = caustica::rhi::Format::R32_UINT;
         indexDesc.isIndexBuffer = true;
         indexDesc.isAccelStructBuildInput = true;
-        indexDesc.initialState = nvrhi::ResourceStates::AccelStructBuildInput;
+        indexDesc.initialState = caustica::rhi::ResourceStates::AccelStructBuildInput;
         indexDesc.keepInitialState = true;
         indexDesc.debugName = "GaussianSplatIcosahedronIndexBuffer";
         m_triangleIndexBuffer = m_device->createBuffer(indexDesc);
 
         commandList->writeBuffer(m_triangleVertexBuffer, vertices.data(), vertices.size() * sizeof(float3));
         commandList->writeBuffer(m_triangleIndexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
-        commandList->setBufferState(m_triangleVertexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
-        commandList->setBufferState(m_triangleIndexBuffer, nvrhi::ResourceStates::AccelStructBuildInput);
+        commandList->setBufferState(m_triangleVertexBuffer, caustica::rhi::ResourceStates::AccelStructBuildInput);
+        commandList->setBufferState(m_triangleIndexBuffer, caustica::rhi::ResourceStates::AccelStructBuildInput);
         commandList->commitBarriers();
 
-        nvrhi::rt::GeometryTriangles triangles;
+        caustica::rhi::rt::GeometryTriangles triangles;
         triangles.vertexBuffer = m_triangleVertexBuffer;
         triangles.indexBuffer = m_triangleIndexBuffer;
-        triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
-        triangles.indexFormat = nvrhi::Format::R32_UINT;
+        triangles.vertexFormat = caustica::rhi::Format::RGB32_FLOAT;
+        triangles.indexFormat = caustica::rhi::Format::R32_UINT;
         triangles.vertexStride = sizeof(float3);
         triangles.vertexCount = uint32_t(vertices.size());
         triangles.indexCount = uint32_t(indices.size());
         geometryDesc.setTriangles(triangles);
-        geometryDesc.flags = nvrhi::rt::GeometryFlags::None;
+        geometryDesc.flags = caustica::rhi::rt::GeometryFlags::None;
     }
 
-    nvrhi::rt::AccelStructDesc blasDesc;
+    caustica::rhi::rt::AccelStructDesc blasDesc;
     blasDesc.isTopLevel = false;
     blasDesc.debugName = params.useAABBs ? "GaussianSplatAabbBLAS" : "GaussianSplatIcosahedronBLAS";
-    blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace
+    blasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace
         | (params.allowBlasCompaction
-            ? nvrhi::rt::AccelStructBuildFlags::AllowCompaction
-            : nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
+            ? caustica::rhi::rt::AccelStructBuildFlags::AllowCompaction
+            : caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate);
     blasDesc.bottomLevelGeometries.push_back(geometryDesc);
 
     m_bottomLevelAS = m_device->createAccelStruct(blasDesc);
-    nvrhi::utils::BuildBottomLevelAccelStruct(commandList, m_bottomLevelAS, blasDesc);
+    caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, m_bottomLevelAS, blasDesc);
 
-    nvrhi::rt::AccelStructDesc tlasDesc;
+    caustica::rhi::rt::AccelStructDesc tlasDesc;
     tlasDesc.isTopLevel = true;
     tlasDesc.debugName = "GaussianSplatTLAS";
     tlasDesc.topLevelMaxInstances = params.useTLASInstances ? splatCount : 1;
-    tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
+    tlasDesc.buildFlags = caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace | caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate;
     m_topLevelAS = m_device->createAccelStruct(tlasDesc);
 
-    std::vector<nvrhi::rt::InstanceDesc> instances;
+    std::vector<caustica::rhi::rt::InstanceDesc> instances;
     instances.resize(params.useTLASInstances ? splatCount : 1u);
     if (params.useTLASInstances)
     {
         for (uint32_t splatIndex = 0; splatIndex < splatCount; ++splatIndex)
         {
             const caustica::GaussianSplatData& splat = splats[splatIndex];
-            nvrhi::rt::InstanceDesc& instanceDesc = instances[splatIndex];
+            caustica::rhi::rt::InstanceDesc& instanceDesc = instances[splatIndex];
             instanceDesc.bottomLevelAS = m_bottomLevelAS;
             instanceDesc.instanceMask = 0xff;
             instanceDesc.instanceID = splatIndex;
             instanceDesc.instanceContributionToHitGroupIndex = 0;
-            instanceDesc.flags = nvrhi::rt::InstanceFlags::ForceNonOpaque;
+            instanceDesc.flags = caustica::rhi::rt::InstanceFlags::ForceNonOpaque;
             fillScaleTranslateTransform(
                 instanceDesc.transform,
                 splat.centerOpacity.xyz(),
@@ -186,20 +186,20 @@ void GaussianSplatAccelBuilder::build(
     }
     else
     {
-        nvrhi::rt::InstanceDesc& instanceDesc = instances[0];
+        caustica::rhi::rt::InstanceDesc& instanceDesc = instances[0];
         instanceDesc.bottomLevelAS = m_bottomLevelAS;
         instanceDesc.instanceMask = 0xff;
         instanceDesc.instanceID = 0;
         instanceDesc.instanceContributionToHitGroupIndex = 0;
-        instanceDesc.flags = nvrhi::rt::InstanceFlags::ForceNonOpaque;
-        std::memcpy(instanceDesc.transform, nvrhi::rt::c_IdentityTransform, sizeof(nvrhi::rt::AffineTransform));
+        instanceDesc.flags = caustica::rhi::rt::InstanceFlags::ForceNonOpaque;
+        std::memcpy(instanceDesc.transform, caustica::rhi::rt::c_IdentityTransform, sizeof(caustica::rhi::rt::AffineTransform));
     }
 
     commandList->buildTopLevelAccelStruct(
         m_topLevelAS,
         instances.data(),
         instances.size(),
-        nvrhi::rt::AccelStructBuildFlags::PreferFastTrace | nvrhi::rt::AccelStructBuildFlags::AllowUpdate);
+        caustica::rhi::rt::AccelStructBuildFlags::PreferFastTrace | caustica::rhi::rt::AccelStructBuildFlags::AllowUpdate);
 
     m_buildPending = false;
     m_lastBlasCompaction = params.allowBlasCompaction;

@@ -35,7 +35,7 @@ using namespace caustica;
 
 #include <shaders/Misc/OmmGeometryDebugData.hlsli>
 
-OpacityMicromapBuilder::OpacityMicromapBuilder(nvrhi::DeviceHandle device,
+OpacityMicromapBuilder::OpacityMicromapBuilder(caustica::rhi::DeviceHandle device,
     std::shared_ptr<caustica::DescriptorTableManager> descriptorTableManager,
     std::shared_ptr<caustica::TextureLoader> textureCache,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
@@ -49,13 +49,13 @@ OpacityMicromapBuilder::OpacityMicromapBuilder(nvrhi::DeviceHandle device,
     m_ommBuildQueue = std::make_unique<OmmBuildQueue>(device, m_descriptorTableManager, m_shaderFactory);
 
     // allocate dummy buffer that works even if not enabled
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(GeometryDebugData) * 1024;
     bufferDesc.debugName = "BindlessGeometryDebug";
     bufferDesc.structStride = sizeof(GeometryDebugData);
     bufferDesc.canHaveRawViews = true;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.keepInitialState = true;
     m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
 }
@@ -70,15 +70,15 @@ void OpacityMicromapBuilder::ensureGeometryDebugCapacity(size_t geometryCount)
     if (geometryCount <= m_geometryDebugDataPtr.size())
         return;
 
-    m_geometryDebugDataPtr.resize(nvrhi::align<size_t>(geometryCount, allocationGranularity));
+    m_geometryDebugDataPtr.resize(caustica::rhi::align<size_t>(geometryCount, allocationGranularity));
 
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(GeometryDebugData) * m_geometryDebugDataPtr.size();
     bufferDesc.debugName = "BindlessGeometryDebug";
     bufferDesc.structStride = sizeof(GeometryDebugData);
     bufferDesc.canHaveRawViews = true;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::Common;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.keepInitialState = true;
 
     m_geometryDebugBuffer = m_device->createBuffer(bufferDesc);
@@ -96,7 +96,7 @@ void OpacityMicromapBuilder::sceneUnloading()
 }
 
 void OpacityMicromapBuilder::createRenderPasses(
-    nvrhi::BindingLayoutHandle bindlessLayout,
+    caustica::rhi::BindingLayoutHandle bindlessLayout,
     caustica::render::RenderDevice& renderDevice)
 {
     m_bindlessLayout = std::move(bindlessLayout);
@@ -188,8 +188,8 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
             geom.dynamicSubdivisionScale = m_uiData.ActiveState->EnableDynamicSubdivision ? m_uiData.ActiveState->DynamicSubdivisionScale : 0.f;
             geom.format = m_uiData.ActiveState->Format;
             geom.flags = m_uiData.ActiveState->Flag;
-            geom.alphaCutoffGT = (omm::OpacityState)m_uiData.ActiveState->AlphaCutoffGT;
-            geom.alphaCutoffLE = (omm::OpacityState)m_uiData.ActiveState->AlphaCutoffLE;
+            geom.alphaCutoffGT = (::omm::OpacityState)m_uiData.ActiveState->AlphaCutoffGT;
+            geom.alphaCutoffLE = (::omm::OpacityState)m_uiData.ActiveState->AlphaCutoffLE;
             geom.maxOmmArrayDataSizeInMB = m_uiData.ActiveState->MaxOmmArrayDataSizeInMB;
             geom.computeOnly = m_uiData.ActiveState->ComputeOnly;
             geom.enableLevelLineIntersection = m_uiData.ActiveState->LevelLineIntersection;
@@ -212,7 +212,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 }
 
 void OpacityMicromapBuilder::destroyOpacityMicromaps(
-    nvrhi::ICommandList& commandList,
+    caustica::rhi::ICommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     commandList.close();
@@ -237,7 +237,7 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 }
 
 void OpacityMicromapBuilder::buildOpacityMicromaps(
-    nvrhi::ICommandList& commandList,
+    caustica::rhi::ICommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     commandList.beginMarker("OMM Updates");
@@ -279,7 +279,7 @@ void OpacityMicromapBuilder::buildOpacityMicromaps(
     commandList.endMarker();
 }
 
-void OpacityMicromapBuilder::writeGeometryDebugBuffer(nvrhi::ICommandList& commandList)
+void OpacityMicromapBuilder::writeGeometryDebugBuffer(caustica::rhi::ICommandList& commandList)
 {
     commandList.writeBuffer(m_geometryDebugBuffer, m_geometryDebugDataPtr.data(), m_geometryDebugDataPtr.size() * sizeof(GeometryDebugData));
 }
@@ -317,7 +317,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(
 
             dgdata.ommIndexBufferIndex = debugData->ommIndexBufferDescriptor ? debugData->ommIndexBufferDescriptor->Get() : -1;
             dgdata.ommIndexBufferOffset = geometryDebug.ommIndexBufferOffset;
-            dgdata.ommIndexBuffer16Bit = geometryDebug.ommIndexBufferFormat == nvrhi::Format::R16_UINT;
+            dgdata.ommIndexBuffer16Bit = geometryDebug.ommIndexBufferFormat == caustica::rhi::Format::R16_UINT;
         }
         else
         {
@@ -334,7 +334,7 @@ void OpacityMicromapBuilder::updateDebugGeometry(
 }
 
 bool OpacityMicromapBuilder::update(
-    nvrhi::ICommandList& commandList,
+    caustica::rhi::ICommandList& commandList,
     const caustica::scene::SceneRenderData& renderData)
 {
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
@@ -385,7 +385,7 @@ bool OpacityMicromapBuilder::debugGUI(
 
     {
         {
-            UI_SCOPED_DISABLE(m_uiData.ActiveState.has_value() && m_uiData.ActiveState->Format != nvrhi::rt::OpacityMicromapFormat::OC1_4_State);
+            UI_SCOPED_DISABLE(m_uiData.ActiveState.has_value() && m_uiData.ActiveState->Format != caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State);
             if (ImGui::Checkbox("Force 2 State", &m_uiData.Force2State))
                 resetAccumulation = true;
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Will force 2-State via TLAS instance mask.");
@@ -439,11 +439,11 @@ bool OpacityMicromapBuilder::debugGUI(
                 "Fast Build"
             };
 
-            std::array<nvrhi::rt::OpacityMicromapBuildFlags, 3> formats =
+            std::array<caustica::rhi::rt::OpacityMicromapBuildFlags, 3> formats =
             {
-                nvrhi::rt::OpacityMicromapBuildFlags::None,
-                nvrhi::rt::OpacityMicromapBuildFlags::FastTrace,
-                nvrhi::rt::OpacityMicromapBuildFlags::FastBuild
+                caustica::rhi::rt::OpacityMicromapBuildFlags::None,
+                caustica::rhi::rt::OpacityMicromapBuildFlags::FastTrace,
+                caustica::rhi::rt::OpacityMicromapBuildFlags::FastBuild
             };
 
             if (ImGui::BeginCombo("Flag", formatNames[(uint32_t)m_uiData.DesiredState.Flag]))
@@ -461,11 +461,11 @@ bool OpacityMicromapBuilder::debugGUI(
         }
 
         {
-            auto FormatToString = [ ](nvrhi::rt::OpacityMicromapFormat format) {
-                assert(format == nvrhi::rt::OpacityMicromapFormat::OC1_2_State || format == nvrhi::rt::OpacityMicromapFormat::OC1_4_State);
-                return format == nvrhi::rt::OpacityMicromapFormat::OC1_2_State ? "2-State" : "4-State";
+            auto FormatToString = [ ](caustica::rhi::rt::OpacityMicromapFormat format) {
+                assert(format == caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State || format == caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State);
+                return format == caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State ? "2-State" : "4-State";
             };
-            std::array<nvrhi::rt::OpacityMicromapFormat, 2> formats = { nvrhi::rt::OpacityMicromapFormat::OC1_2_State, nvrhi::rt::OpacityMicromapFormat::OC1_4_State };
+            std::array<caustica::rhi::rt::OpacityMicromapFormat, 2> formats = { caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State, caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State };
             if (ImGui::BeginCombo("Format", FormatToString(m_uiData.DesiredState.Format)))
             {
                 for (uint i = 0; i < formats.size(); i++)
@@ -481,18 +481,18 @@ bool OpacityMicromapBuilder::debugGUI(
         }
 
         {
-            auto StateToString = [ ](omm::OpacityState state) {
+            auto StateToString = [ ](::omm::OpacityState state) {
                 const char* strings[] = { "Transparent", "Opaque", "UnknownTransparent", "UnknownOpaque" };
                 assert((int)state >= 0 && (int)state < IM_ARRAYSIZE(strings));
                 return strings[(int)state];
             };
-            const std::array<omm::OpacityState, 4> states = { omm::OpacityState::Transparent, omm::OpacityState::Opaque, omm::OpacityState::UnknownTransparent, omm::OpacityState::UnknownOpaque };
+            const std::array<::omm::OpacityState, 4> states = { ::omm::OpacityState::Transparent, ::omm::OpacityState::Opaque, ::omm::OpacityState::UnknownTransparent, ::omm::OpacityState::UnknownOpaque };
 
-            if (ImGui::BeginCombo("AlphaCutoffGT", StateToString((omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT)))
+            if (ImGui::BeginCombo("AlphaCutoffGT", StateToString((::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT)))
             {
                 for (uint i = 0; i < states.size(); i++)
                 {
-                    bool is_selected = states[i] == (omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT;
+                    bool is_selected = states[i] == (::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT;
                     if (ImGui::Selectable(StateToString(states[i]), is_selected))
                         m_uiData.DesiredState.AlphaCutoffGT = (int)states[i];
                     if (is_selected)
@@ -501,11 +501,11 @@ bool OpacityMicromapBuilder::debugGUI(
                 ImGui::EndCombo();
             }
 
-            if (ImGui::BeginCombo("AlphaCutoffLE", StateToString((omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE)))
+            if (ImGui::BeginCombo("AlphaCutoffLE", StateToString((::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE)))
             {
                 for (uint i = 0; i < states.size(); i++)
                 {
-                    bool is_selected = states[i] == (omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE;
+                    bool is_selected = states[i] == (::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE;
                     if (ImGui::Selectable(StateToString(states[i]), is_selected))
                         m_uiData.DesiredState.AlphaCutoffLE = (int)states[i];
                     if (is_selected)

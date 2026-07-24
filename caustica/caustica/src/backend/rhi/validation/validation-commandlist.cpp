@@ -6,7 +6,7 @@
 #include <sstream>
 
 
-namespace nvrhi::validation
+namespace caustica::rhi::validation
 {
 
     CommandListWrapper::CommandListWrapper(DeviceWrapper* device, ICommandList* commandList, bool isImmediate, CommandQueue queueType)
@@ -450,7 +450,7 @@ namespace nvrhi::validation
         m_CommandList->clearSamplerFeedbackTexture(texture);
     }
 
-    void CommandListWrapper::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, nvrhi::Format format)
+    void CommandListWrapper::decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
         m_CommandList->decodeSamplerFeedbackTexture(buffer, texture, format);
     }
@@ -1718,7 +1718,7 @@ namespace nvrhi::validation
         m_CommandList->buildTopLevelAccelStruct(underlyingAS, patchedInstances.data(), uint32_t(patchedInstances.size()), buildFlags);
     }
 
-    void CommandListWrapper::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, nvrhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
+    void CommandListWrapper::buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
     {
         if (!requireOpenState())
             return;
@@ -1885,7 +1885,7 @@ namespace nvrhi::validation
         m_CommandList->convertCoopVecMatrices(convertDescs, numDescs);
     }
 
-    void CommandListWrapper::evaluatePushConstantSize(const nvrhi::BindingLayoutVector& bindingLayouts)
+    void CommandListWrapper::evaluatePushConstantSize(const caustica::rhi::BindingLayoutVector& bindingLayouts)
     {
         m_PipelinePushConstantSize = 0;
 
@@ -1926,4 +1926,4 @@ namespace nvrhi::validation
         return true;
     }
     
-} // namespace nvrhi::validation
+} // namespace caustica::rhi::validation

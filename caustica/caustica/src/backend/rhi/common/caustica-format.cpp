@@ -1,6 +1,6 @@
 #include <rhi/caustica/format.h>
 
-namespace nvrhi::caustica
+namespace caustica::rhi
 {
 
 PixelFormatInfo getPixelFormatInfo(PixelFormat format)
@@ -43,7 +43,7 @@ PixelFormatInfo getPixelFormatInfo(PixelFormat format)
     return info;
 }
 
-Format toNvrhiFormat(PixelFormat format)
+Format toRhiFormat(PixelFormat format)
 {
     switch (format)
     {
@@ -67,7 +67,7 @@ Format toNvrhiFormat(PixelFormat format)
     }
 }
 
-PixelFormat fromNvrhiFormat(Format format)
+PixelFormat fromRhiFormat(Format format)
 {
     switch (format)
     {
@@ -91,4 +91,4 @@ PixelFormat fromNvrhiFormat(Format format)
     }
 }
 
-} // namespace nvrhi::caustica
+} // namespace caustica::rhi

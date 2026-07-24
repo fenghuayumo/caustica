@@ -3,7 +3,7 @@
 
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
 
     BufferHandle Device::createBuffer(const BufferDesc& desc)
@@ -649,4 +649,4 @@ namespace nvrhi::vulkan
         return true;
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

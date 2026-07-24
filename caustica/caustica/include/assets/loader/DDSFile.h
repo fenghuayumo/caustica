@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <vector>
 #include <memory>
 
@@ -11,13 +11,13 @@ struct ImageAsset;
 
 bool loadDDSTextureFromMemory(ImageAsset& textureInfo);
 
-nvrhi::TextureHandle createDDSTextureFromMemory(
-    nvrhi::IDevice* device,
-    nvrhi::ICommandList* commandList,
+caustica::rhi::TextureHandle createDDSTextureFromMemory(
+    caustica::rhi::IDevice* device,
+    caustica::rhi::ICommandList* commandList,
     std::shared_ptr<IBlob> data,
     const char* debugName = nullptr,
     bool forceSRGB = false);
 
-std::shared_ptr<IBlob> saveStagingTextureAsDDS(nvrhi::IDevice* device, nvrhi::IStagingTexture* stagingTexture);
+std::shared_ptr<IBlob> saveStagingTextureAsDDS(caustica::rhi::IDevice* device, caustica::rhi::IStagingTexture* stagingTexture);
 
 } // namespace caustica

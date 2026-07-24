@@ -69,16 +69,16 @@ bool GpuSharedCaches::initialize(GpuDevice& gpuDevice, AssetSystem& assetSystem)
 {
     shaderFactory = CreateShaderFactory(gpuDevice);
 
-    auto* nvrhiDevice = gpuDevice.getDevice();
-    bindlessLayout = render::WorldRenderer::createBindlessLayout(nvrhiDevice);
+    auto* rhiDevice = gpuDevice.getDevice();
+    bindlessLayout = render::WorldRenderer::createBindlessLayout(rhiDevice);
 
-    renderDevice = std::make_unique<render::RenderDevice>(nvrhiDevice, shaderFactory);
-    bindingCache = std::make_unique<BindingCache>(nvrhiDevice);
-    bindlessTable = std::make_unique<BindlessTable>(nvrhiDevice, bindlessLayout);
+    renderDevice = std::make_unique<render::RenderDevice>(rhiDevice, shaderFactory);
+    bindingCache = std::make_unique<BindingCache>(rhiDevice);
+    bindlessTable = std::make_unique<BindlessTable>(rhiDevice, bindlessLayout);
     descriptorTable = bindlessTable->getDescriptorTableManager();
 
     auto nativeFS = std::make_shared<NativeFileSystem>();
-    assetSystem.initialize(nvrhiDevice, nativeFS, descriptorTable);
+    assetSystem.initialize(rhiDevice, nativeFS, descriptorTable);
     textureLoader = assetSystem.getTextureLoader();
     return true;
 }

@@ -2,7 +2,7 @@
 
 #include <core/DescriptorHandle.h>
 #include <render/core/DescriptorTableManager.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <atomic>
 #include <memory>
@@ -50,7 +50,7 @@ private:
     uint32_t m_value = Invalid;
 };
 
-// Convenience aliases (prefixed to avoid nvrhi name clashes)
+// Convenience aliases (prefixed to avoid RHI name clashes)
 using BindlessTextureH  = BindlessHandle<BindlessTextureTag>;
 using BindlessBufferH   = BindlessHandle<BindlessBufferTag>;
 using BindlessSamplerH  = BindlessHandle<BindlessSamplerTag>;
@@ -68,24 +68,24 @@ using BindlessSamplerH  = BindlessHandle<BindlessSamplerTag>;
 class BindlessTable
 {
 public:
-    BindlessTable(nvrhi::IDevice* device, nvrhi::IBindingLayout* layout);
+    BindlessTable(caustica::rhi::IDevice* device, caustica::rhi::IBindingLayout* layout);
     ~BindlessTable();
 
     // --- New API: O(1) freelist allocation with generation tracking ---
-    [[nodiscard]] uint32_t allocate(nvrhi::BindingSetItem item);
+    [[nodiscard]] uint32_t allocate(caustica::rhi::BindingSetItem item);
     void free(uint32_t handle);
     void freeDeferred(uint32_t handle);
     void flushDeferredFrees();
     [[nodiscard]] bool isValid(uint32_t handle) const;
 
     // --- Backward-compatible API (replaces DescriptorTableManager) ---
-    [[nodiscard]] DescriptorIndex createDescriptor(nvrhi::BindingSetItem item);
-    [[nodiscard]] DescriptorHandle createDescriptorHandle(nvrhi::BindingSetItem item);
+    [[nodiscard]] DescriptorIndex createDescriptor(caustica::rhi::BindingSetItem item);
+    [[nodiscard]] DescriptorHandle createDescriptorHandle(caustica::rhi::BindingSetItem item);
     void releaseDescriptor(DescriptorIndex index);
-    [[nodiscard]] nvrhi::BindingSetItem getDescriptor(DescriptorIndex index) const;
+    [[nodiscard]] caustica::rhi::BindingSetItem getDescriptor(DescriptorIndex index) const;
 
     // --- Accessors ---
-    [[nodiscard]] nvrhi::IDescriptorTable* getDescriptorTable() const;
+    [[nodiscard]] caustica::rhi::IDescriptorTable* getDescriptorTable() const;
     [[nodiscard]] std::shared_ptr<DescriptorTableManager> getDescriptorTableManager() const { return m_manager; }
     [[nodiscard]] uint32_t getCapacity() const;
     [[nodiscard]] uint32_t getAllocatedCount() const;

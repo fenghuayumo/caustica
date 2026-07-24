@@ -28,7 +28,7 @@ static const std::string c_ComputeShaderPackMount = "/" + c_ComputeShaderBinarie
 // ComputePipelineRegistry implementation
 //////////////////////////////////////////////////////////////////////////
 
-ComputePipelineRegistry::ComputePipelineRegistry(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
+ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths)
     : m_device(device)
 {
     if (!m_compilerConfig.initialize(device, c_ComputeShaderBinariesRoot))
@@ -81,7 +81,7 @@ std::shared_ptr<ComputeShaderVariant> ComputePipelineRegistry::createVariant(
     const std::string& shaderSourcePath,
     const std::string& entryPoint,
     const std::vector<ShaderMacro>& macros,
-    const nvrhi::BindingLayoutVector& bindingLayouts,
+    const caustica::rhi::BindingLayoutVector& bindingLayouts,
     const std::string& debugName)
 {
     std::shared_ptr<ComputeShaderVariant> variant = std::shared_ptr<ComputeShaderVariant>(
@@ -338,7 +338,7 @@ ComputeShaderVariant::ComputeShaderVariant(
     const std::string& shaderSourcePath,
     const std::string& entryPoint,
     const std::vector<ShaderMacro>& macros,
-    const nvrhi::BindingLayoutVector& bindingLayouts,
+    const caustica::rhi::BindingLayoutVector& bindingLayouts,
     const std::string& debugName,
     const std::shared_ptr<ComputePipelineRegistry>& registry)
     : m_registry(registry)
@@ -427,7 +427,7 @@ void ComputeShaderVariant::prepareCompilation(std::filesystem::file_time_type la
         command += cmdResult.CommandBase;
 
 #if !COMPUTE_REGISTRY_EMBED_PDBS
-        if (registry->getCompilerConfig().GraphicsAPI != nvrhi::GraphicsAPI::VULKAN)
+        if (registry->getCompilerConfig().GraphicsAPI != caustica::rhi::GraphicsAPI::VULKAN)
         {
             std::filesystem::path pdbPath = m_compiledFullPath;
             pdbPath.replace_extension(".pdb");
@@ -492,8 +492,8 @@ void ComputeShaderVariant::loadShaderAndCreatePipeline()
     }
 
     // create shader
-    nvrhi::ShaderDesc shaderDesc;
-    shaderDesc.shaderType = nvrhi::ShaderType::Compute;
+    caustica::rhi::ShaderDesc shaderDesc;
+    shaderDesc.shaderType = caustica::rhi::ShaderType::Compute;
     shaderDesc.debugName = m_debugName;
     shaderDesc.entryName = m_entryPoint.c_str();
 
@@ -506,7 +506,7 @@ void ComputeShaderVariant::loadShaderAndCreatePipeline()
     }
 
     // create pipeline
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.CS = m_shader;
     pipelineDesc.bindingLayouts = m_bindingLayouts;
 

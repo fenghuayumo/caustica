@@ -1,6 +1,6 @@
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     // Format mapping table. The rows must be in the exactly same order as Format enum members are defined.
     static const FormatInfo c_FormatInfo[] = {
@@ -90,4 +90,4 @@ namespace nvrhi
         return info;
     }
 
-} // namespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

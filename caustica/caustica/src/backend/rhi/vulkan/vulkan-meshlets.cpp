@@ -1,7 +1,7 @@
 #include "vulkan-backend.h"
 #include <rhi/common/misc.h>
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
     MeshletPipelineHandle Device::createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo)
     {
@@ -262,7 +262,7 @@ namespace nvrhi::vulkan
 
         if (!state.viewport.viewports.empty() && arraysAreDifferent(state.viewport.viewports, m_CurrentMeshletState.viewport.viewports))
         {
-            nvrhi::static_vector<vk::Viewport, c_MaxViewports> viewports;
+            caustica::rhi::static_vector<vk::Viewport, c_MaxViewports> viewports;
             for (const auto& vp : state.viewport.viewports)
             {
                 viewports.push_back(VKViewportWithDXCoords(vp));
@@ -273,7 +273,7 @@ namespace nvrhi::vulkan
 
         if (!state.viewport.scissorRects.empty() && arraysAreDifferent(state.viewport.scissorRects, m_CurrentMeshletState.viewport.scissorRects))
         {
-            nvrhi::static_vector<vk::Rect2D, c_MaxViewports> scissors;
+            caustica::rhi::static_vector<vk::Rect2D, c_MaxViewports> scissors;
             for (const auto& sc : state.viewport.scissorRects)
             {
                 scissors.push_back(vk::Rect2D(vk::Offset2D(sc.minX, sc.minY),
@@ -326,4 +326,4 @@ namespace nvrhi::vulkan
         m_CurrentCmdBuf->cmdBuf.drawMeshTasksEXT(groupsX, groupsY, groupsZ);
     }
 
-} // namespace nvrhi::vulkan
+} // namespace caustica::rhi::vulkan

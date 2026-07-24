@@ -1,9 +1,9 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 #include <dxgi.h>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     struct DxgiFormatMapping
     {

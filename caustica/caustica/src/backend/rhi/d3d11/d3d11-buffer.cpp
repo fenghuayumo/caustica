@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
 
     Object Buffer::getNativeObject(ObjectType objectType)
@@ -382,4 +382,4 @@ namespace nvrhi::d3d11
     }
     
 	
-} // nanmespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

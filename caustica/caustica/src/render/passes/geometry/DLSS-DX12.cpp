@@ -18,11 +18,11 @@ static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Lev
 class DLSS_DX12 : public DLSS
 {
 public:
-    DLSS_DX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+    DLSS_DX12(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
-        ID3D12Device* d3ddevice = device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
+        ID3D12Device* d3ddevice = device->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Device);
 
         std::wstring executablePathW;
         executablePathW.assign(directoryWithExecutable.begin(), directoryWithExecutable.end());
@@ -96,7 +96,7 @@ public:
         }
 
         m_featureCommandList->open();
-        ID3D12GraphicsCommandList* d3dcmdlist = m_featureCommandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+        ID3D12GraphicsCommandList* d3dcmdlist = m_featureCommandList->getNativeObject(caustica::rhi::ObjectTypes::D3D12_GraphicsCommandList);
 
         m_parameters->Set(NVSDK_NGX_Parameter_CreationNodeMask, 1u);
         m_parameters->Set(NVSDK_NGX_Parameter_VisibilityNodeMask, 1u);
@@ -144,7 +144,7 @@ public:
     }
 
     bool evaluate(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
     {
@@ -159,21 +159,21 @@ public:
             computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
-        ID3D12GraphicsCommandList* d3dcmdlist = commandList->getNativeObject(nvrhi::ObjectTypes::D3D12_GraphicsCommandList);
+        ID3D12GraphicsCommandList* d3dcmdlist = commandList->getNativeObject(caustica::rhi::ObjectTypes::D3D12_GraphicsCommandList);
 
-        commandList->setTextureState(params.inputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.outputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setTextureState(params.depthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.motionVectorsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.inputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.outputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(params.depthTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.motionVectorsTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         if (m_rayReconstructionInitialized)
         {
-            commandList->setTextureState(params.diffuseAlbedo, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            commandList->setTextureState(params.specularAlbedo, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            commandList->setTextureState(params.normalRoughness, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.diffuseAlbedo, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.specularAlbedo, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.normalRoughness, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
         if (useExposureBuffer)
         {
-            commandList->setTextureState(m_exposureTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(m_exposureTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
         commandList->commitBarriers();
 
@@ -186,18 +186,18 @@ public:
         m_parameters->Set(NVSDK_NGX_Parameter_DLSS_Render_Subrect_Dimensions_Height, view.getViewExtent().height());
 
         // Common buffers
-        m_parameters->Set(NVSDK_NGX_Parameter_Color, (ID3D12Resource*)params.inputColorTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-        m_parameters->Set(NVSDK_NGX_Parameter_Output, (ID3D12Resource*)params.outputColorTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-        m_parameters->Set(NVSDK_NGX_Parameter_Depth, (ID3D12Resource*)params.depthTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-        m_parameters->Set(NVSDK_NGX_Parameter_MotionVectors, (ID3D12Resource*)params.motionVectorsTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-        m_parameters->Set(NVSDK_NGX_Parameter_ExposureTexture, useExposureBuffer ? (ID3D12Resource*)m_exposureTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource) : nullptr);
+        m_parameters->Set(NVSDK_NGX_Parameter_Color, (ID3D12Resource*)params.inputColorTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+        m_parameters->Set(NVSDK_NGX_Parameter_Output, (ID3D12Resource*)params.outputColorTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+        m_parameters->Set(NVSDK_NGX_Parameter_Depth, (ID3D12Resource*)params.depthTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+        m_parameters->Set(NVSDK_NGX_Parameter_MotionVectors, (ID3D12Resource*)params.motionVectorsTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+        m_parameters->Set(NVSDK_NGX_Parameter_ExposureTexture, useExposureBuffer ? (ID3D12Resource*)m_exposureTexture->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource) : nullptr);
 
         if (m_rayReconstructionInitialized)
         {
-            m_parameters->Set(NVSDK_NGX_Parameter_DiffuseAlbedo, (ID3D12Resource*)params.diffuseAlbedo->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-            m_parameters->Set(NVSDK_NGX_Parameter_SpecularAlbedo, (ID3D12Resource*)params.specularAlbedo->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-            m_parameters->Set(NVSDK_NGX_Parameter_GBuffer_Normals, (ID3D12Resource*)params.normalRoughness->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
-            m_parameters->Set(NVSDK_NGX_Parameter_GBuffer_Roughness, (ID3D12Resource*)params.normalRoughness->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            m_parameters->Set(NVSDK_NGX_Parameter_DiffuseAlbedo, (ID3D12Resource*)params.diffuseAlbedo->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+            m_parameters->Set(NVSDK_NGX_Parameter_SpecularAlbedo, (ID3D12Resource*)params.specularAlbedo->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+            m_parameters->Set(NVSDK_NGX_Parameter_GBuffer_Normals, (ID3D12Resource*)params.normalRoughness->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
+            m_parameters->Set(NVSDK_NGX_Parameter_GBuffer_Roughness, (ID3D12Resource*)params.normalRoughness->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Resource));
         }
 
         NVSDK_NGX_Result result = NVSDK_NGX_D3D12_EvaluateFeature_C(d3dcmdlist, m_dlssHandle, m_parameters, NULL);
@@ -229,12 +229,12 @@ public:
             m_parameters = nullptr;
         }
 
-        ID3D12Device* d3ddevice = m_device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
+        ID3D12Device* d3ddevice = m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D12_Device);
         NVSDK_NGX_D3D12_Shutdown1(d3ddevice);
     }
 };
 
-std::unique_ptr<DLSS> DLSS::createDX12(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createDX12(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_DX12>(device, shaderFactory, directoryWithExecutable, applicationID);

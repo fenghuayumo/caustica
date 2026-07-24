@@ -32,7 +32,7 @@ using namespace caustica;
 using namespace caustica::render;
 
 TemporalAntiAliasingPass::TemporalAntiAliasingPass(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<ShaderFactory> shaderFactory, 
     caustica::render::RenderDevice& renderDevice,
     const ICompositeView& compositeView,
@@ -43,11 +43,11 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     , m_R2Jitter(0.0f, 0.0f)
     , m_Jitter(TemporalAntiAliasingJitter::MSAA)
 {
-    const nvrhi::TextureDesc& unresolvedColorDesc = params.unresolvedColor->getDesc();
-    const nvrhi::TextureDesc& resolvedColorDesc = params.resolvedColor->getDesc();
+    const caustica::rhi::TextureDesc& unresolvedColorDesc = params.unresolvedColor->getDesc();
+    const caustica::rhi::TextureDesc& resolvedColorDesc = params.resolvedColor->getDesc();
 #ifdef _DEBUG
-    const nvrhi::TextureDesc& feedback1Desc = params.feedback1->getDesc();
-    const nvrhi::TextureDesc& feedback2Desc = params.feedback2->getDesc();
+    const caustica::rhi::TextureDesc& feedback1Desc = params.feedback1->getDesc();
+    const caustica::rhi::TextureDesc& feedback2Desc = params.feedback2->getDesc();
 
     assert(feedback1Desc.width == feedback2Desc.width);
     assert(feedback1Desc.height == feedback2Desc.height);
@@ -58,38 +58,38 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 #endif
 
     bool useStencil = false;
-    nvrhi::Format stencilFormat = nvrhi::Format::UNKNOWN;
+    caustica::rhi::Format stencilFormat = caustica::rhi::Format::UNKNOWN;
     if (params.motionVectorStencilMask)
     {
         useStencil = true;
 
-        nvrhi::Format depthFormat = params.sourceDepth->getDesc().format;
+        caustica::rhi::Format depthFormat = params.sourceDepth->getDesc().format;
 
-        if (depthFormat == nvrhi::Format::D24S8)
-            stencilFormat = nvrhi::Format::X24G8_UINT;
-        else if (depthFormat == nvrhi::Format::D32S8)
-            stencilFormat = nvrhi::Format::X32G8_UINT;
+        if (depthFormat == caustica::rhi::Format::D24S8)
+            stencilFormat = caustica::rhi::Format::X24G8_UINT;
+        else if (depthFormat == caustica::rhi::Format::D32S8)
+            stencilFormat = caustica::rhi::Format::X32G8_UINT;
         else
             assert(!"the format of sourceDepth texture doesn't have a stencil plane");
     }
 
     std::vector<ShaderMacro> MotionVectorMacros;
     MotionVectorMacros.push_back(ShaderMacro("USE_STENCIL", useStencil ? "1" : "0"));
-    m_MotionVectorPS = shaderFactory->createAutoShader("engine/passes/motion_vectors_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_motion_vectors_ps), &MotionVectorMacros, nvrhi::ShaderType::Pixel);
+    m_MotionVectorPS = shaderFactory->createAutoShader("engine/passes/motion_vectors_ps.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_motion_vectors_ps), &MotionVectorMacros, caustica::rhi::ShaderType::Pixel);
     
     std::vector<ShaderMacro> ResolveMacros;
     ResolveMacros.push_back(ShaderMacro("SAMPLE_COUNT", std::to_string(unresolvedColorDesc.sampleCount)));
     ResolveMacros.push_back(ShaderMacro("USE_CATMULL_ROM_FILTER", params.useCatmullRomFilter ? "1" : "0"));
-    m_TemporalAntiAliasingCS = shaderFactory->createAutoShader("engine/passes/taa_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_taa_cs), &ResolveMacros, nvrhi::ShaderType::Compute);
+    m_TemporalAntiAliasingCS = shaderFactory->createAutoShader("engine/passes/taa_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_taa_cs), &ResolveMacros, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.addressU = samplerDesc.addressV = samplerDesc.addressW = nvrhi::SamplerAddressMode::Border;
-    samplerDesc.borderColor = nvrhi::Color(0.0f);
+    caustica::rhi::SamplerDesc samplerDesc;
+    samplerDesc.addressU = samplerDesc.addressV = samplerDesc.addressW = caustica::rhi::SamplerAddressMode::Border;
+    samplerDesc.borderColor = caustica::rhi::Color(0.0f);
     m_BilinearSampler = device->createSampler(samplerDesc);
 
     m_ResolvedColorSize = float2(float(resolvedColorDesc.width), float(resolvedColorDesc.height));
 
-    nvrhi::BufferDesc constantBufferDesc;
+    caustica::rhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(TemporalAntiAliasingConstants);
     constantBufferDesc.debugName = "TemporalAntiAliasingConstants";
     constantBufferDesc.isConstantBuffer = true;
@@ -99,36 +99,36 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 
     if(params.sourceDepth)
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Pixel;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Pixel;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0)
         };
 
         if (useStencil)
         {
-            layoutDesc.bindings.push_back(nvrhi::BindingLayoutItem::Texture_SRV(1));
+            layoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(1));
         }
 
         m_MotionVectorsBindingLayout = device->createBindingLayout(layoutDesc);
 
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_TemporalAntiAliasingCB),
-            nvrhi::BindingSetItem::Texture_SRV(0, params.sourceDepth),
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_TemporalAntiAliasingCB),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, params.sourceDepth),
         };
         if (useStencil)
         {
-            bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(1, params.sourceDepth, stencilFormat));
+            bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(1, params.sourceDepth, stencilFormat));
         }
         m_MotionVectorsBindingSet = device->createBindingSet(bindingSetDesc, m_MotionVectorsBindingLayout);
 
         m_MotionVectorsFramebufferFactory = std::make_unique<FramebufferFactory>(device);
         m_MotionVectorsFramebufferFactory->renderTargets = { params.motionVectors };
 
-        nvrhi::GraphicsPipelineDesc pipelineDesc;
-        pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+        caustica::rhi::GraphicsPipelineDesc pipelineDesc;
+        pipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleStrip;
         pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_MotionVectorPS;
         pipelineDesc.bindingLayouts = { m_MotionVectorsBindingLayout };
@@ -137,42 +137,42 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
         pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
         pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 
-        nvrhi::FramebufferInfo framebufferInfo = m_MotionVectorsFramebufferFactory->getFramebufferInfo();
+        caustica::rhi::FramebufferInfo framebufferInfo = m_MotionVectorsFramebufferFactory->getFramebufferInfo();
 
         m_MotionVectorsPso = device->createGraphicsPipeline(pipelineDesc, framebufferInfo);
     }
 
     {
-        nvrhi::BindingSetDesc bindingSetDesc;
+        caustica::rhi::BindingSetDesc bindingSetDesc;
         bindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(0, m_TemporalAntiAliasingCB),
-            nvrhi::BindingSetItem::Sampler(0, m_BilinearSampler),
-            nvrhi::BindingSetItem::Texture_SRV(0, params.unresolvedColor),
-            nvrhi::BindingSetItem::Texture_SRV(1, params.motionVectors),
-            nvrhi::BindingSetItem::Texture_SRV(2, params.feedback1),
-            nvrhi::BindingSetItem::Texture_UAV(0, params.resolvedColor),
-            nvrhi::BindingSetItem::Texture_UAV(1, params.feedback2)
+            caustica::rhi::BindingSetItem::ConstantBuffer(0, m_TemporalAntiAliasingCB),
+            caustica::rhi::BindingSetItem::Sampler(0, m_BilinearSampler),
+            caustica::rhi::BindingSetItem::Texture_SRV(0, params.unresolvedColor),
+            caustica::rhi::BindingSetItem::Texture_SRV(1, params.motionVectors),
+            caustica::rhi::BindingSetItem::Texture_SRV(2, params.feedback1),
+            caustica::rhi::BindingSetItem::Texture_UAV(0, params.resolvedColor),
+            caustica::rhi::BindingSetItem::Texture_UAV(1, params.feedback2)
         };
         
         m_HasHistoryClampRelaxTexture = params.historyClampRelax != nullptr;
         if (params.historyClampRelax != nullptr)
         {
-            bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(3, params.historyClampRelax));
+            bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(3, params.historyClampRelax));
         }
         else
         {
             // No relax mask, but we need to bind something to match the shader binding slots
-            bindingSetDesc.bindings.push_back(nvrhi::BindingSetItem::Texture_SRV(3, params.unresolvedColor));
+            bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(3, params.unresolvedColor));
         }
 
-        nvrhi::utils::CreateBindingSetAndLayout(device, nvrhi::ShaderType::Compute, 0, bindingSetDesc, m_ResolveBindingLayout, m_ResolveBindingSet);
+        caustica::rhi::utils::CreateBindingSetAndLayout(device, caustica::rhi::ShaderType::Compute, 0, bindingSetDesc, m_ResolveBindingLayout, m_ResolveBindingSet);
      
         // Swap resolvedColor and resolvedColorPrevious (t2 and u0)
         bindingSetDesc.bindings[4].resourceHandle = params.feedback2;
         bindingSetDesc.bindings[6].resourceHandle = params.feedback1;
         m_ResolveBindingSetPrevious = device->createBindingSet(bindingSetDesc, m_ResolveBindingLayout);
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.CS = m_TemporalAntiAliasingCS;
         pipelineDesc.bindingLayouts = { m_ResolveBindingLayout };
 
@@ -181,7 +181,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 }
 
 void TemporalAntiAliasingPass::renderMotionVectors(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const ICompositeView& compositeView,
     const ICompositeView& compositeViewPrevious,
     dm::float3 preViewTranslationDifference)
@@ -211,14 +211,14 @@ void TemporalAntiAliasingPass::renderMotionVectors(
         taaConstants.stencilMask = m_StencilMask;
         commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
 
-        nvrhi::GraphicsState state;
+        caustica::rhi::GraphicsState state;
         state.pipeline = m_MotionVectorsPso;
         state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(*view);
         state.bindings = { m_MotionVectorsBindingSet};
-        state.viewport = toNvrhi(viewportState);
+        state.viewport = toRhi(viewportState);
         commandList->setGraphicsState(state);
 
-        nvrhi::DrawArguments args;
+        caustica::rhi::DrawArguments args;
         args.instanceCount = 1;
         args.vertexCount = 4;
         commandList->draw(args);
@@ -228,7 +228,7 @@ void TemporalAntiAliasingPass::renderMotionVectors(
 }
 
 void TemporalAntiAliasingPass::temporalResolve(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const TemporalAntiAliasingParameters& params,
     bool feedbackIsValid,
     const ICompositeView& compositeViewInput,
@@ -265,7 +265,7 @@ void TemporalAntiAliasingPass::temporalResolve(
         int2 viewportSize = int2(taaConstants.outputViewSize);
         int2 gridSize = (viewportSize + 15) / 16;
 
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = m_ResolvePso;
         state.bindings = { m_ResolveBindingSet };
         commandList->setComputeState(state);

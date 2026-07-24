@@ -25,7 +25,7 @@ PathTracingShaderBuildResult buildPathTracingLibraryShader(
     result.dxc = ShaderCompilerUtils::buildDxcCommand(config, options);
     result.key = makeShaderLibraryKey(
         input.logicalSourcePath.generic_string(),
-        shader::fromNvrhiGraphicsApi(config.GraphicsAPI),
+        shader::fromRhiGraphicsApi(config.GraphicsAPI),
         input.macros,
         options.Profile);
     result.key.cacheHashHex = result.dxc.HashHex;

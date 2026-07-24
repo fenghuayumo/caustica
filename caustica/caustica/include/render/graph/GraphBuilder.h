@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/graph/GpuTypes.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <functional>
@@ -18,14 +18,6 @@ class RenderTargetPool;
 class RenderBufferPool;
 class TransientResourceAllocator;
 }
-
-namespace nvrhi
-{
-class ICommandList;
-class IDevice;
-class ITexture;
-class IBuffer;
-} // namespace nvrhi
 
 namespace caustica::rg
 {
@@ -91,14 +83,14 @@ private:
 class RenderPassContext
 {
 public:
-    RenderPassContext(nvrhi::ICommandList* commandList, const GraphBuilder& graph);
+    RenderPassContext(caustica::rhi::ICommandList* commandList, const GraphBuilder& graph);
 
-    [[nodiscard]] nvrhi::ICommandList* commandList() const { return m_commandList; }
-    [[nodiscard]] nvrhi::ITexture* texture(TextureHandle handle) const;
-    [[nodiscard]] nvrhi::IBuffer* buffer(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::ICommandList* commandList() const { return m_commandList; }
+    [[nodiscard]] caustica::rhi::ITexture* texture(TextureHandle handle) const;
+    [[nodiscard]] caustica::rhi::IBuffer* buffer(BufferHandle handle) const;
 
 private:
-    nvrhi::ICommandList* m_commandList = nullptr;
+    caustica::rhi::ICommandList* m_commandList = nullptr;
     const GraphBuilder* m_graph = nullptr;
 };
 
@@ -108,36 +100,36 @@ public:
     using SetupFn = std::function<void(PassBuilder&)>;
     using ExecuteFn = std::function<void(RenderPassContext&)>;
 
-    void setDevice(nvrhi::IDevice* device);
+    void setDevice(caustica::rhi::IDevice* device);
     void setRenderTargetPool(RenderTargetPool* pool) { m_renderTargetPool = pool; }
     [[nodiscard]] RenderTargetPool* renderTargetPool() const { return m_renderTargetPool; }
     void setRenderBufferPool(RenderBufferPool* pool) { m_renderBufferPool = pool; }
     [[nodiscard]] RenderBufferPool* renderBufferPool() const { return m_renderBufferPool; }
 
-    TextureHandle importTexture(nvrhi::ITexture* texture, nvrhi::ResourceStates initialState);
-    TextureHandle importTexture(nvrhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
-    BufferHandle importBuffer(nvrhi::IBuffer* buffer, nvrhi::ResourceStates initialState);
-    BufferHandle importBuffer(nvrhi::IBuffer* buffer, BufferAccess initialAccess = BufferAccess::ShaderResource);
+    TextureHandle importTexture(caustica::rhi::ITexture* texture, caustica::rhi::ResourceStates initialState);
+    TextureHandle importTexture(caustica::rhi::ITexture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
+    BufferHandle importBuffer(caustica::rhi::IBuffer* buffer, caustica::rhi::ResourceStates initialState);
+    BufferHandle importBuffer(caustica::rhi::IBuffer* buffer, BufferAccess initialAccess = BufferAccess::ShaderResource);
 
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
 
-    void extractTexture(TextureHandle handle, nvrhi::ResourceStates finalState);
+    void extractTexture(TextureHandle handle, caustica::rhi::ResourceStates finalState);
     void extractTexture(TextureHandle handle, TextureAccess finalAccess);
-    void extractBuffer(BufferHandle handle, nvrhi::ResourceStates finalState);
+    void extractBuffer(BufferHandle handle, caustica::rhi::ResourceStates finalState);
     void extractBuffer(BufferHandle handle, BufferAccess finalAccess);
 
     void addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options = {});
 
     void compile();
-    void execute(nvrhi::ICommandList* commandList);
+    void execute(caustica::rhi::ICommandList* commandList);
 
     void reset();
 
-    [[nodiscard]] nvrhi::ITexture* resolveTexture(TextureHandle handle) const;
-    [[nodiscard]] nvrhi::IBuffer* resolveBuffer(BufferHandle handle) const;
-    [[nodiscard]] nvrhi::ResourceStates textureState(TextureHandle handle) const;
-    [[nodiscard]] nvrhi::ResourceStates bufferState(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::ITexture* resolveTexture(TextureHandle handle) const;
+    [[nodiscard]] caustica::rhi::IBuffer* resolveBuffer(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::ResourceStates textureState(TextureHandle handle) const;
+    [[nodiscard]] caustica::rhi::ResourceStates bufferState(BufferHandle handle) const;
     [[nodiscard]] bool isCompiled() const { return m_compiled; }
 
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
@@ -161,22 +153,22 @@ private:
 
     struct GraphTexture
     {
-        nvrhi::ITexture* texture = nullptr;
-        nvrhi::ResourceStates currentState = nvrhi::ResourceStates::Common;
-        std::optional<nvrhi::ResourceStates> finalState;
+        caustica::rhi::ITexture* texture = nullptr;
+        caustica::rhi::ResourceStates currentState = caustica::rhi::ResourceStates::Common;
+        std::optional<caustica::rhi::ResourceStates> finalState;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
         TextureDesc desc;
-        nvrhi::TextureHandle owned;
+        caustica::rhi::TextureHandle owned;
     };
 
     struct GraphBuffer
     {
-        nvrhi::IBuffer* buffer = nullptr;
-        nvrhi::ResourceStates currentState = nvrhi::ResourceStates::Common;
-        std::optional<nvrhi::ResourceStates> finalState;
+        caustica::rhi::IBuffer* buffer = nullptr;
+        caustica::rhi::ResourceStates currentState = caustica::rhi::ResourceStates::Common;
+        std::optional<caustica::rhi::ResourceStates> finalState;
         ResourceLifetime lifetime = ResourceLifetime::Imported;
         BufferDesc desc;
-        nvrhi::BufferHandle owned;
+        caustica::rhi::BufferHandle owned;
     };
 
     struct Pass
@@ -206,11 +198,11 @@ private:
         bool emitted = false;
     };
 
-    static nvrhi::ResourceStates accessToState(TextureAccess access);
-    static nvrhi::ResourceStates accessToState(BufferAccess access);
+    static caustica::rhi::ResourceStates accessToState(TextureAccess access);
+    static caustica::rhi::ResourceStates accessToState(BufferAccess access);
 
-    [[nodiscard]] nvrhi::TextureHandle createNativeTexture(const TextureDesc& desc, bool isVirtual = false) const;
-    [[nodiscard]] nvrhi::BufferHandle createNativeBuffer(const BufferDesc& desc, bool isVirtual = false) const;
+    [[nodiscard]] caustica::rhi::TextureHandle createNativeTexture(const TextureDesc& desc, bool isVirtual = false) const;
+    [[nodiscard]] caustica::rhi::BufferHandle createNativeBuffer(const BufferDesc& desc, bool isVirtual = false) const;
     struct TransientLifetime
     {
         int32_t firstPassOrder = INT32_MAX;
@@ -226,18 +218,18 @@ private:
         const std::vector<TransientLifetime>& textureLifetimes,
         const std::vector<TransientLifetime>& bufferLifetimes);
     void releaseTransientResources();
-    void transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, TextureAccess access);
-    void transitionTexture(nvrhi::ICommandList* commandList, TextureHandle handle, nvrhi::ResourceStates targetState);
-    void transitionBuffer(nvrhi::ICommandList* commandList, BufferHandle handle, BufferAccess access);
-    void transitionBuffer(nvrhi::ICommandList* commandList, BufferHandle handle, nvrhi::ResourceStates targetState);
-    void emitTextureAliasingBarrier(nvrhi::ICommandList* commandList, TextureHandle handle);
-    void emitBufferAliasingBarrier(nvrhi::ICommandList* commandList, BufferHandle handle);
+    void transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, TextureAccess access);
+    void transitionTexture(caustica::rhi::ICommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState);
+    void transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, BufferAccess access);
+    void transitionBuffer(caustica::rhi::ICommandList* commandList, BufferHandle handle, caustica::rhi::ResourceStates targetState);
+    void emitTextureAliasingBarrier(caustica::rhi::ICommandList* commandList, TextureHandle handle);
+    void emitBufferAliasingBarrier(caustica::rhi::ICommandList* commandList, BufferHandle handle);
     void syncPassEndStates(const Pass& pass);
     static bool passUsesTextureAsWrite(const Pass& pass, TextureHandle handle);
     static bool passUsesBufferAsWrite(const Pass& pass, BufferHandle handle);
-    void transitionExtractedResources(nvrhi::ICommandList* commandList);
+    void transitionExtractedResources(caustica::rhi::ICommandList* commandList);
 
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::IDevice* m_device = nullptr;
     RenderTargetPool* m_renderTargetPool = nullptr;
     RenderBufferPool* m_renderBufferPool = nullptr;
     bool m_compiled = false;
@@ -246,10 +238,10 @@ private:
     std::vector<Pass> m_passes;
     std::vector<uint32_t> m_compiledPassOrder;
     std::vector<std::string> m_passNames;
-    std::unordered_map<nvrhi::ITexture*, uint32_t> m_importIndexByTexture;
-    std::unordered_map<nvrhi::IBuffer*, uint32_t> m_importIndexByBuffer;
-    std::vector<nvrhi::HeapHandle> m_transientHeaps;
-    std::vector<nvrhi::HeapHandle> m_transientHeapPool;
+    std::unordered_map<caustica::rhi::ITexture*, uint32_t> m_importIndexByTexture;
+    std::unordered_map<caustica::rhi::IBuffer*, uint32_t> m_importIndexByBuffer;
+    std::vector<caustica::rhi::HeapHandle> m_transientHeaps;
+    std::vector<caustica::rhi::HeapHandle> m_transientHeapPool;
     std::vector<TextureAliasingBarrier> m_textureAliasingBarriers;
     std::vector<BufferAliasingBarrier> m_bufferAliasingBarriers;
     TransientResourceStats m_transientStats;

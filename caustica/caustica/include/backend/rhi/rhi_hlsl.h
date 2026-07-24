@@ -1,9 +1,9 @@
-#ifndef NVRHI_HLSL_H
-#define NVRHI_HLSL_H
+#ifndef CAUSTICA_RHI_HLSL_H
+#define CAUSTICA_RHI_HLSL_H
 
 // bit field defines
 #if defined(__cplusplus) || __HLSL_VERSION >= 2021 || __SLANG__
-namespace nvrhi
+namespace caustica::rhi
 {
     typedef uint64_t GpuVirtualAddress;
     struct GpuVirtualAddressAndStride
@@ -18,7 +18,7 @@ namespace nvrhi
         // Indirect Arg Structs that are shader friendly
         //////////////////////////////////////////////////////////////////////////
         
-        // Shader friendly equivalent of nvrhi::rt::InstanceDesc
+        // Shader friendly equivalent of caustica::rhi::rt::InstanceDesc
         struct IndirectInstanceDesc
         {
 #ifdef __cplusplus
@@ -70,8 +70,8 @@ namespace nvrhi
                 uint32_t          triangleCount : 9;                 // The number of triangles used by the cluster template (max 256)
                 uint32_t          vertexCount : 9;                   // The number of vertices used by the cluster template (max 256)
                 uint32_t          positionTruncateBitCount : 6;      // The number of bits to truncate from the position values
-                uint32_t          indexFormat : 4;                   // The index format to use for the indexBuffer, must be one of nvrhi::rt::ClusteOperationIndexFormat
-                uint32_t          opacityMicromapIndexFormat : 4;    // The index format to use for the opacityMicromapIndexBuffer, see nvrhi::rt::ClusteOperationIndexFormat for possible values
+                uint32_t          indexFormat : 4;                   // The index format to use for the indexBuffer, must be one of caustica::rhi::rt::ClusteOperationIndexFormat
+                uint32_t          opacityMicromapIndexFormat : 4;    // The index format to use for the opacityMicromapIndexBuffer, see caustica::rhi::rt::ClusteOperationIndexFormat for possible values
                 uint32_t          baseGeometryIndexAndFlags;         // The base geometry index (lower 24 bit) and base geometry flags (NVAPI_D3D12_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_GEOMETRY_FLAGS), see geometryIndexBuffer
                 uint16_t          indexBufferStride;                 // The stride of the elements of indexBuffer, in bytes
                 uint16_t          vertexBufferStride;                // The stride of the elements of vertexBuffer, in bytes
@@ -103,7 +103,6 @@ namespace nvrhi
             };
         } // namespace cluster
     } // namespace rt
-} // namespace nvrhi
-
+} // namespace caustica::rhi
 #endif // __HLSL_VERSION 2021
-#endif
+#endif // CAUSTICA_RHI_HLSL_H

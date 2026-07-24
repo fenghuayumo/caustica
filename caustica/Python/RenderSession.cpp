@@ -291,18 +291,18 @@ namespace
     }
 #endif
 
-    nvrhi::GraphicsAPI ResolveGraphicsAPI(const RenderSession::Config& cfg)
+    caustica::rhi::GraphicsAPI ResolveGraphicsAPI(const RenderSession::Config& cfg)
     {
 #if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_VULKAN
-        return cfg.useVulkan ? nvrhi::GraphicsAPI::VULKAN : nvrhi::GraphicsAPI::D3D12;
+        return cfg.useVulkan ? caustica::rhi::GraphicsAPI::VULKAN : caustica::rhi::GraphicsAPI::D3D12;
 #elif CAUSTICA_WITH_VULKAN
         if (!cfg.useVulkan)
             caustica::warning("RenderSession: DX12 was requested but this build only has Vulkan; using Vulkan.");
-        return nvrhi::GraphicsAPI::VULKAN;
+        return caustica::rhi::GraphicsAPI::VULKAN;
 #elif CAUSTICA_WITH_DX12
         if (cfg.useVulkan)
             caustica::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
-        return nvrhi::GraphicsAPI::D3D12;
+        return caustica::rhi::GraphicsAPI::D3D12;
 #else
         static_assert(CAUSTICA_WITH_DX12 || CAUSTICA_WITH_VULKAN, "RTXPT requires at least one graphics backend");
 #endif
@@ -492,8 +492,8 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
     if (!device)
         return false;
 
-    nvrhi::ITexture* tex = m_engine->ldrColorTexture();
-    nvrhi::ResourceStates state = nvrhi::ResourceStates::ShaderResource;
+    caustica::rhi::ITexture* tex = m_engine->ldrColorTexture();
+    caustica::rhi::ResourceStates state = caustica::rhi::ResourceStates::ShaderResource;
 
     if (!tex)
     {
@@ -503,8 +503,8 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
         tex = device->getBackBuffer(backBufferIndex);
         state = m_config.headless
-            ? nvrhi::ResourceStates::RenderTarget
-            : nvrhi::ResourceStates::Present;
+            ? caustica::rhi::ResourceStates::RenderTarget
+            : caustica::rhi::ResourceStates::Present;
     }
 
     if (!tex)
@@ -550,12 +550,12 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
     if (!gpuDevice)
         return std::nullopt;
 
-    nvrhi::IDevice* device = gpuDevice->getDevice();
+    caustica::rhi::IDevice* device = gpuDevice->getDevice();
     if (!device)
         return std::nullopt;
 
-    nvrhi::ITexture* texture = m_engine->ldrColorTexture();
-    nvrhi::ResourceStates textureState = nvrhi::ResourceStates::ShaderResource;
+    caustica::rhi::ITexture* texture = m_engine->ldrColorTexture();
+    caustica::rhi::ResourceStates textureState = caustica::rhi::ResourceStates::ShaderResource;
 
     if (!texture)
     {
@@ -565,8 +565,8 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
 
         texture = gpuDevice->getBackBuffer(backBufferIndex);
         textureState = m_config.headless
-            ? nvrhi::ResourceStates::RenderTarget
-            : nvrhi::ResourceStates::Present;
+            ? caustica::rhi::ResourceStates::RenderTarget
+            : caustica::rhi::ResourceStates::Present;
     }
 
     if (!texture)
@@ -590,53 +590,53 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
     }
 
     // Mirror saveTextureToFile: blit non-RGBA8 targets to SRGBA8, then staging copy.
-    nvrhi::TextureDesc desc = texture->getDesc();
-    nvrhi::TextureHandle tempTexture;
-    nvrhi::FramebufferHandle tempFramebuffer;
+    caustica::rhi::TextureDesc desc = texture->getDesc();
+    caustica::rhi::TextureHandle tempTexture;
+    caustica::rhi::FramebufferHandle tempFramebuffer;
 
-    nvrhi::CommandListHandle commandList = device->createCommandList();
+    caustica::rhi::CommandListHandle commandList = device->createCommandList();
     commandList->open();
 
-    if (textureState != nvrhi::ResourceStates::Unknown)
-        commandList->beginTrackingTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+    if (textureState != caustica::rhi::ResourceStates::Unknown)
+        commandList->beginTrackingTextureState(texture, caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
 
     switch (desc.format)
     {
-    case nvrhi::Format::RGBA8_UNORM:
-    case nvrhi::Format::SRGBA8_UNORM:
+    case caustica::rhi::Format::RGBA8_UNORM:
+    case caustica::rhi::Format::SRGBA8_UNORM:
         tempTexture = texture;
         break;
     default:
-        desc.format = nvrhi::Format::SRGBA8_UNORM;
+        desc.format = caustica::rhi::Format::SRGBA8_UNORM;
         desc.isRenderTarget = true;
-        desc.initialState = nvrhi::ResourceStates::RenderTarget;
+        desc.initialState = caustica::rhi::ResourceStates::RenderTarget;
         desc.keepInitialState = true;
         tempTexture = device->createTexture(desc);
-        tempFramebuffer = device->createFramebuffer(nvrhi::FramebufferDesc().addColorAttachment(tempTexture));
+        tempFramebuffer = device->createFramebuffer(caustica::rhi::FramebufferDesc().addColorAttachment(tempTexture));
         renderDevice->blit().blitTexture(commandList, tempFramebuffer, texture);
         break;
     }
 
-    nvrhi::TextureDesc stagingDesc = desc;
+    caustica::rhi::TextureDesc stagingDesc = desc;
     stagingDesc.isRenderTarget = false;
     stagingDesc.isUAV = false;
     stagingDesc.isTypeless = false;
-    stagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
+    stagingDesc.initialState = caustica::rhi::ResourceStates::CopyDest;
     stagingDesc.keepInitialState = true;
     stagingDesc.debugName = "GetFramebufferLdr Staging";
 
-    nvrhi::StagingTextureHandle stagingTexture = device->createStagingTexture(stagingDesc, nvrhi::CpuAccessMode::Read);
+    caustica::rhi::StagingTextureHandle stagingTexture = device->createStagingTexture(stagingDesc, caustica::rhi::CpuAccessMode::Read);
     if (!stagingTexture)
     {
         commandList->close();
         return std::nullopt;
     }
 
-    commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), tempTexture, nvrhi::TextureSlice());
+    commandList->copyTexture(stagingTexture, caustica::rhi::TextureSlice(), tempTexture, caustica::rhi::TextureSlice());
 
-    if (textureState != nvrhi::ResourceStates::Unknown)
+    if (textureState != caustica::rhi::ResourceStates::Unknown)
     {
-        commandList->setTextureState(texture, nvrhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
+        commandList->setTextureState(texture, caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), textureState);
         commandList->commitBarriers();
     }
 
@@ -648,7 +648,7 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
 
     size_t rowPitch = 0;
     const uint8_t* mapped = static_cast<const uint8_t*>(device->mapStagingTexture(
-        stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+        stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
     if (!mapped)
         return std::nullopt;
 

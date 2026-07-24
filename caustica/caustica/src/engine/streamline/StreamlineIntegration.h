@@ -21,18 +21,18 @@ public:
     virtual void setDLSSOptions(const DLSSOptions& options) override;
     virtual bool isDLSSAvailable() const override { return m_dlssAvailable; }
     virtual void queryDLSSOptimalSettings(const DLSSOptions& options, DLSSSettings& settings) override;
-    virtual void evaluateDLSS(nvrhi::ICommandList* commandList) override;
+    virtual void evaluateDLSS(caustica::rhi::ICommandList* commandList) override;
     virtual void cleanupDLSS(bool wfi) override;
 
     virtual void setNISOptions(const NISOptions& options) override;
     virtual bool isNISAvailable() const override { return m_nisAvailable; }
-    virtual void evaluateNIS(nvrhi::ICommandList* commandList) override;
+    virtual void evaluateNIS(caustica::rhi::ICommandList* commandList) override;
     virtual void cleanupNIS(bool wfi) override;
 
     virtual void setDeepDVCOptions(const DeepDVCOptions& options) override;
     virtual bool isDeepDVCAvailable() const override { return m_deepdvcAvailable; }
     virtual void queryDeepDVCState(uint64_t& estimatedVRamUsage) override;
-    virtual void evaluateDeepDVC(nvrhi::ICommandList* commandList) override;
+    virtual void evaluateDeepDVC(caustica::rhi::ICommandList* commandList) override;
     virtual void cleanupDeepDVC() override;
 
     virtual bool isReflexAvailable() const override { return m_reflexAvailable; }
@@ -50,31 +50,31 @@ public:
     virtual void setDLSSRROptions(const DLSSRROptions& options) override;
     virtual bool isDLSSRRAvailable() const override { return m_dlssrrAvailable; }
     virtual void queryDLSSRROptimalSettings(const DLSSRROptions& options, DLSSRRSettings& settings) override;
-    virtual void evaluateDLSSRR(nvrhi::ICommandList* commandList) override;
+    virtual void evaluateDLSSRR(caustica::rhi::ICommandList* commandList) override;
     virtual void cleanupDLSSRR(bool wfi) override;
 
     virtual void tagResourcesGeneral(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView* view,
-        nvrhi::ITexture* motionVectors,
-        nvrhi::ITexture* depth,
-        nvrhi::ITexture* finalColorHudless) override;
+        caustica::rhi::ITexture* motionVectors,
+        caustica::rhi::ITexture* depth,
+        caustica::rhi::ITexture* finalColorHudless) override;
 
     virtual void tagResourcesDLSSNIS(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView* view,
-        nvrhi::ITexture* output,
-        nvrhi::ITexture* input) override;
+        caustica::rhi::ITexture* output,
+        caustica::rhi::ITexture* input) override;
 
     virtual void tagResourcesDLSSFG(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         bool validViewportExtent = false,
         const Extent &backBufferExtent = {}) override;
 
     virtual void tagResourcesDeepDVC(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView* view,
-        nvrhi::ITexture* output) override;
+        caustica::rhi::ITexture* output) override;
 
     virtual void unTagResourcesDeepDVC() override;
 
@@ -84,30 +84,30 @@ public:
     // * Either specHitDist or specMotionVectors should be provided but not both nor neither. Refer to DLSS-RR 
     //   documentation for more detail.
     virtual void tagResourcesDLSSRR(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const caustica::IView* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
-        nvrhi::ITexture* inputColor,
-        nvrhi::ITexture* diffuseAlbedo,
-        nvrhi::ITexture* specAlbedo,
-        nvrhi::ITexture* normalsAndOptionalRoughness,
-        nvrhi::ITexture* roughness,
-        nvrhi::ITexture* specHitDist,
-        nvrhi::ITexture* specMotionVectors,
-        nvrhi::ITexture* outputColor
+        caustica::rhi::ITexture* inputColor,
+        caustica::rhi::ITexture* diffuseAlbedo,
+        caustica::rhi::ITexture* specAlbedo,
+        caustica::rhi::ITexture* normalsAndOptionalRoughness,
+        caustica::rhi::ITexture* roughness,
+        caustica::rhi::ITexture* specHitDist,
+        caustica::rhi::ITexture* specMotionVectors,
+        caustica::rhi::ITexture* outputColor
     ) override;
 private:
     StreamlineIntegration() {}
     void updateFeatureAvailable();
     uint32_t checkNumSupportedFeatures(const sl::AdapterInfo& adapterInfo);
 
-    nvrhi::Object getNativeCommandList(nvrhi::ICommandList* commandList);
+    caustica::rhi::Object getNativeCommandList(caustica::rhi::ICommandList* commandList);
     void waitForDLSSGInputsProcessing();
 
     bool m_slInitialized = false;
-    nvrhi::GraphicsAPI m_api = nvrhi::GraphicsAPI::D3D12;
-    nvrhi::IDevice* m_device = nullptr;
+    caustica::rhi::GraphicsAPI m_api = caustica::rhi::GraphicsAPI::D3D12;
+    caustica::rhi::IDevice* m_device = nullptr;
 
 #ifdef CAUSTICA_WITH_DX11
     LUID m_d3d11Luid = {};
@@ -161,10 +161,10 @@ public:
         RenderFrameTokenScope& operator=(const RenderFrameTokenScope&) = delete;
     };
 
-    bool initializePreDevice(nvrhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
+    bool initializePreDevice(caustica::rhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
 #if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
     bool setD3DDevice(IUnknown* nativeDevice);
-    bool initializeDeviceDX(nvrhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
+    bool initializeDeviceDX(caustica::rhi::IDevice *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
     // In-place slUpgradeInterface of a raw pointer
     template<typename T>
     static inline bool upgradeInterface(T*& interfacePointer)
@@ -173,9 +173,9 @@ public:
         static_assert(std::is_base_of<IUnknown, T>::value);
         return upgradeInterface((IUnknown*&)interfacePointer);
     }
-    // In-place slUpgradeInterface of a nvrhi::RefCountPtr
+    // In-place slUpgradeInterface of a caustica::rhi::RefCountPtr
     template<typename T>
-    static inline bool upgradeInterface(nvrhi::RefCountPtr<T>& interfacePointer)
+    static inline bool upgradeInterface(caustica::rhi::RefCountPtr<T>& interfacePointer)
     {
         // Ensure that T derives from IUnknown
         static_assert(std::is_base_of<IUnknown, T>::value);
@@ -206,7 +206,7 @@ public:
         uint32_t graphicsQueueCreateFlags{};
         uint32_t opticalFlowQueueCreateFlags{};
     };
-    bool initializeDeviceVK(nvrhi::IDevice* device, const VulkanInfo& vulkanInfo);
+    bool initializeDeviceVK(caustica::rhi::IDevice* device, const VulkanInfo& vulkanInfo);
 #endif
 
     void shutdown();

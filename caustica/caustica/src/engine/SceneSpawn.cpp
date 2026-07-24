@@ -45,8 +45,8 @@ void flushPendingStructureGpu(App& app)
     assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
     const scene::SceneRenderData& gpuSetupData = scenePtr->getRenderDataForFrame(frameIndex);
     runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, &gpuSetupData]() {
-        if (nvrhi::IDevice* nvrhiDevice = device->getDevice())
-            nvrhiDevice->waitForIdle();
+        if (caustica::rhi::IDevice* rhiDevice = device->getDevice())
+            rhiDevice->waitForIdle();
 
         if (caches->textureLoader && caches->renderDevice)
         {
@@ -65,7 +65,7 @@ void flushPendingStructureGpu(App& app)
         // Rebuild BLAS/TLAS immediately while exclusive. Leaving this to the next
         // render frame races new proxies against a stale TLAS and crashes nvwgf2umx.
         worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
-        nvrhi::CommandListHandle commandList = device->getDevice()->createCommandList();
+        caustica::rhi::CommandListHandle commandList = device->getDevice()->createCommandList();
         worldRendererResource->rayTracingResources().recreateAccelStructs(commandList, *scenePtr, &gpuSetupData);
 
         // Keep SBT hit-group count in lockstep with the new TLAS while GPU is idle.

@@ -94,7 +94,7 @@ void caustica::render::WorldRenderer::populateFrameView(ExtractedFrameView& view
 }
 
 void caustica::render::WorldRenderer::populateRenderFrameContext(
-    nvrhi::IFramebuffer* framebuffer,
+    caustica::rhi::IFramebuffer* framebuffer,
     RenderFrameContext& ctx)
 {
     ctx = {};
@@ -114,7 +114,7 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
 FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderFrameContext& ctx)
 {
     const bool aaReset = ctx.frame.needNewPasses || m_context->activeSettings().ResetRealtimeCaches;
-    nvrhi::IDescriptorTable* descriptorTable = m_context->descriptorTable
+    caustica::rhi::IDescriptorTable* descriptorTable = m_context->descriptorTable
         ? m_context->descriptorTable->getDescriptorTable()
         : nullptr;
 
@@ -245,7 +245,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     ctx.commandListWasClosed = false;
     ctx.graphBuilt = true;
 
-    nvrhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
+    caustica::rhi::IFramebuffer* framebuffer = ctx.frame.framebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
 
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
@@ -526,7 +526,7 @@ void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrame
 
 void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameContext& ctx)
 {
-    nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
+    caustica::rhi::IFramebuffer* framebuffer = ctx.framebuffer;
 
     syncCameraViews();
     {
@@ -638,22 +638,22 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         m_context->diagnostics.progressInitializingRenderer.Set(100);
 
         {
-            nvrhi::BindingSetDesc lineBindingSetDesc;
+            caustica::rhi::BindingSetDesc lineBindingSetDesc;
             lineBindingSetDesc.bindings = {
-                nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
-                nvrhi::BindingSetItem::Texture_SRV(0, m_renderTargets->depth)
+                caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
+                caustica::rhi::BindingSetItem::Texture_SRV(0, m_renderTargets->depth)
             };
             m_linesBindingSet = device()->createBindingSet(lineBindingSetDesc, m_linesBindingLayout);
 
-            nvrhi::GraphicsPipelineDesc psoDesc;
+            caustica::rhi::GraphicsPipelineDesc psoDesc;
             psoDesc.VS = m_linesVertexShader;
             psoDesc.PS = m_linesPixelShader;
             psoDesc.inputLayout = m_linesInputLayout;
             psoDesc.bindingLayouts = { m_linesBindingLayout };
-            psoDesc.primType = nvrhi::PrimitiveType::LineList;
+            psoDesc.primType = caustica::rhi::PrimitiveType::LineList;
             psoDesc.renderState.depthStencilState.depthTestEnable = false;
-            psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
-                .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(nvrhi::BlendFactor::Zero).setDestBlendAlpha(nvrhi::BlendFactor::One);
+            psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
+                .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero).setDestBlendAlpha(caustica::rhi::BlendFactor::One);
 
             m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
         }
@@ -809,8 +809,8 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
 
 void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext& ctx)
 {
-    nvrhi::IFramebuffer* framebuffer = ctx.framebuffer;
-    nvrhi::ITexture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
+    caustica::rhi::IFramebuffer* framebuffer = ctx.framebuffer;
+    caustica::rhi::ITexture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
 
     m_commandList->close();
     device()->executeCommandList(m_commandList);
@@ -832,12 +832,12 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
             || m_context->activeRuntime().Picking.hasActivePickRequest()))
     {
         device()->waitForIdle();
-        void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, nvrhi::CpuAccessMode::Read);
+        void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, caustica::rhi::CpuAccessMode::Read);
         assert(pData);
         memcpy(&m_feedbackData, pData, sizeof(DebugFeedbackStruct) * 1);
         device()->unmapBuffer(m_feedback_Buffer_Cpu);
 
-        pData = device()->mapBuffer(m_debugDeltaPathTree_Cpu, nvrhi::CpuAccessMode::Read);
+        pData = device()->mapBuffer(m_debugDeltaPathTree_Cpu, caustica::rhi::CpuAccessMode::Read);
         assert(pData);
         memcpy(&m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
         device()->unmapBuffer(m_debugDeltaPathTree_Cpu);
@@ -892,8 +892,8 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
             [outputColor](rg::RenderPassContext& passCtx) {
                 passCtx.commandList()->clearTextureFloat(
                     passCtx.texture(outputColor),
-                    nvrhi::AllSubresources,
-                    nvrhi::Color(1, 1, 0, 0));
+                    caustica::rhi::AllSubresources,
+                    caustica::rhi::Color(1, 1, 0, 0));
             },
             rg::PassOptions{ .sideEffect = true, .executeAfter = "ClearFrameTargets" });
     }

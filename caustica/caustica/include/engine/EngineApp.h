@@ -122,7 +122,7 @@ public:
     void setCameraVerticalFOV(float radians);
     void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
     [[nodiscard]] bool accumulationCompleted() const;
-    [[nodiscard]] nvrhi::ITexture* ldrColorTexture() const;
+    [[nodiscard]] caustica::rhi::ITexture* ldrColorTexture() const;
     [[nodiscard]] uint32_t frameIndex() const;
 
 private:

@@ -1,8 +1,8 @@
 #include "d3d12-backend.h"
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
-    DXGI_FORMAT convertFormat(nvrhi::Format format)
+    DXGI_FORMAT convertFormat(caustica::rhi::Format format)
     {
         return getDxgiFormatMapping(format).srvFormat;
     }
@@ -293,7 +293,7 @@ namespace nvrhi::d3d12
         }
     }
 
-#if NVRHI_D3D12_WITH_COOPVEC
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
     D3D12_LINEAR_ALGEBRA_DATATYPE convertCoopVecDataType(coopvec::DataType type)
     {
         switch (type)
@@ -381,4 +381,4 @@ namespace nvrhi::d3d12
     }
 #endif
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

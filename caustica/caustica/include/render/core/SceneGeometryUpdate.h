@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/core/PathTracerSettings.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <cstdint>
 #include <memory>
@@ -35,7 +35,7 @@ struct UpdateSceneGeometryParams
     const scene::SceneRenderData*    renderData = nullptr;
     render::SceneGpuResources*       gpuResources = nullptr;
 
-    nvrhi::ICommandList*             commandList = nullptr;
+    caustica::rhi::ICommandList*             commandList = nullptr;
     IDescriptorTableManager*         descriptorTable = nullptr;
     MaterialGpuCache*                materials = nullptr;
     OpacityMicromapBuilder*          opacityMaps = nullptr;

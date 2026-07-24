@@ -1,19 +1,19 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
-namespace nvrhi 
+namespace caustica::rhi
 {
     namespace ObjectTypes
     {
-        constexpr ObjectType Nvrhi_VK_Device = 0x00030101;
+        constexpr ObjectType CAUSTICA_RHI_VK_Device = 0x00030101;
     };
 }
 
-namespace nvrhi::vulkan
+namespace caustica::rhi::vulkan
 {
-    class IDevice : public nvrhi::IDevice
+    class IDevice : public caustica::rhi::IDevice
     {
     public:
         // Additional Vulkan-specific public methods
@@ -59,9 +59,10 @@ namespace nvrhi::vulkan
         std::string vulkanLibraryName; // if empty, use default
     };
 
-    NVRHI_API DeviceHandle createDevice(const DeviceDesc& desc);
+    CAUSTICA_RHI_API DeviceHandle createDevice(const DeviceDesc& desc);
    
-    NVRHI_API VkFormat convertFormat(nvrhi::Format format);
+    CAUSTICA_RHI_API VkFormat convertFormat(caustica::rhi::Format format);
 
-    NVRHI_API const char* resultToString(VkResult result);
+    CAUSTICA_RHI_API const char* resultToString(VkResult result);
 }
+

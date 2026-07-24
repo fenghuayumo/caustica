@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -8,16 +8,16 @@
 
 #include <directx/d3d12.h>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     namespace ObjectTypes
     {
-        constexpr ObjectType Nvrhi_D3D12_Device         = 0x00020101;
-        constexpr ObjectType Nvrhi_D3D12_CommandList    = 0x00020102;
+        constexpr ObjectType CAUSTICA_RHI_D3D12_Device         = 0x00020101;
+        constexpr ObjectType CAUSTICA_RHI_D3D12_CommandList    = 0x00020102;
     };
 }
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     class IRootSignature : public IResource
     {
@@ -25,7 +25,7 @@ namespace nvrhi::d3d12
 
     typedef RefCountPtr<IRootSignature> RootSignatureHandle;
 
-    class ICommandList : public nvrhi::ICommandList
+    class ICommandList : public caustica::rhi::ICommandList
     {
     public:
         virtual bool allocateUploadBuffer(size_t size, void** pCpuAddress, D3D12_GPU_VIRTUAL_ADDRESS* pGpuAddress) = 0;
@@ -70,7 +70,7 @@ namespace nvrhi::d3d12
         Sampler
     };
 
-    class IDevice : public nvrhi::IDevice
+    class IDevice : public caustica::rhi::IDevice
     {
     public:
         // D3D12-specific methods
@@ -108,7 +108,8 @@ namespace nvrhi::d3d12
         bool logBufferLifetime = false;
     };
 
-    NVRHI_API DeviceHandle createDevice(const DeviceDesc& desc);
+    CAUSTICA_RHI_API DeviceHandle createDevice(const DeviceDesc& desc);
 
-    NVRHI_API DXGI_FORMAT convertFormat(nvrhi::Format format);
+    CAUSTICA_RHI_API DXGI_FORMAT convertFormat(caustica::rhi::Format format);
 }
+

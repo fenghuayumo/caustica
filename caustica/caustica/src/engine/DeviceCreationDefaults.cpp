@@ -67,7 +67,7 @@ namespace
 #if defined(_DEBUG)
         params.enableDebugRuntime = true;
         params.enableWarningsAsErrors = true;
-        params.enableNvrhiValidationLayer = true;
+        params.enableRhiValidationLayer = true;
         params.enableGPUValidation = false;
 #endif
 
@@ -101,7 +101,7 @@ namespace
         if (desc.enableDebug)
         {
             params.enableDebugRuntime = true;
-            params.enableNvrhiValidationLayer = true;
+            params.enableRhiValidationLayer = true;
         }
 
 #if CAUSTICA_WITH_DX12

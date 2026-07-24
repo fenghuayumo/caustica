@@ -21,13 +21,13 @@ public:
         caustica::math::int2   BoxSize     = { 128, 96 };
     };
 
-    ZoomTool( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
+    ZoomTool( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory );
     ~ZoomTool( );
 
 public:
     ZoomSettings &                  settings( )         { return m_settings; }
 
-     void                           render( nvrhi::ICommandList * commandList, nvrhi::TextureHandle colorInOut );
+     void                           render( caustica::rhi::ICommandList * commandList, caustica::rhi::TextureHandle colorInOut );
 
      bool                           keyboardUpdate(int key, int scancode, int action, int mods);
      void                           mousePosUpdate(double xpos, double ypos);
@@ -38,13 +38,13 @@ public:
      bool                           debugGUI(float indent);
 
 private:
-    const nvrhi::DeviceHandle       m_device;
+    const caustica::rhi::DeviceHandle       m_device;
     
     ZoomSettings                    m_settings;
-    nvrhi::BufferHandle             m_constantBuffer;
+    caustica::rhi::BufferHandle             m_constantBuffer;
     ComputePass                     m_CSZoomTool;
 
-    nvrhi::BindingLayoutHandle      m_bindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_bindingLayout;
     caustica::BindingCache     m_bindingCache;
 
     caustica::math::float2             m_lastMousePos;

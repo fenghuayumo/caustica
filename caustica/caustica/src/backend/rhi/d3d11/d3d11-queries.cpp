@@ -8,7 +8,7 @@
 #include <iomanip>
 
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
 
 static bool checkedCreateQuery(const D3D11_QUERY_DESC& queryDesc, const char* name, const Context& context, ID3D11Query** pQuery)
@@ -221,4 +221,4 @@ void Device::resetTimerQuery(ITimerQuery* _query)
     query->time = 0.f;
 }
 
-} // namespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

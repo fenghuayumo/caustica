@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/core/BindingCache.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderDevice.h>
 #include <math/math.h>
@@ -39,17 +39,17 @@ public:
 
 private:
 
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     caustica::render::RenderDevice& m_renderDevice;
 
-    nvrhi::ShaderHandle             m_computeShaders[(uint32_t)ComputePassType::MaxCount];
-    nvrhi::ComputePipelineHandle    m_computePSOs[(uint32_t)ComputePassType::MaxCount];
+    caustica::rhi::ShaderHandle             m_computeShaders[(uint32_t)ComputePassType::MaxCount];
+    caustica::rhi::ComputePipelineHandle    m_computePSOs[(uint32_t)ComputePassType::MaxCount];
 
-    nvrhi::SamplerHandle            m_pointSampler;
-    nvrhi::SamplerHandle            m_linearSampler;
+    caustica::rhi::SamplerHandle            m_pointSampler;
+    caustica::rhi::SamplerHandle            m_linearSampler;
 
-    nvrhi::BindingLayoutHandle      m_bindingLayoutCS;
-    nvrhi::BindingSetHandle         m_bindingSetCS;
+    caustica::rhi::BindingLayoutHandle      m_bindingLayoutCS;
+    caustica::rhi::BindingSetHandle         m_bindingSetCS;
 
     caustica::BindingCache     m_bindingCache;
 
@@ -58,13 +58,13 @@ private:
 public:
 
     PostProcess(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<ShaderDebug> shaderDebug
         //, std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory
     );
 
-    void apply(nvrhi::ICommandList* commandList, ComputePassType passType, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::BindingSetHandle bindingSet, nvrhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
-    void apply(nvrhi::ICommandList* commandList, ComputePassType passType, int pass, nvrhi::BufferHandle consts, SampleMiniConstants & miniConsts, nvrhi::ITexture* workTexture, RenderTargets & renderTargets, nvrhi::ITexture* sourceTexture);
+    void apply(caustica::rhi::ICommandList* commandList, ComputePassType passType, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::BindingSetHandle bindingSet, caustica::rhi::BindingLayoutHandle bindingLayout, uint32_t width, uint32_t height);
+    void apply(caustica::rhi::ICommandList* commandList, ComputePassType passType, int pass, caustica::rhi::BufferHandle consts, SampleMiniConstants & miniConsts, caustica::rhi::ITexture* workTexture, RenderTargets & renderTargets, caustica::rhi::ITexture* sourceTexture);
 };

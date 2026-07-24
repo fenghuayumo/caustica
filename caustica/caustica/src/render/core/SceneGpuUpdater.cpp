@@ -60,18 +60,18 @@ private:
     Scene& m_scene;
 };
 
-inline void AppendBufferRange(nvrhi::BufferRange& range, size_t size, uint64_t& currentBufferSize)
+inline void AppendBufferRange(caustica::rhi::BufferRange& range, size_t size, uint64_t& currentBufferSize)
 {
     range.byteOffset = currentBufferSize;
     // GPU allocation is 16-byte aligned, but writeBuffer must copy only `size` source
     // bytes — using the padded range.byteSize reads past the end of CPU vectors.
     range.byteSize = size;
-    currentBufferSize += nvrhi::align(size, size_t(16));
+    currentBufferSize += caustica::rhi::align(size, size_t(16));
 }
 
 template <typename T>
-inline void WriteAttributeRange(nvrhi::ICommandList* commandList, nvrhi::IBuffer* buffer,
-    const std::vector<T>& data, const nvrhi::BufferRange& range)
+inline void WriteAttributeRange(caustica::rhi::ICommandList* commandList, caustica::rhi::IBuffer* buffer,
+    const std::vector<T>& data, const caustica::rhi::BufferRange& range)
 {
     if (data.empty() || range.byteSize == 0)
         return;
@@ -79,76 +79,76 @@ inline void WriteAttributeRange(nvrhi::ICommandList* commandList, nvrhi::IBuffer
     commandList->writeBuffer(buffer, data.data(), range.byteSize, range.byteOffset);
 }
 
-nvrhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
+caustica::rhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
 {
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(MaterialConstants) * gpu.materialData.size();
     bufferDesc.debugName = "BindlessMaterials";
     bufferDesc.structStride = sizeof(MaterialConstants);
     bufferDesc.canHaveRawViews = true;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
     return gpu.device->createBuffer(bufferDesc);
 }
 
-nvrhi::BufferHandle CreateGeometryBuffer(SceneGpuResources& gpu)
+caustica::rhi::BufferHandle CreateGeometryBuffer(SceneGpuResources& gpu)
 {
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(GeometryData) * gpu.geometryData.size();
     bufferDesc.debugName = "BindlessGeometry";
     bufferDesc.structStride = sizeof(GeometryData);
     bufferDesc.canHaveRawViews = true;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
     return gpu.device->createBuffer(bufferDesc);
 }
 
-nvrhi::BufferHandle CreateInstanceBuffer(SceneGpuResources& gpu)
+caustica::rhi::BufferHandle CreateInstanceBuffer(SceneGpuResources& gpu)
 {
-    const bool needStructuredBuffer = gpu.device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D11;
+    const bool needStructuredBuffer = gpu.device->getGraphicsAPI() != caustica::rhi::GraphicsAPI::D3D11;
 
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(InstanceData) * gpu.instanceData.size();
     bufferDesc.debugName = "Instances";
     bufferDesc.structStride = needStructuredBuffer ? sizeof(InstanceData) : 0;
     bufferDesc.canHaveRawViews = true;
     bufferDesc.canHaveUAVs = true;
     bufferDesc.isVertexBuffer = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
 
     return gpu.device->createBuffer(bufferDesc);
 }
 
-nvrhi::BufferHandle CreateMaterialConstantBuffer(SceneGpuResources& gpu, const std::string& debugName)
+caustica::rhi::BufferHandle CreateMaterialConstantBuffer(SceneGpuResources& gpu, const std::string& debugName)
 {
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(MaterialConstants);
     bufferDesc.debugName = debugName;
     bufferDesc.isConstantBuffer = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ConstantBuffer;
     bufferDesc.keepInitialState = true;
 
     return gpu.device->createBuffer(bufferDesc);
 }
 
-void WriteMaterialBuffer(nvrhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteMaterialBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.materialBuffer, gpu.materialData.data(),
         gpu.materialData.size() * sizeof(MaterialConstants));
 }
 
-void WriteGeometryBuffer(nvrhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteGeometryBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.geometryBuffer, gpu.geometryData.data(),
         gpu.geometryData.size() * sizeof(GeometryData));
 }
 
-void WriteInstanceBuffer(nvrhi::ICommandList* commandList, const SceneGpuResources& gpu)
+void WriteInstanceBuffer(caustica::rhi::ICommandList* commandList, const SceneGpuResources& gpu)
 {
     commandList->writeBuffer(gpu.instanceBuffer, gpu.instanceData.data(),
         gpu.instanceData.size() * sizeof(InstanceData));
@@ -261,7 +261,7 @@ void EnsureMeshGpuBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     for (const auto& mesh : renderData.meshSnapshots)
     {
@@ -274,13 +274,13 @@ void EnsureMeshGpuBuffers(
 
         if (!buffers->indexData.empty() && !meshGpu.indexBuffer)
         {
-            nvrhi::BufferDesc bufferDesc;
+            caustica::rhi::BufferDesc bufferDesc;
             bufferDesc.isIndexBuffer = true;
             bufferDesc.byteSize = buffers->indexData.size() * sizeof(uint32_t);
             bufferDesc.debugName = "IndexBuffer";
             bufferDesc.canHaveTypedViews = true;
             bufferDesc.canHaveRawViews = true;
-            bufferDesc.format = nvrhi::Format::R32_UINT;
+            bufferDesc.format = caustica::rhi::Format::R32_UINT;
             bufferDesc.isAccelStructBuildInput = gpu.rayTracingSupported;
 
             meshGpu.indexBuffer = gpu.device->createBuffer(bufferDesc);
@@ -294,15 +294,15 @@ void EnsureMeshGpuBuffers(
             if (descriptorTable)
             {
                 meshGpu.indexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
+                    descriptorTable->createDescriptorHandle(caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
             }
 
-            commandList->beginTrackingBufferState(meshGpu.indexBuffer, nvrhi::ResourceStates::Common);
+            commandList->beginTrackingBufferState(meshGpu.indexBuffer, caustica::rhi::ResourceStates::Common);
             commandList->writeBuffer(meshGpu.indexBuffer, buffers->indexData.data(), buffers->indexData.size() * sizeof(uint32_t));
 
-            nvrhi::ResourceStates state = nvrhi::ResourceStates::IndexBuffer | nvrhi::ResourceStates::ShaderResource;
+            caustica::rhi::ResourceStates state = caustica::rhi::ResourceStates::IndexBuffer | caustica::rhi::ResourceStates::ShaderResource;
             if (bufferDesc.isAccelStructBuildInput)
-                state = state | nvrhi::ResourceStates::AccelStructBuildInput;
+                state = state | caustica::rhi::ResourceStates::AccelStructBuildInput;
 
             commandList->setPermanentBufferState(meshGpu.indexBuffer, state);
             commandList->commitBarriers();
@@ -311,12 +311,12 @@ void EnsureMeshGpuBuffers(
         {
             meshGpu.indexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
-                    nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
+                    caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.indexBuffer)));
         }
 
         if (!meshGpu.vertexBuffer)
         {
-            nvrhi::BufferDesc bufferDesc;
+            caustica::rhi::BufferDesc bufferDesc;
             bufferDesc.isVertexBuffer = true;
             bufferDesc.byteSize = 0;
             bufferDesc.debugName = "VertexBuffer";
@@ -324,9 +324,9 @@ void EnsureMeshGpuBuffers(
             bufferDesc.canHaveRawViews = true;
             bufferDesc.isAccelStructBuildInput = gpu.rayTracingSupported;
 
-            nvrhi::ResourceStates state = nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::ShaderResource;
+            caustica::rhi::ResourceStates state = caustica::rhi::ResourceStates::VertexBuffer | caustica::rhi::ResourceStates::ShaderResource;
             if (bufferDesc.isAccelStructBuildInput)
-                state = state | nvrhi::ResourceStates::AccelStructBuildInput;
+                state = state | caustica::rhi::ResourceStates::AccelStructBuildInput;
             bufferDesc.initialState = state;
             bufferDesc.keepInitialState = true;
 
@@ -367,10 +367,10 @@ void EnsureMeshGpuBuffers(
             if (descriptorTable)
             {
                 meshGpu.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
+                    descriptorTable->createDescriptorHandle(caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
             }
 
-            commandList->beginTrackingBufferState(meshGpu.vertexBuffer, nvrhi::ResourceStates::Common);
+            commandList->beginTrackingBufferState(meshGpu.vertexBuffer, caustica::rhi::ResourceStates::Common);
 
             if (!buffers->positionData.empty())
             {
@@ -402,7 +402,7 @@ void EnsureMeshGpuBuffers(
         {
             meshGpu.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
-                    nvrhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
+                    caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
         }
     }
 
@@ -443,7 +443,7 @@ void EnsureMeshGpuBuffers(
             if (prototypeGpu.hasAttribute(VertexAttribute::TexCoord2))
                 AppendBufferRange(skinnedGpuMesh.vertexBufferRange(VertexAttribute::TexCoord2), totalVertices * sizeof(float2), skinnedVertexBufferSize);
 
-            nvrhi::BufferDesc bufferDesc;
+            caustica::rhi::BufferDesc bufferDesc;
             bufferDesc.isVertexBuffer = true;
             bufferDesc.byteSize = skinnedVertexBufferSize;
             bufferDesc.debugName = "SkinnedVertexBuffer";
@@ -452,14 +452,14 @@ void EnsureMeshGpuBuffers(
             bufferDesc.canHaveUAVs = true;
             bufferDesc.isAccelStructBuildInput = gpu.rayTracingSupported;
             bufferDesc.keepInitialState = true;
-            bufferDesc.initialState = nvrhi::ResourceStates::VertexBuffer;
+            bufferDesc.initialState = caustica::rhi::ResourceStates::VertexBuffer;
 
             skinnedGpuMesh.vertexBuffer = gpu.device->createBuffer(bufferDesc);
 
             if (descriptorTable)
             {
                 skinnedGpuMesh.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
-                    descriptorTable->createDescriptorHandle(nvrhi::BindingSetItem::RawBuffer_SRV(0, skinnedGpuMesh.vertexBuffer)));
+                    descriptorTable->createDescriptorHandle(caustica::rhi::BindingSetItem::RawBuffer_SRV(0, skinnedGpuMesh.vertexBuffer)));
             }
         }
         if (descriptorTable
@@ -468,16 +468,16 @@ void EnsureMeshGpuBuffers(
         {
             skinnedGpuMesh.vertexBufferDescriptor = std::make_shared<DescriptorHandle>(
                 descriptorTable->createDescriptorHandle(
-                    nvrhi::BindingSetItem::RawBuffer_SRV(
+                    caustica::rhi::BindingSetItem::RawBuffer_SRV(
                         0,
                         skinnedGpuMesh.vertexBuffer)));
         }
 
         if (!skinnedGpu.jointBuffer)
         {
-            nvrhi::BufferDesc jointBufferDesc;
+            caustica::rhi::BufferDesc jointBufferDesc;
             jointBufferDesc.debugName = "JointBuffer";
-            jointBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            jointBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
             jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, proxy.jointMatrices.size());
@@ -486,12 +486,12 @@ void EnsureMeshGpuBuffers(
 
         if (!skinnedGpu.skinningBindingSet)
         {
-            nvrhi::BindingSetDesc setDesc;
+            caustica::rhi::BindingSetDesc setDesc;
             setDesc.bindings = {
-                nvrhi::BindingSetItem::PushConstants(0, sizeof(SkinningConstants)),
-                nvrhi::BindingSetItem::RawBuffer_SRV(0, prototypeGpu.vertexBuffer),
-                nvrhi::BindingSetItem::RawBuffer_SRV(1, skinnedGpu.jointBuffer),
-                nvrhi::BindingSetItem::RawBuffer_UAV(0, skinnedGpuMesh.vertexBuffer)
+                caustica::rhi::BindingSetItem::PushConstants(0, sizeof(SkinningConstants)),
+                caustica::rhi::BindingSetItem::RawBuffer_SRV(0, prototypeGpu.vertexBuffer),
+                caustica::rhi::BindingSetItem::RawBuffer_SRV(1, skinnedGpu.jointBuffer),
+                caustica::rhi::BindingSetItem::RawBuffer_UAV(0, skinnedGpuMesh.vertexBuffer)
             };
 
             skinnedGpu.skinningBindingSet = gpu.device->createBindingSet(setDesc, gpu.skinningBindingLayout);
@@ -502,11 +502,11 @@ void EnsureMeshGpuBuffers(
 void DispatchSkinnedMeshUpdates(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     uint32_t /*frameIndex*/)
 {
     bool skinningMarkerPlaced = false;
-    std::vector<nvrhi::BufferHandle> skinnedVertexBuffersWritten;
+    std::vector<caustica::rhi::BufferHandle> skinnedVertexBuffersWritten;
     std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash> skinnedMeshesWritten;
     uint32_t skippedDuplicateSkinnedDispatchCount = 0;
 
@@ -544,7 +544,7 @@ void DispatchSkinnedMeshUpdates(
             proxy.jointMatrices.data(),
             proxy.jointMatrices.size() * sizeof(float4x4));
 
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.pipeline = gpu.skinningPipeline;
         state.bindings = { skinnedGpu.skinningBindingSet };
         commandList->setComputeState(state);
@@ -592,8 +592,8 @@ void DispatchSkinnedMeshUpdates(
 
     if (!skinnedVertexBuffersWritten.empty())
     {
-        for (const nvrhi::BufferHandle& vertexBuffer : skinnedVertexBuffersWritten)
-            commandList->setBufferState(vertexBuffer, nvrhi::ResourceStates::UnorderedAccess);
+        for (const caustica::rhi::BufferHandle& vertexBuffer : skinnedVertexBuffersWritten)
+            commandList->setBufferState(vertexBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
         commandList->commitBarriers();
     }
 
@@ -615,7 +615,7 @@ void DispatchSkinnedMeshUpdates(
 void ApplyMeshGpuUploadCommands(
     SceneGpuResources& gpu,
     std::span<const MeshGpuUploadCommand> commands,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     for (const MeshGpuUploadCommand& command : commands)
     {
@@ -653,10 +653,10 @@ void ApplyMeshGpuUploadCommands(
                     + vertexOffset * sizeof(uint32_t));
         }
 
-        nvrhi::ResourceStates readyState =
-            nvrhi::ResourceStates::VertexBuffer | nvrhi::ResourceStates::ShaderResource;
+        caustica::rhi::ResourceStates readyState =
+            caustica::rhi::ResourceStates::VertexBuffer | caustica::rhi::ResourceStates::ShaderResource;
         if (meshGpu.vertexBuffer->getDesc().isAccelStructBuildInput)
-            readyState = readyState | nvrhi::ResourceStates::AccelStructBuildInput;
+            readyState = readyState | caustica::rhi::ResourceStates::AccelStructBuildInput;
         commandList->setBufferState(meshGpu.vertexBuffer, readyState);
     }
 }
@@ -694,7 +694,7 @@ void UpdateGpuSceneBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     uint32_t frameIndex,
     bool structureChanged,
     bool transformsChanged)
@@ -710,7 +710,7 @@ void UpdateGpuSceneBuffers(
             continue;
         meshGpuIt->second.vertexBuffer = nullptr;
         meshGpuIt->second.vertexBufferDescriptor.reset();
-        meshGpuIt->second.vertexBufferRanges.fill(nvrhi::BufferRange{});
+        meshGpuIt->second.vertexBufferRanges.fill(caustica::rhi::BufferRange{});
     }
     bool materialsChanged = false;
 
@@ -730,14 +730,14 @@ void UpdateGpuSceneBuffers(
 
     if (gpu.enableBindlessResources && renderData.geometryCount > gpu.geometryData.size())
     {
-        gpu.geometryData.resize(nvrhi::align<size_t>(renderData.geometryCount, allocationGranularity));
+        gpu.geometryData.resize(caustica::rhi::align<size_t>(renderData.geometryCount, allocationGranularity));
         gpu.geometryBuffer = CreateGeometryBuffer(gpu);
         arraysAllocated = true;
     }
 
     if (renderData.materialSnapshots.size() > gpu.materialData.size())
     {
-        gpu.materialData.resize(nvrhi::align<size_t>(renderData.materialSnapshots.size(), allocationGranularity));
+        gpu.materialData.resize(caustica::rhi::align<size_t>(renderData.materialSnapshots.size(), allocationGranularity));
         if (gpu.enableBindlessResources)
             gpu.materialBuffer = CreateMaterialBuffer(gpu);
         arraysAllocated = true;
@@ -745,7 +745,7 @@ void UpdateGpuSceneBuffers(
 
     if (renderData.meshInstanceEntities.size() > gpu.instanceData.size())
     {
-        gpu.instanceData.resize(nvrhi::align<size_t>(renderData.meshInstanceEntities.size(), allocationGranularity));
+        gpu.instanceData.resize(caustica::rhi::align<size_t>(renderData.meshInstanceEntities.size(), allocationGranularity));
         gpu.instanceBuffer = CreateInstanceBuffer(gpu);
         arraysAllocated = true;
     }
@@ -851,30 +851,30 @@ void UpdateGpuSceneBuffers(
 
 void SceneGpuUpdater::initialize(
     SceneGpuResources& gpu,
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     ShaderFactory& shaderFactory)
 {
     gpu.clearSceneResources();
     gpu.device = device;
-    gpu.rayTracingSupported = device->queryFeatureSupport(nvrhi::Feature::RayTracingAccelStruct);
+    gpu.rayTracingSupported = device->queryFeatureSupport(caustica::rhi::Feature::RayTracingAccelStruct);
     gpu.skinningShader = shaderFactory.createAutoShader(
         "engine/skinning_cs",
         "main",
         CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs),
         nullptr,
-        nvrhi::ShaderType::Compute);
+        caustica::rhi::ShaderType::Compute);
 
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     layoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::PushConstants(0, sizeof(SkinningConstants)),
-        nvrhi::BindingLayoutItem::RawBuffer_SRV(0),
-        nvrhi::BindingLayoutItem::RawBuffer_SRV(1),
-        nvrhi::BindingLayoutItem::RawBuffer_UAV(0)
+        caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(SkinningConstants)),
+        caustica::rhi::BindingLayoutItem::RawBuffer_SRV(0),
+        caustica::rhi::BindingLayoutItem::RawBuffer_SRV(1),
+        caustica::rhi::BindingLayoutItem::RawBuffer_UAV(0)
     };
     gpu.skinningBindingLayout = device->createBindingLayout(layoutDesc);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { gpu.skinningBindingLayout };
     pipelineDesc.CS = gpu.skinningShader;
     gpu.skinningPipeline = device->createComputePipeline(pipelineDesc);
@@ -884,7 +884,7 @@ void SceneGpuUpdater::refresh(
     Scene& scene,
     SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     uint32_t frameIndex)
 {
     assertRenderThread();
@@ -928,7 +928,7 @@ void SceneGpuUpdater::refreshAfterLoad(
     if (!gpu.device->waitForIdle())
         return;
 
-    nvrhi::CommandListHandle commandList = gpu.device->createCommandList();
+    caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
     {
         EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);

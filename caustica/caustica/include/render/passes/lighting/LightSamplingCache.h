@@ -2,7 +2,7 @@
 
 #include <render/core/BindingCache.h>
 #include <render/SceneGpuResources.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <math/math.h>
 #include <memory>
 #include <vector>
@@ -75,34 +75,34 @@ public:
     };
 
 public:
-    LightSamplingCache(nvrhi::IDevice* device);
+    LightSamplingCache(caustica::rhi::IDevice* device);
     ~LightSamplingCache();
 
     // reset scene related stuff
     void                            sceneReloaded();
 
-    void                            createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, nvrhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
+    void                            createRenderPasses(std::shared_ptr<caustica::ShaderFactory> shaderFactory, caustica::rhi::IBindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::shared_ptr<ShaderDebug> shaderDebug, const uint2 renderResolution, const uint envMapProcessedResolution);
 
     // Main and only processing stage is split into updateBegin/updateEnd. These can be called one after the other as soon as screen space motion vectors are available.
     // The split is purely to facilitate any potential async compute.
     
     // updateBegin can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers. Emissive triangle emission must be accessible at this point.
-    void                            updateBegin(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, nvrhi::IDescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, nvrhi::TextureHandle envMapProcessed);
+    void                            updateBegin(caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const UpdateSettings & settings, double sceneTime, const caustica::scene::SceneRenderData* sceneData, const caustica::render::SceneGpuFrameHandles& gpuHandles, caustica::rhi::IDescriptorTable* bindlessDescriptorTable, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, std::vector<SubInstanceData> & subInstanceData, caustica::rhi::TextureHandle envMapProcessed);
     // updateEnd must happen BEFORE any light sampling (e.g. PT pass with NEE) but AFTER screen space motion vectors are available for reprojection.
-    void                            updateEnd(nvrhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors);
+    void                            updateEnd(caustica::rhi::ICommandList * commandList, caustica::BindingCache & bindingCache, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors);
 
-    nvrhi::BufferHandle             getControlBuffer() const                    { return m_controlBuffer; }
-    nvrhi::BufferHandle             getLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights
-    nvrhi::BufferHandle             getLightExBuffer() const                    { return m_lightsExBuffer; }            // this is the list of light (extended data)
-    nvrhi::BufferHandle             getLightProxyCounters() const               { return m_perLightProxyCounters; }     // these are counters of how many proxies each light has
-    nvrhi::BufferHandle             getLightSamplingProxies() const             { return m_lightSamplingProxies; }      // these are indices into the getLightBuffer()
+    caustica::rhi::BufferHandle             getControlBuffer() const                    { return m_controlBuffer; }
+    caustica::rhi::BufferHandle             getLightBuffer() const                      { return m_lightsBuffer; }              // this is the list of lights
+    caustica::rhi::BufferHandle             getLightExBuffer() const                    { return m_lightsExBuffer; }            // this is the list of light (extended data)
+    caustica::rhi::BufferHandle             getLightProxyCounters() const               { return m_perLightProxyCounters; }     // these are counters of how many proxies each light has
+    caustica::rhi::BufferHandle             getLightSamplingProxies() const             { return m_lightSamplingProxies; }      // these are indices into the getLightBuffer()
 
-    nvrhi::TextureHandle            getEnvLightLookupMap() const                { return m_envLightLookupMap; }
+    caustica::rhi::TextureHandle            getEnvLightLookupMap() const                { return m_envLightLookupMap; }
 
-    nvrhi::BufferHandle             getLocalSamplingBuffer() const              { return m_NEE_AT_LocalSamplingBuffer; }
+    caustica::rhi::BufferHandle             getLocalSamplingBuffer() const              { return m_NEE_AT_LocalSamplingBuffer; }
 
-    nvrhi::TextureHandle            getFeedbackTotalWeight() const              { return m_NEE_AT_FeedbackTotalWeight; }
-    nvrhi::TextureHandle            getFeedbackCandidates() const               { return m_NEE_AT_FeedbackCandidates; }
+    caustica::rhi::TextureHandle            getFeedbackTotalWeight() const              { return m_NEE_AT_FeedbackTotalWeight; }
+    caustica::rhi::TextureHandle            getFeedbackCandidates() const               { return m_NEE_AT_FeedbackCandidates; }
 
 
     bool                            infoGUI(float indent);
@@ -123,14 +123,14 @@ private:
     // this creates emissive triangle proc tasks and also does any required geometry instance (subInstance) processing such as analyt light proxies; has to happen AFTER collectAnalyticLightsCPU
     bool                            processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, MaterialGpuCache& materialGpuCache, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
 
-    void                            fillBindings(nvrhi::BindingSetDesc& outBindingSetDesc, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, nvrhi::BufferHandle subInstanceDataBuffer, nvrhi::TextureHandle depthBuffer, nvrhi::TextureHandle motionVectors, nvrhi::TextureHandle envMapProcessed);
+    void                            fillBindings(caustica::rhi::BindingSetDesc& outBindingSetDesc, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer, caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors, caustica::rhi::TextureHandle envMapProcessed);
 
     void                            updateFrustumConsts(LightSamplingCacheConstants & outConsts, const LightSamplingCache::UpdateSettings & settings);
 
     void                            updateLocalJitter();
 
 private:
-    nvrhi::DeviceHandle             m_device;
+    caustica::rhi::DeviceHandle             m_device;
     caustica::render::RenderDevice* m_renderDevice = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_framebufferFactory;
     std::shared_ptr<ShaderDebug>    m_shaderDebug;
@@ -163,46 +163,46 @@ private:
     ComputePass                     m_executeProxyJobs;
     ComputePass                     m_debugDrawLights;
     
-    nvrhi::BindingLayoutHandle      m_commonBindingLayout;
+    caustica::rhi::BindingLayoutHandle      m_commonBindingLayout;
 
     UpdateSettings                    m_currentSettings;
     LightingControlData             m_currentCtrlBuff;              // NOTE: this does not include GPU-side changes, only the initial state set in update
 
-    nvrhi::BufferHandle             m_controlBuffer;
+    caustica::rhi::BufferHandle             m_controlBuffer;
 
-    nvrhi::SamplerHandle            m_pointSampler;
-    nvrhi::SamplerHandle            m_linearSampler;
+    caustica::rhi::SamplerHandle            m_pointSampler;
+    caustica::rhi::SamplerHandle            m_linearSampler;
 
-    // nvrhi::BufferHandle             m_lightingConstants;                // same content as in control buffer
+    // caustica::rhi::BufferHandle             m_lightingConstants;                // same content as in control buffer
 
-    nvrhi::BufferHandle             m_lightsBuffer;                     // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_lightsExBuffer;                   // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_scratchBuffer;                    // byte size: LLB_SCRATCH_BUFFER_SIZE
-    nvrhi::BufferHandle             m_scratchList;                      // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_historyRemapCurrentToPastBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_historyRemapPastToCurrentBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_lightsBuffer;                     // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_lightsExBuffer;                   // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_scratchBuffer;                    // byte size: LLB_SCRATCH_BUFFER_SIZE
+    caustica::rhi::BufferHandle             m_scratchList;                      // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_historyRemapCurrentToPastBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_historyRemapPastToCurrentBuffer;  // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
 
-    nvrhi::BufferHandle             m_controlBufferReadback;        // for showing debug info
+    caustica::rhi::BufferHandle             m_controlBufferReadback;        // for showing debug info
     int                             m_framesFromLastReadbackCopy;   // the number of frames that passed since 
     LightingControlData             m_lastReadback;
 
-    nvrhi::BufferHandle             m_lightWeights;                 // element count: 2 * CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
-    nvrhi::BufferHandle             m_perLightProxyCounters;        // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
-    nvrhi::BufferHandle             m_lightSamplingProxies;         // element count: CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES  <- this is the output of the GPUSort and is only used to sort the above 2 arrays
+    caustica::rhi::BufferHandle             m_lightWeights;                 // element count: 2 * CAUSTICA_LIGHTING_WEIGHTS_COUNT_HALF
+    caustica::rhi::BufferHandle             m_perLightProxyCounters;        // element count: CAUSTICA_LIGHTING_MAX_LIGHTS
+    caustica::rhi::BufferHandle             m_lightSamplingProxies;         // element count: CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES  <- this is the output of the GPUSort and is only used to sort the above 2 arrays
 
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackTotalWeight;
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackCandidates;
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackTotalWeightScratch;
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackCandidatesScratch;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackTotalWeight;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackCandidates;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackTotalWeightScratch;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackCandidatesScratch;
     bool                            m_NEE_AT_FeedbackBufferFilled;
 
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackTotalWeightBlended;
-    nvrhi::TextureHandle            m_NEE_AT_FeedbackCandidatesBlended;
-    nvrhi::BufferHandle             m_NEE_AT_LocalSamplingBuffer;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackTotalWeightBlended;
+    caustica::rhi::TextureHandle            m_NEE_AT_FeedbackCandidatesBlended;
+    caustica::rhi::BufferHandle             m_NEE_AT_LocalSamplingBuffer;
 
-    nvrhi::TextureHandle            m_envLightLookupMap;            // used for looking up environment lights by direction for full MIS
+    caustica::rhi::TextureHandle            m_envLightLookupMap;            // used for looking up environment lights by direction for full MIS
 
-    nvrhi::TextureHandle            m_NEE_AT_HistoryDepth;
+    caustica::rhi::TextureHandle            m_NEE_AT_HistoryDepth;
 
     std::vector<PolymorphicLightInfo>   m_scratchLightBuffer;                           // these are for scene lights filled in on CPU side
     std::vector<PolymorphicLightInfoEx> m_scratchLightExBuffer;                         // these are for scene lights filled in on CPU side

@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
 
     FramebufferHandle Device::createFramebuffer(const FramebufferDesc& desc)
@@ -253,7 +253,7 @@ namespace nvrhi::d3d11
             }
         }
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
         bool updateSPS = m_CurrentSinglePassStereoState != pipeline->desc.renderState.singlePassStereo;
 
         if (updateSPS)
@@ -582,7 +582,7 @@ namespace nvrhi::d3d11
 
         if (extendedState)
         {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
             NvAPI_D3D11_RASTERIZER_DESC_EX descEx;
             memset(&descEx, 0, sizeof(descEx));
             memcpy(&descEx, &desc11New, sizeof(desc11New));
@@ -623,4 +623,4 @@ namespace nvrhi::d3d11
     }
 
 
-} // nanmespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

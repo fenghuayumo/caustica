@@ -10,12 +10,12 @@
 #include <assets/ImageAsset.h>
 #include <assets/TypedAssets.h>
 
+#include <rhi/rhi.h>
+
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
-
-namespace nvrhi { class IDevice; class ICommandList; }
 
 namespace caustica
 {
@@ -35,7 +35,7 @@ class AssetSystem
 {
 public:
     void initialize(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<IFileSystem> fileSystem,
         std::shared_ptr<IDescriptorTableManager> descriptorTable);
     // Idempotent; safe if never initialized or already shut down.
@@ -67,7 +67,7 @@ public:
         const std::filesystem::path& path,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        nvrhi::ICommandList* commandList);
+        caustica::rhi::ICommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromFileDeferred(
         const std::filesystem::path& path,
@@ -84,7 +84,7 @@ public:
         const std::string& mimeType,
         bool sRGB,
         render::RenderDevice* renderDevice,
-        nvrhi::ICommandList* commandList);
+        caustica::rhi::ICommandList* commandList);
 
     Handle<ImageAsset> loadTextureFromMemoryDeferred(
         const std::shared_ptr<IBlob>& data,

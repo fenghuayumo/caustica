@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 
 namespace caustica
@@ -12,17 +12,17 @@ class GenerateMipsPass
 {
 public:
     GenerateMipsPass(
-        nvrhi::IDevice* device,
+        caustica::rhi::IDevice* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
-        nvrhi::ITexture* sourceEnvironmentMap,
-        nvrhi::ITexture* destinationTexture);
+        caustica::rhi::ITexture* sourceEnvironmentMap,
+        caustica::rhi::ITexture* destinationTexture);
     ~GenerateMipsPass();
-    void process(nvrhi::ICommandList* commandList);
+    void process(caustica::rhi::ICommandList* commandList);
 
 private:
-    nvrhi::ComputePipelineHandle n_pipeline;
-    nvrhi::BindingSetHandle m_bindingSet;
-    nvrhi::TextureHandle m_sourceTexture;
-    nvrhi::TextureHandle m_destinationTexture;
-    nvrhi::SamplerHandle m_linearSampler;
+    caustica::rhi::ComputePipelineHandle n_pipeline;
+    caustica::rhi::BindingSetHandle m_bindingSet;
+    caustica::rhi::TextureHandle m_sourceTexture;
+    caustica::rhi::TextureHandle m_destinationTexture;
+    caustica::rhi::SamplerHandle m_linearSampler;
 };

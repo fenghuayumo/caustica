@@ -2,9 +2,9 @@
 
 #include <imgui.h>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <imgui/imgui_nvrhi.h>
+#include <imgui/imgui_rhi.h>
 #include <core/log.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
@@ -30,7 +30,7 @@ struct VERTEX_CONSTANT_BUFFER
     float        mvp[4][4];
 };
 
-bool ImGui_NVRHI::updateFontTexture()
+bool ImGui_RHI::updateFontTexture()
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -46,10 +46,10 @@ bool ImGui_NVRHI::updateFontTexture()
     if (!pixels)
         return false;
 
-    nvrhi::TextureDesc textureDesc;
+    caustica::rhi::TextureDesc textureDesc;
     textureDesc.width = width;
     textureDesc.height = height;
-    textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+    textureDesc.format = caustica::rhi::Format::RGBA8_UNORM;
     textureDesc.debugName = "ImGui font texture";
 
     fontTexture = m_device->createTexture(textureDesc);
@@ -59,11 +59,11 @@ bool ImGui_NVRHI::updateFontTexture()
 
     m_commandList->open();
 
-    m_commandList->beginTrackingTextureState(fontTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+    m_commandList->beginTrackingTextureState(fontTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
     m_commandList->writeTexture(fontTexture, 0, 0, pixels, width * 4);
 
-    m_commandList->setPermanentTextureState(fontTexture, nvrhi::ResourceStates::ShaderResource);
+    m_commandList->setPermanentTextureState(fontTexture, caustica::rhi::ResourceStates::ShaderResource);
     m_commandList->commitBarriers();
 
     m_commandList->close();
@@ -74,14 +74,14 @@ bool ImGui_NVRHI::updateFontTexture()
     return true;
 }
 
-bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
+bool ImGui_RHI::init(caustica::rhi::IDevice* device, std::shared_ptr<ShaderFactory> shaderFactory)
 {
     m_device = device;
 
     m_commandList = m_device->createCommandList();
 
-    vertexShader = shaderFactory->createAutoShader("engine/imgui_vertex", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_vertex), nullptr, nvrhi::ShaderType::Vertex);
-    pixelShader = shaderFactory->createAutoShader("engine/imgui_pixel", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_pixel), nullptr, nvrhi::ShaderType::Pixel);
+    vertexShader = shaderFactory->createAutoShader("engine/imgui_vertex", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_vertex), nullptr, caustica::rhi::ShaderType::Vertex);
+    pixelShader = shaderFactory->createAutoShader("engine/imgui_pixel", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_imgui_pixel), nullptr, caustica::rhi::ShaderType::Pixel);
     
     if (!vertexShader || !pixelShader)
     {
@@ -90,50 +90,50 @@ bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> sh
     } 
 
     // create attribute layout object
-    nvrhi::VertexAttributeDesc vertexAttribLayout[] = {
-        { "POSITION", nvrhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,pos), sizeof(ImDrawVert), false },
-        { "TEXCOORD", nvrhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,uv),  sizeof(ImDrawVert), false },
-        { "COLOR",    nvrhi::Format::RGBA8_UNORM, 1, 0, offsetof(ImDrawVert,col), sizeof(ImDrawVert), false },
+    caustica::rhi::VertexAttributeDesc vertexAttribLayout[] = {
+        { "POSITION", caustica::rhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,pos), sizeof(ImDrawVert), false },
+        { "TEXCOORD", caustica::rhi::Format::RG32_FLOAT,  1, 0, offsetof(ImDrawVert,uv),  sizeof(ImDrawVert), false },
+        { "COLOR",    caustica::rhi::Format::RGBA8_UNORM, 1, 0, offsetof(ImDrawVert,col), sizeof(ImDrawVert), false },
     };
 
     shaderAttribLayout = m_device->createInputLayout(vertexAttribLayout, sizeof(vertexAttribLayout) / sizeof(vertexAttribLayout[0]), vertexShader);
 
     // create PSO
     {
-        nvrhi::BlendState blendState;
+        caustica::rhi::BlendState blendState;
         blendState.targets[0].setBlendEnable(true)
-            .setSrcBlend(nvrhi::BlendFactor::SrcAlpha)
-            .setDestBlend(nvrhi::BlendFactor::InvSrcAlpha)
-            .setSrcBlendAlpha(nvrhi::BlendFactor::InvSrcAlpha)
-            .setDestBlendAlpha(nvrhi::BlendFactor::Zero);
+            .setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
+            .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha)
+            .setSrcBlendAlpha(caustica::rhi::BlendFactor::InvSrcAlpha)
+            .setDestBlendAlpha(caustica::rhi::BlendFactor::Zero);
 
-        auto rasterState = nvrhi::RasterState()
+        auto rasterState = caustica::rhi::RasterState()
             .setFillSolid()
             .setCullNone()
             .setScissorEnable(true)
             .setDepthClipEnable(true);
 
-        auto depthStencilState = nvrhi::DepthStencilState()
+        auto depthStencilState = caustica::rhi::DepthStencilState()
             .disableDepthTest()
             .enableDepthWrite()
             .disableStencil()
-            .setDepthFunc(nvrhi::ComparisonFunc::Always);
+            .setDepthFunc(caustica::rhi::ComparisonFunc::Always);
 
-        nvrhi::RenderState renderState;
+        caustica::rhi::RenderState renderState;
         renderState.blendState = blendState;
         renderState.depthStencilState = depthStencilState;
         renderState.rasterState = rasterState;
 
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::All;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::All;
         layoutDesc.bindings = { 
-            nvrhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 2),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Sampler(0) 
+            caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(float) * 2),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0) 
         };
         bindingLayout = m_device->createBindingLayout(layoutDesc);
 
-        basePSODesc.primType = nvrhi::PrimitiveType::TriangleList;
+        basePSODesc.primType = caustica::rhi::PrimitiveType::TriangleList;
         basePSODesc.inputLayout = shaderAttribLayout;
         basePSODesc.VS = vertexShader;
         basePSODesc.PS = pixelShader;
@@ -142,8 +142,8 @@ bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> sh
     }
 
     {
-        const auto desc = nvrhi::SamplerDesc()
-            .setAllAddressModes(nvrhi::SamplerAddressMode::Wrap)
+        const auto desc = caustica::rhi::SamplerDesc()
+            .setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap)
             .setAllFilters(true);
 
         fontSampler = m_device->createSampler(desc);
@@ -155,11 +155,11 @@ bool ImGui_NVRHI::init(nvrhi::IDevice* device, std::shared_ptr<ShaderFactory> sh
     return true;
 }
 
-bool ImGui_NVRHI::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, const bool indexBuffer)
+bool ImGui_RHI::reallocateBuffer(caustica::rhi::BufferHandle& buffer, size_t requiredSize, size_t reallocateSize, const bool indexBuffer)
 {
     if (buffer == nullptr || size_t(buffer->getDesc().byteSize) < requiredSize)
     {
-        nvrhi::BufferDesc desc;
+        caustica::rhi::BufferDesc desc;
         desc.byteSize = uint32_t(reallocateSize);
         desc.structStride = 0;
         desc.debugName = indexBuffer ? "ImGui index buffer" : "ImGui vertex buffer";
@@ -168,7 +168,7 @@ bool ImGui_NVRHI::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredS
         desc.isIndexBuffer = indexBuffer;
         desc.isDrawIndirectArgs = false;
         desc.isVolatile = false;
-        desc.initialState = indexBuffer ? nvrhi::ResourceStates::IndexBuffer : nvrhi::ResourceStates::VertexBuffer;
+        desc.initialState = indexBuffer ? caustica::rhi::ResourceStates::IndexBuffer : caustica::rhi::ResourceStates::VertexBuffer;
         desc.keepInitialState = true;
 
         buffer = m_device->createBuffer(desc);
@@ -182,7 +182,7 @@ bool ImGui_NVRHI::reallocateBuffer(nvrhi::BufferHandle& buffer, size_t requiredS
     return true;
 }
 
-nvrhi::IGraphicsPipeline* ImGui_NVRHI::getPSO(nvrhi::FramebufferInfo const& framebufferInfo)
+caustica::rhi::IGraphicsPipeline* ImGui_RHI::getPSO(caustica::rhi::FramebufferInfo const& framebufferInfo)
 {
     if (pso)
         return pso;
@@ -193,7 +193,7 @@ nvrhi::IGraphicsPipeline* ImGui_NVRHI::getPSO(nvrhi::FramebufferInfo const& fram
     return pso;
 }
 
-nvrhi::IBindingSet* ImGui_NVRHI::getBindingSet(nvrhi::ITexture* texture)
+caustica::rhi::IBindingSet* ImGui_RHI::getBindingSet(caustica::rhi::ITexture* texture)
 {
     auto iter = bindingsCache.find(texture);
     if (iter != bindingsCache.end())
@@ -201,15 +201,15 @@ nvrhi::IBindingSet* ImGui_NVRHI::getBindingSet(nvrhi::ITexture* texture)
         return iter->second;
     }
 
-    nvrhi::BindingSetDesc desc;
+    caustica::rhi::BindingSetDesc desc;
 
     desc.bindings = {
-        nvrhi::BindingSetItem::PushConstants(0, sizeof(float) * 2),
-        nvrhi::BindingSetItem::Texture_SRV(0, texture),
-        nvrhi::BindingSetItem::Sampler(0, fontSampler)
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(float) * 2),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, texture),
+        caustica::rhi::BindingSetItem::Sampler(0, fontSampler)
     };
 
-    nvrhi::BindingSetHandle binding;
+    caustica::rhi::BindingSetHandle binding;
     binding = m_device->createBindingSet(desc, bindingLayout);
     assert(binding);
 
@@ -217,7 +217,7 @@ nvrhi::IBindingSet* ImGui_NVRHI::getBindingSet(nvrhi::ITexture* texture)
     return binding;
 }
 
-void ImGui_NVRHI::captureDrawData()
+void ImGui_RHI::captureDrawData()
 {
     ImDrawData* drawData = ImGui::GetDrawData();
     CapturedFrame& frame = m_frames[m_writeSlot];
@@ -263,7 +263,7 @@ void ImGui_NVRHI::captureDrawData()
             if (!srcCmd.UserCallback)
             {
                 CapturedDrawCmd cmd;
-                cmd.texture = reinterpret_cast<nvrhi::ITexture*>(srcCmd.TexRef.GetTexID());
+                cmd.texture = reinterpret_cast<caustica::rhi::ITexture*>(srcCmd.TexRef.GetTexID());
                 cmd.elemCount = srcCmd.ElemCount;
                 cmd.idxOffset = idxOffset;
                 cmd.vtxOffset = vtxOffset;
@@ -288,7 +288,7 @@ void ImGui_NVRHI::captureDrawData()
     m_readSlot.store(frame.valid ? published : -1, std::memory_order_release);
 }
 
-bool ImGui_NVRHI::updateGeometry(nvrhi::ICommandList* commandList, const CapturedFrame& frame)
+bool ImGui_RHI::updateGeometry(caustica::rhi::ICommandList* commandList, const CapturedFrame& frame)
 {
     if (!reallocateBuffer(vertexBuffer,
         frame.vtx.size() * sizeof(ImDrawVert),
@@ -314,7 +314,7 @@ bool ImGui_NVRHI::updateGeometry(nvrhi::ICommandList* commandList, const Capture
     return true;
 }
 
-bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
+bool ImGui_RHI::render(caustica::rhi::IFramebuffer* framebuffer)
 {
     // Swapchain FBs are cleared during backBufferResizing(); never assert-crash here.
     if (!framebuffer)
@@ -339,24 +339,24 @@ bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
 
     float invDisplaySize[2] = { 1.f / frame.displaySize.x, 1.f / frame.displaySize.y };
 
-    nvrhi::GraphicsState drawState;
+    caustica::rhi::GraphicsState drawState;
     drawState.framebuffer = framebuffer;
 
     drawState.pipeline = getPSO(framebuffer->getFramebufferInfo());
 
-    drawState.viewport.viewports.push_back(nvrhi::Viewport(
+    drawState.viewport.viewports.push_back(caustica::rhi::Viewport(
         frame.displaySize.x * frame.framebufferScale.x,
         frame.displaySize.y * frame.framebufferScale.y));
     drawState.viewport.scissorRects.resize(1);
 
-    nvrhi::VertexBufferBinding vbufBinding;
+    caustica::rhi::VertexBufferBinding vbufBinding;
     vbufBinding.buffer = vertexBuffer;
     vbufBinding.slot = 0;
     vbufBinding.offset = 0;
     drawState.vertexBuffers.push_back(vbufBinding);
 
     drawState.indexBuffer.buffer = indexBuffer;
-    drawState.indexBuffer.format = (sizeof(ImDrawIdx) == 2 ? nvrhi::Format::R16_UINT : nvrhi::Format::R32_UINT);
+    drawState.indexBuffer.format = (sizeof(ImDrawIdx) == 2 ? caustica::rhi::Format::R16_UINT : caustica::rhi::Format::R32_UINT);
     drawState.indexBuffer.offset = 0;
 
     for (const CapturedDrawCmd& cmd : frame.cmds)
@@ -364,13 +364,13 @@ bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
         drawState.bindings = { getBindingSet(cmd.texture) };
         assert(drawState.bindings[0]);
 
-        drawState.viewport.scissorRects[0] = nvrhi::Rect(
+        drawState.viewport.scissorRects[0] = caustica::rhi::Rect(
             int(cmd.clipRect.x),
             int(cmd.clipRect.z),
             int(cmd.clipRect.y),
             int(cmd.clipRect.w));
 
-        nvrhi::DrawArguments drawArguments;
+        caustica::rhi::DrawArguments drawArguments;
         drawArguments.vertexCount = cmd.elemCount;
         drawArguments.startIndexLocation = cmd.idxOffset;
         drawArguments.startVertexLocation = cmd.vtxOffset;
@@ -387,7 +387,7 @@ bool ImGui_NVRHI::render(nvrhi::IFramebuffer* framebuffer)
     return true;
 }
 
-void ImGui_NVRHI::backbufferResizing()
+void ImGui_RHI::backbufferResizing()
 {
     pso = nullptr;
 }

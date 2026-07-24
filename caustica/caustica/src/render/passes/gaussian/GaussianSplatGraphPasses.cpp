@@ -257,8 +257,8 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
     if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
         return;
 
-    nvrhi::ITexture* currentColorTexture = ctx.gaussian->currentColor();
-    nvrhi::ITexture* accumulatedColorTexture = ctx.gaussian->accumulatedColor();
+    caustica::rhi::ITexture* currentColorTexture = ctx.gaussian->currentColor();
+    caustica::rhi::ITexture* accumulatedColorTexture = ctx.gaussian->accumulatedColor();
     if (currentColorTexture == nullptr || accumulatedColorTexture == nullptr)
         return;
 
@@ -279,8 +279,8 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
             if (!gaussianSplatsEnabled(ctx))
                 return;
             passCtx.commandList()->copyTexture(
-                passCtx.texture(currentColor), nvrhi::TextureSlice(),
-                passCtx.texture(processedOutputColor), nvrhi::TextureSlice());
+                passCtx.texture(currentColor), caustica::rhi::TextureSlice(),
+                passCtx.texture(processedOutputColor), caustica::rhi::TextureSlice());
         },
         rg::PassOptions{
             .sideEffect = true,

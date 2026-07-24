@@ -1,7 +1,7 @@
 #pragma once
 
 #include <scene/SceneTypes.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 #include <mutex>
 #include <unordered_map>
@@ -34,30 +34,30 @@ class MaterialBindingCache
 {
 public:
     MaterialBindingCache(
-        nvrhi::IDevice* device,
-        nvrhi::ShaderType shaderType,
+        caustica::rhi::IDevice* device,
+        caustica::rhi::ShaderType shaderType,
         uint32_t registerSpace,
         bool registerSpaceIsDescriptorSet,
         const std::vector<MaterialResourceBinding>& bindings,
-        nvrhi::ISampler* sampler,
-        nvrhi::ITexture* fallbackTexture,
+        caustica::rhi::ISampler* sampler,
+        caustica::rhi::ITexture* fallbackTexture,
         render::SceneGpuResources* sceneGpuResources,
         bool trackLiveness = true);
 
-    nvrhi::IBindingLayout* getLayout() const;
-    nvrhi::IBindingSet* getMaterialBindingSet(const Material* material);
+    caustica::rhi::IBindingLayout* getLayout() const;
+    caustica::rhi::IBindingSet* getMaterialBindingSet(const Material* material);
     void clear();
 
 private:
-    nvrhi::BindingSetHandle createMaterialBindingSet(const Material* material);
-    nvrhi::BindingSetItem getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const;
+    caustica::rhi::BindingSetHandle createMaterialBindingSet(const Material* material);
+    caustica::rhi::BindingSetItem getTextureBindingSetItem(uint32_t slot, const Handle<ImageAsset>& texture) const;
 
-    nvrhi::DeviceHandle m_device;
-    nvrhi::BindingLayoutHandle m_bindingLayout;
-    std::unordered_map<const Material*, nvrhi::BindingSetHandle> m_bindingSets;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::BindingLayoutHandle m_bindingLayout;
+    std::unordered_map<const Material*, caustica::rhi::BindingSetHandle> m_bindingSets;
     std::vector<MaterialResourceBinding> m_bindingDesc;
-    nvrhi::TextureHandle m_fallbackTexture;
-    nvrhi::SamplerHandle m_sampler;
+    caustica::rhi::TextureHandle m_fallbackTexture;
+    caustica::rhi::SamplerHandle m_sampler;
     render::SceneGpuResources* m_sceneGpuResources = nullptr;
     std::mutex m_mutex;
     bool m_trackLiveness;

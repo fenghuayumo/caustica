@@ -1,8 +1,8 @@
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 #include <rhi/utils.h>
 #include <cmath>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     // Do not move this function into the header.
     bool verifyHeaderVersion(uint32_t version)
@@ -181,7 +181,7 @@ namespace nvrhi
         if (desc.shadingRateAttachment.valid())
         {
             setTextureState(desc.shadingRateAttachment.texture, desc.shadingRateAttachment.subresources,
-                nvrhi::ResourceStates::ShadingRateSurface);
+                caustica::rhi::ResourceStates::ShadingRateSurface);
         }
     }
     
@@ -239,4 +239,4 @@ namespace nvrhi
         }
     }
 
-} // namespace nvrhi
+} // namespace caustica::rhi

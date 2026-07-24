@@ -167,7 +167,7 @@ void initializeScene(App& app, const std::string& preferredScene)
     cfg->EnableGaussianSplats = true;
 
     GpuDevice* device = gpuDevice(app);
-    if (device && device->getDevice()->queryFeatureSupport(nvrhi::Feature::RayTracingOpacityMicromap))
+    if (device && device->getDevice()->queryFeatureSupport(caustica::rhi::Feature::RayTracingOpacityMicromap))
     {
         wrResource->lightingPasses().createOpacityMapsIfSupported(
             device->getDevice(), descriptorTable, textureLoader, shaderFactory);
@@ -444,11 +444,11 @@ void collectUncompressedTextures(App& app)
     {
         if (texture == nullptr || texture->gpu.texture == nullptr)
             return;
-        nvrhi::TextureDesc desc = texture->gpu.texture->getDesc();
-        if (nvrhi::getFormatInfo(desc.format).blockSize != 1)
+        caustica::rhi::TextureDesc desc = texture->gpu.texture->getDesc();
+        if (caustica::rhi::getFormatInfo(desc.format).blockSize != 1)
             return;
         TextureCompressionType compressionType = normalMap ? (TextureCompressionType::Normalmap) : (
-            (nvrhi::getFormatInfo(desc.format).isSRGB) ? (TextureCompressionType::GenericSRGB) : (TextureCompressionType::GenericLinear));
+            (caustica::rhi::getFormatInfo(desc.format).isSRGB) ? (TextureCompressionType::GenericSRGB) : (TextureCompressionType::GenericLinear));
 
         auto it = vs->uncompressedTextures.insert(std::make_pair(texture, compressionType));
         if (!it.second)

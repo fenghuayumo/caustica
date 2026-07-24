@@ -6,7 +6,7 @@
 #include <algorithm>
 
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
 
 BindingLayoutHandle Device::createBindingLayout(const BindingLayoutDesc& desc)
@@ -478,4 +478,4 @@ void CommandList::bindComputeResourceSets(
 
 #undef D3D11_SET_ARRAY
 
-} // namespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

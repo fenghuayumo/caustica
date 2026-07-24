@@ -1,6 +1,6 @@
 #include <render/PathTracerScenePasses.h>
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica::render
 {

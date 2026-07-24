@@ -18,7 +18,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
     assert(ctx.targetFramebuffer);
     assert(ctx.renderTargets);
 
-    nvrhi::IFramebuffer* framebuffer = ctx.targetFramebuffer;
+    caustica::rhi::IFramebuffer* framebuffer = ctx.targetFramebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
     const bool showDebugLines = ctx.showDebugLines;
     const bool copyDebugFeedback = ctx.copyDebugFeedback;
@@ -37,18 +37,18 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
     {
         debugLineCapture = ctx.graph->importBuffer(
             ctx.debugLineBufferCapture,
-            nvrhi::ResourceStates::Common);
+            caustica::rhi::ResourceStates::Common);
         debugLineDisplay = ctx.graph->importBuffer(
             ctx.debugLineBufferDisplay,
-            nvrhi::ResourceStates::Common);
+            caustica::rhi::ResourceStates::Common);
 
-        ctx.graph->extractBuffer(debugLineCapture, nvrhi::ResourceStates::Common);
-        ctx.graph->extractBuffer(debugLineDisplay, nvrhi::ResourceStates::Common);
+        ctx.graph->extractBuffer(debugLineCapture, caustica::rhi::ResourceStates::Common);
+        ctx.graph->extractBuffer(debugLineDisplay, caustica::rhi::ResourceStates::Common);
     }
 
     if (showDebugLines)
     {
-        nvrhi::ITexture* targetColor = framebuffer->getDesc().colorAttachments[0].texture;
+        caustica::rhi::ITexture* targetColor = framebuffer->getDesc().colorAttachments[0].texture;
         assert(targetColor);
 
         const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(
@@ -62,8 +62,8 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             rg::BufferAccess::ConstantBuffer);
         const uint32_t capturedLineVertexCount = ctx.capturedLineVertexCount;
         const uint32_t cpuLineVertexCount = static_cast<uint32_t>(cpuSideDebugLines.size());
-        const nvrhi::BindingSetHandle linesBindingSet = ctx.linesBindingSet;
-        const nvrhi::GraphicsPipelineHandle linesPipeline = ctx.linesPipeline;
+        const caustica::rhi::BindingSetHandle linesBindingSet = ctx.linesBindingSet;
+        const caustica::rhi::GraphicsPipelineHandle linesPipeline = ctx.linesPipeline;
 
         if (!cpuSideDebugLines.empty())
         {
@@ -94,10 +94,10 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             [framebuffer, viewport = fbinfo.getViewport(), capturedLineVertexCount,
                 cpuLineVertexCount, debugLineCapture, debugLineDisplay,
                 linesBindingSet, linesPipeline](rg::RenderPassContext& passCtx) {
-                nvrhi::ICommandList* commandList = passCtx.commandList();
+                caustica::rhi::ICommandList* commandList = passCtx.commandList();
                 commandList->beginMarker("Debug Lines");
 
-                nvrhi::GraphicsState state;
+                caustica::rhi::GraphicsState state;
                 state.bindings = { linesBindingSet };
                 state.vertexBuffers = { {passCtx.buffer(debugLineDisplay), 0, 0} };
                 state.pipeline = linesPipeline;
@@ -105,7 +105,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
                 state.viewport.addViewportAndScissorRect(viewport);
                 commandList->setGraphicsState(state);
 
-                nvrhi::DrawArguments args;
+                caustica::rhi::DrawArguments args;
                 args.vertexCount = capturedLineVertexCount;
                 commandList->draw(args);
 
@@ -130,18 +130,18 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             rg::BufferAccess::CopyDest);
         const rg::BufferHandle feedbackGpu = ctx.graph->importBuffer(
             ctx.feedbackBufferGpu,
-            nvrhi::ResourceStates::Common);
+            caustica::rhi::ResourceStates::Common);
         const rg::BufferHandle debugDeltaPathTreeCpu = ctx.graph->importBuffer(
             ctx.debugDeltaPathTreeCpu,
             rg::BufferAccess::CopyDest);
         const rg::BufferHandle debugDeltaPathTreeGpu = ctx.graph->importBuffer(
             ctx.debugDeltaPathTreeGpu,
-            nvrhi::ResourceStates::Common);
+            caustica::rhi::ResourceStates::Common);
 
         ctx.graph->extractBuffer(feedbackCpu, rg::BufferAccess::CopyDest);
-        ctx.graph->extractBuffer(feedbackGpu, nvrhi::ResourceStates::Common);
+        ctx.graph->extractBuffer(feedbackGpu, caustica::rhi::ResourceStates::Common);
         ctx.graph->extractBuffer(debugDeltaPathTreeCpu, rg::BufferAccess::CopyDest);
-        ctx.graph->extractBuffer(debugDeltaPathTreeGpu, nvrhi::ResourceStates::Common);
+        ctx.graph->extractBuffer(debugDeltaPathTreeGpu, caustica::rhi::ResourceStates::Common);
 
         ctx.graph->addPass(
             "DebugFeedbackCopies",
@@ -156,7 +156,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             },
             [feedbackCpu, feedbackGpu, debugLineCapture, debugLineDisplay,
                 debugDeltaPathTreeCpu, debugDeltaPathTreeGpu](rg::RenderPassContext& passCtx) {
-                nvrhi::ICommandList* commandList = passCtx.commandList();
+                caustica::rhi::ICommandList* commandList = passCtx.commandList();
                 commandList->copyBuffer(
                     passCtx.buffer(feedbackCpu), 0,
                     passCtx.buffer(feedbackGpu), 0,

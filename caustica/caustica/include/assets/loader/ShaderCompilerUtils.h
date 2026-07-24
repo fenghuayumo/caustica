@@ -7,7 +7,7 @@
 #include <vector>
 #include <filesystem>
 #include <optional>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica { struct ShaderKey; }
 
@@ -25,10 +25,10 @@ struct ShaderCompilerConfig
     std::filesystem::path   ShadersPathExternalIncludes1;
     std::filesystem::path   ShadersPathExternalIncludes2;
     std::filesystem::path   ShaderBinariesPath;
-    nvrhi::GraphicsAPI      GraphicsAPI;
+    caustica::rhi::GraphicsAPI      GraphicsAPI;
     bool                    RuntimeCompilationAvailable = false;
 
-    bool initialize(nvrhi::IDevice* device, const std::string& binarySubfolder);
+    bool initialize(caustica::rhi::IDevice* device, const std::string& binarySubfolder);
     std::string getCompilerPathQuoted() const;
     bool canCompile() const { return RuntimeCompilationAvailable; }
 };

@@ -26,7 +26,7 @@ namespace
 }
 
 void AssetSystem::initialize(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<IFileSystem> fileSystem,
     std::shared_ptr<IDescriptorTableManager> descriptorTable)
 {
@@ -61,7 +61,7 @@ Handle<ImageAsset> AssetSystem::loadTextureFromFile(
     const std::filesystem::path& path,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     return m_TextureLoader->loadTextureFromFile(path, sRGB, renderDevice, commandList);
 }
@@ -87,7 +87,7 @@ Handle<ImageAsset> AssetSystem::loadTextureFromMemory(
     const std::string& mimeType,
     bool sRGB,
     render::RenderDevice* renderDevice,
-    nvrhi::ICommandList* commandList)
+    caustica::rhi::ICommandList* commandList)
 {
     return m_TextureLoader->loadTextureFromMemory(data, name, mimeType, sRGB, renderDevice, commandList);
 }

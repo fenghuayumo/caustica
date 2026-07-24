@@ -5,7 +5,7 @@
 #if WITH_NRD
 
 #include <NRD.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <unordered_map>
 #include <render/core/BindingCache.h>
 
@@ -20,14 +20,14 @@ namespace caustica
 class NrdIntegration
 {
 public:
-    NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser method);
+    NrdIntegration(caustica::rhi::IDevice* device, nrd::Denoiser method);
     ~NrdIntegration();
 
     bool initialize(uint32_t width, uint32_t height, caustica::ShaderFactory& shaderFactory);
     bool isAvailable() const;
 
     void runDenoiserPasses(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const RenderTargets& renderTargets,
         int pass,
         const caustica::PlanarView& view, 
@@ -44,7 +44,7 @@ public:
     const nrd::Denoiser getDenoiser() const { return m_denoiser; }
 
 private:
-    nvrhi::DeviceHandle m_device;
+    caustica::rhi::DeviceHandle m_device;
     bool m_initialized;
     nrd::Instance* m_instance;
     nrd::Denoiser m_denoiser;
@@ -52,20 +52,20 @@ private:
 
     struct NrdPipeline
     {
-        nvrhi::ShaderHandle Shader;
-        nvrhi::BindingLayoutHandle ResourcesBindingLayout;
-        nvrhi::BindingLayoutHandle ConstantsAndSamplersBindingLayout;
-        nvrhi::ComputePipelineHandle Pipeline;
+        caustica::rhi::ShaderHandle Shader;
+        caustica::rhi::BindingLayoutHandle ResourcesBindingLayout;
+        caustica::rhi::BindingLayoutHandle ConstantsAndSamplersBindingLayout;
+        caustica::rhi::ComputePipelineHandle Pipeline;
     };
 
-    nvrhi::BindingLayoutHandle createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc);
-    nvrhi::BindingLayoutHandle createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc);
+    caustica::rhi::BindingLayoutHandle createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc);
+    caustica::rhi::BindingLayoutHandle createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc);
 
-    nvrhi::BufferHandle m_constantBuffer;
+    caustica::rhi::BufferHandle m_constantBuffer;
     std::vector<NrdPipeline> m_pipelines;
-    std::vector<nvrhi::SamplerHandle> m_samplers;
-    std::vector<nvrhi::TextureHandle> m_permanentTextures;
-    std::vector<nvrhi::TextureHandle> m_transientTextures;
+    std::vector<caustica::rhi::SamplerHandle> m_samplers;
+    std::vector<caustica::rhi::TextureHandle> m_permanentTextures;
+    std::vector<caustica::rhi::TextureHandle> m_transientTextures;
     caustica::BindingCache m_bindingCache;
 };
 

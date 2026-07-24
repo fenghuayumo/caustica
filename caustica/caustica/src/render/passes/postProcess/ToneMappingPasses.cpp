@@ -20,27 +20,27 @@ using namespace caustica::render;
 #endif
 
 ToneMappingPass::ToneMappingPass(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
     const caustica::ICompositeView& compositeView,
-	nvrhi::TextureHandle sourceTexture)
+	caustica::rhi::TextureHandle sourceTexture)
     : m_device(device)
     , m_renderDevice(renderDevice)
     , m_FramebufferFactory(colorFramebufferFactory)
 {
     const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
-    nvrhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
+    caustica::rhi::IFramebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
     {
-        m_LuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, nvrhi::ShaderType::Pixel);
-        m_ToneMapShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "main_ps", nullptr, nvrhi::ShaderType::Pixel);
+        m_LuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, caustica::rhi::ShaderType::Pixel);
+        m_ToneMapShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "main_ps", nullptr, caustica::rhi::ShaderType::Pixel);
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-        m_CaptureLuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "capture_cs", nullptr, nvrhi::ShaderType::Compute);
+        m_CaptureLuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/ToneMapping.hlsl", "capture_cs", nullptr, caustica::rhi::ShaderType::Compute);
 #endif
     }
 
-    nvrhi::BufferDesc constantBufferDesc;
+    caustica::rhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(ToneMappingConstants);
     constantBufferDesc.debugName = "ToneMappingConstants";
     constantBufferDesc.isConstantBuffer = true;
@@ -48,11 +48,11 @@ ToneMappingPass::ToneMappingPass(
     constantBufferDesc.maxVersions = 16;// params.numConstantBufferVersions;
     m_ToneMappingCB = m_device->createBuffer(constantBufferDesc);
 
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.setBorderColor(nvrhi::Color(0.f));
+    caustica::rhi::SamplerDesc samplerDesc;
+    samplerDesc.setBorderColor(caustica::rhi::Color(0.f));
     samplerDesc.setAllFilters(true);
     samplerDesc.setMipFilter(false);
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
     m_linearSampler = m_device->createSampler(samplerDesc);
 
     samplerDesc.setAllFilters(false);
@@ -64,17 +64,17 @@ ToneMappingPass::ToneMappingPass(
         for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
         {
             const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-            nvrhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
+            caustica::rhi::IFramebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
             PerViewData& perViewData = m_PerView[viewIndex];
 
             ScissorDesc viewExtent = view->getViewExtent();
             uint32_t viewportWidth = viewExtent.maxX - viewExtent.minX;
             uint32_t viewportHeight = viewExtent.maxY - viewExtent.minY;
 
-            nvrhi::Format format = sourceTexture->getDesc().format == nvrhi::Format::RGBA32_FLOAT ? 
-                nvrhi::Format::R32_FLOAT : nvrhi::Format::R16_FLOAT;
+            caustica::rhi::Format format = sourceTexture->getDesc().format == caustica::rhi::Format::RGBA32_FLOAT ? 
+                caustica::rhi::Format::R32_FLOAT : caustica::rhi::Format::R16_FLOAT;
 
-            nvrhi::TextureDesc luminanceTextureDesc;
+            caustica::rhi::TextureDesc luminanceTextureDesc;
             luminanceTextureDesc.format = format;
             luminanceTextureDesc.width = 1U << (int)log2(viewportWidth); //Lower to nearest power of 2
             luminanceTextureDesc.height = 1U << (int)log2(viewportHeight);
@@ -83,27 +83,27 @@ ToneMappingPass::ToneMappingPass(
             luminanceTextureDesc.isRenderTarget = true;
             luminanceTextureDesc.isUAV = true;
             luminanceTextureDesc.debugName = "Luminance Texture";
-            luminanceTextureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            luminanceTextureDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
             luminanceTextureDesc.keepInitialState = true;
             perViewData.luminanceTexture = m_device->createTexture(luminanceTextureDesc);
             perViewData.luminanceFrameBuffer = m_device->createFramebuffer(
-                nvrhi::FramebufferDesc().addColorAttachment(perViewData.luminanceTexture));
+                caustica::rhi::FramebufferDesc().addColorAttachment(perViewData.luminanceTexture));
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
             // readback for luminance coming out of tonemapper so we can set exposure on the CPU side
             {
-                nvrhi::BufferDesc bufferDesc;
+                caustica::rhi::BufferDesc bufferDesc;
                 bufferDesc.byteSize = 4;
-                bufferDesc.format = nvrhi::Format::R32_FLOAT;
+                bufferDesc.format = caustica::rhi::Format::R32_FLOAT;
                 bufferDesc.canHaveUAVs = true;
-                bufferDesc.initialState = nvrhi::ResourceStates::Common;
+                bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
                 bufferDesc.keepInitialState = true;
                 bufferDesc.debugName = "AvgLuminanceBuffer";
                 bufferDesc.canHaveTypedViews = true;
                 perViewData.avgLuminanceBufferGPU = device->createBuffer(bufferDesc);
 
                 bufferDesc.canHaveUAVs = false;
-                bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+                bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
                 bufferDesc.debugName = "AvgLuminanceReadbackBuffer";
                 for (int i = 0; i < PerViewData::cReadbackLag; i++)
                     perViewData.avgLuminanceBufferReadback[i] = device->createBuffer(bufferDesc);
@@ -113,16 +113,16 @@ ToneMappingPass::ToneMappingPass(
             perViewData.mipMapPass = std::make_unique<MipMapGenPass>(m_device, shaderFactory, perViewData.luminanceTexture, MipMapGenPass::MODE_COLOR);
         }
 
-		nvrhi::BindingLayoutDesc layoutDesc;
-		layoutDesc.visibility = nvrhi::ShaderType::Pixel;
+		caustica::rhi::BindingLayoutDesc layoutDesc;
+		layoutDesc.visibility = caustica::rhi::ShaderType::Pixel;
 		layoutDesc.bindings = {
-			nvrhi::BindingLayoutItem::Texture_SRV(0),
-			nvrhi::BindingLayoutItem::Sampler(1)
+			caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+			caustica::rhi::BindingLayoutItem::Sampler(1)
 		};
 		m_LuminanceBindingLayout = m_device->createBindingLayout(layoutDesc);
 
-		nvrhi::GraphicsPipelineDesc pipelineDesc;
-		pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+		caustica::rhi::GraphicsPipelineDesc pipelineDesc;
+		pipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleStrip;
 		pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
 		pipelineDesc.PS = m_LuminanceShader;
 		pipelineDesc.bindingLayouts = { m_LuminanceBindingLayout };
@@ -134,14 +134,14 @@ ToneMappingPass::ToneMappingPass(
 		m_LuminancePso = m_device->createGraphicsPipeline(pipelineDesc, m_PerView[0].luminanceFrameBuffer);
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::TypedBuffer_UAV(0),
-            nvrhi::BindingLayoutItem::Sampler(0)
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(0),
+            caustica::rhi::BindingLayoutItem::Sampler(0)
         };
         m_CaptureLumBindingLayout = m_device->createBindingLayout(layoutDesc);
-        nvrhi::ComputePipelineDesc captureLumPSODesc;
+        caustica::rhi::ComputePipelineDesc captureLumPSODesc;
         captureLumPSODesc.bindingLayouts = { m_CaptureLumBindingLayout };
         captureLumPSODesc.CS = m_CaptureLuminanceShader;
         m_CaptureLumPso = m_device->createComputePipeline(captureLumPSODesc);
@@ -149,19 +149,19 @@ ToneMappingPass::ToneMappingPass(
     }
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Pixel;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Pixel;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::Sampler(0),
-            nvrhi::BindingLayoutItem::Sampler(1)
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::Sampler(1)
         };
         m_ToneMapBindingLayout = m_device->createBindingLayout(layoutDesc);
 
-        nvrhi::GraphicsPipelineDesc pipelineDesc;
-        pipelineDesc.primType = nvrhi::PrimitiveType::TriangleStrip;
+        caustica::rhi::GraphicsPipelineDesc pipelineDesc;
+        pipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleStrip;
         pipelineDesc.VS = m_renderDevice.blit().fullscreenVS();
         pipelineDesc.PS = m_ToneMapShader;
         pipelineDesc.bindingLayouts = { m_ToneMapBindingLayout};
@@ -184,10 +184,10 @@ void ToneMappingPass::preRender(const ToneMappingParameters& params)
 }
 
 bool ToneMappingPass::render(
-    nvrhi::ICommandList* commandList, 
+    caustica::rhi::ICommandList* commandList, 
     const caustica::ICompositeView& compositeView,
-    nvrhi::ITexture* sourceTexture,
-    nvrhi::IBuffer* constantsBuffer,
+    caustica::rhi::ITexture* sourceTexture,
+    caustica::rhi::IBuffer* constantsBuffer,
     bool enabled)
 {
     assert( m_FrameParamsSet ); // forgot to call preRender before this?
@@ -216,30 +216,30 @@ bool ToneMappingPass::render(
 		{
             PerViewData & viewData = m_PerView[viewIndex];
 
-            nvrhi::BindingSetHandle& bindingSet = viewData.luminanceBindingSet;
+            caustica::rhi::BindingSetHandle& bindingSet = viewData.luminanceBindingSet;
 			if (!bindingSet)
 			{
-				nvrhi::BindingSetDesc bindingSetDesc;
+				caustica::rhi::BindingSetDesc bindingSetDesc;
 				bindingSetDesc.bindings = {
-					nvrhi::BindingSetItem::Texture_SRV(0, sourceTexture),
-					nvrhi::BindingSetItem::Sampler(1, m_linearSampler)
+					caustica::rhi::BindingSetItem::Texture_SRV(0, sourceTexture),
+					caustica::rhi::BindingSetItem::Sampler(1, m_linearSampler)
 				};
 				bindingSet = m_device->createBindingSet(bindingSetDesc, m_LuminanceBindingLayout);
 			}
 
 			const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
-			nvrhi::GraphicsState state;
+			caustica::rhi::GraphicsState state;
 			state.pipeline = m_LuminancePso;
             state.framebuffer = viewData.luminanceFrameBuffer;
 			state.bindings = { bindingSet };
-            nvrhi::ViewportState viewportState;
+            caustica::rhi::ViewportState viewportState;
             viewportState.addViewport(viewData.luminanceFrameBuffer->getFramebufferInfo().getViewport());
-            viewportState.addScissorRect(nvrhi::Rect(viewData.luminanceFrameBuffer->getFramebufferInfo().getViewport()));
+            viewportState.addScissorRect(caustica::rhi::Rect(viewData.luminanceFrameBuffer->getFramebufferInfo().getViewport()));
             state.viewport = viewportState;
            	commandList->setGraphicsState(state);
 
-			nvrhi::DrawArguments args;
+			caustica::rhi::DrawArguments args;
 			args.instanceCount = 1;
 			args.vertexCount = 4;
 			commandList->draw(args);    
@@ -248,12 +248,12 @@ bool ToneMappingPass::render(
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
             {
-                nvrhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
-                        nvrhi::BindingSetItem::Texture_SRV(0, viewData.luminanceTexture),
-                        nvrhi::BindingSetItem::TypedBuffer_UAV(0, viewData.avgLuminanceBufferGPU),
-                        nvrhi::BindingSetItem::Sampler(0, (true) ? m_linearSampler : m_pointSampler) };
-                nvrhi::BindingSetHandle cbindingSet = m_device->createBindingSet(bindingSetDesc, m_CaptureLumBindingLayout);
-                nvrhi::ComputeState cstate;
+                caustica::rhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
+                        caustica::rhi::BindingSetItem::Texture_SRV(0, viewData.luminanceTexture),
+                        caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, viewData.avgLuminanceBufferGPU),
+                        caustica::rhi::BindingSetItem::Sampler(0, (true) ? m_linearSampler : m_pointSampler) };
+                caustica::rhi::BindingSetHandle cbindingSet = m_device->createBindingSet(bindingSetDesc, m_CaptureLumBindingLayout);
+                caustica::rhi::ComputeState cstate;
                 cstate.bindings = { cbindingSet };
                 cstate.pipeline = m_CaptureLumPso;
                 commandList->setComputeState(cstate);
@@ -275,7 +275,7 @@ bool ToneMappingPass::render(
                 {   // map/read/unmap CPU readable buffer
                     assert( viewData.avgLuminanceLastWritten >= 0 );
                     int toReadIndex = (viewData.avgLuminanceLastWritten + 1)%PerViewData::cReadbackLag;
-                    void* pData = m_device->mapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex], nvrhi::CpuAccessMode::Read);
+                    void* pData = m_device->mapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex], caustica::rhi::CpuAccessMode::Read);
                     assert(pData);
                     viewData.avgLuminanceLastCaptured = std::exp2f( *static_cast<float*>(pData) );
                     m_device->unmapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex]);
@@ -289,26 +289,26 @@ bool ToneMappingPass::render(
     commandList->beginMarker("ToneMapping");
     for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-		nvrhi::BindingSetHandle& bindingSet = m_PerView[viewIndex].colorBindingSet;
+		caustica::rhi::BindingSetHandle& bindingSet = m_PerView[viewIndex].colorBindingSet;
 		if (!bindingSet)
 		{
-			nvrhi::BindingSetDesc bindingSetDesc;
+			caustica::rhi::BindingSetDesc bindingSetDesc;
 			bindingSetDesc.bindings = {
-				nvrhi::BindingSetItem::ConstantBuffer(0, constantsBuffer),
-				nvrhi::BindingSetItem::Texture_SRV(0, sourceTexture),                       //Color texture
-				nvrhi::BindingSetItem::Texture_SRV(1, m_PerView[viewIndex].luminanceTexture),                    //Luminance Texture
-				nvrhi::BindingSetItem::Sampler(0, m_linearSampler),    //Luminance sampler
-				nvrhi::BindingSetItem::Sampler(1, m_pointSampler)      //Color sampler
+				caustica::rhi::BindingSetItem::ConstantBuffer(0, constantsBuffer),
+				caustica::rhi::BindingSetItem::Texture_SRV(0, sourceTexture),                       //Color texture
+				caustica::rhi::BindingSetItem::Texture_SRV(1, m_PerView[viewIndex].luminanceTexture),                    //Luminance Texture
+				caustica::rhi::BindingSetItem::Sampler(0, m_linearSampler),    //Luminance sampler
+				caustica::rhi::BindingSetItem::Sampler(1, m_pointSampler)      //Color sampler
 			};
 			bindingSet = m_device->createBindingSet(bindingSetDesc, m_ToneMapBindingLayout);
 		}
         const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
-        nvrhi::GraphicsState state;
+        caustica::rhi::GraphicsState state;
         state.pipeline = m_ToneMapPso;
         state.framebuffer = m_FramebufferFactory->getFramebuffer(*view);
         state.bindings = { bindingSet };
-        state.viewport = toNvrhi(view->getViewportState());
+        state.viewport = toRhi(view->getViewportState());
 
         ToneMappingConstants toneMappingConsts = {};
         toneMappingConsts.whiteScale = m_WhiteScale;
@@ -344,7 +344,7 @@ bool ToneMappingPass::render(
 
         commandList->setGraphicsState(state);
 
-        nvrhi::DrawArguments args;
+        caustica::rhi::DrawArguments args;
         args.instanceCount = 1;
         args.vertexCount = 4;
         commandList->draw(args);
@@ -484,7 +484,7 @@ float3 ToneMappingPass::getPreExposedGray(uint viewIndex)
 }
 #endif
 
-void ToneMappingPass::generateMips(nvrhi::ICommandList* commandList, uint32_t numberOfViews)
+void ToneMappingPass::generateMips(caustica::rhi::ICommandList* commandList, uint32_t numberOfViews)
 {
     for (uint32_t i = 0; i < numberOfViews; i++)
     {

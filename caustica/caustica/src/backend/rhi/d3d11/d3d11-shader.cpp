@@ -6,7 +6,7 @@
 #include <iomanip>
 
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
     void Shader::getBytecode(const void** ppBytecode, size_t* pSize) const
     {
@@ -22,7 +22,7 @@ namespace nvrhi::d3d11
         return nullptr;
     }
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
     static bool convertCustomSemantics(uint32_t numSemantics, const CustomSemantic* semantics, std::vector<NV_CUSTOM_SEMANTIC>& output)
     {
         output.resize(numSemantics);
@@ -95,7 +95,7 @@ namespace nvrhi::d3d11
             }
             else
             {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
                 std::vector<NV_CUSTOM_SEMANTIC> nvapiSemantics;
                 convertCustomSemantics(d.numCustomSemantics, d.pCustomSemantics, nvapiSemantics);
 
@@ -126,7 +126,7 @@ namespace nvrhi::d3d11
             }
             else
             {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
                 std::vector<NV_CUSTOM_SEMANTIC> nvapiSemantics;
                 convertCustomSemantics(d.numCustomSemantics, d.pCustomSemantics, nvapiSemantics);
 
@@ -157,7 +157,7 @@ namespace nvrhi::d3d11
             }
             else
             {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
                 std::vector<NV_CUSTOM_SEMANTIC> nvapiSemantics;
                 convertCustomSemantics(d.numCustomSemantics, d.pCustomSemantics, nvapiSemantics);
 
@@ -188,7 +188,7 @@ namespace nvrhi::d3d11
             }
             else
             {
-#if NVRHI_D3D11_WITH_NVAPI           
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI           
                 std::vector<NV_CUSTOM_SEMANTIC> nvapiSemantics;
                 convertCustomSemantics(d.numCustomSemantics, d.pCustomSemantics, nvapiSemantics);
 
@@ -216,7 +216,7 @@ namespace nvrhi::d3d11
         {
             if (d.hlslExtensionsUAV >= 0)
             {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
                 if (NvAPI_D3D11_SetNvShaderExtnSlot(m_Context.device, d.hlslExtensionsUAV) != NVAPI_OK)
                     return nullptr;
 #else
@@ -231,7 +231,7 @@ namespace nvrhi::d3d11
                 return nullptr;
             }
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
             if (d.hlslExtensionsUAV >= 0)
             {
                 NvAPI_D3D11_SetNvShaderExtnSlot(m_Context.device, ~0u);
@@ -243,7 +243,7 @@ namespace nvrhi::d3d11
         {
             if (d.hlslExtensionsUAV >= 0)
             {
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
                 if (NvAPI_D3D11_SetNvShaderExtnSlot(m_Context.device, d.hlslExtensionsUAV) != NVAPI_OK)
                     return nullptr;
 #else
@@ -258,7 +258,7 @@ namespace nvrhi::d3d11
                 return nullptr;
             }
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
             if (d.hlslExtensionsUAV >= 0)
             {
                 NvAPI_D3D11_SetNvShaderExtnSlot(m_Context.device, ~0u);
@@ -352,4 +352,4 @@ namespace nvrhi::d3d11
         return InputLayoutHandle::Create(inputLayout);
     }
 
-} // nanmespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

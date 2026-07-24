@@ -22,24 +22,24 @@
 using namespace caustica;
 
 IesProfileLoader::IesProfileLoader(
-    nvrhi::IDevice* device, 
+    caustica::rhi::IDevice* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
     std::shared_ptr<IDescriptorTableManager> descriptorTableManager)
     : m_Device(device)
     , m_ShaderFactory(shaderFactory)
     , m_DescriptorTableManager(descriptorTableManager)
 {
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     layoutDesc.bindings = {
-        nvrhi::BindingLayoutItem::TypedBuffer_SRV(0),
-        nvrhi::BindingLayoutItem::Texture_UAV(0),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(0),
+        caustica::rhi::BindingLayoutItem::Texture_UAV(0),
     };
     m_BindingLayout = device->createBindingLayout(layoutDesc);
 
-    m_ComputeShader = m_ShaderFactory->createAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, nvrhi::ShaderType::Compute);
+    m_ComputeShader = m_ShaderFactory->createAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_BindingLayout };
     pipelineDesc.CS = m_ComputeShader;
     m_ComputePipeline = device->createComputePipeline(pipelineDesc);
@@ -222,51 +222,51 @@ std::shared_ptr<IesProfile> IesProfileLoader::loadIesProfile(caustica::IFileSyst
     return profile;
 }
 
-void IesProfileLoader::bakeIesProfile(IesProfile& profile, nvrhi::ICommandList* commandList)
+void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::ICommandList* commandList)
 {
     if (profile.texture)
         return;
 
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(float) * profile.rawData.size();
-    bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-    bufferDesc.format = nvrhi::Format::R32_FLOAT;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
+    bufferDesc.format = caustica::rhi::Format::R32_FLOAT;
     bufferDesc.keepInitialState = true;
     bufferDesc.debugName = "IesProfileData";
     bufferDesc.canHaveTypedViews = true;
-    nvrhi::BufferHandle buffer = m_Device->createBuffer(bufferDesc);
+    caustica::rhi::BufferHandle buffer = m_Device->createBuffer(bufferDesc);
 
-    nvrhi::TextureDesc textureDesc;
-    textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
+    caustica::rhi::TextureDesc textureDesc;
+    textureDesc.dimension = caustica::rhi::TextureDimension::Texture2D;
     textureDesc.width = 128;
     textureDesc.height = 128;
     textureDesc.debugName = profile.name;
-    textureDesc.format = nvrhi::Format::R16_FLOAT;
+    textureDesc.format = caustica::rhi::Format::R16_FLOAT;
     textureDesc.isUAV = true;
     profile.texture = m_Device->createTexture(textureDesc);
 
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::TypedBuffer_SRV(0, buffer),
-        nvrhi::BindingSetItem::Texture_UAV(0, profile.texture)
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, buffer),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, profile.texture)
     };
-    nvrhi::BindingSetHandle bindingSet = m_Device->createBindingSet(bindingSetDesc, m_BindingLayout);
+    caustica::rhi::BindingSetHandle bindingSet = m_Device->createBindingSet(bindingSetDesc, m_BindingLayout);
 
     commandList->writeBuffer(buffer, profile.rawData.data(), profile.rawData.size() * sizeof(float));
 
-    commandList->beginTrackingTextureState(profile.texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common);
+    commandList->beginTrackingTextureState(profile.texture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { bindingSet };
     state.pipeline = m_ComputePipeline;
     commandList->setComputeState(state);
     commandList->dispatch(8, 8, 1);
 
-    commandList->setPermanentTextureState(profile.texture, nvrhi::ResourceStates::ShaderResource);
+    commandList->setPermanentTextureState(profile.texture, caustica::rhi::ResourceStates::ShaderResource);
     commandList->commitBarriers();
 
     if (m_DescriptorTableManager)
     {
-        profile.textureIndex = m_DescriptorTableManager->createDescriptor(nvrhi::BindingSetItem::Texture_SRV(0, profile.texture));
+        profile.textureIndex = m_DescriptorTableManager->createDescriptor(caustica::rhi::BindingSetItem::Texture_SRV(0, profile.texture));
     }
 }

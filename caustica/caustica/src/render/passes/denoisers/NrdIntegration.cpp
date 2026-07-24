@@ -27,59 +27,59 @@ static void NrdFree(void* userArg, void* memory)
     free(memory);
 }
 
-static nvrhi::Format GetNvrhiFormat(nrd::Format format)
+static caustica::rhi::Format GetRhiFormat(nrd::Format format)
 {
     switch (format)
     {
-    case nrd::Format::R8_UNORM:             return nvrhi::Format::R8_UNORM;
-    case nrd::Format::R8_SNORM:             return nvrhi::Format::R8_SNORM;
-    case nrd::Format::R8_UINT:              return nvrhi::Format::R8_UINT;
-    case nrd::Format::R8_SINT:              return nvrhi::Format::R8_SINT;
-    case nrd::Format::RG8_UNORM:            return nvrhi::Format::RG8_UNORM;
-    case nrd::Format::RG8_SNORM:            return nvrhi::Format::RG8_SNORM;
-    case nrd::Format::RG8_UINT:             return nvrhi::Format::RG8_UINT;
-    case nrd::Format::RG8_SINT:             return nvrhi::Format::RG8_SINT;
-    case nrd::Format::RGBA8_UNORM:          return nvrhi::Format::RGBA8_UNORM;
-    case nrd::Format::RGBA8_SNORM:          return nvrhi::Format::RGBA8_SNORM;
-    case nrd::Format::RGBA8_UINT:           return nvrhi::Format::RGBA8_UINT;
-    case nrd::Format::RGBA8_SINT:           return nvrhi::Format::RGBA8_SINT;
-    case nrd::Format::RGBA8_SRGB:           return nvrhi::Format::SRGBA8_UNORM;
-    case nrd::Format::R16_UNORM:            return nvrhi::Format::R16_UNORM;
-    case nrd::Format::R16_SNORM:            return nvrhi::Format::R16_SNORM;
-    case nrd::Format::R16_UINT:             return nvrhi::Format::R16_UINT;
-    case nrd::Format::R16_SINT:             return nvrhi::Format::R16_SINT;
-    case nrd::Format::R16_SFLOAT:           return nvrhi::Format::R16_FLOAT;
-    case nrd::Format::RG16_UNORM:           return nvrhi::Format::RG16_UNORM;
-    case nrd::Format::RG16_SNORM:           return nvrhi::Format::RG16_SNORM;
-    case nrd::Format::RG16_UINT:            return nvrhi::Format::RG16_UINT;
-    case nrd::Format::RG16_SINT:            return nvrhi::Format::RG16_SINT;
-    case nrd::Format::RG16_SFLOAT:          return nvrhi::Format::RG16_FLOAT;
-    case nrd::Format::RGBA16_UNORM:         return nvrhi::Format::RGBA16_UNORM;
-    case nrd::Format::RGBA16_SNORM:         return nvrhi::Format::RGBA16_SNORM;
-    case nrd::Format::RGBA16_UINT:          return nvrhi::Format::RGBA16_UINT;
-    case nrd::Format::RGBA16_SINT:          return nvrhi::Format::RGBA16_SINT;
-    case nrd::Format::RGBA16_SFLOAT:        return nvrhi::Format::RGBA16_FLOAT;
-    case nrd::Format::R32_UINT:             return nvrhi::Format::R32_UINT;
-    case nrd::Format::R32_SINT:             return nvrhi::Format::R32_SINT;
-    case nrd::Format::R32_SFLOAT:           return nvrhi::Format::R32_FLOAT;
-    case nrd::Format::RG32_UINT:            return nvrhi::Format::RG32_UINT;
-    case nrd::Format::RG32_SINT:            return nvrhi::Format::RG32_SINT;
-    case nrd::Format::RG32_SFLOAT:          return nvrhi::Format::RG32_FLOAT;
-    case nrd::Format::RGB32_UINT:           return nvrhi::Format::RGB32_UINT;
-    case nrd::Format::RGB32_SINT:           return nvrhi::Format::RGB32_SINT;
-    case nrd::Format::RGB32_SFLOAT:         return nvrhi::Format::RGB32_FLOAT;
-    case nrd::Format::RGBA32_UINT:          return nvrhi::Format::RGBA32_UINT;
-    case nrd::Format::RGBA32_SINT:          return nvrhi::Format::RGBA32_SINT;
-    case nrd::Format::RGBA32_SFLOAT:        return nvrhi::Format::RGBA32_FLOAT;
-    case nrd::Format::R10_G10_B10_A2_UNORM: return nvrhi::Format::R10G10B10A2_UNORM;
-    case nrd::Format::R10_G10_B10_A2_UINT:  return nvrhi::Format::UNKNOWN; // not representable and not used
-    case nrd::Format::R11_G11_B10_UFLOAT:   return nvrhi::Format::R11G11B10_FLOAT;
-    case nrd::Format::R9_G9_B9_E5_UFLOAT:   return nvrhi::Format::UNKNOWN; // not representable and not used
-    default:                                return nvrhi::Format::UNKNOWN;
+    case nrd::Format::R8_UNORM:             return caustica::rhi::Format::R8_UNORM;
+    case nrd::Format::R8_SNORM:             return caustica::rhi::Format::R8_SNORM;
+    case nrd::Format::R8_UINT:              return caustica::rhi::Format::R8_UINT;
+    case nrd::Format::R8_SINT:              return caustica::rhi::Format::R8_SINT;
+    case nrd::Format::RG8_UNORM:            return caustica::rhi::Format::RG8_UNORM;
+    case nrd::Format::RG8_SNORM:            return caustica::rhi::Format::RG8_SNORM;
+    case nrd::Format::RG8_UINT:             return caustica::rhi::Format::RG8_UINT;
+    case nrd::Format::RG8_SINT:             return caustica::rhi::Format::RG8_SINT;
+    case nrd::Format::RGBA8_UNORM:          return caustica::rhi::Format::RGBA8_UNORM;
+    case nrd::Format::RGBA8_SNORM:          return caustica::rhi::Format::RGBA8_SNORM;
+    case nrd::Format::RGBA8_UINT:           return caustica::rhi::Format::RGBA8_UINT;
+    case nrd::Format::RGBA8_SINT:           return caustica::rhi::Format::RGBA8_SINT;
+    case nrd::Format::RGBA8_SRGB:           return caustica::rhi::Format::SRGBA8_UNORM;
+    case nrd::Format::R16_UNORM:            return caustica::rhi::Format::R16_UNORM;
+    case nrd::Format::R16_SNORM:            return caustica::rhi::Format::R16_SNORM;
+    case nrd::Format::R16_UINT:             return caustica::rhi::Format::R16_UINT;
+    case nrd::Format::R16_SINT:             return caustica::rhi::Format::R16_SINT;
+    case nrd::Format::R16_SFLOAT:           return caustica::rhi::Format::R16_FLOAT;
+    case nrd::Format::RG16_UNORM:           return caustica::rhi::Format::RG16_UNORM;
+    case nrd::Format::RG16_SNORM:           return caustica::rhi::Format::RG16_SNORM;
+    case nrd::Format::RG16_UINT:            return caustica::rhi::Format::RG16_UINT;
+    case nrd::Format::RG16_SINT:            return caustica::rhi::Format::RG16_SINT;
+    case nrd::Format::RG16_SFLOAT:          return caustica::rhi::Format::RG16_FLOAT;
+    case nrd::Format::RGBA16_UNORM:         return caustica::rhi::Format::RGBA16_UNORM;
+    case nrd::Format::RGBA16_SNORM:         return caustica::rhi::Format::RGBA16_SNORM;
+    case nrd::Format::RGBA16_UINT:          return caustica::rhi::Format::RGBA16_UINT;
+    case nrd::Format::RGBA16_SINT:          return caustica::rhi::Format::RGBA16_SINT;
+    case nrd::Format::RGBA16_SFLOAT:        return caustica::rhi::Format::RGBA16_FLOAT;
+    case nrd::Format::R32_UINT:             return caustica::rhi::Format::R32_UINT;
+    case nrd::Format::R32_SINT:             return caustica::rhi::Format::R32_SINT;
+    case nrd::Format::R32_SFLOAT:           return caustica::rhi::Format::R32_FLOAT;
+    case nrd::Format::RG32_UINT:            return caustica::rhi::Format::RG32_UINT;
+    case nrd::Format::RG32_SINT:            return caustica::rhi::Format::RG32_SINT;
+    case nrd::Format::RG32_SFLOAT:          return caustica::rhi::Format::RG32_FLOAT;
+    case nrd::Format::RGB32_UINT:           return caustica::rhi::Format::RGB32_UINT;
+    case nrd::Format::RGB32_SINT:           return caustica::rhi::Format::RGB32_SINT;
+    case nrd::Format::RGB32_SFLOAT:         return caustica::rhi::Format::RGB32_FLOAT;
+    case nrd::Format::RGBA32_UINT:          return caustica::rhi::Format::RGBA32_UINT;
+    case nrd::Format::RGBA32_SINT:          return caustica::rhi::Format::RGBA32_SINT;
+    case nrd::Format::RGBA32_SFLOAT:        return caustica::rhi::Format::RGBA32_FLOAT;
+    case nrd::Format::R10_G10_B10_A2_UNORM: return caustica::rhi::Format::R10G10B10A2_UNORM;
+    case nrd::Format::R10_G10_B10_A2_UINT:  return caustica::rhi::Format::UNKNOWN; // not representable and not used
+    case nrd::Format::R11_G11_B10_UFLOAT:   return caustica::rhi::Format::R11G11B10_FLOAT;
+    case nrd::Format::R9_G9_B9_E5_UFLOAT:   return caustica::rhi::Format::UNKNOWN; // not representable and not used
+    default:                                return caustica::rhi::Format::UNKNOWN;
     }
 }
 
-NrdIntegration::NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser denoiser)
+NrdIntegration::NrdIntegration(caustica::rhi::IDevice* device, nrd::Denoiser denoiser)
     : m_device(device)
     , m_initialized(false)
     , m_instance(nullptr)
@@ -120,7 +120,7 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
     const nrd::InstanceDesc& instanceDesc = nrd::GetInstanceDesc(*m_instance); 
 
     constexpr uint32_t maxInFlightFrames = 4;
-    const nvrhi::BufferDesc constantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(
+    const caustica::rhi::BufferDesc constantBufferDesc = caustica::rhi::utils::CreateVolatileConstantBufferDesc(
         instanceDesc.constantBufferMaxDataSize,
         "NrdConstantBuffer", 
         instanceDesc.descriptorPoolDesc.setsMaxNum * maxInFlightFrames);
@@ -131,17 +131,17 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
     {
         const nrd::Sampler& samplerMode = instanceDesc.samplers[samplerIndex];
 
-        nvrhi::SamplerAddressMode addressMode = nvrhi::SamplerAddressMode::Wrap;
+        caustica::rhi::SamplerAddressMode addressMode = caustica::rhi::SamplerAddressMode::Wrap;
         bool filter = false;
 
         switch (samplerMode)
         {
         case nrd::Sampler::NEAREST_CLAMP:
-            addressMode = nvrhi::SamplerAddressMode::Clamp;
+            addressMode = caustica::rhi::SamplerAddressMode::Clamp;
             filter = false;
             break;
         case nrd::Sampler::LINEAR_CLAMP:
-            addressMode = nvrhi::SamplerAddressMode::Clamp;
+            addressMode = caustica::rhi::SamplerAddressMode::Clamp;
             filter = true;
             break;
         default:
@@ -149,11 +149,11 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
             break;
         }
 
-        auto samplerDesc = nvrhi::SamplerDesc()
+        auto samplerDesc = caustica::rhi::SamplerDesc()
             .setAllAddressModes(addressMode)
             .setAllFilters(filter);
 
-        const nvrhi::SamplerHandle sampler = m_device->createSampler(samplerDesc);
+        const caustica::rhi::SamplerHandle sampler = m_device->createSampler(samplerDesc);
 
         if (!sampler)
         {
@@ -172,7 +172,7 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
         std::vector<caustica::ShaderMacro> macros = { {"NRD_COMPILER_DXC", "1"}, {"NRD_NORMAL_ENCODING", "2"}, {"NRD_ROUGHNESS_ENCODING", "1"} };
         
         NrdPipeline pipeline;
-        pipeline.Shader = shaderFactory.createShader(fileName.c_str(), "main", &macros, nvrhi::ShaderType::Compute);
+        pipeline.Shader = shaderFactory.createShader(fileName.c_str(), "main", &macros, caustica::rhi::ShaderType::Compute);
 
         if (!pipeline.Shader)
         {
@@ -181,8 +181,8 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
         }
 
         // our NRD integration compiles shaders using caustica_compile_shaders (see \external\CMakeLists.txt) - that's why we're not relying on libraryDesc.spirvBindingOffsets anymore!
-        // see NVRHI_DEFAULT_VK_REGISTER_OFFSETS in \external\cmake\compileshaders.cmake - it now matches the NVRHI defaults
-		nvrhi::VulkanBindingOffsets cNRDBindingOffsets; // = { .shaderResource = libraryDesc.spirvBindingOffsets.textureOffset, .sampler = libraryDesc.spirvBindingOffsets.samplerOffset, .constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset, .unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset };
+        // see CAUSTICA_RHI_DEFAULT_VK_REGISTER_OFFSETS in \external\cmake\compileshaders.cmake - it now matches the Caustica RHI defaults
+		caustica::rhi::VulkanBindingOffsets cNRDBindingOffsets; // = { .shaderResource = libraryDesc.spirvBindingOffsets.textureOffset, .sampler = libraryDesc.spirvBindingOffsets.samplerOffset, .constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset, .unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset };
         
         pipeline.ResourcesBindingLayout = createResourcesBindingLayout(instanceDesc, nrdPipelineDesc);
         pipeline.ConstantsAndSamplersBindingLayout = createConstantsAndSamplersBindingLayout(instanceDesc);
@@ -193,7 +193,7 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
             return false;
         }
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         pipelineDesc.bindingLayouts = { pipeline.ResourcesBindingLayout, pipeline.ConstantsAndSamplersBindingLayout };
         pipelineDesc.CS = pipeline.Shader;
         pipeline.Pipeline = m_device->createComputePipeline(pipelineDesc);
@@ -217,9 +217,9 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
             ? instanceDesc.permanentPool[i]
             : instanceDesc.transientPool[i - instanceDesc.permanentPoolSize];
 
-        const nvrhi::Format format = GetNvrhiFormat(nrdTextureDesc.format);
+        const caustica::rhi::Format format = GetRhiFormat(nrdTextureDesc.format);
 
-        if (format == nvrhi::Format::UNKNOWN)
+        if (format == caustica::rhi::Format::UNKNOWN)
         {
             assert(!"Unknown or unsupported NRD format");
             return false;
@@ -228,18 +228,18 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
         std::stringstream ss;
         ss << "NRD " << (isPermanent ? "Permanent" : "Transient") << "Texture [" << (isPermanent ? i : i - instanceDesc.permanentPoolSize) << "]";
 
-        nvrhi::TextureDesc textureDesc;
+        caustica::rhi::TextureDesc textureDesc;
         textureDesc.width = std::max(width / nrdTextureDesc.downsampleFactor, 1u);
         textureDesc.height = std::max(height / nrdTextureDesc.downsampleFactor, 1u);
         textureDesc.format = format;
         textureDesc.mipLevels = 1;
-        textureDesc.dimension = nvrhi::TextureDimension::Texture2D;
-        textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+        textureDesc.dimension = caustica::rhi::TextureDimension::Texture2D;
+        textureDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
         textureDesc.keepInitialState = true;
         textureDesc.isUAV = true;
         textureDesc.debugName = ss.str();
 
-        const nvrhi::TextureHandle texture = m_device->createTexture(textureDesc);
+        const caustica::rhi::TextureHandle texture = m_device->createTexture(textureDesc);
 
         if (!texture)
         {
@@ -257,24 +257,24 @@ bool NrdIntegration::initialize(uint32_t width, uint32_t height, caustica::Shade
     return true;
 }
 
-nvrhi::BindingLayoutHandle NrdIntegration::createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc)
+caustica::rhi::BindingLayoutHandle NrdIntegration::createConstantsAndSamplersBindingLayout(const nrd::InstanceDesc& instanceDesc)
 {
-    nvrhi::BindingLayoutDesc layoutDesc;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
     layoutDesc.registerSpace = instanceDesc.rootSpaceIndex;
     layoutDesc.registerSpaceIsDescriptorSet = true;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
 
-    nvrhi::BindingLayoutItem constantBufferItem = {};
+    caustica::rhi::BindingLayoutItem constantBufferItem = {};
     constantBufferItem.size = 1;
-    constantBufferItem.type = nvrhi::ResourceType::VolatileConstantBuffer;
+    constantBufferItem.type = caustica::rhi::ResourceType::VolatileConstantBuffer;
     constantBufferItem.slot = instanceDesc.constantBufferRegisterIndex;
     layoutDesc.bindings.push_back(constantBufferItem);
 
     for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
     {
-        nvrhi::BindingLayoutItem samplerItem = {};
+        caustica::rhi::BindingLayoutItem samplerItem = {};
         samplerItem.size = 1;
-        samplerItem.type = nvrhi::ResourceType::Sampler;
+        samplerItem.type = caustica::rhi::ResourceType::Sampler;
         samplerItem.slot = instanceDesc.samplersBaseRegisterIndex + samplerIndex;
         layoutDesc.bindings.push_back(samplerItem);
     }
@@ -289,24 +289,24 @@ nvrhi::BindingLayoutHandle NrdIntegration::createConstantsAndSamplersBindingLayo
     return bindingLayout;
 }
 
-nvrhi::BindingLayoutHandle NrdIntegration::createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc)
+caustica::rhi::BindingLayoutHandle NrdIntegration::createResourcesBindingLayout(const nrd::InstanceDesc& instanceDesc, const nrd::PipelineDesc& nrdPipelineDesc)
 {
-    nvrhi::BindingLayoutDesc layoutDesc;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
     layoutDesc.registerSpaceIsDescriptorSet = true;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
 
     for (uint32_t descriptorRangeIndex = 0; descriptorRangeIndex < nrdPipelineDesc.resourceRangesNum; descriptorRangeIndex++)
     {
         const nrd::ResourceRangeDesc& nrdDescriptorRange = nrdPipelineDesc.resourceRanges[descriptorRangeIndex];
 
-        nvrhi::BindingLayoutItem resourceItem = {};
+        caustica::rhi::BindingLayoutItem resourceItem = {};
         switch (nrdDescriptorRange.descriptorType)
         {
         case nrd::DescriptorType::TEXTURE:
-            resourceItem.type = nvrhi::ResourceType::Texture_SRV;
+            resourceItem.type = caustica::rhi::ResourceType::Texture_SRV;
             break;
         case nrd::DescriptorType::STORAGE_TEXTURE:
-            resourceItem.type = nvrhi::ResourceType::Texture_UAV;
+            resourceItem.type = caustica::rhi::ResourceType::Texture_UAV;
             break;
         default:
             assert(!"Unknown NRD descriptor type");
@@ -343,7 +343,7 @@ static inline void MatrixToNrd(float* dest, const dm::float4x4& m)
 }
 
 void NrdIntegration::runDenoiserPasses(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const RenderTargets& renderTargets,
     int pass,
     const caustica::PlanarView& view, 
@@ -418,16 +418,16 @@ void NrdIntegration::runDenoiserPasses(
         assert(m_constantBuffer);
         commandList->writeBuffer(m_constantBuffer, dispatchDesc.constantBufferData, dispatchDesc.constantBufferDataSize);
 
-        nvrhi::BindingSetDesc constantsAndSampelrsSetDesc;
-        constantsAndSampelrsSetDesc.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(instanceDesc.constantBufferRegisterIndex, m_constantBuffer));
+        caustica::rhi::BindingSetDesc constantsAndSampelrsSetDesc;
+        constantsAndSampelrsSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::ConstantBuffer(instanceDesc.constantBufferRegisterIndex, m_constantBuffer));
 
         for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
         {
             assert(m_samplers[samplerIndex]);
-            constantsAndSampelrsSetDesc.bindings.push_back(nvrhi::BindingSetItem::Sampler(instanceDesc.samplersBaseRegisterIndex + samplerIndex, m_samplers[samplerIndex]));
+            constantsAndSampelrsSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Sampler(instanceDesc.samplersBaseRegisterIndex + samplerIndex, m_samplers[samplerIndex]));
         }
 
-        nvrhi::BindingSetDesc resourcesSetDesc;
+        caustica::rhi::BindingSetDesc resourcesSetDesc;
         const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[dispatchDesc.pipelineIndex];
         uint32_t resourceIndex = 0;
 
@@ -440,7 +440,7 @@ void NrdIntegration::runDenoiserPasses(
                 assert(resourceIndex < dispatchDesc.resourcesNum);
                 const nrd::ResourceDesc& resource = dispatchDesc.resources[resourceIndex];
 
-                nvrhi::TextureHandle texture;
+                caustica::rhi::TextureHandle texture;
                 switch (resource.type)
                 {
                 case nrd::ResourceType::IN_MV:
@@ -495,15 +495,15 @@ void NrdIntegration::runDenoiserPasses(
 
                 assert(texture);
 
-                nvrhi::TextureSubresourceSet subresources = nvrhi::AllSubresources;
+                caustica::rhi::TextureSubresourceSet subresources = caustica::rhi::AllSubresources;
 
-                nvrhi::BindingSetItem setItem = nvrhi::BindingSetItem::None();
+                caustica::rhi::BindingSetItem setItem = caustica::rhi::BindingSetItem::None();
                 setItem.resourceHandle = texture;
                 setItem.slot = instanceDesc.resourcesBaseRegisterIndex + descriptorOffset;
                 setItem.subresources = subresources;
                 setItem.type = (nrdDescriptorRange.descriptorType == nrd::DescriptorType::TEXTURE)
-                    ? nvrhi::ResourceType::Texture_SRV
-                    : nvrhi::ResourceType::Texture_UAV;
+                    ? caustica::rhi::ResourceType::Texture_SRV
+                    : caustica::rhi::ResourceType::Texture_UAV;
 
                 resourcesSetDesc.bindings.push_back(setItem);
 
@@ -515,10 +515,10 @@ void NrdIntegration::runDenoiserPasses(
 
         const NrdPipeline& pipeline = m_pipelines[dispatchDesc.pipelineIndex];
 
-        nvrhi::BindingSetHandle resourcesBindingSet = m_bindingCache.getOrCreateBindingSet(resourcesSetDesc, pipeline.ResourcesBindingLayout);
-        nvrhi::BindingSetHandle constantsAndSamplersBindingSet = m_bindingCache.getOrCreateBindingSet(constantsAndSampelrsSetDesc, pipeline.ConstantsAndSamplersBindingLayout);
+        caustica::rhi::BindingSetHandle resourcesBindingSet = m_bindingCache.getOrCreateBindingSet(resourcesSetDesc, pipeline.ResourcesBindingLayout);
+        caustica::rhi::BindingSetHandle constantsAndSamplersBindingSet = m_bindingCache.getOrCreateBindingSet(constantsAndSampelrsSetDesc, pipeline.ConstantsAndSamplersBindingLayout);
 
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { resourcesBindingSet, constantsAndSamplersBindingSet };
         state.pipeline = pipeline.Pipeline;
         commandList->setComputeState(state);

@@ -8,7 +8,7 @@
 #include <scene/SceneImport.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -117,7 +117,7 @@ namespace caustica
         virtual ~Scene() = default;
 
         Scene(
-            nvrhi::IDevice* device,
+            caustica::rhi::IDevice* device,
             ShaderFactory& shaderFactory,
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureLoader> textureCache,

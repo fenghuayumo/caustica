@@ -1,11 +1,7 @@
 #pragma once
 
 #include <cstdint>
-
-namespace nvrhi
-{
-enum class GraphicsAPI : uint8_t;
-}
+#include <rhi/rhi.h>
 
 namespace caustica::shader
 {
@@ -17,8 +13,8 @@ enum class Backend : uint8_t
     Vulkan,
 };
 
-[[nodiscard]] Backend fromNvrhiGraphicsApi(nvrhi::GraphicsAPI api);
-[[nodiscard]] nvrhi::GraphicsAPI toNvrhiGraphicsApi(Backend backend);
+[[nodiscard]] Backend fromRhiGraphicsApi(caustica::rhi::GraphicsAPI api);
+[[nodiscard]] caustica::rhi::GraphicsAPI toRhiGraphicsApi(Backend backend);
 [[nodiscard]] const char* backendToken(Backend backend);
 
 } // namespace caustica::shader

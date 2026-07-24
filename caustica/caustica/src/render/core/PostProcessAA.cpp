@@ -24,7 +24,7 @@ void postProcessAA(CameraController& camera, PostProcessAAParams& params)
 void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params)
 {
     auto& settings = params.settings;
-    nvrhi::ICommandList* commandList = params.commandList;
+    caustica::rhi::ICommandList* commandList = params.commandList;
     RenderTargets* renderTargets = params.renderTargets;
 
     if (!settings.RealtimeMode)
@@ -108,7 +108,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         RAII_SCOPE(commandList->beginMarker("DLSS-RR");, commandList->endMarker(););
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
+        caustica::rhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("DLSSRR_PrepareInputs");
         params.postProcess->apply(
             commandList,
@@ -147,7 +147,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
     {
         // Skip after DLSS/DLSS-RR: merge is for native-res realtime without AA upscale.
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
+        caustica::rhi::TextureDesc tdesc = renderTargets->outputColor->getDesc();
         commandList->beginMarker("NoDenoiserFinalMerge");
         params.postProcess->apply(
             commandList,

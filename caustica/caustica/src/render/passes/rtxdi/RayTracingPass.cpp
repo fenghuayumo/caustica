@@ -9,15 +9,15 @@ using namespace caustica;
 
 
 bool RayTracingPass::init(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     caustica::ShaderFactory& shaderFactory,
     const char* shaderName,
     const std::vector<caustica::ShaderMacro>& extraMacros,
     bool useRayQuery,
     uint32_t computeGroupSize,
-    nvrhi::IBindingLayout* bindingLayout,
-    nvrhi::IBindingLayout* extraBindingLayout,
-    nvrhi::IBindingLayout* bindlessLayout)
+    caustica::rhi::IBindingLayout* bindingLayout,
+    caustica::rhi::IBindingLayout* extraBindingLayout,
+    caustica::rhi::IBindingLayout* bindlessLayout)
 {
     caustica::debug("Initializing RayTracingPass %s...", shaderName);
 
@@ -29,16 +29,16 @@ bool RayTracingPass::init(
 
     if (useRayQuery)
     {
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-        if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
-            macros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
-#endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+        if (device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)
+            macros.push_back({ "CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
+#endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 
-        ComputeShader = shaderFactory.createShader(shaderName, "main", &macros, nvrhi::ShaderType::Compute);
+        ComputeShader = shaderFactory.createShader(shaderName, "main", &macros, caustica::rhi::ShaderType::Compute);
         if (!ComputeShader)
             return false;    
 
-        nvrhi::ComputePipelineDesc pipelineDesc;
+        caustica::rhi::ComputePipelineDesc pipelineDesc;
         if(extraBindingLayout)
             pipelineDesc.bindingLayouts.push_back(extraBindingLayout);
         if (bindlessLayout)
@@ -59,20 +59,20 @@ bool RayTracingPass::init(
     if (!ShaderLibrary)
         return false;
 
-    nvrhi::rt::PipelineDesc rtPipelineDesc;
+    caustica::rhi::rt::PipelineDesc rtPipelineDesc;
     rtPipelineDesc.globalBindingLayouts = { extraBindingLayout, bindlessLayout };
     if (bindingLayout)
         rtPipelineDesc.globalBindingLayouts.push_back(bindingLayout);
     rtPipelineDesc.shaders = {
-        { "", ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration), nullptr },
-        { "", ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss), nullptr }
+        { "", ShaderLibrary->getShader("RayGen", caustica::rhi::ShaderType::RayGeneration), nullptr },
+        { "", ShaderLibrary->getShader("Miss", caustica::rhi::ShaderType::Miss), nullptr }
     };
 
     rtPipelineDesc.hitGroups = {
         {
             "HitGroup",
-            ShaderLibrary->getShader("ClosestHit", nvrhi::ShaderType::ClosestHit),
-            ShaderLibrary->getShader("AnyHit", nvrhi::ShaderType::AnyHit),
+            ShaderLibrary->getShader("ClosestHit", caustica::rhi::ShaderType::ClosestHit),
+            ShaderLibrary->getShader("AnyHit", caustica::rhi::ShaderType::AnyHit),
             nullptr, // intersectionShader
             nullptr, // localBindingLayout
             false // isProceduralPrimitive
@@ -99,18 +99,18 @@ bool RayTracingPass::init(
 }
 
 void RayTracingPass::execute(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     int width,
     int height,
-    nvrhi::IBindingSet* bindingSet,
-    nvrhi::IBindingSet* extraBindingSet,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::IBindingSet* bindingSet,
+    caustica::rhi::IBindingSet* extraBindingSet,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     const void* pushConstants,
     const size_t pushConstantSize)
 {
     if (ComputePipeline)
     {
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { extraBindingSet };
         if (descriptorTable)
             state.bindings.push_back(descriptorTable);
@@ -126,7 +126,7 @@ void RayTracingPass::execute(
     }
     else
     {
-        nvrhi::rt::State state;
+        caustica::rhi::rt::State state;
         state.bindings = { extraBindingSet };
         if (descriptorTable)
             state.bindings.push_back(descriptorTable);
@@ -138,7 +138,7 @@ void RayTracingPass::execute(
         if (pushConstants)
             commandList->setPushConstants(pushConstants, pushConstantSize);
 
-        nvrhi::rt::DispatchRaysArguments args;
+        caustica::rhi::rt::DispatchRaysArguments args;
         args.width = width;
         args.height = height;
         args.depth = 1;

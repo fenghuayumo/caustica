@@ -31,7 +31,7 @@ using namespace caustica::math;
 
 static_assert( sizeof(DenoisingGuidesPassConstants) == sizeof(SampleMiniConstants) );
 
-DenoisingGuidesPass::DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, nvrhi::BindingLayoutHandle bindingLayout )
+DenoisingGuidesPass::DenoisingGuidesPass( caustica::rhi::IDevice* device, std::shared_ptr<caustica::ShaderFactory> shaderFactory, const std::unique_ptr<RenderTargets> & renderTargets, const std::shared_ptr<ShaderDebug> & shaderDebug, caustica::rhi::BindingLayoutHandle bindingLayout )
     : m_device(device)
     , m_bindingCache(device)
     , m_renderTargets(renderTargets)
@@ -39,14 +39,14 @@ DenoisingGuidesPass::DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_pt
     , m_bindingLayout(bindingLayout)
 { 
 
-    // nvrhi::BindingLayoutDesc layoutDesc;
-    // layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    // caustica::rhi::BindingLayoutDesc layoutDesc;
+    // layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     // layoutDesc.bindings = { 
-    //     nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-    //     nvrhi::BindingLayoutItem::Texture_UAV(0) };
+    //     caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+    //     caustica::rhi::BindingLayoutItem::Texture_UAV(0) };
     // m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
@@ -54,7 +54,7 @@ DenoisingGuidesPass::DenoisingGuidesPass( nvrhi::IDevice* device, std::shared_pt
     m_csComputeAvgLayerRadiance.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "computeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
     m_csDebugViz.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
-    //m_constantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesPassConstants), "DenoisingGuidesPassConstants", caustica::c_MaxRenderPassConstantBufferVersions));
+    //m_constantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesPassConstants), "DenoisingGuidesPassConstants", caustica::c_MaxRenderPassConstantBufferVersions));
 }
 
 DenoisingGuidesPass::~DenoisingGuidesPass( )
@@ -63,7 +63,7 @@ DenoisingGuidesPass::~DenoisingGuidesPass( )
 
 #pragma optimize("", off)
 
-void DenoisingGuidesPass::denoiseSpecHitT(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::denoiseSpecHitT(caustica::rhi::ICommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("denoiseSpecHitT"); , commandList->endMarker(); );
 
@@ -75,19 +75,19 @@ void DenoisingGuidesPass::denoiseSpecHitT(nvrhi::ICommandList* commandList, nvrh
     for( int pass = 0; pass < passCount; pass++ )
     {
         // ping
-        commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->specularHitT, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
         consts = DenoisingGuidesPassConstants { .RenderResolution = m_renderTargets->renderSize, .DisplayResolution = m_renderTargets->displaySize, .DebugView = (int)0, .Ping = 1 };
         m_csDenoiseSpecHitT.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
         // pong
-        commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setTextureState(m_renderTargets->scratchFloat1, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->specularHitT, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(m_renderTargets->scratchFloat1, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
         consts = DenoisingGuidesPassConstants { .RenderResolution = m_renderTargets->renderSize, .DisplayResolution = m_renderTargets->displaySize, .DebugView = (int)0, .Ping = 0 };
         m_csDenoiseSpecHitT.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
     }
-    commandList->setTextureState(m_renderTargets->specularHitT, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    commandList->setTextureState(m_renderTargets->specularHitT, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::computeAvgLayerRadiance(nvrhi::ICommandList* commandList, nvrhi::BindingSetHandle bindingSet)
+void DenoisingGuidesPass::computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList, caustica::rhi::BindingSetHandle bindingSet)
 {
     RAII_SCOPE(commandList->beginMarker("computeAvgLayerRadiance"); , commandList->endMarker(); );
 
@@ -101,10 +101,10 @@ void DenoisingGuidesPass::computeAvgLayerRadiance(nvrhi::ICommandList* commandLi
     DenoisingGuidesPassConstants consts { .RenderResolution = m_renderTargets->renderSize, .DisplayResolution = m_renderTargets->displaySize, .DebugView = 0, .Ping = 0 };
     m_csComputeAvgLayerRadiance.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts));
 
-    commandList->setTextureState(m_renderTargets->denoiserAvgLayerRadianceHalfRes, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    commandList->setTextureState(m_renderTargets->denoiserAvgLayerRadianceHalfRes, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
 }
 
-void DenoisingGuidesPass::renderDebugViz( nvrhi::ICommandList * commandList, DebugViewType debugView, nvrhi::BindingSetHandle bindingSet )
+void DenoisingGuidesPass::renderDebugViz( caustica::rhi::ICommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet )
 {
     //if( !m_settings.enabled )
     //    return;

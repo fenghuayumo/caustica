@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi_types.h>
 #include <unordered_map>
 #include <functional>
 #include <deque>
@@ -8,11 +8,11 @@
 #include <unordered_map>
 #include <filesystem>
 
-namespace nvrhi
+namespace caustica::rhi
 {
     typedef std::pair<bool, std::reference_wrapper<const std::string>> ResolvedMarker;
     typedef std::pair<const void*, size_t> BinaryBlob;
-    typedef std::function<uint64_t(BinaryBlob, nvrhi::GraphicsAPI)> ShaderHashGeneratorFunction;
+    typedef std::function<uint64_t(BinaryBlob, caustica::rhi::GraphicsAPI)> ShaderHashGeneratorFunction;
     typedef std::function<BinaryBlob(uint64_t, ShaderHashGeneratorFunction)> ShaderBinaryLookupCallback;
 
     // Aftermath will return the payload of the last marker the GPU executed, so in cases of nested regimes,
@@ -42,10 +42,10 @@ namespace nvrhi
         std::unordered_map<size_t, std::string> m_EventStrings;
     };
 
-    // AftermathCrashDumpHelper tracks all nvrhi::IDevice-level constructs that we need when generating a crash dump
+    // AftermathCrashDumpHelper tracks all caustica::rhi::IDevice-level constructs that we need when generating a crash dump
     // It provides two services: resolving a marker hash to the original string, and getting the specific shader bytecode
     // of a requested shader hash
-    // There should be one AftermathCrashDumpHelper per nvrhi::IDevice
+    // There should be one AftermathCrashDumpHelper per caustica::rhi::IDevice
     // All command lists will register their AftermathMarkerTrackers with the AftermathCrashDumpHelper
     // Any shader bytecode loading and management code (e.g. caustica's ShaderFactory) should register a shader binary lookup callback
     class AftermathCrashDumpHelper
@@ -67,4 +67,4 @@ namespace nvrhi
         std::deque<AftermathMarkerTracker> m_DestroyedMarkerTrackers;
         std::unordered_map<void*, ShaderBinaryLookupCallback> m_ShaderBinaryLookupCallbacks;
     };
-} // namespace nvrhi
+} // namespace caustica::rhi

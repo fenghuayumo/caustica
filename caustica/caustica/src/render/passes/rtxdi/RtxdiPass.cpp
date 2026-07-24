@@ -30,10 +30,10 @@ using namespace caustica;
 using namespace caustica::render;
 
 RtxdiPass::RtxdiPass(
-	nvrhi::IDevice* device,
+	caustica::rhi::IDevice* device,
 	std::shared_ptr<caustica::ShaderFactory> shaderFactory,
 	caustica::render::RenderDevice& renderDevice,
-	nvrhi::BindingLayoutHandle bindlessLayout) :
+	caustica::rhi::BindingLayoutHandle bindlessLayout) :
 		m_device(device),
 		m_shaderFactory(shaderFactory),
 		m_renderDevice(renderDevice),
@@ -41,28 +41,28 @@ RtxdiPass::RtxdiPass(
 		m_PreviousReservoirIndex(0)
 {
 	//create binding layouts
-	nvrhi::BindingLayoutDesc layoutDesc;
-	layoutDesc.visibility = nvrhi::ShaderType::All;
+	caustica::rhi::BindingLayoutDesc layoutDesc;
+	layoutDesc.visibility = caustica::rhi::ShaderType::All;
 	layoutDesc.bindings = {
-		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(21),		//t_LightDataBuffer
-		nvrhi::BindingLayoutItem::TypedBuffer_SRV(22),			//t_NeighborOffsets
-		nvrhi::BindingLayoutItem::TypedBuffer_SRV(23),			//t_LightIndexMappingBuffer
-		nvrhi::BindingLayoutItem::Texture_SRV(25),				//t_LocalLightPdfTexture
-		nvrhi::BindingLayoutItem::StructuredBuffer_SRV(26),		//t_GeometryInstanceToLight
+		caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(21),		//t_LightDataBuffer
+		caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(22),			//t_NeighborOffsets
+		caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(23),			//t_LightIndexMappingBuffer
+		caustica::rhi::BindingLayoutItem::Texture_SRV(25),				//t_LocalLightPdfTexture
+		caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(26),		//t_GeometryInstanceToLight
 		
-		nvrhi::BindingLayoutItem::StructuredBuffer_UAV(13),		//u_LightReservoirs
-		nvrhi::BindingLayoutItem::StructuredBuffer_UAV(14),		//u_GIReservoirs
-		nvrhi::BindingLayoutItem::TypedBuffer_UAV(15),			//u_RisBuffer
-		nvrhi::BindingLayoutItem::TypedBuffer_UAV(16),			//u_RisLightDataBuffer
-        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(17),		//u_PTReservoirs
+		caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(13),		//u_LightReservoirs
+		caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(14),		//u_GIReservoirs
+		caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(15),			//u_RisBuffer
+		caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(16),			//u_RisLightDataBuffer
+        caustica::rhi::BindingLayoutItem::StructuredBuffer_UAV(17),		//u_PTReservoirs
 
-		nvrhi::BindingLayoutItem::VolatileConstantBuffer(5),	//g_RtxdiBridgeConst
+		caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(5),	//g_RtxdiBridgeConst
 
-		nvrhi::BindingLayoutItem::Sampler(4)
+		caustica::rhi::BindingLayoutItem::Sampler(4)
 	};
 	m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 
-	m_rtxdiConstantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(sizeof(RtxdiBridgeConstants), "RtxdiBridgeConstants", 16));
+	m_rtxdiConstantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(sizeof(RtxdiBridgeConstants), "RtxdiBridgeConstants", 16));
 }
 
 RtxdiPass::~RtxdiPass(){}
@@ -126,7 +126,7 @@ void RtxdiPass::updateContextDynamicParameters()
 	m_ImportanceSamplingContext->GetReGIRContext().SetDynamicParameters(regirParams);
 }
 
-void RtxdiPass::createPipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*= nullptr*/, bool useRayQuery /*= true*/)
+void RtxdiPass::createPipelines(caustica::rhi::BindingLayoutHandle extraBindingLayout /*= nullptr*/, bool useRayQuery /*= true*/)
 {
 	const auto& reGIRParams = m_ImportanceSamplingContext->GetReGIRContext().GetReGIRStaticParameters();
 	
@@ -147,10 +147,10 @@ void RtxdiPass::createPipelines(nvrhi::BindingLayoutHandle extraBindingLayout /*
 		{}, useRayQuery, RTXDI_SCREEN_SPACE_GROUP_SIZE, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
 	std::vector<caustica::ShaderMacro> finalShadingMacros = { { "USE_RAY_QUERY", "1" } };
-#if NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-	if (m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12)
-		finalShadingMacros.push_back({ "NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
-#endif // NVRHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+	if (m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12)
+		finalShadingMacros.push_back({ "CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP", "1" });
+#endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 	m_FinalSamplingPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/rtxdi/DIFinalShading.hlsl", "main", finalShadingMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	
 	m_GISpatialResamplingPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/rtxdi/GISpatialResampling.hlsl",
@@ -176,28 +176,28 @@ void RtxdiPass::createBindingSet(const RenderTargets& renderTargets)
 {
 	for (int currentFrame = 0; currentFrame <= 1; currentFrame++)
 	{
-		nvrhi::BindingSetDesc bindingSetDesc;
+		caustica::rhi::BindingSetDesc bindingSetDesc;
 		bindingSetDesc.bindings = {
 			// RTXDI resources
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(21, m_rtxdiResources->LightDataBuffer),
-			nvrhi::BindingSetItem::TypedBuffer_SRV(22, m_rtxdiResources->NeighborOffsetsBuffer),
-			nvrhi::BindingSetItem::TypedBuffer_SRV(23, m_rtxdiResources->LightIndexMappingBuffer),
-			nvrhi::BindingSetItem::Texture_SRV(25, m_rtxdiResources->LocalLightPdfTexture),
-			nvrhi::BindingSetItem::StructuredBuffer_SRV(26, m_rtxdiResources->GeometryInstanceToLightBuffer),
+			caustica::rhi::BindingSetItem::StructuredBuffer_SRV(21, m_rtxdiResources->LightDataBuffer),
+			caustica::rhi::BindingSetItem::TypedBuffer_SRV(22, m_rtxdiResources->NeighborOffsetsBuffer),
+			caustica::rhi::BindingSetItem::TypedBuffer_SRV(23, m_rtxdiResources->LightIndexMappingBuffer),
+			caustica::rhi::BindingSetItem::Texture_SRV(25, m_rtxdiResources->LocalLightPdfTexture),
+			caustica::rhi::BindingSetItem::StructuredBuffer_SRV(26, m_rtxdiResources->GeometryInstanceToLightBuffer),
 			
 			// render targets
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(13, m_rtxdiResources->LightReservoirBuffer),
-			nvrhi::BindingSetItem::StructuredBuffer_UAV(14, m_rtxdiResources->GIReservoirBuffer),
-			nvrhi::BindingSetItem::TypedBuffer_UAV(15, m_rtxdiResources->RisBuffer),
-			nvrhi::BindingSetItem::TypedBuffer_UAV(16, m_rtxdiResources->RisLightDataBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_UAV(17, m_rtxdiResources->PTReservoirBuffer),
+			caustica::rhi::BindingSetItem::StructuredBuffer_UAV(13, m_rtxdiResources->LightReservoirBuffer),
+			caustica::rhi::BindingSetItem::StructuredBuffer_UAV(14, m_rtxdiResources->GIReservoirBuffer),
+			caustica::rhi::BindingSetItem::TypedBuffer_UAV(15, m_rtxdiResources->RisBuffer),
+			caustica::rhi::BindingSetItem::TypedBuffer_UAV(16, m_rtxdiResources->RisLightDataBuffer),
+            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(17, m_rtxdiResources->PTReservoirBuffer),
 			
-			nvrhi::BindingSetItem::ConstantBuffer(5, m_rtxdiConstantBuffer),
+			caustica::rhi::BindingSetItem::ConstantBuffer(5, m_rtxdiConstantBuffer),
 
-			nvrhi::BindingSetItem::Sampler(4, m_renderDevice.samplers().linearWrap())
+			caustica::rhi::BindingSetItem::Sampler(4, m_renderDevice.samplers().linearWrap())
 		};
 
-		const nvrhi::BindingSetHandle bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
+		const caustica::rhi::BindingSetHandle bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
 		if (currentFrame)
 			m_bindingSet = bindingSet;
 		else
@@ -261,19 +261,19 @@ void RtxdiPass::setupFrame(const SetupParams& params)
 }
 
 void RtxdiPass::prepareResources(
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     const RenderTargets& renderTargets,
     EnvMapProcessor* envMap,
     EnvMapSceneParams envMapSceneParams,
     const caustica::scene::SceneRenderData* renderData,
     size_t geometryInstanceCount,
-    nvrhi::IDescriptorTable* descriptorTable,
+    caustica::rhi::IDescriptorTable* descriptorTable,
     const caustica::render::SceneGpuFrameHandles& gpuHandles,
     std::shared_ptr<class MaterialGpuCache> materialGpuCache,
     std::shared_ptr<class OpacityMicromapBuilder> opacityMicromapBuilder,
-    nvrhi::BufferHandle subInstanceDataBuffer,
+    caustica::rhi::BufferHandle subInstanceDataBuffer,
     const RtxdiBridgeParameters& bridgeParams,
-    const nvrhi::BindingLayoutHandle extraBindingLayout,
+    const caustica::rhi::BindingLayoutHandle extraBindingLayout,
     std::shared_ptr<ShaderDebug> shaderDebug)
 {
     m_descriptorTable = descriptorTable;
@@ -371,7 +371,7 @@ void RtxdiPass::prepareResources(
     }
 }
 
-void RtxdiPass::prepareLights(nvrhi::CommandListHandle commandList)
+void RtxdiPass::prepareLights(caustica::rhi::CommandListHandle commandList)
 {
 	if (!m_BridgeParameters.usingLightSampling || !m_PrepareLightsPass || !m_ImportanceSamplingContext)
 		return;
@@ -383,12 +383,12 @@ void RtxdiPass::prepareLights(nvrhi::CommandListHandle commandList)
 	m_ImportanceSamplingContext->SetLightBufferParams(lightBufferParams);
 }
 
-void RtxdiPass::writeBridgeConstants(nvrhi::CommandListHandle commandList)
+void RtxdiPass::writeBridgeConstants(caustica::rhi::CommandListHandle commandList)
 {
 	fillConstants(commandList);
 }
 
-void RtxdiPass::generatePdfMips(nvrhi::CommandListHandle commandList)
+void RtxdiPass::generatePdfMips(caustica::rhi::CommandListHandle commandList)
 {
 	if (!m_BridgeParameters.usingLightSampling || !m_rtxdiResources)
 		return;
@@ -407,7 +407,7 @@ void RtxdiPass::generatePdfMips(nvrhi::CommandListHandle commandList)
 	commandList->endMarker();
 }
 
-void RtxdiPass::presampleLights(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+void RtxdiPass::presampleLights(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
 	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext || !m_rtxdiResources)
 		return;
@@ -423,11 +423,11 @@ void RtxdiPass::presampleLights(nvrhi::CommandListHandle commandList, nvrhi::Bin
 		1
 	};
 
-	nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
 	executeComputePass(commandList, m_PresampleLightsPass, "Pre-sample Lights", presampleDispatchSize, extraBindingSet);
 }
 
-void RtxdiPass::presampleEnvMap(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+void RtxdiPass::presampleEnvMap(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
 	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext || !m_rtxdiResources)
 		return;
@@ -442,11 +442,11 @@ void RtxdiPass::presampleEnvMap(nvrhi::CommandListHandle commandList, nvrhi::Bin
 		1
 	};
 
-	nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
+	caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->RisBuffer);
 	executeComputePass(commandList, m_PresampleEnvMapPass, "Pre-sample Envmap", presampleDispatchSize, extraBindingSet);
 }
 
-void RtxdiPass::presampleReGIR(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+void RtxdiPass::presampleReGIR(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
 	if (!m_BridgeParameters.usingLightSampling || !m_ImportanceSamplingContext)
 		return;
@@ -466,10 +466,10 @@ void RtxdiPass::presampleReGIR(nvrhi::CommandListHandle commandList, nvrhi::Bind
 }
 
 void RtxdiPass::beginFrame(
-    nvrhi::CommandListHandle commandList,
+    caustica::rhi::CommandListHandle commandList,
     const RenderTargets & /*renderTargets*/,
-    const nvrhi::BindingLayoutHandle /*extraBindingLayout*/,
-    nvrhi::BindingSetHandle extraBindingSet )
+    const caustica::rhi::BindingLayoutHandle /*extraBindingLayout*/,
+    caustica::rhi::BindingSetHandle extraBindingSet )
 {
 	prepareLights(commandList);
 	writeBridgeConstants(commandList);
@@ -485,8 +485,8 @@ void RtxdiPass::beginFrame(
 }
 
 void RtxdiPass::execute(
-	nvrhi::CommandListHandle commandList,
-	nvrhi::BindingSetHandle extraBindingSet,
+	caustica::rhi::CommandListHandle commandList,
+	caustica::rhi::BindingSetHandle extraBindingSet,
     bool skipFinal
 )
 {
@@ -510,20 +510,20 @@ void RtxdiPass::execute(
 		if (reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::Temporal ||
 			reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
 		{
-			nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
+			caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
 			executeRayTracingPass(commandList, m_TemporalResamplingPass, "Temporal Re-sampling", dispatchSize, extraBindingSet);
 		}
 		
 		if (reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::Spatial ||
 			reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
 		{
-			nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
+			caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
 			executeRayTracingPass(commandList, m_SpatialResamplingPass, "Spatial Re-sampling", dispatchSize, extraBindingSet);
 
 		}
 
         //Full screen light sampling pass
-        nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
+        caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
 
         if (!skipFinal)
         {
@@ -538,7 +538,7 @@ void RtxdiPass::execute(
 	commandList->endMarker();
 }
 
-void RtxdiPass::fillConstants(nvrhi::CommandListHandle commandList)
+void RtxdiPass::fillConstants(caustica::rhi::CommandListHandle commandList)
 {
 	// Set the ReGir center and the camera position 
 	RtxdiBridgeConstants bridgeConstants{};
@@ -664,7 +664,7 @@ void RtxdiPass::fillReGirIndirectConstants(ReGirIndirectConstants& regirIndirect
 	regirIndirectConstants.numIndirectSamples = m_BridgeParameters.userSettings.regirIndirect.numIndirectSamples;
 }
 
-void RtxdiPass::executeGI(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet, bool skipFinal)
+void RtxdiPass::executeGI(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet, bool skipFinal)
 {
 	commandList->beginMarker("ReSTIR GI");
 
@@ -676,12 +676,12 @@ void RtxdiPass::executeGI(nvrhi::CommandListHandle commandList, nvrhi::BindingSe
 
 	if (reSTIRGI.GetResamplingMode() == rtxdi::ReSTIRGI_ResamplingMode::Spatial || reSTIRGI.GetResamplingMode() == rtxdi::ReSTIRGI_ResamplingMode::TemporalAndSpatial)
 	{
-		nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->GIReservoirBuffer);
+		caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->GIReservoirBuffer);
 
 		executeRayTracingPass(commandList, m_GISpatialResamplingPass, "Spatial Resampling", dispatchSize, extraBindingSet);
 	}
 
-	nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->GIReservoirBuffer);
+	caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->GIReservoirBuffer);
 
     if (!skipFinal)
 	    executeRayTracingPass(commandList, m_GIFinalShadingPass, "Final Shading", dispatchSize, extraBindingSet);
@@ -689,7 +689,7 @@ void RtxdiPass::executeGI(nvrhi::CommandListHandle commandList, nvrhi::BindingSe
 	commandList->endMarker(); // ReSTIR GI
 }
 
-void RtxdiPass::executeFusedDIGIFinal(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+void RtxdiPass::executeFusedDIGIFinal(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
 	auto& reSTIRDI = m_ImportanceSamplingContext->GetReSTIRDIContext();
 	dm::int2 dispatchSize = { (int)reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
@@ -697,7 +697,7 @@ void RtxdiPass::executeFusedDIGIFinal(nvrhi::CommandListHandle commandList, nvrh
     executeRayTracingPass(commandList, m_FusedDIGIFinalShadingPass, "Fused DI GI Final Shading", dispatchSize, extraBindingSet);
 }
 
-void RtxdiPass::executePT(nvrhi::CommandListHandle commandList, nvrhi::BindingSetHandle extraBindingSet)
+void RtxdiPass::executePT(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
     commandList->beginMarker("ReSTIR PT");
 
@@ -709,18 +709,18 @@ void RtxdiPass::executePT(nvrhi::CommandListHandle commandList, nvrhi::BindingSe
     if (reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::Temporal ||
         reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
     {
-        nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
+        caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
         executeRayTracingPass(commandList, m_PTTemporalResamplingPass, "PT Temporal Resampling", dispatchSize, extraBindingSet);
     }
 
     if (reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::Spatial ||
         reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
     {
-        nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
+        caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
         executeRayTracingPass(commandList, m_PTSpatialResamplingPass, "PT Spatial Resampling", dispatchSize, extraBindingSet);
     }
 
-    nvrhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
+    caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
     executeRayTracingPass(commandList, m_PTFinalShadingPass, "PT Final Shading", dispatchSize, extraBindingSet);
 
     commandList->endMarker();
@@ -729,8 +729,8 @@ void RtxdiPass::executePT(nvrhi::CommandListHandle commandList, nvrhi::BindingSe
 void RtxdiPass::endFrame(){}
 
 void RtxdiPass::executeFrame(
-	nvrhi::ICommandList* commandList,
-	nvrhi::BindingSetHandle globalBindingSet,
+	caustica::rhi::ICommandList* commandList,
+	caustica::rhi::BindingSetHandle globalBindingSet,
 	const PathTracerSettings& settings)
 {
 	static bool enableFusedDIGIFinal = true;
@@ -964,11 +964,11 @@ void registerRtxdiGraphPasses(FrameGraphContext ctx)
 } // namespace caustica::render
 
 void RtxdiPass::executeComputePass(
-	nvrhi::CommandListHandle& commandList,
+	caustica::rhi::CommandListHandle& commandList,
 	ComputePass& pass,
 	const char* passName,
 	dm::int3 dispatchSize,
-	nvrhi::BindingSetHandle extraBindingSet /*= nullptr*/)
+	caustica::rhi::BindingSetHandle extraBindingSet /*= nullptr*/)
 {
 	commandList->beginMarker(passName);
     
@@ -980,11 +980,11 @@ void RtxdiPass::executeComputePass(
 }
 
 void RtxdiPass::executeRayTracingPass(
-	nvrhi::CommandListHandle& commandList, 
+	caustica::rhi::CommandListHandle& commandList, 
 	RayTracingPass& pass, 
 	const char* passName, 
 	dm::int2 dispatchSize, 
-	nvrhi::IBindingSet* extraBindingSet /* = nullptr */
+	caustica::rhi::IBindingSet* extraBindingSet /* = nullptr */
 )
 {
 	commandList->beginMarker(passName);

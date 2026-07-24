@@ -31,8 +31,8 @@ void EditorViewport::flushRetired(caustica::GpuDevice& device)
         return;
 
     // Prior path-trace / ImGui frames may still reference the retired color on the GPU.
-    if (nvrhi::IDevice* nvrhiDevice = device.getDevice())
-        nvrhiDevice->waitForIdle();
+    if (caustica::rhi::IDevice* rhiDevice = device.getDevice())
+        rhiDevice->waitForIdle();
 
     clearRetired();
 }
@@ -45,14 +45,14 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     if (m_framebuffer && m_width == width && m_height == height)
         return;
 
-    nvrhi::IDevice* nvrhiDevice = device.getDevice();
-    if (!nvrhiDevice)
+    caustica::rhi::IDevice* rhiDevice = device.getDevice();
+    if (!rhiDevice)
         return;
 
     // Drop any already-retired buffers (from a previous resize) before retiring the current ones.
     if (m_retiredFramebuffer || m_retiredColor || m_retiredDepth)
     {
-        nvrhiDevice->waitForIdle();
+        rhiDevice->waitForIdle();
         clearRetired();
     }
 
@@ -67,32 +67,32 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     m_height = 0;
 
     // Match typical swapchain LDR target (sRGB) so tone-mapped blit looks correct in ImGui.
-    nvrhi::TextureDesc colorDesc = nvrhi::TextureDesc()
+    caustica::rhi::TextureDesc colorDesc = caustica::rhi::TextureDesc()
         .setDebugName("EditorViewport.Color")
         .setWidth(width)
         .setHeight(height)
-        .setFormat(nvrhi::Format::SRGBA8_UNORM)
+        .setFormat(caustica::rhi::Format::SRGBA8_UNORM)
         .setIsRenderTarget(true)
-        .setInitialState(nvrhi::ResourceStates::RenderTarget)
+        .setInitialState(caustica::rhi::ResourceStates::RenderTarget)
         .setKeepInitialState(true);
 
-    m_color = nvrhiDevice->createTexture(colorDesc);
+    m_color = rhiDevice->createTexture(colorDesc);
     if (!m_color)
     {
         caustica::error("EditorViewport: failed to create color texture %ux%u", width, height);
         return;
     }
 
-    nvrhi::TextureDesc depthDesc = nvrhi::TextureDesc()
+    caustica::rhi::TextureDesc depthDesc = caustica::rhi::TextureDesc()
         .setDebugName("EditorViewport.Depth")
         .setWidth(width)
         .setHeight(height)
-        .setFormat(nvrhi::Format::D32)
+        .setFormat(caustica::rhi::Format::D32)
         .setIsTypeless(true)
         .setIsRenderTarget(true)
-        .enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
+        .enableAutomaticStateTracking(caustica::rhi::ResourceStates::DepthWrite);
 
-    m_depth = nvrhiDevice->createTexture(depthDesc);
+    m_depth = rhiDevice->createTexture(depthDesc);
     if (!m_depth)
     {
         caustica::error("EditorViewport: failed to create depth texture %ux%u", width, height);
@@ -100,11 +100,11 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
         return;
     }
 
-    nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
+    caustica::rhi::FramebufferDesc fbDesc = caustica::rhi::FramebufferDesc()
         .addColorAttachment(m_color)
         .setDepthAttachment(m_depth);
 
-    m_framebuffer = nvrhiDevice->createFramebuffer(fbDesc);
+    m_framebuffer = rhiDevice->createFramebuffer(fbDesc);
     if (!m_framebuffer)
     {
         caustica::error("EditorViewport: failed to create framebuffer %ux%u", width, height);

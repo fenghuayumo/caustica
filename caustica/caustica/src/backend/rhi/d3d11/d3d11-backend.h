@@ -9,21 +9,21 @@
 #include <map>
 #include <vector>
 
-#ifndef NVRHI_D3D11_WITH_NVAPI
-#define NVRHI_D3D11_WITH_NVAPI 0
+#ifndef CAUSTICA_RHI_D3D11_WITH_NVAPI
+#define CAUSTICA_RHI_D3D11_WITH_NVAPI 0
 #endif
 
-#if NVRHI_D3D11_WITH_NVAPI
+#if CAUSTICA_RHI_D3D11_WITH_NVAPI
 #include <nvapi.h>
 #include <nvShaderExtnEnums.h>
 #endif
 
 #include <rhi/common/aftermath.h>
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
 #include <GFSDK_Aftermath.h>
 #endif
 
-namespace nvrhi::d3d11
+namespace caustica::rhi::d3d11
 {
     void SetDebugName(ID3D11DeviceChild* pObject, const char* name);
 
@@ -43,7 +43,7 @@ namespace nvrhi::d3d11
         RefCountPtr<ID3D11Buffer> pushConstantBuffer;
         IMessageCallback* messageCallback = nullptr;
         bool nvapiAvailable = false;
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         GFSDK_Aftermath_ContextHandle aftermathContext = nullptr;
 #endif
 
@@ -94,7 +94,7 @@ namespace nvrhi::d3d11
         
         Buffer(const Context& context) : m_Context(context) { }
         const BufferDesc& getDesc() const override { return desc; }
-        GpuVirtualAddress getGpuVirtualAddress() const override { nvrhi::utils::NotImplemented(); return 0; }
+        GpuVirtualAddress getGpuVirtualAddress() const override { caustica::rhi::utils::NotImplemented(); return 0; }
         Object getNativeObject(ObjectType objectType) override;
 
         ID3D11ShaderResourceView* getSRV(Format format, BufferRange range, ResourceType type);
@@ -317,7 +317,7 @@ namespace nvrhi::d3d11
         void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
         void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, nvrhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
@@ -362,7 +362,7 @@ namespace nvrhi::d3d11
         CommandListParameters m_Desc;
 
         RefCountPtr<ID3DUserDefinedAnnotation> m_UserDefinedAnnotation;
-#if NVRHI_WITH_AFTERMATH
+#if CAUSTICA_RHI_WITH_AFTERMATH
         AftermathMarkerTracker m_AftermathTracker;
 #endif
 
@@ -537,4 +537,4 @@ namespace nvrhi::d3d11
         AftermathCrashDumpHelper m_AftermathCrashDumpHelper;
     };
 
-} // namespace nvrhi::d3d11
+} // namespace caustica::rhi::d3d11

@@ -2,7 +2,7 @@
 
 #include <mutex>
 #include <memory>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
 #include <core/ThreadPool.h>
 #include <unordered_map>
@@ -21,7 +21,7 @@ class ComputePipelineRegistry : public std::enable_shared_from_this<ComputePipel
 {
 public:
     // additionalMonitorPaths: extra directories to monitor for hot reload (in addition to the default ShadersPath)
-    ComputePipelineRegistry(nvrhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
+    ComputePipelineRegistry(caustica::rhi::IDevice* device, const std::vector<std::filesystem::path>& additionalMonitorPaths = {});
     ~ComputePipelineRegistry();
 
     // Register a compute shader for hot reload management
@@ -30,7 +30,7 @@ public:
         const std::string& shaderSourcePath,
         const std::string& entryPoint,
         const std::vector<caustica::ShaderMacro>& macros,
-        const nvrhi::BindingLayoutVector& bindingLayouts,
+        const caustica::rhi::BindingLayoutVector& bindingLayouts,
         const std::string& debugName);
 
     // Release a previously created variant
@@ -49,7 +49,7 @@ public:
 private:
     friend class ComputeShaderVariant;
 
-    nvrhi::DeviceHandle getDevice() const { return m_device; }
+    caustica::rhi::DeviceHandle getDevice() const { return m_device; }
     
     const ShaderCompilerUtils::ShaderCompilerConfig& getCompilerConfig() const { return m_compilerConfig; }
     
@@ -68,7 +68,7 @@ private:
     void enqueueShaderForCompilation(ComputeShaderVariant* variant);
 
 private:
-    nvrhi::DeviceHandle m_device;
+    caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<caustica::RootFileSystem> m_shadersFS;
     
     ShaderCompilerUtils::ShaderCompilerConfig m_compilerConfig;
@@ -104,7 +104,7 @@ public:
 
     // Get the compiled compute pipeline
     // Returns nullptr if pipeline is not yet compiled or compilation failed
-    nvrhi::ComputePipelineHandle getPipeline() const { return m_pipeline; }
+    caustica::rhi::ComputePipelineHandle getPipeline() const { return m_pipeline; }
 
     // Check if the variant needs to be updated (recompiled)
     bool needsUpdate() const;
@@ -122,7 +122,7 @@ private:
         const std::string& shaderSourcePath,
         const std::string& entryPoint,
         const std::vector<caustica::ShaderMacro>& macros,
-        const nvrhi::BindingLayoutVector& bindingLayouts,
+        const caustica::rhi::BindingLayoutVector& bindingLayouts,
         const std::string& debugName,
         const std::shared_ptr<ComputePipelineRegistry>& registry);
 
@@ -146,7 +146,7 @@ private:
     std::filesystem::path m_shaderSrcFileName;
     std::string m_entryPoint;
     std::vector<caustica::ShaderMacro> m_macros;
-    nvrhi::BindingLayoutVector m_bindingLayouts;
+    caustica::rhi::BindingLayoutVector m_bindingLayouts;
     std::string m_debugName;
 
     // Compiled shader info
@@ -157,8 +157,8 @@ private:
     std::string m_compileError;
 
     // Pipeline
-    nvrhi::ShaderHandle m_shader;
-    nvrhi::ComputePipelineHandle m_pipeline;
+    caustica::rhi::ShaderHandle m_shader;
+    caustica::rhi::ComputePipelineHandle m_pipeline;
 
     // Version tracking
     int64_t m_localVersion = -1;

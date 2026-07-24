@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 
 namespace caustica
 {
@@ -9,7 +9,7 @@ namespace caustica
 // When framebuffer is null, the swapchain back buffer is used.
 struct RenderFramebufferOverride
 {
-    nvrhi::IFramebuffer* framebuffer = nullptr;
+    caustica::rhi::IFramebuffer* framebuffer = nullptr;
 };
 
 } // namespace caustica

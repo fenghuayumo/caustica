@@ -48,7 +48,7 @@ namespace
 }
 
 SampleProceduralSky::SampleProceduralSky(
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
     , m_shaderFactory(std::move(shaderFactory))
@@ -101,16 +101,16 @@ void SampleProceduralSky::createLutResources()
     m_aerialPerspectiveBindings = nullptr;
     m_atmosphereLutsValid = false;
 
-    auto makeLut = [&](uint width, uint height, const char* name) -> nvrhi::TextureHandle
+    auto makeLut = [&](uint width, uint height, const char* name) -> caustica::rhi::TextureHandle
     {
-        nvrhi::TextureDesc desc;
+        caustica::rhi::TextureDesc desc;
         desc.width = width;
         desc.height = height;
-        desc.format = nvrhi::Format::RGBA16_FLOAT;
-        desc.dimension = nvrhi::TextureDimension::Texture2D;
+        desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+        desc.dimension = caustica::rhi::TextureDimension::Texture2D;
         desc.debugName = name;
         desc.isUAV = true;
-        desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
         desc.keepInitialState = true;
         return m_device->createTexture(desc);
     };
@@ -120,38 +120,38 @@ void SampleProceduralSky::createLutResources()
     m_skyViewLut = makeLut((uint)SKY_ATM_SKYVIEW_LUT_WIDTH, (uint)SKY_ATM_SKYVIEW_LUT_HEIGHT, "SkyAtm/SkyViewLUT");
     m_blackLut = makeLut(1, 1, "SkyAtm/BlackLUT");
 
-    m_lutConstantBuffer = m_device->createBuffer(nvrhi::utils::CreateVolatileConstantBufferDesc(
+    m_lutConstantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(
         sizeof(SkyAtmosphereLutConstants), "SkyAtm/LutConstants", caustica::c_MaxRenderPassConstantBufferVersions * 4));
 
     {
-        nvrhi::SamplerDesc samplerDesc;
+        caustica::rhi::SamplerDesc samplerDesc;
         samplerDesc.setAllFilters(true);
-        samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Clamp);
+        samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Clamp);
         m_linearClampSampler = m_device->createSampler(samplerDesc);
     }
 
     m_transmittanceCS = m_shaderFactory->createShader(
-        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "TransmittanceLutCS", nullptr, nvrhi::ShaderType::Compute);
+        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "TransmittanceLutCS", nullptr, caustica::rhi::ShaderType::Compute);
     m_multiScattCS = m_shaderFactory->createShader(
-        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "MultiScattCS", nullptr, nvrhi::ShaderType::Compute);
+        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "MultiScattCS", nullptr, caustica::rhi::ShaderType::Compute);
     m_skyViewCS = m_shaderFactory->createShader(
-        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "SkyViewLutCS", nullptr, nvrhi::ShaderType::Compute);
+        "caustica/shaders/render/lighting/distant/SkyAtmosphereLUTs.hlsl", "SkyViewLutCS", nullptr, caustica::rhi::ShaderType::Compute);
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::Texture_SRV(2),
-            nvrhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(2),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
         };
         m_lutBindingLayout = m_device->createBindingLayout(layoutDesc);
     }
 
-    nvrhi::ComputePipelineDesc psoDesc;
+    caustica::rhi::ComputePipelineDesc psoDesc;
     psoDesc.bindingLayouts = { m_lutBindingLayout };
     psoDesc.CS = m_transmittanceCS;
     m_transmittancePSO = m_device->createComputePipeline(psoDesc);
@@ -161,7 +161,7 @@ void SampleProceduralSky::createLutResources()
     m_skyViewPSO = m_device->createComputePipeline(psoDesc);
 
     m_aerialPerspectiveConstantBuffer = m_device->createBuffer(
-        nvrhi::utils::CreateVolatileConstantBufferDesc(
+        caustica::rhi::utils::CreateVolatileConstantBufferDesc(
             sizeof(AerialPerspectiveConstants),
             "SkyAtm/AerialPerspectiveConstants",
             caustica::c_MaxRenderPassConstantBufferVersions));
@@ -170,18 +170,18 @@ void SampleProceduralSky::createLutResources()
         "caustica/shaders/render/lighting/distant/AerialPerspective.hlsl",
         "AerialPerspectiveCS",
         nullptr,
-        nvrhi::ShaderType::Compute);
+        caustica::rhi::ShaderType::Compute);
 
     {
-        nvrhi::BindingLayoutDesc layoutDesc;
-        layoutDesc.visibility = nvrhi::ShaderType::Compute;
+        caustica::rhi::BindingLayoutDesc layoutDesc;
+        layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
         layoutDesc.bindings = {
-            nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-            nvrhi::BindingLayoutItem::Texture_UAV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(0),
-            nvrhi::BindingLayoutItem::Texture_SRV(1),
-            nvrhi::BindingLayoutItem::Texture_SRV(2),
-            nvrhi::BindingLayoutItem::Sampler(0),
+            caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+            caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(1),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(2),
+            caustica::rhi::BindingLayoutItem::Sampler(0),
         };
         m_aerialPerspectiveBindingLayout = m_device->createBindingLayout(layoutDesc);
     }
@@ -216,7 +216,7 @@ void SampleProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
 }
 
 void SampleProceduralSky::dispatchLutPasses(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     const ProceduralSkyConstants& consts,
     bool rebuildAtmosphereLuts,
     bool rebuildSkyView)
@@ -233,19 +233,19 @@ void SampleProceduralSky::dispatchLutPasses(
     lutConsts.SkyViewLutHeight = (uint)SKY_ATM_SKYVIEW_LUT_HEIGHT;
     commandList->writeBuffer(m_lutConstantBuffer, &lutConsts, sizeof(lutConsts));
 
-    auto ensureBindings = [&](nvrhi::BindingSetHandle& cached,
-        nvrhi::TextureHandle uav, nvrhi::TextureHandle srv0, nvrhi::TextureHandle srv1) -> nvrhi::BindingSetHandle
+    auto ensureBindings = [&](caustica::rhi::BindingSetHandle& cached,
+        caustica::rhi::TextureHandle uav, caustica::rhi::TextureHandle srv0, caustica::rhi::TextureHandle srv1) -> caustica::rhi::BindingSetHandle
     {
         if (!cached)
         {
-            nvrhi::BindingSetDesc setDesc;
+            caustica::rhi::BindingSetDesc setDesc;
             setDesc.bindings = {
-                nvrhi::BindingSetItem::ConstantBuffer(0, m_lutConstantBuffer),
-                nvrhi::BindingSetItem::Texture_UAV(0, uav),
-                nvrhi::BindingSetItem::Texture_SRV(0, srv0),
-                nvrhi::BindingSetItem::Texture_SRV(1, srv1),
-                nvrhi::BindingSetItem::Texture_SRV(2, m_blackLut),
-                nvrhi::BindingSetItem::Sampler(0, m_linearClampSampler),
+                caustica::rhi::BindingSetItem::ConstantBuffer(0, m_lutConstantBuffer),
+                caustica::rhi::BindingSetItem::Texture_UAV(0, uav),
+                caustica::rhi::BindingSetItem::Texture_SRV(0, srv0),
+                caustica::rhi::BindingSetItem::Texture_SRV(1, srv1),
+                caustica::rhi::BindingSetItem::Texture_SRV(2, m_blackLut),
+                caustica::rhi::BindingSetItem::Sampler(0, m_linearClampSampler),
             };
             cached = m_device->createBindingSet(setDesc, m_lutBindingLayout);
         }
@@ -256,9 +256,9 @@ void SampleProceduralSky::dispatchLutPasses(
     {
         {
             RAII_SCOPE(commandList->beginMarker("SkyAtm/TransmittanceLUT");, commandList->endMarker(););
-            nvrhi::BindingSetHandle transmittanceBindings =
+            caustica::rhi::BindingSetHandle transmittanceBindings =
                 ensureBindings(m_transmittanceBindings, m_transmittanceLut, m_blackLut, m_blackLut);
-            nvrhi::ComputeState state;
+            caustica::rhi::ComputeState state;
             state.bindings = { transmittanceBindings };
             state.pipeline = m_transmittancePSO;
             commandList->setComputeState(state);
@@ -266,19 +266,19 @@ void SampleProceduralSky::dispatchLutPasses(
                 (lutConsts.TransmittanceLutWidth + 7) / 8,
                 (lutConsts.TransmittanceLutHeight + 7) / 8,
                 1);
-            commandList->setTextureState(m_transmittanceLut, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(m_transmittanceLut, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
 
         {
             RAII_SCOPE(commandList->beginMarker("SkyAtm/MultiScatteringLUT");, commandList->endMarker(););
-            nvrhi::BindingSetHandle multiScatBindings =
+            caustica::rhi::BindingSetHandle multiScatBindings =
                 ensureBindings(m_multiScatBindings, m_multiScatLut, m_transmittanceLut, m_blackLut);
-            nvrhi::ComputeState state;
+            caustica::rhi::ComputeState state;
             state.bindings = { multiScatBindings };
             state.pipeline = m_multiScattPSO;
             commandList->setComputeState(state);
             commandList->dispatch((uint)SKY_ATM_MULTISCAT_LUT_RES, (uint)SKY_ATM_MULTISCAT_LUT_RES, 1);
-            commandList->setTextureState(m_multiScatLut, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(m_multiScatLut, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
 
         m_atmosphereLutsValid = true;
@@ -288,9 +288,9 @@ void SampleProceduralSky::dispatchLutPasses(
     if (rebuildSkyView)
     {
         RAII_SCOPE(commandList->beginMarker("SkyAtm/SkyViewLUT");, commandList->endMarker(););
-        nvrhi::BindingSetHandle skyViewBindings =
+        caustica::rhi::BindingSetHandle skyViewBindings =
             ensureBindings(m_skyViewBindings, m_skyViewLut, m_transmittanceLut, m_multiScatLut);
-        nvrhi::ComputeState state;
+        caustica::rhi::ComputeState state;
         state.bindings = { skyViewBindings };
         state.pipeline = m_skyViewPSO;
         commandList->setComputeState(state);
@@ -298,7 +298,7 @@ void SampleProceduralSky::dispatchLutPasses(
             (lutConsts.SkyViewLutWidth + 7) / 8,
             (lutConsts.SkyViewLutHeight + 7) / 8,
             1);
-        commandList->setTextureState(m_skyViewLut, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(m_skyViewLut, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
 
         m_lastSunDir = consts.SunDir;
         m_lastSunIlluminance = consts.SunIlluminance;
@@ -307,9 +307,9 @@ void SampleProceduralSky::dispatchLutPasses(
 }
 
 void SampleProceduralSky::applyAerialPerspective(
-    nvrhi::ICommandList* commandList,
-    nvrhi::ITexture* color,
-    nvrhi::ITexture* depth,
+    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::ITexture* color,
+    caustica::rhi::ITexture* depth,
     const caustica::IView& view,
     uint width,
     uint height,
@@ -338,14 +338,14 @@ void SampleProceduralSky::applyAerialPerspective(
     constants.SampleCount = (uint)dm::clamp(m_aerialPerspectiveSampleCount, 1, 64);
     commandList->writeBuffer(m_aerialPerspectiveConstantBuffer, &constants, sizeof(constants));
 
-    nvrhi::BindingSetDesc bindingSetDesc;
+    caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_aerialPerspectiveConstantBuffer),
-        nvrhi::BindingSetItem::Texture_UAV(0, color),
-        nvrhi::BindingSetItem::Texture_SRV(0, depth),
-        nvrhi::BindingSetItem::Texture_SRV(1, m_transmittanceLut),
-        nvrhi::BindingSetItem::Texture_SRV(2, m_multiScatLut),
-        nvrhi::BindingSetItem::Sampler(0, m_linearClampSampler),
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, m_aerialPerspectiveConstantBuffer),
+        caustica::rhi::BindingSetItem::Texture_UAV(0, color),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, depth),
+        caustica::rhi::BindingSetItem::Texture_SRV(1, m_transmittanceLut),
+        caustica::rhi::BindingSetItem::Texture_SRV(2, m_multiScatLut),
+        caustica::rhi::BindingSetItem::Sampler(0, m_linearClampSampler),
     };
 
     // color/depth can change with resolution or render-target swaps; recreate only then.
@@ -357,7 +357,7 @@ void SampleProceduralSky::applyAerialPerspective(
     if (needNewBindings)
         m_aerialPerspectiveBindings = m_device->createBindingSet(bindingSetDesc, m_aerialPerspectiveBindingLayout);
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.bindings = { m_aerialPerspectiveBindings };
     state.pipeline = m_aerialPerspectivePSO;
     commandList->setComputeState(state);
@@ -365,7 +365,7 @@ void SampleProceduralSky::applyAerialPerspective(
 }
 
 bool SampleProceduralSky::update(
-    nvrhi::ICommandList* commandList,
+    caustica::rhi::ICommandList* commandList,
     double sceneTime,
     ProceduralSkyConstants& outConstants,
     const std::string& presetType,

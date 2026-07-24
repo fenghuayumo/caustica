@@ -28,12 +28,12 @@ set(third_party_folder "Third-Party Libraries")
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-if (CAUSTICA_WITH_NVRHI AND NOT TARGET imgui)
+if (CAUSTICA_WITH_RHI AND NOT TARGET imgui)
     include(imgui.cmake)
     set_target_properties(imgui PROPERTIES FOLDER ${third_party_folder})
 endif()
 
-if (CAUSTICA_WITH_NVRHI AND NOT TARGET imguizmo)
+if (CAUSTICA_WITH_RHI AND NOT TARGET imguizmo)
     include(imguizmo.cmake)
     set_target_properties(imguizmo PROPERTIES FOLDER ${third_party_folder})
 endif()
@@ -68,7 +68,7 @@ if (CAUSTICA_WITH_TINYEXR AND NOT TARGET tinyexr)
     target_include_directories(tinyexr INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyexr)
 endif()
 
-if (CAUSTICA_WITH_NVRHI AND NOT TARGET glfw)
+if (CAUSTICA_WITH_RHI AND NOT TARGET glfw)
     option(GLFW_BUILD_EXAMPLES "" OFF)
     option(GLFW_BUILD_TESTS "" OFF)
     option(GLFW_BUILD_DOCS "" OFF)
@@ -90,8 +90,8 @@ if (NOT TARGET ShaderMake)
     add_subdirectory(ShaderMake)
 endif()
 
-if (CAUSTICA_WITH_NVRHI)
-    # NVRHI backend (nvrhi target + causticaRhi wrappers) is now built from
+if (CAUSTICA_WITH_RHI)
+    # Caustica RHI is now built from
     # caustica/backend, which is added before External in the root CMakeLists.
     set(CAUSTICA_SHADER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica" CACHE PATH "" FORCE)
 

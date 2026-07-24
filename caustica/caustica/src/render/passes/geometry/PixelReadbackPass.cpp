@@ -21,10 +21,10 @@ using namespace caustica;
 using namespace caustica::render;
 
 PixelReadbackPass::PixelReadbackPass(
-    nvrhi::IDevice* device, 
+    caustica::rhi::IDevice* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
-    nvrhi::ITexture* inputTexture, 
-    nvrhi::Format format,
+    caustica::rhi::ITexture* inputTexture, 
+    caustica::rhi::Format format,
     uint32_t arraySlice,
     uint32_t mipLevel)
     : m_device(device)
@@ -32,33 +32,33 @@ PixelReadbackPass::PixelReadbackPass(
     const char* formatName = "";
     switch (format)
     {
-    case nvrhi::Format::RGBA32_FLOAT: formatName = "float4"; break;
-    case nvrhi::Format::RGBA32_UINT: formatName = "uint4"; break;
-    case nvrhi::Format::RGBA32_SINT: formatName = "int4"; break;
+    case caustica::rhi::Format::RGBA32_FLOAT: formatName = "float4"; break;
+    case caustica::rhi::Format::RGBA32_UINT: formatName = "uint4"; break;
+    case caustica::rhi::Format::RGBA32_SINT: formatName = "int4"; break;
     default: assert(!"unsupported readback format");
     }
 
     std::vector<ShaderMacro> macros;
     macros.push_back(ShaderMacro("TYPE", formatName));
     macros.push_back(ShaderMacro("INPUT_MSAA", inputTexture->getDesc().sampleCount > 1 ? "1" : "0"));
-    m_Shader = shaderFactory->createAutoShader("engine/passes/pixel_readback_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_pixel_readback_cs), &macros, nvrhi::ShaderType::Compute);
+    m_Shader = shaderFactory->createAutoShader("engine/passes/pixel_readback_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_pixel_readback_cs), &macros, caustica::rhi::ShaderType::Compute);
 
-    nvrhi::BufferDesc bufferDesc;
+    caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = 16;
     bufferDesc.format = format;
     bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = nvrhi::ResourceStates::CopySource;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::CopySource;
     bufferDesc.keepInitialState = true;
     bufferDesc.debugName = "PixelReadbackPass/IntermediateBuffer";
     bufferDesc.canHaveTypedViews = true;
     m_IntermediateBuffer = m_device->createBuffer(bufferDesc);
 
     bufferDesc.canHaveUAVs = false;
-    bufferDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
+    bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
     bufferDesc.debugName = "PixelReadbackPass/ReadbackBuffer";
     m_ReadbackBuffer = m_device->createBuffer(bufferDesc);
 
-    nvrhi::BufferDesc constantBufferDesc;
+    caustica::rhi::BufferDesc constantBufferDesc;
     constantBufferDesc.byteSize = sizeof(PixelReadbackConstants);
     constantBufferDesc.isConstantBuffer = true;
     constantBufferDesc.isVolatile = true;
@@ -66,39 +66,39 @@ PixelReadbackPass::PixelReadbackPass(
     constantBufferDesc.maxVersions = caustica::c_MaxRenderPassConstantBufferVersions;
     m_ConstantBuffer = m_device->createBuffer(constantBufferDesc);
 
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    caustica::rhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     layoutDesc.bindings = { 
-        nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
-        nvrhi::BindingLayoutItem::Texture_SRV(0),
-        nvrhi::BindingLayoutItem::TypedBuffer_UAV(0)
+        caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0),
+        caustica::rhi::BindingLayoutItem::Texture_SRV(0),
+        caustica::rhi::BindingLayoutItem::TypedBuffer_UAV(0)
     };
 
     m_BindingLayout = m_device->createBindingLayout(layoutDesc);
 
-    nvrhi::BindingSetDesc setDesc;
+    caustica::rhi::BindingSetDesc setDesc;
     setDesc.bindings = {
-        nvrhi::BindingSetItem::ConstantBuffer(0, m_ConstantBuffer),
-        nvrhi::BindingSetItem::Texture_SRV(0, inputTexture, nvrhi::Format::UNKNOWN, nvrhi::TextureSubresourceSet(mipLevel, 1, arraySlice, 1)),
-        nvrhi::BindingSetItem::TypedBuffer_UAV(0, m_IntermediateBuffer)
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, m_ConstantBuffer),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, inputTexture, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(mipLevel, 1, arraySlice, 1)),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_IntermediateBuffer)
     };
 
     m_BindingSet = m_device->createBindingSet(setDesc, m_BindingLayout);
 
-    nvrhi::ComputePipelineDesc pipelineDesc;
+    caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { m_BindingLayout };
     pipelineDesc.CS = m_Shader;
     m_Pipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
 
-void PixelReadbackPass::capture(nvrhi::ICommandList* commandList, dm::uint2 pixelPosition)
+void PixelReadbackPass::capture(caustica::rhi::ICommandList* commandList, dm::uint2 pixelPosition)
 {
     PixelReadbackConstants constants = {};
     constants.pixelPosition = dm::int2(pixelPosition);
     commandList->writeBuffer(m_ConstantBuffer, &constants, sizeof(constants));
 
-    nvrhi::ComputeState state;
+    caustica::rhi::ComputeState state;
     state.pipeline = m_Pipeline;
     state.bindings = { m_BindingSet };
     commandList->setComputeState(state);
@@ -109,7 +109,7 @@ void PixelReadbackPass::capture(nvrhi::ICommandList* commandList, dm::uint2 pixe
 
 dm::float4 PixelReadbackPass::readFloats()
 {
-    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);
 
     float4 values = *static_cast<float4*>(pData);
@@ -120,7 +120,7 @@ dm::float4 PixelReadbackPass::readFloats()
 
 dm::uint4 PixelReadbackPass::readUInts()
 {
-    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);
 
     uint4 values = *static_cast<uint4*>(pData);
@@ -131,7 +131,7 @@ dm::uint4 PixelReadbackPass::readUInts()
 
 dm::int4 PixelReadbackPass::readInts()
 {
-    void* pData = m_device->mapBuffer(m_ReadbackBuffer, nvrhi::CpuAccessMode::Read);
+    void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);
 
     int4 values = *static_cast<int4*>(pData);

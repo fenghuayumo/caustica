@@ -51,27 +51,27 @@ namespace
         return std::isfinite(value) ? std::max(value, 0.0f) : 0.0f;
     }
 
-    nvrhi::TextureDesc makeReadbackTextureDesc(nvrhi::TextureDesc desc, const char* debugName)
+    caustica::rhi::TextureDesc makeReadbackTextureDesc(caustica::rhi::TextureDesc desc, const char* debugName)
     {
         desc.debugName = debugName;
         desc.isRenderTarget = false;
         desc.isUAV = false;
         desc.isTypeless = false;
-        desc.initialState = nvrhi::ResourceStates::CopyDest;
+        desc.initialState = caustica::rhi::ResourceStates::CopyDest;
         desc.keepInitialState = true;
         return desc;
     }
 
     void readR11G11B10Float3Staging(
-        nvrhi::IDevice* device,
-        nvrhi::IStagingTexture* stagingTexture,
+        caustica::rhi::IDevice* device,
+        caustica::rhi::IStagingTexture* stagingTexture,
         uint32_t width,
         uint32_t height,
         std::vector<float>& output)
     {
         size_t rowPitch = 0;
         const uint8_t* mappedData = static_cast<const uint8_t*>(device->mapStagingTexture(
-            stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+            stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
         if (mappedData == nullptr)
             return;
 
@@ -93,15 +93,15 @@ namespace
     }
 
     void readRGBA16Float3Staging(
-        nvrhi::IDevice* device,
-        nvrhi::IStagingTexture* stagingTexture,
+        caustica::rhi::IDevice* device,
+        caustica::rhi::IStagingTexture* stagingTexture,
         uint32_t width,
         uint32_t height,
         std::vector<float>& output)
     {
         size_t rowPitch = 0;
         const uint8_t* mappedData = static_cast<const uint8_t*>(device->mapStagingTexture(
-            stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+            stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
         if (mappedData == nullptr)
             return;
 
@@ -126,11 +126,11 @@ namespace
 
 void DenoisePass::createGuides(
     PathTracingContext* context,
-    nvrhi::IDevice* device,
+    caustica::rhi::IDevice* device,
     const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
     const std::unique_ptr<RenderTargets>& renderTargets,
     const std::shared_ptr<ShaderDebug>& shaderDebug,
-    nvrhi::BindingLayoutHandle bindingLayout)
+    caustica::rhi::BindingLayoutHandle bindingLayout)
 {
     m_context = context;
     m_device = device;
@@ -169,7 +169,7 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 #endif
 }
 
-void DenoisePass::denoiseSpecHitT(nvrhi::ICommandList* commandList)
+void DenoisePass::denoiseSpecHitT(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
@@ -178,7 +178,7 @@ void DenoisePass::denoiseSpecHitT(nvrhi::ICommandList* commandList)
     m_denoisingGuidesPass->denoiseSpecHitT(commandList, m_bindingSet);
 }
 
-void DenoisePass::computeAvgLayerRadiance(nvrhi::ICommandList* commandList)
+void DenoisePass::computeAvgLayerRadiance(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_denoisingGuidesPass);
@@ -194,7 +194,7 @@ void DenoisePass::computeAvgLayerRadiance(nvrhi::ICommandList* commandList)
             m_bindingSet);
 }
 
-void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
+void DenoisePass::prepareGuides(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
 
@@ -204,7 +204,7 @@ void DenoisePass::prepareGuides(nvrhi::ICommandList* commandList)
     computeAvgLayerRadiance(commandList);
 }
 
-void DenoisePass::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
+void DenoisePass::stablePlanesDebugViz(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_postProcess);
@@ -213,7 +213,7 @@ void DenoisePass::stablePlanesDebugViz(nvrhi::ICommandList* commandList)
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     commandList->beginMarker("StablePlanesDebugViz");
-    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+    caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
     m_postProcess->apply(
         commandList,
         PostProcess::ComputePassType::StablePlanesDebugViz,
@@ -262,7 +262,7 @@ SampleMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings
 
 } // namespace
 
-void DenoisePass::prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::prepareNrdInputs(caustica::rhi::ICommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -279,7 +279,7 @@ void DenoisePass::prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIn
         : PostProcess::ComputePassType::REBLURDenoiserPrepareInputs;
 
     SampleMiniConstants miniConstants = makeNrdPlaneMiniConstants(m_context->activeSettings(), planeIndex);
-    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+    caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
 
     commandList->beginMarker("PrepareInputs");
     m_postProcess->apply(
@@ -294,7 +294,7 @@ void DenoisePass::prepareNrdInputs(nvrhi::ICommandList* commandList, int planeIn
     commandList->endMarker();
 }
 
-void DenoisePass::runNrd(nvrhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::runNrd(caustica::rhi::ICommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -349,7 +349,7 @@ void DenoisePass::runNrd(nvrhi::ICommandList* commandList, int planeIndex)
     commandList->endMarker();
 }
 
-void DenoisePass::mergeNrdOutputs(nvrhi::ICommandList* commandList, int planeIndex)
+void DenoisePass::mergeNrdOutputs(caustica::rhi::ICommandList* commandList, int planeIndex)
 {
     assert(commandList);
     assert(m_context);
@@ -381,8 +381,8 @@ void DenoisePass::mergeNrdOutputs(nvrhi::ICommandList* commandList, int planeInd
 }
 
 void DenoisePass::denoiseStablePlane(
-    nvrhi::ICommandList* commandList,
-    nvrhi::IFramebuffer* framebuffer,
+    caustica::rhi::ICommandList* commandList,
+    caustica::rhi::IFramebuffer* framebuffer,
     int planeIndex)
 {
     (void)framebuffer;
@@ -403,7 +403,7 @@ void DenoisePass::denoiseStablePlane(
     commandList->endMarker();
 }
 
-void DenoisePass::denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer* framebuffer)
+void DenoisePass::denoise(caustica::rhi::ICommandList* commandList, caustica::rhi::IFramebuffer* framebuffer)
 {
     assert(m_context);
 
@@ -419,7 +419,7 @@ void DenoisePass::denoise(nvrhi::ICommandList* commandList, nvrhi::IFramebuffer*
         denoiseStablePlane(commandList, framebuffer, pass);
 }
 
-void DenoisePass::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
+void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::ICommandList* commandList)
 {
     assert(commandList);
     assert(m_context);
@@ -435,7 +435,7 @@ void DenoisePass::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
         return;
 
     SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-    nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+    caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
     commandList->beginMarker("NoDenoiserFinalMerge");
     m_postProcess->apply(
         commandList,
@@ -450,7 +450,7 @@ void DenoisePass::runNoDenoiserFinalMerge(nvrhi::ICommandList* commandList)
 }
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool reset)
+bool DenoisePass::evaluateNativeDLSS(caustica::rhi::ICommandList* commandList, bool reset)
 {
     assert(commandList);
     assert(m_context);
@@ -472,7 +472,7 @@ bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool rese
         RAII_SCOPE(commandList->beginMarker("DLSSRR_PrepareInputs");, commandList->endMarker(););
 
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+        caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
         m_postProcess->apply(
             commandList,
             PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs,
@@ -536,7 +536,7 @@ bool DenoisePass::evaluateNativeDLSS(nvrhi::ICommandList* commandList, bool rese
 }
 #endif
 
-void DenoisePass::runDlssUpscale(nvrhi::ICommandList* commandList, bool reset)
+void DenoisePass::runDlssUpscale(caustica::rhi::ICommandList* commandList, bool reset)
 {
     assert(commandList);
     assert(m_context);
@@ -589,13 +589,13 @@ void DenoisePass::runDlssUpscale(nvrhi::ICommandList* commandList, bool reset)
             if (m_context->activeSettings().actualUseStandaloneDenoiser())
             {
                 commandList->copyTexture(
-                    m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
-                    m_renderTargets->outputColor, nvrhi::TextureSlice());
+                    m_renderTargets->processedOutputColor, caustica::rhi::TextureSlice(),
+                    m_renderTargets->outputColor, caustica::rhi::TextureSlice());
             }
             else
             {
                 SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-                nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+                caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
                 commandList->beginMarker("NoDenoiserFinalMerge");
                 m_postProcess->apply(
                     commandList,
@@ -640,7 +640,7 @@ void DenoisePass::resetReferenceOIDN()
         m_oidnDenoiser->reset();
 }
 
-void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
+void DenoisePass::applyReferenceOIDN(caustica::rhi::ICommandList* commandList)
 {
     assert(m_context);
     assert(commandList);
@@ -651,7 +651,7 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
         return;
 
 #if CAUSTICA_WITH_OIDN
-    nvrhi::IDevice* device = m_device;
+    caustica::rhi::IDevice* device = m_device;
     assert(device);
 
     const bool accumulationReady = m_accumulationCompleted
@@ -662,15 +662,15 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
     if (m_oidnDenoiserFailed)
         return;
 
-    const nvrhi::TextureDesc processedDesc = m_renderTargets->processedOutputColor->getDesc();
+    const caustica::rhi::TextureDesc processedDesc = m_renderTargets->processedOutputColor->getDesc();
     if (m_oidnDenoisedOutput == nullptr
         || m_oidnDenoisedOutput->getDesc().width != processedDesc.width
         || m_oidnDenoisedOutput->getDesc().height != processedDesc.height
         || m_oidnDenoisedOutput->getDesc().format != processedDesc.format)
     {
-        nvrhi::TextureDesc oidnOutputDesc = processedDesc;
+        caustica::rhi::TextureDesc oidnOutputDesc = processedDesc;
         oidnOutputDesc.debugName = "ReferenceOIDNDenoisedOutput";
-        oidnOutputDesc.initialState = nvrhi::ResourceStates::CopySource;
+        oidnOutputDesc.initialState = caustica::rhi::ResourceStates::CopySource;
         oidnOutputDesc.keepInitialState = true;
         m_oidnDenoisedOutput = device->createTexture(oidnOutputDesc);
         m_oidnDenoisedOutputValid = false;
@@ -679,18 +679,18 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
     if (m_oidnDenoisedOutputValid)
     {
         commandList->copyTexture(
-            m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
-            m_oidnDenoisedOutput, nvrhi::TextureSlice());
+            m_renderTargets->processedOutputColor, caustica::rhi::TextureSlice(),
+            m_oidnDenoisedOutput, caustica::rhi::TextureSlice());
         return;
     }
 
-    nvrhi::ITexture* sourceTexture = m_renderTargets->accumulatedRadiance;
-    nvrhi::TextureDesc sourceDesc = sourceTexture->getDesc();
-    if (sourceDesc.format != nvrhi::Format::RGBA32_FLOAT)
+    caustica::rhi::ITexture* sourceTexture = m_renderTargets->accumulatedRadiance;
+    caustica::rhi::TextureDesc sourceDesc = sourceTexture->getDesc();
+    if (sourceDesc.format != caustica::rhi::Format::RGBA32_FLOAT)
     {
         caustica::warning(
             "OIDN reference denoiser expected RGBA32_FLOAT accumulation buffer, got %s.",
-            nvrhi::utils::FormatToString(sourceDesc.format));
+            caustica::rhi::utils::FormatToString(sourceDesc.format));
         m_oidnDenoiserFailed = true;
         return;
     }
@@ -713,7 +713,7 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
     if (requestAlbedoGuide || requestNormalGuide)
     {
         SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-        nvrhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
+        caustica::rhi::TextureDesc tdesc = m_renderTargets->outputColor->getDesc();
         commandList->beginMarker("OIDN_PrepareGuides");
         m_postProcess->apply(
             commandList,
@@ -727,9 +727,9 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
         commandList->endMarker();
     }
 
-    nvrhi::StagingTextureHandle stagingTexture = device->createStagingTexture(
+    caustica::rhi::StagingTextureHandle stagingTexture = device->createStagingTexture(
         makeReadbackTextureDesc(sourceDesc, "ReferenceOIDN AccumulatedRadiance Readback"),
-        nvrhi::CpuAccessMode::Read);
+        caustica::rhi::CpuAccessMode::Read);
     if (stagingTexture == nullptr)
     {
         caustica::warning("OIDN reference denoiser failed to create a staging texture.");
@@ -737,19 +737,19 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
         return;
     }
 
-    nvrhi::StagingTextureHandle albedoStagingTexture;
-    nvrhi::StagingTextureHandle normalStagingTexture;
+    caustica::rhi::StagingTextureHandle albedoStagingTexture;
+    caustica::rhi::StagingTextureHandle normalStagingTexture;
     if (requestAlbedoGuide && m_renderTargets->rrDiffuseAlbedo != nullptr)
     {
         albedoStagingTexture = device->createStagingTexture(
             makeReadbackTextureDesc(
                 m_renderTargets->rrDiffuseAlbedo->getDesc(),
                 "ReferenceOIDN Albedo Readback"),
-            nvrhi::CpuAccessMode::Read);
+            caustica::rhi::CpuAccessMode::Read);
         if (albedoStagingTexture != nullptr)
             commandList->copyTexture(
-                albedoStagingTexture, nvrhi::TextureSlice(),
-                m_renderTargets->rrDiffuseAlbedo, nvrhi::TextureSlice());
+                albedoStagingTexture, caustica::rhi::TextureSlice(),
+                m_renderTargets->rrDiffuseAlbedo, caustica::rhi::TextureSlice());
     }
     if (requestNormalGuide && m_renderTargets->rrNormalsAndRoughness != nullptr)
     {
@@ -757,14 +757,14 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
             makeReadbackTextureDesc(
                 m_renderTargets->rrNormalsAndRoughness->getDesc(),
                 "ReferenceOIDN Normal Readback"),
-            nvrhi::CpuAccessMode::Read);
+            caustica::rhi::CpuAccessMode::Read);
         if (normalStagingTexture != nullptr)
             commandList->copyTexture(
-                normalStagingTexture, nvrhi::TextureSlice(),
-                m_renderTargets->rrNormalsAndRoughness, nvrhi::TextureSlice());
+                normalStagingTexture, caustica::rhi::TextureSlice(),
+                m_renderTargets->rrNormalsAndRoughness, caustica::rhi::TextureSlice());
     }
 
-    commandList->copyTexture(stagingTexture, nvrhi::TextureSlice(), sourceTexture, nvrhi::TextureSlice());
+    commandList->copyTexture(stagingTexture, caustica::rhi::TextureSlice(), sourceTexture, caustica::rhi::TextureSlice());
     commandList->close();
     device->executeCommandList(commandList);
     if (!device->waitForIdle())
@@ -777,7 +777,7 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
 
     size_t rowPitch = 0;
     const uint8_t* mappedData = static_cast<const uint8_t*>(device->mapStagingTexture(
-        stagingTexture, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch));
+        stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
     if (mappedData == nullptr)
     {
         commandList->open();
@@ -848,8 +848,8 @@ void DenoisePass::applyReferenceOIDN(nvrhi::ICommandList* commandList)
 
     commandList->writeTexture(m_oidnDenoisedOutput, 0, 0, outputHalf.data(), size_t(width) * sizeof(float16_t4));
     commandList->copyTexture(
-        m_renderTargets->processedOutputColor, nvrhi::TextureSlice(),
-        m_oidnDenoisedOutput, nvrhi::TextureSlice());
+        m_renderTargets->processedOutputColor, caustica::rhi::TextureSlice(),
+        m_oidnDenoisedOutput, caustica::rhi::TextureSlice());
     m_oidnDenoisedOutputValid = true;
 
     caustica::info(

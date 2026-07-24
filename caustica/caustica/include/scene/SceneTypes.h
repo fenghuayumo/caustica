@@ -6,7 +6,7 @@
 #include <assets/TypedAssets.h>
 #include <scene/SceneRenderResourceIds.h>
 #include <shaders/light_types.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -44,7 +44,7 @@ namespace caustica
         Count
     };
 
-    nvrhi::VertexAttributeDesc getVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex);
+    caustica::rhi::VertexAttributeDesc getVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex);
 
 
     struct SceneLoadingStats
@@ -239,7 +239,7 @@ namespace caustica
         }
     };
 
-    inline nvrhi::IBuffer* bufferOrFallback(nvrhi::IBuffer* primary, nvrhi::IBuffer* secondary)
+    inline caustica::rhi::IBuffer* bufferOrFallback(caustica::rhi::IBuffer* primary, caustica::rhi::IBuffer* secondary)
     {
         return primary ? primary : secondary;
     }

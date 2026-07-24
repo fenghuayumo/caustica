@@ -2,7 +2,7 @@
 
 #include <rhi/common/misc.h>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
     TimerQuery::~TimerQuery()
     {
@@ -198,4 +198,4 @@ namespace nvrhi::d3d12
     }
 
 
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

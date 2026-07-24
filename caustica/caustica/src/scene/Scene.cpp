@@ -566,7 +566,7 @@ void Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent compon
 }
 
 Scene::Scene(
-    nvrhi::IDevice* /*device*/,
+    caustica::rhi::IDevice* /*device*/,
     ShaderFactory& /*shaderFactory*/,
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<TextureLoader> textureCache,

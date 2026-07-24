@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <sstream>
 
-namespace nvrhi::d3d12
+namespace caustica::rhi::d3d12
 {
 
     BufferChunk::~BufferChunk()
@@ -271,4 +271,4 @@ namespace nvrhi::d3d12
             }
         }
     }
-} // namespace nvrhi::d3d12
+} // namespace caustica::rhi::d3d12

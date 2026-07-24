@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render/graph/GraphBuilder.h>
-#include <rhi/nvrhi.h>
+#include <rhi/rhi.h>
 #include <memory>
 #include <unordered_map>
 
@@ -22,48 +22,48 @@ namespace caustica::render
         caustica::render::RenderDevice& m_renderDevice;
         std::shared_ptr<caustica::FramebufferFactory> m_FramebufferFactory;
 
-        nvrhi::DeviceHandle m_device;
+        caustica::rhi::DeviceHandle m_device;
 
         struct PerViewData
         {
-            nvrhi::GraphicsPipelineHandle bloomBlurPso;
-            nvrhi::Format                 psoColorFormat = nvrhi::Format::UNKNOWN;
+            caustica::rhi::GraphicsPipelineHandle bloomBlurPso;
+            caustica::rhi::Format                 psoColorFormat = caustica::rhi::Format::UNKNOWN;
         };
 
         std::vector<PerViewData> m_PerViewData;
-        nvrhi::BufferHandle m_BloomHBlurCB;
-        nvrhi::BufferHandle m_BloomVBlurCB;
-        nvrhi::ShaderHandle m_BloomBlurPixelShader;
-        nvrhi::BindingLayoutHandle m_BloomBlurBindingLayout;
-        nvrhi::BindingLayoutHandle m_BloomApplyBindingLayout;
+        caustica::rhi::BufferHandle m_BloomHBlurCB;
+        caustica::rhi::BufferHandle m_BloomVBlurCB;
+        caustica::rhi::ShaderHandle m_BloomBlurPixelShader;
+        caustica::rhi::BindingLayoutHandle m_BloomBlurBindingLayout;
+        caustica::rhi::BindingLayoutHandle m_BloomApplyBindingLayout;
 
-        void ensureBlurPso(uint32_t viewIndex, nvrhi::IFramebuffer* framebuffer);
+        void ensureBlurPso(uint32_t viewIndex, caustica::rhi::IFramebuffer* framebuffer);
 
         void renderInternal(
-            nvrhi::ICommandList* commandList,
+            caustica::rhi::ICommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView,
-            nvrhi::ITexture* sourceDestTexture,
-            nvrhi::ITexture* textureDownscale1,
-            nvrhi::ITexture* textureDownscale2,
-            nvrhi::ITexture* texturePass1Blur,
-            nvrhi::ITexture* texturePass2Blur,
+            caustica::rhi::ITexture* sourceDestTexture,
+            caustica::rhi::ITexture* textureDownscale1,
+            caustica::rhi::ITexture* textureDownscale2,
+            caustica::rhi::ITexture* texturePass1Blur,
+            caustica::rhi::ITexture* texturePass2Blur,
             float sigmaInPixels,
             float blendFactor);
 
     public:
         BloomPass(
-            nvrhi::IDevice* device,
+            caustica::rhi::IDevice* device,
             const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
             caustica::render::RenderDevice& renderDevice,
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
             const caustica::ICompositeView& compositeView);
 
         void render(
-            nvrhi::ICommandList* commandList,
+            caustica::rhi::ICommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
             const caustica::ICompositeView& compositeView,
-            nvrhi::ITexture* sourceDestTexture,
+            caustica::rhi::ITexture* sourceDestTexture,
             float sigmaInPixels,
             float blendFactor);
 

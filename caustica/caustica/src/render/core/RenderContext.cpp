@@ -4,7 +4,7 @@
 namespace caustica
 {
 
-nvrhi::IDevice* renderContext::getDevice() const
+caustica::rhi::IDevice* renderContext::getDevice() const
 {
     return m_GpuDevice->getDevice();
 }

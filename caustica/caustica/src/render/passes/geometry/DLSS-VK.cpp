@@ -20,13 +20,13 @@ static void NVSDK_CONV NgxLogCallback(const char* message, NVSDK_NGX_Logging_Lev
 class DLSS_VK : public DLSS
 {
 public:
-    DLSS_VK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+    DLSS_VK(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
         std::string const& directoryWithExecutable, uint32_t applicationID)
         : DLSS(device, shaderFactory)
     {
-        VkInstance vkInstance = device->getNativeObject(nvrhi::ObjectTypes::VK_Instance);
-        VkPhysicalDevice vkPhysicalDevice = device->getNativeObject(nvrhi::ObjectTypes::VK_PhysicalDevice);
-        VkDevice vkDevice= device->getNativeObject(nvrhi::ObjectTypes::VK_Device);
+        VkInstance vkInstance = device->getNativeObject(caustica::rhi::ObjectTypes::VK_Instance);
+        VkPhysicalDevice vkPhysicalDevice = device->getNativeObject(caustica::rhi::ObjectTypes::VK_PhysicalDevice);
+        VkDevice vkDevice= device->getNativeObject(caustica::rhi::ObjectTypes::VK_Device);
 
         std::wstring executablePathW;
         executablePathW.assign(directoryWithExecutable.begin(), directoryWithExecutable.end());
@@ -101,7 +101,7 @@ public:
         }
 
         m_featureCommandList->open();
-        VkCommandBuffer vkCmdBuf = m_featureCommandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
+        VkCommandBuffer vkCmdBuf = m_featureCommandList->getNativeObject(caustica::rhi::ObjectTypes::VK_CommandBuffer);
 
         m_parameters->Set(NVSDK_NGX_Parameter_CreationNodeMask, 1u);
         m_parameters->Set(NVSDK_NGX_Parameter_VisibilityNodeMask, 1u);
@@ -148,16 +148,16 @@ public:
         m_initParameters = params;
     }
 
-    static void FillTextureResource(NVSDK_NGX_Resource_VK& resource, nvrhi::ITexture* texture)
+    static void FillTextureResource(NVSDK_NGX_Resource_VK& resource, caustica::rhi::ITexture* texture)
     {
-        const nvrhi::TextureDesc& desc = texture->getDesc();
+        const caustica::rhi::TextureDesc& desc = texture->getDesc();
         resource.ReadWrite = desc.isUAV;
         resource.Type = NVSDK_NGX_RESOURCE_VK_TYPE_VK_IMAGEVIEW;
 
         auto& viewInfo = resource.Resource.ImageViewInfo;
-        viewInfo.Image = texture->getNativeObject(nvrhi::ObjectTypes::VK_Image);
-        viewInfo.ImageView = texture->getNativeView(nvrhi::ObjectTypes::VK_ImageView);
-        viewInfo.Format = VkFormat(nvrhi::vulkan::convertFormat(desc.format));
+        viewInfo.Image = texture->getNativeObject(caustica::rhi::ObjectTypes::VK_Image);
+        viewInfo.ImageView = texture->getNativeView(caustica::rhi::ObjectTypes::VK_ImageView);
+        viewInfo.Format = VkFormat(caustica::rhi::vulkan::convertFormat(desc.format));
         viewInfo.Width = desc.width;
         viewInfo.Height = desc.height;
         viewInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -168,7 +168,7 @@ public:
     }
 
     bool evaluate(
-        nvrhi::ICommandList* commandList,
+        caustica::rhi::ICommandList* commandList,
         const EvaluateParameters& params,
         const caustica::PlanarView& view) override
     {
@@ -183,7 +183,7 @@ public:
             computeExposure(commandList, params.exposureBuffer, params.exposureScale);
         }
 
-        VkCommandBuffer vkCmdBuf = commandList->getNativeObject(nvrhi::ObjectTypes::VK_CommandBuffer);
+        VkCommandBuffer vkCmdBuf = commandList->getNativeObject(caustica::rhi::ObjectTypes::VK_CommandBuffer);
 
         NVSDK_NGX_Resource_VK inColorResource;
         NVSDK_NGX_Resource_VK outColorResource;
@@ -208,19 +208,19 @@ public:
             FillTextureResource(exposureResource, m_exposureTexture);
         }
 
-        commandList->setTextureState(params.inputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.outputColorTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        commandList->setTextureState(params.depthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        commandList->setTextureState(params.motionVectorsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.inputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.outputColorTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::UnorderedAccess);
+        commandList->setTextureState(params.depthTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+        commandList->setTextureState(params.motionVectorsTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         if (m_rayReconstructionInitialized)
         {
-            commandList->setTextureState(params.diffuseAlbedo, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            commandList->setTextureState(params.specularAlbedo, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            commandList->setTextureState(params.normalRoughness, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.diffuseAlbedo, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.specularAlbedo, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(params.normalRoughness, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
         if (useExposureBuffer)
         {
-            commandList->setTextureState(m_exposureTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            commandList->setTextureState(m_exposureTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
         }
         commandList->commitBarriers();
 
@@ -276,12 +276,12 @@ public:
             m_parameters = nullptr;
         }
 
-        VkDevice vkDevice = m_device->getNativeObject(nvrhi::ObjectTypes::VK_Device);
+        VkDevice vkDevice = m_device->getNativeObject(caustica::rhi::ObjectTypes::VK_Device);
         NVSDK_NGX_VULKAN_Shutdown1(vkDevice);
     }
 };
 
-std::unique_ptr<DLSS> DLSS::createVK(nvrhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
+std::unique_ptr<DLSS> DLSS::createVK(caustica::rhi::IDevice* device, caustica::ShaderFactory& shaderFactory,
     std::string const& directoryWithExecutable, uint32_t applicationID)
 {
     return std::make_unique<DLSS_VK>(device, shaderFactory, directoryWithExecutable, applicationID);

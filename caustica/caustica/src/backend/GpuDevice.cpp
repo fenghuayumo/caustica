@@ -51,7 +51,7 @@ static void ErrorCallback_GLFW(int error, const char *description)
 
 static const struct
 {
-    nvrhi::Format format;
+    caustica::rhi::Format format;
     uint32_t redBits;
     uint32_t greenBits;
     uint32_t blueBits;
@@ -59,33 +59,33 @@ static const struct
     uint32_t depthBits;
     uint32_t stencilBits;
 } formatInfo[] = {
-    { nvrhi::Format::UNKNOWN,            0,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::R8_UINT,            8,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::RG8_UINT,           8,  8,  0,  0,  0,  0, },
-    { nvrhi::Format::RG8_UNORM,          8,  8,  0,  0,  0,  0, },
-    { nvrhi::Format::R16_UINT,          16,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::R16_UNORM,         16,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::R16_FLOAT,         16,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::RGBA8_UNORM,        8,  8,  8,  8,  0,  0, },
-    { nvrhi::Format::RGBA8_SNORM,        8,  8,  8,  8,  0,  0, },
-    { nvrhi::Format::BGRA8_UNORM,        8,  8,  8,  8,  0,  0, },
-    { nvrhi::Format::SRGBA8_UNORM,       8,  8,  8,  8,  0,  0, },
-    { nvrhi::Format::SBGRA8_UNORM,       8,  8,  8,  8,  0,  0, },
-    { nvrhi::Format::R10G10B10A2_UNORM, 10, 10, 10,  2,  0,  0, },
-    { nvrhi::Format::R11G11B10_FLOAT,   11, 11, 10,  0,  0,  0, },
-    { nvrhi::Format::RG16_UINT,         16, 16,  0,  0,  0,  0, },
-    { nvrhi::Format::RG16_FLOAT,        16, 16,  0,  0,  0,  0, },
-    { nvrhi::Format::R32_UINT,          32,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::R32_FLOAT,         32,  0,  0,  0,  0,  0, },
-    { nvrhi::Format::RGBA16_FLOAT,      16, 16, 16, 16,  0,  0, },
-    { nvrhi::Format::RGBA16_UNORM,      16, 16, 16, 16,  0,  0, },
-    { nvrhi::Format::RGBA16_SNORM,      16, 16, 16, 16,  0,  0, },
-    { nvrhi::Format::RG32_UINT,         32, 32,  0,  0,  0,  0, },
-    { nvrhi::Format::RG32_FLOAT,        32, 32,  0,  0,  0,  0, },
-    { nvrhi::Format::RGB32_UINT,        32, 32, 32,  0,  0,  0, },
-    { nvrhi::Format::RGB32_FLOAT,       32, 32, 32,  0,  0,  0, },
-    { nvrhi::Format::RGBA32_UINT,       32, 32, 32, 32,  0,  0, },
-    { nvrhi::Format::RGBA32_FLOAT,      32, 32, 32, 32,  0,  0, },
+    { caustica::rhi::Format::UNKNOWN,            0,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R8_UINT,            8,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RG8_UINT,           8,  8,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RG8_UNORM,          8,  8,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R16_UINT,          16,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R16_UNORM,         16,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R16_FLOAT,         16,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RGBA8_UNORM,        8,  8,  8,  8,  0,  0, },
+    { caustica::rhi::Format::RGBA8_SNORM,        8,  8,  8,  8,  0,  0, },
+    { caustica::rhi::Format::BGRA8_UNORM,        8,  8,  8,  8,  0,  0, },
+    { caustica::rhi::Format::SRGBA8_UNORM,       8,  8,  8,  8,  0,  0, },
+    { caustica::rhi::Format::SBGRA8_UNORM,       8,  8,  8,  8,  0,  0, },
+    { caustica::rhi::Format::R10G10B10A2_UNORM, 10, 10, 10,  2,  0,  0, },
+    { caustica::rhi::Format::R11G11B10_FLOAT,   11, 11, 10,  0,  0,  0, },
+    { caustica::rhi::Format::RG16_UINT,         16, 16,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RG16_FLOAT,        16, 16,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R32_UINT,          32,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::R32_FLOAT,         32,  0,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RGBA16_FLOAT,      16, 16, 16, 16,  0,  0, },
+    { caustica::rhi::Format::RGBA16_UNORM,      16, 16, 16, 16,  0,  0, },
+    { caustica::rhi::Format::RGBA16_SNORM,      16, 16, 16, 16,  0,  0, },
+    { caustica::rhi::Format::RG32_UINT,         32, 32,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RG32_FLOAT,        32, 32,  0,  0,  0,  0, },
+    { caustica::rhi::Format::RGB32_UINT,        32, 32, 32,  0,  0,  0, },
+    { caustica::rhi::Format::RGB32_FLOAT,       32, 32, 32,  0,  0,  0, },
+    { caustica::rhi::Format::RGBA32_UINT,       32, 32, 32, 32,  0,  0, },
+    { caustica::rhi::Format::RGBA32_FLOAT,      32, 32, 32, 32,  0,  0, },
 };
 
 bool GpuDevice::createInstance(const InstanceParameters& params)
@@ -230,7 +230,7 @@ void GpuDevice::backBufferResized()
     m_SwapChain.framebuffersWithDepth.resize(backBufferCount);
     for (uint32_t index = 0; index < backBufferCount; index++)
     {
-        nvrhi::FramebufferDesc framebufferDesc = nvrhi::FramebufferDesc()
+        caustica::rhi::FramebufferDesc framebufferDesc = caustica::rhi::FramebufferDesc()
             .addColorAttachment(getBackBuffer(index));
         
         m_SwapChain.framebuffers[index] = getDevice()->createFramebuffer(framebufferDesc);
@@ -251,22 +251,22 @@ void GpuDevice::createDepthBuffer()
 {
     m_SwapChain.depthBuffer = nullptr;
 
-    if (m_DeviceParams.depthBufferFormat == nvrhi::Format::UNKNOWN)
+    if (m_DeviceParams.depthBufferFormat == caustica::rhi::Format::UNKNOWN)
         return;
 
-    nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
+    caustica::rhi::TextureDesc textureDesc = caustica::rhi::TextureDesc()
         .setDebugName("Depth Buffer")
         .setWidth(m_DeviceParams.backBufferWidth)
         .setHeight(m_DeviceParams.backBufferHeight)
         .setFormat(m_DeviceParams.depthBufferFormat)
         .setDimension(m_DeviceParams.swapChainSampleCount > 1
-            ? nvrhi::TextureDimension::Texture2DMS
-            : nvrhi::TextureDimension::Texture2D)
+            ? caustica::rhi::TextureDimension::Texture2DMS
+            : caustica::rhi::TextureDimension::Texture2D)
         .setSampleCount(m_DeviceParams.swapChainSampleCount)
         .setSampleQuality(m_DeviceParams.swapChainSampleQuality)
         .setIsTypeless(true)
         .setIsRenderTarget(true)
-        .enableAutomaticStateTracking(nvrhi::ResourceStates::DepthWrite);
+        .enableAutomaticStateTracking(caustica::rhi::ResourceStates::DepthWrite);
 
     m_SwapChain.depthBuffer = getDevice()->createTexture(textureDesc);
 }
@@ -289,21 +289,21 @@ bool GpuDevice::createHeadlessBackBuffers()
 
     for (uint32_t index = 0; index < backBufferCount; ++index)
     {
-        nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
+        caustica::rhi::TextureDesc textureDesc = caustica::rhi::TextureDesc()
             .setDebugName("Headless Back Buffer")
             .setWidth(m_DeviceParams.backBufferWidth)
             .setHeight(m_DeviceParams.backBufferHeight)
             .setFormat(m_DeviceParams.swapChainFormat)
             .setDimension(m_DeviceParams.swapChainSampleCount > 1
-                ? nvrhi::TextureDimension::Texture2DMS
-                : nvrhi::TextureDimension::Texture2D)
+                ? caustica::rhi::TextureDimension::Texture2DMS
+                : caustica::rhi::TextureDimension::Texture2D)
             .setSampleCount(m_DeviceParams.swapChainSampleCount)
             .setSampleQuality(m_DeviceParams.swapChainSampleQuality)
             .setIsRenderTarget(true)
-            .setInitialState(nvrhi::ResourceStates::RenderTarget)
+            .setInitialState(caustica::rhi::ResourceStates::RenderTarget)
             .setKeepInitialState(true);
 
-        nvrhi::TextureHandle texture = getDevice()->createTexture(textureDesc);
+        caustica::rhi::TextureHandle texture = getDevice()->createTexture(textureDesc);
         if (!texture)
         {
             caustica::error("Failed to create headless back buffer %u.", index);
@@ -338,7 +338,7 @@ bool GpuDevice::presentHeadlessFrame()
     return true;
 }
 
-nvrhi::ITexture* GpuDevice::getHeadlessBackBuffer(uint32_t index)
+caustica::rhi::ITexture* GpuDevice::getHeadlessBackBuffer(uint32_t index)
 {
     if (index < m_HeadlessBackBuffers.size())
         return m_HeadlessBackBuffers[index];
@@ -424,22 +424,22 @@ bool GpuDevice::validatePathTracerRequirements() const
 
 bool GpuDevice::supportsRayTracingPipeline() const
 {
-    nvrhi::IDevice* device = getDevice();
-    return device && device->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline);
+    caustica::rhi::IDevice* device = getDevice();
+    return device && device->queryFeatureSupport(caustica::rhi::Feature::RayTracingPipeline);
 }
 
 bool GpuDevice::supportsRayQuery() const
 {
-    nvrhi::IDevice* device = getDevice();
-    return device && device->queryFeatureSupport(nvrhi::Feature::RayQuery);
+    caustica::rhi::IDevice* device = getDevice();
+    return device && device->queryFeatureSupport(caustica::rhi::Feature::RayQuery);
 }
 
 bool GpuDevice::supportsShaderExecutionReordering() const
 {
-    nvrhi::IDevice* device = getDevice();
+    caustica::rhi::IDevice* device = getDevice();
     return device
-        && device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12
-        && device->queryFeatureSupport(nvrhi::Feature::ShaderExecutionReordering);
+        && device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12
+        && device->queryFeatureSupport(caustica::rhi::Feature::ShaderExecutionReordering);
 }
 
 bool GpuDevice::queryVideoMemoryInfo(VideoMemoryInfo& /*out*/) const
@@ -499,7 +499,7 @@ void GpuDevice::updateWindowSize()
 
     if (int(m_DeviceParams.backBufferWidth) != width ||
         int(m_DeviceParams.backBufferHeight) != height ||
-        (m_DeviceParams.vsyncEnabled != m_RequestedVSync && getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN))
+        (m_DeviceParams.vsyncEnabled != m_RequestedVSync && getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN))
     {
         // window is not minimized, and the size has changed
 
@@ -538,12 +538,12 @@ void GpuDevice::shutdown()
     m_InstanceCreated = false;
 }
 
-nvrhi::IFramebuffer* caustica::GpuDevice::getCurrentFramebuffer(bool withDepth)
+caustica::rhi::IFramebuffer* caustica::GpuDevice::getCurrentFramebuffer(bool withDepth)
 {
     return getFramebuffer(getCurrentBackBufferIndex(), withDepth);
 }
 
-nvrhi::IFramebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, bool withDepth)
+caustica::rhi::IFramebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, bool withDepth)
 {
     if (withDepth)
     {
@@ -575,19 +575,19 @@ void GpuDevice::setInformativeWindowTitle(const char* applicationName, bool incl
 {
     std::stringstream ss;
     ss << applicationName;
-    ss << " (" << nvrhi::utils::GraphicsAPIToString(getDevice()->getGraphicsAPI());
+    ss << " (" << caustica::rhi::utils::GraphicsAPIToString(getDevice()->getGraphicsAPI());
 
     if (m_DeviceParams.enableDebugRuntime)
     {
-        if (getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN)
+        if (getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN)
             ss << ", VulkanValidationLayer";
         else
             ss << ", DebugRuntime";
     }
 
-    if (m_DeviceParams.enableNvrhiValidationLayer)
+    if (m_DeviceParams.enableRhiValidationLayer)
     {
-        ss << ", NvrhiValidationLayer";
+        ss << ", RhiValidationLayer";
     }
 
     ss << ")";
@@ -611,20 +611,20 @@ const char* caustica::GpuDevice::getWindowTitle()
     return m_WindowTitle.c_str();
 }
 
-caustica::GpuDevice* caustica::GpuDevice::create(nvrhi::GraphicsAPI api)
+caustica::GpuDevice* caustica::GpuDevice::create(caustica::rhi::GraphicsAPI api)
 {
     switch (api)
     {
 #if CAUSTICA_WITH_DX11
-    case nvrhi::GraphicsAPI::D3D11:
+    case caustica::rhi::GraphicsAPI::D3D11:
         return createD3D11();
 #endif
 #if CAUSTICA_WITH_DX12
-    case nvrhi::GraphicsAPI::D3D12:
+    case caustica::rhi::GraphicsAPI::D3D12:
         return createD3D12();
 #endif
 #if CAUSTICA_WITH_VULKAN
-    case nvrhi::GraphicsAPI::VULKAN:
+    case caustica::rhi::GraphicsAPI::VULKAN:
         return createVK();
 #endif
     default:
@@ -639,21 +639,21 @@ DefaultMessageCallback& DefaultMessageCallback::getInstance()
     return Instance;
 }
 
-void DefaultMessageCallback::message(nvrhi::MessageSeverity severity, const char* messageText)
+void DefaultMessageCallback::message(caustica::rhi::MessageSeverity severity, const char* messageText)
 {
     caustica::Severity logSeverity = caustica::Severity::Info;
     switch (severity)
     {
-    case nvrhi::MessageSeverity::Info:
+    case caustica::rhi::MessageSeverity::Info:
         logSeverity = caustica::Severity::Info;
         break;
-    case nvrhi::MessageSeverity::Warning:
+    case caustica::rhi::MessageSeverity::Warning:
         logSeverity = caustica::Severity::Warning;
         break;
-    case nvrhi::MessageSeverity::Error:
+    case caustica::rhi::MessageSeverity::Error:
         logSeverity = caustica::Severity::Error;
         break;
-    case nvrhi::MessageSeverity::Fatal:
+    case caustica::rhi::MessageSeverity::Fatal:
         logSeverity = caustica::Severity::Fatal;
         break;
     }

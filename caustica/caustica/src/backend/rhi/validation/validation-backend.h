@@ -3,7 +3,7 @@
 #include <rhi/validation.h>
 #include <unordered_set>
 
-namespace nvrhi::validation
+namespace caustica::rhi::validation
 {
     class DeviceWrapper;
 
@@ -45,25 +45,25 @@ namespace nvrhi::validation
             return !(*this == other);
         }
     };
-} // namespace nvrhi::validation
+} // namespace caustica::rhi::validation
 
 namespace std
 {
-    template<> struct hash<nvrhi::validation::BindingLocation>
+    template<> struct hash<caustica::rhi::validation::BindingLocation>
     {
-        std::size_t operator()(nvrhi::validation::BindingLocation const& s) const noexcept
+        std::size_t operator()(caustica::rhi::validation::BindingLocation const& s) const noexcept
         {
             size_t hash = 0;
-            nvrhi::hash_combine(hash, uint32_t(s.type));
-            nvrhi::hash_combine(hash, s.registerSpace);
-            nvrhi::hash_combine(hash, s.slot);
-            nvrhi::hash_combine(hash, s.arrayElement);
+            caustica::rhi::hash_combine(hash, uint32_t(s.type));
+            caustica::rhi::hash_combine(hash, s.registerSpace);
+            caustica::rhi::hash_combine(hash, s.slot);
+            caustica::rhi::hash_combine(hash, s.arrayElement);
             return hash;
         }
     };
 } // namespace std
 
-namespace nvrhi::validation
+namespace caustica::rhi::validation
 {
     typedef std::unordered_set<BindingLocation> BindingLocationSet;
 
@@ -158,7 +158,7 @@ namespace nvrhi::validation
         bool requireType(CommandQueue queueType, const char* operation) const;
         ICommandList* getUnderlyingCommandList() const { return m_CommandList; }
 
-        void evaluatePushConstantSize(const nvrhi::BindingLayoutVector& bindingLayouts);
+        void evaluatePushConstantSize(const caustica::rhi::BindingLayoutVector& bindingLayouts);
         bool validatePushConstants(const char* pipelineType, const char* stateFunctionName) const;
         bool validateBindingSetsAgainstLayouts(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& layouts, const static_vector<IBindingSet*, c_MaxBindingLayouts>& sets) const;
 
@@ -191,7 +191,7 @@ namespace nvrhi::validation
         void copyBuffer(IBuffer* dest, uint64_t destOffsetBytes, IBuffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
 
         void clearSamplerFeedbackTexture(ISamplerFeedbackTexture* texture) override;
-        void decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, nvrhi::Format format) override;
+        void decodeSamplerFeedbackTexture(IBuffer* buffer, ISamplerFeedbackTexture* texture, caustica::rhi::Format format) override;
         void setSamplerFeedbackTextureState(ISamplerFeedbackTexture* texture, ResourceStates stateBits) override;
 
         void setPushConstants(const void* data, size_t byteSize) override;
@@ -217,7 +217,7 @@ namespace nvrhi::validation
         void buildBottomLevelAccelStruct(rt::IAccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
         void compactBottomLevelAccelStructs() override;
         void buildTopLevelAccelStruct(rt::IAccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
-        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, nvrhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+        void buildTopLevelAccelStructFromBuffer(rt::IAccelStruct* as, caustica::rhi::IBuffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
             rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
         void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
 
@@ -378,4 +378,4 @@ namespace nvrhi::validation
         AftermathCrashDumpHelper& getAftermathCrashDumpHelper() override;
     };
 
-} // namespace nvrhi::validation
+} // namespace caustica::rhi::validation
