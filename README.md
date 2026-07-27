@@ -26,8 +26,8 @@ Typical embodied-AI uses include: domain-randomized tabletop/manipulation scenes
 
 At a high level:
 
-* **Application & simulation layer** — Bevy-inspired ECS: `App`, `Plugin`, `ecs::World`, resources, and ordered `AppSchedule` systems (`Startup` → `Update` → `Extract` → `Render` → …).
-* **Rendering layer** — Unreal Engine–inspired pipeline: `WorldRenderer`, render features, pass graph (`GraphBuilder`), transient resource pools, and pipeline plugins that assemble frame work from declarative passes.
+* **Application & simulation layer** — Bevy-inspired ECS: `App` / `EngineApp`, `Plugin`, `ecs::World`, resources, ordered `AppSchedule` systems, and default `SystemSet`s (`Simulation` → `TransformPropagate` → `Extract`).
+* **Rendering layer** — Unreal Engine–inspired pipeline: dedicated `RenderThread`, extract proxies, `WorldRenderer`, render features, pass graph (`GraphBuilder` + parallel waves), and optional `EnqueueRenderCommand` for Logic→RT work.
 * **Path tracing core** — RTXPT-derived shaders and algorithms, including **ReSTIR PT**, **ReSTIR GI**, **ReSTIR DI**, NEE-AT, path-space decomposition, denoiser guides, NRD, and **DLSS**, wired through the engine stack
 
 The result is a pure path tracer (no rasterization in the main light transport path) suited to both **interactive simulation preview** and **offline / headless synthetic-data rendering**.
@@ -62,43 +62,54 @@ Recommended starting points:
 * Scene authoring: [docs/scene-json.md](docs/scene-json.md)
 * Materials for sim-to-real variation: [docs/openpbr.md](docs/openpbr.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
+* RHI / render-thread contract: [docs/architecture-rhi-threading.md](docs/architecture-rhi-threading.md)
 * Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
+* Minimal C++ host (no editor): `application/samples/thin_client` → target `caustica_thin_client`
 
 ## Architecture
 
 ```
-App (frame loop, plugins, schedules)
+EngineApp / App (frame loop, plugins, schedules)
  └── App world (resources) + SceneEntityWorld (scene ECS)
-      ├── Update / PostUpdate   — animation, hierarchy, simulation
-      ├── Extract               — ECS → SceneRenderData proxies (triple-buffered)
-      └── Render (RT)           — WorldRenderer reads proxies only (no live ECS)
+      ├── Startup / First / preUpdate
+      ├── update (SystemSet.Simulation)     — gameplay / animation / host systems
+      ├── PostUpdate (TransformPropagate)   — hierarchy refresh after other PostUpdate work
+      ├── Extract (SystemSet.Extract)       — ECS → SceneRenderData proxies (triple-buffered)
+      └── render / postRender (RT)          — WorldRenderer reads proxies only (no live ECS)
 
 WorldRenderer (UE-like render pipeline)
  ├── PathTracingContext            — persistent GPU state, settings, bindings
  ├── RenderPipelineRegistry        — ordered render features / plugins
- ├── Frame graph (GraphBuilder)    — transient targets, pass edges
+ ├── Frame graph (GraphBuilder)    — waves, transient targets, parallel deferred lists
  └── Path-trace / ReSTIR / NRD / DLSS features
 ```
 
-**ECS × Render Proxy:** logic thread owns `SceneEntityWorld`; Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` and must not walk live ECS for frame lighting. Details: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md).
+**ECS × Render Proxy:** the logic thread owns `SceneEntityWorld`; Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` / committed proxies and must not walk live ECS for frame lighting. Runtime spawn/despawn publishes a new extract generation and builds mesh/AS/SBT work on the render thread asynchronously (see [architecture-render-proxy.md](docs/architecture-render-proxy.md)).
 
-* **Application & simulation layer** — Bevy-inspired: `App`, `Plugin`, schedules, scene ECS components.
-* **Rendering layer** — UE-inspired: dedicated `RenderThread`, extract proxies, `WorldRenderer`, render graph.
+**Embedding:** prefer `EngineApp::create(EngineAppDesc)` over assembling plugins by hand. Add host systems on `AppSchedule::update` (default `system_set::Simulation`). Scene edits go through focused APIs (`SceneSpawn`, `SceneTransform`, `SceneMeshEdit`, `SceneQuery`, …). Occasional render-thread work from Logic uses `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`.
+
+* **Application & simulation layer** — Bevy-inspired: `EngineApp`, `App`, `Plugin`, `AppSchedule`, `SystemSet`, scene ECS components.
+* **Rendering layer** — UE-inspired: dedicated `RenderThread`, extract proxies, `WorldRenderer`, `FrameCommandContext` / GraphBuilder waves.
 * **Path tracing core** — RTXPT-derived shaders (ReSTIR, NEE-AT, NRD, DLSS) wired through the proxy packet.
 
 Key code locations:
 
 | Layer | Paths |
 | --- | --- |
-| App & schedules | `caustica/caustica/include/engine/App.h`, `AppSchedules.h`, `Plugin.h` |
+| Embed entry | `caustica/caustica/include/engine/EngineApp.h` |
+| App & schedules | `caustica/caustica/include/engine/App.h`, `AppSchedules.h`, `SystemSets.h`, `Plugin.h` |
+| Logic → RT enqueue | `caustica/caustica/include/engine/EnqueueRenderCommand.h` |
+| Scene edit / query APIs | `SceneSpawn.h`, `SceneTransform.h`, `SceneMeshEdit.h`, `SceneQuery.h`, `CameraApi.h`, … |
 | ECS core | `caustica/caustica/include/ecs/` |
 | Scene ECS | `caustica/caustica/include/scene/SceneEcs.h` |
 | Render proxies | `caustica/caustica/include/scene/SceneRenderData.h`, `docs/architecture-render-proxy.md` |
+| RHI threading | `docs/architecture-rhi-threading.md` |
 | World renderer | `caustica/caustica/include/render/worldRenderer/` |
 | Render graph | `caustica/caustica/include/render/graph/` |
 | Materials (OpenPBR) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
 | Path tracing shaders | `caustica/caustica/shaders/PathTracer/` |
-| Sample app | `application/editor/app/Main.cpp` |
+| Desktop editor | `application/editor/app/Main.cpp` |
+| Thin client sample | `application/samples/thin_client/Main.cpp` |
 
 ## Features
 
@@ -106,9 +117,10 @@ Key code locations:
 
 * **Scene JSON** workflow for reproducible environments, object placement, lights, and camera rigs
 * **ECS scene graph** (`SceneEntityWorld`) — entities/components map naturally to simulated actors and attachments
-* **Python extension** — headless and windowed `Renderer`, per-frame settings, camera/scene/material control, accumulation for dataset generation
+* **`EngineApp` embed path** — one-call bootstrap for custom hosts; official thin client at `application/samples/thin_client`
+* **Python extension** — headless and windowed `Renderer`, spawn/despawn, materials/lights/cameras, accumulation for dataset generation
 * **Reference + real-time modes** — interactive policy/debug preview and high-SPP offline captures from the same scene
-* glTF/OBJ asset import for props, robots, and scanned environments; animation channels for moving parts
+* Asset import for props, robots, and scanned environments: glTF / OBJ / URDF / USD (+ animation channels)
 
 ### Path tracing & light transport
 
@@ -210,13 +222,13 @@ Full field reference: [OpenPBR materials](docs/openpbr.md)
 | `/bin` | default CMake folder for binaries and compiled shaders |
 | `/build` | default CMake folder for build files |
 | `/Assets` | models, textures, scene files |
-| `/Docs` | documentation |
-| `/docs` | additional project documentation (scene JSON, materials, etc.) |
+| `/docs` | architecture, scene JSON, OpenPBR, and related docs |
 | `/External` | external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM |
-| `/Support` | optional command line tools (denoiser, texture compressor, etc.) |
-| `/caustica` | application wrapper: engine (`caustica/caustica/`), Python bindings, shaders |
-| `/application/editor` | desktop editor / sample app — entry point at `app/Main.cpp` |
-| `/caustica/caustica` | Caustica engine: `causEngine`, `causRender`, `causScene`, `causBackend`, … |
+| `/support` | Python packaging / shader cook scripts and optional CLI tools |
+| `/caustica` | engine tree: `caustica/caustica/` (C++), `Python/` bindings, shaders |
+| `/application/editor` | desktop editor — entry point at `app/Main.cpp` |
+| `/application/samples/thin_client` | minimal `EngineApp` host (no editor UI) |
+| `/python/caustica` | pip package loader for the native extension |
 | `/caustica/caustica/shaders/PathTracer` | core path tracing shaders |
 
 ## Build
@@ -240,11 +252,11 @@ Windows is the primary supported platform. Linux/WSL builds use the Vulkan backe
 
 3. Build the solution generated by CMake in the `./build/` folder.
 
-   For example, with Visual Studio, open `build/RTXPathTracing.sln` and build.
+   For example, with Visual Studio, open `build/caustica.sln` and build.
 
-4. Select and run the `caustica` project. Binaries are built to the `bin` folder. Assets are loaded from the `Assets` folder.
+4. Select and run the `caustica` project (editor). Optional: build `caustica_thin_client` for the minimal host, or `caustica_py` for the Python extension. Binaries land in `bin`; assets load from `Assets`.
 
-   For a binary distribution, place the `Assets` and `Support` folders next to the executable in `bin` (the app searches both `Assets/` and `../Assets/`).
+   For a binary distribution, place the `Assets` and `support` folders next to the executable in `bin` (the app searches both `Assets/` and `../Assets/`).
 
 ## Python Extension Install
 
@@ -360,9 +372,10 @@ Version 717-preview enables native DirectX support for [Shader Execution Reorder
 
 * [Scene JSON format](docs/scene-json.md)
 * [OpenPBR materials](docs/openpbr.md)
-* [Python API overview](py_caustica.md)
-
-More detailed engine documentation is in progress.
+* [ECS + render proxies](docs/architecture-render-proxy.md)
+* [RHI threading contract](docs/architecture-rhi-threading.md)
+* [Python API reference](py_caustica.md)
+* [Python examples](caustica/Python/Examples/README.md)
 
 ## Contact
 
@@ -386,9 +399,9 @@ If you use Caustica in a research project that leads to a publication, please ci
 ```bibtex
 @online{caustica,
    title   = {Caustica: Real-Time Path Tracing},
-   author  = {Caustica Contributors},
-   year    = {2023},
-   url     = {<repository-url>},
+   author  = {Bingyang Hu},
+   year    = {2026},
+   url     = {https://github.com/fenghuayumo/caustica/},
 }
 ```
 

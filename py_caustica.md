@@ -20,9 +20,10 @@ This document describes how to use the current `caustica` Python bindings. The A
 - [Module-Level API](#module-level-api)
 - [Renderer](#renderer) — extension-mode standalone renderer
 - [Sample & Scene](#sample--scene) — `app()`, scene, camera, accumulation
+- [Spawn / Despawn](#spawn--despawn) — prefab load/spawn and entity removal
 - [Model](#model) — `Mesh`, `SceneNode`, deformation, bounds
 - [Material](#material) — `Material` class and scene lookup
-- [Light](#light) — light types and scene lookup
+- [Light](#light) — light create/lookup and typed properties
 - [3DGS](#3dgs) — Gaussian splat loading, settings, enums
 - [Settings](#settings) — path tracing, denoiser, tone mapping, DLSS, etc.
 - [Enums](#enums) — shared enumerations
@@ -71,7 +72,7 @@ python -c "import caustica; print(caustica.MODE)"
 This assembles a local binary wheel from the native extension, runtime DLLs/shared libraries, shaders, and required assets in `bin/`, then installs it into the active Python environment. You can also build the wheel explicitly first:
 
 ```powershell
-python Support/python/build_wheel.py
+python support/python/build_wheel.py
 python -m pip install dist/caustica-*.whl
 ```
 
@@ -83,6 +84,7 @@ Packaging options can be controlled with environment variables:
 | `caustica_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
 | `caustica_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
 | `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
+| `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
 During development, if you prefer not to install the package, you can still add `bin/` to `sys.path` or `PYTHONPATH`:
 
@@ -272,7 +274,7 @@ When `--convert-rdf-to-rub` is enabled, which is the default, both the PLY loade
 
 ### Load OBJ Meshes With Materials
 
-`Renderer.load_mesh_file(...)` and `Sample.load_mesh_file(...)` append OBJ models to the current scene. The loader parses `mtllib` directives in the OBJ file and resolves `.mtl` and texture paths relative to the OBJ/MTL directory by default.
+`Renderer.load_mesh_file(...)` / `Sample.spawn_from_file(...)` append mesh/prefab files to the current scene (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`). For OBJ specifically, the loader parses `mtllib` directives and resolves `.mtl` and texture paths relative to the OBJ/MTL directory by default.
 
 The current OBJ/MTL importer recognizes these common material fields:
 
@@ -430,10 +432,59 @@ sun = scene.find_light("Sun")
 if sun:
     sun.direction = (0.0, -1.0, 0.2)
 
+# Or create typed lights under the scene root at runtime:
+spot = scene.create_spot_light(
+    color=(1.0, 0.95, 0.85),
+    intensity=40.0,
+    radius=0.05,
+    range=8.0,
+    inner_angle=20.0,
+    outer_angle=35.0,
+    name="PySpot",
+)
+if spot:
+    spot.position = (0.0, 2.0, 0.0)
+    spot.direction = (0.0, -1.0, 0.0)
+
 r.step_n(8)
 r.save_screenshot("lights.png")
 r.close()
 ```
+
+### Spawn / Despawn Assets
+
+`Sample.load` / `spawn` / `spawn_from_file` / `despawn` mirror the C++ `SceneSpawn` API.
+Supported mesh/prefab extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`.
+
+```python
+import caustica
+
+with caustica.Renderer(scene="builtin:plane", headless=True, accumulation_target=16) as r:
+    app = r.app
+
+    # One-shot: import + attach under the active scene root.
+    node = app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
+    if node is None:
+        raise RuntimeError("spawn_from_file failed")
+    node.translation = (1.5, 0.5, 0.0)
+    node.scaling = (0.5, 0.5, 0.5)
+
+    # Or split load/spawn when reusing a prefab:
+    prefab = app.load("Models/GlassSphere/GlassSphere.gltf")
+    if prefab:
+        clone = app.spawn(prefab)
+        if clone:
+            clone.translation = (-1.5, 0.5, 0.0)
+
+    r.step_n(1)
+    r.step_until_accumulated()
+    r.save_screenshot("spawned.png")
+
+    # Remove an entity (and children) when done.
+    app.despawn(node)
+```
+
+`load_mesh_file(...)` remains as a bool convenience wrapper around `spawn_from_file`.
 
 ### Deform Mesh Vertices
 
@@ -502,6 +553,7 @@ The sections below are grouped by topic so you can jump directly to the API you 
 | --- | --- |
 | Renderer | [Renderer](#renderer) |
 | Scene / app | [Sample & Scene](#sample--scene) |
+| Spawn / despawn | [Spawn / Despawn](#spawn--despawn) |
 | Mesh / nodes | [Model](#model) |
 | Materials | [Material](#material) |
 | Lights | [Light](#light) |
@@ -562,21 +614,22 @@ caustica.Renderer(
 | `close()` | `None` | Tears down renderer/device. Also called by destructor/context manager. |
 | `load_scene(scene_name, wait_until_ready=True)` | `bool` | Switch scene. |
 | `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` 3DGS scene object under the current scene root. |
-| `load_mesh_file(file_name)` | `bool` | Append a `.gltf`, `.glb`, or `.obj` mesh under the current scene root. OBJ imports resolve referenced `.mtl` files and common material textures relative to the OBJ/MTL path. |
+| `load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`) under the current scene root. OBJ imports resolve referenced `.mtl` files and common material textures relative to the OBJ/MTL path. |
 | `get_scene_bounds()` | `tuple | None` | Active scene world-space `((min.xyz), (max.xyz))` AABB from C++ `Scene::GetSceneBounds()`. |
 | `scene_bounds` | `tuple | None` | Property alias for `get_scene_bounds()`. |
 | `scene_bounds_center` | `tuple | None` | Center of `scene_bounds`. |
 | `scene_bounds_size` | `tuple | None` | Extent `(max - min)` of `scene_bounds`. |
 | `step(dt=-1.0)` | `bool` | Render one frame. Returns `False` on failure or when window close is requested. |
 | `step_n(frames)` | `bool` | Render exactly N frames unless `step()` fails. |
+| `precache_rt_feature_presets(show_progress=True)` | `int` | Load/cook-time `CreateStateObject` for every cooked PT feature preset. Call after at least one `step()` / `step_n(1)`. Returns ready count. Not used by the interactive frame loop. |
 | `step_until_accumulated(max_frames=0)` | `int` | Reset accumulation and step until accumulation completes, or until `max_frames` if positive. |
 | `save_screenshot(output_path)` | `bool` | Save current LDR final color to PNG/JPG/BMP/TGA. |
 | `get_framebuffer(hdr=False)` | `Framebuffer` | CPU readback of current LDR final color. See `Framebuffer` below. `hdr=True` is not implemented yet. |
 | `get_pixels(hdr=False)` | `numpy.ndarray` | Same LDR readback as `(H, W, 4)` `uint8` RGBA. Requires NumPy. `hdr=True` is not implemented yet. |
 | `set_camera(position, direction, up=(0, 1, 0))` | `bool` | Triples can be lists/tuples of 3 floats. |
 | `set_camera_fov(vertical_fov_degrees)` | `None` | Set vertical FOV in degrees. |
-| `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` is called. |
-| `app` | `Sample` | Underlying renderer instance. |
+| `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` or `clear_camera_intrinsics()` is used. |
+| `app` | `Sample` | Underlying renderer instance (`EngineApp::app()` in extension mode). |
 | `settings` | `Settings` | Live UI/settings state. |
 
 ### `Framebuffer`
@@ -652,7 +705,7 @@ For scene files, relative 3DGS paths are resolved relative to the scene JSON fil
 
 ## Sample & Scene
 
-Top-level renderer instance (`Sample`). In extension mode, access it through `renderer.app`; in embed mode, use `caustica.app()`. Scene graph access goes through `app.scene`.
+Top-level renderer instance. Python exposes the C++ `App` (from `EngineApp::app()` / the editor host) as `caustica.Sample` for historical reasons. In extension mode, access it through `renderer.app`; in embed mode, use `caustica.app()`. Scene graph access goes through `app.scene`.
 
 ### Read-Only Properties
 
@@ -677,7 +730,7 @@ Top-level renderer instance (`Sample`). In extension mode, access it through `re
 | --- | --- | --- |
 | `set_scene(scene_name, force_reload=False)` | `None` | Switch scene. |
 | `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
-| `load_mesh_file(file_name)` | `bool` | Append a `.gltf`, `.glb`, or `.obj` mesh node to the current scene. OBJ imports resolve referenced `.mtl` files and common material textures relative to the OBJ/MTL path. |
+| `load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`). Convenience bool wrapper over `spawn_from_file`. |
 | `set_environment_map(path)` | `None` | Override scene environment map source. |
 | `get_scene()` | `Scene | None` | Return the current loaded scene. |
 | `get_scene_bounds()` | `tuple | None` | Shortcut for `scene.get_scene_bounds()`. |
@@ -690,7 +743,11 @@ Top-level renderer instance (`Sample`). In extension mode, access it through `re
 | `set_camera_pos_dir_up(pos_dir_up)` | `bool` | Input format matches `get_camera_pos_dir_up()`. |
 | `set_camera_fov(vertical_fov_degrees)` | `None` | Takes degrees. |
 | `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Uses pixel-space pinhole intrinsics for the active projection. Useful for COLMAP/OpenCV cameras with non-centered `cx/cy`. |
+| `clear_camera_intrinsics()` | `None` | Clear pixel-space intrinsics and restore the FOV-based projection. |
 | `get_camera_fov()` | `float` | Returns current internal value in radians. |
+| `scene_camera_count` | `int` | Number of scene cameras available for selection. |
+| `selected_camera_index` | `int` | Active scene-camera index (`0 .. scene_camera_count-1`). |
+| `get_cameras()` | `list[SceneNode]` | Compatibility alias for `scene.get_cameras()`. |
 | `save_current_camera()` | `None` | Save camera through app's camera persistence path. |
 | `load_current_camera()` | `None` | Restore saved camera. |
 
@@ -701,8 +758,46 @@ Use `Renderer.set_camera()` when working in extension mode; it is simpler than b
 | API | Effect |
 | --- | --- |
 | `request_shader_reload()` | Requests shader reload. |
-| `request_accel_rebuild()` | Requests acceleration structure rebuild. |
+| `request_accel_rebuild()` | Requests a full acceleration structure rebuild. |
+| `request_mesh_accel_rebuild(mesh_or_node)` | Requests a BLAS rebuild for one dirty mesh (or the mesh on a `SceneNode`) without forcing a full scene AS rebuild. |
 | `reset_accumulation()` | Resets reference accumulation. |
+| `reset_realtime_caches()` | Resets realtime caches (ReSTIR / temporal history helpers). |
+
+### Diagnostics (read-only)
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `fps_info` | `str` | Human-readable FPS summary from the live session. |
+| `resolution_info` | `str` | Human-readable resolution summary. |
+| `avg_time_per_frame` | `float` | Average frame time. |
+| `render_size` | `(width, height)` | Current path-tracer render resolution. |
+
+## Spawn / Despawn
+
+Runtime attach/detach of mesh/prefab assets through `Sample` (same path as C++ `SceneSpawn`). Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously.
+
+### `ScenePrefab`
+
+Returned by `Sample.load(path)`.
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `valid` | `bool` | Whether the handle still points at a loaded prefab. |
+| `name` | `str` | Prefab display name. |
+| `source_path` | `str` | Absolute/source path used for the import. |
+| `__bool__` | `bool` | Truthy when the handle is valid. |
+
+### APIs
+
+| API | Return | Notes |
+| --- | --- | --- |
+| `sample.load(path)` | `ScenePrefab` | Import a mesh/prefab file into a CPU-side handle (does not spawn). |
+| `sample.spawn(prefab)` | `SceneNode | None` | Spawn a previously loaded `ScenePrefab` into the active scene. Returns the root node. |
+| `sample.spawn_from_file(path)` | `SceneNode | None` | `load` + `spawn` in one call. |
+| `sample.despawn(node)` | `bool` | Remove a scene entity and its children. |
+| `sample.load_mesh_file(path)` | `bool` | True when `spawn_from_file` succeeds. |
+
+Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd`, `.usda`, `.usdc`.
 
 ### Mode Helpers
 
@@ -741,8 +836,9 @@ Mesh geometry, scene graph nodes, and vertex deformation. Access meshes through 
 | `sample.get_meshes()` | `list[Mesh]` | Compatibility alias for `scene.get_meshes()`. |
 | `sample.find_mesh(name)` | `Mesh | None` | Compatibility alias for `scene.find_mesh(name)`. |
 | `sample.find_node(path)` | `SceneNode | None` | Compatibility alias for `scene.find_node(path)`. |
-| `Renderer.load_mesh_file(file_name)` | `bool` | Append a `.gltf`, `.glb`, or `.obj` mesh (extension mode). |
-| `Sample.load_mesh_file(file_name)` | `bool` | Append a mesh node (embed or extension). |
+| `Renderer.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (extension mode). |
+| `Sample.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab node (embed or extension). |
+| `Sample.spawn_from_file(path)` | `SceneNode | None` | Preferred spawn path; returns the root node. |
 
 ### Vertex Deformation
 
@@ -976,7 +1072,7 @@ app.request_accel_rebuild()
 
 ## Light
 
-Lights are ECS components on `SceneNode`. Lookup returns `SceneNode` handles; typed fields are exposed as properties on that node.
+Lights are ECS components on `SceneNode`. Lookup returns `SceneNode` handles; typed fields are exposed as properties on that node. Prefer `caustica.LightType` over raw integers when branching.
 
 ### Scene Lookup
 
@@ -985,16 +1081,29 @@ Lights are ECS components on `SceneNode`. Lookup returns `SceneNode` handles; ty
 | `scene.get_lights()` | `list[SceneNode]` | All light entities in the current scene. |
 | `scene.find_light(name)` | `SceneNode | None` | Match by entity name. |
 | `scene.light_count` | `int` | Number of lights in the current scene. |
+| `scene.camera_count` | `int` | Number of camera entities in the current scene. |
+| `scene.get_cameras()` | `list[SceneNode]` | All camera entities as `SceneNode`. |
 | `Sample.get_lights()` | `list[SceneNode]` | Compatibility alias for `scene.get_lights()`. |
 | `Sample.find_light(name)` | `SceneNode | None` | Compatibility alias for `scene.find_light(name)`. |
 | `Sample.set_environment_map(path)` | `None` | Override scene environment map source. |
+
+### Create Lights
+
+| API | Notes |
+| --- | --- |
+| `scene.create_directional_light(color=(1,1,1), irradiance=1.0, angular_size=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
+| `scene.create_point_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
+| `scene.create_spot_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, inner_angle=180.0, outer_angle=180.0, name="")` | Attach under scene root; returns `SceneNode`. |
+| `scene.create_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
+
+Empty `name` auto-generates a unique name (`DirectionalLight`, `PointLight`, …).
 
 ### Light properties on `SceneNode`
 
 | Property | Type | Notes |
 | --- | --- | --- |
 | `is_light` | `bool` | True when the entity has a typed light component. |
-| `light_type` | `int` | Engine `LightType_*` constant (1=Directional, 2=Spot, 3=Point, 1000=Environment). |
+| `light_type` | `int` / `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Environment`. |
 | `name` | `str` | Entity name. Read-only. |
 | `color` | `(r, g, b)` | Writable. |
 | `position` | `(x, y, z)` | World-space; updates local translation. |
@@ -1310,6 +1419,20 @@ All enums are arithmetic, so `int(enum_value)` works and enum values can be assi
 | `Emissive` | Emissive texture. |
 | `Transmission` | Transmission texture. |
 
+### Lights
+
+#### `LightType`
+
+| Value | Meaning |
+| --- | --- |
+| `None_` | Not a light (`0`). |
+| `Directional` | Directional / sun light. |
+| `Spot` | Spot light. |
+| `Point` | Point light. |
+| `Environment` | Environment / HDRI light. |
+
+`SceneNode.light_type` stores the same integer values; compare with `int(caustica.LightType.Point)` or the enum directly.
+
 ## Embedded Mode Notes
 
 In embedded mode, scripts run inside `caustica.exe`:
@@ -1334,6 +1457,8 @@ app.reset_accumulation()
 
 Do not create `caustica.Renderer` in embed mode; the running app already owns the renderer.
 
+`EditorSample` is a compatibility wrapper for older embed scripts that already hold an editor host. Prefer `Sample.*` APIs (`spawn_from_file`, `deform_mesh`, …) for new code.
+
 ## Extension Mode Notes
 
 In extension mode, every `Renderer` owns a GPU device and scene. Use `close()` or a context manager so GPU resources are released promptly.
@@ -1355,12 +1480,22 @@ For windowed extension usage:
 | File | Purpose |
 | --- | --- |
 | `caustica/Python/Examples/offline_render.py` | Headless reference render and screenshot. |
+| `caustica/Python/Examples/realtime_render.py` | Windowed realtime loop. |
+| `caustica/Python/Examples/launch_default_scene.py` | Launch the default scene from Python. |
+| `caustica/Python/Examples/render_default_scene.py` | Batch-render the default scene. |
+| `caustica/Python/Examples/render_default_scene_animated.py` | Animated default-scene capture. |
+| `caustica/Python/Examples/render_assets.py` | Asset sweep / batch render helper. |
+| `caustica/Python/Examples/render_m_plate.py` | OBJ/PBR plate material import example. |
 | `caustica/Python/Examples/test_splat_interactive.py` | Windowed or headless 3DGS rasterization test. |
 | `caustica/Python/Examples/3dgs_example.py` | Batch 3DGS Reference/OIDN and Realtime/DLSS-RR render test. |
 | `caustica/Python/Examples/render_gs_colmap_views.py` | Render 3DGS from COLMAP camera poses with full pinhole intrinsics and optional Mip antialiasing. |
+| `caustica/Python/Examples/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
+| `caustica/Python/Examples/test_envmap_proc_sky.py` | Environment map / procedural sky experiment. |
 | `caustica/Python/Examples/example_basic.py` | Basic embedded scripting. |
 | `caustica/Python/Examples/example_modes_dlss_oidn.py` | Realtime/reference mode, DLSS, OIDN settings. |
 | `caustica/Python/Examples/example_animate_lights.py` | Per-frame light edits. |
+
+Also see `caustica/Python/Examples/README.md` for embed vs extension setup.
 
 ## Introspection
 
