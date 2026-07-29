@@ -21,7 +21,7 @@ Vulkan; install the Vulkan SDK and make its SPIR-V-capable `dxc` available.
 Clone or repair the checkout with:
 
 ```powershell
-git clone --recursive https://github.com/fenghuayumo/caustica.git
+git clone --recursive https://github.com/fenghuayumo/caustica/
 cd caustica
 git submodule update --init --recursive
 ```

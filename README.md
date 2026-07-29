@@ -243,7 +243,7 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
 1. Clone the repository **with all submodules recursively**:
 
    ```powershell
-   git clone --recursive https://github.com/fenghuayumo/caustica.git
+   git clone --recursive https://github.com/fenghuayumo/caustica/
    cd caustica
    ```
 
@@ -403,7 +403,7 @@ If you use Caustica in a research project that leads to a publication, please ci
 
 ```bibtex
 @online{caustica,
-   title   = {Caustica 是一个实时Mesh和3DGS的混合PathTracing渲染库},
+   title   = {Caustica: A Real-Time Hybrid Path Tracing Rendering Library for Meshes and 3D Gaussian Splatting},
    author  = {Bingyang Hu},
    year    = {2026},
    url     = {https://github.com/fenghuayumo/caustica/},
