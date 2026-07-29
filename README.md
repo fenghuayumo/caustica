@@ -30,7 +30,7 @@ At a high level:
 * **Rendering layer** — Unreal Engine–inspired pipeline: dedicated `RenderThread`, extract proxies, `WorldRenderer`, render features, pass graph (`GraphBuilder` + parallel waves), and optional `EnqueueRenderCommand` for Logic→RT work.
 * **Path tracing core** — RTXPT-derived shaders and algorithms, including **ReSTIR PT**, **ReSTIR GI**, **ReSTIR DI**, NEE-AT, path-space decomposition, denoiser guides, NRD, and **DLSS**, wired through the engine stack
 
-The result is a pure path tracer (no rasterization in the main light transport path) suited to both **interactive simulation preview** and **offline / headless synthetic-data rendering**.
+The main mesh renderer is a pure path tracer (no rasterization in its light-transport path), while 3D Gaussian Splats use their dedicated render path. Both are available for **interactive simulation preview** and **offline / headless synthetic-data rendering**.
 
 ## Embodied AI & simulation rendering
 
@@ -59,6 +59,8 @@ What fits embodied-AI workflows well:
 
 Recommended starting points:
 
+* Build, runtime layout, and command line: [docs/build-and-run.md](docs/build-and-run.md)
+* C++ embedding with `EngineApp`: [docs/embedding-cpp.md](docs/embedding-cpp.md)
 * Scene authoring: [docs/scene-json.md](docs/scene-json.md)
 * Materials for sim-to-real variation: [docs/openpbr.md](docs/openpbr.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
@@ -75,7 +77,8 @@ EngineApp / App (frame loop, plugins, schedules)
       ├── update (SystemSet.Simulation)     — gameplay / animation / host systems
       ├── PostUpdate (TransformPropagate)   — hierarchy refresh after other PostUpdate work
       ├── Extract (SystemSet.Extract)       — ECS → SceneRenderData proxies (triple-buffered)
-      └── render / postRender (RT)          — WorldRenderer reads proxies only (no live ECS)
+      ├── dispatch render (RT)              — WorldRenderer reads proxies only (no live ECS)
+      └── postRender / Last (Logic)         — run after dispatch; RT may still be in flight
 
 WorldRenderer (UE-like render pipeline)
  ├── PathTracingContext            — persistent GPU state, settings, bindings
@@ -104,9 +107,9 @@ Key code locations:
 | Scene ECS | `caustica/caustica/include/scene/SceneEcs.h` |
 | Render proxies | `caustica/caustica/include/scene/SceneRenderData.h`, `docs/architecture-render-proxy.md` |
 | RHI threading | `docs/architecture-rhi-threading.md` |
-| World renderer | `caustica/caustica/include/render/worldRenderer/` |
+| World renderer | `caustica/caustica/include/render/WorldRenderer.h`, `caustica/caustica/src/render/WorldRenderer*.cpp` |
 | Render graph | `caustica/caustica/include/render/graph/` |
-| Materials (OpenPBR) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
+| Materials (OpenPBR) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
 | Path tracing shaders | `caustica/caustica/shaders/PathTracer/` |
 | Desktop editor | `application/editor/app/Main.cpp` |
 | Thin client sample | `application/samples/thin_client/Main.cpp` |
@@ -197,21 +200,23 @@ Full field reference: [OpenPBR materials](docs/openpbr.md)
 
 ## Requirements
 
-- Windows 10 20H1 (version 2004-10.0.19041) or newer
-- DXR-capable GPU (DirectX Raytracing 1.1 API or higher; if DXR 1.2 is not available, disable Agility SDK 1.619 in CMake settings)
-- Recent GPU driver with DXR support
-- DirectX 12 or Vulkan API
-- CMake v4.02+
-- Visual Studio 2022 (v143 build tools) or later with Windows 10 SDK version 10.0.20348.0 or 10.0.26100.0 or later
+- C++20 compiler and CMake 3.18 or newer
+- Ray-tracing-capable GPU and a recent vendor driver
+- DirectX 12 on Windows, or Vulkan on Windows/Linux/WSL
+- Visual Studio 2022 with x64 build tools for the primary Windows configuration
+- Python 3.8+ development files when `CAUSTICA_WITH_PYTHON=ON` (default)
+- Recursive Git submodules, including the separate `Assets` repository
+
+See [Building and running Caustica](docs/build-and-run.md) for backend-specific prerequisites and optional SDKs.
 
 ## Known Issues
 
-* By default, Agility SDK 1.619 is enabled and requires DXR 1.2 (Shader Model 6.9). The current setup can only switch to older shader models at build configuration time. If your GPU does not support DXR 1.2 with Shader Model 6.9, set `CAUSTICA_D3D_AGILITY_SDK_PATH`, `CAUSTICA_D3D_AGILITY_SDK_VERSION`, and `CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME` CMake variables to empty before cleaning the `/bin` folder, re-configuring, and rebuilding.
+* Agility SDK `1.619.0` is selected by default on Windows. If the target GPU/driver cannot use the required DXR feature level, configure with an empty `CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME`, recreate the build directory, and rebuild.
 * Enabling Vulkan support requires a couple of manual steps; see [Building Vulkan](#building-vulkan).
 * SER and OMM support on Vulkan is currently work in progress.
 * Running Vulkan on AMD GPUs may trigger a TDR during TLAS building in scenes with null TLAS instances.
 * Enabling the Vulkan debug layer will show a number of warnings and errors; fixes are work in progress.
-* For frame capture and GPU profiling, a vendor graphics debugger is recommended. If using tools such as PIX on Windows, disable `RHI_WITH_NVAPI` and `CAUSTICA_WITH_STREAMLINE` in CMake to avoid compatibility issues. Disabling these settings reduces performance and removes some features.
+* For frame capture and GPU profiling, a vendor graphics debugger is recommended. If using tools such as PIX on Windows, disable `CAUSTICA_RHI_WITH_NVAPI` and `CAUSTICA_WITH_STREAMLINE` in CMake to avoid compatibility issues. Disabling these settings reduces performance and removes some features.
 * There is a known issue resulting in LIVE_DEVICE DirectX warnings at shutdown when Streamline is enabled in Debug builds.
 * There is a known issue with black or incorrect transparencies/reflections on some AMD systems with recent drivers.
 
@@ -222,7 +227,7 @@ Full field reference: [OpenPBR materials](docs/openpbr.md)
 | `/bin` | default CMake folder for binaries and compiled shaders |
 | `/build` | default CMake folder for build files |
 | `/Assets` | models, textures, scene files |
-| `/docs` | architecture, scene JSON, OpenPBR, and related docs |
+| `/docs` | build, embedding, architecture, scene JSON, OpenPBR, and related docs |
 | `/External` | external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM |
 | `/support` | Python packaging / shader cook scripts and optional CLI tools |
 | `/caustica` | engine tree: `caustica/caustica/` (C++), `Python/` bindings, shaders |
@@ -233,30 +238,31 @@ Full field reference: [OpenPBR materials](docs/openpbr.md)
 
 ## Build
 
-Windows is the primary supported platform. Linux/WSL builds use the Vulkan backend and can enable OIDN reference-mode denoising.
+Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the complete option matrix, optional SDK setup, runtime file layout, and troubleshooting, read [Building and running Caustica](docs/build-and-run.md).
 
 1. Clone the repository **with all submodules recursively**:
 
-   ```
-   git clone --recursive <repository-url>
+   ```powershell
+   git clone --recursive https://github.com/fenghuayumo/caustica.git
    cd caustica
    ```
 
-2. Use CMake to configure the build and generate project files:
+2. Configure a 64-bit Visual Studio build:
 
+   ```powershell
+   cmake -S . -B build -G "Visual Studio 17 2022" -A x64
    ```
-   cmake CMakeLists.txt -B ./build
+
+3. Build and run the editor:
+
+   ```powershell
+   cmake --build build --config Release --target caustica
+   .\bin\caustica.exe --scene default.json
    ```
 
-   Use `-G "some tested VS version"` if a specific Visual Studio or toolchain version is required. Make sure the x64 platform is used.
+Optional application targets are `caustica_thin_client` (minimal C++ host) and `caustica_py` (Python extension). Binaries and cooked shaders land under `bin/`; assets are discovered in `Assets/` beside the runtime directory or one directory above it.
 
-3. Build the solution generated by CMake in the `./build/` folder.
-
-   For example, with Visual Studio, open `build/caustica.sln` and build.
-
-4. Select and run the `caustica` project (editor). Optional: build `caustica_thin_client` for the minimal host, or `caustica_py` for the Python extension. Binaries land in `bin`; assets load from `Assets`.
-
-   For a binary distribution, place the `Assets` and `support` folders next to the executable in `bin` (the app searches both `Assets/` and `../Assets/`).
+To build a new C++ host, start with the [C++ embedding guide](docs/embedding-cpp.md) and `application/samples/thin_client`.
 
 ## Python Extension Install
 
@@ -271,10 +277,10 @@ The pip build assembles a local binary wheel from `bin/`, including the native e
 
 | Variable | Default | Values |
 | --- | --- | --- |
-| `caustica_WHEEL_VERSION` | `0.2.0` | Any PEP 440 version |
-| `caustica_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
-| `caustica_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
-| `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
+| `CAUSTICA_WHEEL_VERSION` | `0.6.0` | Any PEP 440 version |
+| `CAUSTICA_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
+| `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
+| `CAUSTICA_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
 By default, wheel builds **cook the coverage PT feature-preset matrix**, verify bins, and package them into `caustica.shaders.<api>.pack` (load-only runtime; no DXC beside the binary).
@@ -322,54 +328,53 @@ renderer.precache_rt_feature_presets()
 
 ## Building Vulkan
 
-Vulkan support is not enabled by default on Windows and requires additional setup:
+Vulkan is off by default on Windows and on by default elsewhere. On Windows:
 
-* Install the Vulkan SDK (tested with VulkanSDK-1.3.290.0) and clear the CMake cache so the correct `dxc.exe` from the Vulkan SDK is used for SPIR-V compilation.
-* Set `CAUSTICA_WITH_VULKAN` and `RHI_WITH_VULKAN` CMake variables to `ON`. `DXC_SPIRV_PATH` should pick up the Vulkan SDK DXC during configuration; set it manually if needed.
-* Run with Vulkan using the `--vk` command-line parameter.
+```powershell
+cmake -S . -B build-vk -G "Visual Studio 17 2022" -A x64 `
+  -DCAUSTICA_WITH_VULKAN=ON
+cmake --build build-vk --config Release --target caustica
+.\bin\caustica.exe --backend vulkan
+```
+
+Install the Vulkan SDK first and set `DXC_SPIRV_PATH` if CMake cannot locate its SPIR-V-capable `dxc`. The root option is `CAUSTICA_WITH_VULKAN`; internal `CAUSTICA_RHI_WITH_VULKAN` is derived automatically.
 
 ## Building Linux / WSL
 
-Linux and WSL builds default to Vulkan and disable Windows-only integrations such as DirectX 12 Agility SDK, NVAPI, and Streamline. DLSS/DLSS-RR uses the native NGX Vulkan path when `CAUSTICA_WITH_NATIVE_DLSS=ON` (default for Linux Vulkan builds). OIDN is downloaded from the official x86_64 Linux package when `CAUSTICA_WITH_OIDN=ON`.
+Linux and WSL default to Vulkan and disable DirectX 12 Agility SDK, NVAPI, and Streamline. After installing the compiler, window-system development packages, and Linux Vulkan SDK:
 
-Recommended WSL setup:
-
-```
-sudo apt update
-sudo apt install -y build-essential cmake ninja-build python3-dev xorg-dev libwayland-dev wayland-protocols
-```
-
-Install the Linux Vulkan SDK and ensure `dxc` is on `PATH`, or set `DXC_SPIRV_PATH` explicitly. Then configure and build:
-
-```
+```bash
 cmake -S . -B build-linux -G Ninja \
   -DCAUSTICA_WITH_VULKAN=ON \
-  -DRHI_WITH_VULKAN=ON \
-  -DCAUSTICA_WITH_NATIVE_DLSS=ON \
-  -DCAUSTICA_WITH_OIDN=ON \
   -DDXC_SPIRV_PATH="$VULKAN_SDK/bin/dxc"
-
-cmake --build build-linux --config Release
+cmake --build build-linux --config Release --target caustica
 ```
 
-On Linux, CMake fetches the DLSS SDK and copies DLSS/DLSS-RR runtime `.so` files next to the executable. Use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` for a build without NGX/DLSS. Streamline-only features such as Reflex and DLSS Frame Generation remain Windows-only in this codebase.
+Native NGX DLSS defaults on with Vulkan; use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` for a build without NGX. OIDN defaults on for x86-64 Linux. See [the full build guide](docs/build-and-run.md#linux-and-wsl) for packages and optional configurations.
 
 ## DirectX 12 Agility SDK
 
-Caustica optionally integrates the [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). If `CAUSTICA_DOWNLOAD_AND_ENABLE_AGILITY_SDK` is `TRUE`, version 717-preview is downloaded via CMake and required build variables are set. For a different version, set `CAUSTICA_D3D_AGILITY_SDK_PATH` and `CAUSTICA_D3D_AGILITY_SDK_VERSION` manually.
+Caustica optionally integrates the [DirectX 12 Agility SDK](https://devblogs.microsoft.com/directx/directx12agility/). `CAUSTICA_D3D_AGILITY_SDK_VERSION_NAME` selects and downloads the SDK; the current default is `1.619.0`. CMake derives the SDK path and numeric version.
 
-Version 717-preview enables native DirectX support for [Shader Execution Reordering](https://devblogs.microsoft.com/directx/ser/) and [Opacity Micromaps](https://devblogs.microsoft.com/directx/omm/). DXR 1.2 / Shader Model 6.9 may require a recent preview or production driver from your GPU vendor.
+Set the version-name option to an empty value to use the system D3D12 runtime, or select one of the preview values listed in the root `CMakeLists.txt`. Recreate the build directory when switching. See [the Agility SDK section](docs/build-and-run.md#directx-12-agility-sdk).
 
 ## Command Line
 
-- `--scene` loads a specific `.scene.json` file; example: `--scene programmer-art.scene.json`
-- `--width` and `--height` set the window size; example: `--width 3840 --height 2160`
-- `--fullscreen` starts in full screen mode; example: `--width 3840 --height 2160 --fullscreen`
-- `--debug` enables the graphics API debug layer and additional validation.
-- `--vk` enables Vulkan (see [Building Vulkan](#building-vulkan))
+Run `caustica.exe --help` for the parser-generated complete list.
+
+- `--scene <file>` selects a scene.
+- `--width <px> --height <px>` and `--fullscreen` configure the window.
+- `--backend <dx12|d3d12|vulkan|vk>` selects a compiled backend; `--vk` and `--vulkan` are aliases.
+- `--debug`, `--adapterIndex <n>`, and `--adapter <text>` configure device creation.
+- `--noWindow` creates an offscreen/headless device; `--syncRender` disables the dedicated render thread.
+- `--pythonScript <file>` and `--pythonExpr <expr>` run automation after scene load.
+
+Rendering overrides and capture-sequence options are listed in [the command-line reference](docs/build-and-run.md#command-line).
 
 ## Developer Documentation
 
+* [Build and run](docs/build-and-run.md)
+* [C++ embedding](docs/embedding-cpp.md)
 * [Scene JSON format](docs/scene-json.md)
 * [OpenPBR materials](docs/openpbr.md)
 * [ECS + render proxies](docs/architecture-render-proxy.md)
@@ -398,15 +403,9 @@ If you use Caustica in a research project that leads to a publication, please ci
 
 ```bibtex
 @online{caustica,
-   title   = {Caustica: Real-Time Path Tracing},
+   title   = {Caustica 是一个实时Mesh和3DGS的混合PathTracing渲染库},
    author  = {Bingyang Hu},
    year    = {2026},
    url     = {https://github.com/fenghuayumo/caustica/},
 }
 ```
-
-## License
-
-See [LICENSE.txt](LICENSE.txt).
-
-Bundled third-party components (including NVAPI, DLSS, NRD, RTXDI, and others) are governed by their respective license terms in `External/` and related notices in `LICENSE.txt`.

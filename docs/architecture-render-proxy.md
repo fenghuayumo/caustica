@@ -16,7 +16,7 @@ SceneWorld (ECS)          Extract                SceneRenderData[N%3]           
 ─────────────────         ───────                ────────────────────          ─────────────
 TransformComponent   ──►  Changed / dirty   ──►  MeshInstanceRenderProxy      read-only
 *LightComponent      ──►  LightData pack    ──►  LightRenderProxy             no getEntityWorld()
-| CameraController     ──►  pose / FOV        ──►  CameraSnapshot (valid)      apply then updateViews
+CameraController     ──►  pose / FOV        ──►  ActiveCameraRenderProxy      apply then updateViews
 PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnapshot       activeSettings()
 ```
 
@@ -32,13 +32,17 @@ PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnaps
 
 ## What is extracted today
 
-`extractSceneRenderData()` + `extractSessionRenderState()` (`scene/SceneRenderExtract.cpp`):
+`extractSceneRenderData()` + `extractSessionRenderState()`
+(`caustica/caustica/src/scene/SceneRenderExtract.cpp`):
 
 - `MeshInstanceRenderProxy` — transform, bounds, mesh, `proxiedAnalyticLight`, `parentLightEntity`
 - `SkinnedMeshRenderProxy` — joint matrices / debug lines
 - `LightRenderProxy` — color, `LightData`, world transform (no shadow maps)
-- `CameraSnapshot` — position / dir / up / FOV / intrinsics
+- `CameraRenderProxy` — every scene camera and its projection/exposure data
+- `ActiveCameraRenderProxy` (`CameraSnapshot` compatibility alias) — resolved free/selected camera pose, FOV, clipping, and intrinsics
+- `GaussianSplatRenderProxy` — entity, enable state, and object-to-world transform
 - `RenderSettingsSnapshot` — `PathTracerSettings` copy, invalidation, picking, splat temporal reset, scene time
+- Immutable material, geometry, and mesh resource snapshots when scene structure changes
 - Entity id lists for cameras / animations
 
 Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs)` into a **3-slot** snapshot.
@@ -55,9 +59,9 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 ## RHI threading
 
-Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md) (Phase 1 MT foundation).
+Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md).
 
-## App scene-edit API (P1)
+## App scene-edit API
 
 Prefer these for application / Python / editor scene edits (no WorldRenderer / AS words):
 
@@ -68,8 +72,9 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 `SetSceneMeshVerticesParams` / `SceneMeshEditing.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
 Editor `game::PropComponentBase` is a sample script layer over ECS, not a second component system.
+For a host-side walkthrough, see [C++ embedding](embedding-cpp.md).
 
-## SystemSet + thin client (P2)
+## SystemSet + thin client
 
 Default SystemSets (`SystemSets.h`):
 
@@ -83,7 +88,7 @@ Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRende
 Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
 (EngineApp + one Simulation system that `spawnFromFile` + `setEntityLocalTransform`).
 
-## Async structure handoff (P0)
+## Async structure handoff
 
 Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous
 proxy packet as `Scene::committedRenderData()`, publishes the new generation, and
@@ -99,14 +104,14 @@ While `structureGpuBuildInFlight()`:
 First structure publish with no prior extract still uses exclusive `flushPendingStructureGpuSync`.
 Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
 
-## Remaining gaps
+## Current status and boundaries
 
 | Item | Status |
 | --- | --- |
 | OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
-| Async structure GPU build | Phase 1+2: committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
-| Parallel RHI command-list recording | Phase 1–3: see [architecture-rhi-threading.md](architecture-rhi-threading.md) (`FrameCommandContext` + GraphBuilder waves) |
+| Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
+| Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `SceneMeshEdit` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
@@ -118,10 +123,10 @@ Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
 
 | Piece | Path |
 | --- | --- |
-| Proxy + session snapshot types | `include/scene/SceneRenderData.h` |
-| Extract | `src/scene/SceneRenderExtract.cpp` |
-| Extract schedule | `src/engine/RenderExtractPlugin.cpp` |
-| Snapshot buffer | `include/scene/SceneRenderSnapshot.h` |
+| Proxy + session snapshot types | `caustica/caustica/include/scene/SceneRenderData.h` |
+| Extract | `caustica/caustica/src/scene/SceneRenderExtract.cpp` |
+| Extract schedule | `caustica/caustica/src/engine/RenderExtractPlugin.cpp` |
+| Snapshot buffer | `caustica/caustica/include/scene/SceneRenderSnapshot.h` |
 | Frame settings binding | `PathTracingContext::activeSettings()` / `WorldRenderer::render()` |
 
 ## Why not a “render ECS”

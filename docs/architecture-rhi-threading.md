@@ -12,7 +12,7 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 
 `caustica::isRenderThread()` is true on the dedicated render thread. When the dedicated thread is disabled, the logic thread temporarily acts as the render thread for GPU work.
 
-## Phase 1 API rules
+## Core API rules
 
 | Operation | Allowed on |
 | --- | --- |
@@ -21,7 +21,7 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 | `queueWaitForCommandList` | Render thread only |
 | `runGarbageCollection` | Render thread only |
 | `waitForIdle` | Render thread only; treat as a sync point |
-| `createTexture` / `createBuffer` / other creates | Render thread only (Phase 1; no device-wide create lock yet) |
+| `createTexture` / `createBuffer` / other creates | Render thread only; there is no general device-wide free-threaded create contract. |
 | `mapBuffer` / `mapStagingTexture` | Render thread; may CPU-wait a fence |
 | Present / swapchain resize | Render thread (`dispatchAndWait` for resize) |
 
@@ -31,9 +31,9 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 - **DX11:** Immediate only. The D3D11 backend upgrades deferred requests to immediate.
 - Mid-frame `close → execute → waitForIdle → open` on a shared list is a **sync point**. Keep it rare, RT-only, and annotated `// THREADING: sync-point, RT-only`. Mark such graph passes `PassOptions::serialOnPrimary`.
 
-## Phase 2: CommandListPool / FrameCommandContext
+## CommandListPool / FrameCommandContext
 
-Headers: `rhi/command_list_pool.h`.
+Headers: `caustica/caustica/include/backend/rhi/command_list_pool.h`.
 
 | Type | Role |
 | --- | --- |
@@ -49,7 +49,7 @@ Headers: `rhi/command_list_pool.h`.
 frameCtx.beginPrimary();
 // ... scene / path-trace prep on frameCtx.primary() ...
 
-// GraphBuilder (Phase 3): parallel waves fork + JobSystem record + submitForks
+// GraphBuilder: parallel waves fork + JobSystem record + submitForks
 graph.execute(frameCtx);
 
 frameCtx.endFrame(); // close + execute primary (and any leftover forks)
@@ -61,7 +61,7 @@ frameCtx.endFrame(); // close + execute primary (and any leftover forks)
 - Workers: record only into lists already returned by `fork()`
 - Do not issue conflicting `permanentState` transitions across forked lists in one submit batch
 
-## Phase 3: GraphBuilder waves
+## GraphBuilder waves
 
 `GraphBuilder::compile` builds dependency waves (including WAR edges). `execute(FrameCommandContext&, ExecuteParams)`:
 
@@ -96,12 +96,12 @@ Implications:
 - `mapBuffer` / `mapStagingTexture` may still CPU-wait a fence (RT-only).
 - Logic-thread `finalizeFrameTiming` must **not** call `runGarbageCollection` when the dedicated render thread is active; GC runs at the end of `executeRenderPhase` on the render thread.
 
-## Backend guarantees (Phase 1)
+## Backend guarantees
 
 - **D3D12:** `Device::m_Mutex` serializes `executeCommandLists`, `queueWaitForCommandList`, `waitForIdle`, and `runGarbageCollection` (including `permanentState` writeback in `CommandList::executed`).
 - **Vulkan:** `Device::m_Mutex` serializes `executeCommandLists` + `executed` writeback and GC; `Queue::m_Mutex` serializes `submit`, wait/signal semaphore staging, and `retireCommandBuffers` (pool acquire in `getOrCreateCommandBuffer` remains free-threaded under the same queue lock).
 
-## Out of scope (next)
+## Out of scope
 
 - Free-threaded resource create across many threads
 - Replacing intrusive `AddRef`/`Release` with non-COM lifetime

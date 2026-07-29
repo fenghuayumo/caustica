@@ -355,13 +355,11 @@ def write_build_project(version: str) -> None:
         '    long_description_content_type="text/markdown",\n'
         '    packages=["caustica"],\n'
         "    include_package_data=True,\n"
-        '    license_files=["LICENSE.txt"],\n'
         "    distclass=BinaryDistribution,\n"
         '    python_requires=">=3.8",\n'
         ")\n",
         encoding="utf-8",
     )
-    copy_file(ROOT / "LICENSE.txt", STAGING_DIR / "LICENSE.txt")
 
 
 def build_wheel() -> Path:

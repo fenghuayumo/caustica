@@ -7,6 +7,22 @@ Existing `.material.json` files remain valid.
 
 When `MaterialModel` is `"OpenPBR"`, the inspector shows OpenPBR parameter names and
 converts them internally to `StandardMaterial` fields and the GPU data layout.
+The JSON reader accepts OpenPBR snake_case fields inside an `OpenPBR` object or
+at the material root. If both legacy/PascalCase fields and an `OpenPBR` object
+are present, the OpenPBR object is read after the legacy fields and therefore
+wins for mapped values. A material without an explicit model defaults to
+OpenPBR unless it requests the legacy specular-gloss workflow.
+
+Authoritative implementation paths:
+
+- `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp` — JSON
+  load/save, editor controls, and GPU constant baking.
+- `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli` —
+  path-tracer lobe evaluation.
+- `caustica/Python/PythonBindingsCore.cpp` — Python property names.
+
+Material override discovery and texture path rules are documented in
+[Scene JSON — 材质覆盖](scene-json.md#材质覆盖).
 
 ## Coverage
 

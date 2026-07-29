@@ -148,7 +148,6 @@ setup(
     packages=["caustica"],
     package_dir={"caustica": "python/caustica"},
     include_package_data=True,
-    license_files=["LICENSE.txt"],
     python_requires=">=3.8",
     distclass=BinaryDistribution,
     cmdclass={"build_py": BuildPyWithRuntime},

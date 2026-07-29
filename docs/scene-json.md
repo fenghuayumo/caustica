@@ -1,6 +1,6 @@
-# RTXPT Scene JSON 格式说明
+# Caustica 场景 JSON 格式
 
-本文档说明 RTXPT 当前支持的场景 JSON 描述方式。场景 JSON 负责描述“加载哪些模型”和“这些对象如何挂到场景图里”；材质参数通常不直接写在 scene JSON 节点中，而是通过 `Assets/Materials` 下的 `.material.json` 文件覆盖。
+本文档说明 Caustica 当前支持的场景 JSON 描述方式。场景 JSON 负责描述“加载哪些模型”和“这些对象如何挂到场景图里”；材质参数通常不直接写在 scene JSON 节点中，而是通过 `Assets/Materials` 下的 `.material.json` 文件覆盖。OpenPBR 字段的完整说明见 [OpenPBR materials](openpbr.md)。
 
 相关实现主要在：
 
@@ -8,8 +8,9 @@
 - `caustica/caustica/src/scene/SceneEcs.cpp`
 - `caustica/caustica/src/scene/SceneObjects.cpp`
 - `caustica/caustica/src/scene/SceneTypes.cpp`
-- `Rtxpt/SampleCommon/ExtendedScene.cpp`
-- `Rtxpt/Materials/MaterialsBaker.cpp`
+- `caustica/caustica/src/scene/SceneComponentBuilders.cpp`
+- `caustica/caustica/src/scene/loader/`
+- `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`
 
 ## 最小示例
 
@@ -86,10 +87,10 @@
 运行：
 
 ```powershell
-.\bin\Rtxpt.exe --scene default.json
+.\bin\caustica.exe --scene default.json
 ```
 
-如果传入的是相对文件名，应用会优先从 `Assets/` 中查找。UI 的场景列表会扫描 `Assets/` 根目录下的 `.json` 和 `.scene.json` 文件。
+Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对文件名，应用会从运行时资源根的 `Assets/` 中查找。运行时目录与资源根的完整解析规则见 [构建和运行指南](build-and-run.md#runtime-files-and-asset-lookup)。
 
 ## 顶层字段
 
@@ -137,8 +138,8 @@
 - scene 文件中的相对模型路径相对于该 scene JSON 文件所在目录解析。
 - 放在 `Assets/` 下的 scene 通常写 `Models/...`。
 - 绝对路径也可以使用，建议使用 `/`，例如 `D:/ScanVideo/models/foo.glb`。
-- 静态 `models` 加载路径支持 `.gltf`、`.glb` 和 `.obj`。`.gltf/.glb` 使用引擎 glTF importer，`.obj` 使用 RTXPT OBJ importer。
-- 如果仍然把 OBJ 转成 GLB，要按 OBJ 的 `(position, texcoord, normal)` 三元组生成顶点，不能只按 position 合并顶点；否则 UV seam 会被破坏，表现为贴图已加载但 atlas 块贴错。OBJ 的 `vt.y` 通常还需要转换为 `1 - v`，与 RTXPT runtime OBJ importer 的行为保持一致。
+- 静态 `models` 与 `spawnFromFile` 支持 `.gltf`、`.glb`、`.obj`、`.urdf`、`.usd`、`.usda` 和 `.usdc`。USD 需要构建时成功启用 `CAUSTICA_WITH_OPENUSD`。静态 `models` 中的其他扩展会回退到 glTF importer；`spawnFromFile` 则会直接报告不支持的格式。
+- 如果仍然把 OBJ 转成 GLB，要按 OBJ 的 `(position, texcoord, normal)` 三元组生成顶点，不能只按 position 合并顶点；否则 UV seam 会被破坏，表现为贴图已加载但 atlas 块贴错。OBJ 的 `vt.y` 通常还需要转换为 `1 - v`，与 Caustica runtime OBJ importer 的行为保持一致。
 
 ## `graph` 节点通用字段
 
@@ -170,11 +171,11 @@
 | `type` | 含义 |
 | --- | --- |
 | `DirectionalLight` | 方向光。 |
-| `PointLight` | 点光。RTXPT 扩展支持 `proxyMeshNodes`。 |
-| `SpotLight` | 聚光灯。RTXPT 扩展支持 `proxyMeshNodes`。 |
-| `EnvironmentLight` | 环境贴图光，RTXPT 扩展类型。 |
+| `PointLight` | 点光。支持 `proxyMeshNodes`。 |
+| `SpotLight` | 聚光灯。支持 `proxyMeshNodes`。 |
+| `EnvironmentLight` | 环境贴图光。 |
 | `PerspectiveCamera` | 透视相机。 |
-| `PerspectiveCameraEx` | RTXPT 扩展透视相机，支持曝光参数。推荐使用这个。 |
+| `PerspectiveCameraEx` | 扩展透视相机，支持曝光参数。推荐使用这个。 |
 | `OrthographicCamera` | 正交相机。 |
 | `GaussianSplat` | 3D Gaussian Splat PLY 节点。 |
 | `GaussianSplats` | `GaussianSplat` 的别名。 |
@@ -371,7 +372,7 @@
 
 ## `SampleSettings`
 
-`SampleSettings` 是 RTXPT 用来初始化 UI/渲染状态的 scene 节点。
+`SampleSettings` 用来初始化 Caustica UI/渲染状态。
 
 ```json
 {
@@ -612,7 +613,7 @@ Assets/Materials/default/antman_merged.antman_merged_0.material.json
 
 - JSON 文件不能写注释。
 - scene JSON 中的 Transform 是节点 Transform；材质参数走 `.material.json`。
-- scene JSON 静态 `models` 已支持 `.gltf`、`.glb`、`.obj`；新增格式时应扩展模型 importer 分发，而不是把所有格式强制转成 glTF。
+- scene JSON 静态 `models` 已支持 `.gltf`、`.glb`、`.obj`、`.urdf` 和可选的 OpenUSD 格式；新增格式时应扩展模型 importer 分发，而不是把所有格式强制转成 glTF。
 - `rotation` 是四元数 XYZW；`verticalFov` 和 `euler` 是弧度；灯光的 `angularSize`、`innerAngle`、`outerAngle` 是度。
 - 3DGS 的外观、排序、阴影等渲染选项目前是全局设置，不是每个 3DGS 节点的独立 scene JSON 字段。
 - scene-specific material 目录名来自文件 stem。`foo.scene.json` 对应 `Assets/Materials/foo.scene/`，不是 `foo/`。
