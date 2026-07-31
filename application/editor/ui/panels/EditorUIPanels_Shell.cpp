@@ -5,6 +5,7 @@
 
 #include <engine/App.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/SceneQuery.h>
 #include <render/AppDiagnostics.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -61,6 +62,19 @@ void EditorUI::BuildMainMenuBar()
 
     if (ImGui::BeginMenu("File"))
     {
+        if (ImGui::MenuItem("Open Scene...", "Ctrl+O"))
+            m_sceneEditor.openSceneFromDialog();
+
+        const bool canSave = m_sceneEditor.canSaveScene();
+        const bool canSaveAs = m_sceneEditor.app()
+            && caustica::isSceneLoaded(*m_sceneEditor.app())
+            && m_sceneEditor.editorState().sceneDocumentValid;
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, canSave || canSaveAs))
+            m_sceneEditor.saveScene();
+        if (ImGui::MenuItem("Save Scene As...", nullptr, false, canSaveAs))
+            m_sceneEditor.saveSceneAsFromDialog();
+
+        ImGui::Separator();
         if (ImGui::MenuItem("Reload Shaders", "F5"))
         {
             // Triggered via existing script/system panels when available.

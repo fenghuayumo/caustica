@@ -8,7 +8,9 @@
 #include <render/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/SceneGaussianSplatPasses.h>
+#include <render/SceneLightingPasses.h>
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/GpuSharedCaches.h>
@@ -18,9 +20,15 @@
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/SceneSession.h>
 #include <core/path_utils.h>
+#include <core/json.h>
+#include <core/log.h>
+#include <platform/file_dialog.h>
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneManager.h>
+#include <scene/scene_utils.h>
 #include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
@@ -29,6 +37,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 
 #if CAUSTICA_WITH_PYTHON
 #include "Python/PythonScripting.h"
@@ -381,6 +390,10 @@ void SceneEditor::onSceneUnloading()
     m_editor.InspectorRotationEntity = caustica::ecs::NullEntity;
     m_editor.InspectorRotationEulerValid = false;
     m_editor.SelectedGaussianSplat = false;
+    m_editorState.sceneDocument = Json::Value();
+    m_editorState.sceneDocumentPath.clear();
+    m_editorState.sceneDocumentValid = false;
+    m_editorState.loadedSceneName.clear();
 
     if (m_sampleGame != nullptr)
         m_sampleGame->sceneUnloading();
@@ -529,6 +542,201 @@ void SceneEditor::syncLoadedSceneSystems()
         return;
 
     m_editorState.loadedSceneName = loadedSceneName;
+
+    m_editorState.sceneDocument = Json::Value();
+    m_editorState.sceneDocumentValid = false;
+    m_editorState.sceneDocumentPath.clear();
+
+    const std::filesystem::path scenePath = caustica::currentScenePath(*m_app);
+    if (scenePath.empty() || caustica::isInlineScenePath(scenePath))
+        return;
+
+    Json::Value document;
+    if (caustica::json::loadFromFile(scenePath, document))
+    {
+        m_editorState.sceneDocument = std::move(document);
+        m_editorState.sceneDocumentPath = scenePath;
+        m_editorState.sceneDocumentValid = true;
+    }
+    else
+    {
+        caustica::warning("Could not cache scene JSON for save: '%s'", scenePath.generic_string().c_str());
+    }
+}
+
+namespace
+{
+
+ecs::Entity FindChildEntityByName(scene::SceneEntityWorld& ew, ecs::Entity parent, const std::string& name)
+{
+    if (!ecs::isValid(parent) || name.empty())
+        return ecs::NullEntity;
+
+    for (ecs::Entity child : ew.getEntityChildren(parent))
+    {
+        if (ew.getEntityName(child) == name)
+            return child;
+    }
+    return ecs::NullEntity;
+}
+
+void WriteLocalTransformToJson(Json::Value& node, const scene::LocalTransformComponent& local)
+{
+    {
+        Json::Value translation(Json::arrayValue);
+        caustica::json::write(translation, local.translation);
+        node["translation"] = translation;
+    }
+    {
+        Json::Value rotation(Json::arrayValue);
+        const dm::double4 xyzw(
+            local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w);
+        caustica::json::write(rotation, xyzw);
+        node["rotation"] = rotation;
+        node.removeMember("euler");
+    }
+    {
+        Json::Value scaling(Json::arrayValue);
+        caustica::json::write(scaling, local.scaling);
+        node["scaling"] = scaling;
+    }
+}
+
+void PatchSceneGraphTransforms(
+    Json::Value& nodes,
+    scene::SceneEntityWorld& ew,
+    ecs::Entity parent)
+{
+    if (!nodes.isArray())
+        return;
+
+    for (Json::Value& node : nodes)
+    {
+        if (!node.isObject() || !node["name"].isString())
+            continue;
+
+        const std::string name = node["name"].asString();
+        const ecs::Entity entity = FindChildEntityByName(ew, parent, name);
+        if (!ecs::isValid(entity))
+            continue;
+
+        if (const auto* local = ew.world().tryGet<scene::LocalTransformComponent>(entity);
+            local && local->hasLocalTransform)
+        {
+            WriteLocalTransformToJson(node, *local);
+        }
+
+        if (node.isMember("children"))
+            PatchSceneGraphTransforms(node["children"], ew, entity);
+    }
+}
+
+void SaveSceneMaterials(App& app)
+{
+    auto* wr = app.tryResource<render::WorldRenderer>();
+    if (!wr)
+        return;
+    if (auto materials = wr->lightingPasses().materials())
+        materials->saveAll();
+}
+
+bool SaveSceneDocumentToPath(
+    App& app,
+    EditorState& editorState,
+    const std::filesystem::path& path)
+{
+    if (!editorState.sceneDocumentValid)
+        return false;
+
+    scene::SceneEntityWorld* ew = caustica::entityWorld(app);
+    if (!ew || !ecs::isValid(ew->root()))
+        return false;
+
+    if (editorState.sceneDocument.isMember("graph"))
+        PatchSceneGraphTransforms(editorState.sceneDocument["graph"], *ew, ew->root());
+
+    if (!caustica::json::saveToFile(path, editorState.sceneDocument))
+        return false;
+
+    editorState.sceneDocumentPath = path;
+    SaveSceneMaterials(app);
+    return true;
+}
+
+} // namespace
+
+bool SceneEditor::canSaveScene() const
+{
+    return m_app
+        && caustica::isSceneLoaded(*m_app)
+        && m_editorState.sceneDocumentValid
+        && !m_editorState.sceneDocumentPath.empty()
+        && !caustica::isInlineScenePath(m_editorState.sceneDocumentPath);
+}
+
+bool SceneEditor::openSceneFromDialog()
+{
+    if (!m_app)
+        return false;
+
+    std::string picked;
+    if (!caustica::FileDialog(
+            true,
+            "Scene files (*.scene.json;*.json)\0*.scene.json;*.json\0All files\0*.*\0",
+            picked))
+        return false;
+
+    caustica::setCurrentScene(*m_app, picked);
+    return true;
+}
+
+bool SceneEditor::saveScene()
+{
+    if (!canSaveScene())
+        return saveSceneAsFromDialog();
+
+    if (!SaveSceneDocumentToPath(*m_app, m_editorState, m_editorState.sceneDocumentPath))
+    {
+        caustica::error("Failed to save scene '%s'", m_editorState.sceneDocumentPath.generic_string().c_str());
+        return false;
+    }
+
+    caustica::info("Saved scene '%s'", m_editorState.sceneDocumentPath.generic_string().c_str());
+    return true;
+}
+
+bool SceneEditor::saveSceneAsFromDialog()
+{
+    if (!m_app || !m_editorState.sceneDocumentValid || !caustica::isSceneLoaded(*m_app))
+        return false;
+
+    std::string picked = m_editorState.sceneDocumentPath.generic_string();
+    if (!caustica::FileDialog(
+            false,
+            "Scene files (*.scene.json)\0*.scene.json\0JSON files (*.json)\0*.json\0All files\0*.*\0",
+            picked))
+        return false;
+
+    std::filesystem::path path(picked);
+    if (path.extension().empty())
+        path += ".scene.json";
+
+    if (!SaveSceneDocumentToPath(*m_app, m_editorState, path))
+    {
+        caustica::error("Failed to save scene '%s'", path.generic_string().c_str());
+        return false;
+    }
+
+    const std::string sceneName = path.filename().generic_string();
+    if (auto* session = m_app->tryResource<SceneSession>(); session && session->manager)
+        session->manager->retargetCurrentScene(sceneName, path);
+
+    if (auto scene = caustica::activeScene(*m_app))
+        caustica::commitActiveScene(*m_app, std::move(scene), sceneName, path);
+
+    m_editorState.loadedSceneName = sceneName;
+    caustica::info("Saved scene as '%s'", path.generic_string().c_str());
+    return true;
 }
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)

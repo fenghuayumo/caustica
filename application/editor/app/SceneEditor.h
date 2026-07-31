@@ -123,6 +123,12 @@ public:
     void updateWindowTitle();
     void afterWorldRender(caustica::GpuDevice& gpuDevice);
 
+    // File menu: open/save scene JSON (Save patches transforms into cached document).
+    bool openSceneFromDialog();
+    bool saveScene();
+    bool saveSceneAsFromDialog();
+    [[nodiscard]] bool canSaveScene() const;
+
     void prepareEditorFrame();
     void captureScriptPostRender(std::function<bool(const char* fileName)> saveTexture);
     ::ZoomTool* getOrCreateZoomTool();

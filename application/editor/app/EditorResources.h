@@ -5,6 +5,9 @@
 
 #include "ui/EditorUIData.h"
 
+#include <json/json.h>
+
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -16,6 +19,10 @@ class CaptureScriptManager;
 struct EditorState
 {
     std::string loadedSceneName;
+    // Source scene JSON cached on load for Save Scene (transform patch-back).
+    Json::Value sceneDocument;
+    std::filesystem::path sceneDocumentPath;
+    bool sceneDocumentValid = false;
 };
 
 struct CaptureScriptState

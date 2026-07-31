@@ -112,6 +112,15 @@ void SceneManager::clearScene()
     m_scene.reset();
 }
 
+void SceneManager::retargetCurrentScene(
+    const std::string& sceneName,
+    const std::filesystem::path& scenePath)
+{
+    m_currentSceneName = sceneName;
+    m_currentScenePath = scenePath;
+    m_inlineSceneJson.clear();
+}
+
 bool SceneManager::beginSceneSwitch(const std::string&           sceneName,
                                     const std::filesystem::path& assetsPath,
                                     bool                         forceReload)

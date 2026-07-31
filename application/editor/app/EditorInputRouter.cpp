@@ -118,6 +118,16 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
             sceneEditor.requestRedo();
             return true;
         }
+        if (key == ToGlfwKey(caustica::Key::O) && !shiftDown)
+        {
+            sceneEditor.openSceneFromDialog();
+            return true;
+        }
+        if (key == ToGlfwKey(caustica::Key::S) && !shiftDown)
+        {
+            sceneEditor.saveScene();
+            return true;
+        }
     }
 
     // I / Shift+I: insert keyframe at current Timeline frame (Blender-style).

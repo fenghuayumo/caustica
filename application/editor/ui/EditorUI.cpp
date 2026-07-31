@@ -160,24 +160,12 @@ void EditorUI::buildUI(void)
         RAII_SCOPE(ImGui::Begin("Render Settings", &m_editorUI.Viewport.ShowRenderSettings);, ImGui::End(););
         RAII_SCOPE(ImGui::PushItemWidth(layout.defItemWidth);, ImGui::PopItemWidth(););
 
-        if (m_sceneEditor.app())
-        {
-            ImGui::TextUnformatted(getGpuDevice()->getRendererString());
-            ImGui::TextUnformatted(caustica::resolutionInfo(*m_sceneEditor.app()).c_str());
-            ImGui::TextUnformatted(caustica::fpsInfo(*m_sceneEditor.app()).c_str());
-        }
-
         if (BuildUIScriptsAndEtc())
         {
             BuildStatusBar();
             return;
         }
 
-        if (BuildSceneComboPanel(layout))
-        {
-            BuildStatusBar();
-            return;
-        }
         BuildScenePanel(layout);
         BuildSampleGamePanel(layout);
         BuildCameraPanel(layout);

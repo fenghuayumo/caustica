@@ -348,6 +348,7 @@ public:
                                     getShaderPermutationTable() const       { return m_shaderPermutationTable; }
 
     bool                            saveSingle(StandardMaterialBase& material);
+    void                            saveAll();
     bool                            loadSingle(StandardMaterialBase& material);
     bool                            setMaterialTexture(
                                         StandardMaterial& material,
@@ -366,7 +367,6 @@ private:
 
     std::shared_ptr<StandardMaterial> load(const std::string & modelFileName, const std::string& name);
     std::shared_ptr<StandardMaterial> importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
-    void                            saveAll();
 
     void                            completeDeferredTexturesLoad(caustica::rhi::CommandList* commandList);
     void                            recordTexture(const StandardMaterialTexture& texture);

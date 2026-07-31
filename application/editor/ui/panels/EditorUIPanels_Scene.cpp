@@ -35,178 +35,112 @@ using namespace caustica::editor;
 namespace caustica::editor
 {
 
-bool EditorUI::BuildSceneComboPanel(const PanelLayout& layout)
+void EditorUI::BuildScenePanel(const PanelLayout& layout)
 {
-    bool sceneChangeRequested = false;
-    std::string requestedScene;
-
+    uint uncompressedTextureCount = (uint)m_sceneEditor.uncompressedTextures().size();
+    if (uncompressedTextureCount > 0)
     {
-        const std::string currentScene = caustica::currentSceneName(*m_sceneEditor.app());
-        RAII_SCOPE(ImGui::PushItemWidth(-60.0f * m_currentScale); , ImGui::PopItemWidth(); );
-        RAII_SCOPE(ImGui::PushID("SceneComboID"); , ImGui::PopID(); );
-        if (ImGui::BeginCombo("Scene", currentScene.c_str()))
+        ImGui::TextColored(warnColor, "Scene has %d uncompressed textures", uncompressedTextureCount);
+        if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
+            if (compressTextures(m_sceneEditor.uncompressedTextures()))
+                caustica::setCurrentScene(*m_sceneEditor.app(), caustica::currentSceneName(*m_sceneEditor.app()), true);
+    }
+
+    if (m_sceneEditor.game() && m_sceneEditor.game()->IsInitialized())
+    {
+        if (ImGui::CollapsingHeader("Interactive elements"))
         {
-            const std::vector<std::string>& scenes = caustica::availableScenes(*m_sceneEditor.app());
-            for (const std::string& scene : scenes)
-            {
-                bool is_selected = scene == currentScene;
-                if (ImGui::Selectable(scene.c_str(), is_selected) && !is_selected)
-                {
-                    requestedScene = scene;
-                    sceneChangeRequested = true;
-                }
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
+            RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
+            m_sceneEditor.game()->debugGUI(layout.indent);
         }
     }
 
-    if (sceneChangeRequested)
+    if (m_editorUI.TogglableNodes != nullptr && m_editorUI.TogglableNodes->size() > 0 && ImGui::CollapsingHeader("Togglables"))
     {
-        caustica::setCurrentScene(*m_sceneEditor.app(), requestedScene);
-        return true;
+        for (int i = 0; i < m_editorUI.TogglableNodes->size(); i++)
+        {
+            auto& node = (*m_editorUI.TogglableNodes)[i];
+            bool selected = node.IsSelected();
+            if (ImGui::Checkbox(node.UIName.c_str(), &selected))
+            {
+                node.SetSelected(selected);
+                m_settings.ResetAccumulation = true;
+            }
+        }
     }
 
-    return false;
-}
+    if (m_runtime.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
+    {
+        RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-void EditorUI::BuildScenePanel(const PanelLayout& layout)
-{
-        if (ImGui::CollapsingHeader("Scene", ImGuiTreeNodeFlags_DefaultOpen))
+        RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
+        GaussianSplatModeCombo(m_ui);
+        GaussianSplatShadowsModeCombo(m_ui);
+
+        if (ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-            uint uncompressedTextureCount = (uint)m_sceneEditor.uncompressedTextures().size();
-            if (uncompressedTextureCount > 0)
-            {
-                ImGui::TextColored(warnColor, "Scene has %d uncompressed textures", uncompressedTextureCount);
-                if (ImGui::Button("Batch compress with nvtt_export.exe", { -1, 0 }))
-                    if (compressTextures(m_sceneEditor.uncompressedTextures()))
-                    {   // reload scene
-                        caustica::setCurrentScene(*m_sceneEditor.app(), caustica::currentSceneName(*m_sceneEditor.app()), true);
-                    }
-            }
 
+            RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
+            RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
+            RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
+            RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
+            RESET_ON_CHANGE(ImGui::DragFloat("Depth Iso Threshold", &m_settings.GaussianSplatDepthIsoThreshold, 0.01f, 0.0f, 1.0f, "%.2f"));
+            RESET_ON_CHANGE(ImGui::Checkbox("Fragment shader barycentric", &m_settings.GaussianSplatFragmentShaderBarycentric));
+
+            ImGui::SeparatorText("Culling");
+            bool cullingChanged = false;
+            cullingChanged |= ImGui::RadioButton("Disabled", &m_settings.GaussianSplatFrustumCulling, 0);
+            cullingChanged |= ImGui::RadioButton("At distance stage", &m_settings.GaussianSplatFrustumCulling, 1);
+            cullingChanged |= ImGui::RadioButton("At raster stage", &m_settings.GaussianSplatFrustumCulling, 2);
+            RESET_ON_CHANGE(cullingChanged);
+            RESET_ON_CHANGE(ImGui::DragFloat("Frustum dilation", &m_settings.GaussianSplatFrustumDilation, 0.01f, 0.0f, 1.0f, "%.2f"));
+            RESET_ON_CHANGE(ImGui::Checkbox("Screen size culling", &m_settings.GaussianSplatScreenSizeCulling));
+            ImGui::BeginDisabled(!m_settings.GaussianSplatScreenSizeCulling);
+            RESET_ON_CHANGE(ImGui::DragFloat("Min pixel coverage", &m_settings.GaussianSplatMinPixelCoverage, 0.1f, 0.1f, 20.0f, "%.2f"));
+            ImGui::EndDisabled();
+        }
+
+        if (ImGui::CollapsingHeader("Emission", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+
+            RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
+            ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
+            RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
+            if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
             {
-                UI_SCOPED_DISABLE(!m_settings.RealtimeMode);
-                ImGui::Checkbox("Enable animations", &m_settings.EnableAnimations);
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Animations are not available in reference mode");
+                m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
+                m_settings.ResetAccumulation = true;
             }
-            ImGui::SameLine();
-            if (ImGui::Button("reset animation time"))
+            ImGui::EndDisabled();
+        }
+
+        if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED
+            && ImGui::CollapsingHeader("Ray Tracing", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+
+            bool asChanged = false;
+            asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);
+            asChanged |= GaussianSplatRtxParticleFormatCombo(m_ui);
+            asChanged |= ImGui::Checkbox("Adaptive clamp", &m_settings.GaussianSplatRtxAdaptiveClamp);
+            if (asChanged)
             {
-                m_sceneEditor.setSceneTime(0);
+                m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
                 m_settings.ResetAccumulation = true;
             }
 
-            if (m_sceneEditor.game() && m_sceneEditor.game()->IsInitialized())
+            if (ResolveGaussianSplatShadowMode(m_ui) == GAUSSIAN_SPLAT_SHADOWS_SOFT)
             {
-                if (ImGui::CollapsingHeader("Interactive elements"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
-                {
-                    RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                    m_sceneEditor.game()->debugGUI(layout.indent);
-                }
+                RESET_ON_CHANGE(ImGui::DragFloat("Soft shadow radius", &m_settings.GaussianSplatShadowSoftRadius, 0.01f, 0.0f, 0.5f, "%.2f"));
+                RESET_ON_CHANGE(ImGui::InputInt("Soft shadow samples", &m_settings.GaussianSplatShadowSoftSampleCount, 1, 4));
+                m_settings.GaussianSplatShadowSoftSampleCount = dm::clamp(m_settings.GaussianSplatShadowSoftSampleCount, 1, 16);
             }
 
-            if (m_editorUI.TogglableNodes != nullptr && m_editorUI.TogglableNodes->size() > 0 && ImGui::CollapsingHeader("Togglables"))
-            {
-                for (int i = 0; i < m_editorUI.TogglableNodes->size(); i++)
-                {
-                    auto& node = (*m_editorUI.TogglableNodes)[i];
-                    bool selected = node.IsSelected();
-                    if (ImGui::Checkbox(node.UIName.c_str(), &selected))
-                    {
-                        node.SetSelected(selected);
-                        m_settings.ResetAccumulation = true;
-                    }
-                }
-            }
-
-            if (m_runtime.GaussianSplats.SplatCount > 0 && ImGui::CollapsingHeader("3D Gaussian Splats"))
-            {
-                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-                RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
-                GaussianSplatModeCombo(m_ui);
-                GaussianSplatShadowsModeCombo(m_ui);
-
-                if (ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-                    RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
-                    RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
-                    RESET_ON_CHANGE(ImGui::DragFloat("Depth Iso Threshold", &m_settings.GaussianSplatDepthIsoThreshold, 0.01f, 0.0f, 1.0f, "%.2f"));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Fragment shader barycentric", &m_settings.GaussianSplatFragmentShaderBarycentric));
-
-                    ImGui::SeparatorText("Culling");
-                    bool cullingChanged = false;
-                    cullingChanged |= ImGui::RadioButton("Disabled", &m_settings.GaussianSplatFrustumCulling, 0);
-                    cullingChanged |= ImGui::RadioButton("At distance stage", &m_settings.GaussianSplatFrustumCulling, 1);
-                    cullingChanged |= ImGui::RadioButton("At raster stage", &m_settings.GaussianSplatFrustumCulling, 2);
-                    RESET_ON_CHANGE(cullingChanged);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Frustum dilation", &m_settings.GaussianSplatFrustumDilation, 0.01f, 0.0f, 1.0f, "%.2f"));
-                    RESET_ON_CHANGE(ImGui::Checkbox("Screen size culling", &m_settings.GaussianSplatScreenSizeCulling));
-                    ImGui::BeginDisabled(!m_settings.GaussianSplatScreenSizeCulling);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Min pixel coverage", &m_settings.GaussianSplatMinPixelCoverage, 0.1f, 0.1f, 20.0f, "%.2f"));
-                    ImGui::EndDisabled();
-                }
-
-                if (ImGui::CollapsingHeader("Emission", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-                    RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
-                    ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
-                    RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-                    if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
-                    {
-                        m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
-                        m_settings.ResetAccumulation = true;
-                    }
-                    ImGui::EndDisabled();
-                }
-
-                if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED
-                    && ImGui::CollapsingHeader("Ray Tracing", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-                    bool asChanged = false;
-                    asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);
-                    asChanged |= GaussianSplatRtxParticleFormatCombo(m_ui);
-                    asChanged |= ImGui::Checkbox("Adaptive clamp", &m_settings.GaussianSplatRtxAdaptiveClamp);
-                    if (asChanged)
-                    {
-                        m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
-                        m_settings.ResetAccumulation = true;
-                    }
-
-                    if (ResolveGaussianSplatShadowMode(m_ui) == GAUSSIAN_SPLAT_SHADOWS_SOFT)
-                    {
-                        RESET_ON_CHANGE(ImGui::DragFloat("Soft shadow radius", &m_settings.GaussianSplatShadowSoftRadius, 0.01f, 0.0f, 0.5f, "%.2f"));
-                        RESET_ON_CHANGE(ImGui::InputInt("Soft shadow samples", &m_settings.GaussianSplatShadowSoftSampleCount, 1, 4));
-                        m_settings.GaussianSplatShadowSoftSampleCount = dm::clamp(m_settings.GaussianSplatShadowSoftSampleCount, 1, 16);
-                    }
-
-                    RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_settings.GaussianSplatRtxParticleShadowOffset, 0.01f, 0.0f, 1.0f, "%.2f"));
-                }
-            }
-
-            // Environment Map / Sky moved to Hierarchy → Environment Light → Inspector
-            // (Blender-style: world lighting is a scene entity, not a render-settings dump).
-
-            if (ImGui::CollapsingHeader("Materials"))
-            {
-                RAII_SCOPE( ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                if (auto& materialGpuCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials(); materialGpuCache != nullptr)
-                    materialGpuCache->debugGui(layout.indent);
-            }
+            RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_settings.GaussianSplatRtxParticleShadowOffset, 0.01f, 0.0f, 1.0f, "%.2f"));
         }
-
-
+    }
 }
 
 void EditorUI::BuildSampleGamePanel(const PanelLayout& layout)

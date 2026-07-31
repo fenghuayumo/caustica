@@ -42,6 +42,9 @@ public:
 
     void clearScene();
 
+    // Update name/path without reloading (e.g. Save Scene As).
+    void retargetCurrentScene(const std::string& sceneName, const std::filesystem::path& scenePath);
+
     bool beginSceneSwitch(const std::string& sceneName,
                           const std::filesystem::path& assetsPath,
                           bool forceReload);
