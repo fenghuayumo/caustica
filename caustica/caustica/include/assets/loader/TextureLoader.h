@@ -33,7 +33,11 @@ public:
         AssetStore<ImageAsset>& images);
     ~TextureLoader();
 
+    // Clears cached textures and unregisters them. Idempotent.
     void reset();
+    // Drop registry/image store pointers so a late destructor cannot UAF after
+    // AssetSystem has torn down its members. Call only from AssetSystem::shutdown.
+    void detachFromStores();
 
     Handle<ImageAsset> loadTextureFromFile(
         const std::filesystem::path& path,
@@ -99,8 +103,9 @@ private:
     std::mutex m_TexturesToFinalizeMutex;
 
     std::shared_ptr<IFileSystem> m_fs;
-    AssetRegistry& m_Registry;
-    AssetStore<ImageAsset>& m_Images;
+    // Non-owning; nulled by detachFromStores() when AssetSystem shuts down.
+    AssetRegistry* m_Registry = nullptr;
+    AssetStore<ImageAsset>* m_Images = nullptr;
 
     uint32_t m_MaxTextureSize = 0;
     bool m_GenerateMipmaps = true;

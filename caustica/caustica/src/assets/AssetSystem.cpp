@@ -45,6 +45,11 @@ void AssetSystem::shutdown()
     if (!m_Initialized)
         return;
 
+    // Detach before clearing stores / dropping the shared_ptr so any leftover
+    // Scene/shared holders cannot UAF m_Registry/m_Images in ~TextureLoader.
+    if (m_TextureLoader)
+        m_TextureLoader->detachFromStores();
+
     m_ArtifactCache.clear();
     m_HotReload.clear();
     m_Dependencies.clear();

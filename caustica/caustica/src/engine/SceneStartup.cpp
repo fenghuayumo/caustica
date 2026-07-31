@@ -133,6 +133,9 @@ void registerGpuRenderShutdown(App& app)
     app.addSystem<system_label::GpuRenderShutdown>(AppSchedule::shutdown, [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->shutdown();
+        // SceneSession reset drops SceneManager's scene, but ActiveScene may still
+        // keep the Scene (+ TextureLoader) alive until AssetSystemShutdown.
+        clearActiveScene(ctx.app);
     });
 }
 

@@ -57,8 +57,8 @@ TextureLoader::TextureLoader(
     : m_Device(device)
     , m_DescriptorTable(std::move(descriptorTable))
     , m_fs(std::move(fs))
-    , m_Registry(registry)
-    , m_Images(images)
+    , m_Registry(&registry)
+    , m_Images(&images)
 {
 }
 
@@ -69,13 +69,23 @@ TextureLoader::~TextureLoader()
 
 void TextureLoader::reset()
 {
-    m_Images.forEach([&](const AssetId& id, std::shared_ptr<ImageAsset>) {
-        m_Registry.unregisterAsset(id);
+    if (!m_Registry || !m_Images)
+        return;
+
+    m_Images->forEach([&](const AssetId& id, std::shared_ptr<ImageAsset>) {
+        m_Registry->unregisterAsset(id);
     });
 
-    m_Images.clear();
+    m_Images->clear();
     m_TexturesRequested = 0;
     m_TexturesLoaded = 0;
+}
+
+void TextureLoader::detachFromStores()
+{
+    reset();
+    m_Registry = nullptr;
+    m_Images = nullptr;
 }
 
 void TextureLoader::setGenerateMipmaps(bool generateMipmaps)
@@ -88,18 +98,18 @@ void TextureLoader::registerTextureAsset(const std::shared_ptr<ImageAsset>& text
     if (texture->path.empty())
         return;
 
-    AssetId id = m_Registry.registerAsset(texture->path, AssetType::Texture);
+    AssetId id = m_Registry->registerAsset(texture->path, AssetType::Texture);
     texture->id = id;
-    m_Registry.setState(id, AssetState::Loaded);
+    m_Registry->setState(id, AssetState::Loaded);
 }
 
 bool TextureLoader::findTextureInCache(const std::filesystem::path& path, std::shared_ptr<ImageAsset>& texture)
 {
-    AssetId id = m_Registry.findByPath(path);
+    AssetId id = m_Registry->findByPath(path);
 
     if (id.isValid())
     {
-        texture = m_Images.get(id);
+        texture = m_Images->get(id);
         if (texture)
             return true;
     }
@@ -108,10 +118,10 @@ bool TextureLoader::findTextureInCache(const std::filesystem::path& path, std::s
     texture->path = path.generic_string();
 
     if (!id.isValid())
-        id = m_Registry.registerAsset(path, AssetType::Texture);
+        id = m_Registry->registerAsset(path, AssetType::Texture);
 
     texture->id = id;
-    (void)m_Images.insert(id, texture);
+    (void)m_Images->insert(id, texture);
 
     ++m_TexturesRequested;
     return false;
@@ -383,9 +393,9 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
-    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    AssetId id = m_Registry->registerAsset(name, AssetType::Texture);
     texture->id = id;
-    (void)m_Images.insert(id, texture);
+    (void)m_Images->insert(id, texture);
 
     threadPool.addTask([this, texture, data, mimeType]()
     {
@@ -416,9 +426,9 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemory(
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
-    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    AssetId id = m_Registry->registerAsset(name, AssetType::Texture);
     texture->id = id;
-    (void)m_Images.insert(id, texture);
+    (void)m_Images->insert(id, texture);
 
     if (fillTextureData(data, texture, "", mimeType))
     {
@@ -441,9 +451,9 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryDeferred(
     texture->forceSRGB = sRGB;
     texture->path = name;
     texture->mimeType = mimeType;
-    AssetId id = m_Registry.registerAsset(name, AssetType::Texture);
+    AssetId id = m_Registry->registerAsset(name, AssetType::Texture);
     texture->id = id;
-    (void)m_Images.insert(id, texture);
+    (void)m_Images->insert(id, texture);
 
     if (fillTextureData(data, texture, "", mimeType))
     {
@@ -459,10 +469,13 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryDeferred(
 
 std::shared_ptr<ImageAsset> TextureLoader::getLoadedTexture(std::filesystem::path const& path)
 {
-    AssetId id = m_Registry.findByPath(path);
+    if (!m_Registry || !m_Images)
+        return nullptr;
+
+    AssetId id = m_Registry->findByPath(path);
     if (!id.isValid())
         return nullptr;
-    return m_Images.get(id);
+    return m_Images->get(id);
 }
 
 void TextureLoader::setMaxTextureSize(uint32_t size)
@@ -482,15 +495,18 @@ bool TextureLoader::isTextureFinalized(const Handle<ImageAsset>& texture)
 
 bool TextureLoader::unloadTexture(const Handle<ImageAsset>& texture)
 {
+    if (!m_Registry || !m_Images)
+        return false;
+
     AssetId id = texture.id();
     if (!id.isValid())
         return false;
 
-    if (!m_Images.get(id))
+    if (!m_Images->get(id))
         return false;
 
-    m_Registry.unregisterAsset(id);
-    m_Images.remove(id);
+    m_Registry->unregisterAsset(id);
+    m_Images->remove(id);
     return true;
 }
 
