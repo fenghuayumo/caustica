@@ -8,21 +8,23 @@
 namespace caustica
 {
 
-// Progress bar helper — shows a native OS progress window during long operations.
+// Progress bar helper — shows a compact native progress card during long operations.
 // Usage:
 //   ProgressBar bar("Loading scene...");
 //   bar.Set(50);
 //   // ... work ...
 //   bar.Set(100);
 //   // bar.stop() called automatically in destructor
+//
+// Calling start() again while active updates the status text in place (no flicker).
 class ProgressBar
 {
 public:
     ProgressBar() = default;
-    explicit ProgressBar(const char* windowText) { start(windowText); }
+    explicit ProgressBar(const char* statusText) { start(statusText); }
     ~ProgressBar() { stop(); }
 
-    bool start(const char* windowText);
+    bool start(const char* statusText);
     void Set(int percentage);
     void stop();
     [[nodiscard]] bool Active() const;

@@ -395,11 +395,11 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     if (ctx.needNewPasses)
     {
         // Only show the OS progress dialog on cold init / first material bootstrap.
-        // Viewport resize also sets needNewPasses; flashing "Initializing renderer..."
+        // Viewport resize also sets needNewPasses; flashing a progress card
         // on every dock drag is poor UX and causes visible flicker.
         const bool coldInit = (m_context->scenePasses.lighting.materials() == nullptr);
         if (coldInit)
-            m_context->diagnostics.progressInitializingRenderer.start("Initializing renderer...");
+            m_context->diagnostics.progressInitializingRenderer.start("Preparing renderer...");
 
         if (coldInit)
         {

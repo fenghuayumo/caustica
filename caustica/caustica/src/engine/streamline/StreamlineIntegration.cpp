@@ -626,38 +626,46 @@ void StreamlineIntegration::shutdown()
     if (!m_slInitialized)
         return;
 
-    // free feature resources before slShutdown. Without this (especially DLSS-G),
-    // window close can hang or crash while Streamline still owns live GPU work.
+    // Teardown path: never pop MessageBox for Streamline cleanup noise.
+    // slShutdown can still return eErrorExceptionHandler when host tags already
+    // point at destroyed textures; that must not block window close.
+    caustica::enableOutputToMessageBox(false);
+
+    // Drain GPU before freeing SL-owned resources / plugin unload.
+    if (m_device)
+    {
+        m_device->waitForIdle();
+        m_device->runGarbageCollection();
+    }
+
+    // Disable frame generation before freeResources — leaving DLSS-G On through
+    // plugin unload is a common source of eErrorExceptionHandler in slShutdown.
     if (m_dlssgAvailable)
+    {
+        DLSSGOptions off{};
+        off.mode = DLSSGMode::eOff;
+        setDLSSGOptions(off);
         cleanupDLSSG(false);
+    }
     if (m_dlssAvailable)
         cleanupDLSS(false);
     if (m_dlssrrAvailable)
         cleanupDLSSRR(false);
+    if (m_nisAvailable)
+        cleanupNIS(false);
     if (m_deepdvcAvailable)
         cleanupDeepDVC();
 
-    // Un-set all tags
-    sl::ResourceTag inputs[] = 
-    {
-        sl::ResourceTag{nullptr, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeBackbuffer, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeAlbedo, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeSpecularAlbedo, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeNormals, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeRoughness, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeSpecularHitDistance, sl::ResourceLifecycle::eValidUntilPresent},
-        sl::ResourceTag{nullptr, sl::kBufferTypeSpecularMotionVectors, sl::ResourceLifecycle::eValidUntilPresent}
-    };
-    successCheck(slSetTag(m_viewport, inputs, _countof(inputs), nullptr), "slSetTag_clear");
+    // Skip slSetTag(nullptr...) clear: after WorldRenderer teardown the previous
+    // tags reference destroyed resources, and clearing them can throw inside SL.
 
-    // shutdown Streamline
-    successCheck(slShutdown(), "slShutdown");
+    const sl::Result shutdownResult = slShutdown();
+    if (shutdownResult != sl::Result::eOk)
+        caustica::warning("Streamline slShutdown returned %d", static_cast<int>(shutdownResult));
+
     m_slInitialized = false;
+    m_device = nullptr;
+    m_currentFrame = nullptr;
 }
 
 void StreamlineIntegration::setViewport(uint32_t viewportIndex)
@@ -1285,12 +1293,17 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
 
 void StreamlineIntegration::releaseResourceCallback(sl::Resource* resource, void* device)
 {
-    if (resource)
-    {
-        auto i = (IUnknown*)resource->native;
-        i->Release();
-    }
-};
+    (void)device;
+    if (!resource || !resource->native)
+        return;
+
+    // slShutdown / slFreeResources may invoke this more than once for the same
+    // allocation; releasing a null/already-cleared native pointer throws and
+    // surfaces as eErrorExceptionHandler.
+    auto* unknown = static_cast<IUnknown*>(resource->native);
+    resource->native = nullptr;
+    unknown->Release();
+}
 
 #if CAUSTICA_WITH_DX12
 D3D12_RESOURCE_STATES D3D12convertResourceStates(caustica::rhi::ResourceStates stateBits)

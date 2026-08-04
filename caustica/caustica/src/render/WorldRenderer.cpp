@@ -768,6 +768,10 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     if (!gpuHandles.valid())
         return;
 
+    // Cold init / early structure sync can run before MaterialGpuCache exists.
+    if (!m_context->scenePasses.lighting.materials() || !m_renderTargets)
+        return;
+
     caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
     caustica::rhi::Buffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.

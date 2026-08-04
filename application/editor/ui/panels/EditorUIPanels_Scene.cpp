@@ -74,14 +74,30 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
         RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
         RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
-        GaussianSplatModeCombo(m_ui);
-        GaussianSplatShadowsModeCombo(m_ui);
+        RESET_ON_CHANGE(GaussianSplatPrimaryMethodCombo(m_ui));
+        RESET_ON_CHANGE(GaussianSplatShadowsModeCombo(m_ui));
 
         if (ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
             RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
+            RESET_ON_CHANGE(GaussianSplatFormatCombo("SH Format", &m_settings.GaussianSplatSHFormat));
+            RESET_ON_CHANGE(GaussianSplatFormatCombo("RGBA Format", &m_settings.GaussianSplatRGBAFormat));
+            if (m_settings.GaussianSplatPrimaryMethod == 0)
+            {
+                const bool projectionChanged = SettingsCombo(
+                    "Projection",
+                    &m_settings.GaussianSplatProjectionMethod,
+                    "Eigen\0Conic (tight floaters)\0\0");
+                m_settings.GaussianSplatProjectionMethod = dm::clamp(m_settings.GaussianSplatProjectionMethod, 0, 1);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "3DGS EWA submode only (ignored by 3DGUT).\n"
+                        "Conic: opacity-tight axis-aligned extents.\n"
+                        "Eigen: oriented ellipses with the same opacity-tight factor.");
+                RESET_ON_CHANGE(projectionChanged);
+            }
             RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
             RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
             RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
@@ -117,9 +133,10 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
         }
 
         if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED
-            && ImGui::CollapsingHeader("Ray Tracing", ImGuiTreeNodeFlags_DefaultOpen))
+            && ImGui::CollapsingHeader("Mesh Shadow RT", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+            ImGui::TextDisabled("Shadows use mesh BVH rays; primary stays 3DGS/3DGUT.");
 
             bool asChanged = false;
             asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);

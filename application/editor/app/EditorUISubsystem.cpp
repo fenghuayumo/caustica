@@ -98,7 +98,7 @@ void EditorUISubsystem::prepareViewportForRender(caustica::GpuDevice& gpuDevice)
     }
 
     // Quantize + debounce: continuous dock/window drags would otherwise recreate
-    // path-tracer targets every frame and flash "Initializing renderer...".
+    // path-tracer targets every frame and flash the progress card.
     constexpr uint32_t kQuantize = 4u;
     constexpr auto kSettle = std::chrono::milliseconds(150);
     const uint32_t desiredW = std::max(16u, (vp.DesiredWidth + kQuantize / 2u) / kQuantize * kQuantize);

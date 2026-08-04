@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <unordered_set>
+#include <vector>
 
 namespace caustica
 {
@@ -127,6 +128,9 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
     }
 
     auto* entityWorld = passes.m_sessionScene->getEntityWorld();
+    // Destroy after iteration — despawning mid-each<> is unsafe.
+    std::vector<ecs::Entity> failedEntities;
+
     entityWorld->world().each<scene::GaussianSplatComponent>(
         [&](ecs::Entity entity, scene::GaussianSplatComponent& component)
         {
@@ -138,14 +142,16 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
             if (splatPath.empty())
             {
                 caustica::error(
-                    "Gaussian Splat entity '%s' has no path/file field.",
+                    "Gaussian Splat entity '%s' has no path/file field; removing entity.",
                     entityWorld->getEntityName(entity).c_str());
+                failedEntities.push_back(entity);
                 return;
             }
 
             auto pass = std::make_shared<GaussianSplatPass>(
                 passes.m_gpuDevice->getDevice(), passes.m_shaderFactory);
-            if (pass->loadFromFile(splatPath, splat.convertRdfToRub))
+            if (pass->loadFromFile(splatPath, splat.convertRdfToRub)
+                && pass->getSplatCount() > 0)
             {
                 splat.resolvedPath = splatPath.string();
                 splat.loadedSplatCount = pass->getSplatCount();
@@ -156,15 +162,23 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
                 object.entity = entity;
                 object.pass = std::move(pass);
                 passes.m_objects.push_back(std::move(object));
+                return;
             }
-            else
-            {
-                caustica::error(
-                    "Failed to load Gaussian Splat entity '%s' from '%s'.",
-                    entityWorld->getEntityName(entity).c_str(),
-                    splatPath.string().c_str());
-            }
+
+            caustica::error(
+                "Failed to load Gaussian Splat entity '%s' from '%s'; removing entity.",
+                entityWorld->getEntityName(entity).c_str(),
+                splatPath.string().c_str());
+            failedEntities.push_back(entity);
         });
+
+    for (ecs::Entity entity : failedEntities)
+        entityWorld->destroyEntity(entity);
+
+    // Do not requestGpuStructureSync here. Failed splats never contributed GPU
+    // resources, and during onSceneLoaded materials/AS may not exist yet —
+    // early structure sync would crash in recreateBindingSet. Hierarchy reads
+    // live ECS, so destroyEntity is enough; the next extract picks up the change.
 
     passes.updateUIState();
     if (passes.m_onTemporalReset)

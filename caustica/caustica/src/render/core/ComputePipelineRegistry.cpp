@@ -249,7 +249,7 @@ void ComputePipelineRegistry::update(bool forceReload)
         progressTotal = (int)m_parallelCompileListUnique.size();
         
         if (progressTotal > 0)
-            progressCompilingShaders.start(stringFormat("Compiling compute shaders (%d)...", progressTotal).c_str());
+            progressCompilingShaders.start("Preparing shaders...");
 
         // Compile shaders (potentially in parallel)
         for (auto& [name, variant] : m_parallelCompileListUnique)

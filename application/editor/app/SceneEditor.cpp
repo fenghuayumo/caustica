@@ -242,7 +242,7 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     , m_inputRouter()
     , m_contentEditor(*this)
 {
-    m_viewState.progressLoading.start("Initializing...");
+    m_viewState.progressLoading.start("Starting up...");
     m_viewState.progressLoading.Set(50);
     m_inputRouter.bind(*this);
     m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_renderAppState, m_cmdLine);

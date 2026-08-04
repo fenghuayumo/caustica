@@ -904,11 +904,11 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         std::atomic_int progressCounterCompleted;
         int progressTotal;
 
-        ProgressBar progressCompilingShaders;
+        ProgressBar progressPreparing;
         progressCounterCompleted = 0;
         progressTotal = (int)m_parallelCompileListUnique.size();
         if (m_parallelCompileListUnique.size() > 0)
-            progressCompilingShaders.start(stringFormat("Compiling shaders (%d)...", progressTotal).c_str());
+            progressPreparing.start("Preparing shaders...");
         else if (isLoadOnlyMode() && !updateQueue.empty())
             caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
             fflush(stdout);
@@ -922,11 +922,11 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             } // not sure why this would happen
 
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-            m_threadPool.addTask([ this, permutation, &progressCompilingShaders, &progressCounterCompleted, progressTotal ]() {
+            m_threadPool.addTask([ this, permutation, &progressPreparing, &progressCounterCompleted, progressTotal ]() {
 #endif
                 permutation->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
-                progressCompilingShaders.Set(0 + 100 * completed / progressTotal);
+                progressPreparing.Set(0 + 100 * completed / progressTotal);
 
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
             });
@@ -963,15 +963,14 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             caustica::info("PathTracingShaderCompiler: loaded %zu shader libraries, building %zu PSOs...",
                 m_parallelCompileListAll.size(), updateQueue.size());
 
-        progressCompilingShaders.Set(100);
+        progressPreparing.Set(100);
         m_parallelCompileListAll.clear();
         m_parallelCompileListUnique.clear();
 
-        ProgressBar progressCompilingPSOs;
         progressCounterCompleted = 0;
         progressTotal = (int)updateQueue.size();
         if (progressTotal > 0)
-            progressCompilingPSOs.start( stringFormat("Compiling PSOs (%d)...", progressTotal).c_str() );
+            progressPreparing.start("Preparing graphics...");
 
         if (!updateQueue.empty() && firstError == "")
         {
@@ -980,11 +979,11 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             for (const std::shared_ptr<PTPipelineVariant>& variant : updateQueue)
             {
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-                m_threadPool.addTask([this, variant, &progressCompilingPSOs, &progressCounterCompleted, progressTotal ](){
+                m_threadPool.addTask([this, variant, &progressPreparing, &progressCounterCompleted, progressTotal ](){
     #endif
                 variant->updateFinalize();
                 int completed = progressCounterCompleted.fetch_add(1)+1;
-                progressCompilingPSOs.Set(0 + 99 * completed / progressTotal);
+                progressPreparing.Set(0 + 99 * completed / progressTotal);
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
                 });
     #endif
@@ -993,7 +992,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             m_threadPool.waitForTasks();
     #endif
 
-            progressCompilingPSOs.Set(100);
+            progressPreparing.Set(100);
         }
 
 
@@ -1077,7 +1076,7 @@ void PathTracingShaderCompiler::buildPipelines(
 
     ProgressBar progressMissing;
     if (showProgress)
-        progressMissing.start(stringFormat("Warming RT pipelines (%d)...", (int)missing.size()).c_str());
+        progressMissing.start("Preparing ray tracing...");
 
     for (const std::shared_ptr<PTPipelineVariant>& variant : missing)
         variant->updateStart(*m_lastUpdatedSourceTimestamp);

@@ -401,11 +401,14 @@ struct PathTracerSettings
 
     bool                                EnableGaussianSplats = true;
     bool                                GaussianSplatDepthTest = true;
+    // Primary color path only. Shadows (when not off) add mesh BVH ray tracing on top of either primary.
+    int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT
     bool                                GaussianSplatShadows = false;
     int                                 GaussianSplatShadowsMode = 0; // 0 = off, 1 = hard, 2 = soft
     int                                 GaussianSplatSortingMode = 0; // 0 = GPU sort, 1 = stochastic splats
-    int                                 GaussianSplatSHFormat = 2;
-    int                                 GaussianSplatRGBAFormat = 2;
+    // Float16 is the quality default (Uint8 quantizes SH to [-1,1] and crushes view-dependent color).
+    int                                 GaussianSplatSHFormat = 1;
+    int                                 GaussianSplatRGBAFormat = 1;
     bool                                GaussianSplatUseAABBs = false;
     bool                                GaussianSplatUseTLASInstances = true;
     bool                                GaussianSplatBlasCompaction = true;
@@ -421,13 +424,14 @@ struct PathTracerSettings
     float                               GaussianSplatRtxColoredShadowStrength = 0.0f;
     float                               GaussianSplatRtxMeshCompositeThreshold = 0.0f;
     float                               GaussianSplatRtxDepthIsoThreshold = 0.70f;
-    bool                                GaussianSplatMipAntialiasing = false;
+    bool                                GaussianSplatMipAntialiasing = true;
     bool                                GaussianSplatQuantizeNormals = true;
     int                                 GaussianSplatFTBSyncMode = 0; // 0 = Disabled, 1 = Interlock
     float                               GaussianSplatDepthIsoThreshold = 0.70f;
     bool                                GaussianSplatFragmentShaderBarycentric = false;
-    int                                 GaussianSplatFrustumCulling = 1; // 0 = Disabled, 1 = At distance stage, 2 = At raster stage
+    int                                 GaussianSplatFrustumCulling = 2; // 0 = Disabled, 1 = At distance stage, 2 = At raster stage
     float                               GaussianSplatFrustumDilation = 0.20f;
+    int                                 GaussianSplatProjectionMethod = 1; // 0 = Eigen, 1 = Conic (opacity-tight / GUT-like)
     bool                                GaussianSplatScreenSizeCulling = false;
     float                               GaussianSplatMinPixelCoverage = 1.0f;
     float                               GaussianSplatScale = 1.0f;

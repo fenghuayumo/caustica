@@ -49,7 +49,7 @@ namespace
     {
         if (!viewState.progressLoading.Active())
         {
-            viewState.progressLoading.start("Initializing...");
+            viewState.progressLoading.start("Starting up...");
             viewState.progressLoading.Set(50);
         }
     }

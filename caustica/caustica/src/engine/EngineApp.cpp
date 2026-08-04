@@ -174,7 +174,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         m_ownsDevice = true;
     }
 
-    m_viewStatePtr->progressLoading.start("Initializing...");
+    m_viewStatePtr->progressLoading.start("Starting up...");
     m_viewStatePtr->progressLoading.Set(50);
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.json") : m_desc.scene;
