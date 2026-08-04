@@ -127,7 +127,10 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
         : GaussianSplatRenderTarget::ProcessedOutputColor;
     renderSettings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(
         std::clamp(settings.GaussianSplatFrustumCulling, 0, 2));
-    renderSettings.projectionMethod = GaussianSplatProjectionMethod::Eigen;
+    renderSettings.primaryMethod = static_cast<GaussianSplatPrimaryMethod>(
+        std::clamp(settings.GaussianSplatPrimaryMethod, 0, 1));
+    renderSettings.projectionMethod = static_cast<GaussianSplatProjectionMethod>(
+        std::clamp(settings.GaussianSplatProjectionMethod, 0, 1));
     renderSettings.shFormat = static_cast<GaussianSplatStorageFormat>(std::clamp(settings.GaussianSplatSHFormat, 0, 2));
     renderSettings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(std::clamp(settings.GaussianSplatRGBAFormat, 0, 2));
     renderSettings.screenSizeCulling = settings.GaussianSplatScreenSizeCulling;

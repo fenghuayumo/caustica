@@ -46,6 +46,12 @@ enum class GaussianSplatProjectionMethod : uint32_t
     Conic = 1
 };
 
+enum class GaussianSplatPrimaryMethod : uint32_t
+{
+    GS = 0,
+    GUT = 1
+};
+
 enum class GaussianSplatRenderTarget : uint32_t
 {
     ProcessedOutputColor = 0,
@@ -57,14 +63,16 @@ struct GaussianSplatRenderSettings
     bool enabled = true;
     bool depthTest = true;
     bool shadowsEnabled = false;
+    GaussianSplatPrimaryMethod primaryMethod = GaussianSplatPrimaryMethod::GS;
     GaussianSplatSortMode sortingMode = GaussianSplatSortMode::GpuSort;
     GaussianSplatRenderTarget renderTarget = GaussianSplatRenderTarget::ProcessedOutputColor;
     GaussianSplatFrustumCulling frustumCulling = GaussianSplatFrustumCulling::AtRasterStage;
-    GaussianSplatProjectionMethod projectionMethod = GaussianSplatProjectionMethod::Eigen;
-    GaussianSplatStorageFormat shFormat = GaussianSplatStorageFormat::Uint8;
-    GaussianSplatStorageFormat rgbaFormat = GaussianSplatStorageFormat::Uint8;
+    // 3DGS-only submode: Eigen vs Conic extents (ignored by 3DGUT primary).
+    GaussianSplatProjectionMethod projectionMethod = GaussianSplatProjectionMethod::Conic;
+    GaussianSplatStorageFormat shFormat = GaussianSplatStorageFormat::Float16;
+    GaussianSplatStorageFormat rgbaFormat = GaussianSplatStorageFormat::Float16;
     bool screenSizeCulling = false;
-    bool mipSplattingAntialiasing = false;
+    bool mipSplattingAntialiasing = true;
     bool useAABBs = false;
     bool useTLASInstances = true;
     bool blasCompaction = true;
@@ -191,13 +199,23 @@ private:
     caustica::rhi::ShaderHandle m_rasterPixelShader;
     caustica::rhi::ShaderHandle m_hybridVertexShader;
     caustica::rhi::ShaderHandle m_hybridPixelShader;
+    caustica::rhi::ShaderHandle m_gutRasterVertexShader;
+    caustica::rhi::ShaderHandle m_gutRasterPixelShader;
+    caustica::rhi::ShaderHandle m_gutHybridVertexShader;
+    caustica::rhi::ShaderHandle m_gutHybridPixelShader;
     caustica::rhi::ShaderHandle m_sortKeyShader;
     caustica::rhi::GraphicsPipelineHandle m_rasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_hybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutHybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticRasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticHybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticProcessedRasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticProcessedHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticProcessedRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticProcessedHybridRenderPipeline;
     caustica::rhi::ComputePipelineHandle m_sortKeyPipeline;
     caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
     caustica::render::GaussianSplatSorter m_sorter;

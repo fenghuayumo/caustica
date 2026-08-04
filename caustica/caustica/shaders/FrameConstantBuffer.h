@@ -89,6 +89,10 @@ struct GaussianSplatConstants
 
     float4 cameraPosition;
     float4x4 objectToWorld;
+    float4x4 worldToObject;
+    // Camera origin in splat object space. SH is authored in object space, so view-dependent
+    // radiance must use this (matches vk_gaussian_splatting model-space view dir).
+    float4 cameraPositionObject;
 
     float splatScale;
     float alphaScale;
@@ -132,6 +136,8 @@ struct GaussianSplatData
     float4 covariance0;   // xx, xy, xz, yy
     float4 covariance1;   // yz, zz, unused, unused
     float4 color;         // rgb = SH degree 0 color, a unused
+    float4 scale;         // xyz = linear scale (already exp'd), w unused
+    float4 rotation;      // wxyz unit quaternion
 };
 
 #endif // __FRAME_CONSTANT_BUFFER_H__

@@ -523,14 +523,25 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     std::vector<caustica::ShaderMacro> rasterShadowMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "0" })
     };
-    m_rasterVertexShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", "vs_main", &rasterShadowMacros, caustica::rhi::ShaderType::Vertex);
-    m_rasterPixelShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", "ps_main", &rasterShadowMacros, caustica::rhi::ShaderType::Pixel);
+    auto createVsPs = [this](const char* path, std::vector<caustica::ShaderMacro>& macros,
+        caustica::rhi::ShaderHandle& vs, caustica::rhi::ShaderHandle& ps)
+    {
+        vs = m_shaderFactory->createShader(path, "vs_main", &macros, caustica::rhi::ShaderType::Vertex);
+        ps = m_shaderFactory->createShader(path, "ps_main", &macros, caustica::rhi::ShaderType::Pixel);
+    };
+
+    createVsPs("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", rasterShadowMacros,
+        m_rasterVertexShader, m_rasterPixelShader);
 
     std::vector<caustica::ShaderMacro> hybridShadowMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_HYBRID_SHADOWS", "1" })
     };
-    m_hybridVertexShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", "vs_main", &hybridShadowMacros, caustica::rhi::ShaderType::Vertex);
-    m_hybridPixelShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", "ps_main", &hybridShadowMacros, caustica::rhi::ShaderType::Pixel);
+    createVsPs("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", hybridShadowMacros,
+        m_hybridVertexShader, m_hybridPixelShader);
+    createVsPs("caustica/shaders/render/processingPasses/GaussianSplatGutRaster.hlsl", rasterShadowMacros,
+        m_gutRasterVertexShader, m_gutRasterPixelShader);
+    createVsPs("caustica/shaders/render/processingPasses/GaussianSplatGutRaster.hlsl", hybridShadowMacros,
+        m_gutHybridVertexShader, m_gutHybridPixelShader);
 
     std::vector<caustica::ShaderMacro> sortKeyMacros = {
         caustica::ShaderMacro({ "GAUSSIAN_SPLAT_SORT_KEYS", "1" })
@@ -538,9 +549,6 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     m_sortKeyShader = m_shaderFactory->createShader("caustica/shaders/render/processingPasses/GaussianSplatRaster.hlsl", "cs_sort_keys", &sortKeyMacros, caustica::rhi::ShaderType::Compute);
 
     caustica::rhi::GraphicsPipelineDesc pipelineDesc;
-    pipelineDesc.bindingLayouts = { m_rasterRenderBindingLayout };
-    pipelineDesc.VS = m_rasterVertexShader;
-    pipelineDesc.PS = m_rasterPixelShader;
     pipelineDesc.primType = caustica::rhi::PrimitiveType::TriangleList;
     pipelineDesc.renderState.rasterState.cullMode = caustica::rhi::RasterCullMode::None;
     pipelineDesc.renderState.rasterState.depthClipEnable = true;
@@ -555,18 +563,28 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     alphaBlend.destBlendAlpha = caustica::rhi::BlendFactor::One;
     pipelineDesc.renderState.blendState.targets[0] = alphaBlend;
 
-    m_rasterRenderPipeline = m_device->createGraphicsPipeline(
-        pipelineDesc,
-        renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+    auto createAlphaPipeline = [&](caustica::rhi::BindingLayoutHandle layout,
+        caustica::rhi::ShaderHandle vs, caustica::rhi::ShaderHandle ps)
+    {
+        pipelineDesc.bindingLayouts = { layout };
+        pipelineDesc.VS = vs;
+        pipelineDesc.PS = ps;
+        pipelineDesc.renderState.blendState.targets[0] = alphaBlend;
+        pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
+        pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
+        return m_device->createGraphicsPipeline(
+            pipelineDesc,
+            renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+    };
 
-    pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
-    pipelineDesc.VS = m_hybridVertexShader;
-    pipelineDesc.PS = m_hybridPixelShader;
-    m_hybridRenderPipeline = m_device->createGraphicsPipeline(
-        pipelineDesc,
-        renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+    m_rasterRenderPipeline = createAlphaPipeline(m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+    m_hybridRenderPipeline = createAlphaPipeline(m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+    m_gutRasterRenderPipeline = createAlphaPipeline(m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+    m_gutHybridRenderPipeline = createAlphaPipeline(m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
 
-    if (m_stochasticFramebuffer)
+    auto createStochasticPipeline = [&](std::shared_ptr<caustica::FramebufferFactory> fb,
+        caustica::rhi::BindingLayoutHandle layout,
+        caustica::rhi::ShaderHandle vs, caustica::rhi::ShaderHandle ps)
     {
         caustica::rhi::BlendState::RenderTarget opaqueBlend;
         opaqueBlend.blendEnable = false;
@@ -574,44 +592,36 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
         pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
         pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
         pipelineDesc.renderState.depthStencilState.depthFunc = caustica::rhi::ComparisonFunc::GreaterOrEqual;
-
-        pipelineDesc.bindingLayouts = { m_rasterRenderBindingLayout };
-        pipelineDesc.VS = m_rasterVertexShader;
-        pipelineDesc.PS = m_rasterPixelShader;
-        m_stochasticRasterRenderPipeline = m_device->createGraphicsPipeline(
+        pipelineDesc.bindingLayouts = { layout };
+        pipelineDesc.VS = vs;
+        pipelineDesc.PS = ps;
+        return m_device->createGraphicsPipeline(
             pipelineDesc,
-            m_stochasticFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+            fb->getFramebuffer(caustica::rhi::AllSubresources));
+    };
 
-        pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
-        pipelineDesc.VS = m_hybridVertexShader;
-        pipelineDesc.PS = m_hybridPixelShader;
-        m_stochasticHybridRenderPipeline = m_device->createGraphicsPipeline(
-            pipelineDesc,
-            m_stochasticFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+    if (m_stochasticFramebuffer)
+    {
+        m_stochasticRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+        m_stochasticHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticFramebuffer, m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+        m_gutStochasticRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+        m_gutStochasticHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
     }
 
     if (m_stochasticProcessedFramebuffer)
     {
-        caustica::rhi::BlendState::RenderTarget opaqueBlend;
-        opaqueBlend.blendEnable = false;
-        pipelineDesc.renderState.blendState.targets[0] = opaqueBlend;
-        pipelineDesc.renderState.depthStencilState.depthTestEnable = true;
-        pipelineDesc.renderState.depthStencilState.depthWriteEnable = true;
-        pipelineDesc.renderState.depthStencilState.depthFunc = caustica::rhi::ComparisonFunc::GreaterOrEqual;
-
-        pipelineDesc.bindingLayouts = { m_rasterRenderBindingLayout };
-        pipelineDesc.VS = m_rasterVertexShader;
-        pipelineDesc.PS = m_rasterPixelShader;
-        m_stochasticProcessedRasterRenderPipeline = m_device->createGraphicsPipeline(
-            pipelineDesc,
-            m_stochasticProcessedFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
-
-        pipelineDesc.bindingLayouts = { m_hybridRenderBindingLayout };
-        pipelineDesc.VS = m_hybridVertexShader;
-        pipelineDesc.PS = m_hybridPixelShader;
-        m_stochasticProcessedHybridRenderPipeline = m_device->createGraphicsPipeline(
-            pipelineDesc,
-            m_stochasticProcessedFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+        m_stochasticProcessedRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticProcessedFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+        m_stochasticProcessedHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticProcessedFramebuffer, m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+        m_gutStochasticProcessedRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticProcessedFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+        m_gutStochasticProcessedHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticProcessedFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
     }
 
     caustica::rhi::ComputePipelineDesc computePipelineDesc;
@@ -772,8 +782,14 @@ bool GaussianSplatPass::upload(
         : m_stochasticProcessedFramebuffer;
     if (stochasticSplats && (!stochasticFramebuffer || !stochasticDepthBuffer))
         return false;
-    if (!stochasticSplats && !m_rasterRenderPipeline)
-        return false;
+    if (!stochasticSplats)
+    {
+        const bool hasPrimaryPipeline = settings.primaryMethod == GaussianSplatPrimaryMethod::GUT
+            ? m_gutRasterRenderPipeline != nullptr
+            : m_rasterRenderPipeline != nullptr;
+        if (!hasPrimaryPipeline)
+            return false;
+    }
 
     commandList->beginMarker("GaussianSplatsUpload");
 
@@ -800,6 +816,13 @@ bool GaussianSplatPass::upload(
     const float3 cameraPosition = view.getViewOrigin();
     constants.cameraPosition = float4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.0f);
     constants.objectToWorld = settings.objectToWorld;
+    {
+        // SH / 3DGUT kernel evaluation is in object/training space.
+        const float4x4 worldToObject = inverse(settings.objectToWorld);
+        constants.worldToObject = worldToObject;
+        const float4 cameraObject = float4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.0f) * worldToObject;
+        constants.cameraPositionObject = float4(cameraObject.x, cameraObject.y, cameraObject.z, 1.0f);
+    }
     constants.splatScale = settings.splatScale;
     constants.alphaScale = settings.alphaScale;
     constants.brightness = settings.brightness;
@@ -835,12 +858,28 @@ bool GaussianSplatPass::upload(
     constants.stochasticFrameIndex = settings.stochasticFrameIndex;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
+    const bool useGut = settings.primaryMethod == GaussianSplatPrimaryMethod::GUT;
     caustica::rhi::GraphicsPipelineHandle renderPipeline;
     if (useHybridShadows)
     {
+        if (useGut)
+        {
+            renderPipeline = stochasticSplats
+                ? (stochasticToOutput ? m_gutStochasticHybridRenderPipeline : m_gutStochasticProcessedHybridRenderPipeline)
+                : m_gutHybridRenderPipeline;
+        }
+        else
+        {
+            renderPipeline = stochasticSplats
+                ? (stochasticToOutput ? m_stochasticHybridRenderPipeline : m_stochasticProcessedHybridRenderPipeline)
+                : m_hybridRenderPipeline;
+        }
+    }
+    else if (useGut)
+    {
         renderPipeline = stochasticSplats
-            ? (stochasticToOutput ? m_stochasticHybridRenderPipeline : m_stochasticProcessedHybridRenderPipeline)
-            : m_hybridRenderPipeline;
+            ? (stochasticToOutput ? m_gutStochasticRasterRenderPipeline : m_gutStochasticProcessedRasterRenderPipeline)
+            : m_gutRasterRenderPipeline;
     }
     else
     {

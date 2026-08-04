@@ -95,11 +95,29 @@ struct VertexOutput
 };
 
 static const float kSqrt8 = 2.8284271247461903f;
+static const float kMaxExtentFactor = 3.33f; // matches 3DGUT / original 3DGS 3-sigma-ish cap
 static const float kFragmentAlphaCullThreshold = 1.0f / 255.0f;
 
+// Opacity-tight extent factor from 3DGUT (GUT_TIGHT_OPACITY_BOUNDING).
+// Low-opacity floaters get much smaller quads instead of a fixed sqrt(8) footprint.
+float OpacityTightExtentFactor(float opacity, float alphaThreshold)
+{
+    float threshold = max(alphaThreshold, kFragmentAlphaCullThreshold);
+    float safeOpacity = max(opacity, threshold);
+    float maxPower = log(safeOpacity / threshold);
+    return min(kMaxExtentFactor, sqrt(max(0.0f, 2.0f * maxPower)));
+}
+
+// 3DGS radiance is trained against sRGB display values. Convert to linear for the HDR
+// tonemap path (same transfer vk_gaussian_splatting applies after raster in deferred shading).
+// Values above 1 are passed through with a linear extension so bright SH peaks are preserved.
 float SrgbToLinear(float srgb)
 {
-    return srgb <= 0.04045f ? srgb / 12.92f : pow(max((srgb + 0.055f) / 1.055f, 0.0f), 2.4f);
+    if (srgb <= 0.04045f)
+        return srgb / 12.92f;
+    if (srgb >= 1.0f)
+        return srgb;
+    return pow((srgb + 0.055f) / 1.055f, 2.4f);
 }
 
 float3 SrgbToLinear(float3 srgb)
@@ -200,7 +218,13 @@ float3 ProjectCovariance(float3x3 cov3D, float4 viewCenter)
     return float3(cov2D[0][0], cov2D[0][1], cov2D[1][1]);
 }
 
-bool ComputeProjectedBasis(float3 cov2D, inout float opacity, out float2 basis1, out float2 basis2, out float3 conic)
+bool ComputeProjectedBasis(
+    float3 cov2D,
+    inout float opacity,
+    out float2 basis1,
+    out float2 basis2,
+    out float3 conic,
+    out float extentFactor)
 {
     float detOrig = max(cov2D.x * cov2D.z - cov2D.y * cov2D.y, 1e-12f);
 
@@ -212,36 +236,48 @@ bool ComputeProjectedBasis(float3 cov2D, inout float opacity, out float2 basis1,
     float d = cov2D.z;
     float det = a * d - b * b;
     float traceOver2 = 0.5f * (a + d);
-    float root = sqrt(max(0.1f, traceOver2 * traceOver2 - det));
+    // Match 3DGS / vk_gaussian_splatting: do not floor the discriminant (a 0.1 floor
+    // rounds thin ellipses toward circles and softens fine detail).
+    float root = sqrt(max(0.0f, traceOver2 * traceOver2 - det));
     float eigenValue1 = traceOver2 + root;
     float eigenValue2 = traceOver2 - root;
 
-    if (eigenValue2 <= 0.0f)
-    {
-        basis1 = 0.0f;
-        basis2 = 0.0f;
-        conic = 0.0f;
+    basis1 = 0.0f;
+    basis2 = 0.0f;
+    conic = 0.0f;
+    extentFactor = 0.0f;
+
+    if (eigenValue2 <= 0.0f || det <= 0.0f)
         return false;
-    }
 
     if (g_Const.mipSplattingAntialiasing != 0)
         opacity *= sqrt(max(detOrig / max(det, 1e-12f), 0.0f));
+
+    // Drop near-invisible splats early (same spirit as GUT_ALPHA_THRESHOLD for extent).
+    if (opacity < max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold))
+        return false;
+
+    extentFactor = OpacityTightExtentFactor(opacity, g_Const.alphaCullThreshold);
+    if (extentFactor <= 0.0f)
+        return false;
 
     conic = float3(d, -b, a) / max(det, 1e-12f);
 
     if (g_Const.projectionMethod == kGaussianSplatProjectionConic)
     {
-        float radius = g_Const.splatScale * min(kSqrt8 * sqrt(eigenValue1), 2048.0f);
-        basis1 = float2(radius, 0.0f);
-        basis2 = float2(0.0f, radius);
-        return true;
+        // 3DGUT-style axis-aligned rect bound: shrink both axes by opacity, then clamp to radius.
+        float radius = min(extentFactor * sqrt(eigenValue1), 2048.0f);
+        float2 extent = min(extentFactor * sqrt(float2(a, d)), float2(radius, radius));
+        basis1 = float2(g_Const.splatScale * extent.x, 0.0f);
+        basis2 = float2(0.0f, g_Const.splatScale * extent.y);
+        return radius > 0.0f;
     }
 
     float2 eigenVector1 = normalize(float2(abs(b) < 0.001f ? 1.0f : b, eigenValue1 - a));
     float2 eigenVector2 = float2(eigenVector1.y, -eigenVector1.x);
 
-    basis1 = eigenVector1 * g_Const.splatScale * min(kSqrt8 * sqrt(eigenValue1), 2048.0f);
-    basis2 = eigenVector2 * g_Const.splatScale * min(kSqrt8 * sqrt(eigenValue2), 2048.0f);
+    basis1 = eigenVector1 * g_Const.splatScale * min(extentFactor * sqrt(eigenValue1), 2048.0f);
+    basis2 = eigenVector2 * g_Const.splatScale * min(extentFactor * sqrt(eigenValue2), 2048.0f);
     conic = float3(1.0f, 0.0f, 1.0f);
 
     return true;
@@ -355,8 +391,15 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
     float2 basis1;
     float2 basis2;
     float3 conic;
+    float extentFactor;
     float opacity = splatColorOpacity.a;
-    if (!ComputeProjectedBasis(ProjectCovariance(LoadCovariance(splat), viewCenter), opacity, basis1, basis2, conic))
+    if (!ComputeProjectedBasis(
+            ProjectCovariance(LoadCovariance(splat), viewCenter),
+            opacity,
+            basis1,
+            basis2,
+            conic,
+            extentFactor))
     {
         output.position = float4(0.0f, 0.0f, 2.0f, 1.0f);
         return output;
@@ -378,16 +421,19 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
     float3 color = splatColorOpacity.rgb * g_Const.tintColor;
     if (g_Const.shDegree > 0)
     {
-        float3 worldViewDir = normalize(worldCenter.xyz - g_Const.cameraPosition.xyz);
-        color += FetchViewDependentRadiance(sourceSplatIndex, worldViewDir);
+        // SH lobes live in object/training space (same as splat centers before objectToWorld).
+        float3 objectViewDir = normalize(splat.centerOpacity.xyz - g_Const.cameraPositionObject.xyz);
+        color += FetchViewDependentRadiance(sourceSplatIndex, objectViewDir);
     }
 
     float3 displayColor = max(color, 0.0f);
 
     output.position = float4(ndcCenter.xy + ndcOffset, ndcCenter.z, 1.0f);
+    // Eigen: whitened coords use the same opacity-tight factor as the quad extent.
+    // Conic: fragPos is pixel offset from center (x^T * conic * x).
     output.fragPos = g_Const.projectionMethod == kGaussianSplatProjectionConic
         ? corner.x * basis1 + corner.y * basis2
-        : corner * kSqrt8;
+        : corner * extentFactor;
     output.conic = conic;
     output.color = float4(SrgbToLinear(displayColor) * g_Const.brightness, opacity);
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
@@ -402,11 +448,16 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
     float A = input.conic.x * input.fragPos.x * input.fragPos.x
         + 2.0f * input.conic.y * input.fragPos.x * input.fragPos.y
         + input.conic.z * input.fragPos.y * input.fragPos.y;
-    if (A > 8.0f)
+
+    float alphaThreshold = max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold);
+    float scaledAlpha = max(input.color.a * g_Const.alphaScale, alphaThreshold);
+    // Opacity-aware cutoff: discard once response would fall below the alpha threshold.
+    float maxA = 2.0f * log(scaledAlpha / alphaThreshold);
+    if (A > maxA)
         discard;
 
     float opacity = exp(-0.5f * A) * input.color.a * g_Const.alphaScale;
-    if (opacity <= max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold))
+    if (opacity <= alphaThreshold)
         discard;
 
     if (g_Const.sortMode == kGaussianSplatSortRandom)

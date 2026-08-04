@@ -134,27 +134,20 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         return dm::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT);
     }
 
-    bool GaussianSplatModeCombo(EditorUIData& ui)
+    bool GaussianSplatPrimaryMethodCombo(EditorUIData& ui)
     {
-        int renderingMode = ResolveGaussianSplatShadowMode(ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED ? 1 : 0;
-        if (!SettingsCombo(
-                "Rendering Mode",
-                &renderingMode,
-                "Raster 3DGS (VS)\0Hybrid 3DGS + 3DGRT\0\0"))
+        int primaryMethod = ui.render.settings.GaussianSplatPrimaryMethod;
+        // Split string so "\0" is not parsed as octal \03 (would become 3DGS + ETX + DGUT).
+        if (!SettingsCombo("Rendering Mode", &primaryMethod, "3DGS\0" "3DGUT\0\0"))
             return false;
 
-        if (renderingMode == 1)
-        {
-            ui.render.settings.GaussianSplatShadows = true;
-            if (ui.render.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED)
-                ui.render.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_HARD;
-        }
-        else
-        {
-            ui.render.settings.GaussianSplatShadows = false;
-            ui.render.settings.GaussianSplatShadowsMode = GAUSSIAN_SPLAT_SHADOWS_DISABLED;
-        }
-        ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        primaryMethod = dm::clamp(primaryMethod, 0, 1);
+        ui.render.settings.GaussianSplatPrimaryMethod = primaryMethod;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Color path: 3DGS (EWA / VS raster) or 3DGUT (Unscented Transform + 3D kernel).\n"
+                "Shadows are separate (Off/Hard/Soft) and work with either mode.");
+
         ui.render.settings.ResetAccumulation = true;
         return true;
     }
@@ -168,14 +161,18 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
 
         if (!SettingsCombo(
-                "Shadows Mode",
+                "Shadows",
                 &shadowMode,
-                "Shadows off\0Hard shadows\0Soft shadows\0\0"))
+                "Off\0Hard\0Soft\0\0"))
             return false;
 
         shadowMode = dm::clamp(shadowMode, GAUSSIAN_SPLAT_SHADOWS_DISABLED, GAUSSIAN_SPLAT_SHADOWS_SOFT);
         ui.render.settings.GaussianSplatShadowsMode = shadowMode;
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "When not Off, shadows are ray-traced against the mesh BVH on top of the\n"
+                "selected primary (3DGS or 3DGUT). Primary color path is unchanged.");
 
         if (wasEnabled != ui.render.settings.GaussianSplatShadows)
             ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;

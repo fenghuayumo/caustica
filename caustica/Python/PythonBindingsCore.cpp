@@ -83,6 +83,7 @@ namespace py_enums
     enum class GaussianSplatSortMode : int { GpuSort = 0, StochasticSplats = 1 };
     enum class GaussianSplatStorageFormat : int { Float32 = 0, Float16 = 1, Uint8 = 2 };
     enum class GaussianSplatFrustumCulling : int { Disabled = 0, AtDistanceStage = 1, AtRasterStage = 2 };
+    enum class GaussianSplatPrimaryMethod : int { GS = 0, GUT = 1 };
     enum class GaussianSplatShadowMode : int { Disabled = 0, Hard = 1, Soft = 2 };
     enum class GaussianSplatFTBSyncMode : int { Disabled = 0, Interlock = 1 };
     enum class LightType : int {
@@ -727,8 +728,15 @@ void RegisterCoreBindings(nb::module_& m)
         .value("AtRasterStage",    py_enums::GaussianSplatFrustumCulling::AtRasterStage)
         .export_values();
 
+    nb::enum_<py_enums::GaussianSplatPrimaryMethod>(m, "GaussianSplatPrimaryMethod",
+        "Primary splat color path (orthogonal to mesh shadows).",
+        nb::is_arithmetic())
+        .value("GS",  py_enums::GaussianSplatPrimaryMethod::GS)
+        .value("GUT", py_enums::GaussianSplatPrimaryMethod::GUT)
+        .export_values();
+
     nb::enum_<GaussianSplatShadowMode>(m, "GaussianSplatShadowMode",
-        "Hybrid 3DGS shadow mode.",
+        "Mesh BVH shadow mode for the splat primary path (Off disables RT shadows).",
         nb::is_arithmetic())
         .value("Disabled", GaussianSplatShadowMode::Disabled)
         .value("Hard",     GaussianSplatShadowMode::Hard)
@@ -1604,10 +1612,12 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def_rw("enable_gaussian_splats",        &PathTracerSettings::EnableGaussianSplats)
         .def_rw("gaussian_splat_depth_test",     &PathTracerSettings::GaussianSplatDepthTest)
+        .def_rw("gaussian_splat_primary_method", &PathTracerSettings::GaussianSplatPrimaryMethod,
+                "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT.")
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_hybrid_shadows", &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,
-                "3DGS shadow mode (caustica.GaussianSplatShadowMode).")
+                "Mesh shadow mode (caustica.GaussianSplatShadowMode). Orthogonal to primary 3DGS/3DGUT.")
         .def_rw("gaussian_splat_sorting_mode",   &PathTracerSettings::GaussianSplatSortingMode,
                 "3DGS sort mode (caustica.GaussianSplatSortMode).")
         .def_rw("gaussian_splat_sh_format",      &PathTracerSettings::GaussianSplatSHFormat,

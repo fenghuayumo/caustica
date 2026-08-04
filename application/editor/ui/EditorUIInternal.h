@@ -30,9 +30,10 @@ std::string TrimTogglable(const std::string text);
 std::string TrimSkyDisplayName(std::string text);
 
 int ResolveGaussianSplatShadowMode(const EditorUIData& ui);
-bool GaussianSplatModeCombo(EditorUIData& ui);
+bool GaussianSplatPrimaryMethodCombo(EditorUIData& ui);
 bool GaussianSplatShadowsModeCombo(EditorUIData& ui);
 bool GaussianSplatSortingCombo(EditorUIData& ui);
+bool GaussianSplatFormatCombo(const char* label, int* value);
 bool GaussianSplatFTBCombo(EditorUIData& ui);
 bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui);
