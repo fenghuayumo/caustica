@@ -135,6 +135,10 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     renderSettings.rgbaFormat = static_cast<GaussianSplatStorageFormat>(std::clamp(settings.GaussianSplatRGBAFormat, 0, 2));
     renderSettings.screenSizeCulling = settings.GaussianSplatScreenSizeCulling;
     renderSettings.mipSplattingAntialiasing = settings.GaussianSplatMipAntialiasing;
+    renderSettings.referenceGammaCompositing = settings.GaussianSplatReferenceGammaCompositing
+        && renderSettings.sortingMode == GaussianSplatSortMode::GpuSort
+        && renderSettings.renderTarget == GaussianSplatRenderTarget::ProcessedOutputColor;
+    renderSettings.covarianceDilation = std::clamp(settings.GaussianSplatCovarianceDilation, 0.0f, 2.0f);
     renderSettings.useAABBs = settings.GaussianSplatUseAABBs;
     renderSettings.useTLASInstances = settings.GaussianSplatUseTLASInstances;
     renderSettings.blasCompaction = settings.GaussianSplatBlasCompaction;

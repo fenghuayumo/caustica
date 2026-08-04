@@ -66,6 +66,7 @@ public:
     void executeUpload(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
     void executeSort(caustica::rhi::CommandList* commandList);
     void executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
+    void executeColorSpaceConversion(caustica::rhi::CommandList* commandList, bool toLinear);
     void executeAccumulate(caustica::rhi::CommandList* commandList);
 
     [[nodiscard]] caustica::rhi::Texture* currentColor() const { return m_currentColor.Get(); }
@@ -89,6 +90,10 @@ private:
 
     caustica::rhi::TextureHandle m_currentColor;
     caustica::rhi::TextureHandle m_accumulatedColor;
+    caustica::rhi::BindingLayoutHandle m_colorSpaceBindingLayout;
+    caustica::rhi::BindingSetHandle m_colorSpaceBindingSet;
+    caustica::rhi::ShaderHandle m_colorSpaceShader;
+    caustica::rhi::ComputePipelineHandle m_colorSpacePipeline;
     std::unique_ptr<AccumulationPass> m_accumulationPass;
     std::shared_ptr<GPUSort> m_gpuSort;
     bool m_compositeRendered = false;

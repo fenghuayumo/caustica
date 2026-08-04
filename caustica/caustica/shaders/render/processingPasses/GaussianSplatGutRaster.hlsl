@@ -25,6 +25,8 @@ static const uint kGaussianSplatFrustumCullingAtRaster = 2;
 static const uint kGaussianSplatFormatFloat32 = 0;
 static const uint kGaussianSplatFormatFloat16 = 1;
 static const uint kGaussianSplatFormatUint8 = 2;
+static const uint kGaussianSplatProjectionEigen = 0;
+static const uint kGaussianSplatProjectionConic = 1;
 static const uint kGaussianSplatSortRandom = 1;
 static const uint kGaussianSplatShScalarStride = 45;
 
@@ -34,12 +36,11 @@ static const float kGutBeta = 2.0f;
 static const float kGutLambda = 0.0f;
 static const float kGutDelta = 1.73205080757f; // sqrt(alpha^2 * (D+kappa))
 static const float kGutInImageMarginFactor = 0.1f;
-static const float kGutCovarianceDilation = 0.3f;
-static const float kGutAlphaThreshold = 0.01f;
 static const float kGutMaxExtentFactor = 3.33f;
 static const float kFragmentAlphaCullThreshold = 1.0f / 255.0f;
 static const float kKernelMinResponse = 0.0113f;
 static const float kAlphaClamp = 0.99f;
+static const float kGutAlphaThreshold = 0.01f;
 
 struct VertexOutput
 {
@@ -54,20 +55,6 @@ struct VertexOutput
     nointerpolation float3 worldCenter : TEXCOORD5;
 #endif
 };
-
-float SrgbToLinear(float srgb)
-{
-    if (srgb <= 0.04045f)
-        return srgb / 12.92f;
-    if (srgb >= 1.0f)
-        return srgb;
-    return pow((srgb + 0.055f) / 1.055f, 2.4f);
-}
-
-float3 SrgbToLinear(float3 srgb)
-{
-    return float3(SrgbToLinear(srgb.r), SrgbToLinear(srgb.g), SrgbToLinear(srgb.b));
-}
 
 uint GaussianSplatFormatSize(uint format)
 {
@@ -132,7 +119,21 @@ float2 GetQuadCorner(uint vertexInSplat)
     }
 }
 
-// Matches vk_gaussian_splatting quatToMat3 (quat xyzw). Storage is wxyz.
+float SrgbToLinear(float srgb)
+{
+    if (srgb <= 0.04045f)
+        return srgb / 12.92f;
+    if (srgb >= 1.0f)
+        return srgb;
+    return pow((srgb + 0.055f) / 1.055f, 2.4f);
+}
+
+float3 SrgbToLinear(float3 srgb)
+{
+    return float3(SrgbToLinear(srgb.r), SrgbToLinear(srgb.g), SrgbToLinear(srgb.b));
+}
+
+// Matches vk quatToMat3 (quat xyzw). Storage is wxyz.
 float3x3 QuatWxyzToMat3(float4 wxyz)
 {
     float w = wxyz.x;
@@ -230,10 +231,10 @@ bool ProjectWorldToPixel(float3 worldPos, out float2 pixel)
     pixel = clip.xy * invW * g_Const.view.clipToWindowScale + g_Const.view.clipToWindowBias;
 
     float2 resolution = g_Const.view.viewportSize;
-    float2 tolMargin = resolution * kGutInImageMarginFactor;
+    float2 tolerance = resolution * kGutInImageMarginFactor;
     float2 local = pixel - g_Const.view.viewportOrigin;
-    return local.x > -tolMargin.x && local.y > -tolMargin.y
-        && local.x < resolution.x + tolMargin.x && local.y < resolution.y + tolMargin.y;
+    return local.x > -tolerance.x && local.y > -tolerance.y
+        && local.x < resolution.x + tolerance.x && local.y < resolution.y + tolerance.y;
 }
 
 bool GutParticleProjection(
@@ -264,9 +265,9 @@ bool GutParticleProjection(
         particleProjCenter += weightI * projectedSigmaPoints[i + 1];
 
         float3 worldMinus = mul(float4(particlePosition - delta, 1.0f), g_Const.objectToWorld).xyz;
-        if (ProjectWorldToPixel(worldMinus, projectedSigmaPoints[i + 1 + 3]))
+        if (ProjectWorldToPixel(worldMinus, projectedSigmaPoints[i + 4]))
             numValidPoints++;
-        particleProjCenter += weightI * projectedSigmaPoints[i + 1 + 3];
+        particleProjCenter += weightI * projectedSigmaPoints[i + 4];
     }
 
     if (numValidPoints == 0)
@@ -296,14 +297,12 @@ bool GutParticleProjection(
     return true;
 }
 
-bool GutProjectedExtentConicOpacity(
-    float3 covariance,
-    inout float opacity,
-    out float2 extent)
+bool GutProjectedExtentConicOpacity(float3 covariance, inout float opacity, out float2 extent)
 {
-    float3 dilated = float3(covariance.x + kGutCovarianceDilation, covariance.y, covariance.z + kGutCovarianceDilation);
+    float dilation = max(g_Const.covarianceDilation, 0.0f);
+    float3 dilated = float3(covariance.x + dilation, covariance.y, covariance.z + dilation);
     float dilatedDet = dilated.x * dilated.z - dilated.y * dilated.y;
-    if (dilatedDet == 0.0f)
+    if (dilatedDet <= 0.0f)
     {
         extent = 0.0f;
         return false;
@@ -312,8 +311,7 @@ bool GutProjectedExtentConicOpacity(
     if (g_Const.mipSplattingAntialiasing != 0)
     {
         float covDet = covariance.x * covariance.z - covariance.y * covariance.y;
-        float convolutionFactor = sqrt(max(0.000025f, covDet / dilatedDet));
-        opacity *= convolutionFactor;
+        opacity *= sqrt(max(0.000025f, covDet / dilatedDet));
     }
 
     if (opacity < kGutAlphaThreshold)
@@ -323,12 +321,46 @@ bool GutProjectedExtentConicOpacity(
     }
 
     float maxPower = log(opacity / kGutAlphaThreshold);
-    float extentFactor = min(kGutMaxExtentFactor, sqrt(2.0f * maxPower));
+    float extentFactor = min(kGutMaxExtentFactor, sqrt(max(0.0f, 2.0f * maxPower)));
     float mid = 0.5f * (dilated.x + dilated.z);
     float lambda = mid + sqrt(max(0.01f, mid * mid - dilatedDet));
     float radius = extentFactor * sqrt(lambda);
-    extent = min(extentFactor * sqrt(float2(dilated.x, dilated.z)), float2(radius, radius));
+    extent = min(extentFactor * sqrt(max(dilated.xz, 0.0f)), float2(radius, radius));
     return radius > 0.0f;
+}
+
+bool GutProjectedExtentEigen(float3 covariance, inout float opacity, out float2 basis1, out float2 basis2)
+{
+    float detOrig = covariance.x * covariance.z - covariance.y * covariance.y;
+    float dilation = max(g_Const.covarianceDilation, 0.0f);
+    covariance.x += dilation;
+    covariance.z += dilation;
+
+    float a = covariance.x;
+    float b = covariance.y;
+    float d = covariance.z;
+    float det = a * d - b * b;
+    float traceOver2 = 0.5f * (a + d);
+    float root = sqrt(max(0.0f, traceOver2 * traceOver2 - det));
+    float eigenValue1 = traceOver2 + root;
+    float eigenValue2 = traceOver2 - root;
+    basis1 = 0.0f;
+    basis2 = 0.0f;
+
+    if (eigenValue2 <= 0.0f || det <= 0.0f)
+        return false;
+
+    if (g_Const.mipSplattingAntialiasing != 0)
+        opacity *= sqrt(max(detOrig / max(det, 1e-12f), 0.0f));
+
+    if (opacity < max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold))
+        return false;
+
+    float2 eigenVector1 = normalize(float2(abs(b) < 0.001f ? 1.0f : b, eigenValue1 - a));
+    float2 eigenVector2 = float2(eigenVector1.y, -eigenVector1.x);
+    basis1 = eigenVector1 * min(kGutMaxExtentFactor * sqrt(eigenValue1), 2048.0f);
+    basis2 = eigenVector2 * min(kGutMaxExtentFactor * sqrt(eigenValue2), 2048.0f);
+    return true;
 }
 
 void ParticleCanonicalRay(
@@ -400,21 +432,38 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
         }
     }
 
-    float3 particleScale = max(splat.scale.xyz * max(g_Const.splatScale, 0.0f), float3(1e-8f, 1e-8f, 1e-8f));
+    // 3DGUT projects the mean and six covariance sigma points through the actual camera
+    // projection. Unlike the EWA Jacobian, this remains accurate for large/near splats.
+    float3 particleScale = max(
+        splat.scale.xyz * max(g_Const.splatScale, 0.0f),
+        float3(1e-8f, 1e-8f, 1e-8f));
     float3x3 particleRotation = QuatWxyzToMat3(splat.rotation);
     float3x3 particleInvRotation = transpose(particleRotation);
 
-    float2 projCenter;
-    float3 projCovariance;
-    if (!GutParticleProjection(splat.centerOpacity.xyz, particleScale, particleRotation, projCenter, projCovariance))
+    float2 projectedCenter;
+    float3 projectedCovariance;
+    if (!GutParticleProjection(
+            splat.centerOpacity.xyz,
+            particleScale,
+            particleRotation,
+            projectedCenter,
+            projectedCovariance))
     {
         output.position = float4(0.0f, 0.0f, 2.0f, 1.0f);
         return output;
     }
 
     float opacity = splatColorOpacity.a;
-    float2 extent;
-    if (!GutProjectedExtentConicOpacity(projCovariance, opacity, extent))
+    float2 extent = 0.0f;
+    float2 basis1 = 0.0f;
+    float2 basis2 = 0.0f;
+    bool validExtent = false;
+    if (g_Const.projectionMethod == kGaussianSplatProjectionConic)
+        validExtent = GutProjectedExtentConicOpacity(projectedCovariance, opacity, extent);
+    else
+        validExtent = GutProjectedExtentEigen(projectedCovariance, opacity, basis1, basis2);
+
+    if (!validExtent)
     {
         output.position = float4(0.0f, 0.0f, 2.0f, 1.0f);
         return output;
@@ -422,7 +471,9 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
 
     if (g_Const.screenSizeCulling != 0)
     {
-        float pixelCoverage = 2.0f * max(extent.x, extent.y);
+        float pixelCoverage = g_Const.projectionMethod == kGaussianSplatProjectionConic
+            ? 2.0f * max(extent.x, extent.y)
+            : 2.0f * max(length(basis1), length(basis2));
         if (pixelCoverage < max(g_Const.minPixelCoverage, 0.0f))
         {
             output.position = float4(0.0f, 0.0f, 2.0f, 1.0f);
@@ -430,9 +481,12 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
         }
     }
 
-    float2 ndcXY = (projCenter - g_Const.view.clipToWindowBias) / g_Const.view.clipToWindowScale;
-    float2 ndcExtent = extent / abs(g_Const.view.clipToWindowScale);
-    float ndcZ = clipCenter.z / clipCenter.w;
+    float2 ndcCenter = (projectedCenter - g_Const.view.clipToWindowBias) / g_Const.view.clipToWindowScale;
+    float2 pixelOffset = g_Const.projectionMethod == kGaussianSplatProjectionConic
+        ? corner * extent
+        : corner.x * basis1 + corner.y * basis2;
+    float2 ndcOffset = pixelOffset / g_Const.view.clipToWindowScale;
+    float ndcDepth = clipCenter.z / clipCenter.w;
 
     float3 color = splatColorOpacity.rgb * g_Const.tintColor;
     if (g_Const.shDegree > 0)
@@ -441,8 +495,12 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
         color += FetchViewDependentRadiance(sourceSplatIndex, objectViewDir);
     }
 
-    output.position = float4(ndcXY + corner * ndcExtent, ndcZ, 1.0f);
-    output.color = float4(SrgbToLinear(max(color, 0.0f)) * g_Const.brightness, opacity);
+    output.position = float4(ndcCenter + ndcOffset, ndcDepth, 1.0f);
+    float3 displayColor = max(color, 0.0f);
+    float3 compositingColor = g_Const.referenceGammaCompositing != 0
+        ? displayColor
+        : SrgbToLinear(displayColor);
+    output.color = float4(compositingColor * g_Const.brightness, opacity);
     output.splatPosition = splat.centerOpacity.xyz;
     output.splatScale = particleScale;
     output.splatInvRotation0 = particleInvRotation[0];
@@ -456,13 +514,11 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
 
 float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Target0
 {
-    // Primary ray through this pixel (pinhole), then evaluate 3DGRT quadratic kernel in object space.
     float2 ndc = (input.position.xy - g_Const.view.clipToWindowBias) / g_Const.view.clipToWindowScale;
     float4 worldH = mul(float4(ndc, 0.0f, 1.0f), g_Const.view.matClipToWorldNoOffset);
     float3 worldFar = worldH.xyz / max(worldH.w, 1e-8f);
     float3 rayOriginWorld = g_Const.cameraPosition.xyz;
     float3 rayDirWorld = normalize(worldFar - rayOriginWorld);
-
     float3 rayOrigin = mul(float4(rayOriginWorld, 1.0f), g_Const.worldToObject).xyz;
     float3 rayDirection = normalize(mul(rayDirWorld, (float3x3)g_Const.worldToObject));
 

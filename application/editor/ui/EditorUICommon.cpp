@@ -149,6 +149,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
                 "Shadows are separate (Off/Hard/Soft) and work with either mode.");
 
         ui.render.settings.ResetAccumulation = true;
+        ui.render.settings.ResetRealtimeCaches = true;
         return true;
     }
 

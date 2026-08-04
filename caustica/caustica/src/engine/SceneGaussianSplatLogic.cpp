@@ -175,6 +175,15 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
     for (ecs::Entity entity : failedEntities)
         entityWorld->destroyEntity(entity);
 
+    // The vk reference renders raster splats at the display resolution with DLSS
+    // disabled. Do the same when a scene containing splats is opened; users can
+    // explicitly re-enable TAA/DLSS afterwards when they prefer performance.
+    if (!passes.m_objects.empty() && passes.m_settings && passes.m_settings->RealtimeAA != 0)
+    {
+        caustica::info("3D Gaussian Splats: using native-resolution rendering for reference quality.");
+        passes.m_settings->RealtimeAA = 0;
+    }
+
     // Do not requestGpuStructureSync here. Failed splats never contributed GPU
     // resources, and during onSceneLoaded materials/AS may not exist yet —
     // early structure sync would crash in recreateBindingSet. Hierarchy reads
@@ -271,6 +280,11 @@ bool SceneGaussianSplatLogic::attachToScene(
     passes.m_objects.push_back(std::move(object));
 
     passes.m_settings->EnableGaussianSplats = true;
+    if (passes.m_settings->RealtimeAA != 0)
+    {
+        caustica::info("3D Gaussian Splats: disabling TAA/DLSS to use native-resolution reference quality.");
+        passes.m_settings->RealtimeAA = 0;
+    }
     passes.updateUIState();
     if (passes.m_onTemporalReset)
         passes.m_onTemporalReset();

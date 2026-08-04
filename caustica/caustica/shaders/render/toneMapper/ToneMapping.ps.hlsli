@@ -132,7 +132,9 @@ float4 applyToneMapping(float2 texC)
     finalColor *= (kExposureKey / avgLuminance);
 #endif
 */
-    if(gParams.autoExposure)
+    // Disabling tone mapping must also bypass exposure. This makes the UI's master
+    // switch deterministic even if a stale Auto Exposure checkbox remains enabled.
+    if(gParams.enabled && gParams.autoExposure)
     {
         // apply auto exposure
 

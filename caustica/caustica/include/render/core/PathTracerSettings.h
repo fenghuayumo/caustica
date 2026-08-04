@@ -424,14 +424,21 @@ struct PathTracerSettings
     float                               GaussianSplatRtxColoredShadowStrength = 0.0f;
     float                               GaussianSplatRtxMeshCompositeThreshold = 0.0f;
     float                               GaussianSplatRtxDepthIsoThreshold = 0.70f;
-    bool                                GaussianSplatMipAntialiasing = true;
+    // Match vk_gaussian_splatting's raster default. Mip opacity compensation is
+    // useful for minification, but softens this reference-quality native-res path.
+    bool                                GaussianSplatMipAntialiasing = false;
+    // Match vk_gaussian_splatting's display-referred back-to-front alpha compositing.
+    // The graph temporarily converts the HDR target to sRGB around the sorted splat pass,
+    // then restores linear color before Bloom / tone mapping.
+    bool                                GaussianSplatReferenceGammaCompositing = true;
     bool                                GaussianSplatQuantizeNormals = true;
     int                                 GaussianSplatFTBSyncMode = 0; // 0 = Disabled, 1 = Interlock
     float                               GaussianSplatDepthIsoThreshold = 0.70f;
     bool                                GaussianSplatFragmentShaderBarycentric = false;
     int                                 GaussianSplatFrustumCulling = 2; // 0 = Disabled, 1 = At distance stage, 2 = At raster stage
     float                               GaussianSplatFrustumDilation = 0.20f;
-    int                                 GaussianSplatProjectionMethod = 1; // 0 = Eigen, 1 = Conic (opacity-tight / GUT-like)
+    int                                 GaussianSplatProjectionMethod = 1; // 3DGUT only: 0 = Eigen, 1 = Conic (paper/reference)
+    float                               GaussianSplatCovarianceDilation = 0.30f;
     bool                                GaussianSplatScreenSizeCulling = false;
     float                               GaussianSplatMinPixelCoverage = 1.0f;
     float                               GaussianSplatScale = 1.0f;

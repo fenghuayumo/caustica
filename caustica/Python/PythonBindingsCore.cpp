@@ -1639,7 +1639,14 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("gaussian_splat_rtx_colored_shadow_strength", &PathTracerSettings::GaussianSplatRtxColoredShadowStrength)
         .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &PathTracerSettings::GaussianSplatRtxMeshCompositeThreshold)
         .def_rw("gaussian_splat_rtx_depth_iso_threshold", &PathTracerSettings::GaussianSplatRtxDepthIsoThreshold)
+        .def_rw("gaussian_splat_projection_method", &PathTracerSettings::GaussianSplatProjectionMethod,
+                "3DGUT extent method: 0=oriented Eigen, 1=paper/reference Conic. Ignored by 3DGS.")
+        .def_rw("gaussian_splat_covariance_dilation", &PathTracerSettings::GaussianSplatCovarianceDilation,
+                "Screen-space covariance low-pass kernel size; typically 0.1 or 0.3.")
         .def_rw("gaussian_splat_mip_antialiasing", &PathTracerSettings::GaussianSplatMipAntialiasing)
+        .def_rw("gaussian_splat_reference_gamma_compositing",
+                &PathTracerSettings::GaussianSplatReferenceGammaCompositing,
+                "Use vk_gaussian_splatting-compatible sRGB alpha compositing for GPU-sorted splats.")
         .def_rw("gaussian_splat_quantize_normals", &PathTracerSettings::GaussianSplatQuantizeNormals)
         .def_rw("gaussian_splat_ftb_sync_mode", &PathTracerSettings::GaussianSplatFTBSyncMode,
                 "3DGS front-to-back synchronization mode (caustica.GaussianSplatFTBSyncMode).")

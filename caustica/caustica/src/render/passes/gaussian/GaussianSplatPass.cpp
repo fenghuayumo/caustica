@@ -196,7 +196,15 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     m_colorOpacity.clear();
     m_colorOpacity.reserve(m_splats.size());
     for (const caustica::GaussianSplatData& splat : m_splats)
-        m_colorOpacity.push_back(float4(splat.color.x, splat.color.y, splat.color.z, splat.centerOpacity.w));
+    {
+        // Match vk_gaussian_splatting: the degree-0 color is display RGB and is clamped
+        // before storage regardless of the selected GPU format. SH residuals remain signed.
+        m_colorOpacity.push_back(float4(
+            Clamp01(splat.color.x),
+            Clamp01(splat.color.y),
+            Clamp01(splat.color.z),
+            Clamp01(splat.centerOpacity.w)));
+    }
 
     m_localBounds = box3::empty();
     for (const caustica::GaussianSplatData& splat : m_splats)
@@ -856,6 +864,8 @@ bool GaussianSplatPass::upload(
     constants.rgbaFormat = uint32_t(settings.rgbaFormat);
     constants.projectionMethod = uint32_t(settings.projectionMethod);
     constants.stochasticFrameIndex = settings.stochasticFrameIndex;
+    constants.covarianceDilation = std::max(settings.covarianceDilation, 0.0f);
+    constants.referenceGammaCompositing = settings.referenceGammaCompositing ? 1u : 0u;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     const bool useGut = settings.primaryMethod == GaussianSplatPrimaryMethod::GUT;

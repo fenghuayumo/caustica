@@ -67,12 +67,15 @@ struct GaussianSplatRenderSettings
     GaussianSplatSortMode sortingMode = GaussianSplatSortMode::GpuSort;
     GaussianSplatRenderTarget renderTarget = GaussianSplatRenderTarget::ProcessedOutputColor;
     GaussianSplatFrustumCulling frustumCulling = GaussianSplatFrustumCulling::AtRasterStage;
-    // 3DGS-only submode: Eigen vs Conic extents (ignored by 3DGUT primary).
+    // 3DGUT-only projected extent: Eigen is faster; Conic is the paper/reference default.
+    // The regular 3DGS path always uses its oriented Eigen/whitened representation.
     GaussianSplatProjectionMethod projectionMethod = GaussianSplatProjectionMethod::Conic;
     GaussianSplatStorageFormat shFormat = GaussianSplatStorageFormat::Float16;
     GaussianSplatStorageFormat rgbaFormat = GaussianSplatStorageFormat::Float16;
     bool screenSizeCulling = false;
     bool mipSplattingAntialiasing = true;
+    bool referenceGammaCompositing = true;
+    float covarianceDilation = 0.3f;
     bool useAABBs = false;
     bool useTLASInstances = true;
     bool blasCompaction = true;

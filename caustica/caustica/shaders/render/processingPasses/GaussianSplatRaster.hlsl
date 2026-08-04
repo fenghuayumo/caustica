@@ -19,8 +19,6 @@ static const uint kGaussianSplatFrustumCullingAtRaster = 2;
 static const uint kGaussianSplatFormatFloat32 = 0;
 static const uint kGaussianSplatFormatFloat16 = 1;
 static const uint kGaussianSplatFormatUint8 = 2;
-static const uint kGaussianSplatProjectionEigen = 0;
-static const uint kGaussianSplatProjectionConic = 1;
 static const uint kGaussianSplatSortRandom = 1;
 static const uint kGaussianSplatShScalarStride = 45;
 
@@ -87,30 +85,19 @@ struct VertexOutput
 {
     float4 position : SV_Position;
     float2 fragPos : TEXCOORD0;
-    nointerpolation float3 conic : TEXCOORD1;
     nointerpolation float4 color : COLOR0;
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
-    nointerpolation float3 worldCenter : TEXCOORD2;
+    nointerpolation float3 worldCenter : TEXCOORD1;
 #endif
 };
 
+// vk_gaussian_splatting threedgs_raster: fixed sqrt(8) eigen extents + whitened fragPos.
 static const float kSqrt8 = 2.8284271247461903f;
-static const float kMaxExtentFactor = 3.33f; // matches 3DGUT / original 3DGS 3-sigma-ish cap
 static const float kFragmentAlphaCullThreshold = 1.0f / 255.0f;
 
-// Opacity-tight extent factor from 3DGUT (GUT_TIGHT_OPACITY_BOUNDING).
-// Low-opacity floaters get much smaller quads instead of a fixed sqrt(8) footprint.
-float OpacityTightExtentFactor(float opacity, float alphaThreshold)
-{
-    float threshold = max(alphaThreshold, kFragmentAlphaCullThreshold);
-    float safeOpacity = max(opacity, threshold);
-    float maxPower = log(safeOpacity / threshold);
-    return min(kMaxExtentFactor, sqrt(max(0.0f, 2.0f * maxPower)));
-}
-
-// 3DGS radiance is trained against sRGB display values. Convert to linear for the HDR
-// tonemap path (same transfer vk_gaussian_splatting applies after raster in deferred shading).
-// Values above 1 are passed through with a linear extension so bright SH peaks are preserved.
+// Training SH/RGBA is display-referred (sRGB). Convert before writing into the HDR buffer so
+// tonemap-off to sRGB LDR does not treat gamma-encoded values as linear (washed / pale).
+// vk applies the same transfer after raster in deferred_shading when lighting is off.
 float SrgbToLinear(float srgb)
 {
     if (srgb <= 0.04045f)
@@ -222,14 +209,13 @@ bool ComputeProjectedBasis(
     float3 cov2D,
     inout float opacity,
     out float2 basis1,
-    out float2 basis2,
-    out float3 conic,
-    out float extentFactor)
+    out float2 basis2)
 {
-    float detOrig = max(cov2D.x * cov2D.z - cov2D.y * cov2D.y, 1e-12f);
+    float detOrig = cov2D.x * cov2D.z - cov2D.y * cov2D.y;
 
-    cov2D.x += 0.3f;
-    cov2D.z += 0.3f;
+    float covarianceDilation = max(g_Const.covarianceDilation, 0.0f);
+    cov2D.x += covarianceDilation;
+    cov2D.z += covarianceDilation;
 
     float a = cov2D.x;
     float b = cov2D.y;
@@ -244,8 +230,6 @@ bool ComputeProjectedBasis(
 
     basis1 = 0.0f;
     basis2 = 0.0f;
-    conic = 0.0f;
-    extentFactor = 0.0f;
 
     if (eigenValue2 <= 0.0f || det <= 0.0f)
         return false;
@@ -253,32 +237,16 @@ bool ComputeProjectedBasis(
     if (g_Const.mipSplattingAntialiasing != 0)
         opacity *= sqrt(max(detOrig / max(det, 1e-12f), 0.0f));
 
-    // Drop near-invisible splats early (same spirit as GUT_ALPHA_THRESHOLD for extent).
     if (opacity < max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold))
         return false;
 
-    extentFactor = OpacityTightExtentFactor(opacity, g_Const.alphaCullThreshold);
-    if (extentFactor <= 0.0f)
-        return false;
-
-    conic = float3(d, -b, a) / max(det, 1e-12f);
-
-    if (g_Const.projectionMethod == kGaussianSplatProjectionConic)
-    {
-        // 3DGUT-style axis-aligned rect bound: shrink both axes by opacity, then clamp to radius.
-        float radius = min(extentFactor * sqrt(eigenValue1), 2048.0f);
-        float2 extent = min(extentFactor * sqrt(float2(a, d)), float2(radius, radius));
-        basis1 = float2(g_Const.splatScale * extent.x, 0.0f);
-        basis2 = float2(0.0f, g_Const.splatScale * extent.y);
-        return radius > 0.0f;
-    }
-
+    // Always use oriented eigen extents (vk threedgsProjectedExtentBasis). Axis-aligned
+    // AABB bounds inflate rotated sky floaters into large translucent blobs.
     float2 eigenVector1 = normalize(float2(abs(b) < 0.001f ? 1.0f : b, eigenValue1 - a));
     float2 eigenVector2 = float2(eigenVector1.y, -eigenVector1.x);
 
-    basis1 = eigenVector1 * g_Const.splatScale * min(extentFactor * sqrt(eigenValue1), 2048.0f);
-    basis2 = eigenVector2 * g_Const.splatScale * min(extentFactor * sqrt(eigenValue2), 2048.0f);
-    conic = float3(1.0f, 0.0f, 1.0f);
+    basis1 = eigenVector1 * g_Const.splatScale * min(kSqrt8 * sqrt(eigenValue1), 2048.0f);
+    basis2 = eigenVector2 * g_Const.splatScale * min(kSqrt8 * sqrt(eigenValue2), 2048.0f);
 
     return true;
 }
@@ -390,16 +358,12 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
 
     float2 basis1;
     float2 basis2;
-    float3 conic;
-    float extentFactor;
     float opacity = splatColorOpacity.a;
     if (!ComputeProjectedBasis(
             ProjectCovariance(LoadCovariance(splat), viewCenter),
             opacity,
             basis1,
-            basis2,
-            conic,
-            extentFactor))
+            basis2))
     {
         output.position = float4(0.0f, 0.0f, 2.0f, 1.0f);
         return output;
@@ -429,13 +393,15 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
     float3 displayColor = max(color, 0.0f);
 
     output.position = float4(ndcCenter.xy + ndcOffset, ndcCenter.z, 1.0f);
-    // Eigen: whitened coords use the same opacity-tight factor as the quad extent.
-    // Conic: fragPos is pixel offset from center (x^T * conic * x).
-    output.fragPos = g_Const.projectionMethod == kGaussianSplatProjectionConic
-        ? corner.x * basis1 + corner.y * basis2
-        : corner * extentFactor;
-    output.conic = conic;
-    output.color = float4(SrgbToLinear(displayColor) * g_Const.brightness, opacity);
+    // The oriented basis whitens the projected covariance, so fragment evaluation is x*x + y*y.
+    output.fragPos = corner * kSqrt8;
+    // vk_gaussian_splatting's unlit raster path blends the display-referred training RGB
+    // directly. The frame graph brackets this pass with linear<->sRGB conversions so the
+    // rest of caustica still receives a linear HDR target.
+    float3 compositingColor = g_Const.referenceGammaCompositing != 0
+        ? displayColor
+        : SrgbToLinear(displayColor);
+    output.color = float4(compositingColor * g_Const.brightness, opacity);
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
     output.worldCenter = worldCenter.xyz;
 #endif
@@ -445,17 +411,13 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
 
 float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Target0
 {
-    float A = input.conic.x * input.fragPos.x * input.fragPos.x
-        + 2.0f * input.conic.y * input.fragPos.x * input.fragPos.y
-        + input.conic.z * input.fragPos.y * input.fragPos.y;
+    float A = dot(input.fragPos, input.fragPos);
 
-    float alphaThreshold = max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold);
-    float scaledAlpha = max(input.color.a * g_Const.alphaScale, alphaThreshold);
-    // Opacity-aware cutoff: discard once response would fall below the alpha threshold.
-    float maxA = 2.0f * log(scaledAlpha / alphaThreshold);
-    if (A > maxA)
+    // The whitened radius is sqrt(8), matching vk_gaussian_splatting.
+    if (A > 8.0f)
         discard;
 
+    float alphaThreshold = max(g_Const.alphaCullThreshold, kFragmentAlphaCullThreshold);
     float opacity = exp(-0.5f * A) * input.color.a * g_Const.alphaScale;
     if (opacity <= alphaThreshold)
         discard;

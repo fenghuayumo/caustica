@@ -84,20 +84,29 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
             RESET_ON_CHANGE(GaussianSplatFormatCombo("SH Format", &m_settings.GaussianSplatSHFormat));
             RESET_ON_CHANGE(GaussianSplatFormatCombo("RGBA Format", &m_settings.GaussianSplatRGBAFormat));
-            if (m_settings.GaussianSplatPrimaryMethod == 0)
+            if (m_settings.GaussianSplatPrimaryMethod == 1)
             {
                 const bool projectionChanged = SettingsCombo(
                     "Projection",
                     &m_settings.GaussianSplatProjectionMethod,
-                    "Eigen\0Conic (tight floaters)\0\0");
+                    "Eigen (oriented)\0Conic (paper/reference)\0\0");
                 m_settings.GaussianSplatProjectionMethod = dm::clamp(m_settings.GaussianSplatProjectionMethod, 0, 1);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(
-                        "3DGS EWA submode only (ignored by 3DGUT).\n"
-                        "Conic: opacity-tight axis-aligned extents.\n"
-                        "Eigen: oriented ellipses with the same opacity-tight factor.");
+                        "3DGUT projected-extent method (3DGS always uses Eigen).\n"
+                        "Eigen: oriented rectangle, lower overdraw.\n"
+                        "Conic: axis-aligned opacity-tight bound from the 3DGUT paper.");
                 RESET_ON_CHANGE(projectionChanged);
             }
+            RESET_ON_CHANGE(ImGui::DragFloat(
+                "Low pass kernel",
+                &m_settings.GaussianSplatCovarianceDilation,
+                0.01f,
+                0.0f,
+                0.3f,
+                "%.2f"));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("2D covariance dilation. 0.1 is the Mip-Splatting default; 0.3 is the 3DGS/3DGUT default.");
             RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
             RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
             RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
@@ -114,21 +123,6 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             RESET_ON_CHANGE(ImGui::Checkbox("Screen size culling", &m_settings.GaussianSplatScreenSizeCulling));
             ImGui::BeginDisabled(!m_settings.GaussianSplatScreenSizeCulling);
             RESET_ON_CHANGE(ImGui::DragFloat("Min pixel coverage", &m_settings.GaussianSplatMinPixelCoverage, 0.1f, 0.1f, 20.0f, "%.2f"));
-            ImGui::EndDisabled();
-        }
-
-        if (ImGui::CollapsingHeader("Emission", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-
-            RESET_ON_CHANGE(ImGui::Checkbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
-            ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
-            RESET_ON_CHANGE(ImGui::DragFloat("Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-            if (ImGui::InputInt("Emission Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256, 4096))
-            {
-                m_settings.GaussianSplatEmissionMaxProxyCount = dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
-                m_settings.ResetAccumulation = true;
-            }
             ImGui::EndDisabled();
         }
 

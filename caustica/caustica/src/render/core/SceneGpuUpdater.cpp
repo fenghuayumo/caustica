@@ -138,18 +138,24 @@ caustica::rhi::BufferHandle CreateMaterialConstantBuffer(SceneGpuResources& gpu,
 
 void WriteMaterialBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
+    if (!gpu.materialBuffer || gpu.materialData.empty())
+        return;
     commandList->writeBuffer(gpu.materialBuffer, gpu.materialData.data(),
         gpu.materialData.size() * sizeof(MaterialConstants));
 }
 
 void WriteGeometryBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
+    if (!gpu.geometryBuffer || gpu.geometryData.empty())
+        return;
     commandList->writeBuffer(gpu.geometryBuffer, gpu.geometryData.data(),
         gpu.geometryData.size() * sizeof(GeometryData));
 }
 
 void WriteInstanceBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
+    if (!gpu.instanceBuffer || gpu.instanceData.empty())
+        return;
     commandList->writeBuffer(gpu.instanceBuffer, gpu.instanceData.data(),
         gpu.instanceData.size() * sizeof(InstanceData));
 }

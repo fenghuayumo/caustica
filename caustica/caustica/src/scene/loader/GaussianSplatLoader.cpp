@@ -366,9 +366,13 @@ namespace
         splat.centerOpacity = float4(position[0], position[1], position[2], Clamp01(raw.alpha));
         splat.covariance0 = float4(cov00, cov01, cov02, cov11);
         splat.covariance1 = float4(cov12, cov22, 0.0f, 0.0f);
-        // DC color is 0.5 + SH_C0 * f_dc and is often slightly outside [0,1]. Clamping here
-        // crushed highlights before they ever reached the rasterizer.
-        splat.color = float4(raw.color[0], raw.color[1], raw.color[2], 0.0f);
+        // vk_gaussian_splatting stores the display-referred DC/base RGB in a
+        // normalized RGBA field, so clamp it before any view-dependent SH is added.
+        splat.color = float4(
+            Clamp01(raw.color[0]),
+            Clamp01(raw.color[1]),
+            Clamp01(raw.color[2]),
+            0.0f);
         splat.scale = float4(raw.scale[0], raw.scale[1], raw.scale[2], 0.0f);
         splat.rotation = float4(rotation[0], rotation[1], rotation[2], rotation[3]); // wxyz
 

@@ -90,7 +90,9 @@ namespace
         rg::TextureHandle sceneDepth,
         const char* uploadPassName,
         const char* sortPassName,
-        const char* rasterPassName)
+        const char* rasterPassName,
+        const char* encodePassName,
+        const char* decodePassName)
     {
         const std::vector<GaussianSplatGraphHandles> resources =
             importGaussianSplatGraphResources(ctx, renderToOutputColor);
@@ -141,6 +143,27 @@ namespace
             },
             rg::PassOptions{ .sideEffect = true, .executeAfter = uploadPassName });
 
+        const bool referenceGammaCompositing =
+            !renderToOutputColor
+            && ctx.settings->GaussianSplatSortingMode == 0
+            && ctx.settings->GaussianSplatReferenceGammaCompositing;
+        const char* rasterExecuteAfter = sortPassName;
+        if (referenceGammaCompositing)
+        {
+            ctx.graph->addPass(
+                encodePassName,
+                [colorTarget](rg::PassBuilder& setup) {
+                    setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
+                    setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
+                },
+                [ctx](rg::RenderPassContext& passCtx) {
+                    if (gaussianSplatsEnabled(ctx))
+                        ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), false);
+                },
+                rg::PassOptions{ .sideEffect = true, .executeAfter = sortPassName });
+            rasterExecuteAfter = encodePassName;
+        }
+
         ctx.graph->addPass(
             rasterPassName,
             [resources, colorTarget, sceneDepth](rg::PassBuilder& setup) {
@@ -163,7 +186,22 @@ namespace
                 if (gaussianSplatsEnabled(ctx))
                     ctx.gaussian->executeRaster(passCtx.commandList(), renderToOutputColor);
             },
-            rg::PassOptions{ .sideEffect = true, .executeAfter = sortPassName });
+            rg::PassOptions{ .sideEffect = true, .executeAfter = rasterExecuteAfter });
+
+        if (referenceGammaCompositing)
+        {
+            ctx.graph->addPass(
+                decodePassName,
+                [colorTarget](rg::PassBuilder& setup) {
+                    setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
+                    setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
+                },
+                [ctx](rg::RenderPassContext& passCtx) {
+                    if (gaussianSplatsEnabled(ctx))
+                        ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), true);
+                },
+                rg::PassOptions{ .sideEffect = true, .executeAfter = rasterPassName });
+        }
         return true;
     }
 }
@@ -194,7 +232,9 @@ void registerGaussianSplatPreAAPass(FrameGraphContext ctx)
         depth,
         "GaussianSplatsStochasticUpload",
         "GaussianSplatsStochasticSort",
-        "GaussianSplatsStochastic");
+        "GaussianSplatsStochastic",
+        "GaussianSplatsStochasticLinearToSrgb",
+        "GaussianSplatsStochasticSrgbToLinear");
 }
 
 void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
@@ -267,7 +307,9 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         depth,
         "GaussianSplatsCompositeUpload",
         "GaussianSplatsCompositeSort",
-        "GaussianSplatsComposite");
+        "GaussianSplatsComposite",
+        "GaussianSplatsCompositeLinearToSrgb",
+        "GaussianSplatsCompositeSrgbToLinear");
     if (!registeredRenderStages)
         return;
 

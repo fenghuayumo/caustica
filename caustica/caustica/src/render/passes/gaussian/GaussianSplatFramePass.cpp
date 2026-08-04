@@ -57,6 +57,33 @@ void GaussianSplatFramePass::createTemporalResources(
     m_accumulationPass->createPipeline();
     m_accumulationPass->createBindingSet(
         m_currentColor, m_accumulatedColor, renderTargets->processedOutputColor);
+
+    caustica::rhi::BindingLayoutDesc colorSpaceLayoutDesc;
+    colorSpaceLayoutDesc.visibility = caustica::rhi::ShaderType::Compute;
+    colorSpaceLayoutDesc.bindings = {
+        caustica::rhi::BindingLayoutItem::Texture_UAV(0),
+        caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(dm::uint4)),
+    };
+    m_colorSpaceBindingLayout = device->createBindingLayout(colorSpaceLayoutDesc);
+
+    caustica::rhi::BindingSetDesc colorSpaceBindingSetDesc;
+    colorSpaceBindingSetDesc.bindings = {
+        caustica::rhi::BindingSetItem::Texture_UAV(0, renderTargets->processedOutputColor),
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(dm::uint4)),
+    };
+    m_colorSpaceBindingSet = device->createBindingSet(
+        colorSpaceBindingSetDesc,
+        m_colorSpaceBindingLayout);
+
+    m_colorSpaceShader = shaderFactory->createShader(
+        "caustica/shaders/render/processingPasses/GaussianSplatColorSpace.hlsl",
+        "main",
+        nullptr,
+        caustica::rhi::ShaderType::Compute);
+    caustica::rhi::ComputePipelineDesc colorSpacePipelineDesc;
+    colorSpacePipelineDesc.bindingLayouts = { m_colorSpaceBindingLayout };
+    colorSpacePipelineDesc.CS = m_colorSpaceShader;
+    m_colorSpacePipeline = device->createComputePipeline(colorSpacePipelineDesc);
 }
 
 void GaussianSplatFramePass::bindStable(
@@ -255,6 +282,39 @@ void GaussianSplatFramePass::executeSort(caustica::rhi::CommandList* commandList
         commandList,
         m_context->frameGaussianSplats(),
         *m_scenePasses);
+}
+
+void GaussianSplatFramePass::executeColorSpaceConversion(
+    caustica::rhi::CommandList* commandList,
+    bool toLinear)
+{
+    if (commandList == nullptr || !m_colorSpacePipeline || !m_colorSpaceBindingSet
+        || m_displaySize.x == 0 || m_displaySize.y == 0)
+    {
+        return;
+    }
+
+    commandList->beginMarker(toLinear
+        ? "GaussianSplatsSrgbToLinear"
+        : "GaussianSplatsLinearToSrgb");
+
+    caustica::rhi::ComputeState state;
+    state.pipeline = m_colorSpacePipeline;
+    state.bindings = { m_colorSpaceBindingSet };
+    commandList->setComputeState(state);
+
+    const dm::uint4 constants(
+        toLinear ? 1u : 0u,
+        m_displaySize.x,
+        m_displaySize.y,
+        0u);
+    commandList->setPushConstants(&constants, sizeof(constants));
+    commandList->dispatch(
+        dm::div_ceil(m_displaySize.x, 8u),
+        dm::div_ceil(m_displaySize.y, 8u),
+        1);
+
+    commandList->endMarker();
 }
 
 void GaussianSplatFramePass::executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor)

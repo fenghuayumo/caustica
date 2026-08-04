@@ -128,6 +128,10 @@ struct GaussianSplatConstants
     uint rgbaFormat;
     uint projectionMethod;
     uint stochasticFrameIndex;
+
+    float covarianceDilation;
+    uint referenceGammaCompositing;
+    float2 padding1;
 };
 
 struct GaussianSplatData
