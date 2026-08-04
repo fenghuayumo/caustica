@@ -408,7 +408,7 @@ struct PathTracerSettings
     int                                 GaussianSplatSortingMode = 0; // 0 = GPU sort, 1 = stochastic splats
     // Float16 is the quality default (Uint8 quantizes SH to [-1,1] and crushes view-dependent color).
     int                                 GaussianSplatSHFormat = 1;
-    int                                 GaussianSplatRGBAFormat = 1;
+    int                                 GaussianSplatRGBAFormat = 2; // Uint8
     bool                                GaussianSplatUseAABBs = false;
     bool                                GaussianSplatUseTLASInstances = true;
     bool                                GaussianSplatBlasCompaction = true;
@@ -437,7 +437,7 @@ struct PathTracerSettings
     bool                                GaussianSplatFragmentShaderBarycentric = false;
     int                                 GaussianSplatFrustumCulling = 2; // 0 = Disabled, 1 = At distance stage, 2 = At raster stage
     float                               GaussianSplatFrustumDilation = 0.20f;
-    int                                 GaussianSplatProjectionMethod = 1; // 3DGUT only: 0 = Eigen, 1 = Conic (paper/reference)
+    int                                 GaussianSplatProjectionMethod = 0; // 3DGUT only: 0 = Eigen, 1 = Conic (paper/reference)
     float                               GaussianSplatCovarianceDilation = 0.30f;
     bool                                GaussianSplatScreenSizeCulling = false;
     float                               GaussianSplatMinPixelCoverage = 1.0f;

@@ -34,7 +34,6 @@ bool GaussianSplatPrimaryMethodCombo(EditorUIData& ui);
 bool GaussianSplatShadowsModeCombo(EditorUIData& ui);
 bool GaussianSplatSortingCombo(EditorUIData& ui);
 bool GaussianSplatFormatCombo(const char* label, int* value);
-bool GaussianSplatFTBCombo(EditorUIData& ui);
 bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui);
 void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter);

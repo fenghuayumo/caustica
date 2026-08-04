@@ -83,35 +83,8 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
 
             RESET_ON_CHANGE(GaussianSplatSortingCombo(m_ui));
             RESET_ON_CHANGE(GaussianSplatFormatCombo("SH Format", &m_settings.GaussianSplatSHFormat));
-            RESET_ON_CHANGE(GaussianSplatFormatCombo("RGBA Format", &m_settings.GaussianSplatRGBAFormat));
-            if (m_settings.GaussianSplatPrimaryMethod == 1)
-            {
-                const bool projectionChanged = SettingsCombo(
-                    "Projection",
-                    &m_settings.GaussianSplatProjectionMethod,
-                    "Eigen (oriented)\0Conic (paper/reference)\0\0");
-                m_settings.GaussianSplatProjectionMethod = dm::clamp(m_settings.GaussianSplatProjectionMethod, 0, 1);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "3DGUT projected-extent method (3DGS always uses Eigen).\n"
-                        "Eigen: oriented rectangle, lower overdraw.\n"
-                        "Conic: axis-aligned opacity-tight bound from the 3DGUT paper.");
-                RESET_ON_CHANGE(projectionChanged);
-            }
-            RESET_ON_CHANGE(ImGui::DragFloat(
-                "Low pass kernel",
-                &m_settings.GaussianSplatCovarianceDilation,
-                0.01f,
-                0.0f,
-                0.3f,
-                "%.2f"));
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("2D covariance dilation. 0.1 is the Mip-Splatting default; 0.3 is the 3DGS/3DGUT default.");
             RESET_ON_CHANGE(ImGui::Checkbox("Mip splatting antialiasing", &m_settings.GaussianSplatMipAntialiasing));
             RESET_ON_CHANGE(ImGui::Checkbox("Quantize Normals", &m_settings.GaussianSplatQuantizeNormals));
-            RESET_ON_CHANGE(GaussianSplatFTBCombo(m_ui));
-            RESET_ON_CHANGE(ImGui::DragFloat("Depth Iso Threshold", &m_settings.GaussianSplatDepthIsoThreshold, 0.01f, 0.0f, 1.0f, "%.2f"));
-            RESET_ON_CHANGE(ImGui::Checkbox("Fragment shader barycentric", &m_settings.GaussianSplatFragmentShaderBarycentric));
 
             ImGui::SeparatorText("Culling");
             bool cullingChanged = false;

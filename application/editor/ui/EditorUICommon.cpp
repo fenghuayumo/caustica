@@ -202,18 +202,6 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         return changed;
     }
 
-    bool GaussianSplatFTBCombo(EditorUIData& ui)
-    {
-        const bool changed = SettingsCombo(
-            "FTB Sync Mode",
-            &ui.render.settings.GaussianSplatFTBSyncMode,
-            "Disabled (fast)\0Interlock\0\0");
-        ui.render.settings.GaussianSplatFTBSyncMode = dm::clamp(ui.render.settings.GaussianSplatFTBSyncMode, 0, 1);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Front-to-back depth synchronization mode. The current RTXPT overlay path does not write a 3DGS depth iso buffer yet.");
-        return changed;
-    }
-
     bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui)
     {
         const bool changed = SettingsCombo("Kernel Degree", &ui.render.settings.GaussianSplatRtxKernelDegree,
