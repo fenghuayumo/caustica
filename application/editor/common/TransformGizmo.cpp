@@ -142,6 +142,9 @@ void HandleTransformGizmoShortcuts(EditorUIState& editorUI)
     // Avoid stealing Ctrl/Alt/Super chords (e.g. Ctrl+R shader reload).
     if (io.KeyCtrl || io.KeyAlt || io.KeySuper)
         return;
+    // RMB + WASD/QE fly mode owns Q/S — don't switch tools while flying.
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+        return;
 
     if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
         editorUI.GizmoEnabled = false;

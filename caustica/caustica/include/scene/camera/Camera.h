@@ -63,11 +63,15 @@ namespace caustica
         void keyboardUpdate(int key, int scancode, int action, int mods) override;
         void mousePosUpdate(double xpos, double ypos) override;
         void mouseButtonUpdate(int button, int action, int mods) override;
+        void mouseScrollUpdate(double xoffset, double yoffset) override;
         void animate(float deltaT) override;
         void animateSmooth(float deltaT);
 
         void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
         void lookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+
+        // Clears WASD/QE/roll keys so releasing RMB fly-mode cannot leave stuck motion.
+        void clearFlyKeyboardState();
 
     private:
         std::pair<bool, dm::affine3> animateRoll(dm::affine3 initialRotation);
@@ -80,6 +84,7 @@ namespace caustica
         dm::float3 m_CameraMovePrev = 0.f;
         dm::float3 m_CameraMoveDamp = 0.f;
         bool m_IsDragging = false;
+        bool m_IsPanning = false;
 
         typedef enum
         {

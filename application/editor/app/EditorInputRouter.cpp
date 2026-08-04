@@ -42,6 +42,38 @@ inline constexpr int cGlfwPress = 1;
 inline constexpr int cGlfwRelease = 0;
 inline constexpr int cGlfwRepeat = 2;
 
+// WASD/QE/ZC only apply while RMB is held (fly mode). Arrow keys stay free for pan.
+bool isCameraFlyKey(int key)
+{
+    return key == ToGlfwKey(caustica::Key::W)
+        || key == ToGlfwKey(caustica::Key::A)
+        || key == ToGlfwKey(caustica::Key::S)
+        || key == ToGlfwKey(caustica::Key::D)
+        || key == ToGlfwKey(caustica::Key::Q)
+        || key == ToGlfwKey(caustica::Key::E)
+        || key == ToGlfwKey(caustica::Key::Z)
+        || key == ToGlfwKey(caustica::Key::C);
+}
+
+bool isRightMouseDown(SceneEditor& sceneEditor)
+{
+    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
+        ? sceneEditor.app()->getGpuDevice()->getWindow()
+        : nullptr;
+    return window && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+}
+
+struct RightClickPickState
+{
+    bool tracking = false;
+    bool dragged = false;
+    double pressX = 0.0;
+    double pressY = 0.0;
+};
+
+RightClickPickState g_rightClickPick;
+constexpr double kRightClickPickSlopPx = 4.0;
+
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
     const auto& editor = sceneEditor.editorUIState();
@@ -178,8 +210,12 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
+    // WASD/QE fly only while RMB is held so Q/T/R/S gizmo hotkeys stay free.
     if (!(game && game->CameraActive()))
-        camera->camera().keyboardUpdate(key, e.getScancode(), action, mods);
+    {
+        if (!isCameraFlyKey(key) || isRightMouseDown(sceneEditor))
+            camera->camera().keyboardUpdate(key, e.getScancode(), action, mods);
+    }
 
     if (game && game->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
@@ -230,7 +266,10 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
+    {
+        // Always accept releases so fly keys cannot stick after RMB-up.
         camera->camera().keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods);
+    }
     if (game && game->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
     return true;
@@ -244,6 +283,14 @@ bool onKeyTyped(SceneEditor& /*sceneEditor*/, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
+    if (g_rightClickPick.tracking)
+    {
+        const double dx = e.getX() - g_rightClickPick.pressX;
+        const double dy = e.getY() - g_rightClickPick.pressY;
+        if ((dx * dx + dy * dy) > (kRightClickPickSlopPx * kRightClickPickSlopPx))
+            g_rightClickPick.dragged = true;
+    }
+
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
@@ -300,8 +347,13 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     }
     else if (button == ToGlfwMouse(caustica::Mouse::Right))
     {
-        syncPickPositionFromCursor(sceneEditor);
-        requestMaterialPick(session.runtime);
+        // Defer material pick until release if the user only clicked (no fly look-drag).
+        g_rightClickPick.tracking = true;
+        g_rightClickPick.dragged = false;
+        g_rightClickPick.pressX = 0.0;
+        g_rightClickPick.pressY = 0.0;
+        if (GLFWwindow* window = sceneEditor.app()->getGpuDevice()->getWindow())
+            glfwGetCursorPos(window, &g_rightClickPick.pressX, &g_rightClickPick.pressY);
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
@@ -313,6 +365,20 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
 bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleasedEvent& e)
 {
+    const int button = ToGlfwMouse(e.getButton());
+    const int mods = ToGlfwMods(e.getModifiers());
+
+    if (button == ToGlfwMouse(caustica::Mouse::Right) && g_rightClickPick.tracking)
+    {
+        const bool clicked = !g_rightClickPick.dragged;
+        g_rightClickPick = {};
+        if (clicked && !uiCapturesMouseForEditor(sceneEditor) && !gizmoCapturesInput(sceneEditor))
+        {
+            syncPickPositionFromCursor(sceneEditor);
+            requestMaterialPick(sceneEditor.renderAppState().runtime);
+        }
+    }
+
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
@@ -320,16 +386,17 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     if (!camera)
         return true;
 
-    const int button = ToGlfwMouse(e.getButton());
-    const int mods = ToGlfwMods(e.getModifiers());
-
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
         return true;
     if (!(game && game->CameraActive()))
+    {
         camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
+        if (button == ToGlfwMouse(caustica::Mouse::Right))
+            camera->camera().clearFlyKeyboardState();
+    }
     if (game)
         game->mouseButtonUpdate(button, cGlfwRelease, mods);
     return true;
@@ -339,12 +406,25 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.AddMouseWheelEvent(static_cast<float>(e.getXOffset()), static_cast<float>(e.getYOffset()));
-    if (uiCapturesMouseForEditor(sceneEditor))
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return true;
 
+    auto* camera = caustica::editor::editorCamera(sceneEditor);
     auto* game = sceneEditor.game().get();
-    if (!(game && game->CameraActive()))
-        sceneEditor.renderAppState().settings.CameraMoveSpeed *= 1.0f + static_cast<float>(e.getYOffset()) * 0.1f;
+    if (!camera || (game && game->CameraActive()))
+        return true;
+
+    // Alt + wheel: change fly speed. Plain wheel: dolly zoom in/out.
+    const bool altHeld = io.KeyAlt;
+    if (altHeld)
+    {
+        float& speed = sceneEditor.renderAppState().settings.CameraMoveSpeed;
+        speed = std::clamp(speed * (1.0f + static_cast<float>(e.getYOffset()) * 0.1f), 0.01f, 100.f);
+    }
+    else
+    {
+        camera->camera().mouseScrollUpdate(e.getXOffset(), e.getYOffset());
+    }
     return true;
 }
 

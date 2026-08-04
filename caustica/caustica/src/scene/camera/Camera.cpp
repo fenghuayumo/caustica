@@ -1,4 +1,5 @@
 #include <cassert>
+#include <algorithm>
 #include <scene/camera/Camera.h>
 #include <scene/View.h>
 
@@ -59,6 +60,28 @@ void FirstPersonCamera::mouseButtonUpdate(int button, int action, int mods)
     else {
         m_MouseButtonState[cameraButton] = false;
     }
+}
+
+void FirstPersonCamera::clearFlyKeyboardState()
+{
+    m_KeyboardState[KeyboardControls::MoveUp] = false;
+    m_KeyboardState[KeyboardControls::MoveDown] = false;
+    m_KeyboardState[KeyboardControls::MoveLeft] = false;
+    m_KeyboardState[KeyboardControls::MoveRight] = false;
+    m_KeyboardState[KeyboardControls::MoveForward] = false;
+    m_KeyboardState[KeyboardControls::MoveBackward] = false;
+    m_KeyboardState[KeyboardControls::RollLeft] = false;
+    m_KeyboardState[KeyboardControls::RollRight] = false;
+}
+
+void FirstPersonCamera::mouseScrollUpdate(double /*xoffset*/, double yoffset)
+{
+    if (yoffset == 0.0)
+        return;
+
+    // Dolly along look direction; step scales with move speed.
+    const float step = m_MoveSpeed * 0.35f * static_cast<float>(yoffset);
+    updateCamera(m_CameraDir * step, affine3::identity());
 }
 
 void FirstPersonCamera::lookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
@@ -125,6 +148,29 @@ std::pair<bool, float3> FirstPersonCamera::animateTranslation(float deltaT)
         cameraDirty = true;
         cameraMoveVec += -m_CameraUp * moveStep;
     }
+
+    // Arrow keys: screen-aligned pan (always available; no conflict with WASD fly).
+    if (m_KeyboardState[KeyboardControls::YawLeft])
+    {
+        cameraDirty = true;
+        cameraMoveVec += -m_CameraRight * moveStep;
+    }
+    if (m_KeyboardState[KeyboardControls::YawRight])
+    {
+        cameraDirty = true;
+        cameraMoveVec += m_CameraRight * moveStep;
+    }
+    if (m_KeyboardState[KeyboardControls::PitchUp])
+    {
+        cameraDirty = true;
+        cameraMoveVec += m_CameraUp * moveStep;
+    }
+    if (m_KeyboardState[KeyboardControls::PitchDown])
+    {
+        cameraDirty = true;
+        cameraMoveVec += -m_CameraUp * moveStep;
+    }
+
     return std::make_pair(cameraDirty, cameraMoveVec);
 }
 
@@ -157,27 +203,33 @@ std::pair<bool, affine3> FirstPersonCamera::animateRoll(affine3 initialRotation)
 void FirstPersonCamera::animate(float deltaT)
 {
     // Track mouse delta.
-    // Use m_IsDragging to avoid random camera rotations when clicking inside an inactive window.
-    float2 mouseMove = 0.f;
-    if (m_MouseButtonState[MouseButtons::Left])
-    {
-        if (m_IsDragging)
-            mouseMove = m_MousePos - m_MousePosPrev;
+    // Use m_IsDragging / m_IsPanning to avoid jumps on the first frame of a press.
+    const bool lookHeld = m_MouseButtonState[MouseButtons::Left]
+        || m_MouseButtonState[MouseButtons::Right];
+    const bool panHeld = m_MouseButtonState[MouseButtons::Middle];
 
-        m_IsDragging = true;
-    }
-    else
-    {
-        m_IsDragging = false;
-    }
+    float2 mouseMove = 0.f;
+    if ((lookHeld && m_IsDragging) || (panHeld && m_IsPanning))
+        mouseMove = m_MousePos - m_MousePosPrev;
+
+    m_IsDragging = lookHeld;
+    m_IsPanning = panHeld;
     m_MousePosPrev = m_MousePos;
 
     bool cameraDirty = false;
     affine3 cameraRotation = affine3::identity();
+    float3 cameraMoveVec = 0.f;
 
-    // handle mouse rotation first
-    // this will affect the movement vectors in the world matrix, which we use below
-    if (m_MouseButtonState[MouseButtons::Left] && (mouseMove.x != 0 || mouseMove.y != 0))
+    // Middle-mouse drag: screen-space pan (truck / pedestal).
+    if (panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
+    {
+        const float panScale = m_MoveSpeed * 0.02f;
+        cameraMoveVec += (-mouseMove.x * m_CameraRight + mouseMove.y * m_CameraUp) * panScale;
+        cameraDirty = true;
+    }
+
+    // Left or right mouse drag: look (yaw / pitch). RMB also looks while flying.
+    if (lookHeld && !panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
     {
         float yaw = m_RotateSpeed * mouseMove.x;
         float pitch = m_RotateSpeed * mouseMove.y;
@@ -193,10 +245,10 @@ void FirstPersonCamera::animate(float deltaT)
     cameraDirty |= rollResult.first;
     cameraRotation = rollResult.second;
 
-    // handle translation
+    // handle translation (WASD / QE / arrows)
     auto translateResult = animateTranslation(deltaT);
     cameraDirty |= translateResult.first;
-    const float3& cameraMoveVec = translateResult.second;
+    cameraMoveVec += translateResult.second;
 
     if (cameraDirty)
     {
