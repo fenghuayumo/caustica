@@ -310,27 +310,4 @@ void EditorUI::BuildAdvancedRenderSettings(const PanelLayout& layout)
     ImGui::TextDisabled("More tuning: Window > Console, then `cvar.list r[.].*`");
 }
 
-void EditorUI::BuildDeveloperRenderSettings(const PanelLayout& layout)
-{
-    SettingsCategoryHeader("Developer / Compatibility");
-    ImGui::TextWrapped(
-        "Raw algorithm and diagnostic controls are kept here for compatibility. "
-        "They are also available through r.* console commands.");
-
-    BuildScenePanel(layout);
-    BuildSampleGamePanel(layout);
-    BuildLightingPanel(layout);
-    BuildPathTracerPanel(layout);
-    BuildStochasticTextureFilteringPanel(layout);
-    BuildDLSSReflexPanel(layout);
-    BuildTAAPanel(layout);
-    BuildRTXDIPanel(layout);
-    BuildStablePlanesPanel(layout);
-    BuildStandaloneDenoiserPanel(layout);
-    BuildOpacityMicroMapsPanel(layout);
-    BuildAccelerationStructurePanel(layout);
-    BuildDebuggingPanel(layout);
-    BuildQuickToneMappingBar(layout);
-}
-
 } // namespace caustica::editor

@@ -93,7 +93,6 @@ private:
     void BuildPathTracerPanel(const PanelLayout& layout);
     void BuildRenderSettingsOverview(const PanelLayout& layout);
     void BuildAdvancedRenderSettings(const PanelLayout& layout);
-    void BuildDeveloperRenderSettings(const PanelLayout& layout);
     void BuildStochasticTextureFilteringPanel(const PanelLayout& layout);
     void BuildDLSSReflexPanel(const PanelLayout& layout);
     void BuildTAAPanel(const PanelLayout& layout);

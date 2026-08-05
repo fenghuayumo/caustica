@@ -150,17 +150,6 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         )
     {
 
-        std::string envMapOverrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
-        std::vector<std::string> envOptions;
-        envOptions.push_back( c_EnvMapSceneDefault );
-        envOptions.push_back( c_EnvMapProcSky );
-        envOptions.push_back( c_EnvMapProcSky_Morning );
-        envOptions.push_back( c_EnvMapProcSky_Midday );
-        envOptions.push_back( c_EnvMapProcSky_Evening );
-        envOptions.push_back( c_EnvMapProcSky_Dawn );
-        envOptions.push_back( c_EnvMapProcSky_PitchBlack );
-        int envOptionsCurrentIndex = -1; for (int i = 0; i < envOptions.size(); i++) if (envOptions[i]==envMapOverrideSource) envOptionsCurrentIndex = i;
-
         std::vector<std::string> materialVariants;
         if (findSubStringIgnoreCase(caustica::currentSceneName(*m_sceneEditor.app()), "bistro") != std::string::npos)
             materialVariants = {"dry", "wet", "silly"};
@@ -172,7 +161,6 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
             std::string                 Name;
             std::optional<std::string>  HoverText;
 
-            bool *                      PropVar         = nullptr; // type 1
             TogglableNode *             PropNode        = nullptr; // type 2
             std::vector<std::string> *  PropOptions     = nullptr; // type 3
             int *                       PropOptionIndex = nullptr; // type 3
@@ -181,12 +169,10 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
             bool                        enabled;
 
-            BigButton( const std::string & name, bool & prop ) : Name(name), PropVar(&prop), PropNode(nullptr), enabled(true) {}
-            BigButton( const std::string & name, bool & prop, const std::string& hoverText, bool enabled ) : Name(name), PropVar(&prop), PropNode(nullptr), HoverText(hoverText), enabled(enabled) {}
-            BigButton( const std::string & name, TogglableNode * prop ) : Name(TrimTogglable(name)), PropVar(nullptr), PropNode(prop), enabled(true) {}
-            BigButton( const std::string & name, std::vector<std::string>* propOptions, int* propOptionIndex, const std::string& hoverText, const std::function<std::string(std::string)> & getItemName) : Name(name), PropOptions(propOptions), PropOptionIndex(propOptionIndex), HoverText(hoverText), enabled(true), GetItemName(getItemName) { assert(PropOptions->size()>0); }
-            bool                IsSelected() const            { return (PropOptions != nullptr)?(true):((PropVar != nullptr)?(*PropVar):(PropNode->IsSelected())); }
-            void                SetSelected( bool selected )  { if( PropVar != nullptr ) *PropVar = selected; else if (PropNode != nullptr ) PropNode->SetSelected(selected); else *PropOptionIndex = ( ((*PropOptionIndex)+1) % PropOptions->size() ); }
+            BigButton( const std::string & name, TogglableNode * prop ) : Name(TrimTogglable(name)), PropNode(prop), enabled(true) {}
+            BigButton( const std::string & name, std::vector<std::string>* propOptions, int* propOptionIndex, const std::string& hoverText, const std::function<std::string(std::string)> & getItemName) : Name(name), PropNode(nullptr), PropOptions(propOptions), PropOptionIndex(propOptionIndex), HoverText(hoverText), enabled(true), GetItemName(getItemName) { assert(PropOptions->size()>0); }
+            bool                IsSelected() const            { return (PropOptions != nullptr)?(true):(PropNode->IsSelected()); }
+            void                SetSelected( bool selected )  { if (PropNode != nullptr ) PropNode->SetSelected(selected); else *PropOptionIndex = ( ((*PropOptionIndex)+1) % PropOptions->size() ); }
             std::string         GetText() const 
             {
                 if (PropOptions != nullptr)
@@ -202,9 +188,6 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
         };
         std::vector<BigButton> buttons;
-        buttons.push_back(BigButton("Animations", m_settings.EnableAnimations, "Animations are not available in reference mode", m_settings.RealtimeMode));
-        buttons.push_back(BigButton("AutoExposure", m_settings.ToneMappingParams.autoExposure ) );
-        buttons.push_back(BigButton("Sky: ", &envOptions, &envOptionsCurrentIndex, "For more options see Scene/Environment in the main UI", std::function<std::string(std::string)>(TrimSkyDisplayName) ));
         if (materialVariants.size()>0) buttons.push_back(BigButton("Variant: ", &materialVariants, &m_settings.MaterialVariantIndex, "Material or other scene variants", nullptr));
         for (int i = 0; m_editorUI.TogglableNodes != nullptr && i < m_editorUI.TogglableNodes->size(); i++)
             buttons.push_back(BigButton((*m_editorUI.TogglableNodes)[i].UIName, &(*m_editorUI.TogglableNodes)[i]));
@@ -248,11 +231,6 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
                 }
             }
             ImGui::End();
-        }
-
-        if (envOptionsCurrentIndex >= 0 && envOptionsCurrentIndex < envOptions.size() && envOptions[envOptionsCurrentIndex] != envMapOverrideSource )
-        {
-            caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), envOptions[envOptionsCurrentIndex]);
         }
 
         if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)

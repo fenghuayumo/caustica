@@ -181,7 +181,7 @@ void EditorUI::buildUI(void)
             return;
         }
 
-        const char* detailLabels[] = { "Basic", "Advanced", "Developer" };
+        const char* detailLabels[] = { "Basic", "Advanced" };
         const float segmentSpacing = ImGui::GetStyle().ItemSpacing.x;
         const float segmentWidth = std::max(
             1.f,
@@ -193,13 +193,14 @@ void EditorUI::buildUI(void)
             if (i > 0)
                 ImGui::SameLine(0.f, segmentSpacing);
 
-            const bool selected = m_editorUI.RenderSettingsDetailLevel == i;
+            const bool selected =
+                m_editorUI.ShowAdvancedRenderSettings == (i == 1);
             ImGui::PushID(i);
             if (ImGui::InvisibleButton(
                     "##RenderSettingsDetail",
                     ImVec2(segmentWidth, ImGui::GetFrameHeight())))
             {
-                m_editorUI.RenderSettingsDetailLevel = i;
+                m_editorUI.ShowAdvancedRenderSettings = i == 1;
             }
 
             const ImVec2 itemMin = ImGui::GetItemRectMin();
@@ -226,10 +227,8 @@ void EditorUI::buildUI(void)
         ImGui::Separator();
 
         BuildRenderSettingsOverview(layout);
-        if (m_editorUI.RenderSettingsDetailLevel >= 1)
+        if (m_editorUI.ShowAdvancedRenderSettings)
             BuildAdvancedRenderSettings(layout);
-        if (m_editorUI.RenderSettingsDetailLevel >= 2)
-            BuildDeveloperRenderSettings(layout);
     }
 
     BuildPreferencesPanel(layout);

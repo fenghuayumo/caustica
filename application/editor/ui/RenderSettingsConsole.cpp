@@ -244,6 +244,9 @@ void InitializeEntries()
 
 #define SETTING_ACCESS(field) [](EditorUIData& ui) -> auto& { return ui.render.settings.field; }
 
+    AddScalar("r.Animation.Enabled", "Enable scene animation playback.",
+        SETTING_ACCESS(EnableAnimations), Invalidation::None);
+
     AddEnum("r.PathTracing.Mode", "Path tracing operating mode.",
         SETTING_ACCESS(RealtimeMode), { "reference", "realtime" }, resetCaches);
     AddScalar("r.PathTracing.TargetSamples", "Reference accumulation target.",
@@ -365,6 +368,11 @@ void InitializeEntries()
 
     AddScalar("r.PostProcess.ToneMapping", "Enable tone mapping.",
         SETTING_ACCESS(EnableToneMapping), reset);
+    AddScalar("r.PostProcess.AutoExposure", "Enable automatic exposure.",
+        [](EditorUIData& ui) -> auto& {
+            return ui.render.settings.ToneMappingParams.autoExposure;
+        },
+        reset);
     AddScalar("r.PostProcess.TestHDR", "Enable the HDR test pass.",
         SETTING_ACCESS(PostProcessTestPassHDR), reset);
     AddScalar("r.PostProcess.EdgeDetection", "Enable the LDR edge-detection test.",
