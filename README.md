@@ -161,10 +161,9 @@ Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shad
 
 Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
 
-* **Authoring model** — set `MaterialModel` to `"OpenPBR"` (default for new materials) and write parameters in OpenPBR snake_case (`base_color`, `coat_weight`, `subsurface_radius`, …) or inside an `OpenPBR` JSON block
+* **Authoring** — write parameters in OpenPBR snake_case (`base_color`, `coat_weight`, `subsurface_radius`, …) or inside an `OpenPBR` JSON block; existing PascalCase fields still load and bake to the same GPU layout
 * **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, **fuzz**, **coat** (with darkening), **thin-film** iridescence, **dispersion**, and **subsurface** (lobe mix + homogeneous scatter)
-* **Backward compatible** — legacy `BaseOrDiffuseColor`, `Metalness`, `Roughness`, ORM textures, and related RTXPT-era fields still load and bake to the same GPU layout
-* **Editor UI** — material inspector shows OpenPBR names when `MaterialModel` is `"OpenPBR"` and converts internally to `StandardMaterial` constants
+* **Editor UI** — material inspector shows OpenPBR parameter names and maps them to `StandardMaterial` / GPU constants
 
 Approximate vs full spec: subsurface uses homogeneous volume scattering rather than a full BSSRDF random walk; coat/base share one shading normal; energy balance is approximate (Turquin MS + coat attenuation).
 
@@ -172,7 +171,6 @@ Example:
 
 ```json
 {
-  "MaterialModel": "OpenPBR",
   "OpenPBR": {
     "base_color": [0.55, 0.48, 0.40],
     "base_metalness": 0.0,
