@@ -13,21 +13,19 @@ and saves one PNG per selected COLMAP image.
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import math
 import os
 import re
 import struct
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
+from _common import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_GS_DIR = Path(r"D:/ScanVideo/models/example/GS")
 LEGACY_GS_DIR = Path(r"D:/ProgramCode/Python/demo_gsplat&blender/GS")
 
@@ -76,23 +74,6 @@ class RenderView:
     cx: float
     cy: float
     c2w: np.ndarray
-
-
-def configure_import_path() -> None:
-    candidates = [
-        REPO_ROOT / "bin",
-        REPO_ROOT / "build" / "caustica" / "Release",
-        Path(__file__).resolve().parent,
-    ]
-    for candidate in candidates:
-        if glob.glob(str(candidate / "caustica*.pyd")) or glob.glob(str(candidate / "caustica*.so")):
-            sys.path.insert(0, str(candidate))
-            os.environ["PATH"] = str(candidate) + os.pathsep + os.environ.get("PATH", "")
-            os.chdir(candidate)
-            return
-
-    searched = "\n".join(f"  {p}" for p in candidates)
-    raise RuntimeError(f"Could not find caustica Python module. Searched:\n{searched}")
 
 
 def read_next_bytes(fid, num_bytes: int, fmt: str, endian: str = "<"):
@@ -487,7 +468,6 @@ def main() -> int:
             f"(fx={fx0:.3f}, fy={fy0:.3f}, cx={cx0:.3f}, cy={cy0:.3f})"
         )
 
-    configure_import_path()
     import caustica
 
     scene = str(create_splat_only_scene())

@@ -86,16 +86,8 @@ Packaging options can be controlled with environment variables:
 | `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
-During development, if you prefer not to install the package, you can still add `bin/` to `sys.path` or `PYTHONPATH`:
-
-```python
-import sys
-sys.path.insert(0, r"D:\ProgramCode\C++\caustica\bin")
-
-import caustica
-```
-
-See `configure_import_path()` in `caustica/Python/Examples/test_splat_interactive.py` for another example.
+Prefer installing the package (`python -m pip install .`) so examples can simply `import caustica`.
+If import fails, fix the install rather than patching `sys.path` in scripts.
 
 ## Quick Examples
 
@@ -1479,16 +1471,14 @@ For windowed extension usage:
 
 | File | Purpose |
 | --- | --- |
+| `caustica/Python/Examples/_common.py` | Shared path / framing helpers. |
 | `caustica/Python/Examples/offline_render.py` | Headless reference render and screenshot. |
-| `caustica/Python/Examples/realtime_render.py` | Windowed realtime loop. |
-| `caustica/Python/Examples/launch_default_scene.py` | Launch the default scene from Python. |
-| `caustica/Python/Examples/render_default_scene.py` | Batch-render the default scene. |
+| `caustica/Python/Examples/realtime_render.py` | Realtime / denoiser smoke test. |
+| `caustica/Python/Examples/launch_default_scene.py` | Builtin scene, mesh import, FPS / OIDN smoke. |
+| `caustica/Python/Examples/render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT. |
 | `caustica/Python/Examples/render_default_scene_animated.py` | Animated default-scene capture. |
-| `caustica/Python/Examples/render_assets.py` | Asset sweep / batch render helper. |
-| `caustica/Python/Examples/render_m_plate.py` | OBJ/PBR plate material import example. |
-| `caustica/Python/Examples/test_splat_interactive.py` | Windowed or headless 3DGS rasterization test. |
-| `caustica/Python/Examples/3dgs_example.py` | Batch 3DGS Reference/OIDN and Realtime/DLSS-RR render test. |
-| `caustica/Python/Examples/render_gs_colmap_views.py` | Render 3DGS from COLMAP camera poses with full pinhole intrinsics and optional Mip antialiasing. |
+| `caustica/Python/Examples/3dgs_example.py` | 3DGS interactive / Reference+OIDN / Realtime+DLSS. |
+| `caustica/Python/Examples/render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics. |
 | `caustica/Python/Examples/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
 | `caustica/Python/Examples/test_envmap_proc_sky.py` | Environment map / procedural sky experiment. |
 | `caustica/Python/Examples/example_basic.py` | Basic embedded scripting. |

@@ -70,28 +70,27 @@ def configure_reference_oidn(app):
 
 def main():
     if caustica.MODE == "extension":
-        # Standalone (offline) - create our own renderer.
-        renderer = caustica.Renderer(
-            width=1280, height=720, headless=True,
+        with caustica.Renderer(
+            width=1280,
+            height=720,
+            headless=True,
             scene="bistro-programmer-art.scene.json",
-        )
-        app = renderer.app
-    else:
-        # Embedded - use the running caustica.exe singleton.
-        app = caustica.app()
-        renderer = None
+        ) as renderer:
+            app = renderer.app
+            print("\n=== Realtime / DLSS-RR ===")
+            configure_realtime_dlss(app)
+            print("\n=== Reference / OIDN ===")
+            configure_reference_oidn(app)
+            print("\n[caustica] Rendering reference frame to ref.png ...")
+            renderer.step_until_accumulated()
+            renderer.save_screenshot("ref.png")
+        return
 
+    app = caustica.app()
     print("\n=== Realtime / DLSS-RR ===")
     configure_realtime_dlss(app)
-
     print("\n=== Reference / OIDN ===")
     configure_reference_oidn(app)
-
-    if renderer is not None:
-        print("\n[caustica] Rendering reference frame to ref.png ...")
-        renderer.step_until_accumulated()
-        renderer.save_screenshot("ref.png")
-        renderer.close()
 
 
 if __name__ == "__main__":

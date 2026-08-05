@@ -22,39 +22,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import glob
-import os
-import sys
 import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_SCENE = REPO_ROOT / "Assets" / "default.json"
+from _common import (
+    ASSETS_DIR,
+    resolve_output_path,
+    resolve_scene_arg,
+    run_window_loop,
+)
 
-
-def configure_import_path() -> None:
-    try:
-        import caustica  # noqa: F401
-
-        return
-    except ImportError:
-        pass
-
-    candidates = [
-        REPO_ROOT / "bin",
-        REPO_ROOT / "build-linux" / "bin",
-        REPO_ROOT / "build" / "caustica" / "Release",
-        Path(__file__).resolve().parent,
-    ]
-    for candidate in candidates:
-        if glob.glob(str(candidate / "caustica*.pyd")) or glob.glob(str(candidate / "caustica*.so")):
-            sys.path.insert(0, str(candidate))
-            os.environ["PATH"] = str(candidate) + os.pathsep + os.environ.get("PATH", "")
-            os.chdir(candidate)
-            return
-
-    searched = "\n".join(f"  {p}" for p in candidates)
-    raise RuntimeError(f"Could not find caustica Python module. Searched:\n{searched}")
+DEFAULT_SCENE = ASSETS_DIR / "default.json"
 
 
 def configure_gaussian_splats(caustica, settings, args: argparse.Namespace) -> None:
@@ -157,16 +135,6 @@ def parse_args() -> argparse.Namespace:
     return build_arg_parser().parse_args()
 
 
-def resolve_scene_arg(scene_arg: str) -> str:
-    path = Path(scene_arg)
-    if path.is_file():
-        return str(path.resolve())
-    assets_candidate = REPO_ROOT / "Assets" / scene_arg
-    if assets_candidate.is_file():
-        return str(assets_candidate.resolve())
-    return scene_arg
-
-
 def main() -> int:
     args = parse_args()
     if args.oidn and not args.headless:
@@ -174,7 +142,6 @@ def main() -> int:
         args.headless = True
 
     launch_cwd = Path.cwd()
-    configure_import_path()
     import caustica
 
     scene = resolve_scene_arg(args.scene)
@@ -185,7 +152,7 @@ def main() -> int:
     print(f"[caustica] 3DGS  : {render_label}, soft shadow + emitter lighting")
 
     use_reference = args.headless or args.oidn
-    renderer = caustica.Renderer(
+    with caustica.Renderer(
         width=args.width,
         height=args.height,
         headless=args.headless,
@@ -193,9 +160,7 @@ def main() -> int:
         scene=scene,
         realtime=not use_reference,
         accumulation_target=args.spp,
-    )
-
-    try:
+    ) as renderer:
         print(f"[caustica] Loaded scene: {renderer.app.scene_name}")
         scene_obj = renderer.app.scene
         print(f"[caustica] Materials in scene: {scene_obj.material_count}")
@@ -204,49 +169,33 @@ def main() -> int:
         print(f"[caustica] 3DGS splat count  : {renderer.app.gaussian_splat_count}")
 
         settings = renderer.settings
-        settings.realtime_mode = not use_reference
-        settings.accumulation_target = args.spp
-        settings.accumulation_prewarm_realtime_caches = False
+        if use_reference:
+            renderer.app.set_reference_mode(spp=args.spp, oidn=args.oidn, oidn_quality=args.oidn_quality)
+            settings.oidn_use_gpu = args.oidn_gpu
+            if args.oidn:
+                settings.oidn_apply()
+                print("[caustica] OIDN enabled")
+        else:
+            renderer.app.set_realtime_mode(
+                standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.Off)
+            )
         settings.bounce_count = args.bounces
         settings.use_nee = True
         settings.enable_tone_mapping = True
-        settings.realtime_aa = int(caustica.RealtimeAA.Off)
         apply_gaussian_settings_and_rebuild(renderer, caustica, settings, args)
 
-        if args.oidn:
-            settings.oidn_enabled = True
-            settings.oidn_use_gpu = args.oidn_gpu
-            settings.oidn_quality = args.oidn_quality
-            settings.oidn_apply()
-            print("[caustica] OIDN enabled")
-
         if args.headless:
-            label = f"{args.spp} spp"
-            if args.oidn:
-                label += " + OIDN"
+            label = f"{args.spp} spp" + (" + OIDN" if args.oidn else "")
             print(f"[caustica] Rendering {label} ...")
             t_start = time.time()
             frames = renderer.step_until_accumulated()
-            elapsed = time.time() - t_start
-            print(f"[caustica] Done in {elapsed:.2f}s ({frames} frames)")
-
-            out_path = Path(args.out)
-            if not out_path.is_absolute():
-                out_path = launch_cwd / out_path
-            out_path = out_path.resolve()
+            print(f"[caustica] Done in {time.time() - t_start:.2f}s ({frames} frames)")
+            out_path = resolve_output_path(args.out, launch_cwd)
             if not renderer.save_screenshot(str(out_path)):
                 raise RuntimeError(f"Failed to save screenshot: {out_path}")
             print(f"[caustica] Saved: {out_path}")
         else:
-            print("[caustica] Ready. Close window or Ctrl+C to exit.")
-            print("[caustica]   Left-click  -> Inspector (Transform)")
-            print("[caustica]   Right-click -> Material Editor")
-            while renderer.step(-1.0):
-                time.sleep(0.001)
-    except KeyboardInterrupt:
-        print("\n[caustica] Interrupted.")
-    finally:
-        renderer.close()
+            run_window_loop(renderer)
 
     return 0
 

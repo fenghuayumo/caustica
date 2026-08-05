@@ -30,12 +30,11 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
+from _common import resolve_output_path, resolve_scene_arg
 from render_default_scene import (
     DEFAULT_SCENE,
     apply_gaussian_settings_and_rebuild,
     build_arg_parser,
-    configure_import_path,
-    resolve_scene_arg,
 )
 
 
@@ -169,10 +168,7 @@ def configure_renderer(renderer, caustica, args: argparse.Namespace) -> tuple[ob
 
 
 def render_sequence(renderer, mesh, base_vertices, center, args: argparse.Namespace, launch_cwd: Path) -> None:
-    out_dir = args.out_dir
-    if not out_dir.is_absolute():
-        out_dir = launch_cwd / out_dir
-    out_dir = out_dir.resolve()
+    out_dir = resolve_output_path(args.out_dir, launch_cwd)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     settings = renderer.settings
@@ -222,7 +218,6 @@ def main() -> int:
         args.oidn = False
 
     launch_cwd = Path.cwd()
-    configure_import_path()
     import caustica
 
     scene = resolve_scene_arg(args.scene)
@@ -230,7 +225,7 @@ def main() -> int:
     print(f"[caustica] Scene : {scene}")
     print(f"[caustica] Mode  : {mode}")
 
-    renderer = caustica.Renderer(
+    with caustica.Renderer(
         width=args.width,
         height=args.height,
         headless=args.headless,
@@ -238,9 +233,7 @@ def main() -> int:
         scene=scene,
         realtime=True,
         accumulation_target=max(args.spp_per_frame, 1),
-    )
-
-    try:
+    ) as renderer:
         print(f"[caustica] Loaded scene: {renderer.app.scene_name}")
         mesh, base_vertices, center = configure_renderer(renderer, caustica, args)
 
@@ -248,10 +241,6 @@ def main() -> int:
             render_sequence(renderer, mesh, base_vertices, center, args, launch_cwd)
         else:
             run_window_loop(renderer, mesh, base_vertices, center, args)
-    except KeyboardInterrupt:
-        print("\n[caustica] Interrupted.")
-    finally:
-        renderer.close()
 
     return 0
 

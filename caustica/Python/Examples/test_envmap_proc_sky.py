@@ -25,17 +25,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import glob
 import json
-import os
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-REPO_ASSETS = REPO_ROOT / "Assets"
+from _common import ASSETS_DIR, resolve_output_path, run_window_loop
+
+REPO_ASSETS = ASSETS_DIR
 DEFAULT_HDRI_REL = "EnvironmentMaps/20060807_wells6_hd.hdr"
 DEFAULT_HDRI = str((REPO_ASSETS / DEFAULT_HDRI_REL).resolve())
 
@@ -49,37 +47,6 @@ PROC_SKY_MIDDAY = "==PROCEDURAL_SKY_MIDDAY=="
 PROC_SKY_EVENING = "==PROCEDURAL_SKY_EVENING=="
 PROC_SKY_DAWN = "==PROCEDURAL_SKY_DAWN=="
 PROC_SKY_PITCHBLACK = "==PROCEDURAL_SKY_PITCHBLACK=="
-
-
-def configure_import_path() -> None:
-    # Prefer a local build (bin/) over an installed pip package. A bare
-    # "import caustica" would load site-packages first while ShaderPrecompiled
-    # and the .pyd next to the repo may be newer or the only complete copy.
-    candidates = [
-        REPO_ROOT / "bin",
-        REPO_ROOT / "build-linux" / "bin",
-        REPO_ROOT / "build" / "caustica" / "Release",
-        Path(__file__).resolve().parent,
-    ]
-    for candidate in candidates:
-        if glob.glob(str(candidate / "caustica*.pyd")) or glob.glob(str(candidate / "caustica*.so")):
-            for name in list(sys.modules):
-                if name == "caustica" or name.startswith("caustica."):
-                    del sys.modules[name]
-            sys.path.insert(0, str(candidate))
-            os.environ["PATH"] = str(candidate) + os.pathsep + os.environ.get("PATH", "")
-            os.chdir(candidate)
-            return
-
-    try:
-        import caustica  # noqa: F401
-
-        return
-    except ImportError:
-        pass
-
-    searched = "\n".join(f"  {p}" for p in candidates)
-    raise RuntimeError(f"Could not find caustica Python module. Searched:\n{searched}")
 
 
 def resolve_hdri_path(path: str | Path) -> str:
@@ -546,7 +513,6 @@ def main() -> int:
         return 0
 
     launch_cwd = Path.cwd()
-    configure_import_path()
     import caustica
 
     cases = select_cases(args)
@@ -585,9 +551,7 @@ def main() -> int:
 
         out_dir: Path | None = None
         if args.headless:
-            out_dir = Path(args.out_dir)
-            if not out_dir.is_absolute():
-                out_dir = launch_cwd / out_dir
+            out_dir = resolve_output_path(args.out_dir, launch_cwd)
 
         for index, case in enumerate(cases, start=1):
             print(
@@ -619,9 +583,7 @@ def main() -> int:
                 warmup = max(case.warmup_frames, args.warmup_frames)
                 if warmup > 0:
                     renderer.step_n(warmup)
-                print("[caustica] Interactive preview ready. Close window or Ctrl+C to exit.")
-                while renderer.step(-1.0):
-                    time.sleep(0.001)
+                run_window_loop(renderer)
                 break
     except KeyboardInterrupt:
         print("\n[caustica] Interrupted.")

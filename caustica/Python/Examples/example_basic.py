@@ -48,8 +48,10 @@ for light in scene.get_lights():
 # 5) Tone & quality settings
 settings.bounce_count       = 8       # path-tracer max bounces
 settings.diffuse_bounce_count = 3
-settings.realtime_mode      = True
-settings.realtime_aa        = 3       # DLSS-RR
+app.set_realtime_mode(
+    standalone_denoiser=False,
+    realtime_aa=int(caustica.RealtimeAA.DLSS_RR),
+)
 settings.enable_bloom       = True
 settings.bloom_intensity    = 0.005
 
