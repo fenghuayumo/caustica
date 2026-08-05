@@ -29,22 +29,23 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, size);
 
-    // Default: Render Settings | Viewport + Timeline | Hierarchy / Inspector+Post Process
+    // Default: Render Settings | Viewport + Timeline/Console Log | Hierarchy / Inspector+Post Process
     ImGuiID dockMain = dockspaceId;
     ImGuiID dockLeft = 0;
     ImGuiID dockRight = 0;
     ImGuiID dockRightTop = 0;
     ImGuiID dockRightBottom = 0;
-    ImGuiID dockTimeline = 0;
+    ImGuiID dockBottom = 0;
 
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.22f, &dockLeft, &dockMain);
     ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.24f, &dockRight, &dockMain);
     ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.55f, &dockRightBottom, &dockRightTop);
-    ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.24f, &dockTimeline, &dockMain);
+    ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.24f, &dockBottom, &dockMain);
 
     ImGui::DockBuilderDockWindow("Render Settings", dockLeft);
     ImGui::DockBuilderDockWindow("Viewport", dockMain);
-    ImGui::DockBuilderDockWindow("Timeline", dockTimeline);
+    ImGui::DockBuilderDockWindow("Timeline", dockBottom);
+    ImGui::DockBuilderDockWindow("Console Log", dockBottom);
     ImGui::DockBuilderDockWindow("Hierarchy", dockRightTop);
     ImGui::DockBuilderDockWindow("Inspector", dockRightBottom);
     ImGui::DockBuilderDockWindow("Material Editor", dockRightBottom);
@@ -178,7 +179,7 @@ void EditorUI::BuildDockSpace()
     ImGui::PopStyleVar(3);
 
     // Bump id when default dock window set changes so old ini layouts migrate.
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v6");
+    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v7");
     if (m_editorUI.Viewport.RequestResetDockLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
     {
         ApplyDefaultDockLayout(dockspaceId, ImGui::GetContentRegionAvail());

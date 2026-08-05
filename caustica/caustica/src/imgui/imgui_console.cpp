@@ -213,15 +213,12 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 		ImGui::PopStyleColor();
 	}
 
-	const float footerHeight =
-		ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing() + 4.f;
-
-	// --- Log list ---
+	// --- Log list (commands go through the ` Command Bar, not this panel) ---
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, kColChildBg);
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
 	ImGui::BeginChild(
 		"##ConsoleLogList",
-		ImVec2(0.f, -footerHeight),
+		ImVec2(0.f, 0.f),
 		true,
 		ImGuiWindowFlags_HorizontalScrollbar);
 
@@ -313,53 +310,6 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor();
-
-	// --- Command prompt ---
-	ImGui::Spacing();
-	ImGui::AlignTextToFramePadding();
-	ImGui::PushStyleColor(ImGuiCol_Text, kColCommand);
-	ImGui::TextUnformatted(">");
-	ImGui::PopStyleColor();
-	ImGui::SameLine();
-	ImGui::SetNextItemWidth(-1.f);
-
-	if (m_Options.font)
-		ImGui::PushFont(m_Options.font->getScaledFont());
-
-	bool reclaim_focus = requestFocus;
-	const auto flags = ImGuiInputTextFlags_EnterReturnsTrue
-		| ImGuiInputTextFlags_CallbackCompletion
-		| ImGuiInputTextFlags_CallbackHistory;
-	if (requestFocus)
-		ImGui::SetKeyboardFocusHere();
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.07f, 0.08f, 0.10f, 1.f));
-	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
-	if (ImGui::InputText(
-			"##Command",
-			m_InputBuffer.data(),
-			m_InputBuffer.size(),
-			flags,
-			[](ImGuiInputTextCallbackData* data) {
-				return static_cast<ImGui_Console*>(data->UserData)->textEditCallback(data);
-			},
-			this))
-	{
-		if (m_InputBuffer.front() != '\0')
-		{
-			this->execCommand(m_InputBuffer.data());
-			m_InputBuffer.front() = 0;
-		}
-		reclaim_focus = true;
-	}
-	ImGui::PopStyleVar();
-	ImGui::PopStyleColor();
-
-	if (m_Options.font)
-		ImGui::PopFont();
-
-	ImGui::SetItemDefaultFocus();
-	if (reclaim_focus)
-		ImGui::SetKeyboardFocusHere(-1);
 
 	ImGui::End();
 	ImGui::PopStyleColor();

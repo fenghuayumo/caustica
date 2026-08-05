@@ -50,7 +50,7 @@ namespace caustica
 
 		void clearHistory();
 
-		// Full Console panel (log history + command line). Open via Window > Console.
+		// Full Console Log panel (history / filters only). Commands use the ` Command Bar.
 		void render(bool* open = nullptr, bool requestFocus = false);
 
 		// UE-style overlay: slim command bar + live suggestions. Toggle with `.
