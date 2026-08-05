@@ -265,6 +265,7 @@ void EditorUI::buildUI(void)
     const TransformGizmoContext gizmoCtx{ m_sceneEditor, m_editorUI, m_settings };
     DrawInfiniteGrid(gizmoCtx);
     DrawTransformGizmo(gizmoCtx);
+    DrawViewOrientationGizmo(gizmoCtx);
     BuildStatusBar();
 
     // Draw last so the UE-style command bar stays above docked panels,

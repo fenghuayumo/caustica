@@ -8,6 +8,7 @@
 #include "ui/EditorUIInternal.h"
 
 #include <ImGuizmo.h>
+#include "common/imoguizmo.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <engine/SessionCamera.h>
@@ -17,7 +18,7 @@
 #include <scene/View.h>
 
 #include <algorithm>
-#include <cstring>
+#include <cmath>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -493,4 +494,119 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     }
 
     return manipulated && !editingUi && !g_drag.suppressUntilRelease;
+}
+
+namespace
+{
+
+// Dedicated square projection for the orientation widget (not the scene camera).
+void BuildImOGuizmoProjectionMatrix(float outMatrix[16])
+{
+    // Caustica view space is LHS / D3D-style; keep the widget projection matching.
+    Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(dm::PI_f * 0.5f, 1.f, 0.1f, 1000.f), outMatrix);
+}
+
+bool ApplyImOGuizmoViewMatrix(CameraController& camera, const float viewMatrix[16])
+{
+    const dm::affine3 viewAffine = ImGuizmoMatrixToAffine3(viewMatrix);
+    const dm::affine3 invView = inverse(viewAffine);
+
+    const dm::float3 pos = invView.m_translation;
+    const dm::float3 dir = normalize(dm::float3(
+        viewAffine.m_linear.m02,
+        viewAffine.m_linear.m12,
+        viewAffine.m_linear.m22));
+    const dm::float3 up = normalize(dm::float3(
+        viewAffine.m_linear.m01,
+        viewAffine.m_linear.m11,
+        viewAffine.m_linear.m21));
+
+    if (!std::isfinite(pos.x) || !std::isfinite(dir.x) || !std::isfinite(up.x))
+        return false;
+    if (length(dir) < 1e-6f || length(up) < 1e-6f)
+        return false;
+
+    camera.camera().lookTo(pos, dir, up);
+    camera.markCameraChanged();
+    return true;
+}
+
+} // namespace
+
+void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx)
+{
+    if (!ctx.editorUI.ShowUI || !ctx.editorUI.ShowViewOrientationGizmo)
+        return;
+
+    const auto& vp = ctx.editorUI.Viewport;
+    if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
+        return;
+
+    App* app = ctx.sceneEditor.app();
+    auto* camera = caustica::editor::editorCamera(ctx.sceneEditor);
+    if (!app || !camera)
+        return;
+
+    const auto& view = caustica::currentView(*app);
+    if (!view)
+        return;
+
+    constexpr float kSize = 96.f;
+    constexpr float kPad = 10.f;
+    const float gizmoX = vp.PosX + vp.SizeX - kSize - kPad;
+    const float gizmoY = vp.PosY + kPad;
+
+    float viewMatrix[16];
+    float projectionMatrix[16];
+    Affine3ToImGuizmoMatrix(view->getViewMatrix(), viewMatrix);
+    BuildImOGuizmoProjectionMatrix(projectionMatrix);
+
+    // Pivot distance enables click-to-axis / orbit. Prefer distance to origin so
+    // framing stays stable; fall back when the camera sits near the origin.
+    float pivotDistance = length(camera->camera().getPosition());
+    if (pivotDistance < 0.25f)
+        pivotDistance = 1.f;
+
+    ImOGuizmo::SetRect(gizmoX, gizmoY, kSize);
+    ImOGuizmo::SetDrawList(ImGui::GetForegroundDrawList());
+
+    // Caustica camera basis is Y-up with +Z look (LHS); match ImOGuizmo's ZYX.
+    const bool viewChanged = ImOGuizmo::DrawGizmo(
+        viewMatrix,
+        projectionMatrix,
+        pivotDistance,
+        ImOGuizmo::CoordinateSystem::ZYX);
+
+    if (viewChanged)
+    {
+        if (ApplyImOGuizmoViewMatrix(*camera, viewMatrix))
+            ctx.settings.ResetAccumulation = true;
+    }
+
+    // Steal viewport picks / camera orbit while the cursor is over the widget
+    // (or while a drag started on it is still held).
+    const float hSize = kSize * 0.5f;
+    const ImVec2 center(gizmoX + hSize, gizmoY + hSize);
+    const float hoverRadius = hSize * ImOGuizmo::config.hoverCircleRadiusScale;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const float dx = mouse.x - center.x;
+    const float dy = mouse.y - center.y;
+    const bool hovered = (dx * dx + dy * dy) <= (hoverRadius * hoverRadius);
+
+    static bool s_viewGizmoCapturing = false;
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        if (hovered)
+            s_viewGizmoCapturing = true;
+    }
+    else
+    {
+        s_viewGizmoCapturing = false;
+    }
+
+    if (hovered || s_viewGizmoCapturing || viewChanged)
+    {
+        ctx.editorUI.GizmoCapturingInput = true;
+        ImGui::GetIO().WantCaptureMouse = true;
+    }
 }

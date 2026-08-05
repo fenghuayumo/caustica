@@ -14,22 +14,96 @@ using namespace caustica;
 using namespace caustica;
 
 
-static ImVec4 getSeverityColor(caustica::Severity severity)
-{
-	using namespace caustica;	
-	switch (severity)
-	{
-	case Severity::Info: return ImVec4(.6f, .8f, 1.f, 1.f);
-	case Severity::Warning: return ImVec4(1.f, .5f, 0.f, 1.f);
-	case Severity::Error: return ImVec4(1.f, 0.f, 0.f, 1.f);
-	default:
-		break;
-	}
-	return ImVec4(1.f, 1.f, 1.f, 1.f);
-}
-
 namespace
 {
+// UE Output Log–inspired palette
+constexpr ImVec4 kColLog      = { 0.82f, 0.84f, 0.86f, 1.f };
+constexpr ImVec4 kColInfo     = { 0.55f, 0.78f, 1.00f, 1.f };
+constexpr ImVec4 kColWarning  = { 1.00f, 0.78f, 0.22f, 1.f };
+constexpr ImVec4 kColError    = { 1.00f, 0.38f, 0.35f, 1.f };
+constexpr ImVec4 kColFatal    = { 1.00f, 0.20f, 0.25f, 1.f };
+constexpr ImVec4 kColCommand  = { 0.45f, 0.92f, 0.62f, 1.f };
+constexpr ImVec4 kColRowA     = { 0.10f, 0.11f, 0.13f, 1.f };
+constexpr ImVec4 kColRowB     = { 0.12f, 0.13f, 0.16f, 1.f };
+constexpr ImVec4 kColChildBg  = { 0.08f, 0.09f, 0.11f, 1.f };
+constexpr ImVec4 kColToolbar  = { 0.14f, 0.15f, 0.18f, 1.f };
+
+ImVec4 getSeverityColor(caustica::Severity severity)
+{
+	using namespace caustica;
+	switch (severity)
+	{
+	case Severity::Debug:   return ImVec4(0.55f, 0.58f, 0.62f, 1.f);
+	case Severity::Info:    return kColInfo;
+	case Severity::Warning: return kColWarning;
+	case Severity::Error:   return kColError;
+	case Severity::Fatal:   return kColFatal;
+	default:                return kColLog;
+	}
+}
+
+const char* getSeverityTag(caustica::Severity severity)
+{
+	using namespace caustica;
+	switch (severity)
+	{
+	case Severity::Debug:   return "Debug";
+	case Severity::Info:    return "Log";
+	case Severity::Warning: return "Warning";
+	case Severity::Error:   return "Error";
+	case Severity::Fatal:   return "Fatal";
+	default:                return "Log";
+	}
+}
+
+bool passesFilter(std::string const& text, char const* filter)
+{
+	if (!filter || filter[0] == '\0')
+		return true;
+	auto containsCi = [](std::string const& hay, char const* needle) {
+		if (!needle || !*needle)
+			return true;
+		for (size_t i = 0; i < hay.size(); ++i)
+		{
+			size_t j = 0;
+			while (needle[j]
+				&& i + j < hay.size()
+				&& std::tolower(static_cast<unsigned char>(hay[i + j]))
+					== std::tolower(static_cast<unsigned char>(needle[j])))
+			{
+				++j;
+			}
+			if (!needle[j])
+				return true;
+		}
+		return false;
+	};
+	return containsCi(text, filter);
+}
+
+bool severityChip(char const* label, bool* enabled, ImVec4 const& color)
+{
+	ImGui::PushID(label);
+	const ImVec4 bg = *enabled
+		? ImVec4(color.x * 0.35f, color.y * 0.35f, color.z * 0.35f, 1.f)
+		: ImVec4(0.18f, 0.19f, 0.22f, 1.f);
+	const ImVec4 border = *enabled ? color : ImVec4(0.30f, 0.32f, 0.36f, 1.f);
+	ImGui::PushStyleColor(ImGuiCol_Button, bg);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(bg.x + 0.06f, bg.y + 0.06f, bg.z + 0.06f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(bg.x + 0.10f, bg.y + 0.10f, bg.z + 0.10f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Border, border);
+	ImGui::PushStyleColor(ImGuiCol_Text, *enabled ? color : ImVec4(0.55f, 0.57f, 0.60f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.f, 3.f));
+	const bool pressed = ImGui::Button(label);
+	ImGui::PopStyleVar(2);
+	ImGui::PopStyleColor(5);
+	if (pressed)
+		*enabled = !*enabled;
+	ImGui::PopID();
+	return pressed;
+}
+
 inline std::string_view isolateKeyword(std::string_view line)
 {
 	ds::ltrim(line);
@@ -75,6 +149,7 @@ void ImGui_Console::Print(char const* fmt, ...)
 
 	LogItem item;
 	item.text = buf.data();
+	item.textColor = (item.text.rfind("> ", 0) == 0) ? kColCommand : kColLog;
 	m_ItemsLog.push_back(item);
 }
 
@@ -82,6 +157,7 @@ void ImGui_Console::Print(std::string_view line)
 {
 	LogItem item;
 	item.text = line;
+	item.textColor = (item.text.rfind("> ", 0) == 0) ? kColCommand : kColLog;
 	m_ItemsLog.push_back(item);
 }
 
@@ -98,60 +174,71 @@ void ImGui_Console::clearHistory()
 
 void ImGui_Console::render(bool* open, bool requestFocus)
 {
-	ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(860, 480), ImGuiCond_FirstUseEver);
 	if (requestFocus)
 	{
 		ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
 		ImGui::SetNextWindowFocus();
 	}
 
-	if (!ImGui::Begin("Console", open, ImGuiWindowFlags_MenuBar))
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.11f, 0.12f, 0.14f, 1.f));
+	if (!ImGui::Begin("Console Log", open))
 	{
 		ImGui::End();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 		return;
 	}
 
-	if (ImGui::BeginPopupContextItem())
+	// --- Toolbar (UE Output Log style) ---
 	{
-		if (ImGui::MenuItem("Close Console"))
-			*open = false;
-		ImGui::EndPopup();
-	}
-
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("Edit"))
-		{
-			bool clearLog = ImGui::MenuItem("clear Log");
-			bool clearHistory = ImGui::MenuItem("clear History");
-			bool clearAll = ImGui::MenuItem("clear All");
-
-			if (clearLog || clearAll)
-				this->clearLog();
-			if (clearHistory || clearAll)
-				this->clearHistory();
-			ImGui::EndMenu();
-		}
-		ImGui::EndMenuBar();			
-	}
-
-	// Log area
-
-	const float footer_height = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-	ImGui::BeginChild("Log panel", ImVec2(0, -footer_height), false, ImGuiWindowFlags_HorizontalScrollbar);
-
-	// right click popup on log panel
-	if (ImGui::BeginPopupContextWindow()) 
-	{
-		if (ImGui::Selectable("clear"))
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, kColToolbar);
+		ImGui::BeginChild("##ConsoleToolbar", ImVec2(0.f, ImGui::GetFrameHeightWithSpacing() + 6.f),
+			true, ImGuiWindowFlags_NoScrollbar);
+		if (ImGui::Button("Clear"))
 			clearLog();
-		ImGui::EndPopup();
+		ImGui::SameLine();
+		ImGui::Checkbox("Auto-scroll", &m_Options.auto_scroll);
+		ImGui::SameLine(0.f, 12.f);
+		severityChip("Errors", &m_Options.show_errors, kColError);
+		ImGui::SameLine();
+		severityChip("Warnings", &m_Options.show_warnings, kColWarning);
+		ImGui::SameLine();
+		severityChip("Messages", &m_Options.show_info, kColInfo);
+		ImGui::SameLine(0.f, 12.f);
+		ImGui::SetNextItemWidth((std::max)(120.f, ImGui::GetContentRegionAvail().x));
+		ImGui::InputTextWithHint("##ConsoleFilter", "Filter...", m_FilterBuf, sizeof(m_FilterBuf));
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
 	}
 
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+	const float footerHeight =
+		ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing() + 4.f;
+
+	// --- Log list ---
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, kColChildBg);
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
+	ImGui::BeginChild(
+		"##ConsoleLogList",
+		ImVec2(0.f, -footerHeight),
+		true,
+		ImGuiWindowFlags_HorizontalScrollbar);
+
+	if (ImGui::BeginPopupContextWindow())
+	{
+		if (ImGui::MenuItem("Clear Log"))
+			clearLog();
+		if (ImGui::MenuItem("Clear History"))
+			clearHistory();
+		ImGui::EndPopup();
+	}
 
 	if (m_Options.font)
 		ImGui::PushFont(m_Options.font->getScaledFont());
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	int visibleRow = 0;
 	for (auto const& item : m_ItemsLog)
 	{
 		using namespace caustica;
@@ -159,21 +246,62 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 		bool showItem = true;
 		switch (item.severity)
 		{
-		case Severity::Info: showItem = m_Options.show_info; break;
-		case Severity::Warning: showItem = m_Options.show_warnings; break;
-		case Severity::Error: showItem = m_Options.show_errors; break;
-		default: break;
+		case Severity::Info:
+		case Severity::Debug:
+		case Severity::None:
+			showItem = m_Options.show_info;
+			break;
+		case Severity::Warning:
+			showItem = m_Options.show_warnings;
+			break;
+		case Severity::Error:
+		case Severity::Fatal:
+			showItem = m_Options.show_errors;
+			break;
+		default:
+			break;
 		}
+		if (!showItem || !passesFilter(item.text, m_FilterBuf))
+			continue;
 
-		if (showItem)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Text, item.textColor);
-			ImGui::TextUnformatted(item.text.c_str());
-			ImGui::PopStyleColor();
-		}
+		const ImVec4 severityColor = (item.severity == Severity::None)
+			? item.textColor
+			: getSeverityColor(item.severity);
+		const char* tag = getSeverityTag(item.severity);
+
+		const ImVec2 rowMin = ImGui::GetCursorScreenPos();
+		const float rowW = ImGui::GetContentRegionAvail().x;
+		const float rowH = ImGui::GetTextLineHeightWithSpacing();
+		const ImVec2 rowMax(rowMin.x + rowW, rowMin.y + rowH);
+
+		drawList->AddRectFilled(
+			rowMin,
+			rowMax,
+			ImGui::ColorConvertFloat4ToU32((visibleRow & 1) ? kColRowB : kColRowA));
+		// Severity accent bar (UE-style)
+		drawList->AddRectFilled(
+			rowMin,
+			ImVec2(rowMin.x + 3.f, rowMax.y),
+			ImGui::ColorConvertFloat4ToU32(severityColor));
+
+		ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 8.f, rowMin.y + 1.f));
+		ImGui::PushStyleColor(ImGuiCol_Text, severityColor);
+		ImGui::TextUnformatted(tag);
+		ImGui::PopStyleColor();
+		ImGui::SameLine(72.f);
+		ImGui::PushStyleColor(ImGuiCol_Text, item.textColor);
+		ImGui::TextUnformatted(item.text.c_str());
+		ImGui::PopStyleColor();
+
+		// Keep layout advancing even if text wrapped oddly.
+		if (ImGui::GetCursorScreenPos().y < rowMax.y)
+			ImGui::SetCursorScreenPos(ImVec2(rowMin.x, rowMax.y));
+
+		++visibleRow;
 	}
 
-	if (m_Options.scroll_to_bottom || (m_Options.auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
+	if (m_Options.scroll_to_bottom
+		|| (m_Options.auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.f))
 	{
 		ImGui::SetScrollHereY(1.f);
 	}
@@ -182,25 +310,39 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 		ImGui::PopFont();
 
 	m_Options.scroll_to_bottom = false;
+	ImGui::EndChild();
 	ImGui::PopStyleVar();
-	ImGui::EndChild(); // end log scroll area
+	ImGui::PopStyleColor();
 
-	ImGui::Separator();
+	// --- Command prompt ---
+	ImGui::Spacing();
+	ImGui::AlignTextToFramePadding();
+	ImGui::PushStyleColor(ImGuiCol_Text, kColCommand);
+	ImGui::TextUnformatted(">");
+	ImGui::PopStyleColor();
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(-1.f);
 
-	// Command line (also available in the log panel for convenience)
 	if (m_Options.font)
 		ImGui::PushFont(m_Options.font->getScaledFont());
 
 	bool reclaim_focus = requestFocus;
-	auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
+	const auto flags = ImGuiInputTextFlags_EnterReturnsTrue
+		| ImGuiInputTextFlags_CallbackCompletion
+		| ImGuiInputTextFlags_CallbackHistory;
 	if (requestFocus)
 		ImGui::SetKeyboardFocusHere();
-	if (ImGui::InputText("##Command", m_InputBuffer.data(), m_InputBuffer.size(), flags, 
-		[](ImGuiInputTextCallbackData* data)
-		{
-			ImGui_Console* console = (ImGui_Console*)data->UserData;
-			return console->textEditCallback(data);
-		}, (void*)this))
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.07f, 0.08f, 0.10f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
+	if (ImGui::InputText(
+			"##Command",
+			m_InputBuffer.data(),
+			m_InputBuffer.size(),
+			flags,
+			[](ImGuiInputTextCallbackData* data) {
+				return static_cast<ImGui_Console*>(data->UserData)->textEditCallback(data);
+			},
+			this))
 	{
 		if (m_InputBuffer.front() != '\0')
 		{
@@ -209,30 +351,19 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 		}
 		reclaim_focus = true;
 	}
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor();
 
 	if (m_Options.font)
 		ImGui::PopFont();
 
-	// Auto-focus on window apparition / after submitting a command
 	ImGui::SetItemDefaultFocus();
 	if (reclaim_focus)
-		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
-
-	ImGui::SameLine();
-	ImGui::AlignTextToFramePadding();
-	ImGui::Text("Filters : "); ImGui::SameLine();
-	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1);
-	auto filterButton = [](char const* label, bool* value, caustica::Severity severity) {
-		ImGui::PushStyleColor(ImGuiCol_Border, getSeverityColor(severity));
-		ImGui::Checkbox(label, value);
-		ImGui::PopStyleColor();
-	};
-	filterButton("Errors", &m_Options.show_errors, caustica::Severity::Error); ImGui::SameLine();
-	filterButton("Warnings", &m_Options.show_warnings, caustica::Severity::Warning); ImGui::SameLine();
-	filterButton("Info", &m_Options.show_info, caustica::Severity::Info);
-	ImGui::PopStyleVar(); // FrameBorder
+		ImGui::SetKeyboardFocusHere(-1);
 
 	ImGui::End();
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar();
 }
 
 std::vector<std::string> ImGui_Console::currentSuggestions() const

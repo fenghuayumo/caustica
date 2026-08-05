@@ -33,7 +33,7 @@ namespace caustica
 			bool scroll_to_bottom = false; // scoll to botom on console creation, if the log is not empty
 
 			bool capture_log = true;       // captures engine event logs & redirects to the console
-			bool show_info = false;        // default state of log events filters
+			bool show_info = true;         // default state of log events filters
 			bool show_warnings = true;
 			bool show_errors = true;
 		};
@@ -97,6 +97,7 @@ namespace caustica
 
 		std::vector<std::string> m_Suggestions;
 		int m_SuggestionIndex = -1;
+		char m_FilterBuf[128] = {};
 
 	private:
 

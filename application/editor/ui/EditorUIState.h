@@ -92,6 +92,8 @@ struct EditorSelectionState
     bool ShowTransformGizmo = true;
     // Viewport ground grid (ImGuizmo::DrawGrid); default visible.
     bool ShowInfiniteGrid = true;
+    // Viewport corner orientation gizmo (ImOGuizmo); default visible.
+    bool ShowViewOrientationGizmo = true;
     bool GizmoEnabled = true;
     int GizmoOperation = 7; // ImGuizmo::TRANSLATE
     int GizmoMode = 0;      // ImGuizmo::LOCAL

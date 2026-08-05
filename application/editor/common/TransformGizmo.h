@@ -20,6 +20,8 @@ struct TransformGizmoContext
 void BuildTransformGizmoToolbar(EditorUIState& editorUI);
 void DrawInfiniteGrid(const TransformGizmoContext& ctx);
 bool DrawTransformGizmo(const TransformGizmoContext& ctx);
+// Viewport top-right orientation widget (ImOGuizmo XYZ axes).
+void DrawViewOrientationGizmo(const TransformGizmoContext& ctx);
 
 // True while a gizmo drag session is in progress (including the release frame
 // before the undo command is committed).

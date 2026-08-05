@@ -105,6 +105,7 @@ void EditorUI::BuildMainMenuBar()
         ImGui::Separator();
         ImGui::MenuItem("Transform Gizmo", nullptr, &m_editorUI.ShowTransformGizmo);
         ImGui::MenuItem("Infinite Grid", nullptr, &m_editorUI.ShowInfiniteGrid);
+        ImGui::MenuItem("View Orientation Gizmo", nullptr, &m_editorUI.ShowViewOrientationGizmo);
         ImGui::Separator();
         if (ImGui::MenuItem("Preferences..."))
             m_editorUI.ShowPreferences = true;
@@ -124,12 +125,6 @@ void EditorUI::BuildMainMenuBar()
         ImGui::MenuItem("Render Settings", nullptr, &m_editorUI.Viewport.ShowRenderSettings);
         ImGui::MenuItem("Status Bar", nullptr, &m_editorUI.Viewport.ShowStatusBar);
         ImGui::Separator();
-        ImGui::MenuItem("Show All UI", "F2", &m_editorUI.ShowUI);
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu("Window"))
-    {
         if (ImGui::MenuItem("Command Bar", "`", &m_editorUI.ShowCommandBar))
         {
             if (m_editorUI.ShowCommandBar)
@@ -138,7 +133,8 @@ void EditorUI::BuildMainMenuBar()
         if (ImGui::MenuItem("Console Log", nullptr, &m_editorUI.ShowConsole) && m_editorUI.ShowConsole)
             m_editorUI.RequestFocusConsole = true;
         ImGui::Separator();
-        if (ImGui::MenuItem("Reset Window Layout"))
+        ImGui::MenuItem("Show All UI", "F2", &m_editorUI.ShowUI);
+        if (ImGui::MenuItem("Reset Layout"))
         {
             m_editorUI.Viewport.ShowViewport = true;
             m_editorUI.Viewport.ShowHierarchy = true;
