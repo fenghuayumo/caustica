@@ -50,6 +50,11 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
     auto* ew = caustica::entityWorld(*m_sceneEditor.app());
     ImGui::Begin("Inspector", &m_editorUI.ShowInspector);
+    if (m_editorUI.RequestFocusInspector)
+    {
+        ImGui::SetWindowFocus();
+        m_editorUI.RequestFocusInspector = false;
+    }
     (void)layout;
 
     // Function-static edit session for Transform undo grouping (see Transform section).
@@ -473,6 +478,11 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
         return;
 
     ImGui::Begin("Material Editor", &m_editorUI.ShowMaterialEditor);
+    if (m_editorUI.RequestFocusMaterialEditor)
+    {
+        ImGui::SetWindowFocus();
+        m_editorUI.RequestFocusMaterialEditor = false;
+    }
     ImGui::PushItemWidth(layout.defItemWidth);
 
     std::shared_ptr<StandardMaterial> material = StandardMaterial::safeCast(m_editorUI.SelectedMaterial);

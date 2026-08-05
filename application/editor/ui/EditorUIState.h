@@ -58,6 +58,9 @@ struct EditorWindowState
     bool ShowPreferences = false;
     // 0 = Basic, 1 = Advanced, 2 = Developer. Basic is deliberately the default.
     int RenderSettingsDetailLevel = 0;
+    // Set when a toggle enables the panel; consumed after Begin() to select its dock tab.
+    bool RequestFocusInspector = false;
+    bool RequestFocusMaterialEditor = false;
     EditorViewportState Viewport;
 };
 
@@ -83,6 +86,8 @@ struct EditorSelectionState
 
     // ImGuizmo transform gizmo state (operation/mode values match ImGuizmo enums)
     bool ShowTransformGizmo = true;
+    // Viewport ground grid (ImGuizmo::DrawGrid); default visible.
+    bool ShowInfiniteGrid = true;
     bool GizmoEnabled = true;
     int GizmoOperation = 7; // ImGuizmo::TRANSLATE
     int GizmoMode = 0;      // ImGuizmo::LOCAL

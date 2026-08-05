@@ -104,6 +104,7 @@ void EditorUI::BuildMainMenuBar()
             m_sceneEditor.requestRedo();
         ImGui::Separator();
         ImGui::MenuItem("Transform Gizmo", nullptr, &m_editorUI.ShowTransformGizmo);
+        ImGui::MenuItem("Infinite Grid", nullptr, &m_editorUI.ShowInfiniteGrid);
         ImGui::Separator();
         if (ImGui::MenuItem("Preferences..."))
             m_editorUI.ShowPreferences = true;
@@ -114,8 +115,10 @@ void EditorUI::BuildMainMenuBar()
     {
         ImGui::MenuItem("Viewport", nullptr, &m_editorUI.Viewport.ShowViewport);
         ImGui::MenuItem("Hierarchy", nullptr, &m_editorUI.Viewport.ShowHierarchy);
-        ImGui::MenuItem("Inspector", nullptr, &m_editorUI.ShowInspector);
-        ImGui::MenuItem("Material Editor", nullptr, &m_editorUI.ShowMaterialEditor);
+        if (ImGui::MenuItem("Inspector", nullptr, &m_editorUI.ShowInspector) && m_editorUI.ShowInspector)
+            m_editorUI.RequestFocusInspector = true;
+        if (ImGui::MenuItem("Material Editor", nullptr, &m_editorUI.ShowMaterialEditor) && m_editorUI.ShowMaterialEditor)
+            m_editorUI.RequestFocusMaterialEditor = true;
         ImGui::MenuItem("Post Process", nullptr, &m_editorUI.ShowPostProcess);
         ImGui::MenuItem("Timeline", nullptr, &m_editorUI.ShowTimeline);
         ImGui::MenuItem("Render Settings", nullptr, &m_editorUI.Viewport.ShowRenderSettings);
@@ -317,8 +320,8 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     // Child window gives the tool strip its own hit-test layer above the canvas.
     {
         constexpr float kToolbarPad = 6.f;
-        // Match TransformGizmoToolbar strip: 6 buttons + 1 separator + padding.
-        constexpr float kToolbarW = 3.f * 2.f + 28.f * 6.f + 1.f * 5.f + 5.f;
+        // Match TransformGizmoToolbar strip: 7 buttons + 2 separators + padding.
+        constexpr float kToolbarW = 3.f * 2.f + 28.f * 7.f + 2.f * 4.f + 5.f * 2.f;
         constexpr float kToolbarH = 28.f + 3.f * 2.f;
         ImGui::SetCursorScreenPos(ImVec2(canvasPos.x + kToolbarPad, canvasPos.y + kToolbarPad));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));

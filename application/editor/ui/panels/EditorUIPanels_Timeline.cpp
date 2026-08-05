@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include "common/IconsMaterialSymbols.h"
 
 #include "SceneEditor.h"
 
@@ -42,121 +43,28 @@ enum class TimelineIcon
     JumpEnd,
     InsertKey,
     DeleteKey,
+    InsertVisibilityKey,
+    DeleteVisibilityKey,
 };
 
-void DrawTimelineIcon(
-    ImDrawList* drawList,
-    ImVec2 min,
-    ImVec2 max,
-    TimelineIcon icon,
-    ImU32 color)
+const char* TimelineIconGlyph(TimelineIcon icon)
 {
-    const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
-    const float s = std::min(max.x - min.x, max.y - min.y) * 0.25f;
-    const float thickness = std::max(1.5f, s * 0.24f);
-
-    const auto drawChevron = [&](bool right) {
-        const float direction = right ? 1.f : -1.f;
-        drawList->AddLine(
-            ImVec2(center.x - direction * s * 0.45f, center.y - s * 0.72f),
-            ImVec2(center.x + direction * s * 0.30f, center.y),
-            color,
-            thickness);
-        drawList->AddLine(
-            ImVec2(center.x + direction * s * 0.30f, center.y),
-            ImVec2(center.x - direction * s * 0.45f, center.y + s * 0.72f),
-            color,
-            thickness);
-    };
-
     switch (icon)
     {
-    case TimelineIcon::JumpStart:
-        drawList->AddRectFilled(
-            ImVec2(center.x - s * 0.90f, center.y - s * 0.78f),
-            ImVec2(center.x - s * 0.66f, center.y + s * 0.78f),
-            color,
-            1.f);
-        drawList->AddTriangleFilled(
-            ImVec2(center.x - s * 0.48f, center.y),
-            ImVec2(center.x + s * 0.62f, center.y - s * 0.76f),
-            ImVec2(center.x + s * 0.62f, center.y + s * 0.76f),
-            color);
-        break;
-    case TimelineIcon::PreviousFrame:
-        drawChevron(false);
-        break;
-    case TimelineIcon::Play:
-        drawList->AddTriangleFilled(
-            ImVec2(center.x - s * 0.58f, center.y - s * 0.82f),
-            ImVec2(center.x + s * 0.78f, center.y),
-            ImVec2(center.x - s * 0.58f, center.y + s * 0.82f),
-            color);
-        break;
-    case TimelineIcon::Pause:
-        drawList->AddRectFilled(
-            ImVec2(center.x - s * 0.62f, center.y - s * 0.80f),
-            ImVec2(center.x - s * 0.16f, center.y + s * 0.80f),
-            color,
-            1.f);
-        drawList->AddRectFilled(
-            ImVec2(center.x + s * 0.16f, center.y - s * 0.80f),
-            ImVec2(center.x + s * 0.62f, center.y + s * 0.80f),
-            color,
-            1.f);
-        break;
-    case TimelineIcon::NextFrame:
-        drawChevron(true);
-        break;
-    case TimelineIcon::JumpEnd:
-        drawList->AddTriangleFilled(
-            ImVec2(center.x + s * 0.48f, center.y),
-            ImVec2(center.x - s * 0.62f, center.y - s * 0.76f),
-            ImVec2(center.x - s * 0.62f, center.y + s * 0.76f),
-            color);
-        drawList->AddRectFilled(
-            ImVec2(center.x + s * 0.66f, center.y - s * 0.78f),
-            ImVec2(center.x + s * 0.90f, center.y + s * 0.78f),
-            color,
-            1.f);
-        break;
-    case TimelineIcon::InsertKey:
-    case TimelineIcon::DeleteKey:
-    {
-        const ImVec2 diamond[] = {
-            ImVec2(center.x, center.y - s * 0.88f),
-            ImVec2(center.x + s * 0.88f, center.y),
-            ImVec2(center.x, center.y + s * 0.88f),
-            ImVec2(center.x - s * 0.88f, center.y),
-        };
-        if (icon == TimelineIcon::InsertKey)
-            drawList->AddConvexPolyFilled(diamond, IM_ARRAYSIZE(diamond), color);
-        else
-            drawList->AddPolyline(
-                diamond,
-                IM_ARRAYSIZE(diamond),
-                color,
-                ImDrawFlags_Closed,
-                thickness);
-
-        const ImU32 markColor =
-            icon == TimelineIcon::InsertKey ? IM_COL32(24, 27, 31, 255) : color;
-        drawList->AddLine(
-            ImVec2(center.x - s * 0.38f, center.y),
-            ImVec2(center.x + s * 0.38f, center.y),
-            markColor,
-            std::max(1.2f, thickness * 0.72f));
-        if (icon == TimelineIcon::InsertKey)
-        {
-            drawList->AddLine(
-                ImVec2(center.x, center.y - s * 0.38f),
-                ImVec2(center.x, center.y + s * 0.38f),
-                markColor,
-                std::max(1.2f, thickness * 0.72f));
-        }
-        break;
+    case TimelineIcon::JumpStart:            return ICON_MS_FIRST_PAGE;
+    case TimelineIcon::PreviousFrame:        return ICON_MS_SKIP_PREVIOUS;
+    case TimelineIcon::Play:                 return ICON_MS_PLAY_ARROW;
+    case TimelineIcon::Pause:                return ICON_MS_PAUSE;
+    case TimelineIcon::NextFrame:            return ICON_MS_SKIP_NEXT;
+    case TimelineIcon::JumpEnd:              return ICON_MS_LAST_PAGE;
+    // Transform keys: diamond+ / trash — reads as "add keyframe" / "delete keyframe".
+    case TimelineIcon::InsertKey:            return ICON_MS_ADD_DIAMOND;
+    case TimelineIcon::DeleteKey:            return ICON_MS_DELETE;
+    // Visibility keys: eye / eye-off.
+    case TimelineIcon::InsertVisibilityKey:  return ICON_MS_VISIBILITY;
+    case TimelineIcon::DeleteVisibilityKey:  return ICON_MS_VISIBILITY_OFF;
     }
-    }
+    return ICON_MS_ADD_DIAMOND;
 }
 
 bool TimelineIconButton(
@@ -168,42 +76,35 @@ bool TimelineIconButton(
 {
     constexpr float width = 29.f;
     constexpr float height = 27.f;
-    const ImVec2 min = ImGui::GetCursorScreenPos();
-    const ImVec2 max(min.x + width, min.y + height);
+
+    // vk_gaussian_splatting-style toggle chrome.
+    if (selected)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.40f, 0.62f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.50f, 0.75f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.18f, 0.32f, 0.52f, 1.0f));
+    }
+    else
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.30f, 0.30f, 0.30f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.40f, 0.40f, 0.40f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.20f, 0.20f, 0.20f, 1.0f));
+    }
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 4.f));
 
     if (!enabled)
         ImGui::BeginDisabled();
-    const bool pressed = ImGui::InvisibleButton(id, ImVec2(width, height));
+    ImGui::PushID(id);
+    const bool pressed = ImGui::Button(TimelineIconGlyph(icon), ImVec2(width, height));
+    ImGui::PopID();
     const bool hovered =
         ImGui::IsItemHovered(enabled ? ImGuiHoveredFlags_None : ImGuiHoveredFlags_AllowWhenDisabled);
     if (!enabled)
         ImGui::EndDisabled();
 
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    const EditorColors& colors = GetEditorColors();
-    if (selected)
-    {
-        drawList->AddRectFilled(
-            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdleActive), 4.f);
-        drawList->AddRect(
-            min, max, ImGui::ColorConvertFloat4ToU32(colors.AccentHovered), 4.f, 0, 1.f);
-    }
-    else if (hovered && enabled)
-    {
-        drawList->AddRectFilled(
-            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdleHovered), 4.f);
-    }
-    else
-    {
-        drawList->AddRectFilled(
-            min, max, ImGui::ColorConvertFloat4ToU32(colors.ToolbarIdle), 4.f);
-    }
-
-    const ImU32 foreground = ImGui::ColorConvertFloat4ToU32(
-        !enabled
-            ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)
-            : (selected ? colors.AccentHovered : colors.Text));
-    DrawTimelineIcon(drawList, min, max, icon, foreground);
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(3);
 
     if (tooltip && hovered)
         ImGui::SetTooltip("%s", tooltip);
@@ -350,7 +251,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     TimelineToolbarSeparator();
     if (TimelineIconButton(
             "##InsertVisibilityKey",
-            TimelineIcon::InsertKey,
+            TimelineIcon::InsertVisibilityKey,
             hasVisibilityKey,
             canVisibility,
             !canVisibility
@@ -365,7 +266,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     ImGui::SameLine(0.f, 2.f);
     if (TimelineIconButton(
             "##DeleteVisibilityKey",
-            TimelineIcon::DeleteKey,
+            TimelineIcon::DeleteVisibilityKey,
             false,
             hasVisibilityKey,
             "Delete visibility keyframe"))

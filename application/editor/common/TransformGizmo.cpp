@@ -249,6 +249,45 @@ void DrawNoSelectionHint(const EditorUIState& editorUI)
 
 } // namespace
 
+void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
+{
+    if (!ctx.editorUI.ShowUI || !ctx.editorUI.ShowInfiniteGrid)
+        return;
+
+    App* app = ctx.sceneEditor.app();
+    if (!app)
+        return;
+
+    const auto& view = caustica::currentView(*app);
+    if (!view || view->isOrthographicProjection())
+        return;
+
+    const auto& vp = ctx.editorUI.Viewport;
+    if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
+        return;
+
+    ImGuizmo::BeginFrame();
+    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+    if (ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport"))
+        ImGuizmo::SetAlternativeWindow(viewportWindow);
+    ImGuizmo::SetRect(vp.PosX, vp.PosY, vp.SizeX, vp.SizeY);
+    ImGuizmo::SetOrthographic(false);
+
+    float viewMatrix[16];
+    float projectionMatrix[16];
+    Affine3ToImGuizmoMatrix(view->getViewMatrix(), viewMatrix);
+    BuildGizmoProjectionMatrix(ctx, *view, projectionMatrix);
+
+    float identity[16] = {
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f,
+    };
+    // Large finite grid on Y=0 (ImGuizmo DrawGrid); feels infinite in typical editor framing.
+    ImGuizmo::DrawGrid(viewMatrix, projectionMatrix, identity, 120.f);
+}
+
 bool caustica::editor::IsTransformGizmoEditing()
 {
     return g_undo.tracking || g_drag.active || g_drag.suppressUntilRelease || ImGuizmo::IsUsing();

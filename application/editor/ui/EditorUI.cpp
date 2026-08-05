@@ -247,7 +247,9 @@ void EditorUI::buildUI(void)
 
     // After all dock panels (same ordering as pre-DockSpace): ImGuizmo BeginFrame +
     // foreground draw list so the gizmo is never covered by the Viewport image.
-    DrawTransformGizmo(TransformGizmoContext{ m_sceneEditor, m_editorUI, m_settings });
+    const TransformGizmoContext gizmoCtx{ m_sceneEditor, m_editorUI, m_settings };
+    DrawInfiniteGrid(gizmoCtx);
+    DrawTransformGizmo(gizmoCtx);
     BuildStatusBar();
 }
 

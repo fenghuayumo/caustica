@@ -37,6 +37,9 @@ namespace caustica
         bool m_mergeMode = false;
         // ImGui glyph-range pairs (min,max,...,0). Empty => font default ranges.
         std::vector<ImWchar> m_glyphRanges;
+        // ImGui 1.92+: ranges this source must NOT serve (first matching source wins).
+        std::vector<ImWchar> m_glyphExcludeRanges;
+        ImVec2 m_glyphOffset = ImVec2(0.f, 0.f);
 
         void createScaledFont(float displayScale);
         void releaseScaledFont();
@@ -74,6 +77,23 @@ namespace caustica
             for (const ImWchar* p = ranges; *p; ++p)
                 m_glyphRanges.push_back(*p);
             m_glyphRanges.push_back(0);
+        }
+
+        // Pixel offset applied when baking this face (Material Symbols needs a small Y nudge).
+        void configureGlyphOffset(ImVec2 offset)
+        {
+            m_glyphOffset = offset;
+        }
+
+        // ImGui 1.92 GlyphExcludeRanges — keep small (a few inclusive pairs + 0).
+        void configureGlyphExcludeRanges(const ImWchar* ranges)
+        {
+            m_glyphExcludeRanges.clear();
+            if (!ranges)
+                return;
+            for (const ImWchar* p = ranges; *p; ++p)
+                m_glyphExcludeRanges.push_back(*p);
+            m_glyphExcludeRanges.push_back(0);
         }
 
         // Returns true if the custom font data has been successfully loaded.

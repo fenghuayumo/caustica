@@ -373,8 +373,11 @@ void RegisteredFont::createScaledFont(float displayScale)
     // Slight brighten helps thin UI fonts stay readable on dark themes.
     fontConfig.RasterizerMultiply = 1.05f;
     fontConfig.MergeMode = m_mergeMode;
+    fontConfig.GlyphOffset = m_glyphOffset;
     if (!m_glyphRanges.empty())
         fontConfig.GlyphRanges = m_glyphRanges.data();
+    if (!m_glyphExcludeRanges.empty())
+        fontConfig.GlyphExcludeRanges = m_glyphExcludeRanges.data();
 
     m_imFont = nullptr;
 

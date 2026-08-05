@@ -1,9 +1,11 @@
 #include "common/ImGuiManager.h"
 #include "common/EditorTheme.h"
+#include "common/IconsMaterialSymbols.h"
 
 #include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
 #include <imgui.h>
+#include <material_symbols/material_symbols_rounded_regular.h>
 
 #include "EditorUI.h"
 #include <core/file_utils.h>
@@ -118,9 +120,24 @@ void ImGuiManager::loadDefaultFont(caustica::ImGui_Renderer& renderer,
     if (font)
         renderer.setDefaultFont(font);
 
+    // Material Symbols BEFORE SegoeIcons. ImGui 1.92 picks the first source that
+    // contains a codepoint; SegoeIcons overlaps the Material Symbols PUA and was
+    // stealing open_with / autorenew / attractions (showing Fluent "login" etc.).
+    constexpr float kMsSize = kUiFontSize * (9.f / 7.f);
+    auto materialSymbols = renderer.createFontFromMemoryCompressed(
+        g_materialSymbolsRounded_compressed_data,
+        g_materialSymbolsRounded_compressed_size,
+        kMsSize);
+    if (materialSymbols && materialSymbols->hasFontData())
+    {
+        materialSymbols->configureMerge(kMaterialSymbolsFullRange);
+        // Keep Fluent chrome glyphs (search/lock/eye) on SegoeIcons.
+        materialSymbols->configureGlyphExcludeRanges(kFluentEditorIconExcludeFromMs);
+        materialSymbols->configureGlyphOffset(ImVec2(kMsSize * 0.01f, kMsSize * 0.20f));
+    }
+
 #if defined(_WIN32)
-    // Merge Fluent / MDL2 icons into the default face so editor chrome can use
-    // professional system glyphs (eye, lock, refresh, folder, …).
+    // Fluent / MDL2 for editor chrome (eye, lock, refresh, …).
     static const ImWchar kEditorIconRanges[] = {
         0xE721, 0xE721, // Search
         0xE72C, 0xE72E, // Refresh … Lock
