@@ -13,6 +13,12 @@ tests/output/*
 /External/OIDN
 /External/DLSS
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
 # local project files for shader development outside of VS
 *.sublime-*
 compile-shaders.bat
