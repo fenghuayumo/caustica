@@ -54,7 +54,13 @@ namespace caustica
 		void render(bool* open = nullptr, bool requestFocus = false);
 
 		// UE-style overlay: slim command bar + live suggestions. Toggle with `.
-		void renderCommandBar(bool* open, bool requestFocus = false);
+		// When anchorSize is valid (>1), the bar is clamped inside that screen rect
+		// (typically the editor Viewport). Otherwise it uses the main ImGui work area.
+		void renderCommandBar(
+			bool* open,
+			bool requestFocus = false,
+			ImVec2 anchorPos = ImVec2(0.f, 0.f),
+			ImVec2 anchorSize = ImVec2(0.f, 0.f));
 
 	private:
 

@@ -229,24 +229,6 @@ bool IsEditingInspectorUi()
     return true;
 }
 
-void DrawNoSelectionHint(const EditorUIState& editorUI)
-{
-    const auto& vp = editorUI.Viewport;
-    if (!vp.RectValid || vp.SizeX < 8.f || vp.SizeY < 8.f)
-        return;
-
-    const char* msg = "Select a mesh / 3DGS (click viewport or Hierarchy) to show Transform Gizmo";
-    const ImVec2 ts = ImGui::CalcTextSize(msg);
-    const ImVec2 pos(vp.PosX + 10.f, vp.PosY + vp.SizeY - ts.y - 12.f);
-    ImDrawList* dl = ImGui::GetForegroundDrawList();
-    dl->AddRectFilled(
-        ImVec2(pos.x - 6.f, pos.y - 4.f),
-        ImVec2(pos.x + ts.x + 6.f, pos.y + ts.y + 4.f),
-        IM_COL32(12, 14, 18, 180),
-        4.f);
-    dl->AddText(pos, IM_COL32(210, 214, 220, 230), msg);
-}
-
 } // namespace
 
 void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
@@ -347,7 +329,6 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     {
         ResetGizmoUndoState();
         ResetGizmoDragState();
-        DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
 
@@ -357,7 +338,6 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     {
         ResetGizmoUndoState();
         ResetGizmoDragState();
-        DrawNoSelectionHint(ctx.editorUI);
         return false;
     }
 

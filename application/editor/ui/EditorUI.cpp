@@ -159,7 +159,12 @@ void EditorUI::buildUI(void)
         {
             const bool focusCommandBar = m_editorUI.RequestFocusCommandBar;
             m_editorUI.RequestFocusCommandBar = false;
-            m_console->renderCommandBar(&m_editorUI.ShowCommandBar, focusCommandBar);
+            const auto& vp = m_editorUI.Viewport;
+            m_console->renderCommandBar(
+                &m_editorUI.ShowCommandBar,
+                focusCommandBar,
+                vp.RectValid ? ImVec2(vp.PosX, vp.PosY) : ImVec2(0.f, 0.f),
+                vp.RectValid ? ImVec2(vp.SizeX, vp.SizeY) : ImVec2(0.f, 0.f));
         }
         BuildStatusBar();
         return;
@@ -262,12 +267,18 @@ void EditorUI::buildUI(void)
     DrawTransformGizmo(gizmoCtx);
     BuildStatusBar();
 
-    // Draw last so the UE-style command bar stays above docked panels.
+    // Draw last so the UE-style command bar stays above docked panels,
+    // and clamp it to the Viewport rect (not under Hierarchy / Inspector).
     if (m_editorUI.ShowCommandBar && m_console)
     {
         const bool focusCommandBar = m_editorUI.RequestFocusCommandBar;
         m_editorUI.RequestFocusCommandBar = false;
-        m_console->renderCommandBar(&m_editorUI.ShowCommandBar, focusCommandBar);
+        const auto& vp = m_editorUI.Viewport;
+        m_console->renderCommandBar(
+            &m_editorUI.ShowCommandBar,
+            focusCommandBar,
+            vp.RectValid ? ImVec2(vp.PosX, vp.PosY) : ImVec2(0.f, 0.f),
+            vp.RectValid ? ImVec2(vp.SizeX, vp.SizeY) : ImVec2(0.f, 0.f));
     }
 }
 

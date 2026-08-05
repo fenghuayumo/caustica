@@ -197,27 +197,19 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         return true;
     }
 
-    // UE-style command bar: ` / ~ opens a slim input overlay (not the log Console panel).
-    // Accept the common US/Win scancode when IME/layout remaps the keycode.
+    // UE-style command bar: ` / ~ (Esc 下方). Always toggle — do not require leaving
+    // text focus first. Also accept the common US/Win scancode for IME remaps.
     constexpr int kGraveScancode = 0x29;
     const bool graveKey = key == ToGlfwKey(caustica::Key::GraveAccent)
+        || key == ToGlfwKey(caustica::Key::World1)
         || e.getScancode() == kGraveScancode;
     if (graveKey && action == cGlfwPress && !ctrlDown && !altDown)
     {
         auto& editor = sceneEditor.editorUIState();
-        // Always allow closing while the bar owns text focus; only block open when
-        // some other text field is active.
+        editor.ShowCommandBar = !editor.ShowCommandBar;
         if (editor.ShowCommandBar)
-        {
-            editor.ShowCommandBar = false;
-            return true;
-        }
-        if (!ImGui::GetIO().WantTextInput)
-        {
-            editor.ShowCommandBar = true;
             editor.RequestFocusCommandBar = true;
-            return true;
-        }
+        return true;
     }
 
     if (ImGui::GetIO().WantCaptureKeyboard)
@@ -301,9 +293,19 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
 bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
 {
     const unsigned int cp = e.getCodepoint();
-    // ` / ~ toggles the command bar; don't insert the activator into the input.
-    if ((cp == '`' || cp == '~') && sceneEditor.editorUIState().ShowCommandBar)
+    // ASCII `/~ : KeyPressed already toggled — only swallow so they are not typed.
+    if (cp == '`' || cp == '~')
         return true;
+
+    // Chinese · / fullwidth ｀ often arrive as char-only (no GRAVE keycode). Toggle here.
+    if (cp == 0x00B7u || cp == 0xFF40u)
+    {
+        auto& editor = sceneEditor.editorUIState();
+        editor.ShowCommandBar = !editor.ShowCommandBar;
+        if (editor.ShowCommandBar)
+            editor.RequestFocusCommandBar = true;
+        return true;
+    }
 
     imGuiForwardInputCharacter(cp);
     return ImGui::GetIO().WantTextInput;

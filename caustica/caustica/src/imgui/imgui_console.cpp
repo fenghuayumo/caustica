@@ -261,19 +261,32 @@ void ImGui_Console::applySuggestion(std::string const& suggestion)
 	m_SuggestionIndex = -1;
 }
 
-void ImGui_Console::renderCommandBar(bool* open, bool requestFocus)
+void ImGui_Console::renderCommandBar(
+	bool* open,
+	bool requestFocus,
+	ImVec2 anchorPos,
+	ImVec2 anchorSize)
 {
 	if (!open || !*open)
 		return;
 
-	const ImGuiViewport* vp = ImGui::GetMainViewport();
-	if (!vp)
+	const ImGuiViewport* mainVp = ImGui::GetMainViewport();
+	if (!mainVp)
 		return;
 
-	constexpr float kBarMargin = 10.f;
+	constexpr float kBarMargin = 8.f;
 	constexpr float kBarHeight = 36.f;
 	constexpr int kMaxSuggestions = 12;
 	constexpr int kRecentLogLines = 8;
+
+	// Prefer the editor Viewport rect so the bar does not cover Hierarchy / Inspector.
+	ImVec2 regionPos = mainVp->WorkPos;
+	ImVec2 regionSize = mainVp->WorkSize;
+	if (anchorSize.x > 1.f && anchorSize.y > 1.f)
+	{
+		regionPos = anchorPos;
+		regionSize = anchorSize;
+	}
 
 	m_Suggestions = currentSuggestions();
 	if (m_SuggestionIndex >= static_cast<int>(m_Suggestions.size()))
@@ -306,14 +319,18 @@ void ImGui_Console::renderCommandBar(bool* open, bool requestFocus)
 		? 0.f
 		: (suggestRowH * static_cast<float>(recent.size()) + 10.f);
 
-	const float totalH = kBarHeight + suggestH + logH + 16.f;
-	const ImVec2 barPos(vp->WorkPos.x + kBarMargin, vp->WorkPos.y + vp->WorkSize.y - totalH - kBarMargin);
-	const ImVec2 barSize(vp->WorkSize.x - kBarMargin * 2.f, totalH);
+	const float maxBarH = (std::max)(kBarHeight + 8.f, regionSize.y - kBarMargin * 2.f);
+	const float totalH = (std::min)(kBarHeight + suggestH + logH + 16.f, maxBarH);
+	const float barW = (std::max)(120.f, regionSize.x - kBarMargin * 2.f);
+	const ImVec2 barPos(
+		regionPos.x + kBarMargin,
+		regionPos.y + regionSize.y - totalH - kBarMargin);
+	const ImVec2 barSize(barW, totalH);
 
 	ImGui::SetNextWindowPos(barPos, ImGuiCond_Always);
 	ImGui::SetNextWindowSize(barSize, ImGuiCond_Always);
 	ImGui::SetNextWindowBgAlpha(0.94f);
-	ImGui::SetNextWindowViewport(vp->ID);
+	ImGui::SetNextWindowViewport(mainVp->ID);
 
 	ImGuiWindowFlags flags =
 		ImGuiWindowFlags_NoDecoration
