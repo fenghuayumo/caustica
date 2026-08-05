@@ -283,20 +283,6 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 
             ImGui::Checkbox("Show debug lines", &m_settings.ShowDebugLines);
 
-            if (ImGui::Checkbox("Show inspector", &m_editorUI.ShowInspector) && m_editorUI.ShowInspector)
-            {
-#if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-                m_editorUI.ShowDeltaTree = false;
-#endif
-            }
-
-            if (ImGui::Checkbox("Show material editor", &m_editorUI.ShowMaterialEditor) && m_editorUI.ShowMaterialEditor)
-            {
-#if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
-                m_editorUI.ShowDeltaTree = false;
-#endif
-            }
-
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
             if (!m_settings.ActualUseStablePlanes())
             {
@@ -311,8 +297,6 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                     m_sceneEditor.renderRuntimeState().Picking.requestMaterialPick();
                 }
             }
-#else
-            ImGui::Text("Delta tree debug viz disabled; to enable set ENABLE_DEBUG_DELTA_TREE_VIZUALISATION to 1");
 #endif
             ImGui::Separator();
 
