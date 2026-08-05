@@ -1,4 +1,5 @@
 #include "EditorHost.h"
+#include "ui/RenderSettingsConsole.h"
 
 namespace caustica::editor
 {
@@ -7,6 +8,8 @@ EditorHost::EditorHost()
     : sceneEditor(cmdLine, editorUiData, diagnostics)
 {
 }
+
+EditorHost::~EditorHost() = default;
 
 void installEditorLogFilter(EditorHost& /*host*/)
 {

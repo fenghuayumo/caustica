@@ -53,15 +53,18 @@ float2 RectToRect( float2 pt, float2 srcRCentre, float2 srcRSize, float2 dstRCen
 [numthreads(16, 16, 1)]
 void main( uint2 dispatchThreadID : SV_DispatchThreadID )
 {
+    uint2 screenSizeUI;
+    g_screenTexture.GetDimensions( screenSizeUI.x, screenSizeUI.y );
+
+    // Dispatch dimensions are rounded up to the 16x16 thread-group size.
+    if( any( dispatchThreadID >= screenSizeUI ) )
+        return;
+
     const float2 screenPos = float2( dispatchThreadID ) + float2( 0.5, 0.5 ); // same as SV_Position
 
     const float zoomFactor = g_zoomToolConstants.ZoomFactor;
 
     float4 srcRect  = g_zoomToolConstants.SourceRectangle;
-    float4 srcColor = g_screenTexture[dispatchThreadID];
-
-    uint2 screenSizeUI;
-    g_screenTexture.GetDimensions( screenSizeUI.x, screenSizeUI.y );
 
     const float2 screenSize     = float2(screenSizeUI);
     const float2 screenCenter   = float2(screenSizeUI) * 0.5;
@@ -83,6 +86,7 @@ void main( uint2 dispatchThreadID : SV_DispatchThreadID )
     if( IsInRect(screenPos.xy, displayRect ) )
     {
         float2 texCoord = RectToRect( screenPos.xy, displayRectCenter, displayRectSize, srcRectCenter, srcRectSize );
+        texCoord = clamp( texCoord, float2( 0.0, 0.0 ), screenSize - float2( 1.0, 1.0 ) );
         float2 cursorPosZoomed = g_zoomToolConstants.CursorViewportPos.xy; //RectToRect( g_globals.CursorViewportPosition.xy+0.5, displayRectCenter, displayRectSize, srcRectCenter, srcRectSize );
         float3 colour = g_screenTexture.Load( int2( texCoord ) ).rgb;
 

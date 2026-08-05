@@ -56,6 +56,8 @@ struct EditorWindowState
     bool ShowTimeline = true;
     bool ShowPostProcess = true;
     bool ShowPreferences = false;
+    // 0 = Basic, 1 = Advanced, 2 = Developer. Basic is deliberately the default.
+    int RenderSettingsDetailLevel = 0;
     EditorViewportState Viewport;
 };
 

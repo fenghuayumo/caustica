@@ -39,7 +39,8 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         m_config.sceneEditor,
         m_config.editorUiData,
         serSupported,
-        m_config.cmdLine);
+        m_config.cmdLine,
+        m_config.console);
     m_ui->init(gpuSharedCaches->shaderFactory);
     m_viewport = std::make_unique<EditorViewport>();
 

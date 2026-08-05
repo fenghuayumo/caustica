@@ -3,6 +3,7 @@
 #include <core/string_utils.h>
 
 #include <cassert>
+#include <atomic>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -69,8 +70,9 @@ namespace caustica::console
 		case VariableState::CODE: return "CODE";
 		case VariableState::CONSOLE: return "CONSOLE";
 		case VariableState::INI: return "INI";
+		case VariableState::COMMAND_LINE: return "COMMAND_LINE";
 		default:
-			return "UNSET";
+			return setby == VariableState::CONSOLE ? "CONSOLE" : "UNSET";
 		}
 	}
 
@@ -85,8 +87,12 @@ namespace caustica::console
 			return false;
 		if (cheat && (setby <= CODE) && (origin > CODE))
 			return false;
+		if (origin < setby)
+			return false;
 		return true;
 	}
+
+	static std::atomic_bool g_StartupVariablesLocked = false;
 	
 	//
 	// Console Object Dictionary
@@ -194,6 +200,38 @@ namespace caustica::console
 			return nullptr;
 		}
 
+		template <typename T> Object* RegisterBoundVariable(BoundVariableDesc<T> const& desc)
+		{
+			if (!IsValidName(desc.name))
+			{
+				caustica::error("attempting to register a bound console variable with invalid name");
+				return nullptr;
+			}
+
+			std::lock_guard<std::mutex> lock(m_Mutex);
+			if (auto it = m_Dictionary.find(desc.name); it != m_Dictionary.end())
+			{
+				auto* variable = dynamic_cast<VariableImpl<T>*>(it->second->asVariable());
+				if (!variable)
+				{
+					caustica::error("console object '%s' already exists with a different type", desc.name);
+					return nullptr;
+				}
+				variable->configureBinding(desc);
+				return variable;
+			}
+
+			VariableState state(
+				desc.readOnly || !desc.setter,
+				desc.cheat,
+				VariableType::isA<T>(),
+				VariableState::CODE);
+			auto* variable = new VariableImpl<T>(desc.defaultValue, desc.description, state);
+			variable->configureBinding(desc);
+			m_Dictionary[desc.name] = variable;
+			return variable;
+		}
+
 		Object* findObject(std::string_view name)
 		{
 			if (!name.empty())
@@ -211,6 +249,7 @@ namespace caustica::console
 			std::vector<std::string_view> matches;
 			if (auto rx = regex_from_char(regex))
 			{
+				std::lock_guard<std::mutex> lock(m_Mutex);
 				for (auto& it : m_Dictionary)
 					if (std::regex_match(it.first, *rx))
 						matches.push_back(std::string_view(it.first));
@@ -223,6 +262,7 @@ namespace caustica::console
 			std::vector<Object*> matches;
 			if (auto rx = regex_from_char(regex))
 			{
+				std::lock_guard<std::mutex> lock(m_Mutex);
 				for (auto& it : m_Dictionary)
 					if (std::regex_match(it.first, *rx))
 						matches.push_back(it.second);
@@ -326,28 +366,98 @@ namespace caustica::console
 
     template <typename T> class AutoVariable;
 
+	template <typename T>
+	bool valuesEqual(T const& a, T const& b)
+	{
+		if constexpr (std::is_arithmetic_v<T> || std::is_same_v<T, std::string>)
+		{
+			return a == b;
+		}
+		else
+		{
+			for (int i = 0; i < T::DIM; ++i)
+				if (a[i] != b[i])
+					return false;
+			return true;
+		}
+	}
+
 	template <typename T> class VariableImpl : public Variable
 	{
 	public:
 
 		VariableImpl(T const& data, char const* description, VariableState state) 
-			: Variable(description, state), m_Data(data) { }
+			: Variable(description ? description : "", state), m_Data(data), m_DefaultData(data) { }
 
 		virtual Variable* asVariable() override { return this; }
 
-		inline T getData() const { return m_Data; }
+		inline T getData() const
+		{
+			if (m_Getter)
+				m_Data = m_Getter();
+			return m_Data;
+		}
 
-		inline T const& getDataRef() const { return m_Data; }
+		inline T const& getDataRef() const
+		{
+			if (m_Getter)
+				m_Data = m_Getter();
+			return m_Data;
+		}
+
+		void configureBinding(BoundVariableDesc<T> const& desc)
+		{
+			m_DefaultData = desc.defaultValue;
+			m_Data = desc.defaultValue;
+			m_Getter = {};
+			m_Setter = desc.setter;
+			m_Validator = desc.validator;
+			m_Choices = desc.choices;
+			m_Flags = desc.flags;
+			m_Description = desc.description ? desc.description : "";
+			m_State.read_only = desc.readOnly || !desc.setter;
+			m_State.cheat = desc.cheat;
+			m_ValueSuggestions.clear();
+			for (auto const& choice : m_Choices)
+				m_ValueSuggestions.push_back(choice.first);
+			m_DefaultValue = getValueAsString();
+			m_Getter = desc.getter;
+			m_OnChange = desc.onChanged
+				? [callback = desc.onChanged](Variable&) { callback(); }
+				: Callback{};
+		}
 
 		inline bool setData(T const& value, SetBy setby)
 		{
 			VariableState flags = this->getState();
+			if (hasFlag(m_Flags, VariableFlags::STARTUP_ONLY)
+				&& g_StartupVariablesLocked.load(std::memory_order_acquire)
+				&& setby > SetBy::CODE)
+			{
+				caustica::error("cvar '%s' is startup-only - value not set", this->getName().c_str());
+				return false;
+			}
 			if (flags.canSetValue(setby))
 			{
-				m_Data = value;
+				T const previous = getData();
+				T validated = value;
+				if (m_Validator)
+				{
+					std::string error;
+					if (!m_Validator(validated, error))
+					{
+						caustica::error("cvar '%s' rejected value: %s",
+							this->getName().c_str(), error.c_str());
+						return false;
+					}
+				}
+
+				if (m_Setter)
+					m_Setter(validated);
+				m_Data = validated;
 				this->m_State.setby = setby;
 
-				if (m_OnChange)
+				if (m_OnChange && !valuesEqual(previous, validated))
 					m_OnChange(*this);
 				return true;
 			}
@@ -366,8 +476,15 @@ namespace caustica::console
 		virtual bool setValueFromString(std::string_view s, SetBy setby) override
 		{
 			if (!s.empty())
+			{
+				for (auto const& choice : m_Choices)
+				{
+					if (ds::strcasecmp(std::string(s), choice.first))
+						return this->setData(choice.second, setby);
+				}
 				if (auto value = ds::parse<T>(s))
 					return this->setData(*value, setby);
+			}
 
 			caustica::error("cvar '%s' failed parsing value string '%s' (expected a %s) - value not set",
 				this->getName().c_str(), std::string(s).c_str(), asString((VariableType::Type)m_State.type));
@@ -381,10 +498,19 @@ namespace caustica::console
 
 		virtual std::string getValueAsString() const override
 		{
+			T const value = m_Getter ? m_Getter() : m_Data;
+			for (auto const& choice : m_Choices)
+				if (valuesEqual(choice.second, value))
+					return choice.first;
 			char buff[16] = { 0 };
-			if (auto [p, ec] = std::to_chars(buff, buff+16, m_Data); ec == std::errc())
+			if (auto [p, ec] = std::to_chars(buff, buff+16, value); ec == std::errc())
 				return std::string(buff);
 			return std::string();
+		}
+
+		virtual bool resetToDefault(SetBy setby) override
+		{
+			return setData(m_DefaultData, setby);
 		}
 
 		// default accessors
@@ -424,7 +550,12 @@ namespace caustica::console
 	private:
 		friend class AutoVariable<T>;
 
-		T m_Data;
+		mutable T m_Data;
+		T m_DefaultData{};
+		std::function<T()> m_Getter;
+		std::function<void(T const&)> m_Setter;
+		std::function<bool(T&, std::string&)> m_Validator;
+		std::vector<std::pair<std::string, T>> m_Choices;
 	};
 
 	// specialisations
@@ -521,14 +652,21 @@ namespace caustica::console
 		return buff;
 	}
 
-	template <> std::string VariableImpl<bool>::getValueAsString() const { return m_Data ? "true" : "false"; }
-	template <> std::string VariableImpl<int2>::getValueAsString() const { return vector_to_string(m_Data); }
-	template <> std::string VariableImpl<int3>::getValueAsString() const { return vector_to_string(m_Data); }
-    template <> std::string VariableImpl<float>::getValueAsString() const { return float_to_string(m_Data); }
-    template <> std::string VariableImpl<float2>::getValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<float3>::getValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<float4>::getValueAsString() const { return float_vector_to_string(m_Data); }
-	template <> std::string VariableImpl<std::string>::getValueAsString() const { return m_Data; }
+	template <> std::string VariableImpl<bool>::getValueAsString() const
+	{
+		bool const value = getData();
+		for (auto const& choice : m_Choices)
+			if (choice.second == value)
+				return choice.first;
+		return value ? "true" : "false";
+	}
+	template <> std::string VariableImpl<int2>::getValueAsString() const { return vector_to_string(getData()); }
+	template <> std::string VariableImpl<int3>::getValueAsString() const { return vector_to_string(getData()); }
+    template <> std::string VariableImpl<float>::getValueAsString() const { return float_to_string(getData()); }
+    template <> std::string VariableImpl<float2>::getValueAsString() const { return float_vector_to_string(getData()); }
+	template <> std::string VariableImpl<float3>::getValueAsString() const { return float_vector_to_string(getData()); }
+	template <> std::string VariableImpl<float4>::getValueAsString() const { return float_vector_to_string(getData()); }
+	template <> std::string VariableImpl<std::string>::getValueAsString() const { return getData(); }
 
 	//
 	// Console Variable Reference 
@@ -569,6 +707,89 @@ namespace caustica::console
 	bool registerCommand(CommandDesc const& desc)
 	{
 		return objectsDictionary.registerCommand(desc) != nullptr;
+	}
+
+#define DEFINE_BOUND_VARIABLE_REGISTRATION(type) \
+	template <> Variable* registerBoundVariable<type>(BoundVariableDesc<type> const& desc) \
+	{ \
+		if (Object* object = objectsDictionary.RegisterBoundVariable<type>(desc)) \
+			return object->asVariable(); \
+		return nullptr; \
+	}
+
+	DEFINE_BOUND_VARIABLE_REGISTRATION(bool);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(int);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(float);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::int2);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::int3);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float2);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float3);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float4);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(std::string);
+
+#undef DEFINE_BOUND_VARIABLE_REGISTRATION
+
+	void lockStartupVariables()
+	{
+		g_StartupVariablesLocked.store(true, std::memory_order_release);
+	}
+
+	bool startupVariablesLocked()
+	{
+		return g_StartupVariablesLocked.load(std::memory_order_acquire);
+	}
+
+	std::string dumpVariables(char const* regex, bool includeDeveloper)
+	{
+		std::string output;
+		for (Object* object : matchObjects(regex))
+		{
+			Variable* variable = object->asVariable();
+			if (!variable || (!includeDeveloper && hasFlag(variable->getFlags(), VariableFlags::DEVELOPER)))
+				continue;
+
+			output += variable->getName();
+			output += " = ";
+			output += variable->getValueAsString();
+			if (!variable->getDefaultValueAsString().empty())
+			{
+				output += " (default: ";
+				output += variable->getDefaultValueAsString();
+				output += ')';
+			}
+			output += " [";
+			output += asString(
+				static_cast<VariableState::SetBy>(variable->getState().setby));
+			output += "]\n";
+		}
+		return output;
+	}
+
+	size_t resetVariables(char const* regex, VariableState::SetBy setby)
+	{
+		size_t count = 0;
+		for (Object* object : matchObjects(regex))
+		{
+			if (Variable* variable = object->asVariable())
+				count += variable->resetToDefault(setby) ? 1u : 0u;
+		}
+		return count;
+	}
+
+	std::string exportVariables(char const* regex, bool archiveOnly)
+	{
+		std::string output;
+		for (Object* object : matchObjects(regex))
+		{
+			Variable* variable = object->asVariable();
+			if (!variable || (archiveOnly && !hasFlag(variable->getFlags(), VariableFlags::ARCHIVE)))
+				continue;
+			output += variable->getName();
+			output += '=';
+			output += variable->getValueAsString();
+			output += '\n';
+		}
+		return output;
 	}
 
 	bool unregisterCommand(std::string_view name)

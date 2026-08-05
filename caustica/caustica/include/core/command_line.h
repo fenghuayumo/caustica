@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 // =============================================================================
 // CommandLineOptions — Application command-line configuration.
@@ -66,6 +67,11 @@ struct CommandLineOptions
     int sceneSwitchTestInterval = 0;
     int sceneSwitchTestCount = 0;
     bool syncRender = false;
+
+    // Generic console bootstrap. Repeat either option to apply multiple values
+    // or commands after subsystems have registered their CVars.
+    std::vector<std::string> consoleSets;
+    std::vector<std::string> consoleExec;
 
     CommandLineOptions() = default;
 

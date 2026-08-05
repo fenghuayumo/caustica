@@ -64,6 +64,7 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
     }
 
     BuildDisplayPerformancePanel(layout);
+    BuildCameraPanel(layout);
     BuildSystemPanel(layout);
 
     ImGui::End();

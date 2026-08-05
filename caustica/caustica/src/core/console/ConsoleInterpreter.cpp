@@ -4,6 +4,7 @@
 #include <core/log.h>
 
 #include <cassert>
+#include <mutex>
 
 namespace caustica::console
 {
@@ -157,7 +158,9 @@ namespace caustica::console
 		initializeDefaultCommands();
 	}
 		
-	Interpreter::Result Interpreter::execute(std::string_view const cmdline)
+	Interpreter::Result Interpreter::execute(
+		std::string_view const cmdline,
+		VariableState::SetBy origin)
 	{
 		if (cmdline.empty())
 			return { false };
@@ -197,17 +200,25 @@ namespace caustica::console
 				}
 				else
 				{
-					// string_view starting at the beginning of the 2nd arg & ending at end of cmdline
-					std::string_view value = { 
-						args[1].data(),
-						(size_t)((cmdline.data() + cmdline.size()) - args[1].data())
-					};
-					return { var->setValueFromString(value), {} };
+					std::string value = args[1];
+					for (size_t i = 2; i < args.size(); ++i)
+					{
+						value += ' ';
+						value += args[i];
+					}
+					if (var->setValueFromString(value, origin))
+						return { true, var->getName() + " = " + var->getValueAsString() };
+					return { false, "failed to set " + var->getName() };
 				}
 			}
 		}
 		else
-			caustica::error("no console object with name '%s' found", std::string(args[0]).c_str());
+		{
+			std::string const message =
+				"no console object with name '" + std::string(args[0]) + "' found";
+			caustica::error("%s", message.c_str());
+			return { false, message };
+		}
 
 		return {false};
 	}
@@ -234,7 +245,9 @@ namespace caustica::console
 			{
 				// user is looking for the command's arguments
 				if (auto* cobj = findCommand(tokens[0]))
-				return cobj->suggest(cmdline, cursor_pos);
+					return cobj->suggest(cmdline, cursor_pos);
+				if (auto* variable = findVariable(tokens[0]))
+					return variable->getValueSuggestions();
 			}
 		}
 		return {};
@@ -266,10 +279,33 @@ namespace caustica::console
 					r.status = true;
 					return r;
 				}
-				else
+			else
 			{
 				if (auto cobj = findObject(args[1]))
-					return { true, cobj->getDescription() };
+				{
+					std::string output = cobj->getDescription();
+					if (Variable* variable = cobj->asVariable())
+					{
+						output += "\nCurrent: ";
+						output += variable->getValueAsString();
+						if (!variable->getDefaultValueAsString().empty())
+						{
+							output += "\nDefault: ";
+							output += variable->getDefaultValueAsString();
+						}
+						if (!variable->getValueSuggestions().empty())
+						{
+							output += "\nValues: ";
+							for (size_t i = 0; i < variable->getValueSuggestions().size(); ++i)
+							{
+								if (i > 0)
+									output += ", ";
+								output += variable->getValueSuggestions()[i];
+							}
+						}
+					}
+					return { true, output };
+				}
 				else
 					return { false, std::string("no console object with name '") + std::string(args[1]) + "' found" };
 			}
@@ -298,13 +334,42 @@ namespace caustica::console
 		}
 	};
 
+	static CommandDesc cvar_list_cmd = {
+		"cvar.list",
+		"cvar.list [regex]\nLists console variables, current values, defaults and sources.",
+		[](Command::Args const& args) -> Command::Result {
+			return { true, dumpVariables(args.size() > 1 ? args[1].c_str() : ".*") };
+		},
+		{}
+	};
+
+	static CommandDesc cvar_reset_cmd = {
+		"cvar.reset",
+		"cvar.reset [regex]\nResets matching console variables to their registered defaults.",
+		[](Command::Args const& args) -> Command::Result {
+			size_t const count = resetVariables(args.size() > 1 ? args[1].c_str() : ".*");
+			return { true, "reset " + std::to_string(count) + " variable(s)" };
+		},
+		{}
+	};
+
+	static CommandDesc cvar_export_cmd = {
+		"cvar.export",
+		"cvar.export [regex]\nPrints ARCHIVE console variables as name=value configuration lines.",
+		[](Command::Args const& args) -> Command::Result {
+			return { true, exportVariables(args.size() > 1 ? args[1].c_str() : ".*") };
+		},
+		{}
+	};
+
 	static void initializeDefaultCommands()
 	{
-		static bool initialized = false;
-		if (!initialized)
-			for (auto const& cmd : { help_cmd })
+		static std::once_flag initialized;
+		std::call_once(initialized, []()
+		{
+			for (auto const& cmd : { help_cmd, cvar_list_cmd, cvar_reset_cmd, cvar_export_cmd })
 				registerCommand(cmd);
-		initialized = true;
+		});
 	}
 
 }

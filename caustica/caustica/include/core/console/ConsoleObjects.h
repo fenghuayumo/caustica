@@ -3,9 +3,11 @@
 #include <math/math.h>
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 #include <string.h>
 
@@ -145,6 +147,7 @@ namespace caustica
 				UNSET = 0,
 				CODE,
 				INI,
+				COMMAND_LINE,
 				CONSOLE
 			};
 
@@ -166,8 +169,27 @@ namespace caustica
 			uint32_t read_only : 1;
 			uint32_t cheat     : 1;
 			uint32_t type      : 5;
-			uint32_t setby     : 2;
+			uint32_t setby     : 3;
 		};
+
+		enum class VariableFlags : uint32_t
+		{
+			NONE         = 0,
+			ARCHIVE      = 1u << 0, // included in saved/exported user configuration
+			DEVELOPER    = 1u << 1, // hidden from normal user-facing settings surfaces
+			STARTUP_ONLY = 1u << 2, // cannot be changed after startup variables are locked
+		};
+
+		constexpr VariableFlags operator|(VariableFlags a, VariableFlags b)
+		{
+			return static_cast<VariableFlags>(
+				static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+		}
+
+		constexpr bool hasFlag(VariableFlags value, VariableFlags flag)
+		{
+			return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
+		}
 
 		class Variable : public Object
 		{
@@ -178,6 +200,9 @@ namespace caustica
 			typedef VariableState::SetBy SetBy;
 
 			VariableState getState() const { return m_State; }
+			VariableFlags getFlags() const { return m_Flags; }
+			std::string const& getDefaultValueAsString() const { return m_DefaultValue; }
+			std::vector<std::string> const& getValueSuggestions() const { return m_ValueSuggestions; }
 
 			void setReadOnly(bool ronly) { m_State.read_only = ronly; }
 
@@ -218,6 +243,7 @@ namespace caustica
 			virtual bool setValueFromString(std::string const& s, SetBy setby = SetBy::CODE) = 0;
 
 			virtual std::string getValueAsString() const = 0;
+			virtual bool resetToDefault(SetBy setby = SetBy::CONSOLE) = 0;
 
 		public:
 
@@ -237,6 +263,9 @@ namespace caustica
 
 			Callback m_OnChange;
 			VariableState m_State;
+			VariableFlags m_Flags = VariableFlags::NONE;
+			std::string m_DefaultValue;
+			std::vector<std::string> m_ValueSuggestions;
 		};
 
 		template <typename TVar> class VariableImpl;
@@ -289,6 +318,49 @@ namespace caustica
 		};
 
 		bool registerCommand(CommandDesc const& desc);
+
+		// Generic externally-bound CVar descriptor. The core console owns parsing,
+		// source priority, help metadata, enum suggestions and default reset;
+		// the subsystem supplies only storage access and domain validation.
+		template <typename T>
+		struct BoundVariableDesc
+		{
+			char const* name = nullptr;
+			char const* description = nullptr;
+			T defaultValue{};
+			std::function<T()> getter;
+			std::function<void(T const&)> setter;
+			// May clamp/normalize value. Return false and set error to reject it.
+			std::function<bool(T& value, std::string& error)> validator;
+			std::function<void()> onChanged;
+			std::vector<std::pair<std::string, T>> choices;
+			VariableFlags flags = VariableFlags::NONE;
+			bool readOnly = false;
+			bool cheat = false;
+		};
+
+		template <typename T>
+		Variable* registerBoundVariable(BoundVariableDesc<T> const& desc);
+
+		template <> Variable* registerBoundVariable<bool>(BoundVariableDesc<bool> const& desc);
+		template <> Variable* registerBoundVariable<int>(BoundVariableDesc<int> const& desc);
+		template <> Variable* registerBoundVariable<float>(BoundVariableDesc<float> const& desc);
+		template <> Variable* registerBoundVariable<dm::int2>(BoundVariableDesc<dm::int2> const& desc);
+		template <> Variable* registerBoundVariable<dm::int3>(BoundVariableDesc<dm::int3> const& desc);
+		template <> Variable* registerBoundVariable<dm::float2>(BoundVariableDesc<dm::float2> const& desc);
+		template <> Variable* registerBoundVariable<dm::float3>(BoundVariableDesc<dm::float3> const& desc);
+		template <> Variable* registerBoundVariable<dm::float4>(BoundVariableDesc<dm::float4> const& desc);
+		template <> Variable* registerBoundVariable<std::string>(BoundVariableDesc<std::string> const& desc);
+
+		// STARTUP_ONLY variables remain writable until this is called by the host
+		// after command-line/config processing.
+		void lockStartupVariables();
+		bool startupVariablesLocked();
+
+		// Generic tooling used by both native and ImGui consoles.
+		std::string dumpVariables(char const* regex = ".*", bool includeDeveloper = true);
+		size_t resetVariables(char const* regex = ".*", VariableState::SetBy setby = VariableState::CONSOLE);
+		std::string exportVariables(char const* regex = ".*", bool archiveOnly = true);
 
 		Object* findObject(std::string_view name);
 

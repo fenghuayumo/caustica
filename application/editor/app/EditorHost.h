@@ -7,8 +7,12 @@
 #include "SceneEditor.h"
 #include "ui/EditorUIData.h"
 
+#include <memory>
+
 namespace caustica::editor
 {
+
+class RenderSettingsConsoleBinding;
 
 // Host-owned editor bag: cmdline, UI data, diagnostics, SceneEditor shell.
 struct EditorHost
@@ -17,8 +21,10 @@ struct EditorHost
     EditorUIData editorUiData;
     render::AppDiagnostics diagnostics;
     SceneEditor sceneEditor;
+    std::unique_ptr<RenderSettingsConsoleBinding> console;
 
     EditorHost();
+    ~EditorHost();
 };
 
 void installEditorLogFilter(EditorHost& host);

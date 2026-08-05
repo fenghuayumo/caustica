@@ -197,6 +197,16 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         return true;
     }
 
+    if (key == ToGlfwKey(caustica::Key::GraveAccent) && action == cGlfwPress
+        && !ctrlDown && !altDown)
+    {
+        auto& editor = sceneEditor.editorUIState();
+        editor.ShowConsole = !editor.ShowConsole;
+        if (editor.ShowConsole)
+            editor.ShowUI = true;
+        return true;
+    }
+
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 

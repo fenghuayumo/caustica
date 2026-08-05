@@ -3,9 +3,11 @@
 #include "EditorPlugin.h"
 #include "EditorStartup.h"
 #include "common/LocalConfig.h"
+#include "ui/RenderSettingsConsole.h"
 
 #include <engine/App.h>
 #include <engine/SceneLifecycle.h>
+#include <core/console/ConsoleObjects.h>
 #include <core/log.h>
 #include <events/application_event.h>
 #include <events/event.h>
@@ -18,6 +20,62 @@ extern const char* g_windowTitle;
 
 namespace caustica::editor
 {
+
+namespace
+{
+
+bool ApplyConsoleSets(EditorHost& host, bool registeredOnly)
+{
+    bool success = true;
+    for (const std::string& assignment : host.cmdLine.consoleSets)
+    {
+        std::string command = assignment;
+        if (const size_t equals = command.find('='); equals != std::string::npos)
+            command[equals] = ' ';
+
+        if (registeredOnly)
+        {
+            const size_t separator = command.find(' ');
+            const std::string_view name(
+                command.data(),
+                separator == std::string::npos ? command.size() : separator);
+            if (!caustica::console::findVariable(name))
+                continue;
+        }
+
+        std::string output;
+        if (!host.console->execute(
+                command,
+                &output,
+                caustica::console::VariableState::COMMAND_LINE))
+        {
+            caustica::error("Failed command-line CVar assignment: %s", assignment.c_str());
+            success = false;
+        }
+    }
+    return success;
+}
+
+void ApplyConsoleExec(EditorHost& host)
+{
+    for (const std::string& command : host.cmdLine.consoleExec)
+    {
+        std::string output;
+        if (!host.console->execute(
+                command,
+                &output,
+                caustica::console::VariableState::COMMAND_LINE))
+        {
+            caustica::error("Failed command-line console command: %s", command.c_str());
+        }
+        else if (!output.empty())
+        {
+            caustica::info("%s", output.c_str());
+        }
+    }
+}
+
+} // namespace
 
 std::unique_ptr<caustica::EngineApp> createEditorEngine(
     EditorHost& host,
@@ -34,6 +92,10 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     if (!ProcessEditorStartupCommandLine(argc, argv, host.cmdLine, createDesc, preferredScene))
         return nullptr;
+
+    InitializeEditorUIDataFromCommandLine(host.editorUiData, host.cmdLine);
+    host.console = std::make_unique<RenderSettingsConsoleBinding>(host.editorUiData);
+    ApplyConsoleSets(host, true);
 
     const bool automatedRun = host.cmdLine.nonInteractive
         || host.cmdLine.captureSimple
@@ -108,6 +170,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
             .sceneEditor = host.sceneEditor,
             .editorUiData = host.editorUiData,
             .cmdLine = host.cmdLine,
+            .console = *host.console,
         };
         app->addPlugin<EditorPlugin>(sceneConfig, host.sceneEditor, &uiConfig);
     }
@@ -144,6 +207,12 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     if (!engine->finishStartup())
         return nullptr;
+
+    // Re-apply assignments after scene/subsystem startup so late registrations
+    // and scene-provided render settings still receive command-line priority.
+    ApplyConsoleSets(host, false);
+    ApplyConsoleExec(host);
+    caustica::console::lockStartupVariables();
 
     return engine;
 }

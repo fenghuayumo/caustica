@@ -1,5 +1,7 @@
 #pragma once
 
+#include <core/console/ConsoleObjects.h>
+
 #include <memory>
 #include <string>
 #include <string_view>
@@ -54,7 +56,9 @@ namespace caustica
 				std::string output;
 			};
 
-			Result execute(std::string_view const cmdline);
+			Result execute(
+				std::string_view const cmdline,
+				VariableState::SetBy origin = VariableState::CONSOLE);
 
 			// parse incomplete command line & return auto-completion suggestions
 			std::vector<std::string> suggest(std::string_view const cmdline, size_t cursor_pos);

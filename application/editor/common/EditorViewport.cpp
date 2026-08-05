@@ -73,6 +73,11 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
         .setHeight(height)
         .setFormat(caustica::rhi::Format::SRGBA8_UNORM)
         .setIsRenderTarget(true)
+        // ZoomTool writes the tone-mapped viewport through a linear RGBA8 UAV view.
+        // Typeless is required for the sRGB render-target / linear UAV view pair,
+        // particularly on Vulkan where the image must be mutable.
+        .setIsUAV(true)
+        .setIsTypeless(true)
         .setInitialState(caustica::rhi::ResourceStates::RenderTarget)
         .setKeepInitialState(true);
 

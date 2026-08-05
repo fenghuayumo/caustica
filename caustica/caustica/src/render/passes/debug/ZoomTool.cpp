@@ -84,7 +84,12 @@ bool ZoomTool::mouseButtonUpdate(int button, int action, int mods)
 
 void ZoomTool::render( caustica::rhi::CommandList * commandList, caustica::rhi::TextureHandle colorInOut )
 {
-    if( !m_settings.enabled )
+    if( !m_settings.enabled || !commandList || !colorInOut )
+        return;
+
+    const caustica::rhi::TextureDesc& colorDesc = colorInOut->getDesc();
+    // Swapchain and other fallback targets are not guaranteed to support UAVs.
+    if( !colorDesc.isUAV )
         return;
 
     ZoomToolShaderConstants consts{};
@@ -102,8 +107,8 @@ void ZoomTool::render( caustica::rhi::CommandList * commandList, caustica::rhi::
 
         caustica::rhi::BindingSetHandle bindingSet = m_bindingCache.getOrCreateBindingSet(bindingSetDesc, m_bindingLayout);
 
-        int threadGroupCountX = (colorInOut->getDesc().width + 16 - 1) / 16;
-        int threadGroupCountY = (colorInOut->getDesc().height + 16 - 1) / 16;
+        int threadGroupCountX = (colorDesc.width + 16 - 1) / 16;
+        int threadGroupCountY = (colorDesc.height + 16 - 1) / 16;
 
         m_CSZoomTool.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet);
     }

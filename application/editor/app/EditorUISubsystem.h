@@ -19,6 +19,7 @@ namespace caustica::editor
 class EditorUI;
 class EditorUIData;
 class EditorViewport;
+class RenderSettingsConsoleBinding;
 class SceneEditor;
 
 struct EditorUISubsystemConfig
@@ -27,6 +28,7 @@ struct EditorUISubsystemConfig
     SceneEditor& sceneEditor;
     EditorUIData& editorUiData;
     const CommandLineOptions& cmdLine;
+    RenderSettingsConsoleBinding& console;
 };
 
 class EditorUISubsystem

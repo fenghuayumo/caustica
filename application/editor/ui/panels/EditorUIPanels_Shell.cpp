@@ -127,6 +127,8 @@ void EditorUI::BuildMainMenuBar()
 
     if (ImGui::BeginMenu("Window"))
     {
+        ImGui::MenuItem("Console", "`", &m_editorUI.ShowConsole);
+        ImGui::Separator();
         if (ImGui::MenuItem("Reset Window Layout"))
         {
             m_editorUI.Viewport.ShowViewport = true;

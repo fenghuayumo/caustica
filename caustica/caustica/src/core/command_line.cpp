@@ -68,7 +68,9 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
             ("pythonExpr", "Inline Python expression to run after scene load", value(pythonExpr))
             ("sceneSwitchTest", "Auto-switch scenes every N render frames (render-thread path)", value(sceneSwitchTestInterval))
             ("sceneSwitchTestCount", "Exit after this many auto scene switches (0 = unlimited)", value(sceneSwitchTestCount))
-            ("syncRender", "Run rendering on the main thread (disable async render thread)", value(syncRender));
+            ("syncRender", "Run rendering on the main thread (disable async render thread)", value(syncRender))
+            ("set", "Set a console variable (repeatable): --set r.Name=value", value(consoleSets))
+            ("exec", "Execute a console command (repeatable): --exec \"command args\"", value(consoleExec));
 
         int argc = _argc;
         char const* const* argv = _argv;

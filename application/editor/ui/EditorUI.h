@@ -39,12 +39,18 @@ namespace caustica::editor
 
 class SceneEditor;
 class ImGuiManager;
-class SceneEditor;
+class RenderSettingsConsoleBinding;
 
 class EditorUI : public caustica::ImGui_Renderer
 {
 public:
-    EditorUI(caustica::GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine);
+    EditorUI(
+        caustica::GpuDevice* deviceManager,
+        SceneEditor& sceneEditor,
+        EditorUIData& ui,
+        bool NVAPI_SERSupported,
+        const CommandLineOptions& cmdLine,
+        RenderSettingsConsoleBinding& console);
     virtual ~EditorUI();
 protected:
     virtual void buildUI(void) override;
@@ -85,6 +91,9 @@ private:
     void BuildCameraPanel(const PanelLayout& layout);
     void BuildLightingPanel(const PanelLayout& layout);
     void BuildPathTracerPanel(const PanelLayout& layout);
+    void BuildRenderSettingsOverview(const PanelLayout& layout);
+    void BuildAdvancedRenderSettings(const PanelLayout& layout);
+    void BuildDeveloperRenderSettings(const PanelLayout& layout);
     void BuildStochasticTextureFilteringPanel(const PanelLayout& layout);
     void BuildDLSSReflexPanel(const PanelLayout& layout);
     void BuildTAAPanel(const PanelLayout& layout);

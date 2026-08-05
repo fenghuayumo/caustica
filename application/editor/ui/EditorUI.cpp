@@ -5,6 +5,7 @@
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
+#include "ui/RenderSettingsConsole.h"
 
 #include <render/AppDiagnostics.h>
 #include <render/SceneLightingPasses.h>
@@ -13,9 +14,11 @@
 #include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
+#include <algorithm>
 #include <cstdio>
 #include <render/passes/debug/Korgi.h>
 #include <common/CaptureScriptManager.h>
+#include <core/console/ConsoleInterpreter.h>
 
 #if CAUSTICA_WITH_PYTHON
 #include "Python/PythonScripting.h"
@@ -32,7 +35,13 @@ void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOp
     caustica::render::InitializeRenderAppStateFromCommandLine(ui.render, cmdLine);
 }
 
-EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUIData& ui, bool NVAPI_SERSupported, const CommandLineOptions& cmdLine)
+EditorUI::EditorUI(
+    GpuDevice* deviceManager,
+    SceneEditor& sceneEditor,
+    EditorUIData& ui,
+    bool NVAPI_SERSupported,
+    const CommandLineOptions& cmdLine,
+    RenderSettingsConsoleBinding& console)
         : ImGui_Renderer(deviceManager)
         , m_sceneEditor(sceneEditor)
         , m_ui(ui)
@@ -53,6 +62,12 @@ EditorUI::EditorUI(GpuDevice* deviceManager, SceneEditor& sceneEditor, EditorUID
 
     // apply command-line overrides to UI defaults
     m_imguiManager->applyCommandLineDefaults();
+
+    caustica::ImGui_Console::Options consoleOptions;
+    consoleOptions.capture_log = true;
+    consoleOptions.show_info = true;
+    m_console = std::make_unique<caustica::ImGui_Console>(
+        console.interpreter(), consoleOptions);
 
 #if KORGI_ENABLED
     m_korgiBindings = std::make_unique<KorgiBindings>(m_ui);
@@ -166,21 +181,35 @@ void EditorUI::buildUI(void)
             return;
         }
 
-        BuildScenePanel(layout);
-        BuildSampleGamePanel(layout);
-        BuildCameraPanel(layout);
-        BuildLightingPanel(layout);
-        BuildPathTracerPanel(layout);
-        BuildStochasticTextureFilteringPanel(layout);
-        BuildDLSSReflexPanel(layout);
-        BuildTAAPanel(layout);
-        BuildRTXDIPanel(layout);
-        BuildStablePlanesPanel(layout);
-        BuildStandaloneDenoiserPanel(layout);
-        BuildOpacityMicroMapsPanel(layout);
-        BuildAccelerationStructurePanel(layout);
-        BuildDebuggingPanel(layout);
-        BuildQuickToneMappingBar(layout);
+        const char* detailLabels[] = { "Basic", "Advanced", "Developer" };
+        const float segmentSpacing = ImGui::GetStyle().ItemSpacing.x;
+        const float segmentWidth = std::max(
+            1.f,
+            (ImGui::GetContentRegionAvail().x
+                - segmentSpacing * (IM_ARRAYSIZE(detailLabels) - 1))
+                / IM_ARRAYSIZE(detailLabels));
+        ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
+        for (int i = 0; i < IM_ARRAYSIZE(detailLabels); ++i)
+        {
+            if (i > 0)
+                ImGui::SameLine(0.f, segmentSpacing);
+            if (ImGui::Selectable(
+                    detailLabels[i],
+                    m_editorUI.RenderSettingsDetailLevel == i,
+                    ImGuiSelectableFlags_None,
+                    ImVec2(segmentWidth, ImGui::GetFrameHeight())))
+            {
+                m_editorUI.RenderSettingsDetailLevel = i;
+            }
+        }
+        ImGui::PopStyleVar();
+        ImGui::Separator();
+
+        BuildRenderSettingsOverview(layout);
+        if (m_editorUI.RenderSettingsDetailLevel >= 1)
+            BuildAdvancedRenderSettings(layout);
+        if (m_editorUI.RenderSettingsDetailLevel >= 2)
+            BuildDeveloperRenderSettings(layout);
     }
 
     BuildPreferencesPanel(layout);
@@ -193,6 +222,8 @@ void EditorUI::buildUI(void)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
     BuildTimelinePanel(layout);
+    if (m_editorUI.ShowConsole && m_console)
+        m_console->render(&m_editorUI.ShowConsole);
 
     // After all dock panels (same ordering as pre-DockSpace): ImGuizmo BeginFrame +
     // foreground draw list so the gizmo is never covered by the Viewport image.

@@ -174,7 +174,7 @@ void ImGui_Console::render(bool* open)
 			return console->textEditCallback(data);
 		}, (void*)this))
 	{
-		if (m_InputBuffer.front()!='0')
+		if (m_InputBuffer.front() != '\0')
 		{
 			this->execCommand(m_InputBuffer.data());
 			m_InputBuffer.front() = 0;
@@ -212,15 +212,19 @@ static void printLines(ImGui_Console& console, std::string const& output)
 	if (output.empty())
 		return;
 
-	std::string line;
-	for (int start = 0, curr = 0; curr < (int)output.size(); ++curr)
+	size_t start = 0;
+	for (size_t curr = 0; curr < output.size(); ++curr)
 	{
 		if ((output[curr] == '\r') || (output[curr] == '\n'))
 		{
 			console.Print(std::string_view(&output[start], curr - start));
-			start = ++curr;
+			if (output[curr] == '\r' && curr + 1 < output.size() && output[curr + 1] == '\n')
+				++curr;
+			start = curr + 1;
 		}
-	}		
+	}
+	if (start < output.size())
+		console.Print(std::string_view(&output[start], output.size() - start));
 }
 
 void ImGui_Console::execCommand(char const* cmdline)
@@ -230,14 +234,14 @@ void ImGui_Console::execCommand(char const* cmdline)
 	{
 		this->Print("> %s", cmd.data());
 
-		if (auto result = m_Interpreter->execute(cmd); result.status)
-		{
-			if (!result.output.empty())
-				printLines(*this, result.output.c_str());
+		auto result = m_Interpreter->execute(cmd);
+		if (!result.output.empty())
+			printLines(*this, result.output.c_str());
+		else if (!result.status)
+			this->Print("Command failed. Use 'help <name>' or 'help --list <regex>'.");
 
-			m_History.push_back(cmd.data());
-			m_HistoryIterator = m_History.rend();
-		}
+		m_History.push_back(cmd.data());
+		m_HistoryIterator = m_History.rend();
 	}
 }
 
