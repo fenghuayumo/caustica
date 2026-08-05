@@ -62,40 +62,6 @@ namespace
             && settings.BloomRadius > 0.f;
     }
 
-    void registerTestRaygenHdrPass(
-        rg::TextureHandle processedOutputColor,
-        FrameGraphContext ctx,
-        bool enabled)
-    {
-        assert(ctx.graph);
-
-        ctx.graph->addPass(
-            "TestRaygenPP_HDR",
-            [processedOutputColor](rg::PassBuilder& setup) {
-                setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
-            },
-            [processedOutputColor, ctx](rg::RenderPassContext& passCtx) {
-                assert(ctx.extractedView);
-                PTPipelineVariant* pipeline = ctx.ptTestRaygenPPHDR;
-                assert(pipeline);
-
-                caustica::rhi::rt::DispatchRaysArguments args;
-                args.width = ctx.extractedView->displaySize.x;
-                args.height = ctx.extractedView->displaySize.y;
-
-                caustica::rhi::rt::State state;
-                state.shaderTable = pipeline->getShaderTable();
-                state.bindings = { ctx.bindingSet, ctx.descriptorTable };
-                passCtx.commandList()->setRayTracingState(state);
-
-                FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
-                passCtx.commandList()->setPushConstants(&miniConstants, sizeof(miniConstants));
-                passCtx.commandList()->dispatchRays(args);
-                (void)passCtx.texture(processedOutputColor);
-            },
-            rg::PassOptions{ .enabled = enabled });
-    }
-
     void registerEdgeDetectionGraphPasses(
         rg::TextureHandle ldrColor,
         rg::TextureHandle ldrColorScratch,
@@ -188,11 +154,6 @@ void registerPostProcess(FrameGraphContext ctx)
             ctx.settings->BloomIntensity,
             isBloomEnabled(*ctx.settings));
     }
-
-    registerTestRaygenHdrPass(
-        processedOutputColor,
-        ctx,
-        ctx.settings->PostProcessTestPassHDR && ctx.ptTestRaygenPPHDR != nullptr);
 
     toneMappingPass->registerGraphPass(
         *ctx.graph,

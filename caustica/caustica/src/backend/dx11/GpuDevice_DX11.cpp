@@ -232,18 +232,14 @@ bool GpuDevice_DX11::createDevice()
 
 bool GpuDevice_DX11::createSwapChain()
 {
-    UINT windowStyle = m_DeviceParams.startFullscreen
-        ? (WS_POPUP | WS_SYSMENU | WS_VISIBLE)
-        : m_DeviceParams.startMaximized
-            ? (WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_MAXIMIZE)
-            : (WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-
-    RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
-    AdjustWindowRect(&rect, windowStyle, FALSE);
-    
-    if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
+    // glfwSetWindowPos takes a *client* origin and restores from maximized.
+    // Repositioning a maximized/fullscreen window pushes the title bar off-screen
+    // (client at 0,0 → outer frame at -caption/-border) and hides min/max/close.
+    if (!m_DeviceParams.startFullscreen && !m_DeviceParams.startMaximized)
     {
-        glfwSetWindowPos(m_Window, rect.left, rect.top);
+        RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
+        if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
+            glfwSetWindowPos(m_Window, rect.left, rect.top);
     }
 
     m_hWnd = glfwGetWin32Window(m_Window);

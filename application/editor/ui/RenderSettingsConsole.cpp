@@ -373,8 +373,6 @@ void InitializeEntries()
             return ui.render.settings.ToneMappingParams.autoExposure;
         },
         reset);
-    AddScalar("r.PostProcess.TestHDR", "Enable the HDR test pass.",
-        SETTING_ACCESS(PostProcessTestPassHDR), reset);
     AddScalar("r.PostProcess.EdgeDetection", "Enable the LDR edge-detection test.",
         SETTING_ACCESS(PostProcessEdgeDetection), reset);
     AddScalar("r.PostProcess.EdgeThreshold", "Edge-detection threshold.",

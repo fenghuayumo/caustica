@@ -166,7 +166,6 @@ public:
     std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineBuildStablePlanes() { return m_ptPipelineBuildStablePlanes; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineFillStablePlanes() { return m_ptPipelineFillStablePlanes; }
-    std::shared_ptr<PTPipelineVariant>& ptPipelineTestRaygenPPHDR() { return m_ptPipelineTestRaygenPPHDR; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineEdgeDetection() { return m_ptPipelineEdgeDetection; }
 
     caustica::rhi::CommandListHandle getCommandList() const
@@ -277,7 +276,6 @@ private:
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineReference;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineBuildStablePlanes;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineFillStablePlanes;
-    std::shared_ptr<PTPipelineVariant>          m_ptPipelineTestRaygenPPHDR;
     std::shared_ptr<PTPipelineVariant>          m_ptPipelineEdgeDetection;
     std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
     std::shared_ptr<RtPipelineCache>                      m_rtPipelineCache;

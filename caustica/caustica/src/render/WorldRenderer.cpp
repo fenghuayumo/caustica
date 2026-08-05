@@ -461,7 +461,6 @@ void caustica::render::WorldRenderer::onSceneUnloading()
     m_ptPipelineReference = nullptr;
     m_ptPipelineBuildStablePlanes = nullptr;
     m_ptPipelineFillStablePlanes = nullptr;
-    m_ptPipelineTestRaygenPPHDR = nullptr;
     m_ptPipelineEdgeDetection = nullptr;
 }
 

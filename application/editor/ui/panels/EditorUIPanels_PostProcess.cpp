@@ -108,7 +108,6 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
     if (ImGui::CollapsingHeader("Early (HDR)", ImGuiTreeNodeFlags_DefaultOpen))
     {
         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-        SettingsCheckbox("Test Pass", &m_settings.PostProcessTestPassHDR);
 
         if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen))
         {

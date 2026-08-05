@@ -391,7 +391,6 @@ struct PathTracerSettings
     nrd::ReblurSettings                 ReblurSettings;
     //nrd::ReferenceSettings              NRDReferenceSettings;
 
-    bool                                PostProcessTestPassHDR = false;
     bool                                PostProcessEdgeDetection = false;
     float                               PostProcessEdgeDetectionThreshold = 0.1f;
 

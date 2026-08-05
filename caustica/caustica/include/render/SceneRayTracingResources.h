@@ -85,7 +85,6 @@ public:
     std::shared_ptr<PTPipelineVariant>& pipelineReference();
     std::shared_ptr<PTPipelineVariant>& pipelineBuildStablePlanes();
     std::shared_ptr<PTPipelineVariant>& pipelineFillStablePlanes();
-    std::shared_ptr<PTPipelineVariant>& pipelineTestRaygenPPHDR();
     std::shared_ptr<PTPipelineVariant>& pipelineEdgeDetection();
 
 private:

@@ -2,22 +2,8 @@
 
 #include "Bindings/ShaderResourceBindings.hlsli"
 
-// These are used for performance testing and development; actual post-process stuff is in PostProcess.h/.cpp/.hlsl
-
-#ifdef PP_TEST_HDR
-[shader("raygeneration")]
-void RAYGEN_ENTRY()
-{
-    uint2 pixelPos = DispatchRaysIndex().xy;
-
-    float3 existingColor = u_ProcessedOutputColor[pixelPos].rgb;
-
-    if ( length(float2(pixelPos.xy) - float2(800, 500)) < 100 ) // draw a circle for testing
-        existingColor.z += 10;
-
-    u_ProcessedOutputColor[pixelPos] = float4( existingColor, 1 );
-}
-#endif
+// Development/debug post-process raygen helpers. Production post-process is
+// elsewhere under PostProcess*.
 
 #ifdef PP_EDGE_DETECTION
 float3 LoadLDR(uint2 pixelPos)

@@ -124,9 +124,10 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
         setIcon(desc);
     }
 
-    // Windowed mode: center on the primary monitor work area so the title bar
-    // (and close button) stays visible instead of sitting off-screen.
-    if (!desc.Fullscreen)
+    // Windowed (non-maximized) mode: center on the primary monitor work area so
+    // the title bar and close button stay visible. Skip when maximized —
+    // glfwSetWindowPos restores from maximize and can push the caption off-screen.
+    if (!desc.Fullscreen && !desc.Maximized)
     {
         if (GLFWmonitor* monitor = glfwGetPrimaryMonitor())
         {

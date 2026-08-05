@@ -36,12 +36,6 @@ PIPELINE_VARIANTS = [
     },
     {
         "source": "TestRaygenPP.hlsl",
-        "pipeline_id": "TESTRG",
-        "macros": [("PP_TEST_HDR", "1")],
-        "material_source": None,
-    },
-    {
-        "source": "TestRaygenPP.hlsl",
         "pipeline_id": "EDGY",
         "macros": [("PP_EDGE_DETECTION", "1")],
         "material_source": None,

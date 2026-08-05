@@ -73,11 +73,6 @@ void SceneRayTracingResources::createRTPipelines()
     // Optional editor-only raygen variants stay on the Default macro set.
     std::vector<caustica::ShaderMacro> defaultMacros;
     fillPtFeaturePresetMacros(PtFeaturePresetId::Default, defaultMacros);
-    if (m_settings->PostProcessTestPassHDR && !pipelineTestRaygenPPHDR())
-    {
-        pipelineTestRaygenPPHDR() = compiler->createVariant(
-            "TestRaygenPP.hlsl", { SM("PP_TEST_HDR", "1") }, "TESTRG", true, defaultMacros);
-    }
     if (m_settings->PostProcessEdgeDetection && !pipelineEdgeDetection())
     {
         pipelineEdgeDetection() = compiler->createVariant(
@@ -285,11 +280,6 @@ std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineBuildStabl
 std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineFillStablePlanes()
 {
     return m_worldRenderer->ptPipelineFillStablePlanes();
-}
-
-std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineTestRaygenPPHDR()
-{
-    return m_worldRenderer->ptPipelineTestRaygenPPHDR();
 }
 
 std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineEdgeDetection()

@@ -149,7 +149,6 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .ptBuildStablePlanes = m_ptPipelineBuildStablePlanes.get(),
         .ptFillStablePlanes = m_ptPipelineFillStablePlanes.get(),
         .ptReference = m_ptPipelineReference.get(),
-        .ptTestRaygenPPHDR = m_ptPipelineTestRaygenPPHDR.get(),
         .ptEdgeDetection = m_ptPipelineEdgeDetection.get(),
         .exportVBufferPSO = m_pathTracePass ? m_pathTracePass->exportVBufferPSO() : nullptr,
         .toneMapping = m_toneMappingPass.get(),

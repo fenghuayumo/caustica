@@ -92,7 +92,6 @@ struct FrameGraphContext
     PTPipelineVariant* ptBuildStablePlanes = nullptr;
     PTPipelineVariant* ptFillStablePlanes = nullptr;
     PTPipelineVariant* ptReference = nullptr;
-    PTPipelineVariant* ptTestRaygenPPHDR = nullptr;
     PTPipelineVariant* ptEdgeDetection = nullptr;
     caustica::rhi::ComputePipelineHandle exportVBufferPSO;
 
