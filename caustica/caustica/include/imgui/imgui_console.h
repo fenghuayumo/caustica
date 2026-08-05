@@ -31,6 +31,7 @@ namespace caustica
 
 			bool auto_scroll = true;       // automatically keep log output scrolled to the most recent item
 			bool scroll_to_bottom = false; // scoll to botom on console creation, if the log is not empty
+			bool word_wrap = true;         // wrap long log lines (UE Output Log default)
 
 			bool capture_log = true;       // captures engine event logs & redirects to the console
 			bool show_info = true;         // default state of log events filters

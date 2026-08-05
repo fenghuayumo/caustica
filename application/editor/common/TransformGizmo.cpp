@@ -249,10 +249,16 @@ void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
     if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
         return;
 
+    // Draw on the Viewport window list (not the foreground list). ImGuizmo::DrawGrid
+    // does not clip; foreground drawing was painting over Timeline / side panels.
+    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+    if (!viewportWindow || !viewportWindow->Active || viewportWindow->Hidden)
+        return;
+
     ImGuizmo::BeginFrame();
-    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
-    if (ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport"))
-        ImGuizmo::SetAlternativeWindow(viewportWindow);
+    ImDrawList* drawList = viewportWindow->DrawList;
+    ImGuizmo::SetDrawlist(drawList);
+    ImGuizmo::SetAlternativeWindow(viewportWindow);
     ImGuizmo::SetRect(vp.PosX, vp.PosY, vp.SizeX, vp.SizeY);
     ImGuizmo::SetOrthographic(false);
 
@@ -267,8 +273,13 @@ void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
         0.f, 0.f, 1.f, 0.f,
         0.f, 0.f, 0.f, 1.f,
     };
+
+    const ImVec2 clipMin(vp.PosX, vp.PosY);
+    const ImVec2 clipMax(vp.PosX + vp.SizeX, vp.PosY + vp.SizeY);
+    drawList->PushClipRect(clipMin, clipMax, true);
     // Large finite grid on Y=0 (ImGuizmo DrawGrid); feels infinite in typical editor framing.
     ImGuizmo::DrawGrid(viewMatrix, projectionMatrix, identity, 120.f);
+    drawList->PopClipRect();
 }
 
 bool caustica::editor::IsTransformGizmoEditing()

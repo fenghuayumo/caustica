@@ -20,7 +20,10 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
                viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
         ImGuiCond_Appearing,
         ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(420.f * m_currentScale, 520.f * m_currentScale), ImGuiCond_Appearing);
+    // Default 4:3 landscape — wider than the old tall 420x520 dialog.
+    const float prefW = 640.f * m_currentScale;
+    const float prefH = 480.f * m_currentScale;
+    ImGui::SetNextWindowSize(ImVec2(prefW, prefH), ImGuiCond_Appearing);
 
     if (!ImGui::Begin("Preferences", &m_editorUI.ShowPreferences))
     {
@@ -28,7 +31,10 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
         return;
     }
 
-    RAII_SCOPE(ImGui::PushItemWidth(layout.defItemWidth);, ImGui::PopItemWidth(););
+    // PopItemWidth must run before End(); popping after End lands in Debug##Default
+    // and triggers the red ImGui "PopItemWidth() too many times" tooltip.
+    (void)layout;
+    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
 
     if (m_sceneEditor.app())
     {
@@ -64,9 +70,9 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
     }
 
     BuildDisplayPerformancePanel(layout);
-    BuildCameraPanel(layout);
     BuildSystemPanel(layout);
 
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 

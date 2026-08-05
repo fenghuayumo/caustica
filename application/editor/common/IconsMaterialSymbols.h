@@ -29,6 +29,16 @@
 #define ICON_MS_ADD_DIAMOND           "\xef\x92\x9c" // U+f49c
 #define ICON_MS_ARROW_SELECTOR_TOOL   "\xef\xa0\xaf" // U+f82f
 
+// Console Log / Output Log toolbar
+#define ICON_MS_DELETE_SWEEP          "\xee\x85\xac" // U+e16c  clear log
+#define ICON_MS_CHAT                  "\xee\x83\x89" // U+e0c9  messages
+#define ICON_MS_WARNING               "\xef\x82\x83" // U+f083
+#define ICON_MS_ERROR                 "\xef\xa2\xb6" // U+f8b6
+#define ICON_MS_WRAP_TEXT             "\xee\x89\x9b" // U+e25b
+#define ICON_MS_VERTICAL_ALIGN_BOTTOM "\xee\x89\x98" // U+e258  scroll to end
+#define ICON_MS_SEARCH                "\xef\xbd\xba" // U+ef7a
+#define ICON_MS_INFO                  "\xee\xa2\x8e" // U+e88e
+
 // Full Material Symbols PUA (ImGui 1.92 loads glyphs on demand).
 inline constexpr ImWchar kMaterialSymbolsFullRange[] = {
     ICON_MIN_MS, ICON_MAX_MS,

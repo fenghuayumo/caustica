@@ -13,6 +13,7 @@ enum class EditorThemeId : int
     Nord,
     Warm,
     Slate,
+    Carbon, // near-black, flat chrome
     Count
 };
 

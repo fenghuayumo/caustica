@@ -143,7 +143,10 @@ void EditorUI::BuildMainMenuBar()
             m_editorUI.ShowMaterialEditor = true;
             m_editorUI.ShowPostProcess = true;
             m_editorUI.ShowTimeline = true;
+            m_editorUI.ShowConsole = true;
             m_editorUI.Viewport.ShowRenderSettings = true;
+            m_editorUI.Viewport.ShowStatusBar = true;
+            m_editorUI.RequestFocusInspector = true;
             m_editorUI.Viewport.RequestResetDockLayout = true;
         }
         ImGui::EndMenu();
@@ -179,9 +182,17 @@ void EditorUI::BuildDockSpace()
     ImGui::PopStyleVar(3);
 
     // Bump id when default dock window set changes so old ini layouts migrate.
-    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v7");
+    const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace_v8");
     if (m_editorUI.Viewport.RequestResetDockLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
     {
+        // Fresh / reset layouts should reopen the default panel set (ini may have closed them).
+        m_editorUI.Viewport.ShowViewport = true;
+        m_editorUI.Viewport.ShowHierarchy = true;
+        m_editorUI.Viewport.ShowRenderSettings = true;
+        m_editorUI.ShowInspector = true;
+        m_editorUI.ShowMaterialEditor = true;
+        m_editorUI.ShowPostProcess = true;
+        m_editorUI.ShowTimeline = true;
         ApplyDefaultDockLayout(dockspaceId, ImGui::GetContentRegionAvail());
         m_editorUI.Viewport.RequestResetDockLayout = false;
     }

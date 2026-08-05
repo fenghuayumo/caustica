@@ -35,6 +35,14 @@ struct ThemePalette
     ImVec4 frameHovered;
     ImVec4 scrollbarGrab;
     ImVec4 scrollbarGrabHovered;
+    // Per-theme chrome (defaults match the original shared ApplyPalette metrics).
+    float frameRounding = 3.0f;
+    float popupRounding = 4.0f;
+    float scrollbarRounding = 3.0f;
+    float grabRounding = 3.0f;
+    float frameBorderSize = 0.0f;
+    float windowBorderSize = 0.0f;
+    float childBorderSize = 0.0f;
 };
 
 // Dark — near-black default (Blender / VS Code Dark feel).
@@ -115,6 +123,40 @@ const ThemePalette kSlate = {
     Rgba(60, 66, 74), Rgba(74, 82, 90, 0.85f), Rgba(100, 110, 120, 0.95f),
 };
 
+// Carbon — near-black flat chrome with cool blue accent.
+const ThemePalette kCarbon = {
+    "Carbon",
+    {
+        Rgba(220, 220, 220), // Text
+        Rgba(128, 128, 128), // TextMuted
+        Rgba(241, 194, 50),  // TextWarning
+        Rgba(140, 140, 140), // TextCategory
+        Rgba(0, 120, 215),   // Accent
+        Rgba(40, 150, 240),  // AccentHovered
+        Rgba(0, 90, 170),    // AccentActive
+        Rgba(36, 36, 36, 0.96f), // ToolbarIdle
+        Rgba(48, 48, 48, 0.98f), // ToolbarIdleHovered
+        Rgba(0, 120, 215, 0.55f), // ToolbarIdleActive
+    },
+    Rgba(26, 26, 26),  // bg0 window  #1A1A1A
+    Rgba(36, 36, 36),  // bg1 title / menu #242424
+    Rgba(45, 45, 45),  // bg2 frames #2D2D2D
+    Rgba(54, 54, 54),  // bg3 buttons / headers
+    Rgba(64, 64, 64),  // border
+    Rgba(48, 48, 48),  // separator
+    Rgba(96, 96, 96),  // textDisabled
+    Rgba(58, 58, 58),  // frameHovered
+    Rgba(72, 72, 72, 0.90f),  // scrollbarGrab
+    Rgba(96, 96, 96, 0.95f),  // scrollbarGrabHovered
+    2.0f, // frameRounding
+    2.0f, // popupRounding
+    2.0f, // scrollbarRounding
+    2.0f, // grabRounding
+    1.0f, // frameBorderSize
+    0.0f, // windowBorderSize
+    0.0f, // childBorderSize
+};
+
 const ThemePalette* const kThemes[] = {
     &kDark,
     &kGraphite,
@@ -122,6 +164,7 @@ const ThemePalette* const kThemes[] = {
     &kNord,
     &kWarm,
     &kSlate,
+    &kCarbon,
 };
 static_assert(sizeof(kThemes) / sizeof(kThemes[0]) == static_cast<int>(EditorThemeId::Count));
 
@@ -160,6 +203,9 @@ EditorThemeId ThemeIdFromName(const std::string& name)
         if (name == kThemes[i]->name)
             return static_cast<EditorThemeId>(i);
     }
+    // Legacy alias from a briefly shipped name.
+    if (name == "Unreal")
+        return EditorThemeId::Carbon;
     return EditorThemeId::Dark;
 }
 
@@ -177,10 +223,10 @@ void ApplyPalette(const ThemePalette& pal, float displayScale)
 
     style.WindowRounding = 0.0f;
     style.ChildRounding = 0.0f;
-    style.FrameRounding = Scaled(3.0f, displayScale);
-    style.PopupRounding = Scaled(4.0f, displayScale);
-    style.ScrollbarRounding = Scaled(3.0f, displayScale);
-    style.GrabRounding = Scaled(3.0f, displayScale);
+    style.FrameRounding = Scaled(pal.frameRounding, displayScale);
+    style.PopupRounding = Scaled(pal.popupRounding, displayScale);
+    style.ScrollbarRounding = Scaled(pal.scrollbarRounding, displayScale);
+    style.GrabRounding = Scaled(pal.grabRounding, displayScale);
     style.TabRounding = 0.0f;
 
     style.WindowPadding = Scaled(ImVec2(10.0f, 8.0f), displayScale);
@@ -192,10 +238,10 @@ void ApplyPalette(const ThemePalette& pal, float displayScale)
     style.ScrollbarSize = Scaled(11.0f, displayScale);
     style.GrabMinSize = Scaled(9.0f, displayScale);
 
-    style.WindowBorderSize = 0.0f;
-    style.ChildBorderSize = 0.0f;
+    style.WindowBorderSize = pal.windowBorderSize;
+    style.ChildBorderSize = pal.childBorderSize;
     style.PopupBorderSize = 1.0f;
-    style.FrameBorderSize = 0.0f;
+    style.FrameBorderSize = pal.frameBorderSize;
     style.TabBorderSize = 0.0f;
     style.TabBarBorderSize = 0.0f;
     style.TabBarOverlineSize = Scaled(2.0f, displayScale);

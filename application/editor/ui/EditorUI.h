@@ -88,7 +88,6 @@ private:
     void BuildPreferencesPanel(const PanelLayout& layout);
     void BuildScenePanel(const PanelLayout& layout);
     void BuildSampleGamePanel(const PanelLayout& layout);
-    void BuildCameraPanel(const PanelLayout& layout);
     void BuildLightingPanel(const PanelLayout& layout);
     void BuildPathTracerPanel(const PanelLayout& layout);
     void BuildRenderSettingsOverview(const PanelLayout& layout);

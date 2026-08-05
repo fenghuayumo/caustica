@@ -16,39 +16,44 @@ using namespace caustica;
 
 namespace
 {
-// UE Output Log–inspired palette
-constexpr ImVec4 kColLog      = { 0.82f, 0.84f, 0.86f, 1.f };
-constexpr ImVec4 kColInfo     = { 0.55f, 0.78f, 1.00f, 1.f };
-constexpr ImVec4 kColWarning  = { 1.00f, 0.78f, 0.22f, 1.f };
-constexpr ImVec4 kColError    = { 1.00f, 0.38f, 0.35f, 1.f };
-constexpr ImVec4 kColFatal    = { 1.00f, 0.20f, 0.25f, 1.f };
-constexpr ImVec4 kColCommand  = { 0.45f, 0.92f, 0.62f, 1.f };
-constexpr ImVec4 kColRowA     = { 0.10f, 0.11f, 0.13f, 1.f };
-constexpr ImVec4 kColRowB     = { 0.12f, 0.13f, 0.16f, 1.f };
-constexpr ImVec4 kColChildBg  = { 0.08f, 0.09f, 0.11f, 1.f };
-constexpr ImVec4 kColToolbar  = { 0.14f, 0.15f, 0.18f, 1.f };
+// UE5 Output Log palette (Slate dark)
+constexpr ImVec4 kColDisplay  = { 0.82f, 0.82f, 0.82f, 1.f }; // near-white body
+constexpr ImVec4 kColVerbose  = { 0.55f, 0.55f, 0.55f, 1.f };
+constexpr ImVec4 kColWarning  = { 0.93f, 0.79f, 0.23f, 1.f }; // UE warning yellow
+constexpr ImVec4 kColError    = { 0.93f, 0.33f, 0.31f, 1.f }; // UE error red
+constexpr ImVec4 kColFatal    = { 1.00f, 0.22f, 0.22f, 1.f };
+constexpr ImVec4 kColCommand  = { 0.40f, 0.85f, 0.45f, 1.f }; // Cmd green
+constexpr ImVec4 kColLog      = kColDisplay;
+constexpr ImVec4 kColInfo     = kColDisplay;
+constexpr ImVec4 kColWindowBg = { 0.10f, 0.10f, 0.10f, 1.f }; // #1A1A1A
+constexpr ImVec4 kColListBg   = { 0.06f, 0.06f, 0.06f, 1.f }; // #0F0F0F
+constexpr ImVec4 kColToolbar  = { 0.16f, 0.16f, 0.16f, 1.f }; // #292929
+constexpr ImVec4 kColBorder   = { 0.22f, 0.22f, 0.22f, 1.f };
+constexpr ImVec4 kColSelBg    = { 0.20f, 0.32f, 0.48f, 0.55f };
+constexpr ImVec4 kColMuted    = { 0.50f, 0.50f, 0.50f, 1.f };
 
 ImVec4 getSeverityColor(caustica::Severity severity)
 {
 	using namespace caustica;
 	switch (severity)
 	{
-	case Severity::Debug:   return ImVec4(0.55f, 0.58f, 0.62f, 1.f);
-	case Severity::Info:    return kColInfo;
+	case Severity::Debug:   return kColVerbose;
+	case Severity::Info:    return kColDisplay;
 	case Severity::Warning: return kColWarning;
 	case Severity::Error:   return kColError;
 	case Severity::Fatal:   return kColFatal;
-	default:                return kColLog;
+	default:                return kColDisplay;
 	}
 }
 
-const char* getSeverityTag(caustica::Severity severity)
+// UE verbosity token shown after "LogCaustica: "
+const char* getVerbosityName(caustica::Severity severity)
 {
 	using namespace caustica;
 	switch (severity)
 	{
-	case Severity::Debug:   return "Debug";
-	case Severity::Info:    return "Log";
+	case Severity::Debug:   return "Verbose";
+	case Severity::Info:    return "Display";
 	case Severity::Warning: return "Warning";
 	case Severity::Error:   return "Error";
 	case Severity::Fatal:   return "Fatal";
@@ -81,27 +86,78 @@ bool passesFilter(std::string const& text, char const* filter)
 	return containsCi(text, filter);
 }
 
-bool severityChip(char const* label, bool* enabled, ImVec4 const& color)
+// Material Symbols PUA (editor ImGuiManager merges this font into the UI atlas).
+// Keep in sync with application/editor/common/IconsMaterialSymbols.h
+constexpr char const* kIconDeleteSweep = "\xee\x85\xac"; // U+e16c
+constexpr char const* kIconChat        = "\xee\x83\x89"; // U+e0c9
+constexpr char const* kIconWarning     = "\xef\x82\x83"; // U+f083
+constexpr char const* kIconError       = "\xef\xa2\xb6"; // U+f8b6
+constexpr char const* kIconWrapText    = "\xee\x89\x9b"; // U+e25b
+constexpr char const* kIconScrollEnd   = "\xee\x89\x98"; // U+e258
+constexpr char const* kIconSearch      = "\xef\xbd\xba"; // U+ef7a
+
+constexpr float kIconBtn = 24.f;
+
+bool iconButton(char const* id, char const* iconUtf8, bool active, char const* tip, ImVec4 const& accent)
 {
-	ImGui::PushID(label);
-	const ImVec4 bg = *enabled
-		? ImVec4(color.x * 0.35f, color.y * 0.35f, color.z * 0.35f, 1.f)
-		: ImVec4(0.18f, 0.19f, 0.22f, 1.f);
-	const ImVec4 border = *enabled ? color : ImVec4(0.30f, 0.32f, 0.36f, 1.f);
+	ImGui::PushID(id);
+	const ImVec4 bg = active
+		? ImVec4(accent.x * 0.28f, accent.y * 0.28f, accent.z * 0.28f, 1.f)
+		: ImVec4(0.18f, 0.18f, 0.18f, 1.f);
+	const ImVec4 iconCol = active ? accent : kColMuted;
+
 	ImGui::PushStyleColor(ImGuiCol_Button, bg);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(bg.x + 0.06f, bg.y + 0.06f, bg.z + 0.06f, 1.f));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(bg.x + 0.10f, bg.y + 0.10f, bg.z + 0.10f, 1.f));
-	ImGui::PushStyleColor(ImGuiCol_Border, border);
-	ImGui::PushStyleColor(ImGuiCol_Text, *enabled ? color : ImVec4(0.55f, 0.57f, 0.60f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Text, iconCol);
+	ImGui::PushStyleColor(ImGuiCol_Border, active ? accent : kColBorder);
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.f, 3.f));
-	const bool pressed = ImGui::Button(label);
-	ImGui::PopStyleVar(2);
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f, 3.f));
+	const bool pressed = ImGui::Button(iconUtf8, ImVec2(kIconBtn, kIconBtn));
+	ImGui::PopStyleVar(3);
 	ImGui::PopStyleColor(5);
-	if (pressed)
-		*enabled = !*enabled;
+	if (tip && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+		ImGui::SetTooltip("%s", tip);
 	ImGui::PopID();
 	return pressed;
+}
+
+bool iconToggle(char const* id, char const* iconUtf8, bool* enabled, char const* tip, ImVec4 const& accent)
+{
+	const bool pressed = iconButton(id, iconUtf8, *enabled, tip, accent);
+	if (pressed)
+		*enabled = !*enabled;
+	return pressed;
+}
+
+void toolbarSep(float height)
+{
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	const ImVec2 p = ImGui::GetCursorScreenPos();
+	const float x = p.x + 2.f;
+	dl->AddLine(
+		ImVec2(x, p.y + 4.f),
+		ImVec2(x, p.y + height - 4.f),
+		ImGui::ColorConvertFloat4ToU32(kColBorder),
+		1.f);
+	ImGui::Dummy(ImVec2(5.f, height));
+}
+
+std::string formatLogLine(caustica::Severity severity, std::string const& text)
+{
+	using namespace caustica;
+	// Command echoes already start with "> "
+	if (severity == Severity::None && text.rfind("> ", 0) == 0)
+		return text;
+	if (severity == Severity::None)
+		return text;
+	// UE: LogCategory: Verbosity: Message
+	std::string line = "LogCaustica: ";
+	line += getVerbosityName(severity);
+	line += ": ";
+	line += text;
+	return line;
 }
 
 inline std::string_view isolateKeyword(std::string_view line)
@@ -174,53 +230,117 @@ void ImGui_Console::clearHistory()
 
 void ImGui_Console::render(bool* open, bool requestFocus)
 {
-	ImGui::SetNextWindowSize(ImVec2(860, 480), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(860, 420), ImGuiCond_FirstUseEver);
 	if (requestFocus)
 	{
 		ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
 		ImGui::SetNextWindowFocus();
 	}
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 8.f));
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.11f, 0.12f, 0.14f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.f);
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, kColWindowBg);
+	ImGui::PushStyleColor(ImGuiCol_Border, kColBorder);
+	ImGui::PushStyleColor(ImGuiCol_TitleBg, kColToolbar);
+	ImGui::PushStyleColor(ImGuiCol_TitleBgActive, kColToolbar);
+	ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, kColToolbar);
 	if (!ImGui::Begin("Console Log", open))
 	{
 		ImGui::End();
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
+		ImGui::PopStyleColor(5);
+		ImGui::PopStyleVar(3);
 		return;
 	}
 
-	// --- Toolbar (UE Output Log style) ---
+	using namespace caustica;
+	int countMessages = 0, countWarnings = 0, countErrors = 0;
+	for (auto const& item : m_ItemsLog)
 	{
+		switch (item.severity)
+		{
+		case Severity::Warning:                 ++countWarnings; break;
+		case Severity::Error:
+		case Severity::Fatal:                   ++countErrors; break;
+		default:                                ++countMessages; break;
+		}
+	}
+
+	// --- Flat toolbar with Material Symbol icon buttons ---
+	{
+		const float barH = kIconBtn + 10.f;
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, kColToolbar);
-		ImGui::BeginChild("##ConsoleToolbar", ImVec2(0.f, ImGui::GetFrameHeightWithSpacing() + 6.f),
-			true, ImGuiWindowFlags_NoScrollbar);
-		if (ImGui::Button("Clear"))
+		ImGui::BeginChild("##ConsoleToolbar", ImVec2(0.f, barH), false, ImGuiWindowFlags_NoScrollbar);
+		ImGui::SetCursorPos(ImVec2(6.f, 5.f));
+
+		char tipMessages[48];
+		char tipWarnings[48];
+		char tipErrors[48];
+		std::snprintf(tipMessages, sizeof(tipMessages), "Messages (%d)", countMessages);
+		std::snprintf(tipWarnings, sizeof(tipWarnings), "Warnings (%d)", countWarnings);
+		std::snprintf(tipErrors, sizeof(tipErrors), "Errors (%d)", countErrors);
+
+		if (iconButton("##Clear", kIconDeleteSweep, false, "Clear Log", kColDisplay))
 			clearLog();
-		ImGui::SameLine();
-		ImGui::Checkbox("Auto-scroll", &m_Options.auto_scroll);
-		ImGui::SameLine(0.f, 12.f);
-		severityChip("Errors", &m_Options.show_errors, kColError);
-		ImGui::SameLine();
-		severityChip("Warnings", &m_Options.show_warnings, kColWarning);
-		ImGui::SameLine();
-		severityChip("Messages", &m_Options.show_info, kColInfo);
-		ImGui::SameLine(0.f, 12.f);
-		ImGui::SetNextItemWidth((std::max)(120.f, ImGui::GetContentRegionAvail().x));
-		ImGui::InputTextWithHint("##ConsoleFilter", "Filter...", m_FilterBuf, sizeof(m_FilterBuf));
+		ImGui::SameLine(0.f, 2.f);
+		toolbarSep(kIconBtn);
+		ImGui::SameLine(0.f, 2.f);
+
+		iconToggle("##Messages", kIconChat, &m_Options.show_info, tipMessages, kColDisplay);
+		ImGui::SameLine(0.f, 3.f);
+		iconToggle("##Warnings", kIconWarning, &m_Options.show_warnings, tipWarnings, kColWarning);
+		ImGui::SameLine(0.f, 3.f);
+		iconToggle("##Errors", kIconError, &m_Options.show_errors, tipErrors, kColError);
+
+		ImGui::SameLine(0.f, 2.f);
+		toolbarSep(kIconBtn);
+		ImGui::SameLine(0.f, 2.f);
+
+		iconToggle("##WordWrap", kIconWrapText, &m_Options.word_wrap, "Word Wrap",
+			ImVec4(0.55f, 0.72f, 0.95f, 1.f));
+		ImGui::SameLine(0.f, 3.f);
+		iconToggle("##ScrollEnd", kIconScrollEnd, &m_Options.auto_scroll, "Scroll to End",
+			ImVec4(0.55f, 0.72f, 0.95f, 1.f));
+
+		ImGui::SameLine(0.f, 8.f);
+		ImGui::AlignTextToFramePadding();
+		ImGui::PushStyleColor(ImGuiCol_Text, kColMuted);
+		ImGui::TextUnformatted(kIconSearch);
+		ImGui::PopStyleColor();
+		ImGui::SameLine(0.f, 4.f);
+		const float searchW = (std::max)(120.f, ImGui::GetContentRegionAvail().x - 6.f);
+		ImGui::SetNextItemWidth(searchW);
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.10f, 0.10f, 0.10f, 1.f));
+		ImGui::PushStyleColor(ImGuiCol_Border, kColBorder);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f, 4.f));
+		ImGui::InputTextWithHint("##ConsoleFilter", "Search...", m_FilterBuf, sizeof(m_FilterBuf));
+		ImGui::PopStyleVar(3);
+		ImGui::PopStyleColor(2);
+
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
 	}
 
-	// --- Log list (commands go through the ` Command Bar, not this panel) ---
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, kColChildBg);
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
+	// Thin separator under toolbar
+	{
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImVec2 p = ImGui::GetCursorScreenPos();
+		const float w = ImGui::GetContentRegionAvail().x;
+		dl->AddLine(p, ImVec2(p.x + w, p.y), ImGui::ColorConvertFloat4ToU32(kColBorder), 1.f);
+		ImGui::Dummy(ImVec2(0.f, 1.f));
+	}
+
+	// --- Log list ---
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, kColListBg);
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
 	ImGui::BeginChild(
 		"##ConsoleLogList",
 		ImVec2(0.f, 0.f),
-		true,
-		ImGuiWindowFlags_HorizontalScrollbar);
+		false,
+		m_Options.word_wrap ? ImGuiWindowFlags_None : ImGuiWindowFlags_HorizontalScrollbar);
 
 	if (ImGui::BeginPopupContextWindow())
 	{
@@ -234,12 +354,9 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 	if (m_Options.font)
 		ImGui::PushFont(m_Options.font->getScaledFont());
 
-	ImDrawList* drawList = ImGui::GetWindowDrawList();
-	int visibleRow = 0;
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 1.f));
 	for (auto const& item : m_ItemsLog)
 	{
-		using namespace caustica;
-
 		bool showItem = true;
 		switch (item.severity)
 		{
@@ -261,41 +378,62 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 		if (!showItem || !passesFilter(item.text, m_FilterBuf))
 			continue;
 
-		const ImVec4 severityColor = (item.severity == Severity::None)
+		const std::string line = formatLogLine(item.severity, item.text);
+		const ImVec4 lineColor = (item.severity == Severity::None)
 			? item.textColor
 			: getSeverityColor(item.severity);
-		const char* tag = getSeverityTag(item.severity);
 
-		const ImVec2 rowMin = ImGui::GetCursorScreenPos();
-		const float rowW = ImGui::GetContentRegionAvail().x;
-		const float rowH = ImGui::GetTextLineHeightWithSpacing();
-		const ImVec2 rowMax(rowMin.x + rowW, rowMin.y + rowH);
+		ImGui::PushID(static_cast<int>(ImGui::GetCursorPosY() * 1000.f) ^ static_cast<int>(line.size()));
+		ImGui::PushStyleColor(ImGuiCol_Text, lineColor);
+		ImGui::PushStyleColor(ImGuiCol_Header, kColSelBg);
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(kColSelBg.x, kColSelBg.y, kColSelBg.z, 0.70f));
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(kColSelBg.x, kColSelBg.y, kColSelBg.z, 0.85f));
 
-		drawList->AddRectFilled(
-			rowMin,
-			rowMax,
-			ImGui::ColorConvertFloat4ToU32((visibleRow & 1) ? kColRowB : kColRowA));
-		// Severity accent bar (UE-style)
-		drawList->AddRectFilled(
-			rowMin,
-			ImVec2(rowMin.x + 3.f, rowMax.y),
-			ImGui::ColorConvertFloat4ToU32(severityColor));
+		ImGuiSelectableFlags selFlags = ImGuiSelectableFlags_AllowDoubleClick;
+		if (m_Options.word_wrap)
+			selFlags |= ImGuiSelectableFlags_AllowOverlap;
 
-		ImGui::SetCursorScreenPos(ImVec2(rowMin.x + 8.f, rowMin.y + 1.f));
-		ImGui::PushStyleColor(ImGuiCol_Text, severityColor);
-		ImGui::TextUnformatted(tag);
-		ImGui::PopStyleColor();
-		ImGui::SameLine(72.f);
-		ImGui::PushStyleColor(ImGuiCol_Text, item.textColor);
-		ImGui::TextUnformatted(item.text.c_str());
-		ImGui::PopStyleColor();
+		const float wrapW = m_Options.word_wrap ? ImGui::GetContentRegionAvail().x : 0.f;
+		if (m_Options.word_wrap)
+			ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrapW);
 
-		// Keep layout advancing even if text wrapped oddly.
-		if (ImGui::GetCursorScreenPos().y < rowMax.y)
-			ImGui::SetCursorScreenPos(ImVec2(rowMin.x, rowMax.y));
+		// Selectable + TextWrapped: draw selectable hitbox then overlaid text for wrap.
+		const ImVec2 textSize = m_Options.word_wrap
+			? ImGui::CalcTextSize(line.c_str(), nullptr, false, wrapW)
+			: ImGui::CalcTextSize(line.c_str());
+		const float rowH = (std::max)(ImGui::GetTextLineHeight(), textSize.y) + 2.f;
 
-		++visibleRow;
+		if (ImGui::Selectable("##row", false, selFlags, ImVec2(0.f, rowH)))
+		{
+			if (ImGui::IsMouseDoubleClicked(0))
+				ImGui::SetClipboardText(line.c_str());
+		}
+		if (ImGui::BeginPopupContextItem("##rowCtx"))
+		{
+			if (ImGui::MenuItem("Copy"))
+				ImGui::SetClipboardText(line.c_str());
+			if (ImGui::MenuItem("Clear Log"))
+				clearLog();
+			ImGui::EndPopup();
+		}
+
+		// Draw the actual log text over the selectable
+		ImVec2 textPos = ImGui::GetItemRectMin();
+		textPos.x += 2.f;
+		textPos.y += 1.f;
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		if (m_Options.word_wrap)
+			dl->AddText(nullptr, 0.f, textPos, ImGui::GetColorU32(ImGuiCol_Text), line.c_str(), nullptr, wrapW);
+		else
+			dl->AddText(textPos, ImGui::GetColorU32(ImGuiCol_Text), line.c_str());
+
+		if (m_Options.word_wrap)
+			ImGui::PopTextWrapPos();
+
+		ImGui::PopStyleColor(4);
+		ImGui::PopID();
 	}
+	ImGui::PopStyleVar();
 
 	if (m_Options.scroll_to_bottom
 		|| (m_Options.auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.f))
@@ -308,12 +446,12 @@ void ImGui_Console::render(bool* open, bool requestFocus)
 
 	m_Options.scroll_to_bottom = false;
 	ImGui::EndChild();
-	ImGui::PopStyleVar();
+	ImGui::PopStyleVar(2);
 	ImGui::PopStyleColor();
 
 	ImGui::End();
-	ImGui::PopStyleColor();
-	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(5);
+	ImGui::PopStyleVar(3);
 }
 
 std::vector<std::string> ImGui_Console::currentSuggestions() const
