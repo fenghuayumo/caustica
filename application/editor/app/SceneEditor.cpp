@@ -91,8 +91,22 @@ scene::AnimationComponent& FindOrCreateEditorAnimation(
             return *animation;
     }
 
+    scene::AnimationComponent* existing = nullptr;
+    entityWorld.world().each<scene::AnimationComponent>(
+        [&](ecs::Entity entity, scene::AnimationComponent& animation) {
+            if (!existing && animation.editorAuthored)
+            {
+                cachedEntity = entity;
+                existing = &animation;
+            }
+        });
+    if (existing)
+        return *existing;
+
     cachedEntity = entityWorld.createEntity("Editor Keyframes", entityWorld.root());
-    entityWorld.setAnimation(cachedEntity, scene::AnimationComponent{});
+    scene::AnimationComponent animation;
+    animation.editorAuthored = true;
+    entityWorld.setAnimation(cachedEntity, std::move(animation));
     return *entityWorld.world().get<scene::AnimationComponent>(cachedEntity);
 }
 
@@ -640,6 +654,145 @@ void SaveSceneMaterials(App& app)
         materials->saveAll();
 }
 
+const char* AnimationModeName(animation::InterpolationMode mode)
+{
+    switch (mode)
+    {
+    case animation::InterpolationMode::Step:             return "step";
+    case animation::InterpolationMode::Linear:           return "linear";
+    case animation::InterpolationMode::Slerp:            return "slerp";
+    case animation::InterpolationMode::CatmullRomSpline: return "catmull-rom";
+    case animation::InterpolationMode::HermiteSpline:    return "hermite";
+    default:                                             return "step";
+    }
+}
+
+const char* AnimationAttributeName(const scene::AnimationChannelData& channel)
+{
+    switch (channel.attribute)
+    {
+    case AnimationAttribute::Translation: return "translation";
+    case AnimationAttribute::Rotation:    return "rotation";
+    case AnimationAttribute::Scaling:     return "scaling";
+    case AnimationAttribute::Visibility:  return "visibility";
+    case AnimationAttribute::LeafProperty:
+        return channel.leafPropertyName.empty() ? nullptr : channel.leafPropertyName.c_str();
+    case AnimationAttribute::Undefined:
+    default:
+        return nullptr;
+    }
+}
+
+void WriteAnimationValue(
+    Json::Value& destination,
+    const dm::float4& value,
+    AnimationAttribute attribute)
+{
+    if (attribute == AnimationAttribute::Visibility)
+    {
+        destination = value.x;
+        return;
+    }
+
+    destination = Json::Value(Json::arrayValue);
+    destination.append(value.x);
+    destination.append(value.y);
+    destination.append(value.z);
+    if (attribute == AnimationAttribute::Rotation
+        || attribute == AnimationAttribute::LeafProperty)
+    {
+        destination.append(value.w);
+    }
+}
+
+void PatchEditorAnimations(
+    Json::Value& document,
+    scene::SceneEntityWorld& entityWorld)
+{
+    // Preserve scene-authored animation JSON verbatim. Imported animations are
+    // owned by their source assets and must not be baked into the scene on save.
+    Json::Value animations(Json::arrayValue);
+    const Json::Value& existingAnimations = document["animations"];
+    if (existingAnimations.isArray())
+    {
+        for (const Json::Value& animationNode : existingAnimations)
+        {
+            if (!animationNode["editorAuthored"].asBool())
+                animations.append(animationNode);
+        }
+    }
+
+    entityWorld.world().each<scene::AnimationComponent>(
+        [&](ecs::Entity animationEntity, scene::AnimationComponent& animationComponent) {
+            if (!animationComponent.editorAuthored)
+                return;
+
+            Json::Value animationNode(Json::objectValue);
+            std::string name = entityWorld.getEntityName(animationEntity);
+            animationNode["name"] = name.empty() ? "Editor Keyframes" : name;
+            animationNode["editorAuthored"] = true;
+            Json::Value channels(Json::arrayValue);
+
+            for (const auto& channel : animationComponent.channels)
+            {
+                if (!channel.sampler || channel.sampler->getKeyframes().empty())
+                    continue;
+
+                const char* attributeName = AnimationAttributeName(channel);
+                if (!attributeName)
+                    continue;
+
+                std::string target;
+                if (channel.targetMaterial)
+                {
+                    target = "material:" + channel.targetMaterial->name;
+                }
+                else if (ecs::isValid(channel.targetEntity))
+                {
+                    target = entityWorld.getEntityPath(channel.targetEntity).generic_string();
+                }
+                if (target.empty())
+                    continue;
+
+                Json::Value channelNode(Json::objectValue);
+                channelNode["target"] = target;
+                channelNode["attribute"] = attributeName;
+                channelNode["mode"] = AnimationModeName(channel.sampler->getMode());
+
+                Json::Value keyframes(Json::arrayValue);
+                for (const auto& keyframe : channel.sampler->getKeyframes())
+                {
+                    Json::Value keyframeNode(Json::objectValue);
+                    keyframeNode["time"] = keyframe.time;
+                    WriteAnimationValue(
+                        keyframeNode["value"], keyframe.value, channel.attribute);
+                    if (channel.sampler->getMode()
+                        == animation::InterpolationMode::HermiteSpline)
+                    {
+                        WriteAnimationValue(
+                            keyframeNode["inTangent"], keyframe.inTangent, channel.attribute);
+                        WriteAnimationValue(
+                            keyframeNode["outTangent"], keyframe.outTangent, channel.attribute);
+                    }
+                    keyframes.append(std::move(keyframeNode));
+                }
+                channelNode["data"] = std::move(keyframes);
+                channels.append(std::move(channelNode));
+            }
+
+            if (!channels.empty())
+            {
+                animationNode["channels"] = std::move(channels);
+                animations.append(std::move(animationNode));
+            }
+        });
+
+    if (animations.empty())
+        document.removeMember("animations");
+    else
+        document["animations"] = std::move(animations);
+}
+
 bool SaveSceneDocumentToPath(
     App& app,
     EditorState& editorState,
@@ -654,6 +807,7 @@ bool SaveSceneDocumentToPath(
 
     if (editorState.sceneDocument.isMember("graph"))
         PatchSceneGraphTransforms(editorState.sceneDocument["graph"], *ew, ew->root());
+    PatchEditorAnimations(editorState.sceneDocument, *ew);
 
     if (!caustica::json::saveToFile(path, editorState.sceneDocument))
         return false;
@@ -950,6 +1104,9 @@ bool SceneEditor::insertVisibilityKeyframe(ecs::Entity entity, float timeSeconds
         return false;
 
     EnsureUniqueSampler(*channel);
+    // Visibility is a discrete state even when an existing scene track was
+    // authored with a different interpolation mode.
+    channel->sampler->setInterpolationMode(animation::InterpolationMode::Step);
     channel->sampler->upsertKeyframe(
         MakeVisibilityKeyframe(timeSeconds, GetEntityVisibility(*entityWorld, entity)));
 

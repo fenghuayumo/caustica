@@ -232,6 +232,9 @@ struct AnimationComponent
 {
     std::vector<AnimationChannelData> channels;
     float duration = 0.f;
+    // Editor-authored tracks are serialized back into scene JSON by the editor.
+    // Imported animation components remain owned by their source assets.
+    bool editorAuthored = false;
 };
 
 // Fixed-topology mesh point cache (e.g. soft body from USD bake).

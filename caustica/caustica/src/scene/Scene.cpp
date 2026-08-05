@@ -1071,6 +1071,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
     for (const auto& animationNode : nodeList)
     {
         scene::AnimationComponent component;
+        component.editorAuthored = animationNode["editorAuthored"].asBool();
         std::string animationName;
 
         const auto& nameNode = animationNode["name"];

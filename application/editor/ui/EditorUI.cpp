@@ -188,21 +188,41 @@ void EditorUI::buildUI(void)
             (ImGui::GetContentRegionAvail().x
                 - segmentSpacing * (IM_ARRAYSIZE(detailLabels) - 1))
                 / IM_ARRAYSIZE(detailLabels));
-        ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
         for (int i = 0; i < IM_ARRAYSIZE(detailLabels); ++i)
         {
             if (i > 0)
                 ImGui::SameLine(0.f, segmentSpacing);
-            if (ImGui::Selectable(
-                    detailLabels[i],
-                    m_editorUI.RenderSettingsDetailLevel == i,
-                    ImGuiSelectableFlags_None,
+
+            const bool selected = m_editorUI.RenderSettingsDetailLevel == i;
+            ImGui::PushID(i);
+            if (ImGui::InvisibleButton(
+                    "##RenderSettingsDetail",
                     ImVec2(segmentWidth, ImGui::GetFrameHeight())))
             {
                 m_editorUI.RenderSettingsDetailLevel = i;
             }
+
+            const ImVec2 itemMin = ImGui::GetItemRectMin();
+            const ImVec2 itemMax = ImGui::GetItemRectMax();
+            const ImU32 background = ImGui::GetColorU32(
+                selected
+                    ? ImGuiCol_Header
+                    : (ImGui::IsItemHovered() ? ImGuiCol_HeaderHovered : ImGuiCol_Button));
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            drawList->AddRectFilled(
+                itemMin,
+                itemMax,
+                background,
+                ImGui::GetStyle().FrameRounding);
+            const ImVec2 textSize = ImGui::CalcTextSize(detailLabels[i]);
+            drawList->AddText(
+                ImVec2(
+                    itemMin.x + (itemMax.x - itemMin.x - textSize.x) * 0.5f,
+                    itemMin.y + (itemMax.y - itemMin.y - textSize.y) * 0.5f),
+                ImGui::GetColorU32(ImGuiCol_Text),
+                detailLabels[i]);
+            ImGui::PopID();
         }
-        ImGui::PopStyleVar();
         ImGui::Separator();
 
         BuildRenderSettingsOverview(layout);
