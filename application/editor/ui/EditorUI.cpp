@@ -154,6 +154,13 @@ void EditorUI::buildUI(void)
 
     if (!m_editorUI.ShowUI)
     {
+        // Command bar stays available with UI chrome hidden (F2).
+        if (m_editorUI.ShowCommandBar && m_console)
+        {
+            const bool focusCommandBar = m_editorUI.RequestFocusCommandBar;
+            m_editorUI.RequestFocusCommandBar = false;
+            m_console->renderCommandBar(&m_editorUI.ShowCommandBar, focusCommandBar);
+        }
         BuildStatusBar();
         return;
     }
@@ -242,7 +249,11 @@ void EditorUI::buildUI(void)
     BuildGameStandalonePanel(layout);
     BuildTimelinePanel(layout);
     if (m_editorUI.ShowConsole && m_console)
-        m_console->render(&m_editorUI.ShowConsole);
+    {
+        const bool focusConsole = m_editorUI.RequestFocusConsole;
+        m_editorUI.RequestFocusConsole = false;
+        m_console->render(&m_editorUI.ShowConsole, focusConsole);
+    }
 
     // After all dock panels (same ordering as pre-DockSpace): ImGuizmo BeginFrame +
     // foreground draw list so the gizmo is never covered by the Viewport image.
@@ -250,6 +261,14 @@ void EditorUI::buildUI(void)
     DrawInfiniteGrid(gizmoCtx);
     DrawTransformGizmo(gizmoCtx);
     BuildStatusBar();
+
+    // Draw last so the UE-style command bar stays above docked panels.
+    if (m_editorUI.ShowCommandBar && m_console)
+    {
+        const bool focusCommandBar = m_editorUI.RequestFocusCommandBar;
+        m_editorUI.RequestFocusCommandBar = false;
+        m_console->renderCommandBar(&m_editorUI.ShowCommandBar, focusCommandBar);
+    }
 }
 
 

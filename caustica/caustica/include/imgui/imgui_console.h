@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 
+#include <array>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -49,7 +50,11 @@ namespace caustica
 
 		void clearHistory();
 
-		void render(bool * open=nullptr);
+		// Full Console panel (log history + command line). Open via Window > Console.
+		void render(bool* open = nullptr, bool requestFocus = false);
+
+		// UE-style overlay: slim command bar + live suggestions. Toggle with `.
+		void renderCommandBar(bool* open, bool requestFocus = false);
 
 	private:
 
@@ -60,6 +65,10 @@ namespace caustica
 		int textEditCallback(ImGuiInputTextCallbackData* data);
 
 		void execCommand(char const* cmd);
+
+		void applySuggestion(std::string const& suggestion);
+
+		std::vector<std::string> currentSuggestions() const;
 
 	private:
 
@@ -79,6 +88,9 @@ namespace caustica
 
 		typedef caustica::core::circular_buffer<LogItem, 5000> ItemsLog;
 		ItemsLog m_ItemsLog;
+
+		std::vector<std::string> m_Suggestions;
+		int m_SuggestionIndex = -1;
 
 	private:
 

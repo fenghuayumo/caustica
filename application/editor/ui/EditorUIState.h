@@ -49,6 +49,8 @@ struct EditorWindowState
     bool ShowUI = true;
     bool RenderWhenOutOfFocus = false;
     bool ShowConsole = false;
+    // UE-style overlay command bar (toggle with `). Separate from the Console log panel.
+    bool ShowCommandBar = false;
     bool ShowSceneTweakerWindow = false;
     bool ShowDeltaTree = false;
     bool ShowMaterialEditor = true;
@@ -61,6 +63,8 @@ struct EditorWindowState
     // Set when a toggle enables the panel; consumed after Begin() to select its dock tab.
     bool RequestFocusInspector = false;
     bool RequestFocusMaterialEditor = false;
+    bool RequestFocusConsole = false;
+    bool RequestFocusCommandBar = false;
     EditorViewportState Viewport;
 };
 

@@ -130,7 +130,13 @@ void EditorUI::BuildMainMenuBar()
 
     if (ImGui::BeginMenu("Window"))
     {
-        ImGui::MenuItem("Console", "`", &m_editorUI.ShowConsole);
+        if (ImGui::MenuItem("Command Bar", "`", &m_editorUI.ShowCommandBar))
+        {
+            if (m_editorUI.ShowCommandBar)
+                m_editorUI.RequestFocusCommandBar = true;
+        }
+        if (ImGui::MenuItem("Console Log", nullptr, &m_editorUI.ShowConsole) && m_editorUI.ShowConsole)
+            m_editorUI.RequestFocusConsole = true;
         ImGui::Separator();
         if (ImGui::MenuItem("Reset Window Layout"))
         {

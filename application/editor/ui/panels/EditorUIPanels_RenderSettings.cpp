@@ -307,7 +307,7 @@ void EditorUI::BuildAdvancedRenderSettings(const PanelLayout& layout)
     }
 
     ImGui::Spacing();
-    ImGui::TextDisabled("More tuning: Window > Console, then `cvar.list r[.].*`");
+    ImGui::TextDisabled("More tuning: press ` for Command Bar, then `cvar.list r[.].*`");
 }
 
 } // namespace caustica::editor

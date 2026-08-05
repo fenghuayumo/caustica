@@ -197,14 +197,27 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         return true;
     }
 
-    if (key == ToGlfwKey(caustica::Key::GraveAccent) && action == cGlfwPress
-        && !ctrlDown && !altDown)
+    // UE-style command bar: ` / ~ opens a slim input overlay (not the log Console panel).
+    // Accept the common US/Win scancode when IME/layout remaps the keycode.
+    constexpr int kGraveScancode = 0x29;
+    const bool graveKey = key == ToGlfwKey(caustica::Key::GraveAccent)
+        || e.getScancode() == kGraveScancode;
+    if (graveKey && action == cGlfwPress && !ctrlDown && !altDown)
     {
         auto& editor = sceneEditor.editorUIState();
-        editor.ShowConsole = !editor.ShowConsole;
-        if (editor.ShowConsole)
-            editor.ShowUI = true;
-        return true;
+        // Always allow closing while the bar owns text focus; only block open when
+        // some other text field is active.
+        if (editor.ShowCommandBar)
+        {
+            editor.ShowCommandBar = false;
+            return true;
+        }
+        if (!ImGui::GetIO().WantTextInput)
+        {
+            editor.ShowCommandBar = true;
+            editor.RequestFocusCommandBar = true;
+            return true;
+        }
     }
 
     if (ImGui::GetIO().WantCaptureKeyboard)
@@ -285,9 +298,14 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     return true;
 }
 
-bool onKeyTyped(SceneEditor& /*sceneEditor*/, caustica::KeyTypedEvent& e)
+bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
 {
-    imGuiForwardInputCharacter(e.getCodepoint());
+    const unsigned int cp = e.getCodepoint();
+    // ` / ~ toggles the command bar; don't insert the activator into the input.
+    if ((cp == '`' || cp == '~') && sceneEditor.editorUIState().ShowCommandBar)
+        return true;
+
+    imGuiForwardInputCharacter(cp);
     return ImGui::GetIO().WantTextInput;
 }
 
