@@ -63,17 +63,19 @@ void EditorUI::BuildMainMenuBar()
 
     if (ImGui::BeginMenu("File"))
     {
-        if (ImGui::MenuItem("Open Scene...", "Ctrl+O"))
-            m_sceneEditor.openSceneFromDialog();
+        const bool sceneBusy = m_sceneEditor.app()
+            && caustica::isSceneStructureBusy(*m_sceneEditor.app());
+        if (ImGui::MenuItem("Open Scene...", "Ctrl+O", false, !sceneBusy))
+            m_sceneEditor.requestOpenSceneFromDialog();
 
         const bool canSave = m_sceneEditor.canSaveScene();
         const bool canSaveAs = m_sceneEditor.app()
             && caustica::isSceneLoaded(*m_sceneEditor.app())
             && m_sceneEditor.editorState().sceneDocumentValid;
         if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, canSave || canSaveAs))
-            m_sceneEditor.saveScene();
+            m_sceneEditor.requestSaveScene();
         if (ImGui::MenuItem("Save Scene As...", nullptr, false, canSaveAs))
-            m_sceneEditor.saveSceneAsFromDialog();
+            m_sceneEditor.requestSaveSceneAsFromDialog();
 
         ImGui::Separator();
         if (ImGui::MenuItem("Reload Shaders", "F5"))
@@ -103,10 +105,6 @@ void EditorUI::BuildMainMenuBar()
             m_sceneEditor.requestUndo();
         if (ImGui::MenuItem(redoText, "Ctrl+Y", false, canRedo))
             m_sceneEditor.requestRedo();
-        ImGui::Separator();
-        ImGui::MenuItem("Transform Gizmo", nullptr, &m_editorUI.ShowTransformGizmo);
-        ImGui::MenuItem("Infinite Grid", nullptr, &m_editorUI.ShowInfiniteGrid);
-        ImGui::MenuItem("View Orientation Gizmo", nullptr, &m_editorUI.ShowViewOrientationGizmo);
         ImGui::Separator();
         if (ImGui::MenuItem("Preferences..."))
             m_editorUI.ShowPreferences = true;

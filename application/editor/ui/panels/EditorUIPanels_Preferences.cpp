@@ -20,7 +20,7 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
                viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
         ImGuiCond_Appearing,
         ImVec2(0.5f, 0.5f));
-    // Default 4:3 landscape — wider than the old tall 420x520 dialog.
+    // Default 4:3 landscape (width > height). Old ini may still store tall 420x520.
     const float prefW = 640.f * m_currentScale;
     const float prefH = 480.f * m_currentScale;
     ImGui::SetNextWindowSize(ImVec2(prefW, prefH), ImGuiCond_Appearing);
@@ -29,6 +29,14 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
     {
         ImGui::End();
         return;
+    }
+
+    // Override persisted portrait sizes so the dialog always opens landscape 4:3.
+    if (ImGui::IsWindowAppearing())
+    {
+        const ImVec2 size = ImGui::GetWindowSize();
+        if (size.y >= size.x)
+            ImGui::SetWindowSize(ImVec2(prefW, prefH));
     }
 
     // PopItemWidth must run before End(); popping after End lands in Debug##Default

@@ -494,7 +494,7 @@ void ImGui_Console::renderCommandBar(
 		return;
 
 	constexpr float kBarMargin = 8.f;
-	constexpr float kBarHeight = 36.f;
+	constexpr float kBarHeight = 42.f;
 	constexpr int kMaxSuggestions = 12;
 	constexpr int kRecentLogLines = 8;
 
@@ -617,10 +617,18 @@ void ImGui_Console::renderCommandBar(
 		ImGui::PopStyleColor();
 	}
 
-	// Prompt + input
+	// Prompt + input — lift FrameBg / border so the field reads against the bar.
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.14f, 0.16f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.36f, 0.36f, 0.40f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 5.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.f);
+	ImGui::BeginChild("##CommandBarInputRow", ImVec2(0.f, 0.f), true, ImGuiWindowFlags_NoScrollbar);
+
 	ImGui::AlignTextToFramePadding();
+	ImGui::PushStyleColor(ImGuiCol_Text, kColCommand);
 	ImGui::TextUnformatted(">");
-	ImGui::SameLine();
+	ImGui::PopStyleColor();
+	ImGui::SameLine(0.f, 6.f);
 	ImGui::SetNextItemWidth(-1.f);
 
 	if (requestFocus)
@@ -648,6 +656,14 @@ void ImGui_Console::renderCommandBar(
 	if (!suggestionsActive)
 		inputFlags |= ImGuiInputTextFlags_CallbackHistory;
 
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.08f, 0.10f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.10f, 0.10f, 0.12f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.11f, 0.11f, 0.14f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.42f, 0.42f, 0.48f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.f, 5.f));
+
 	bool submitted = ImGui::InputText(
 		"##CommandBarInput",
 		m_InputBuffer.data(),
@@ -658,6 +674,9 @@ void ImGui_Console::renderCommandBar(
 			return static_cast<ImGui_Console*>(data->UserData)->textEditCallback(data);
 		},
 		this);
+
+	ImGui::PopStyleVar(3);
+	ImGui::PopStyleColor(4);
 
 	if (submitted)
 	{
@@ -672,6 +691,10 @@ void ImGui_Console::renderCommandBar(
 		}
 		ImGui::SetKeyboardFocusHere(-1);
 	}
+
+	ImGui::EndChild();
+	ImGui::PopStyleVar(2);
+	ImGui::PopStyleColor(2);
 
 	if (m_Options.font)
 		ImGui::PopFont();
