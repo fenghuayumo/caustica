@@ -151,7 +151,10 @@ Prefer system parameters, then focused application headers:
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
 | `engine/SceneMeshEdit.h` | Vertex reads/deformation and geometry-sequence playback (**entity** overloads). |
-| `MeshHandle` / `MeshInstanceComponent` | App mesh identity (`meshHandle()`); do not dig `MeshInfo` GPU ids. |
+| `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
+| `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
+
+`EngineApp.h` does not pull `Scene.h`; use `SceneQuery` / system params for scene access.
 | `engine/CameraApi.h` | Camera selection state, pose, FOV, and intrinsics. |
 | `engine/SceneLifecycle.h` | Scene selection/reload operations. |
 | `engine/RenderSessionApi.h` | Session-level render controls. |

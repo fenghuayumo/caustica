@@ -17,7 +17,6 @@
 #include <render/RenderAppState.h>
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
-#include <scene/Scene.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -26,6 +25,8 @@
 
 namespace caustica
 {
+
+class Scene;
 
 // Minimal config for embedding caustica in a new application.
 // Prefer EngineApp::create() over assembling SceneAppConfig / DefaultPlugins yourself.

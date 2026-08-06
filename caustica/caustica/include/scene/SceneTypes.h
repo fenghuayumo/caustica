@@ -76,10 +76,13 @@ namespace caustica
 
     const char* materialDomainToString(MaterialDomain domain);
 
+    namespace scene::internal { struct RenderResourceAccess; }
+
     struct Material
     {
-        scene::MaterialRenderResourceId renderResourceId;
-        Handle<MaterialAsset> asset;
+        friend struct scene::internal::RenderResourceAccess;
+
+        Handle<MaterialAsset> asset; // app-facing MaterialHandle when registered
         std::string name;
         std::string modelFileName;      // where this material originated from, e.g. GLTF file name
         int materialIndexInModel = -1;  // index of the material in the model file
@@ -147,11 +150,15 @@ namespace caustica
         // Useful when metalness and roughness are packed into a 2-channel texture for BC5 encoding.
         bool metalnessInRedChannel = false;
 
-        int materialID = 0;
+        int materialID = 0; // dense scene-list index (legacy); pick uses StandardMaterial::gpuDataIndex
 
         virtual ~Material() = default;
         void fillConstantBuffer(struct MaterialConstants& constants, bool useResourceDescriptorHeapBindless = false) const;
         bool setProperty(const std::string& name, const dm::float4& value);
+
+    private:
+        // Extract / GPU registry key — not part of the app authoring surface.
+        scene::MaterialRenderResourceId m_renderResourceId;
     };
 
 
@@ -183,8 +190,6 @@ namespace caustica
 
         Count
     };
-
-    namespace scene::internal { struct RenderResourceAccess; }
 
     struct MeshGeometry
     {

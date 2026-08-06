@@ -1,8 +1,8 @@
 #pragma once
 
-// Engine-internal GPU keys for MeshInfo / MeshGeometry.
-// Applications must not include this. Use MeshHandle, MeshInstanceComponent,
-// SceneMeshEdit (entity), SceneSpawn, SceneTransform instead.
+// Engine-internal GPU keys for MeshInfo / MeshGeometry / Material.
+// Applications must not include this. Use MeshHandle, MaterialHandle,
+// MeshInstanceComponent, SceneMeshEdit (entity), SceneSpawn, SceneTransform instead.
 
 #include <scene/SceneTypes.h>
 
@@ -29,6 +29,16 @@ struct RenderResourceAccess
     [[nodiscard]] static GeometryRenderResourceId& geometryId(MeshGeometry& geometry)
     {
         return geometry.m_renderResourceId;
+    }
+
+    [[nodiscard]] static MaterialRenderResourceId materialId(const Material* material)
+    {
+        return material ? material->m_renderResourceId : MaterialRenderResourceId{};
+    }
+
+    [[nodiscard]] static MaterialRenderResourceId& materialId(Material& material)
+    {
+        return material.m_renderResourceId;
     }
 };
 

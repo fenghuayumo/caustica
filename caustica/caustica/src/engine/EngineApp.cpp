@@ -2,9 +2,11 @@
 
 #include <engine/DefaultPlugins.h>
 #include <engine/EntryPoint.h>
+#include <engine/SceneQuery.h>
 #include <core/path_utils.h>
 #include <core/log.h>
 #include <platform/window.h>
+#include <scene/Scene.h>
 
 #include <array>
 #include <utility>

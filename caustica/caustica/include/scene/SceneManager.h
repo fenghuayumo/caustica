@@ -68,17 +68,6 @@ public:
     [[nodiscard]] bool isStructureEditInFlight() const { return m_structureEditDepth > 0; }
     [[nodiscard]] bool isSceneStructureBusy() const { return isSceneLoading() || isStructureEditInFlight(); }
 
-    // Looks up by Material::materialID (dense scene-list index).
-    // Prefer caustica::findMaterial(app, id) -- it resolves StandardMaterial::gpuDataIndex first.
-    static std::shared_ptr<caustica::Material> findMaterial(
-        const std::shared_ptr<caustica::Scene>& scene, int materialID)
-    {
-        if (!scene) return nullptr;
-        for (const auto& mat : scene->getMaterials())
-            if (mat->materialID == materialID) return mat;
-        return nullptr;
-    }
-
     static caustica::ecs::Entity findEntityByInstanceIndex(
         const std::shared_ptr<caustica::Scene>& scene, int instanceIndex)
     {

@@ -16,9 +16,9 @@ std::atomic<uint32_t> g_nextMaterialRenderResourceId{0};
 
 void EnsureMaterialRenderResourceId(const std::shared_ptr<Material>& material)
 {
-    if (material && !material->renderResourceId)
+    if (material && !RenderResourceAccess::materialId(material.get()))
     {
-        material->renderResourceId = scene::MaterialRenderResourceId::make(
+        RenderResourceAccess::materialId(*material) = scene::MaterialRenderResourceId::make(
             g_nextMaterialRenderResourceId.fetch_add(1, std::memory_order_relaxed), 0);
     }
 }

@@ -1,7 +1,10 @@
 #include <render/core/MaterialBindingCache.h>
 #include <render/SceneGpuResources.h>
+#include <scene/internal/RenderResourceAccess.h>
 
 #include <core/log.h>
+
+using caustica::scene::internal::RenderResourceAccess;
 
 namespace caustica
 {
@@ -109,7 +112,7 @@ caustica::rhi::BindingSetHandle MaterialBindingCache::createMaterialBindingSet(c
             if (m_sceneGpuResources == nullptr)
                 return nullptr;
             const auto materialGpuIt =
-                m_sceneGpuResources->materialRegistry.find(material->renderResourceId);
+                m_sceneGpuResources->materialRegistry.find(RenderResourceAccess::materialId(material));
             if (materialGpuIt == m_sceneGpuResources->materialRegistry.end()
                 || !materialGpuIt->second.constantsBuffer)
             {

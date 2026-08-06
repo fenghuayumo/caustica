@@ -8,11 +8,13 @@
 #include <engine/SceneSession.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
+#include <scene/internal/RenderResourceAccess.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/WorldRenderer.h>
 
 using namespace caustica::render;
+using caustica::scene::internal::RenderResourceAccess;
 
 namespace caustica
 {
@@ -156,8 +158,8 @@ bool shouldRenderWhenUnfocused(const App& app)
 
 std::shared_ptr<Material> findMaterial(const App& app, int materialID)
 {
-    // Path-tracer pick stores StandardMaterial::gpuDataIndex. After the snapshot refactor,
-    // Standard materials live in MaterialGpuCache (not MaterialEx::standardData on scene materials).
+    // Pick id is StandardMaterial::gpuDataIndex (path-tracer / Material Editor).
+    // Do not fall back to dense Material::materialID — it can diverge after imports.
     if (materialID < 0)
         return nullptr;
 
@@ -166,43 +168,32 @@ std::shared_ptr<Material> findMaterial(const App& app, int materialID)
     const std::shared_ptr<StandardMaterial> standardFromCache =
         cache ? cache->findByGpuDataIndex(uint(materialID)) : nullptr;
 
-    if (standardFromCache)
-    {
-        // Prefer a live scene MaterialEx so the editor keeps a stable identity;
-        // re-link standardData for StandardMaterial::safeCast / Material Editor.
-        if (const std::shared_ptr<Scene> active = activeScene(app))
-        {
-            for (const auto& mat : active->getMaterials())
-            {
-                auto materialEx = std::dynamic_pointer_cast<MaterialEx>(mat);
-                if (!materialEx || !mat)
-                    continue;
-                if (cache->findByResourceId(mat->renderResourceId).get() != standardFromCache.get())
-                    continue;
-                materialEx->standardData = standardFromCache;
-                return mat;
-            }
-        }
-
-        // No scene counterpart (or id mismatch) - wrap for Material Editor only.
-        auto wrap = std::make_shared<MaterialEx>();
-        wrap->standardData = standardFromCache;
-        wrap->name = standardFromCache->name;
-        wrap->modelFileName = standardFromCache->modelName;
-        return wrap;
-    }
-
-    // Fallback: dense scene-list Material::materialID (can diverge from gpuDataIndex).
-    const std::shared_ptr<Scene> active = activeScene(app);
-    if (!active)
+    if (!standardFromCache)
         return nullptr;
 
-    for (const auto& mat : active->getMaterials())
+    // Prefer a live scene MaterialEx so the editor keeps a stable identity;
+    // re-link standardData for StandardMaterial::safeCast / Material Editor.
+    if (const std::shared_ptr<Scene> active = activeScene(app))
     {
-        if (mat && mat->materialID == materialID)
+        for (const auto& mat : active->getMaterials())
+        {
+            auto materialEx = std::dynamic_pointer_cast<MaterialEx>(mat);
+            if (!materialEx || !mat)
+                continue;
+            if (cache->findByResourceId(RenderResourceAccess::materialId(mat.get())).get()
+                != standardFromCache.get())
+                continue;
+            materialEx->standardData = standardFromCache;
             return mat;
+        }
     }
-    return nullptr;
+
+    // No scene counterpart — wrap for Material Editor only.
+    auto wrap = std::make_shared<MaterialEx>();
+    wrap->standardData = standardFromCache;
+    wrap->name = standardFromCache->name;
+    wrap->modelFileName = standardFromCache->modelName;
+    return wrap;
 }
 
 ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex)

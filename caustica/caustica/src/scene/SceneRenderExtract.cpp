@@ -475,11 +475,11 @@ void ExtractMaterialSnapshots(
     out.materialSnapshots.reserve(entityWorld.getMaterials().size());
     for (const std::shared_ptr<Material>& material : entityWorld.getMaterials())
     {
-        if (!material || !material->renderResourceId)
+        if (!material || !RenderResourceAccess::materialId(material.get()))
             continue;
 
         MaterialRenderResourceSnapshot snapshot;
-        snapshot.id = material->renderResourceId;
+        snapshot.id = RenderResourceAccess::materialId(material.get());
         snapshot.materialIndex = material->materialID;
         snapshot.debugName = material->name;
         snapshot.modelFileName = material->modelFileName;
@@ -567,9 +567,7 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
                 continue;
             GeometryRenderResourceSnapshot geometry;
             geometry.id = RenderResourceAccess::geometryId(sourceGeometry.get());
-            geometry.materialId = sourceGeometry->material
-                ? sourceGeometry->material->renderResourceId
-                : MaterialRenderResourceId{};
+            geometry.materialId = RenderResourceAccess::materialId(sourceGeometry->material.get());
             geometry.materialIndex = sourceGeometry->material
                 ? sourceGeometry->material->materialID
                 : ~0u;

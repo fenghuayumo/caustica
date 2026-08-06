@@ -34,6 +34,9 @@ struct MaterialAsset
     std::shared_ptr<Material> material;
 };
 
+// App-facing material identity (AssetSystem). Prefer over digging Material GPU ids.
+using MaterialHandle = Handle<MaterialAsset>;
+
 struct SceneAsset
 {
     AssetId id = AssetId::invalid();

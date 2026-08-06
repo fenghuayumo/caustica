@@ -39,6 +39,7 @@ void clearActiveScene(App& app);
 [[nodiscard]] bool shouldSkipRender(const App& app);
 [[nodiscard]] bool shouldRenderWhenUnfocused(const App& app);
 
+// Resolve by path-tracer pick id (StandardMaterial::gpuDataIndex). Not Material::materialID.
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);
 [[nodiscard]] ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex);
 
