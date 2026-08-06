@@ -7,7 +7,7 @@ caustica exposes a `caustica` Python module in **two complementary modes**:
 | **Embed** | `caustica.exe` | Python is hosted inside the running renderer | Live tweaking, debug overlays, capture scripts |
 | **Extension** | `caustica.pyd` | Python launches the renderer (`python script.py`) | Offline rendering, batch / data generation, headless CI |
 
-Both modes share the same `caustica.Material`, `caustica.SceneNode`, `caustica.settings`,
+Both modes share the same `caustica.Material`, `caustica.SceneEntity`, `caustica.settings`,
 `caustica.Sample` types. Inspect `caustica.MODE` (`"embed"` vs `"extension"`) when you need
 to branch.
 

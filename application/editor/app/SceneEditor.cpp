@@ -1336,9 +1336,9 @@ bool SceneEditor::loadObjMeshFile(const std::filesystem::path& filePath)
     return m_contentEditor.loadObjMeshFile(filePath);
 }
 
-bool SceneEditor::deleteSceneNode(caustica::ecs::Entity entity)
+bool SceneEditor::deleteEntity(caustica::ecs::Entity entity)
 {
-    return m_contentEditor.deleteSceneNode(entity);
+    return m_contentEditor.deleteEntity(entity);
 }
 
 void SceneEditor::processPendingSceneDeletes()
@@ -1353,7 +1353,7 @@ void SceneEditor::processPendingSceneDeletes()
     if (!ew || !ew->world().isAlive(entity))
         return;
 
-    deleteSceneNode(entity);
+    deleteEntity(entity);
 }
 
 void SceneEditor::requestFullRebuild()
@@ -1361,27 +1361,14 @@ void SceneEditor::requestFullRebuild()
     m_contentEditor.requestFullRebuild();
 }
 
-std::vector<float3> SceneEditor::getMeshVertices(const std::shared_ptr<MeshInfo>& mesh) const
+std::vector<float3> SceneEditor::getMeshVertices(caustica::ecs::Entity entity) const
 {
-    return m_contentEditor.getMeshVertices(mesh);
-}
-
-std::vector<float3> SceneEditor::getMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh)
-{
-    return m_contentEditor.getMeshVerticesWorld(mesh);
+    return m_contentEditor.getMeshVertices(entity);
 }
 
 std::vector<float3> SceneEditor::getMeshVerticesWorld(caustica::ecs::Entity entity)
 {
     return m_contentEditor.getMeshVerticesWorld(entity);
-}
-
-void SceneEditor::setMeshVerticesWorld(const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<float3>& vertices,
-    bool recomputeNormals,
-    bool rebuildAccelerationStructure)
-{
-    m_contentEditor.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 void SceneEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
@@ -1392,12 +1379,12 @@ void SceneEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
     m_contentEditor.setMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
-void SceneEditor::setMeshVertices(const std::shared_ptr<MeshInfo>& mesh,
+void SceneEditor::setMeshVertices(caustica::ecs::Entity entity,
     const std::vector<float3>& vertices,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
-    m_contentEditor.setMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+    m_contentEditor.setMeshVertices(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
 }
 
 ZoomTool* SceneEditor::getOrCreateZoomTool()

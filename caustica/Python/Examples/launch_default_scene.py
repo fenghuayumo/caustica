@@ -47,16 +47,16 @@ def customize_imported_model(
         raise RuntimeError("No active scene after mesh import.")
 
     model_name = model_path.stem
-    node = scene.find_node(model_name)
-    if node is not None:
-        node.translation = IMPORTED_MODEL_TRANSLATION
-        node.scaling = IMPORTED_MODEL_SCALING
+    entity = scene.find_entity(model_name)
+    if entity is not None:
+        entity.translation = IMPORTED_MODEL_TRANSLATION
+        entity.scaling = IMPORTED_MODEL_SCALING
         print(
-            f"[caustica] Updated node '{model_name}' transform: "
+            f"[caustica] Updated entity '{model_name}' transform: "
             f"translation={IMPORTED_MODEL_TRANSLATION}, scaling={IMPORTED_MODEL_SCALING}"
         )
     else:
-        print(f"[caustica] WARNING: scene node '{model_name}' not found")
+        print(f"[caustica] WARNING: scene entity '{model_name}' not found")
 
     renderer.step_n(1)
 
@@ -262,8 +262,8 @@ def main() -> int:
             if not obj_path.exists():
                 raise FileNotFoundError(f"Mesh not found: {obj_path}")
             print(f"[caustica] Loading mesh: {obj_path}")
-            node = renderer.app.spawn_from_file(str(obj_path))
-            if node is None:
+            entity = renderer.app.spawn_from_file(str(obj_path))
+            if entity is None:
                 raise RuntimeError(f"spawn_from_file failed: {obj_path}")
             customize_imported_model(renderer, obj_path, albedo=albedo, tint=albedo is None)
 

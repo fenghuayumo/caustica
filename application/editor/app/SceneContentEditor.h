@@ -5,12 +5,7 @@
 #include <ecs/Entity.h>
 
 #include <filesystem>
-#include <memory>
-
-namespace caustica
-{
-struct MeshInfo;
-}
+#include <vector>
 
 namespace caustica::editor
 {
@@ -28,17 +23,12 @@ public:
     bool loadMeshFile(const std::filesystem::path& filePath);
     bool loadGltfMeshFile(const std::filesystem::path& filePath);
     bool loadObjMeshFile(const std::filesystem::path& filePath);
-    bool deleteSceneNode(caustica::ecs::Entity entity);
+    bool deleteEntity(caustica::ecs::Entity entity);
     void requestFullRebuild();
 
-    std::vector<caustica::math::float3> getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
-    std::vector<caustica::math::float3> getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const;
+    std::vector<caustica::math::float3> getMeshVertices(caustica::ecs::Entity entity) const;
     std::vector<caustica::math::float3> getMeshVerticesWorld(caustica::ecs::Entity entity) const;
-    void setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
-        const std::vector<caustica::math::float3>& vertices,
-        bool recomputeNormals = true,
-        bool rebuildAccelerationStructure = true);
-    void setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
+    void setMeshVertices(caustica::ecs::Entity entity,
         const std::vector<caustica::math::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);

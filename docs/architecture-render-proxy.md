@@ -67,13 +67,13 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 - `SceneSpawn.h` - `load` / `spawn` / `despawn`
 - `SceneTransform.h` - local transform / translation / visibility
-- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`), prefer **entity** overloads
+- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`) via **entity** only
 - `MeshHandle` / `MaterialHandle` + `MeshInstanceComponent::meshHandle()` — app asset identity
 
 `MeshInfo` / `MeshGeometry` / `Material` GPU keys (`m_renderResourceId`) are private; only Extract /
 GPU updater touch them via `scene/internal/RenderResourceAccess.h`. Pick materials with
-`findMaterial(app, gpuDataIndex)` — not dense `Material::materialID`. Do not dig
-`shared_ptr<MeshInfo>` for new hosts.
+`findMaterial(app, gpuDataIndex)` — not dense `Material::materialID`. Hosts use entity +
+`MeshHandle` only — not `shared_ptr<MeshInfo>`.
 `SetSceneMeshVerticesParams` / `engine/internal/SceneMeshEditing.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
 Editor `demo::PropComponentBase` / `GameModel` live only under `application/editor/game`

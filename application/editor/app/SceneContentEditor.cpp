@@ -105,7 +105,7 @@ bool SceneContentEditor::loadObjMeshFile(const std::filesystem::path& filePath)
     return importMeshFile(filePath);
 }
 
-bool SceneContentEditor::deleteSceneNode(caustica::ecs::Entity entity)
+bool SceneContentEditor::deleteEntity(caustica::ecs::Entity entity)
 {
     auto* app = m_sceneEditor.app();
     if (!app)
@@ -131,31 +131,14 @@ void SceneContentEditor::requestFullRebuild()
         pathTracing->rayTracingResources().requestFullRebuild();
 }
 
-std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh) const
+std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(caustica::ecs::Entity entity) const
 {
-    return caustica::getMeshVertices(*m_sceneEditor.app(), mesh);
-}
-
-std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh) const
-{
-    return caustica::getMeshVerticesWorld(*m_sceneEditor.app(), mesh);
+    return caustica::getMeshVertices(*m_sceneEditor.app(), entity);
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVerticesWorld(caustica::ecs::Entity entity) const
 {
     return caustica::getMeshVerticesWorld(*m_sceneEditor.app(), entity);
-}
-
-void SceneContentEditor::setMeshVerticesWorld(const std::shared_ptr<caustica::MeshInfo>& mesh,
-    const std::vector<caustica::math::float3>& vertices,
-    bool recomputeNormals,
-    bool rebuildAccelerationStructure)
-{
-    caustica::setMeshVerticesWorld(
-        *m_sceneEditor.app(),
-        mesh,
-        vertices,
-        { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }
 
 void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
@@ -170,14 +153,14 @@ void SceneContentEditor::setMeshVerticesWorld(caustica::ecs::Entity entity,
         { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }
 
-void SceneContentEditor::setMeshVertices(const std::shared_ptr<caustica::MeshInfo>& mesh,
+void SceneContentEditor::setMeshVertices(caustica::ecs::Entity entity,
     const std::vector<caustica::math::float3>& vertices,
     bool recomputeNormals,
     bool rebuildAccelerationStructure)
 {
     caustica::setMeshVertices(
         *m_sceneEditor.app(),
-        mesh,
+        entity,
         vertices,
         { .recomputeNormals = recomputeNormals, .rebuildAccelerationStructure = rebuildAccelerationStructure });
 }

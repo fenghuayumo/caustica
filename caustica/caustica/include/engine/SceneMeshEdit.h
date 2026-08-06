@@ -4,14 +4,12 @@
 #include <math/math.h>
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 
 namespace caustica
 {
 
 class App;
-struct MeshInfo;
 
 // App-facing mesh deform options. GPU upload / AS rebuild stay inside the engine.
 // (Low-level GPU wiring: engine/internal/SceneMeshEditing.h — apps must not include.)
@@ -26,30 +24,17 @@ struct SceneMeshEditOptions
     bool resetAccumulationOnAccelRebuild = true;
 };
 
-// Prefer entity overloads. shared_ptr<MeshInfo> remains for importers / transitional Python.
 [[nodiscard]] std::vector<dm::float3> getMeshVertices(App& app, ecs::Entity entity);
-[[nodiscard]] std::vector<dm::float3> getMeshVertices(App& app, const std::shared_ptr<MeshInfo>& mesh);
 [[nodiscard]] std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity);
-[[nodiscard]] std::vector<dm::float3> getMeshVerticesWorld(App& app, const std::shared_ptr<MeshInfo>& mesh);
 
 void setMeshVertices(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SceneMeshEditOptions& options = {});
-void setMeshVertices(
-    App& app,
-    const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options = {});
 void setMeshVerticesWorld(
     App& app,
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options = {});
-void setMeshVerticesWorld(
-    App& app,
-    const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
     const SceneMeshEditOptions& options = {});
 

@@ -63,22 +63,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def find_target_mesh(app, mesh_name: str):
+def find_target_mesh_entity(app, mesh_name: str):
     if mesh_name:
-        mesh = app.find_mesh(mesh_name)
-        if mesh is not None:
-            return mesh
+        entity = app.find_mesh_entity(mesh_name)
+        if entity is not None:
+            return entity
 
-    for mesh in app.get_meshes():
-        name = mesh.name.lower()
+    for entity in app.get_mesh_entities():
+        name = entity.name.lower()
         if name in {"plane", "builtin_plane"} or name.startswith("builtin:"):
             continue
-        return mesh
+        return entity
 
-    meshes = app.get_meshes()
-    if meshes:
-        return meshes[-1]
-    raise RuntimeError("No deformable mesh found in the loaded scene.")
+    entities = app.get_mesh_entities()
+    if entities:
+        return entities[-1]
+    raise RuntimeError("No deformable mesh entity found in the loaded scene.")
 
 
 def compute_mesh_center(vertices: list[tuple[float, float, float]]) -> tuple[float, float, float]:
@@ -128,7 +128,7 @@ def make_deform_callback(
 
 def apply_deformation(
     app,
-    mesh,
+    entity,
     base_vertices: list[tuple[float, float, float]],
     center: tuple[float, float, float],
     args: argparse.Namespace,
@@ -138,7 +138,7 @@ def apply_deformation(
         base_vertices, center, args.deform_mode, args.amplitude, time_value
     )
     app.deform_mesh(
-        mesh,
+        entity,
         callback,
         recompute_normals=args.recompute_normals,
         rebuild_acceleration_structure=args.rebuild_accel,
@@ -157,17 +157,17 @@ def configure_renderer(renderer, caustica, args: argparse.Namespace) -> tuple[ob
     settings.enable_animations = False
     apply_gaussian_settings_and_rebuild(renderer, caustica, settings, args)
 
-    mesh = find_target_mesh(renderer.app, args.mesh_name)
-    base_vertices = list(renderer.app.get_mesh_vertices(mesh))
+    entity = find_target_mesh_entity(renderer.app, args.mesh_name)
+    base_vertices = list(renderer.app.get_mesh_vertices(entity))
     if not base_vertices:
-        raise RuntimeError(f"Mesh '{mesh.name}' has no readable CPU vertex cache.")
+        raise RuntimeError(f"Mesh entity '{entity.name}' has no readable CPU vertex cache.")
     center = compute_mesh_center(base_vertices)
-    print(f"[caustica] Target mesh : {mesh.name} ({mesh.vertex_count} vertices)")
+    print(f"[caustica] Target mesh entity : {entity.name} ({len(base_vertices)} vertices)")
     print(f"[caustica] Deform mode : {args.deform_mode}, amplitude={args.amplitude}, speed={args.speed}")
-    return mesh, base_vertices, center
+    return entity, base_vertices, center
 
 
-def render_sequence(renderer, mesh, base_vertices, center, args: argparse.Namespace, launch_cwd: Path) -> None:
+def render_sequence(renderer, entity, base_vertices, center, args: argparse.Namespace, launch_cwd: Path) -> None:
     out_dir = resolve_output_path(args.out_dir, launch_cwd)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -179,7 +179,7 @@ def render_sequence(renderer, mesh, base_vertices, center, args: argparse.Namesp
     t_start = time.time()
     for frame in range(args.frames):
         time_value = (frame / max(args.frames - 1, 1)) * math.pi * 2.0 * args.speed
-        apply_deformation(renderer.app, mesh, base_vertices, center, args, time_value)
+        apply_deformation(renderer.app, entity, base_vertices, center, args, time_value)
         settings.reset_accumulation = True
         renderer.step_n(max(args.spp_per_frame, 1))
 
@@ -192,7 +192,7 @@ def render_sequence(renderer, mesh, base_vertices, center, args: argparse.Namesp
     print(f"[caustica] Animation sequence done in {elapsed:.2f}s ({args.frames} frames)")
 
 
-def run_window_loop(renderer, mesh, base_vertices, center, args: argparse.Namespace) -> None:
+def run_window_loop(renderer, entity, base_vertices, center, args: argparse.Namespace) -> None:
     print("[caustica] Ready. Animated mesh deformation running.")
     print("[caustica]   Close window or Ctrl+C to exit.")
     settings = renderer.settings
@@ -201,7 +201,7 @@ def run_window_loop(renderer, mesh, base_vertices, center, args: argparse.Namesp
     try:
         while True:
             time_value = (time.time() - t0) * args.speed
-            apply_deformation(renderer.app, mesh, base_vertices, center, args, time_value)
+            apply_deformation(renderer.app, entity, base_vertices, center, args, time_value)
             settings.reset_accumulation = True
             if not renderer.step(-1.0):
                 break
@@ -235,12 +235,12 @@ def main() -> int:
         accumulation_target=max(args.spp_per_frame, 1),
     ) as renderer:
         print(f"[caustica] Loaded scene: {renderer.app.scene_name}")
-        mesh, base_vertices, center = configure_renderer(renderer, caustica, args)
+        entity, base_vertices, center = configure_renderer(renderer, caustica, args)
 
         if args.headless:
-            render_sequence(renderer, mesh, base_vertices, center, args, launch_cwd)
+            render_sequence(renderer, entity, base_vertices, center, args, launch_cwd)
         else:
-            run_window_loop(renderer, mesh, base_vertices, center, args)
+            run_window_loop(renderer, entity, base_vertices, center, args)
 
     return 0
 

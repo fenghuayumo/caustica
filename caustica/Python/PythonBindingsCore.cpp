@@ -45,9 +45,6 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include <array>
-#include <cstring>
-#include <unordered_set>
 #include <algorithm>
 #include <cctype>
 
@@ -363,7 +360,7 @@ namespace
         }
     }
 
-    std::shared_ptr<PySceneEntity> PyNodeFromEntity(Scene* scene, ecs::Entity entity)
+    std::shared_ptr<PySceneEntity> PyEntityFromEntity(Scene* scene, ecs::Entity entity)
     {
         if (!scene || !ecs::isValid(entity))
             return nullptr;
@@ -409,94 +406,50 @@ namespace
         return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
     }
 
-    std::vector<std::shared_ptr<MeshInfo>> GetSceneMeshes(const Scene* scene)
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneMeshEntities(Scene* scene)
     {
-        std::vector<std::shared_ptr<MeshInfo>> result;
+        std::vector<std::shared_ptr<PySceneEntity>> result;
         if (!scene)
             return result;
 
-        for (const auto& mesh : scene->getMeshes())
-            result.push_back(mesh);
+        for (ecs::Entity entity : scene->getMeshInstances())
+        {
+            if (auto pyEntity = PyEntityFromEntity(scene, entity))
+                result.push_back(std::move(pyEntity));
+        }
         return result;
     }
 
-    std::shared_ptr<MeshInfo> FindSceneMesh(const Scene* scene, const std::string& name)
+    std::shared_ptr<PySceneEntity> FindSceneMeshEntity(Scene* scene, const std::string& name)
     {
-        if (!scene)
+        if (!scene || name.empty())
             return nullptr;
 
-        for (const auto& mesh : scene->getMeshes())
+        scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
+        for (ecs::Entity entity : scene->getMeshInstances())
         {
-            if (mesh && mesh->name == name)
-                return mesh;
+            if (!ecs::isValid(entity))
+                continue;
+
+            if (entityWorld && entityWorld->getEntityName(entity) == name)
+                return PyEntityFromEntity(scene, entity);
+
+            if (entityWorld)
+            {
+                const auto* meshComponent =
+                    entityWorld->world().tryGet<scene::MeshInstanceComponent>(entity);
+                if (meshComponent && meshComponent->mesh && meshComponent->mesh->name == name)
+                    return PyEntityFromEntity(scene, entity);
+            }
         }
         return nullptr;
     }
 
-    std::shared_ptr<MeshInfo> MeshFromEntity(const PySceneEntity& pyEntity)
+    ecs::Entity EntityFromPy(const std::shared_ptr<PySceneEntity>& entity)
     {
-        scene::SceneEntityWorld* entityWorld = pyEntity.entityWorld();
-        if (!entityWorld || !ecs::isValid(pyEntity.entity))
-            return nullptr;
-
-        const auto* meshComponent = entityWorld->world().get<scene::MeshInstanceComponent>(pyEntity.entity);
-        return meshComponent && meshComponent->mesh ? meshComponent->mesh : nullptr;
-    }
-
-    ecs::Entity EntityHandleFromPyNode(const std::shared_ptr<PySceneEntity>& node)
-    {
-        if (!node || !ecs::isValid(node->entity))
-            throw std::runtime_error("SceneNode is null or invalid");
-        return node->entity;
-    }
-
-    std::array<uint32_t, 3> MeshPositionKey(const float3& p)
-    {
-        std::array<uint32_t, 3> key{};
-        std::memcpy(&key[0], &p.x, sizeof(uint32_t));
-        std::memcpy(&key[1], &p.y, sizeof(uint32_t));
-        std::memcpy(&key[2], &p.z, sizeof(uint32_t));
-        return key;
-    }
-
-    struct MeshPositionKeyHash
-    {
-        size_t operator()(const std::array<uint32_t, 3>& key) const noexcept
-        {
-            size_t h = std::hash<uint32_t>{}(key[0]);
-            h ^= std::hash<uint32_t>{}(key[1]) + 0x9e3779b9u + (h << 6) + (h >> 2);
-            h ^= std::hash<uint32_t>{}(key[2]) + 0x9e3779b9u + (h << 6) + (h >> 2);
-            return h;
-        }
-    };
-
-    size_t UniqueMeshPositionCount(const MeshInfo& mesh)
-    {
-        if (!mesh.buffers || mesh.totalVertices == 0)
-            return 0;
-
-        const auto& positions = mesh.buffers->positionData;
-        const size_t begin = size_t(mesh.vertexOffset);
-        const size_t end = begin + size_t(mesh.totalVertices);
-        if (positions.size() < end)
-            return size_t(mesh.totalVertices);
-
-        const auto* meshEx = dynamic_cast<const MeshInfoEx*>(&mesh);
-        if (meshEx && meshEx->DeformationSourcePositionIndices.size() == size_t(mesh.totalVertices))
-        {
-            std::unordered_set<uint32_t> uniqueSourcePositions;
-            uniqueSourcePositions.reserve(mesh.totalVertices);
-            for (uint32_t sourceIndex : meshEx->DeformationSourcePositionIndices)
-                uniqueSourcePositions.insert(sourceIndex);
-            return uniqueSourcePositions.size();
-        }
-
-        std::unordered_set<std::array<uint32_t, 3>, MeshPositionKeyHash> uniquePositions;
-        uniquePositions.reserve(mesh.totalVertices);
-        for (size_t i = begin; i < end; ++i)
-            uniquePositions.insert(MeshPositionKey(positions[i]));
-
-        return uniquePositions.size();
+        if (!entity || !ecs::isValid(entity->entity))
+            throw std::runtime_error("SceneEntity is null or invalid");
+        return entity->entity;
     }
 
     std::vector<float3> ToFloat3Vector(const nb::object& src)
@@ -758,7 +711,7 @@ void RegisterCoreBindings(nb::module_& m)
         .export_values();
 
     nb::enum_<LightType>(m, "LightType",
-        "Light entity kind. Matches SceneNode.light_type and shaders/light_types.h.",
+        "Light entity kind. Matches SceneEntity.light_type and shaders/light_types.h.",
         nb::is_arithmetic())
         .value("None_", LightType::None, "Not a light (LightType_None / 0).")
         .value("Directional", LightType::Directional)
@@ -1097,42 +1050,21 @@ void RegisterCoreBindings(nb::module_& m)
                 return std::string("<caustica.Material '") + self.name + "'>";
             });
 
-    // Lights are ECS typed components on SceneNode (no OO Light hierarchy).
+    // Lights are ECS typed components on SceneEntity (no OO Light hierarchy).
 
     nb::class_<MeshHandle>(m, "MeshHandle",
-        "Asset-system mesh identity. Prefer SceneNode + Sample.*_mesh*(node=...) over Mesh.")
+        "Asset-system mesh identity. Prefer SceneEntity + Sample.*_mesh*(entity=...).")
         .def_prop_ro("valid", [](const MeshHandle& self) { return bool(self); })
         .def_prop_ro("name", [](const MeshHandle& self) -> std::string {
                 return self ? self->name : std::string{};
             })
-        .def_prop_ro("mesh", [](const MeshHandle& self) -> std::shared_ptr<MeshInfo> {
-                return self ? self->mesh : nullptr;
-            }, "Transitional CPU Mesh record, or None.")
         .def("__repr__", [](const MeshHandle& self) {
                 return self
                     ? (std::string("<caustica.MeshHandle '") + self->name + "'>")
                     : std::string("<caustica.MeshHandle invalid>");
             });
 
-    nb::class_<MeshInfo>(m, "Mesh",
-        "Transitional CPU mesh record. Prefer SceneNode + entity deform APIs\n"
-        "(get_mesh_vertices(node=...), set_mesh_vertices(node=...), deform_mesh(node=...)).")
-        .def_ro("name", &MeshInfo::name)
-        .def_ro("global_mesh_index", &MeshInfo::globalMeshIndex)
-        .def_prop_ro("vertex_count", [](MeshInfo& self) { return UniqueMeshPositionCount(self); },
-            "Number of unique position vertices returned by Sample.get_mesh_vertices.")
-        .def_ro("index_count", &MeshInfo::totalIndices)
-        .def_prop_ro("geometry_count", [](MeshInfo& self) { return self.geometries.size(); })
-        .def_prop_ro("bounds", [](MeshInfo& self) -> nb::object {
-                return SceneBoundsTuple(ValidSceneBounds(self.objectSpaceBounds));
-            },
-            "Object-space `((min.xyz), (max.xyz))` AABB for this mesh.")
-        .def("__repr__", [](MeshInfo& self) {
-                return std::string("<caustica.Mesh '") + self.name
-                    + "' vertices=" + std::to_string(self.totalVertices) + ">";
-            });
-
-    nb::class_<PySceneEntity>(m, "SceneNode",
+    nb::class_<PySceneEntity>(m, "SceneEntity",
         "ECS scene entity wrapper for runtime mesh/light/camera transforms.")
         .def_prop_ro("name", [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -1150,11 +1082,11 @@ void RegisterCoreBindings(nb::module_& m)
                     entityWorld->world().tryGet<scene::MeshInstanceComponent>(self.entity);
                 return meshComponent ? meshComponent->meshHandle() : MeshHandle{};
             }, "MeshHandle for this mesh instance, or invalid when not a mesh.")
-        .def_prop_ro("mesh", [](PySceneEntity& self) {
-                return MeshFromEntity(self);
-            }, "Transitional Mesh record, or None when it is not a mesh instance.")
         .def_prop_ro("is_mesh", [](PySceneEntity& self) {
-                return MeshFromEntity(self) != nullptr;
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !ecs::isValid(self.entity))
+                    return false;
+                return entityWorld->world().tryGet<scene::MeshInstanceComponent>(self.entity) != nullptr;
             })
         .def_prop_ro("is_light", [](PySceneEntity& self) {
                 return EntityLightType(self) != LightType_None;
@@ -1172,7 +1104,7 @@ void RegisterCoreBindings(nb::module_& m)
                 if (dm::float3* color = TryMutableLightColor(self))
                     *color = ToFloat3(v);
             },
-            "Light color when this node has a light component.")
+            "Light color when this entity has a light component.")
         .def_prop_rw("intensity",
             [](PySceneEntity& self) {
                 const float* intensity = TryMutableLightIntensity(self);
@@ -1381,7 +1313,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def("__repr__", [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
                 const std::string name = entityWorld ? entityWorld->getEntityName(self.entity) : std::string{};
-                return std::string("<caustica.SceneNode '") + name + "'>";
+                return std::string("<caustica.SceneEntity '") + name + "'>";
             });
 
     // --- Scene ------------------------------------------------------------
@@ -1403,23 +1335,24 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def("get_lights", [](Scene& self) {
                 return GetSceneLights(&self);
-            }, "Return every light entity as SceneNode.")
+            }, "Return every light entity as SceneEntity.")
 
         .def("find_light", [](Scene& self, const std::string& name) {
                 return FindSceneLight(&self, name);
-            }, nb::arg("name"), "Look up a light entity by name; returns SceneNode or None.")
+            }, nb::arg("name"), "Look up a light entity by name; returns SceneEntity or None.")
         .def("get_cameras", [](Scene& self) {
                 return GetSceneCameras(&self);
-            }, "Return every camera entity as SceneNode.")
-        .def("find_node", [](Scene& self, const std::string& path) {
+            }, "Return every camera entity as SceneEntity.")
+        .def("find_entity", [](Scene& self, const std::string& path) {
                 return FindSceneEntity(&self, path);
             }, nb::arg("path"), "Look up a scene entity by name or path.")
-        .def("get_meshes", [](Scene& self) {
-                return GetSceneMeshes(&self);
-            }, "Transitional: list CPU Mesh records. Prefer SceneNode / MeshHandle.")
-        .def("find_mesh", [](Scene& self, const std::string& name) {
-                return FindSceneMesh(&self, name);
-            }, nb::arg("name"), "Transitional: prefer find_node + node.mesh_handle.")
+        .def("get_mesh_entities", [](Scene& self) {
+                return GetSceneMeshEntities(&self);
+            }, "Return every mesh-instance entity as SceneEntity.")
+        .def("find_mesh_entity", [](Scene& self, const std::string& name) {
+                return FindSceneMeshEntity(&self, name);
+            }, nb::arg("name"),
+            "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
         .def("create_directional_light",
             [](Scene& self, nb::object color, float irradiance, float angularSize, const std::string& name) {
@@ -1435,7 +1368,7 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("irradiance") = 1.f,
             nb::arg("angular_size") = 0.f,
             nb::arg("name") = std::string(),
-            "Create a directional light under the scene root and return its SceneNode.")
+            "Create a directional light under the scene root and return its SceneEntity.")
         .def("create_point_light",
             [](Scene& self, nb::object color, float intensity, float radius, float range, const std::string& name) {
                 const std::string lightName = MakeUniqueLightName(&self, name, "PointLight");
@@ -1452,7 +1385,7 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("radius") = 0.f,
             nb::arg("range") = 0.f,
             nb::arg("name") = std::string(),
-            "Create a point light under the scene root and return its SceneNode.")
+            "Create a point light under the scene root and return its SceneEntity.")
         .def("create_spot_light",
             [](Scene& self, nb::object color, float intensity, float radius, float range,
                float innerAngle, float outerAngle, const std::string& name) {
@@ -1474,7 +1407,7 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("inner_angle") = 180.f,
             nb::arg("outer_angle") = 180.f,
             nb::arg("name") = std::string(),
-            "Create a spot light under the scene root and return its SceneNode.")
+            "Create a spot light under the scene root and return its SceneEntity.")
         .def("create_environment_light",
             [](Scene& self, nb::object color, const std::string& path, float rotation, const std::string& name) {
                 const std::string lightName = MakeUniqueLightName(&self, name, "EnvironmentLight");
@@ -1489,7 +1422,7 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("path") = std::string(),
             nb::arg("rotation") = 0.f,
             nb::arg("name") = std::string(),
-            "Create an environment light under the scene root and return its SceneNode.")
+            "Create an environment light under the scene root and return its SceneEntity.")
 
         .def_prop_ro("material_count", [](Scene& self) {
                 return GetSceneMaterials(&self).size();
@@ -1862,16 +1795,16 @@ void RegisterCoreBindings(nb::module_& m)
         .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
                 return FindSceneLight(caustica::activeScene(self).get(), name);
             }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_node", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
+        .def("find_entity", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
                 return FindSceneEntity(caustica::activeScene(self).get(), path);
-            }, nb::arg("path"), "Compatibility alias for `sample.scene.find_node(path)`.")
+            }, nb::arg("path"), "Compatibility alias for `sample.scene.find_entity(path)`.")
 
-        .def("get_meshes", [](App& self) {
-                return GetSceneMeshes(caustica::activeScene(self).get());
-            }, "Transitional: prefer SceneNode / MeshHandle.")
-        .def("find_mesh", [](App& self, const std::string& name) -> std::shared_ptr<MeshInfo> {
-                return FindSceneMesh(caustica::activeScene(self).get(), name);
-            }, nb::arg("name"), "Transitional: prefer find_node + node.mesh_handle.")
+        .def("get_mesh_entities", [](App& self) {
+                return GetSceneMeshEntities(caustica::activeScene(self).get());
+            }, "Compatibility alias for `sample.scene.get_mesh_entities()`.")
+        .def("find_mesh_entity", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
+                return FindSceneMeshEntity(caustica::activeScene(self).get(), name);
+            }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh_entity(name)`.")
 
         .def("set_environment_map", [](App& self, const std::string& path) {
                 caustica::setEnvMapOverrideSource(self, path);
@@ -1923,67 +1856,50 @@ void RegisterCoreBindings(nb::module_& m)
             "assets.load: import a mesh/prefab file into a ScenePrefab handle (no spawn).")
         .def("spawn", [](App& self, const Handle<ScenePrefabAsset>& prefab) {
                 auto scene = caustica::activeScene(self);
-                return PyNodeFromEntity(scene.get(), caustica::spawn(self, prefab));
+                return PyEntityFromEntity(scene.get(), caustica::spawn(self, prefab));
             },
             nb::arg("prefab"),
-            "Spawn a previously loaded ScenePrefab into the active scene. Returns root SceneNode.")
+            "Spawn a previously loaded ScenePrefab into the active scene. Returns root SceneEntity.")
         .def("spawn_from_file", [](App& self, const std::string& path) {
                 auto scene = caustica::activeScene(self);
-                return PyNodeFromEntity(scene.get(), caustica::spawnFromFile(self, path));
+                return PyEntityFromEntity(scene.get(), caustica::spawnFromFile(self, path));
             },
             nb::arg("path"),
-            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*). Returns root SceneNode.")
+            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*). Returns root SceneEntity.")
         .def("load_mesh_file", [](App& self, const std::string& fileName) {
                 return caustica::spawnFromFile(self, fileName) != ecs::NullEntity;
             },
             nb::arg("file_name"),
             "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc) to the current scene.")
-        .def("despawn", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
-                return caustica::despawn(self, EntityHandleFromPyNode(node));
+        .def("despawn", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return caustica::despawn(self, EntityFromPy(entity));
             },
-            nb::arg("node"),
+            nb::arg("entity"),
             "Remove a scene entity (and children) via the engine despawn path.")
 
-        .def("get_mesh_vertices", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
+        .def("get_mesh_vertices", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
                 return Float3VectorToList(
-                    caustica::getMeshVertices(self, EntityHandleFromPyNode(node)));
-            }, nb::arg("node"),
-            "Return unique mesh positions for a SceneNode in object space.")
-        .def("get_mesh_vertices", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(caustica::getMeshVertices(self, mesh));
-            }, nb::arg("mesh"),
-            "Transitional: prefer get_mesh_vertices(node=...).")
+                    caustica::getMeshVertices(self, EntityFromPy(entity)));
+            }, nb::arg("entity"),
+            "Return unique mesh positions for a SceneEntity in object space.")
         .def("set_mesh_vertices",
-            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
+            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 caustica::setMeshVertices(
                     self,
-                    EntityHandleFromPyNode(node),
+                    EntityFromPy(entity),
                     ToFloat3Vector(vertices),
                     { .recomputeNormals = recomputeNormals,
                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
             },
-            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "Replace object-space positions for a SceneNode mesh.")
-        .def("set_mesh_vertices",
-            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                caustica::setMeshVertices(
-                    self,
-                    mesh,
-                    ToFloat3Vector(vertices),
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-            },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Transitional: prefer set_mesh_vertices(node=...).")
+            "Replace object-space positions for a SceneEntity mesh.")
         .def("deform_mesh",
-            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
+            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity entity = EntityHandleFromPyNode(node);
-                std::vector<float3> vertices = caustica::getMeshVertices(self, entity);
+                const ecs::Entity handle = EntityFromPy(entity);
+                std::vector<float3> vertices = caustica::getMeshVertices(self, handle);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
@@ -1992,94 +1908,36 @@ void RegisterCoreBindings(nb::module_& m)
                 }
                 caustica::setMeshVertices(
                     self,
-                    entity,
+                    handle,
                     vertices,
                     { .recomputeNormals = recomputeNormals,
                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
                 return vertices.size();
             },
-            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "Apply callback(i, (x,y,z)) to each unique object-space vertex on a SceneNode.")
-        .def("deform_mesh",
-            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = caustica::getMeshVertices(self, mesh);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                caustica::setMeshVertices(
-                    self,
-                    mesh,
-                    vertices,
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-                return vertices.size();
-            },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Transitional: prefer deform_mesh(node=...).")
-        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<PySceneEntity>& node) {
+            "Apply callback(i, (x,y,z)) to each unique object-space vertex on a SceneEntity.")
+        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
                 return Float3VectorToList(
-                    caustica::getMeshVerticesWorld(self, EntityHandleFromPyNode(node)));
-            }, nb::arg("node"))
-        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(caustica::getMeshVerticesWorld(self, mesh));
-            }, nb::arg("mesh"),
-            "Transitional: prefer get_mesh_vertices_world(node=...).")
+                    caustica::getMeshVerticesWorld(self, EntityFromPy(entity)));
+            }, nb::arg("entity"))
         .def("set_mesh_vertices_world",
-            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
+            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
                 caustica::setMeshVerticesWorld(
                     self,
-                    EntityHandleFromPyNode(node),
+                    EntityFromPy(entity),
                     ToFloat3Vector(vertices),
                     { .recomputeNormals = recomputeNormals,
                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
             },
-            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
-        .def("set_mesh_vertices_world",
-            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                caustica::setMeshVerticesWorld(
-                    self,
-                    mesh,
-                    ToFloat3Vector(vertices),
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-            },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Transitional: prefer set_mesh_vertices_world(node=...).")
-        .def("deform_mesh_world",
-            [](App& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity entity = EntityHandleFromPyNode(node);
-                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, entity);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                caustica::setMeshVerticesWorld(
-                    self,
-                    entity,
-                    vertices,
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-                return vertices.size();
-            },
-            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh_world",
-            [](App& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, mesh);
+                const ecs::Entity handle = EntityFromPy(entity);
+                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, handle);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
@@ -2088,15 +1946,14 @@ void RegisterCoreBindings(nb::module_& m)
                 }
                 caustica::setMeshVerticesWorld(
                     self,
-                    mesh,
+                    handle,
                     vertices,
                     { .recomputeNormals = recomputeNormals,
                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
                 return vertices.size();
             },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Transitional: prefer deform_mesh_world(node=...).")
+            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("rebuild_acceleration_structure") = true)
 
         .def("request_shader_reload",  [](App& self) {
                 self.resource<RenderAppState>().runtime.Invalidation.ShaderReloadRequested = true;
@@ -2105,17 +1962,11 @@ void RegisterCoreBindings(nb::module_& m)
                 self.resource<RenderAppState>().runtime.Invalidation.AccelerationStructRebuildRequested = true;
             })
         .def("request_mesh_accel_rebuild",
-            [](App& self, const std::shared_ptr<PySceneEntity>& node) {
-                caustica::requestMeshAccelRebuild(self, EntityHandleFromPyNode(node));
+            [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
+                caustica::requestMeshAccelRebuild(self, EntityFromPy(entity));
             },
-            nb::arg("node"),
-            "Request a BLAS rebuild for the mesh on one SceneNode.")
-        .def("request_mesh_accel_rebuild",
-            [](App& self, const std::shared_ptr<MeshInfo>& mesh) {
-                caustica::requestMeshAccelRebuild(self, mesh);
-            },
-            nb::arg("mesh"),
-            "Transitional: prefer request_mesh_accel_rebuild(node=...).")
+            nb::arg("entity"),
+            "Request a BLAS rebuild for the mesh on one SceneEntity.")
         .def("reset_accumulation",     [](App& self) {
                 if (auto* s = caustica::settings(self))
                     s->ResetAccumulation = true;
@@ -2189,7 +2040,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Current path-tracer render resolution as (width, height).")
         ;
 
-    nb::class_<SceneEditor>(m, "EditorSample",
+        nb::class_<SceneEditor>(m, "EditorSample",
         "Editor host extensions. Prefer Sample.* APIs (load_mesh_file / deform_mesh / spawn);\n"
         "these methods remain for embed-mode scripts that already hold an EditorSample.")
         .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
@@ -2198,84 +2049,60 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("file_name"),
             "Append a mesh file (.gltf/.glb/.obj/.urdf/.usd*) to the current scene.")
-        .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.getMeshVertices(mesh));
-            }, nb::arg("mesh"),
+        .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return Float3VectorToList(self.getMeshVertices(EntityFromPy(entity)));
+            }, nb::arg("entity"),
             "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
         .def("set_mesh_vertices",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.setMeshVertices(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVertices(EntityFromPy(entity), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "Replace all unique object-space positions for a mesh and refresh GPU buffers.")
+            "Replace all unique object-space positions for a SceneEntity mesh.")
         .def("deform_mesh",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.getMeshVertices(mesh);
+                const ecs::Entity handle = EntityFromPy(entity);
+                std::vector<float3> vertices = self.getMeshVertices(handle);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.setMeshVertices(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVertices(handle, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true,
-            "apply a Python callback to each unique vertex.")
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh) {
-                return Float3VectorToList(self.getMeshVerticesWorld(mesh));
-            }, nb::arg("mesh"))
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node) {
-                return Float3VectorToList(self.getMeshVerticesWorld(EntityHandleFromPyNode(node)));
-            }, nb::arg("node"))
+            "Apply callback(i, (x,y,z)) to each unique object-space vertex on a SceneEntity.")
+        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return Float3VectorToList(self.getMeshVerticesWorld(EntityFromPy(entity)));
+            }, nb::arg("entity"))
         .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object vertices,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.setMeshVerticesWorld(mesh, ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(EntityFromPy(entity), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
             },
-            nb::arg("mesh"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
-        .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.setMeshVerticesWorld(EntityHandleFromPyNode(node), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("node"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<MeshInfo>& mesh, nb::object callback,
+            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                bool recomputeNormals, bool rebuildAccelerationStructure) {
-                std::vector<float3> vertices = self.getMeshVerticesWorld(mesh);
+                const ecs::Entity handle = EntityFromPy(entity);
+                std::vector<float3> vertices = self.getMeshVerticesWorld(handle);
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
                     if (!updated.is_none())
                         vertices[i] = ToFloat3(updated);
                 }
-                self.setMeshVerticesWorld(mesh, vertices, recomputeNormals, rebuildAccelerationStructure);
+                self.setMeshVerticesWorld(handle, vertices, recomputeNormals, rebuildAccelerationStructure);
                 return vertices.size();
             },
-            nb::arg("mesh"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
-        .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& node, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity entity = EntityHandleFromPyNode(node);
-                std::vector<float3> vertices = self.getMeshVerticesWorld(entity);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.setMeshVerticesWorld(entity, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("node"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
             nb::arg("rebuild_acceleration_structure") = true)
         ;
 }

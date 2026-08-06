@@ -65,12 +65,7 @@ SetSceneMeshVerticesParams makeInternalMeshEditParams(App& app, const SceneMeshE
 
 std::vector<dm::float3> getMeshVertices(App& app, ecs::Entity entity)
 {
-    return getMeshVertices(app, meshFromEntity(app, entity));
-}
-
-std::vector<dm::float3> getMeshVertices(App& /*app*/, const std::shared_ptr<MeshInfo>& mesh)
-{
-    return caustica::getMeshVertices(mesh);
+    return caustica::getMeshVertices(meshFromEntity(app, entity));
 }
 
 std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
@@ -80,29 +75,13 @@ std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
     return caustica::getMeshVerticesWorld(activeScene(app), entity, frameIndex);
 }
 
-std::vector<dm::float3> getMeshVerticesWorld(App& app, const std::shared_ptr<MeshInfo>& mesh)
-{
-    GpuDevice* device = gpuDevice(app);
-    const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-    return caustica::getMeshVerticesWorld(activeScene(app), mesh, frameIndex);
-}
-
 void setMeshVertices(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SceneMeshEditOptions& options)
 {
-    setMeshVertices(app, meshFromEntity(app, entity), vertices, options);
-}
-
-void setMeshVertices(
-    App& app,
-    const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options)
-{
-    caustica::setMeshVertices(mesh, vertices, makeInternalMeshEditParams(app, options));
+    caustica::setMeshVertices(meshFromEntity(app, entity), vertices, makeInternalMeshEditParams(app, options));
 }
 
 void setMeshVerticesWorld(
@@ -112,15 +91,6 @@ void setMeshVerticesWorld(
     const SceneMeshEditOptions& options)
 {
     caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshEditParams(app, options));
-}
-
-void setMeshVerticesWorld(
-    App& app,
-    const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options)
-{
-    caustica::setMeshVerticesWorld(mesh, vertices, makeInternalMeshEditParams(app, options));
 }
 
 bool applyGeometrySequence(

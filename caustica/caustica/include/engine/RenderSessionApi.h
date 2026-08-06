@@ -34,7 +34,7 @@ bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool
 [[nodiscard]] uint32_t gaussianSplatObjectCount(const App& app);
 [[nodiscard]] const std::string& gaussianSplatFileName(const App& app);
 
-// Prefer entity. shared_ptr path is transitional (Python / internal deform).
+// Prefer entity for public/host code. MeshInfo overloads are engine-internal use.
 void requestMeshAccelRebuild(App& app, ecs::Entity entity, bool resetAccumulation = true);
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh);
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bool resetAccumulation);
