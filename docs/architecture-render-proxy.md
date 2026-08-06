@@ -12,12 +12,12 @@ Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game
 ## Intended contract
 
 ```
-SceneWorld (ECS)          Extract                SceneRenderData[N%3]           WorldRenderer
-─────────────────         ───────                ────────────────────          ─────────────
-TransformComponent   ──►  Changed / dirty   ──►  MeshInstanceRenderProxy      read-only
-*LightComponent      ──►  LightData pack    ──►  LightRenderProxy             no getEntityWorld()
-CameraController     ──►  pose / FOV        ──►  ActiveCameraRenderProxy      apply then updateViews
-PathTracerSettings   ──►  full copy         ──►  RenderSettingsSnapshot       activeSettings()
+SceneWorld (ECS)     PostUpdate resolve      Extract (copy)         SceneRenderData[N%3]      WorldRenderer
+─────────────────    ──────────────────      ──────────────         ────────────────────     ─────────────
+TransformComponent   ResolvedActiveCamera ─► ActiveCamera copy  ──► ActiveCameraRenderProxy  read-only
+*LightComponent      (App resource)          Light/mesh proxies ──► LightRenderProxy          no getEntityWorld()
+SessionCamera        after TransformPropagate PathTracerSettings ─► RenderSettingsSnapshot    activeSettings()
+PathTracerSettings   (already App resource)  one-shot clear
 ```
 
 **Rules**
@@ -86,6 +86,15 @@ Host systems can take Bevy-style parameters: `EntityWorld`, `Query<...>`, `Res` 
 `Commands`. Bundle spawn is `EntityWorld::spawn(...)` / `SceneEntityWorld::spawnNamed` (typed
 lights/meshes still go through the existing `set*` bookkeeping). `EngineApp::run` /
 `stepFrame` auto-run `finishStartup` after the host registers systems.
+
+Session camera / settings stay **App resources** (`SessionCamera`, `ResolvedActiveCamera`,
+`PathTracerSettings`). Free vs scene camera resolve runs in PostUpdate
+(`SceneResolveActiveCamera` after `TransformPropagate`); Extract only copies into the snapshot.
+Applications must not dig `worldRenderer()` — use `RenderSessionApi` / `CameraApi` /
+`SceneLifecycle`. `WorldRenderer` access is `engine/internal/WorldRendererAccess.h`.
+
+`Scene` owns `SceneEntityWorld` + `SceneRenderSnapshot` + `SceneStructureGpuSync` (async AS
+handoff). Editor `application/editor/game` and `scene/GameModel` / `GameTypes` are demo-only.
 
 Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).

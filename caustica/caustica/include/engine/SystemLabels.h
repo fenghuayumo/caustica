@@ -22,6 +22,7 @@ struct SceneStartup { static constexpr const char* name = "Scene.Startup"; };
 struct SceneBeginFrame { static constexpr const char* name = "Scene.beginFrame"; };
 struct SceneAnimate { static constexpr const char* name = "Scene.animate"; };
 struct SceneUpdateCamera { static constexpr const char* name = "Scene.updateCamera"; };
+struct SceneResolveActiveCamera { static constexpr const char* name = "Scene.ResolveActiveCamera"; };
 struct SceneTickSimulation { static constexpr const char* name = "Scene.TickSimulation"; };
 struct SceneUpdateWindowTitle { static constexpr const char* name = "Scene.UpdateWindowTitle"; };
 struct SceneRefreshEntityWorld { static constexpr const char* name = "Scene.RefreshEntityWorld"; };

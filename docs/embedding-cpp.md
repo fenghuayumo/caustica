@@ -114,7 +114,9 @@ engine->run();
 
 Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
 `Query<Components...>`, and `SystemContext&`. Prefer `EntityWorld` /
-`Query<>` over digging through `GpuRenderSubsystem`.
+`Query<>` over digging through `GpuRenderSubsystem` or `WorldRenderer`.
+Session camera / path-tracer settings are App resources; do not call
+`worldRenderer()` from host code — use `RenderSessionApi` / `CameraApi`.
 
 An `update` system with no explicit set joins
 `system_set::Simulation`. The per-frame order is:

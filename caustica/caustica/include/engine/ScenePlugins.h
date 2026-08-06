@@ -43,6 +43,7 @@ struct WindowTitlePlugin : Plugin
 
 // Schedule entry points implemented by the plugins above / RenderFrameApi.
 void updateCamera(App& app, float elapsedTimeSeconds);
+void resolveActiveCamera(App& app);
 void updateWindowTitle(App& app);
 void prepareRenderFrame(App& app);
 void refreshEntityWorld(App& app, uint32_t frameIndex);

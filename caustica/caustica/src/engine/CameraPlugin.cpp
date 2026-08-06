@@ -3,6 +3,8 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/AppResources.h>
+#include <engine/RenderSessionApi.h>
+#include <engine/ResolvedActiveCamera.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
@@ -10,7 +12,6 @@
 #include <backend/GpuDevice.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
@@ -39,8 +40,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
         : 1;
     cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), cameraCount - 1);
 
-    // Logic-side preview of the selected scene camera (same proxy math Extract uses).
-    // RT still consumes ActiveCameraRenderProxy from the published snapshot.
+    // Logic-side preview of the selected scene camera (same proxy math as ResolveActiveCamera).
     if (cam.selectedCameraIndex() > 0 && cameraEntities)
     {
         const uint32_t camIdx = cam.selectedCameraIndex() - 1;
@@ -60,27 +60,21 @@ void updateCamera(App& app, float elapsedTimeSeconds)
 
     cam.camera().animate(elapsedTimeSeconds);
 
-    if (auto* wr = worldRenderer(app))
+    if (cfg->CameraAntiRRSleepJitter > 0)
     {
-        if (cfg->CameraAntiRRSleepJitter > 0)
-        {
-            float off = 0.05f * ((wr->getFrameIndex() % 2)
-                ? (-cfg->CameraAntiRRSleepJitter)
-                : cfg->CameraAntiRRSleepJitter);
+        float off = 0.05f * ((renderFrameIndex(app) % 2)
+            ? (-cfg->CameraAntiRRSleepJitter)
+            : cfg->CameraAntiRRSleepJitter);
 
-            math::float3 dir = cam.camera().getDir();
-            math::float3 right = math::normalize(math::cross(dir, cam.camera().getUp()));
-            math::affine3 rot = math::rotation(right, off);
-            dir = rot.transformVector(dir);
+        math::float3 dir = cam.camera().getDir();
+        math::float3 right = math::normalize(math::cross(dir, cam.camera().getUp()));
+        math::affine3 rot = math::rotation(right, off);
+        dir = rot.transformVector(dir);
 
-            cam.camera().lookTo(cam.camera().getPosition(), dir, cam.camera().getUp());
-        }
+        cam.camera().lookTo(cam.camera().getPosition(), dir, cam.camera().getUp());
     }
 
-    // SessionCamera's PlanarView is logic-side only (gizmo / 3DGS CPU pick). The
-    // render thread owns a separate CameraController filled from Extract — keep
-    // this view in sync with the free-camera pose using the window framebuffer
-    // size (display space), not WorldRenderer::getRenderSize().
+    // SessionCamera's PlanarView is logic-side only (gizmo / 3DGS CPU pick).
     if (GpuDevice* device = app.getGpuDevice(); device && !device->isHeadless())
     {
         int width = 0;
@@ -100,9 +94,47 @@ void updateCamera(App& app, float elapsedTimeSeconds)
         cam.updateLastCameraState();
         if (!cfg->RealtimeMode)
             cfg->ResetAccumulation = true;
-        if (auto* wr = worldRenderer(app))
-            wr->setGaussianSplatTemporalReset(true);
+        setGaussianSplatTemporalReset(app, true);
     }
+}
+
+void resolveActiveCamera(App& app)
+{
+    auto* sessionCam = app.tryResource<SessionCamera>();
+    auto* resolved = app.tryResource<ResolvedActiveCamera>();
+    if (!sessionCam || !resolved)
+        return;
+
+    CameraController& cam = sessionCam->camera;
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
+
+    // selectedIndex 0 = free camera; 1..N = scene cameras in registration order.
+    // Runs after TransformPropagate so GlobalTransform is current for RT.
+    if (cam.selectedCameraIndex() > 0 && ew)
+    {
+        const auto& cameraEntities = ew->cameraEntitiesInRegistrationOrder();
+        const uint32_t camIdx = cam.selectedCameraIndex() - 1;
+        if (camIdx < cameraEntities.size())
+        {
+            const ecs::Entity camEntity = cameraEntities[camIdx];
+            const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
+            const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
+            if (camComp && globalComp)
+            {
+                const scene::CameraRenderProxy proxy =
+                    scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
+                if (proxy.projection == scene::CameraProjectionKind::Perspective)
+                {
+                    scene::fillActiveCameraFromPerspectiveProxy(
+                        proxy, cam.selectedCameraIndex(), resolved->camera);
+                    return;
+                }
+            }
+        }
+    }
+
+    scene::fillActiveCameraFromFreeController(cam, resolved->camera);
 }
 
 void CameraPlugin::configureSchedules(App& app)
@@ -112,6 +144,13 @@ void CameraPlugin::configureSchedules(App& app)
             return;
         updateCamera(ctx.app, ctx.deltaTimeSeconds);
     });
+
+    app.addSystem<system_label::SceneResolveActiveCamera>(
+        AppSchedule::PostUpdate,
+        [](SystemContext& ctx) { resolveActiveCamera(ctx.app); },
+        AppSystemOrdering{}
+            .inSet<system_set::TransformPropagate>()
+            .runAfter<system_label::SceneRefreshEntityWorld>());
 }
 
 } // namespace caustica

@@ -2,6 +2,7 @@
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -9,7 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <engine/ActiveScene.h>
 #include <assets/AssetSystem.h>
@@ -18,6 +19,7 @@
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
+#include <cstdarg>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
 #include <scene/scene_utils.h>
@@ -610,6 +612,16 @@ bool hasAsyncLoadingInProgress(const App& app)
         return false;
     return diag->asyncLoadingInProgress
         || runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0;
+}
+
+void sceneSwitchTrace(const char* fmt, ...)
+{
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    detail::sceneSwitchTrace("%s", buf);
 }
 
 } // namespace caustica

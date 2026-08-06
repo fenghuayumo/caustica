@@ -499,65 +499,28 @@ bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
 bool Scene::hasSceneStructureChanged(uint32_t frameIndex) const
 {
     const scene::SceneRenderPublishState& state = m_RenderSnapshot.publishedStateForFrame(frameIndex);
-    return state.structureGeneration
-        > m_gpuStructureConsumedGeneration.load(std::memory_order_acquire);
+    return state.structureGeneration > m_structureGpu.consumedGeneration();
 }
 
 void Scene::acknowledgeGpuStructureConsumed(uint32_t frameIndex)
 {
     const uint64_t generation =
         m_RenderSnapshot.publishedStateForFrame(frameIndex).structureGeneration;
-    uint64_t consumed = m_gpuStructureConsumedGeneration.load(std::memory_order_relaxed);
-    while (consumed < generation
-        && !m_gpuStructureConsumedGeneration.compare_exchange_weak(
-            consumed, generation, std::memory_order_release, std::memory_order_relaxed))
-    {
-    }
-}
-
-void Scene::requestGpuStructureSync()
-{
-    m_pendingGpuStructureSync = true;
-}
-
-void Scene::clearGpuStructureSyncRequest()
-{
-    m_pendingGpuStructureSync = false;
+    m_structureGpu.acknowledgeGpuStructureConsumed(generation);
 }
 
 void Scene::freezeCommittedFromLogicCache()
 {
-    assertLogicThread();
     if (!m_LogicExtractCacheValid)
         return;
-
-    auto frozen = std::make_shared<scene::SceneRenderData>(m_LogicExtractCache);
-    std::lock_guard lock(m_committedRenderDataMutex);
-    m_committedRenderData = std::move(frozen);
-}
-
-void Scene::beginStructureGpuBuild()
-{
-    m_structureGpuBuildInFlight.store(true, std::memory_order_release);
+    m_structureGpu.freezeCommittedFromLogicCache(m_LogicExtractCache);
 }
 
 void Scene::finishStructureGpuBuild(
     uint32_t frameIndex, std::shared_ptr<const scene::SceneRenderData> built)
 {
-    assertRenderThread();
-    if (built)
-    {
-        std::lock_guard lock(m_committedRenderDataMutex);
-        m_committedRenderData = std::move(built);
-    }
     acknowledgeGpuStructureConsumed(frameIndex);
-    m_structureGpuBuildInFlight.store(false, std::memory_order_release);
-}
-
-std::shared_ptr<const scene::SceneRenderData> Scene::committedRenderData() const
-{
-    std::lock_guard lock(m_committedRenderDataMutex);
-    return m_committedRenderData;
+    m_structureGpu.finishStructureGpuBuild(std::move(built));
 }
 
 void Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
@@ -1266,15 +1229,9 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     pending.transformsChanged = m_EntityWorld->hasPendingTransformChanges();
     pending.frameIndex = frameIndex;
     if (pending.structureChanged)
-    {
-        pending.structureGeneration =
-            m_gpuStructureGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
-    }
+        pending.structureGeneration = m_structureGpu.bumpPublishedGeneration();
     else
-    {
-        pending.structureGeneration =
-            m_gpuStructureGeneration.load(std::memory_order_acquire);
-    }
+        pending.structureGeneration = m_structureGpu.publishedGeneration();
 
     m_EntityWorld->refresh(frameIndex);
 }
@@ -1312,9 +1269,8 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
     {
         // Carry structure-flush across no-op frames until GPU consumes it.
         // Do not treat this as an extract structure rebuild — proxies are already current.
-        pending.structureGeneration = m_gpuStructureGeneration.load(std::memory_order_acquire);
-        pending.structureChanged = pending.structureGeneration
-            > m_gpuStructureConsumedGeneration.load(std::memory_order_acquire);
+        pending.structureGeneration = m_structureGpu.publishedGeneration();
+        pending.structureChanged = pending.structureGeneration > m_structureGpu.consumedGeneration();
         pending.transformsChanged = false;
         pending.frameIndex = frameIndex;
     }

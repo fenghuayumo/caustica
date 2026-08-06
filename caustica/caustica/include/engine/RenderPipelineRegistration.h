@@ -1,7 +1,7 @@
 #pragma once
 
 #include <engine/App.h>
-#include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/WorldRenderer.h>
 

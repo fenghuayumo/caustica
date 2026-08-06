@@ -19,7 +19,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneSession.h>
 #include <core/path_utils.h>
@@ -882,18 +882,18 @@ bool SceneEditor::openSceneFromDialog()
         return false;
     }
 
-    caustica::detail::sceneSwitchTrace("Open Scene: showing file dialog");
+    caustica::sceneSwitchTrace("Open Scene: showing file dialog");
     std::string picked;
     if (!caustica::FileDialog(
             true,
             "Scene files (*.scene.json;*.json)\0*.scene.json;*.json\0All files\0*.*\0",
             picked))
     {
-        caustica::detail::sceneSwitchTrace("Open Scene: cancelled");
+        caustica::sceneSwitchTrace("Open Scene: cancelled");
         return false;
     }
 
-    caustica::detail::sceneSwitchTrace("Open Scene: picked '%s'", picked.c_str());
+    caustica::sceneSwitchTrace("Open Scene: picked '%s'", picked.c_str());
     // forceReload: dialog pick must always reload even if the path string matches.
     caustica::setCurrentScene(*m_app, picked, true);
     return true;

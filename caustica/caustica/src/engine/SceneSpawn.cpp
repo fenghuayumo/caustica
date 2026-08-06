@@ -1,12 +1,13 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SceneGaussianSplatLogic.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneQuery.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/ScenePlugins.h>
 #include <assets/AssetSystem.h>

@@ -3,7 +3,7 @@
 #include <cassert>
 #include <engine/CameraApi.h>
 #include <engine/SceneQuery.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <render/core/CameraController.h>
 
 namespace caustica

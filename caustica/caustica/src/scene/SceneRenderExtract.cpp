@@ -360,37 +360,6 @@ void ExtractAnimationEntities(ecs::World& world, SceneRenderData& out)
     });
 }
 
-void FillActiveCameraFromFreeController(const CameraController& camera, ActiveCameraRenderProxy& out)
-{
-    out.sourceEntity = ecs::NullEntity;
-    out.selectedCameraIndex = camera.selectedCameraIndex();
-    out.position = camera.camera().getPosition();
-    out.direction = camera.camera().getDir();
-    out.up = camera.camera().getUp();
-    out.verticalFovRadians = camera.verticalFOV();
-    out.zNear = camera.zNear();
-    out.useCustomIntrinsics = camera.useCustomIntrinsics();
-    out.intrinsics = camera.intrinsics();
-    out.intrinsicsViewport = camera.intrinsicsViewport();
-    out.valid = true;
-}
-
-void FillActiveCameraFromPerspectiveProxy(const CameraRenderProxy& proxy, uint32_t selectedIndex, ActiveCameraRenderProxy& out)
-{
-    const dm::affine3 viewToWorld = getCameraViewToWorldMatrix(proxy.transform);
-    out.sourceEntity = proxy.entity;
-    out.selectedCameraIndex = selectedIndex;
-    out.position = viewToWorld.m_translation;
-    out.direction = viewToWorld.m_linear.row2;
-    out.up = viewToWorld.m_linear.row1;
-    out.verticalFovRadians = proxy.verticalFovRadians;
-    out.zNear = proxy.zNear;
-    out.useCustomIntrinsics = false;
-    out.intrinsics = dm::float4(0.f);
-    out.intrinsicsViewport = dm::float2(0.f);
-    out.valid = true;
-}
-
 void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSettings& settings)
 {
     if (proxy.projection != CameraProjectionKind::Perspective)
@@ -410,6 +379,37 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
 }
 
 } // namespace
+
+void fillActiveCameraFromFreeController(const CameraController& camera, ActiveCameraRenderProxy& out)
+{
+    out.sourceEntity = ecs::NullEntity;
+    out.selectedCameraIndex = camera.selectedCameraIndex();
+    out.position = camera.camera().getPosition();
+    out.direction = camera.camera().getDir();
+    out.up = camera.camera().getUp();
+    out.verticalFovRadians = camera.verticalFOV();
+    out.zNear = camera.zNear();
+    out.useCustomIntrinsics = camera.useCustomIntrinsics();
+    out.intrinsics = camera.intrinsics();
+    out.intrinsicsViewport = camera.intrinsicsViewport();
+    out.valid = true;
+}
+
+void fillActiveCameraFromPerspectiveProxy(const CameraRenderProxy& proxy, uint32_t selectedIndex, ActiveCameraRenderProxy& out)
+{
+    const dm::affine3 viewToWorld = getCameraViewToWorldMatrix(proxy.transform);
+    out.sourceEntity = proxy.entity;
+    out.selectedCameraIndex = selectedIndex;
+    out.position = viewToWorld.m_translation;
+    out.direction = viewToWorld.m_linear.row2;
+    out.up = viewToWorld.m_linear.row1;
+    out.verticalFovRadians = proxy.verticalFovRadians;
+    out.zNear = proxy.zNear;
+    out.useCustomIntrinsics = false;
+    out.intrinsics = dm::float4(0.f);
+    out.intrinsicsViewport = dm::float2(0.f);
+    out.valid = true;
+}
 
 CameraRenderProxy makeCameraRenderProxy(
     ecs::Entity entity,
@@ -455,7 +455,7 @@ void applyCameraRenderProxyToController(
         return;
 
     ActiveCameraRenderProxy active;
-    FillActiveCameraFromPerspectiveProxy(proxy, camera.selectedCameraIndex(), active);
+    fillActiveCameraFromPerspectiveProxy(proxy, camera.selectedCameraIndex(), active);
     camera.camera().lookTo(active.position, active.direction, active.up);
     camera.setVerticalFOV(active.verticalFovRadians);
     camera.setZNear(active.zNear);
@@ -669,26 +669,9 @@ void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRe
     out.renderSettings.gaussianSplatTemporalReset = inputs.gaussianSplatTemporalReset;
     out.renderSettings.sceneTime = inputs.sceneTime;
 
-    if (!inputs.camera)
-        return;
-
-    const CameraController& freeCamera = *inputs.camera;
-    const uint32_t selectedIndex = freeCamera.selectedCameraIndex();
-
-    // selectedIndex 0 = free camera; 1..N = CameraRenderProxy[N-1].
-    if (selectedIndex > 0)
-    {
-        const uint32_t proxyIndex = selectedIndex - 1;
-        if (proxyIndex < out.cameras.size()
-            && out.cameras[proxyIndex].projection == CameraProjectionKind::Perspective)
-        {
-            FillActiveCameraFromPerspectiveProxy(out.cameras[proxyIndex], selectedIndex, out.camera);
-            ApplyCameraExposureToSettings(out.cameras[proxyIndex], out.renderSettings.settings);
-            return;
-        }
-    }
-
-    FillActiveCameraFromFreeController(freeCamera, out.camera);
+    // Pure copy — free vs scene resolve runs in ResolveActiveCamera (PostUpdate).
+    if (inputs.activeCamera)
+        out.camera = *inputs.activeCamera;
 }
 
 } // namespace caustica::scene

@@ -22,4 +22,6 @@ void tickSceneGpuBind(App& app);
 void collectUncompressedTextures(App& app);
 [[nodiscard]] bool hasAsyncLoadingInProgress(const App& app);
 
+void sceneSwitchTrace(const char* fmt, ...);
+
 } // namespace caustica

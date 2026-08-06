@@ -1,5 +1,8 @@
 #pragma once
 
+// DEMO-ONLY (editor SampleGame / LightController sidecar). Not engine ECS.
+// Prefer typed *LightComponent + systems for new applications.
+
 #include <math/math.h>
 #include <ecs/Entity.h>
 #include <scene/SceneContent.h>

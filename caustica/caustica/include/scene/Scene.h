@@ -5,6 +5,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneRenderSnapshot.h>
+#include <scene/SceneStructureGpu.h>
 #include <scene/SceneImport.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
@@ -13,7 +14,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -64,16 +64,8 @@ namespace caustica
         std::shared_ptr<UrdfImporter> m_UrdfImporter;
         std::vector<SceneImportResult> m_Models;
 
-        // Monotonic handoff prevents an old render frame from acknowledging a newer
-        // structure publish. Logic writes published generation; render advances consumed.
-        std::atomic<uint64_t> m_gpuStructureGeneration{0};
-        std::atomic<uint64_t> m_gpuStructureConsumedGeneration{0};
-        // Logic mutated ECS structure; Extract enqueues async GPU/AS build for the
-        // published generation. Render serves m_committedRenderData until commit.
-        bool m_pendingGpuStructureSync = false;
-        std::atomic<bool> m_structureGpuBuildInFlight{false};
-        mutable std::mutex m_committedRenderDataMutex;
-        std::shared_ptr<const scene::SceneRenderData> m_committedRenderData;
+        // Async structure GPU handoff (committed-serve while AS/SBT builds).
+        SceneStructureGpuSync m_structureGpu;
 
         std::atomic<uint32_t> m_gpuReadFrameIndex{UINT32_MAX};
 
@@ -129,7 +121,7 @@ namespace caustica
         void refreshEntityWorldForFrame(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
-        // Optional session inputs resolve ActiveCamera + RenderSettingsSnapshot in the same slot.
+        // Optional session inputs copy pre-resolved ActiveCamera + settings into the slot.
         void extractAndPublishRenderSnapshot(
             uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
 
@@ -152,20 +144,20 @@ namespace caustica
         void acknowledgeGpuStructureConsumed(uint32_t frameIndex);
 
         // Bevy-style: mutate ECS only; Extract enqueues async GPU/AS build.
-        void requestGpuStructureSync();
-        [[nodiscard]] bool needsGpuStructureSync() const { return m_pendingGpuStructureSync; }
-        void clearGpuStructureSyncRequest();
+        void requestGpuStructureSync() { m_structureGpu.requestGpuStructureSync(); }
+        [[nodiscard]] bool needsGpuStructureSync() const { return m_structureGpu.needsGpuStructureSync(); }
+        void clearGpuStructureSyncRequest() { m_structureGpu.clearGpuStructureSync(); }
 
         // Async structure handoff: freeze pre-edit proxies, mark build in flight, commit
         // after RT finishes AS/SBT/bindings for the published generation.
         void freezeCommittedFromLogicCache();
-        void beginStructureGpuBuild();
+        void beginStructureGpuBuild() { m_structureGpu.beginStructureGpuBuild(); }
         void finishStructureGpuBuild(uint32_t frameIndex, std::shared_ptr<const scene::SceneRenderData> built);
-        [[nodiscard]] bool structureGpuBuildInFlight() const
+        [[nodiscard]] bool structureGpuBuildInFlight() const { return m_structureGpu.structureGpuBuildInFlight(); }
+        [[nodiscard]] std::shared_ptr<const scene::SceneRenderData> committedRenderData() const
         {
-            return m_structureGpuBuildInFlight.load(std::memory_order_acquire);
+            return m_structureGpu.committedRenderData();
         }
-        [[nodiscard]] std::shared_ptr<const scene::SceneRenderData> committedRenderData() const;
 
         [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
         [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;
@@ -191,7 +183,7 @@ namespace caustica
         [[nodiscard]] size_t getMaxGeometryCountPerMesh() const;
         [[nodiscard]] size_t getGeometryInstancesCount() const;
 
-        // Entity lists: beginGpuReadFrame → that slot; else latest published (pick/UI after
+        // Entity lists: beginGpuReadFrame ? that slot; else latest published (pick/UI after
         // endGpuReadFrame); else logic-thread ECS (pre-first-publish only).
         [[nodiscard]] const std::vector<ecs::Entity>& getMeshInstances() const;
         [[nodiscard]] const std::vector<ecs::Entity>& getSkinnedMeshInstances() const;
@@ -222,7 +214,7 @@ namespace caustica
         [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }
         void setAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
 
-        // Break MeshInfo↔MeshAsset / Material↔MaterialAsset / Scene↔SceneAsset
+        // Break MeshInfo?MeshAsset / Material?MaterialAsset / Scene?SceneAsset
         // shared_ptr cycles and drop extract-cache retained mesh refs so GPU
         // resources can destroy while the device is still alive (window close).
         void prepareForUnload();

@@ -4,6 +4,7 @@
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
+#include <engine/ResolvedActiveCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/ScenePlugins.h>
 #include <render/WorldRenderer.h>
@@ -20,6 +21,7 @@ void SceneRuntimePlugin::build(App& app)
     app.emplaceResource<ActiveScene>();
     app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<SessionCamera>();
+    app.emplaceResource<ResolvedActiveCamera>();
     app.emplaceResource<SceneSession>();
     app.emplaceResource<render::WorldRenderer>();
     app.emplaceResource<GpuRenderSubsystem>();

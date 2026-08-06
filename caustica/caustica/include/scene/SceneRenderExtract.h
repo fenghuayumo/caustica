@@ -35,12 +35,11 @@ namespace caustica::scene
         uint32_t frameIndex,
         SceneRenderExtractFlags flags = {});
 
-    // Logic-thread only. Copies settings / runtime into the snapshot, then resolves
-    // ActiveCameraRenderProxy from free CameraController or CameraRenderProxy.
+    // Logic-thread only. Pure copy of settings / runtime / pre-resolved active camera.
     // Consumes one-shot flags on the live settings object after copy.
     void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out);
 
-    // Logic-thread helpers shared by Update (UI preview) and Extract (RT snapshot).
+    // Logic-thread helpers shared by Update (UI preview) and ResolveActiveCamera.
     [[nodiscard]] CameraRenderProxy makeCameraRenderProxy(
         ecs::Entity entity,
         const CameraComponent& component,
@@ -50,5 +49,10 @@ namespace caustica::scene
         const CameraRenderProxy& proxy,
         CameraController& camera,
         PathTracerSettings* settings = nullptr);
+
+    void fillActiveCameraFromFreeController(
+        const CameraController& camera, ActiveCameraRenderProxy& out);
+    void fillActiveCameraFromPerspectiveProxy(
+        const CameraRenderProxy& proxy, uint32_t selectedIndex, ActiveCameraRenderProxy& out);
 
 } // namespace caustica::scene

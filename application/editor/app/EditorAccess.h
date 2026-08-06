@@ -4,12 +4,15 @@
 
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
 #include <render/WorldRenderer.h>
 #include <scene/Scene.h>
+
+// Editor may use internal WorldRenderer access; application samples must not.
 
 #include <cassert>
 #include <memory>

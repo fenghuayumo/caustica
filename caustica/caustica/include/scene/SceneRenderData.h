@@ -37,8 +37,8 @@ namespace caustica::scene
     //   MeshInstanceRenderProxy, SkinnedMeshRenderProxy, LightRenderProxy,
     //   CameraRenderProxy (+ resolved ActiveCameraRenderProxy), GaussianSplatRenderProxy,
     //   RenderSettingsSnapshot.
-    // Free-camera pose / selected index enter via SessionRenderExtractInputs; scene cameras
-    // are resolved from CameraRenderProxy during Extract, not by RT querying ECS.
+    // Active camera is resolved into App resource ResolvedActiveCamera after
+    // TransformPropagate; Extract copies it via SessionRenderExtractInputs.
 
     struct MeshInstanceRenderProxy
     {
@@ -239,13 +239,12 @@ namespace caustica::scene
         std::vector<GeometryRenderResourceSnapshot> geometries;
     };
 
-    // Logic-thread session inputs consumed during Extract (not ECS).
-    // Free-camera pose / selection come from CameraController; PathTracerSettings is copied
-    // into RenderSettingsSnapshot (one-shot flags cleared after copy). Scene cameras are
-    // taken from CameraRenderProxy when selectedCameraIndex > 0.
+    // Logic-thread session inputs consumed during Extract (pure copy into the snapshot).
+    // Active camera is pre-resolved (ResolvedActiveCamera); PathTracerSettings is copied
+    // into RenderSettingsSnapshot (one-shot flags cleared after copy).
     struct SessionRenderExtractInputs
     {
-        const class CameraController* camera = nullptr;
+        const ActiveCameraRenderProxy* activeCamera = nullptr;
         PathTracerSettings* settings = nullptr; // non-const: one-shot flags cleared after copy
         const render::RenderRuntimeState* runtime = nullptr;
         double sceneTime = 0.0;

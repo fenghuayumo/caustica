@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderFrameApi.h>
@@ -8,7 +9,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <assets/AssetSystem.h>
 #include <scene/SceneManager.h>

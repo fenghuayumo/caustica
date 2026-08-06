@@ -9,7 +9,7 @@
 #include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <core/path_utils.h>
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <render/core/BindingCache.h>
 #include <render/core/SceneGpuUpdater.h>
 #include <render/passes/lighting/MaterialGpuCache.h>

@@ -498,6 +498,8 @@ endif()
 # Application framework, console, splash screen, Aftermath, Streamline.
 
 file(GLOB caus_engine_headers include/engine/*.h)
+file(GLOB caus_engine_internal_headers include/engine/internal/*.h)
+list(APPEND caus_engine_headers ${caus_engine_internal_headers})
 file(GLOB caus_engine_sources src/engine/*.cpp src/engine/*.c)
 
 # Conditional: Aftermath GPU crash dump

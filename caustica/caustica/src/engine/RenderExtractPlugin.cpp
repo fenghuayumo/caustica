@@ -2,11 +2,12 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
-#include <engine/SessionCamera.h>
+#include <engine/ResolvedActiveCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
+#include <engine/internal/WorldRendererAccess.h>
 
 #include <backend/GpuDevice.h>
 #include <render/RenderRuntimeState.h>
@@ -23,8 +24,8 @@ void prepareRenderFrame(App& app)
 {
     auto* vs = app.tryResource<SceneViewState>();
     auto* diag = app.tryResource<render::AppDiagnostics>();
-    auto* worldRendererResource = app.tryResource<render::WorldRenderer>();
-    auto* sessionCam = app.tryResource<SessionCamera>();
+    auto* worldRendererResource = worldRenderer(app);
+    auto* resolvedCamera = app.tryResource<ResolvedActiveCamera>();
     GpuDevice* device = app.getGpuDevice();
     // Do not tear down the native loading card while a scene switch is in flight —
     // Extract can resume before onSceneLoaded finishes painting 50→100.
@@ -46,7 +47,7 @@ void prepareRenderFrame(App& app)
 
     // PostUpdate may have refreshed with the change tick still open. Always close it
     // after the Extract system — even when we cannot publish a snapshot this frame.
-    if (!device || !worldRendererResource || !sessionCam)
+    if (!device || !worldRendererResource || !resolvedCamera)
     {
         endChangeDetection();
         return;
@@ -67,8 +68,9 @@ void prepareRenderFrame(App& app)
     const bool haveCommittedServeTarget =
         !canStartStructure || static_cast<bool>(scene->committedRenderData());
 
+    // Pure session copy: camera already resolved after TransformPropagate.
     scene::SessionRenderExtractInputs sessionInputs;
-    sessionInputs.camera = &sessionCam->camera;
+    sessionInputs.activeCamera = &resolvedCamera->camera;
     sessionInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
     sessionInputs.settings = app.tryResource<PathTracerSettings>();
     sessionInputs.runtime = app.tryResource<render::RenderRuntimeState>();

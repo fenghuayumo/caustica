@@ -1,4 +1,4 @@
-#include <engine/SceneApiInternal.h>
+#include <engine/internal/SceneApiInternal.h>
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/SessionCamera.h>

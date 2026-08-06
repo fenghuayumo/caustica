@@ -16,12 +16,10 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 
-#include <engine/AppResources.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
-#include <render/WorldRenderer.h>
 #include <math/box.h>
 #include <math/math.h>
 
@@ -181,14 +179,9 @@ public:
     uint32_t PrecacheRtFeaturePresets(bool showProgress = true)
     {
         App* app = GetApp();
-        auto* wr = app ? caustica::worldRenderer(*app) : nullptr;
-        if (!app || !wr)
+        if (!app)
             return 0;
-        uint32_t ready = 0;
-        app->runGpuWorkOnRenderThread([wr, showProgress, &ready]() {
-            ready = wr->precacheAllRtFeaturePresets(showProgress);
-        });
-        return ready;
+        return caustica::precacheRtFeaturePresets(*app, showProgress);
     }
 
     bool isValid() const { return m_session && m_session->GetEngine() != nullptr; }

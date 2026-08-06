@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneGaussianSplatLogic.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -161,6 +162,45 @@ std::string fpsInfo(const App& app)
     if (SceneViewState* vs = viewState(app))
         return vs->fpsInfo;
     return {};
+}
+
+uint32_t precacheRtFeaturePresets(App& app, bool showProgress)
+{
+    auto* wr = worldRenderer(app);
+    if (!wr)
+        return 0;
+    uint32_t ready = 0;
+    runGpuWorkOnRenderThread(app, [wr, showProgress, &ready]() {
+        ready = wr->precacheAllRtFeaturePresets(showProgress);
+    });
+    return ready;
+}
+
+void requestFullAccelRebuild(App& app)
+{
+    if (auto* wr = worldRenderer(app))
+        wr->rayTracingResources().requestAccelerationStructureRebuild();
+}
+
+uint32_t renderFrameIndex(const App& app)
+{
+    auto* wr = worldRenderer(app);
+    return wr ? static_cast<uint32_t>(wr->getFrameIndex()) : 0;
+}
+
+void setGaussianSplatTemporalReset(App& app, bool enabled)
+{
+    if (auto* wr = worldRenderer(app))
+        wr->setGaussianSplatTemporalReset(enabled);
+}
+
+bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target)
+{
+    auto* wr = worldRenderer(app);
+    if (!wr || !target)
+        return false;
+    wr->denoisedScreenshot(target);
+    return true;
 }
 
 } // namespace caustica

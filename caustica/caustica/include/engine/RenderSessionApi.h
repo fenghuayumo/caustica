@@ -47,4 +47,10 @@ void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh, bo
 [[nodiscard]] std::string resolutionInfo(const App& app);
 [[nodiscard]] std::string fpsInfo(const App& app);
 
+uint32_t precacheRtFeaturePresets(App& app, bool showProgress = true);
+void requestFullAccelRebuild(App& app);
+[[nodiscard]] uint32_t renderFrameIndex(const App& app);
+void setGaussianSplatTemporalReset(App& app, bool enabled = true);
+bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target);
+
 } // namespace caustica

@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneQuery.h>

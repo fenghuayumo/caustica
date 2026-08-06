@@ -2,6 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneMeshEditing.h>
