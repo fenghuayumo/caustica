@@ -187,12 +187,13 @@ void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::CommandList*         
                                             const AccelStructBuildSettings& settings,
                                             bool&                           fullRebuildRequested)
 {
-    if (m_materialGpuCache
-        && m_materialStateRevision != m_materialGpuCache->materialStateRevision())
-    {
-        fullRebuildRequested = true;
-        return;
-    }
+    // Material content revisions no longer imply a full-scene AS recreate.
+    // Callers that change RT geometry flags (alpha / NEE / skip / permutation)
+    // set AccelerationStructRebuildRequested explicitly; mesh topology edits
+    // enqueue targeted rebuilds via requestMeshRebuild.
+    (void)fullRebuildRequested;
+    if (m_materialGpuCache)
+        m_materialStateRevision = m_materialGpuCache->materialStateRevision();
 
     std::vector<scene::MeshRenderResourceId> dirtyMeshIds;
     {

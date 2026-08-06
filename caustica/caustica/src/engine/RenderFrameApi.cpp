@@ -240,7 +240,9 @@ void animate(App& app, float fElapsedTimeSeconds)
     const bool enableSkeletal = cfg->EnableAnimations && cfg->RealtimeMode;
     const bool enableKeyframes = cfg->EnableKeyframes && cfg->RealtimeMode;
     const bool anyPlayback = enableSkeletal || enableKeyframes;
-    const bool enableAnimationUpdate = anyPlayback || cfg->ResetAccumulation;
+    // Do not treat ResetAccumulation (material/UI edits) as a timeline seek.
+    // Scrubbing applies poses via SceneEditor::evaluateAnimationsAt directly.
+    const bool enableAnimationUpdate = anyPlayback;
 
     if (auto* wr = worldRenderer(app))
     {
@@ -301,9 +303,8 @@ void animate(App& app, float fElapsedTimeSeconds)
                     if (scene::getAnimationDuration(*animation) <= 0.0f)
                         continue;
 
-                    // Playback is split; seeks apply both so the pose matches sceneTime.
-                    const bool applyThis = cfg->ResetAccumulation
-                        || (animation->editorAuthored ? enableKeyframes : enableSkeletal);
+                    const bool applyThis =
+                        animation->editorAuthored ? enableKeyframes : enableSkeletal;
                     if (!applyThis)
                         continue;
 
@@ -325,7 +326,8 @@ void animate(App& app, float fElapsedTimeSeconds)
                 }
                 else
                 {
-                    // ResetAccumulation-only seeks: update globals and zero motion.
+                    // Playback gated but clock not advancing (e.g. EnableAnimations with
+                    // no imported content): keep previous==current so filters stay quiet.
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
                     ew->syncPreviousTransformsFromCurrent();
                 }
@@ -335,7 +337,7 @@ void animate(App& app, float fElapsedTimeSeconds)
 
                 // Fixed-topology USD / soft-body point caches (SceneMeshEdit hides GPU wiring).
                 // Geometry sequences follow imported/skeletal playback, not editor keyframes.
-                if (enableSkeletal || cfg->ResetAccumulation)
+                if (enableSkeletal)
                 {
                     const PathTracerSettings* before = cfg;
                     const bool hadResetAccumulation = before && before->ResetAccumulation;

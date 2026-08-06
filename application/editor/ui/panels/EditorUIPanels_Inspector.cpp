@@ -512,22 +512,37 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
     const float alphaCutoffAfter = material->alphaCutoff;
 
-    if (mspBefore != mspAfter ||
+    const bool materialStateDirty =
+        mspBefore != mspAfter ||
         wasAlphaTestedEnabled != material->enableAlphaTesting ||
         wasTransmissionEnabled != material->enableTransmission ||
         wasExcludedFromNEE != material->excludeFromNEE ||
         wasSkipRender != material->skipRender ||
-        dirty)
+        dirty;
+
+    // Live ColorEdit/Slider drags mark dirty every frame. Wiping DLSS-RR/NRD/TAA
+    // history (and syncPreviousView via ResetAccumulation) on each tick makes the
+    // whole mesh shimmer — subpixel jitter with no temporal history. Keep uploading
+    // the material CB during the drag; flush the temporal reset when the widget is idle.
+    static bool s_materialEditNeedsTemporalReset = false;
+    if (materialStateDirty)
+        s_materialEditNeedsTemporalReset = true;
+    if (s_materialEditNeedsTemporalReset && !ImGui::IsAnyItemActive())
     {
-        m_settings.ResetAccumulation = 1;
+        m_settings.ResetAccumulation = true;
+        m_settings.ResetRealtimeCaches = true;
+        s_materialEditNeedsTemporalReset = false;
     }
 
     // UE-style: material edits must not force RTPSO CreateStateObject.
-    // Alpha/skip/NEE visibility changes only need acceleration-structure refresh + SBT remap.
+    // Only RT geometry / hit-group inputs need acceleration-structure refresh + SBT remap.
+    // Shading-only edits (color/roughness/etc.) upload the material CB and reset accumulation.
+    // alphaCutoff changes OMM content via materialStateRevision; it does not change BLAS flags.
     if (wasAlphaTestedEnabled != material->enableAlphaTesting ||
+        wasTransmissionEnabled != material->enableTransmission ||
         wasExcludedFromNEE != material->excludeFromNEE ||
-        mspBefore != mspAfter ||
-        wasSkipRender != material->skipRender)
+        wasSkipRender != material->skipRender ||
+        mspBefore != mspAfter)
     {
         m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
     }

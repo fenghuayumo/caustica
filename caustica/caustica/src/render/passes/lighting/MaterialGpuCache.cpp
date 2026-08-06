@@ -660,6 +660,17 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
 {
     bool update = false;
 
+    // Snapshot RT / hit-group / OMM inputs. Shading-only edits must not bump
+    // materialStateRevision — that forces full AS + OMM + SBT rebuilds.
+    const bool rtAlphaTestingBefore = enableAlphaTesting;
+    const bool rtTransmissionBefore = enableTransmission;
+    const bool rtExcludeFromNEEBefore = excludeFromNEE;
+    const bool rtSkipRenderBefore = skipRender;
+    const bool rtThinSurfaceBefore = thinSurface;
+    const bool rtBaseTextureBefore = enableBaseTexture;
+    const float rtAlphaCutoffBefore = alphaCutoff;
+    const MaterialShaderPermutationKey rtMspBefore(computeShaderPermutation(""));
+
     float itemWidth = ImGui::CalcItemWidth();
 
     auto getShortTexturePath = [ ](const StandardMaterialTexture & texture) -> std::string
@@ -914,7 +925,21 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
     // mark for update
     gpuDataDirty |= update;
     if (update)
-        cache.notifyMaterialEdited();
+    {
+        const MaterialShaderPermutationKey rtMspAfter(computeShaderPermutation(""));
+        const bool rayTracingStateChanged =
+            rtAlphaTestingBefore != enableAlphaTesting
+            || rtTransmissionBefore != enableTransmission
+            || rtExcludeFromNEEBefore != excludeFromNEE
+            || rtSkipRenderBefore != skipRender
+            || rtThinSurfaceBefore != thinSurface
+            || rtBaseTextureBefore != enableBaseTexture
+            || rtAlphaCutoffBefore != alphaCutoff
+            || !(rtMspBefore == rtMspAfter);
+        // Color/roughness/metalness etc. only need the material CB upload above.
+        if (rayTracingStateChanged)
+            cache.notifyMaterialEdited();
+    }
 
     return update;
 }
