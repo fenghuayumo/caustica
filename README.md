@@ -89,7 +89,7 @@ WorldRenderer (UE-like render pipeline)
 
 **ECS × Render Proxy:** the logic thread owns `SceneEntityWorld`; Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` / committed proxies and must not walk live ECS for frame lighting. Runtime spawn/despawn publishes a new extract generation and builds mesh/AS/SBT work on the render thread asynchronously (see [architecture-render-proxy.md](docs/architecture-render-proxy.md)).
 
-**Embedding:** prefer `EngineApp::create(EngineAppDesc)` over assembling plugins by hand. Add host systems on `AppSchedule::update` (default `system_set::Simulation`). Scene edits go through focused APIs (`SceneSpawn`, `SceneTransform`, `SceneMeshEdit`, `SceneQuery`, …). Occasional render-thread work from Logic uses `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`.
+**Embedding:** prefer `EngineApp::create` → `addSystem` / `EntityWorld` / `Query<>` → `run()` (Startup is automatic). Scene edits go through `EntityWorld::spawn` / focused APIs (`SceneSpawn`, `SceneTransform`, …). Occasional render-thread work from Logic uses `EnqueueRenderCommand`.
 
 * **Application & simulation layer** — Bevy-inspired: `EngineApp`, `App`, `Plugin`, `AppSchedule`, `SystemSet`, scene ECS components.
 * **Rendering layer** — UE-inspired: dedicated `RenderThread`, extract proxies, `WorldRenderer`, `FrameCommandContext` / GraphBuilder waves.

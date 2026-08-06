@@ -792,6 +792,69 @@ void SceneEntityWorld::setMeshInstance(ecs::Entity entity, const std::shared_ptr
     updateLeafContentAndBounds(entity);
 }
 
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, NameComponent component)
+{
+    m_world.emplace<NameComponent>(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, LocalTransformComponent component)
+{
+    if (!component.hasLocalTransform)
+        return;
+    setLocalTransform(entity, &component.translation, &component.rotation, &component.scaling);
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, MeshInstanceComponent component)
+{
+    if (component.mesh)
+    {
+        setMeshInstance(entity, component.mesh);
+        if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
+        {
+            mesh->enabled = component.enabled;
+            mesh->proxiedAnalyticLight = component.proxiedAnalyticLight;
+        }
+        return;
+    }
+    m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
+    updateLeafContentAndBounds(entity);
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, DirectionalLightComponent component)
+{
+    setDirectionalLight(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, SpotLightComponent component)
+{
+    setSpotLight(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, PointLightComponent component)
+{
+    setPointLight(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, EnvironmentLightComponent component)
+{
+    setEnvironmentLight(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, CameraComponent component)
+{
+    setCamera(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, AnimationComponent component)
+{
+    setAnimation(entity, std::move(component));
+}
+
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, GaussianSplatComponent component)
+{
+    setGaussianSplat(entity, component.splat);
+}
+
 void SceneEntityWorld::setSkinnedMeshInstance(
     ecs::Entity entity, SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh)
 {

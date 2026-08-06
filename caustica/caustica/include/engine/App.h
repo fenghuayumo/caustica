@@ -3,8 +3,10 @@
 #include <backend/GpuDevice.h>
 #include <backend/GpuFrameDriver.h>
 #include <engine/AppSchedules.h>
+#include <engine/EntityWorld.h>
 #include <engine/Plugin.h>
 #include <engine/RenderThread.h>
+#include <ecs/QueryView.h>
 #include <ecs/World.h>
 #include <events/event.h>
 
@@ -72,6 +74,21 @@ struct SystemParameter<SystemContext>
     static SystemContext& make(SystemContext& context) { return context; }
 };
 
+template<>
+struct SystemParameter<EntityWorld>
+{
+    static EntityWorld make(SystemContext& context) { return EntityWorld(context.entityWorld()); }
+};
+
+template<typename... Components>
+struct SystemParameter<ecs::Query<Components...>>
+{
+    static ecs::Query<Components...> make(SystemContext& context)
+    {
+        return ecs::Query<Components...>(context.sceneEcs());
+    }
+};
+
 template<typename Parameter>
 decltype(auto) makeSystemParameter(SystemContext& context)
 {
@@ -103,8 +120,8 @@ SystemFn makeTypedSystem(F&& system)
 //
 // Prefer EngineApp::create for new apps (Bevy-like one-liner):
 //   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem<MySimLabel>(AppSchedule::update, ...);
-//   engine->run();
+//   engine->addSystem<MySimLabel>(AppSchedule::update, [](EntityWorld scene, ...) { ... });
+//   engine->run(); // finishStartup runs automatically
 //
 // Low-level lifecycle (advanced):
 //   app.addPlugins(DefaultPlugins{sceneConfig});

@@ -97,11 +97,19 @@ int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuIni
 
 int runEngineApp(std::unique_ptr<EngineApp> engine)
 {
-    if (!engine || !engine->isValid() || !engine->app().isStarted())
+    if (!engine || !engine->isValid())
     {
-        error("runEngineApp requires a started EngineApp");
+        error("runEngineApp requires a valid EngineApp");
         if (engine)
             engine->shutdown();
+        shutdownAppPlatform();
+        return 1;
+    }
+
+    if (!engine->finishStartup())
+    {
+        error("runEngineApp: finishStartup failed");
+        engine->shutdown();
         shutdownAppPlatform();
         return 1;
     }

@@ -82,11 +82,16 @@ Default SystemSets (`SystemSets.h`):
 - `system_set::TransformPropagate` — hierarchy refresh in `PostUpdate` (after other PostUpdate systems)
 - `system_set::Extract` — Extract publish path
 
+Host systems can take Bevy-style parameters: `EntityWorld`, `Query<...>`, `Res` / `ResMut`,
+`Commands`. Bundle spawn is `EntityWorld::spawn(...)` / `SceneEntityWorld::spawnNamed` (typed
+lights/meshes still go through the existing `set*` bookkeeping). `EngineApp::run` /
+`stepFrame` auto-run `finishStartup` after the host registers systems.
+
 Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).
 
 Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
-(EngineApp + one Simulation system that `spawnFromFile` + `setEntityLocalTransform`).
+(`EngineApp` + one Simulation system using `EntityWorld` + `spawnFromFile`).
 
 ## Async structure handoff
 

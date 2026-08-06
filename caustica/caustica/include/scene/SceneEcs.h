@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -62,6 +63,23 @@ struct LocalTransformComponent
     dm::double3 scaling = 1.0;
     dm::daffine3 transform = dm::daffine3::identity();
     bool hasLocalTransform = false;
+
+    // Authoring helper for Bundle spawn / system code.
+    [[nodiscard]] static LocalTransformComponent fromTRS(
+        const dm::double3& translation,
+        const dm::dquat& rotation = dm::dquat::identity(),
+        const dm::double3& scaling = dm::double3(1.0))
+    {
+        LocalTransformComponent local{};
+        local.translation = translation;
+        local.rotation = rotation;
+        local.scaling = scaling;
+        local.hasLocalTransform = true;
+        local.transform = dm::scaling(local.scaling);
+        local.transform *= local.rotation.toAffine();
+        local.transform *= dm::translation(local.translation);
+        return local;
+    }
 };
 
 struct GlobalTransformComponent
@@ -307,6 +325,22 @@ public:
     void destroyEntity(ecs::Entity entity);
     bool setParent(ecs::Entity entity, ecs::Entity parent);
 
+    // Bevy-style bundle spawn on the scene hierarchy (createEntity defaults + components).
+    // Typed lights / mesh / camera go through set* so resource bookkeeping stays correct.
+    template<typename... Components>
+    ecs::Entity spawn(Components&&... components)
+    {
+        return spawnNamed({}, ecs::NullEntity, std::forward<Components>(components)...);
+    }
+
+    template<typename... Components>
+    ecs::Entity spawnNamed(const std::string& name, ecs::Entity parent, Components&&... components)
+    {
+        ecs::Entity entity = createEntity(name, parent);
+        (insertSpawnComponent(entity, std::forward<Components>(components)), ...);
+        return entity;
+    }
+
     void setLocalTransform(ecs::Entity entity,
         const dm::double3* translation,
         const dm::dquat* rotation,
@@ -381,6 +415,23 @@ private:
     void updateLeafContentAndBounds(ecs::Entity entity);
     void ensureChangeDetection();
     void syncDirtyFlagsFromChangeDetection();
+
+    void insertSpawnComponent(ecs::Entity entity, NameComponent component);
+    void insertSpawnComponent(ecs::Entity entity, LocalTransformComponent component);
+    void insertSpawnComponent(ecs::Entity entity, MeshInstanceComponent component);
+    void insertSpawnComponent(ecs::Entity entity, DirectionalLightComponent component);
+    void insertSpawnComponent(ecs::Entity entity, SpotLightComponent component);
+    void insertSpawnComponent(ecs::Entity entity, PointLightComponent component);
+    void insertSpawnComponent(ecs::Entity entity, EnvironmentLightComponent component);
+    void insertSpawnComponent(ecs::Entity entity, CameraComponent component);
+    void insertSpawnComponent(ecs::Entity entity, AnimationComponent component);
+    void insertSpawnComponent(ecs::Entity entity, GaussianSplatComponent component);
+
+    template<typename T>
+    void insertSpawnComponent(ecs::Entity entity, T&& component)
+    {
+        m_world.emplace<std::remove_cvref_t<T>>(entity, std::forward<T>(component));
+    }
 
     void beginRefreshFrame();
     void markDirtySkinnedMeshes(uint32_t frameIndex);

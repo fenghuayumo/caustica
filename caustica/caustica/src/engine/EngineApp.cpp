@@ -228,6 +228,8 @@ void EngineApp::run()
 {
     if (!m_valid || !m_app)
         return;
+    if (!finishStartup())
+        return;
     m_app->run();
     shutdown();
 }
@@ -235,6 +237,9 @@ void EngineApp::run()
 bool EngineApp::stepFrame(float dtSeconds)
 {
     if (!m_valid || !m_app)
+        return false;
+
+    if (!finishStartup())
         return false;
 
     if (dtSeconds < 0.f)

@@ -77,46 +77,44 @@ Frequently used fields:
 | `runtimeDirectory` | auto | Directory containing cooked shaders and runtime libraries. |
 | `resourceRoot` | auto | Directory containing `Assets/`. |
 | `device`, `window` | `nullptr` | Inject host-owned objects; `EngineApp` does not take ownership. |
-| `finishStartup` | `true` | Set false to register host plugins/systems before startup schedules run. |
+| `finishStartup` | `false` | Deprecated. `create()` leaves Startup pending; `run()` / `stepFrame()` finish automatically. Set true only if you need Startup inside `create()`. |
 
 `viewState`, `diagnostics`, `renderState`, and `cmdLine` can point to host-owned
 state. `preGpuDeviceInit` runs just before an owned device is created.
 
 ## Registering simulation systems
 
-When adding systems or plugins during initialization, create with
-`finishStartup=false`, register them, and call `finishStartup()` exactly once:
+Bevy-style: `create` → `addSystem` / `addPlugin` → `run()` (Startup is automatic):
 
 ```cpp
 #include <engine/EngineApp.h>
+#include <engine/EntityWorld.h>
 #include <engine/SceneSpawn.h>
-#include <engine/SceneTransform.h>
+#include <engine/SceneQuery.h>
 
 struct HostSimulationLabel
 {
     static constexpr const char* name = "Host.Simulation";
 };
 
-auto engine = caustica::EngineApp::create({
-    .scene = "default.json",
-    .finishStartup = false,
-});
+auto engine = caustica::EngineApp::create({ .scene = "default.json" });
 
-engine->app().addSystem<HostSimulationLabel>(
+engine->addSystem<HostSimulationLabel>(
     caustica::AppSchedule::update,
-    [](caustica::SystemContext& ctx) {
-        if (!caustica::isSceneLoaded(ctx.app))
+    [](caustica::EntityWorld scene, caustica::SystemContext& ctx) {
+        if (!scene || !caustica::isSceneLoaded(ctx.app))
             return;
 
         // Mutate host state or the logic-side scene here.
         // Extract publishes the render-thread snapshot after update/PostUpdate.
     });
 
-if (!engine->finishStartup())
-    return 1;
-
 engine->run();
 ```
+
+Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
+`Query<Components...>`, and `SystemContext&`. Prefer `EntityWorld` /
+`Query<>` over digging through `GpuRenderSubsystem`.
 
 An `update` system with no explicit set joins
 `system_set::Simulation`. The per-frame order is:
@@ -125,33 +123,47 @@ An `update` system with no explicit set joins
 First → preUpdate → update → PostUpdate → Extract → dispatch render → postRender → Last
 ```
 
-`Startup` runs once during `finishStartup()` and `shutdown` runs during engine
-shutdown. Transform propagation is the tail of `PostUpdate`; Extract publishes
-the ECS-free render snapshot afterward. The `render` schedule executes in the
-render-thread domain when the dedicated thread is active. `postRender` and
-`Last` continue on the logic thread after dispatch and do not imply that the
-asynchronous render work has completed.
+`Startup` runs once on the first `run()` / `stepFrame()` / explicit
+`finishStartup()`. `shutdown` runs during engine shutdown. Transform propagation
+is the tail of `PostUpdate`; Extract publishes the ECS-free render snapshot
+afterward. The `render` schedule executes in the render-thread domain when the
+dedicated thread is active. `postRender` and `Last` continue on the logic thread
+after dispatch and do not imply that the asynchronous render work has completed.
 
-Systems can request typed parameters (`Res<T>`, `ResMut<T>`, `Commands`, or
-`SystemContext`) or take a `SystemContext&`. Use
-`AppSystemOrdering::runBefore`, `runAfter`, and `inSet` for explicit ordering.
+Use `AppSystemOrdering::runBefore`, `runAfter`, and `inSet` for explicit ordering.
+Hosts that must run code after Startup but before the loop (e.g. the editor) can
+still call `finishStartup()` explicitly.
 
 ## Scene access and mutation
 
-Use the focused application headers:
+Prefer system parameters, then focused application headers:
 
-| Header | Supported operations |
+| API | Supported operations |
 | --- | --- |
-| `engine/SceneQuery.h` | Active scene, scene ECS, load status, materials, and entity lookup. |
-| `engine/SceneSpawn.h` | `load`, `spawn`, `spawnFromFile`, and `despawn`. |
-| `engine/SceneTransform.h` | Local transform, translation, and visibility. |
+| `EntityWorld` (system param) | `spawn` / `spawnNamed` bundles, `setLocalTransform`, scene ECS access. |
+| `Query<...>` (system param) | Bevy-style `each` over scene components (`Changed<>` / `With<>` supported). |
+| `engine/SceneQuery.h` | Active scene, load status, materials, and entity lookup. |
+| `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
+| `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
 | `engine/SceneMeshEdit.h` | Vertex reads/deformation and geometry-sequence playback. |
 | `engine/CameraApi.h` | Camera selection state, pose, FOV, and intrinsics. |
 | `engine/SceneLifecycle.h` | Scene selection/reload operations. |
 | `engine/RenderSessionApi.h` | Session-level render controls. |
 | `engine/RenderFrameApi.h` | Accumulation and rendered-frame access. |
 
-Example runtime spawn:
+Bundle spawn example (lights / meshes keep SceneEntityWorld bookkeeping):
+
+```cpp
+scene.spawn(
+    caustica::scene::NameComponent{ "Spinner" },
+    caustica::scene::LocalTransformComponent::fromTRS(
+        dm::double3{ 2.0, 1.0, 0.0 },
+        dm::dquat::identity(),
+        dm::double3{ 0.5, 0.5, 0.5 }),
+    caustica::scene::PointLightComponent{ .intensity = 5.f });
+```
+
+Prefab spawn example:
 
 ```cpp
 caustica::ecs::Entity entity =

@@ -124,7 +124,6 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     desc.fullscreen = host.cmdLine.fullscreen;
     desc.scene = preferredScene;
     desc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
-    desc.finishStartup = false;
     desc.viewState = &host.sceneEditor.viewState();
     desc.diagnostics = &host.diagnostics;
     desc.renderState = &host.editorUiData.render;

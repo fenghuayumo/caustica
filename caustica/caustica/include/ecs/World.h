@@ -27,6 +27,16 @@ public:
         return m_registry.create();
     }
 
+    // Bevy-style bundle spawn: create entity and emplace all components.
+    template<typename... Components>
+    Entity spawn(Components&&... components)
+        requires (sizeof...(Components) > 0)
+    {
+        Entity entity = spawn();
+        (emplace<std::remove_cvref_t<Components>>(entity, std::forward<Components>(components)), ...);
+        return entity;
+    }
+
     void despawn(Entity entity)
     {
         if (!isAlive(entity))

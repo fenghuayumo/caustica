@@ -3,8 +3,8 @@
 
 #include <engine/EngineApp.h>
 #include <engine/EntryPoint.h>
+#include <engine/EntityWorld.h>
 #include <engine/SceneSpawn.h>
-#include <engine/SceneTransform.h>
 #include <engine/SceneQuery.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SystemSets.h>
@@ -37,16 +37,40 @@ struct ThinClientState
     float angleRadians = 0.f;
 };
 
-void registerThinClientSystems(caustica::EngineApp& engine)
-{
-    auto& app = engine.app();
-    app.emplaceResource<ThinClientState>();
+} // namespace
 
-    app.addSystem<ThinClientSpinLabel>(
+#ifdef _WIN32
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+#else
+int main(int, char**)
+#endif
+{
+    caustica::initializeAppPlatform();
+#ifdef _WIN32
+    caustica::initNativeConsole(/*visibleByDefault=*/true);
+#endif
+
+    auto engine = caustica::EngineApp::create(caustica::EngineAppDesc{
+        .width = 1280,
+        .height = 720,
+        .scene = "convergence-test.scene.json",
+        .windowTitle = "caustica thin client",
+    });
+
+    if (!engine || !engine->isValid())
+    {
+        caustica::error("thin_client: EngineApp::create failed");
+        caustica::shutdownAppPlatform();
+        return 1;
+    }
+
+    engine->emplaceResource<ThinClientState>();
+    engine->addSystem<ThinClientSpinLabel>(
         caustica::AppSchedule::update,
-        [](caustica::SystemContext& ctx) {
-            auto* state = ctx.tryRes<ThinClientState>();
-            if (!state)
+        [](caustica::ResMut<ThinClientState> state,
+           caustica::EntityWorld scene,
+           caustica::SystemContext& ctx) {
+            if (!scene)
                 return;
 
             // Once: spawn an extra mesh into the already-loaded scene.
@@ -57,8 +81,7 @@ void registerThinClientSystems(caustica::EngineApp& engine)
                     ctx.app, "Models/GlassSphere/GlassSphere.gltf");
                 if (caustica::ecs::isValid(state->spawned))
                 {
-                    caustica::setEntityLocalTransform(
-                        ctx.app,
+                    scene.setLocalTransform(
                         state->spawned,
                         dm::double3{ 2.0, 1.0, 0.0 },
                         std::nullopt,
@@ -79,8 +102,7 @@ void registerThinClientSystems(caustica::EngineApp& engine)
             const dm::dquat rotation = dm::dquat::fromWXYZ(
                 std::cos(half),
                 dm::double3{ 0.0, std::sin(half), 0.0 });
-            caustica::setEntityLocalTransform(
-                ctx.app,
+            scene.setLocalTransform(
                 state->spawned,
                 dm::double3{ 2.0, 1.0, 0.0 },
                 rotation,
@@ -96,45 +118,6 @@ void registerThinClientSystems(caustica::EngineApp& engine)
             }
         },
         caustica::AppSystemOrdering{}.inSet<caustica::system_set::Simulation>());
-}
-
-} // namespace
-
-#ifdef _WIN32
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
-#else
-int main(int, char**)
-#endif
-{
-    caustica::initializeAppPlatform();
-#ifdef _WIN32
-    caustica::initNativeConsole(/*visibleByDefault=*/true);
-#endif
-
-    auto engine = caustica::EngineApp::create(caustica::EngineAppDesc{
-        .width = 1280,
-        .height = 720,
-        .scene = "convergence-test.scene.json",
-        .windowTitle = "caustica thin client",
-        .finishStartup = false,
-    });
-
-    if (!engine || !engine->isValid())
-    {
-        caustica::error("thin_client: EngineApp::create failed");
-        caustica::shutdownAppPlatform();
-        return 1;
-    }
-
-    registerThinClientSystems(*engine);
-
-    if (!engine->finishStartup())
-    {
-        caustica::error("thin_client: finishStartup failed");
-        engine->shutdown();
-        caustica::shutdownAppPlatform();
-        return 1;
-    }
 
     return caustica::runEngineApp(std::move(engine));
 }

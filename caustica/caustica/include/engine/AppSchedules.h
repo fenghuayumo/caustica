@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ecs/QueryView.h>
 #include <ecs/World.h>
 #include <engine/SystemLabel.h>
 
@@ -12,6 +13,10 @@ namespace caustica
 
 class App;
 class GpuDevice;
+
+// Convenience alias so systems can take Query<...> without the ecs:: prefix.
+template<typename... Components>
+using Query = ecs::Query<Components...>;
 
 template<class T>
 class Res

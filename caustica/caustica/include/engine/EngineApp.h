@@ -54,8 +54,11 @@ struct EngineAppDesc
     GpuDevice* device = nullptr;
     Window* window = nullptr;
 
-    // When false, caller adds more plugins then calls EngineApp::finishStartup().
-    bool finishStartup = true;
+    // Deprecated: create() never runs Startup. Prefer addSystem/addPlugin after create,
+    // then run() / stepFrame() (auto finishStartup) or an explicit finishStartup() call.
+    // If true, Startup still runs inside create() for rare hosts that need a loaded scene
+    // before the first step without calling finishStartup().
+    bool finishStartup = false;
 
     // Optional host-owned state (nullptr = EngineApp owns internals as today).
     SceneViewState* viewState = nullptr;
@@ -71,21 +74,19 @@ struct EngineAppDesc
     AppHook preGpuDeviceInit = nullptr;
 };
 
-// Bevy-style embed entry: one create() call, then run() or stepFrame().
+// Bevy-style embed entry: create → add systems/plugins → run() / stepFrame().
 //
 //   auto engine = caustica::EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->app().addSystem<MySimLabel>(AppSchedule::update, [](SystemContext& ctx) {
-//       if (auto* ew = ctx.entityWorld())
-//           ew->world().each<scene::LocalTransformComponent>(...);
-//   });
-//   engine->run();
+//   engine->addSystem<MySimLabel>(AppSchedule::update,
+//       [](EntityWorld scene, ecs::Query<scene::LocalTransformComponent> q) { ... });
+//   engine->run(); // finishStartup runs automatically
 //
 // Headless:
 //   auto engine = caustica::EngineApp::create({ .headless = true });
-//   while (running) engine->stepFrame();
+//   while (running) engine->stepFrame(); // also auto-starts
 //
-// Scene mutations: caustica::load/spawn/despawn + SceneTransform (ECS only; Extract flushes GPU).
-// Scene queries: ctx.entityWorld() / caustica::entityWorld(app) -- not GpuRenderSubsystem.
+// Scene mutations: EntityWorld::spawn / setLocalTransform, or SceneSpawn / SceneTransform.
+// Scene queries: EntityWorld / Query<> system params -- not GpuRenderSubsystem.
 // Systems on update default to system_set::Simulation; hierarchy refresh is TransformPropagate.
 // Occasional RT work: EnqueueRenderCommand (non-blocking).
 class EngineApp
@@ -100,13 +101,33 @@ public:
 
     [[nodiscard]] bool isValid() const { return m_valid; }
 
-    // Call when create used finishStartup=false (after adding host plugins).
+    // Runs Startup schedules once. Optional — run() / stepFrame() call this automatically.
     bool finishStartup();
 
     void run();
     bool stepFrame(float dtSeconds = -1.f);
     void requestExit();
     void shutdown();
+
+    template<typename Label, class F>
+    EngineApp& addSystem(AppSchedule schedule, F&& system, AppSystemOrdering ordering = {})
+    {
+        m_app->addSystem<Label>(schedule, std::forward<F>(system), std::move(ordering));
+        return *this;
+    }
+
+    template<typename T, typename... Args>
+    T& emplaceResource(Args&&... args)
+    {
+        return m_app->emplaceResource<T>(std::forward<Args>(args)...);
+    }
+
+    template<typename T, typename... Args>
+    EngineApp& addPlugin(Args&&... args)
+    {
+        m_app->addPlugin<T>(std::forward<Args>(args)...);
+        return *this;
+    }
 
     [[nodiscard]] App& app();
     [[nodiscard]] const App& app() const;
