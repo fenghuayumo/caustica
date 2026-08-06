@@ -291,6 +291,7 @@ void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
     {
         cfg->RealtimeMode = sampleSettings->realtimeMode.value_or(cfg->RealtimeMode);
         cfg->EnableAnimations = sampleSettings->enableAnimations.value_or(cfg->EnableAnimations);
+        cfg->EnableKeyframes = sampleSettings->enableKeyframes.value_or(cfg->EnableKeyframes);
         if (sampleSettings->startingCamera.has_value())
             cam->setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
         if (sampleSettings->realtimeFireflyFilter.has_value())
@@ -313,12 +314,16 @@ void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const Com
 
     vs->sceneTime = 0.0;
     cfg->EnableAnimations = false;
+    cfg->EnableKeyframes = false;
     cfg->RealtimeMode = false;
 
     applySampleSettingsFromScene(app, manager);
 
     if (cmd.stopAnimations)
+    {
         cfg->EnableAnimations = false;
+        cfg->EnableKeyframes = false;
+    }
     if (cmd.OverrideToRealtimeMode)
         cfg->RealtimeMode = true;
     if (cmd.OverrideToReferenceMode)

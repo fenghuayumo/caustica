@@ -78,6 +78,7 @@
       "type": "SampleSettings",
       "realtimeMode": true,
       "enableAnimations": false,
+      "enableKeyframes": false,
       "startingCamera": -1
     }
   ]
@@ -378,9 +379,10 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 {
   "name": "SampleSettings",
   "type": "SampleSettings",
-  "realtimeMode": true,
-  "enableAnimations": false,
-  "startingCamera": -1,
+      "realtimeMode": true,
+      "enableAnimations": false,
+      "enableKeyframes": false,
+      "startingCamera": -1,
   "realtimeFireflyFilter": 0.15,
   "maxBounces": 8,
   "maxDiffuseBounces": 4,
@@ -391,7 +393,8 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
 | `realtimeMode` | bool | 初始是否进入实时模式。 |
-| `enableAnimations` | bool | 初始是否启用动画。 |
+| `enableAnimations` | bool | 初始是否启用导入/骨骼动画（非 editorAuthored）。 |
+| `enableKeyframes` | bool | 初始是否启用编辑器关键帧时间线播放（editorAuthored）。默认 false。 |
 | `startingCamera` | integer | 初始相机索引。`-1` 表示 free flight camera；`0` 表示第一个 scene camera。 |
 | `realtimeFireflyFilter` | number | 设置实时 firefly filter 阈值，并启用该 filter。 |
 | `maxBounces` | integer | 最大反弹次数。 |

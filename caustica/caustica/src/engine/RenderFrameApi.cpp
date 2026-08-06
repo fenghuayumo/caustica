@@ -237,8 +237,10 @@ void animate(App& app, float fElapsedTimeSeconds)
         }
     }
 
-    const bool enableAnimations = cfg->EnableAnimations && cfg->RealtimeMode;
-    const bool enableAnimationUpdate = enableAnimations || cfg->ResetAccumulation;
+    const bool enableSkeletal = cfg->EnableAnimations && cfg->RealtimeMode;
+    const bool enableKeyframes = cfg->EnableKeyframes && cfg->RealtimeMode;
+    const bool anyPlayback = enableSkeletal || enableKeyframes;
+    const bool enableAnimationUpdate = anyPlayback || cfg->ResetAccumulation;
 
     if (auto* wr = worldRenderer(app))
     {
@@ -248,9 +250,6 @@ void animate(App& app, float fElapsedTimeSeconds)
 
     if (isSceneLoaded(app) && enableAnimationUpdate)
     {
-        if (enableAnimations)
-            vs->sceneTime += fElapsedTimeSeconds;
-
         const std::shared_ptr<Scene> scene = activeScene(app);
         if (scene)
         {
@@ -259,17 +258,34 @@ void animate(App& app, float fElapsedTimeSeconds)
             {
                 auto& world = ew->world();
                 float loopDuration = 0.f;
+                bool hasImportedAnim = false;
+                bool hasGeometrySequence = false;
                 for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
-                    if (animation)
-                        loopDuration = std::max(loopDuration, scene::getAnimationDuration(*animation));
+                    if (!animation)
+                        continue;
+                    loopDuration = std::max(loopDuration, scene::getAnimationDuration(*animation));
+                    if (!animation->editorAuthored)
+                        hasImportedAnim = true;
                 }
                 world.each<scene::GeometrySequenceComponent>(
                     [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
                         if (!sequence.timesSeconds.empty())
+                        {
+                            hasGeometrySequence = true;
                             loopDuration = std::max(loopDuration, sequence.timesSeconds.back());
+                        }
                     });
+
+                // Timeline Play always drives the shared clock. EnableAnimations only does
+                // when imported/skeletal (or geometry-sequence) content exists — otherwise
+                // SampleSettings.enableAnimations would drag the editor playhead on
+                // keyframe-only scenes.
+                const bool advanceClock = enableKeyframes
+                    || (enableSkeletal && (hasImportedAnim || hasGeometrySequence));
+                if (advanceClock)
+                    vs->sceneTime += fElapsedTimeSeconds;
 
                 const float animTime = (loopDuration > 0.f)
                     ? float(fmod(vs->sceneTime, double(loopDuration)))
@@ -285,6 +301,12 @@ void animate(App& app, float fElapsedTimeSeconds)
                     if (scene::getAnimationDuration(*animation) <= 0.0f)
                         continue;
 
+                    // Playback is split; seeks apply both so the pose matches sceneTime.
+                    const bool applyThis = cfg->ResetAccumulation
+                        || (animation->editorAuthored ? enableKeyframes : enableSkeletal);
+                    if (!applyThis)
+                        continue;
+
                     (void)scene::applyAnimation(*animation, animTime, *ew);
                     for (const auto& channel : animation->channels)
                     {
@@ -297,7 +319,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     }
                 }
 
-                if (enableAnimations)
+                if (advanceClock)
                 {
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
                 }
@@ -312,6 +334,8 @@ void animate(App& app, float fElapsedTimeSeconds)
                     runtime->Invalidation.AccelerationStructRebuildRequested = true;
 
                 // Fixed-topology USD / soft-body point caches (SceneMeshEdit hides GPU wiring).
+                // Geometry sequences follow imported/skeletal playback, not editor keyframes.
+                if (enableSkeletal || cfg->ResetAccumulation)
                 {
                     const PathTracerSettings* before = cfg;
                     const bool hadResetAccumulation = before && before->ResetAccumulation;

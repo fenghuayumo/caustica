@@ -1492,6 +1492,7 @@ void RegisterCoreBindings(nb::module_& m)
         "Live renderer session state (path tracer settings and runtime flags).\n"
         "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
         .def_rw("enable_animations",             &PathTracerSettings::EnableAnimations)
+        .def_rw("enable_keyframes",              &PathTracerSettings::EnableKeyframes)
         .def_rw("enable_vsync",                  &PathTracerSettings::EnableVsync)
         .def_rw("fps_limiter",                   &PathTracerSettings::FPSLimiter)
 

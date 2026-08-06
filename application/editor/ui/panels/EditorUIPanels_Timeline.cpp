@@ -156,7 +156,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
 
     const auto setFrame = [&](int frame, bool continuousScrub = false) {
         frame = std::clamp(frame, m_editorUI.StartFrame, m_editorUI.EndFrame);
-        if (frame == currentFrame && !m_settings.EnableAnimations)
+        if (frame == currentFrame && !m_settings.EnableKeyframes)
             return;
 
         // Adjacent steps (±1) and active playhead/frame drags should behave like
@@ -164,6 +164,8 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         const int delta = std::abs(frame - currentFrame);
         const bool continuous = continuousScrub || delta <= 1;
 
+        // Freeze the shared scene clock while scrubbing (skeletal uses the same time).
+        m_settings.EnableKeyframes = false;
         m_settings.EnableAnimations = false;
         m_sceneEditor.evaluateAnimationsAt(
             static_cast<float>(frame) * frameSeconds,
@@ -192,13 +194,13 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     ImGui::SameLine(0.f, 2.f);
     if (TimelineIconButton(
             "##PlayPause",
-            m_settings.EnableAnimations ? TimelineIcon::Pause : TimelineIcon::Play,
-            m_settings.EnableAnimations,
+            m_settings.EnableKeyframes ? TimelineIcon::Pause : TimelineIcon::Play,
+            m_settings.EnableKeyframes,
             m_settings.RealtimeMode,
             m_settings.RealtimeMode
-                ? (m_settings.EnableAnimations ? "Pause animation (Space)" : "Play animation (Space)")
-                : "Animation playback is unavailable in reference mode"))
-        m_settings.EnableAnimations = !m_settings.EnableAnimations;
+                ? (m_settings.EnableKeyframes ? "Pause keyframes (Space)" : "Play keyframes (Space)")
+                : "Keyframe playback is unavailable in reference mode"))
+        m_settings.EnableKeyframes = !m_settings.EnableKeyframes;
     ImGui::SameLine(0.f, 2.f);
     if (TimelineIconButton(
             "##NextFrame",
@@ -236,7 +238,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
                 ? "Update Location / Rotation / Scale keyframe (I)"
                 : "Insert Location, Rotation and Scale keyframe (I)"))
     {
-        m_settings.EnableAnimations = false;
+        m_settings.EnableKeyframes = false;
         m_sceneEditor.insertTransformKeyframe(selected, keyTime);
     }
     ImGui::SameLine(0.f, 2.f);
@@ -260,7 +262,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
                     ? "Update visibility keyframe (from Hierarchy eye / Inspector Visible) (Shift+I)"
                     : "Insert visibility keyframe (current Visible state) (Shift+I)")))
     {
-        m_settings.EnableAnimations = false;
+        m_settings.EnableKeyframes = false;
         m_sceneEditor.insertVisibilityKeyframe(selected, keyTime);
     }
     ImGui::SameLine(0.f, 2.f);

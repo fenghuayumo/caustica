@@ -1276,7 +1276,7 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode 
 
             if (mode == AnimationEvaluateMode::ContinuousScrub)
             {
-                // Same as EnableAnimations playback: capture previous transforms so
+                // Same as timeline/skeletal playback: capture previous transforms so
                 // MVs/TAA/NRD see a smooth step instead of wiping history every drag tick.
                 entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
             }

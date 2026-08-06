@@ -244,8 +244,10 @@ void InitializeEntries()
 
 #define SETTING_ACCESS(field) [](EditorUIData& ui) -> auto& { return ui.render.settings.field; }
 
-    AddScalar("r.Animation.Enabled", "Enable scene animation playback.",
+    AddScalar("r.Animation.Enabled", "Enable imported / skeletal animation playback.",
         SETTING_ACCESS(EnableAnimations), Invalidation::None);
+    AddScalar("r.Animation.Keyframes.Enabled", "Enable editor keyframe timeline playback.",
+        SETTING_ACCESS(EnableKeyframes), Invalidation::None);
 
     AddEnum("r.PathTracing.Mode", "Path tracing operating mode.",
         SETTING_ACCESS(RealtimeMode), { "reference", "realtime" }, resetCaches);

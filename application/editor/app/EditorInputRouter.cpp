@@ -183,7 +183,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
                 editor.EndFrame);
             const float keyTime = static_cast<float>(currentFrame) * frameSeconds;
 
-            sceneEditor.renderAppState().settings.EnableAnimations = false;
+            sceneEditor.renderAppState().settings.EnableKeyframes = false;
             if (shiftDown)
             {
                 if (sceneEditor.canAnimateVisibility(selected))
@@ -241,7 +241,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (key == ToGlfwKey(caustica::Key::Space) && action == cGlfwPress
         && !ctrlDown && !altDown)
     {
-        session.settings.EnableAnimations = !session.settings.EnableAnimations;
+        session.settings.EnableKeyframes = !session.settings.EnableKeyframes;
         return true;
     }
     if (key == ToGlfwKey(caustica::Key::F1) && action == cGlfwPress)

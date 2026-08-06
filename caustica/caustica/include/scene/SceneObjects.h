@@ -44,6 +44,7 @@ namespace caustica
         std::string name;
         std::optional<bool>  realtimeMode;
         std::optional<bool>  enableAnimations;
+        std::optional<bool>  enableKeyframes;
         std::optional<int>   startingCamera;
         std::optional<float> realtimeFireflyFilter;
         std::optional<int>   maxBounces;

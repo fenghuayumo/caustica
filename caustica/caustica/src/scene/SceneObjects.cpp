@@ -26,6 +26,7 @@ void SampleSettings::load(const Json::Value& node)
 {
     node["realtimeMode"]          >> realtimeMode;
     node["enableAnimations"]      >> enableAnimations;
+    node["enableKeyframes"]       >> enableKeyframes;
     node["startingCamera"]        >> startingCamera;
     node["realtimeFireflyFilter"] >> realtimeFireflyFilter;
     node["maxBounces"]            >> maxBounces;

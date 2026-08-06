@@ -83,6 +83,7 @@ void LocalConfig::PostAppInit(caustica::render::RenderAppState& sampleUI)
         sampleUI.settings.StandaloneDenoiser = false;
         //sampleUI.settings.ToneMappingParams.exposureCompensation = 5.2f;
         sampleUI.settings.EnableAnimations = false;
+        sampleUI.settings.EnableKeyframes = false;
         sampleUI.settings.ReferenceFireflyFilterEnabled = false;
 
         sampleUI.settings.RealtimeMode = false;
@@ -119,6 +120,7 @@ void LocalConfig::PostAppInit(caustica::render::RenderAppState& sampleUI)
         //sampleUI.settings.EnvironmentMapParams.enabled = false;
         //sampleUI.settings.ToneMappingParams.exposureCompensation = 5.2f;
         sampleUI.settings.EnableAnimations = false;
+        sampleUI.settings.EnableKeyframes = false;
     }
 
 }
