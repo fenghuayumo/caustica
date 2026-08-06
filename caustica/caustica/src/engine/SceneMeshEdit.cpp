@@ -3,9 +3,9 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
+#include <engine/internal/SceneMeshEditing.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/SceneMeshEditing.h>
 #include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
 #include <render/WorldRenderer.h>
@@ -17,6 +17,16 @@ namespace caustica
 {
 namespace
 {
+
+std::shared_ptr<MeshInfo> meshFromEntity(App& app, ecs::Entity entity)
+{
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
+    if (!ew || !ecs::isValid(entity))
+        return nullptr;
+    auto* meshInstance = ew->world().tryGet<scene::MeshInstanceComponent>(entity);
+    return meshInstance ? meshInstance->mesh : nullptr;
+}
 
 SetSceneMeshVerticesParams makeInternalMeshEditParams(App& app, const SceneMeshEditOptions& options)
 {
@@ -52,9 +62,21 @@ SetSceneMeshVerticesParams makeInternalMeshEditParams(App& app, const SceneMeshE
 
 } // namespace
 
+std::vector<dm::float3> getMeshVertices(App& app, ecs::Entity entity)
+{
+    return getMeshVertices(app, meshFromEntity(app, entity));
+}
+
 std::vector<dm::float3> getMeshVertices(App& /*app*/, const std::shared_ptr<MeshInfo>& mesh)
 {
     return caustica::getMeshVertices(mesh);
+}
+
+std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
+{
+    GpuDevice* device = gpuDevice(app);
+    const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
+    return caustica::getMeshVerticesWorld(activeScene(app), entity, frameIndex);
 }
 
 std::vector<dm::float3> getMeshVerticesWorld(App& app, const std::shared_ptr<MeshInfo>& mesh)
@@ -64,11 +86,13 @@ std::vector<dm::float3> getMeshVerticesWorld(App& app, const std::shared_ptr<Mes
     return caustica::getMeshVerticesWorld(activeScene(app), mesh, frameIndex);
 }
 
-std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
+void setMeshVertices(
+    App& app,
+    ecs::Entity entity,
+    const std::vector<dm::float3>& vertices,
+    const SceneMeshEditOptions& options)
 {
-    GpuDevice* device = gpuDevice(app);
-    const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
-    return caustica::getMeshVerticesWorld(activeScene(app), entity, frameIndex);
+    setMeshVertices(app, meshFromEntity(app, entity), vertices, options);
 }
 
 void setMeshVertices(
@@ -82,20 +106,20 @@ void setMeshVertices(
 
 void setMeshVerticesWorld(
     App& app,
-    const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options)
-{
-    caustica::setMeshVerticesWorld(mesh, vertices, makeInternalMeshEditParams(app, options));
-}
-
-void setMeshVerticesWorld(
-    App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
     const SceneMeshEditOptions& options)
 {
     caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshEditParams(app, options));
+}
+
+void setMeshVerticesWorld(
+    App& app,
+    const std::shared_ptr<MeshInfo>& mesh,
+    const std::vector<dm::float3>& vertices,
+    const SceneMeshEditOptions& options)
+{
+    caustica::setMeshVerticesWorld(mesh, vertices, makeInternalMeshEditParams(app, options));
 }
 
 bool applyGeometrySequence(

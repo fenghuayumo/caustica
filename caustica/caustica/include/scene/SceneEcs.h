@@ -108,9 +108,8 @@ struct SceneContentComponent
 
 struct MeshInstanceComponent
 {
-    // Logic/authoring handle (CPU geometry + materials). Extract keys GPU state by
-    // mesh->renderResourceId; AssetSystem owns MeshAsset via mesh->asset.
-    // Apps should prefer SceneMeshEdit / SceneSpawn / SceneTransform - do not dig renderResourceId.
+    // Engine CPU mesh record. Apps: meshHandle() + SceneMeshEdit(entity) / SceneSpawn / SceneTransform.
+    // GPU keys are private on MeshInfo (scene::internal::RenderResourceAccess only).
     std::shared_ptr<MeshInfo> mesh;
     int instanceIndex = -1;
     int geometryInstanceIndex = -1;
@@ -119,6 +118,11 @@ struct MeshInstanceComponent
     // Hierarchy / Inspector visibility. Hidden instances keep their TLAS slot
     // (instanceMask = 0) so InstanceIndex stays aligned with ECS.
     bool enabled = true;
+
+    [[nodiscard]] MeshHandle meshHandle() const
+    {
+        return mesh ? mesh->asset : MeshHandle{};
+    }
 };
 
 inline constexpr uint32_t kForceSkinnedMeshUpdateFrameIndex = UINT32_MAX;

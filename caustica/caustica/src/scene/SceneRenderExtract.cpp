@@ -3,6 +3,9 @@
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/internal/RenderResourceAccess.h>
+
+using caustica::scene::internal::RenderResourceAccess;
 
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
@@ -111,7 +114,7 @@ void FillMeshInstanceProxy(
     proxy.instanceIndex = ref.meshComp->instanceIndex;
     proxy.geometryInstanceIndex = ref.meshComp->geometryInstanceIndex;
     const std::shared_ptr<MeshInfo>& mesh = ref.meshComp->mesh;
-    proxy.meshId = mesh ? mesh->renderResourceId : MeshRenderResourceId{};
+    proxy.meshId = RenderResourceAccess::meshId(mesh.get());
     proxy.globalMeshIndex = mesh ? mesh->globalMeshIndex : -1;
     proxy.geometryCount = mesh
         ? static_cast<uint32_t>(mesh->geometries.size())
@@ -215,10 +218,8 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
         {
             SkinnedMeshRenderProxy proxy;
             proxy.entity = entity;
-            proxy.meshId = meshInstance.mesh ? meshInstance.mesh->renderResourceId : MeshRenderResourceId{};
-            proxy.prototypeMeshId = skinned.prototypeMesh
-                ? skinned.prototypeMesh->renderResourceId
-                : MeshRenderResourceId{};
+            proxy.meshId = RenderResourceAccess::meshId(meshInstance.mesh.get());
+            proxy.prototypeMeshId = RenderResourceAccess::meshId(skinned.prototypeMesh.get());
             proxy.transformFloat = ownerGlobal.transformFloat;
             if (const auto* name = world.get<NameComponent>(entity))
                 proxy.debugName = name->value;
@@ -529,10 +530,10 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
     out.meshSnapshots.reserve(entityWorld.getMeshes().size());
     for (const std::shared_ptr<MeshInfo>& source : entityWorld.getMeshes())
     {
-        if (!source || !source->renderResourceId)
+        if (!source || !RenderResourceAccess::meshId(source.get()))
             continue;
         MeshRenderResourceSnapshot mesh;
-        mesh.id = source->renderResourceId;
+        mesh.id = RenderResourceAccess::meshId(source.get());
         mesh.debugName = source->name;
         mesh.type = source->type;
         mesh.objectSpaceBounds = source->objectSpaceBounds;
@@ -565,7 +566,7 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
             if (!sourceGeometry)
                 continue;
             GeometryRenderResourceSnapshot geometry;
-            geometry.id = sourceGeometry->renderResourceId;
+            geometry.id = RenderResourceAccess::geometryId(sourceGeometry.get());
             geometry.materialId = sourceGeometry->material
                 ? sourceGeometry->material->renderResourceId
                 : MaterialRenderResourceId{};

@@ -12,9 +12,12 @@
 #include <render/core/AccelStructManager.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
+#include <scene/internal/RenderResourceAccess.h>
 
 #include <cassert>
 #include <vector>
+
+using caustica::scene::internal::RenderResourceAccess;
 
 namespace caustica::render
 {
@@ -209,7 +212,7 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
         return;
     }
 
-    m_accelStructs->requestMeshRebuild(mesh->renderResourceId);
+    m_accelStructs->requestMeshRebuild(RenderResourceAccess::meshId(mesh.get()));
 }
 
 void SceneRayTracingResources::requestAccelerationStructureRebuild()

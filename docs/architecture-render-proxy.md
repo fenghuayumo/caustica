@@ -67,9 +67,12 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 - `SceneSpawn.h` - `load` / `spawn` / `despawn`
 - `SceneTransform.h` - local transform / translation / visibility
-- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`)
+- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`), prefer **entity** overloads
+- `MeshHandle` (`Handle<MeshAsset>`) + `MeshInstanceComponent::meshHandle()` — app mesh identity
 
-`SetSceneMeshVerticesParams` / `SceneMeshEditing.h` remain engine-internal.
+`MeshInfo` GPU keys (`m_renderResourceId`) are private; only Extract / GPU updater touch them via
+`scene/internal/RenderResourceAccess.h`. Do not dig `shared_ptr<MeshInfo>` for new hosts.
+`SetSceneMeshVerticesParams` / `engine/internal/SceneMeshEditing.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
 Editor `demo::PropComponentBase` / `GameModel` live only under `application/editor/game`
 (not in `causScene`). Sample scripts over ECS — not a second component system.

@@ -1,4 +1,4 @@
-#include <engine/SceneMeshEditing.h>
+#include <engine/internal/SceneMeshEditing.h>
 #include <render/SceneGpuResources.h>
 
 #include <core/ThreadContext.h>
@@ -6,6 +6,9 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneObjects.h>
 #include <scene/SceneTypes.h>
+#include <scene/internal/RenderResourceAccess.h>
+
+using caustica::scene::internal::RenderResourceAccess;
 
 // Logic / game thread only (editor, Python deform, animation geometry sequences).
 // Do not call from the dedicated render thread — mutate ECS then Extract.
@@ -326,7 +329,7 @@ bool UploadMeshDeformationToGpu(
         return false;
 
     render::MeshGpuUploadCommand command;
-    command.meshId = mesh->renderResourceId;
+    command.meshId = RenderResourceAccess::meshId(mesh.get());
     command.vertexOffset = mesh->vertexOffset;
     command.positions.assign(buffers.positionData.begin() + begin, buffers.positionData.begin() + end);
 
@@ -357,7 +360,7 @@ bool SyncMeshPrevPositionFromCurrent(
         return false;
 
     render::MeshGpuUploadCommand command;
-    command.meshId = mesh->renderResourceId;
+    command.meshId = RenderResourceAccess::meshId(mesh.get());
     command.vertexOffset = mesh->vertexOffset;
     command.previousPositions.assign(
         buffers.positionData.begin() + begin,
@@ -374,7 +377,7 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
     if (params.gpuResources)
     {
         render::MeshGpuUploadCommand command;
-        command.meshId = mesh->renderResourceId;
+        command.meshId = RenderResourceAccess::meshId(mesh.get());
         command.recreateVertexBuffer = true;
         params.gpuResources->enqueueMeshUpload(std::move(command));
     }

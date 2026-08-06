@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assets/AssetId.h>
+#include <assets/Handle.h>
 
 #include <filesystem>
 #include <memory>
@@ -21,6 +22,9 @@ struct MeshAsset
     std::filesystem::path sourcePath;
     std::shared_ptr<MeshInfo> mesh;
 };
+
+// App-facing mesh identity (AssetSystem). Prefer over digging MeshInfo / GPU ids.
+using MeshHandle = Handle<MeshAsset>;
 
 struct MaterialAsset
 {

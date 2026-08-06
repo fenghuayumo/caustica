@@ -2,9 +2,12 @@
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneGaussianSplatLogic.h>
+#include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderSessionApi.h>
+#include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
@@ -101,6 +104,18 @@ float avgTimePerFrame(const App& app)
         return 0.0f;
     std::chrono::duration<double> elapsed = (diag->benchLast - diag->benchStart);
     return float(elapsed.count() / diag->benchFrames);
+}
+
+void requestMeshAccelRebuild(App& app, ecs::Entity entity, bool resetAccumulation)
+{
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
+    if (!ew || !ecs::isValid(entity))
+        return;
+    auto* meshInstance = ew->world().tryGet<scene::MeshInstanceComponent>(entity);
+    if (!meshInstance || !meshInstance->mesh)
+        return;
+    requestMeshAccelRebuild(app, meshInstance->mesh, resetAccumulation);
 }
 
 void requestMeshAccelRebuild(App& app, const std::shared_ptr<MeshInfo>& mesh)

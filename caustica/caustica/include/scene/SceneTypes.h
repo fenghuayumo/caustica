@@ -184,9 +184,12 @@ namespace caustica
         Count
     };
 
+    namespace scene::internal { struct RenderResourceAccess; }
+
     struct MeshGeometry
     {
-        scene::GeometryRenderResourceId renderResourceId;
+        friend struct scene::internal::RenderResourceAccess;
+
         std::shared_ptr<Material> material;
         dm::box3 objectSpaceBounds;
         uint32_t indexOffsetInMesh = 0;
@@ -198,6 +201,10 @@ namespace caustica
         MeshGeometryPrimitiveType type = MeshGeometryPrimitiveType::Triangles;
 
         virtual ~MeshGeometry() = default;
+
+    private:
+        // Extract / GPU registry key — not part of the app authoring surface.
+        scene::GeometryRenderResourceId m_renderResourceId;
     };
 
     enum class MeshType : uint8_t
@@ -210,14 +217,14 @@ namespace caustica
         Count
     };
 
-    // CPU mesh authoring record. dual identity:
-    // - shared_ptr<MeshInfo> on MeshInstanceComponent = logic/deform handle
-    // - renderResourceId = Extract / GPU scene key (assigned on register)
-    // - asset = AssetSystem MeshAsset handle (hot-reload / deps)
+    // CPU mesh authoring record (engine-owned).
+    // Apps should use MeshHandle (asset) + MeshInstanceComponent / SceneMeshEdit(entity).
+    // GPU keys live in m_renderResourceId and are only touched via scene::internal::RenderResourceAccess.
     struct MeshInfo
     {
-        scene::MeshRenderResourceId renderResourceId;
-        Handle<MeshAsset> asset;
+        friend struct scene::internal::RenderResourceAccess;
+
+        Handle<MeshAsset> asset; // app-facing MeshHandle when registered with AssetSystem
         std::string name;
         MeshType type = MeshType::Triangles;
         std::shared_ptr<BufferGroup> buffers;
@@ -241,6 +248,10 @@ namespace caustica
                 || (type == MeshType::CurveDisjointOrthogonalTriangleStrips)
                 || (type == MeshType::CurveLinearSweptSpheres);
         }
+
+    private:
+        // Extract / GPU registry key — assigned on SceneResources register.
+        scene::MeshRenderResourceId m_renderResourceId;
     };
 
     inline caustica::rhi::Buffer* bufferOrFallback(caustica::rhi::Buffer* primary, caustica::rhi::Buffer* secondary)

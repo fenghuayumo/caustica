@@ -1,9 +1,11 @@
 #include <scene/SceneResources.h>
+#include <scene/internal/RenderResourceAccess.h>
 
 #include <algorithm>
 #include <atomic>
 
 using namespace caustica;
+using scene::internal::RenderResourceAccess;
 
 namespace
 {
@@ -26,17 +28,17 @@ void EnsureMeshRenderResourceIds(const std::shared_ptr<MeshInfo>& mesh)
     if (!mesh)
         return;
 
-    if (!mesh->renderResourceId)
+    if (!RenderResourceAccess::meshId(mesh.get()))
     {
-        mesh->renderResourceId = scene::MeshRenderResourceId::make(
+        RenderResourceAccess::meshId(*mesh) = scene::MeshRenderResourceId::make(
             g_nextMeshRenderResourceId.fetch_add(1, std::memory_order_relaxed), 0);
     }
 
     for (const std::shared_ptr<MeshGeometry>& geometry : mesh->geometries)
     {
-        if (geometry && !geometry->renderResourceId)
+        if (geometry && !RenderResourceAccess::geometryId(geometry.get()))
         {
-            geometry->renderResourceId = scene::GeometryRenderResourceId::make(
+            RenderResourceAccess::geometryId(*geometry) = scene::GeometryRenderResourceId::make(
                 g_nextGeometryRenderResourceId.fetch_add(1, std::memory_order_relaxed), 0);
         }
         if (geometry)
