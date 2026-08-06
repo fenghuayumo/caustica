@@ -1318,8 +1318,8 @@ void RegisterCoreBindings(nb::module_& m)
 
     // --- Scene ------------------------------------------------------------
     nb::class_<Scene>(m, "Scene",
-        "Loaded caustica scene. Material and light access lives here so Python\n"
-        "scripts can follow the same shape as the C++ Sample::scene() path.")
+        "Loaded caustica scene. Materials, lights, and SceneEntity lookup live here.\n"
+        "Prefer Sample.find_entity / get_mesh_entities over digging engine MeshInfo.")
         .def("get_materials", [](Scene& self) {
                 return GetSceneMaterials(&self);
             }, "Return every StandardMaterial in this scene.")

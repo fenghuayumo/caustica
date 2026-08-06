@@ -55,9 +55,9 @@ with caustica.Renderer(
 Runtime spawn (same path as C++ `SceneSpawn`):
 
 ```python
-node = r.app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
-if node:
-    node.translation = (1.5, 0.5, 0.0)
+entity = r.app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
+if entity:
+    entity.translation = (1.5, 0.5, 0.0)
     r.app.reset_accumulation()
 ```
 
@@ -70,7 +70,7 @@ if node:
 | `realtime_render.py` | Realtime / denoiser smoke (TAA, NRD, DLSS, OIDN) |
 | `launch_default_scene.py` | Builtin `plane_cube`, optional mesh import / FPS / OIDN |
 | `render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT |
-| `render_default_scene_animated.py` | Default scene + mesh deformation |
+| `render_default_scene_animated.py` | Default scene + `SceneEntity` mesh deformation |
 | `3dgs_example.py` | 3DGS interactive / reference+OIDN / realtime+DLSS |
 | `render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics |
 | `test_intrinsics_demo.py` | Off-center `set_camera_intrinsics` |

@@ -38,7 +38,7 @@ if wall is not None:
     wall.emissive_color     = (1.0, 0.7, 0.4)
     wall.emissive_intensity = 5.0
 
-# 4) Enumerate scene lights and bump their intensity
+# 4) Enumerate light SceneEntity handles and bump intensity
 print("\n=== Lights ===")
 for light in scene.get_lights():
     print(f"  type={light.light_type}  name={light.name}  color={light.color}")

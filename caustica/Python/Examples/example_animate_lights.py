@@ -26,6 +26,7 @@ palette = [
     (1.0, 0.9, 0.2),   # yellow
 ]
 
+# get_lights() returns SceneEntity handles with light components.
 lights = scene.get_lights()
 for i, light in enumerate(lights):
     if int(light.light_type) not in (

@@ -138,8 +138,8 @@ def apply_deformation(
         base_vertices, center, args.deform_mode, args.amplitude, time_value
     )
     app.deform_mesh(
-        entity,
-        callback,
+        entity=entity,
+        callback=callback,
         recompute_normals=args.recompute_normals,
         rebuild_acceleration_structure=args.rebuild_accel,
     )

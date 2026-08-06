@@ -21,7 +21,7 @@ This document describes how to use the current `caustica` Python bindings. The A
 - [Renderer](#renderer) — extension-mode standalone renderer
 - [Sample & Scene](#sample--scene) — `app()`, scene, camera, accumulation
 - [Spawn / Despawn](#spawn--despawn) — prefab load/spawn and entity removal
-- [Model](#model) — `Mesh`, `SceneNode`, deformation, bounds
+- [Model](#model) — `SceneEntity`, `MeshHandle`, deformation, bounds
 - [Material](#material) — `Material` class and scene lookup
 - [Light](#light) — light create/lookup and typed properties
 - [3DGS](#3dgs) — Gaussian splat loading, settings, enums
@@ -455,11 +455,11 @@ with caustica.Renderer(scene="builtin:plane", headless=True, accumulation_target
     app = r.app
 
     # One-shot: import + attach under the active scene root.
-    node = app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
-    if node is None:
+    entity = app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
+    if entity is None:
         raise RuntimeError("spawn_from_file failed")
-    node.translation = (1.5, 0.5, 0.0)
-    node.scaling = (0.5, 0.5, 0.5)
+    entity.translation = (1.5, 0.5, 0.0)
+    entity.scaling = (0.5, 0.5, 0.5)
 
     # Or split load/spawn when reusing a prefab:
     prefab = app.load("Models/GlassSphere/GlassSphere.gltf")
@@ -473,19 +473,19 @@ with caustica.Renderer(scene="builtin:plane", headless=True, accumulation_target
     r.save_screenshot("spawned.png")
 
     # Remove an entity (and children) when done.
-    app.despawn(node)
+    app.despawn(entity)
 ```
 
 `load_mesh_file(...)` remains as a bool convenience wrapper around `spawn_from_file`.
 
 ### Deform Mesh Vertices
 
-Mesh deformation works on unique object-space position vertices. Importers may
-split one OBJ/glTF position into multiple render vertices for UV or normal
-seams; Python returns that position once, and write-back propagates the edit to
-all split render vertices. After `set_mesh_vertices(...)` or `deform_mesh(...)`,
-caustica refreshes the mesh GPU buffer and can rebuild ray tracing acceleration
-structures so the edited geometry is used by subsequent frames.
+Mesh deformation is **entity-first**: pass a `SceneEntity` that has a mesh
+instance. Importers may split one OBJ/glTF position into multiple render
+vertices for UV or normal seams; Python returns that position once, and
+write-back propagates the edit to all split render vertices. After
+`set_mesh_vertices(...)` or `deform_mesh(...)`, caustica refreshes GPU buffers
+and can rebuild ray tracing acceleration structures.
 
 ```python
 import math
@@ -494,8 +494,8 @@ import caustica
 r = caustica.Renderer(scene="builtin:cube", headless=True, accumulation_target=8)
 app = r.app
 
-mesh = app.find_mesh("cube") or app.get_meshes()[0]
-vertices = list(app.get_mesh_vertices(mesh))
+entity = app.find_mesh_entity("cube") or app.get_mesh_entities()[0]
+vertices = list(app.get_mesh_vertices(entity))
 
 # Simple soft bulge: move upper vertices upward based on x/z radius.
 deformed = []
@@ -504,7 +504,7 @@ for x, y, z in vertices:
     lift = 0.15 * max(0.0, 1.0 - radius)
     deformed.append((x, y + lift, z))
 
-app.set_mesh_vertices(mesh, deformed, recompute_normals=True)
+app.set_mesh_vertices(entity, deformed, recompute_normals=True)
 app.step_until_accumulated()
 r.save_screenshot("deformed_mesh.png")
 r.close()
@@ -519,22 +519,21 @@ def wave(index, p):
         return None
     return (x, y + 0.05 * math.sin(index * 0.37), z)
 
-app.deform_mesh(mesh, wave, recompute_normals=True)
+app.deform_mesh(entity, wave, recompute_normals=True)
 ```
 
-Use the `_world` variants when the values you read and return should be scene
-world coordinates. Passing a `Mesh` works when that mesh has exactly one scene
-instance. For instanced/shared meshes, pass the owning `SceneNode` so caustica can
-use that node's local-to-world transform:
+Use the `_world` variants when values should be scene world coordinates. Always
+pass the owning mesh `SceneEntity` so the local-to-world transform is correct
+for that instance:
 
 ```python
-node = app.find_node("cube")  # or any mesh node/path
+entity = app.find_entity("cube")  # name or path; or find_mesh_entity(...)
 
 def lift_world(index, p):
     x, y, z = p
     return (x, y + 0.25, z)
 
-app.deform_mesh_world(node, lift_world, recompute_normals=True)
+app.deform_mesh_world(entity, lift_world, recompute_normals=True)
 ```
 
 ## API Reference
@@ -546,7 +545,7 @@ The sections below are grouped by topic so you can jump directly to the API you 
 | Renderer | [Renderer](#renderer) |
 | Scene / app | [Sample & Scene](#sample--scene) |
 | Spawn / despawn | [Spawn / Despawn](#spawn--despawn) |
-| Mesh / nodes | [Model](#model) |
+| Mesh / entities | [Model](#model) |
 | Materials | [Material](#material) |
 | Lights | [Light](#light) |
 | Gaussian splats | [3DGS](#3dgs) |
@@ -721,7 +720,7 @@ Top-level renderer instance. Python exposes the C++ `App` (from `EngineApp::app(
 | API | Return | Notes |
 | --- | --- | --- |
 | `set_scene(scene_name, force_reload=False)` | `None` | Switch scene. |
-| `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
+| `load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` object to the current scene. |
 | `load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`). Convenience bool wrapper over `spawn_from_file`. |
 | `set_environment_map(path)` | `None` | Override scene environment map source. |
 | `get_scene()` | `Scene | None` | Return the current loaded scene. |
@@ -739,7 +738,7 @@ Top-level renderer instance. Python exposes the C++ `App` (from `EngineApp::app(
 | `get_camera_fov()` | `float` | Returns current internal value in radians. |
 | `scene_camera_count` | `int` | Number of scene cameras available for selection. |
 | `selected_camera_index` | `int` | Active scene-camera index (`0 .. scene_camera_count-1`). |
-| `get_cameras()` | `list[SceneNode]` | Compatibility alias for `scene.get_cameras()`. |
+| `get_cameras()` | `list[SceneEntity]` | Compatibility alias for `scene.get_cameras()`. |
 | `save_current_camera()` | `None` | Save camera through app's camera persistence path. |
 | `load_current_camera()` | `None` | Restore saved camera. |
 
@@ -751,7 +750,7 @@ Use `Renderer.set_camera()` when working in extension mode; it is simpler than b
 | --- | --- |
 | `request_shader_reload()` | Requests shader reload. |
 | `request_accel_rebuild()` | Requests a full acceleration structure rebuild. |
-| `request_mesh_accel_rebuild(mesh_or_node)` | Requests a BLAS rebuild for one dirty mesh (or the mesh on a `SceneNode`) without forcing a full scene AS rebuild. |
+| `request_mesh_accel_rebuild(entity)` | Requests a BLAS rebuild for the mesh on one `SceneEntity` without forcing a full scene AS rebuild. |
 | `reset_accumulation()` | Resets reference accumulation. |
 | `reset_realtime_caches()` | Resets realtime caches (ReSTIR / temporal history helpers). |
 
@@ -784,9 +783,9 @@ Returned by `Sample.load(path)`.
 | API | Return | Notes |
 | --- | --- | --- |
 | `sample.load(path)` | `ScenePrefab` | Import a mesh/prefab file into a CPU-side handle (does not spawn). |
-| `sample.spawn(prefab)` | `SceneNode | None` | Spawn a previously loaded `ScenePrefab` into the active scene. Returns the root node. |
-| `sample.spawn_from_file(path)` | `SceneNode | None` | `load` + `spawn` in one call. |
-| `sample.despawn(node)` | `bool` | Remove a scene entity and its children. |
+| `sample.spawn(prefab)` | `SceneEntity | None` | Spawn a previously loaded `ScenePrefab` into the active scene. Returns the root entity. |
+| `sample.spawn_from_file(path)` | `SceneEntity | None` | `load` + `spawn` in one call. |
+| `sample.despawn(entity)` | `bool` | Remove a scene entity and its children. |
 | `sample.load_mesh_file(path)` | `bool` | True when `spawn_from_file` succeeds. |
 
 Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd`, `.usda`, `.usdc`.
@@ -815,33 +814,34 @@ app.set_reference_mode(
 
 ## Model
 
-Mesh geometry, scene graph nodes, and vertex deformation. Access meshes through `app.scene` or `Sample` compatibility aliases.
+Scene entities, asset mesh identity (`MeshHandle`), and vertex deformation.
+There is no public `Mesh` / `SceneNode` type — use `SceneEntity` and entity-keyed
+mesh APIs. Engine CPU mesh records stay internal.
 
 ### Scene Lookup
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `scene.get_meshes()` | `list[Mesh]` | All meshes in the current scene. |
-| `scene.find_mesh(name)` | `Mesh | None` | Match by mesh name. |
-| `scene.mesh_count` | `int` | Number of meshes in the current scene. |
-| `scene.find_node(path)` | `SceneNode | None` | Find a scene graph node by name or path. |
-| `sample.get_meshes()` | `list[Mesh]` | Compatibility alias for `scene.get_meshes()`. |
-| `sample.find_mesh(name)` | `Mesh | None` | Compatibility alias for `scene.find_mesh(name)`. |
-| `sample.find_node(path)` | `SceneNode | None` | Compatibility alias for `scene.find_node(path)`. |
+| `scene.get_mesh_entities()` | `list[SceneEntity]` | All mesh-instance entities in the current scene. |
+| `scene.find_mesh_entity(name)` | `SceneEntity | None` | Match by mesh asset name or entity name. |
+| `scene.find_entity(path)` | `SceneEntity | None` | Find an entity by name or path. |
+| `sample.get_mesh_entities()` | `list[SceneEntity]` | Compatibility alias for `scene.get_mesh_entities()`. |
+| `sample.find_mesh_entity(name)` | `SceneEntity | None` | Compatibility alias for `scene.find_mesh_entity(name)`. |
+| `sample.find_entity(path)` | `SceneEntity | None` | Compatibility alias for `scene.find_entity(path)`. |
 | `Renderer.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (extension mode). |
-| `Sample.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab node (embed or extension). |
-| `Sample.spawn_from_file(path)` | `SceneNode | None` | Preferred spawn path; returns the root node. |
+| `Sample.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (embed or extension). |
+| `Sample.spawn_from_file(path)` | `SceneEntity | None` | Preferred spawn path; returns the root entity. |
 
 ### Vertex Deformation
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `sample.get_mesh_vertices(mesh)` | `list[tuple]` | Returns unique object-space `(x, y, z)` position vertices. |
-| `sample.set_mesh_vertices(mesh, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replaces unique positions. `vertices` must contain exactly `mesh.vertex_count` triples. |
-| `sample.deform_mesh(mesh, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | Calls `callback(index, (x, y, z))` for each unique position. Return a new triple or `None`; returns the processed vertex count. |
-| `sample.get_mesh_vertices_world(mesh_or_node)` | `list[tuple]` | Returns unique world-space `(x, y, z)` position vertices. Pass a `SceneNode` for instanced/shared meshes. |
-| `sample.set_mesh_vertices_world(mesh_or_node, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replaces unique positions from world-space coordinates, converting through the selected node transform. |
-| `sample.deform_mesh_world(mesh_or_node, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | Callback receives unique world-space `(x, y, z)` and returns a world-space replacement or `None`. |
+| `sample.get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space `(x, y, z)` positions for the entity's mesh. |
+| `sample.set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace unique positions. Length must match `len(get_mesh_vertices(entity))`. |
+| `sample.deform_mesh(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | Calls `callback(index, (x, y, z))` for each unique position. Return a new triple or `None`; returns the processed vertex count. |
+| `sample.get_mesh_vertices_world(entity)` | `list[tuple]` | Unique world-space positions using that entity's transform. |
+| `sample.set_mesh_vertices_world(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace positions from world-space coordinates. |
+| `sample.deform_mesh_world(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | World-space deform callback; return a world triple or `None`. |
 
 `set_mesh_vertices(...)` updates object-space mesh bounds, optionally recomputes normals,
 refreshes GPU vertex data, resets accumulation, and requests acceleration structure rebuild
@@ -849,61 +849,53 @@ by default. Keep `rebuild_acceleration_structure=True` for ray tracing-correct g
 Only set it to `False` when batching several edits and calling `request_accel_rebuild()`
 after the final update.
 
-For OBJ files, `mesh.vertex_count` matches the number of source `v` position
-records used by faces, in the same order as those `v` records appear in the OBJ
-file. Editing one returned position updates every render vertex split from that
-source position by normals or UVs.
-
-The `_world` variants refresh the scene graph transform state before converting
-coordinates, so recent Python transform edits such as `node.translation = ...`
-are reflected immediately. The underlying mesh vertex buffer is still shared:
-editing a mesh through one node updates the mesh data used by any other nodes
-that instance the same `Mesh`.
+The `_world` variants refresh transform state before converting coordinates, so
+recent edits such as `entity.translation = ...` are reflected immediately. Shared
+mesh buffers still apply: deforming through one mesh entity updates geometry used
+by other instances of the same engine mesh record.
 
 ### Scene Bounds
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `scene.get_scene_bounds()` | `tuple | None` | World-space `((min.xyz), (max.xyz))` AABB from C++ `Scene::GetSceneBounds()`. |
+| `scene.get_scene_bounds()` | `tuple | None` | World-space `((min.xyz), (max.xyz))` AABB from C++ `Scene::getSceneBounds()`. |
 | `scene.get_bounds()` | `tuple | None` | Alias for `scene.get_scene_bounds()`. |
 | `scene.bounds` | `tuple | None` | Property alias for `scene.get_scene_bounds()`. |
 | `scene.bounds_center` | `tuple | None` | Center of `scene.bounds`. |
 | `scene.bounds_size` | `tuple | None` | Extent `(max - min)` of `scene.bounds`. |
 | `Renderer.get_scene_bounds()` / `scene_bounds` | `tuple | None` | Extension-mode world bounds shortcut. |
 
-### `Mesh` Class
+### `MeshHandle` Class
 
-Returned by `Scene.get_meshes()`, `Scene.find_mesh()`, `Sample.get_meshes()`,
-`Sample.find_mesh()`, and `SceneNode.mesh`.
+Asset-system mesh identity (`Handle<MeshAsset>`). Prefer this over digging engine
+CPU mesh records. Returned by `SceneEntity.mesh_handle`.
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `name` | `str` | Mesh name from the source model or builtin primitive. |
-| `global_mesh_index` | `int` | Internal scene mesh index. |
-| `vertex_count` | `int` | Number of unique positions returned by `get_mesh_vertices(...)` and expected by `set_mesh_vertices(...)`. |
-| `index_count` | `int` | Total index count. |
-| `geometry_count` | `int` | Number of mesh geometry groups/submeshes. |
-| `bounds` | `((min.xyz), (max.xyz)) \| None` | Object-space mesh AABB. |
+| `valid` | `bool` | Whether the handle resolves. |
+| `name` | `str` | Mesh asset name when valid. |
+| `__bool__` | `bool` | Truthy when valid. |
 
-Vertex data is edited through `Sample.set_mesh_vertices()` / `Sample.deform_mesh()`, not through writable `Mesh` properties, because changing vertices also needs GPU buffer refresh and acceleration-structure invalidation.
+### `SceneEntity` Class
 
-### `SceneNode` Class
-
-Returned by `Scene.find_node()` and `Sample.find_node()`.
+ECS entity wrapper returned by `find_entity`, `find_mesh_entity`, `get_mesh_entities`,
+`get_lights`, `get_cameras`, `spawn` / `spawn_from_file`, and light create helpers.
 
 | Property | Type |
 | --- | --- |
 | `name` | `str` |
 | `path` | `str` |
-| `mesh` | `Mesh | None` |
+| `mesh_handle` | `MeshHandle` |
 | `is_mesh` | `bool` |
+| `is_light` | `bool` |
+| `light_type` | `int` / `LightType` |
 | `translation` | `(x, y, z)` |
 | `rotation` | `(x, y, z, w)` quaternion |
 | `euler` | `(x, y, z)` radians |
 | `scaling` | `(x, y, z)` |
-| `bounds` | `((min.xyz), (max.xyz)) \| None` |
+| `bounds` | world AABB tuple or `None` |
 
-`rotation` and `euler` both write the node's local Transform rotation. Assigning
+`rotation` and `euler` both write the entity's local Transform rotation. Assigning
 `euler` converts XYZ radians to the stored quaternion; assigning `rotation` expects
 an XYZW quaternion, matching scene JSON. Python Transform edits reset accumulation
 automatically so the next rendered frame does not blend with the previous pose.
@@ -1064,33 +1056,33 @@ app.request_accel_rebuild()
 
 ## Light
 
-Lights are ECS components on `SceneNode`. Lookup returns `SceneNode` handles; typed fields are exposed as properties on that node. Prefer `caustica.LightType` over raw integers when branching.
+Lights are ECS components on `SceneEntity`. Lookup returns `SceneEntity` handles; typed fields are exposed as properties on that entity. Prefer `caustica.LightType` over raw integers when branching.
 
 ### Scene Lookup
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `scene.get_lights()` | `list[SceneNode]` | All light entities in the current scene. |
-| `scene.find_light(name)` | `SceneNode | None` | Match by entity name. |
+| `scene.get_lights()` | `list[SceneEntity]` | All light entities in the current scene. |
+| `scene.find_light(name)` | `SceneEntity | None` | Match by entity name. |
 | `scene.light_count` | `int` | Number of lights in the current scene. |
 | `scene.camera_count` | `int` | Number of camera entities in the current scene. |
-| `scene.get_cameras()` | `list[SceneNode]` | All camera entities as `SceneNode`. |
-| `Sample.get_lights()` | `list[SceneNode]` | Compatibility alias for `scene.get_lights()`. |
-| `Sample.find_light(name)` | `SceneNode | None` | Compatibility alias for `scene.find_light(name)`. |
+| `scene.get_cameras()` | `list[SceneEntity]` | All camera entities as `SceneEntity`. |
+| `Sample.get_lights()` | `list[SceneEntity]` | Compatibility alias for `scene.get_lights()`. |
+| `Sample.find_light(name)` | `SceneEntity | None` | Compatibility alias for `scene.find_light(name)`. |
 | `Sample.set_environment_map(path)` | `None` | Override scene environment map source. |
 
 ### Create Lights
 
 | API | Notes |
 | --- | --- |
-| `scene.create_directional_light(color=(1,1,1), irradiance=1.0, angular_size=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
-| `scene.create_point_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
-| `scene.create_spot_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, inner_angle=180.0, outer_angle=180.0, name="")` | Attach under scene root; returns `SceneNode`. |
-| `scene.create_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | Attach under scene root; returns `SceneNode`. |
+| `scene.create_directional_light(color=(1,1,1), irradiance=1.0, angular_size=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
+| `scene.create_point_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
+| `scene.create_spot_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, inner_angle=180.0, outer_angle=180.0, name="")` | Attach under scene root; returns `SceneEntity`. |
+| `scene.create_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
 
 Empty `name` auto-generates a unique name (`DirectionalLight`, `PointLight`, …).
 
-### Light properties on `SceneNode`
+### Light properties on `SceneEntity`
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -1109,14 +1101,14 @@ For common environment tweaks, prefer `settings.environment_map` (see [Settings]
 
 ## 3DGS
 
-3D Gaussian splat loading, scene graph nodes, and render settings.
+3D Gaussian splat loading, scene entities, and render settings.
 
 ### Loading
 
 | API | Return | Notes |
 | --- | --- | --- |
 | `Renderer.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` 3DGS scene object (extension mode). |
-| `Sample.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` node to the current scene. |
+| `Sample.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` object to the current scene. |
 | Scene JSON `GaussianSplat` node | — | Declare splats in inline or file-based scene JSON. See [Renderer → Inline / Builtin Scenes](#inline--builtin-scenes). |
 
 Read-only status on `Sample` / `Renderer.settings`:
@@ -1423,7 +1415,7 @@ All enums are arithmetic, so `int(enum_value)` works and enum values can be assi
 | `Point` | Point light. |
 | `Environment` | Environment / HDRI light. |
 
-`SceneNode.light_type` stores the same integer values; compare with `int(caustica.LightType.Point)` or the enum directly.
+`SceneEntity.light_type` stores the same integer values; compare with `int(caustica.LightType.Point)` or the enum directly.
 
 ## Embedded Mode Notes
 
@@ -1476,7 +1468,7 @@ For windowed extension usage:
 | `caustica/Python/Examples/realtime_render.py` | Realtime / denoiser smoke test. |
 | `caustica/Python/Examples/launch_default_scene.py` | Builtin scene, mesh import, FPS / OIDN smoke. |
 | `caustica/Python/Examples/render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT. |
-| `caustica/Python/Examples/render_default_scene_animated.py` | Animated default-scene capture. |
+| `caustica/Python/Examples/render_default_scene_animated.py` | Animated default-scene capture via `SceneEntity` deform. |
 | `caustica/Python/Examples/3dgs_example.py` | 3DGS interactive / Reference+OIDN / Realtime+DLSS. |
 | `caustica/Python/Examples/render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics. |
 | `caustica/Python/Examples/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
@@ -1496,5 +1488,6 @@ import caustica
 help(caustica)
 help(caustica.Renderer)
 help(caustica.Sample)
+help(caustica.SceneEntity)
 help(caustica.Settings)
 ```
