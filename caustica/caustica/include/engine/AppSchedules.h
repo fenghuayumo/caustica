@@ -126,7 +126,7 @@ struct SystemContext
         return world.commands();
     }
 
-    // Live scene ECS (not App resource world). Prefer over GpuRenderSubsystem digs.
+    // Live scene ECS (not App resource world). Prefer over internal GPU digs.
     [[nodiscard]] scene::SceneEntityWorld* entityWorld();
     [[nodiscard]] const scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] ecs::World* sceneEcs();

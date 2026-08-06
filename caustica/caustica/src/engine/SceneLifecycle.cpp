@@ -1,11 +1,12 @@
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/internal/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneLifecycle.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>

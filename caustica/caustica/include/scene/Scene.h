@@ -120,6 +120,8 @@ namespace caustica
 
         void refreshEntityWorldForFrame(uint32_t frameIndex);
 
+        // Extract / GPU read paths are engine+editor only. Hosts use EntityWorld +
+        // SceneLifecycle / SceneQuery — do not obtain Scene* via EngineApp.
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
         // Optional frame inputs copy pre-resolved ActiveCamera + settings into the slot.
         void extractAndPublishRenderSnapshot(

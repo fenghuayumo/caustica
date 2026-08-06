@@ -2,6 +2,7 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>

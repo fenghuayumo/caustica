@@ -3,6 +3,7 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/ResolvedActiveCamera.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>

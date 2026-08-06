@@ -2,21 +2,23 @@
 #include <engine/AppResources.h>
 #include <cassert>
 #include <engine/CameraApi.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
+#include <scene/Scene.h>
 
 namespace caustica
 {
 
-uint sceneCameraCount(const App& app)
+uint32_t sceneCameraCount(const App& app)
 {
     auto scenePtr = activeScene(app);
     if (!scenePtr)
         return 1;
-    return (uint)scenePtr->getCameraEntities().size() + 1;
+    return static_cast<uint32_t>(scenePtr->getCameraEntities().size()) + 1;
 }
 
-uint& selectedCameraIndex(App& app)
+uint32_t& selectedCameraIndex(App& app)
 {
     assert(cameraController(app));
     return cameraController(app)->selectedCameraIndex();

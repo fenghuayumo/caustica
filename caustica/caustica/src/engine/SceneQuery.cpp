@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -33,7 +34,7 @@ namespace
 std::shared_ptr<Scene> activeScene(const App& app)
 {
     if (const ActiveScene* active = tryActiveScene(app))
-        return active->scene;
+        return active->m_scene;
     return nullptr;
 }
 
@@ -52,7 +53,7 @@ void commitActiveScene(
     if (!active)
         return;
 
-    active->scene = std::move(scene);
+    active->m_scene = std::move(scene);
     active->name = std::move(name);
     active->path = std::move(path);
     ++active->generation;
@@ -80,7 +81,7 @@ void clearActiveScene(App& app)
     if (!active)
         return;
 
-    active->scene.reset();
+    active->m_scene.reset();
     active->name.clear();
     active->path.clear();
     ++active->generation;
@@ -89,7 +90,7 @@ void clearActiveScene(App& app)
 scene::SceneEntityWorld* entityWorld(const App& app)
 {
     if (const ActiveScene* active = tryActiveScene(app))
-        return active->entityWorld();
+        return active->m_scene ? active->m_scene->getEntityWorld() : nullptr;
     return nullptr;
 }
 

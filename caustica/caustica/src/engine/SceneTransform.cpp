@@ -1,6 +1,7 @@
 #include <engine/SceneTransform.h>
 
 #include <engine/App.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>

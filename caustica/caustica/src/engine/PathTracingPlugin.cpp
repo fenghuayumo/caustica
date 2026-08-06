@@ -2,6 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SystemLabels.h>

@@ -3,6 +3,7 @@
 #include <scene/camera/Camera.h>
 #include <scene/View.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -12,8 +13,8 @@ namespace caustica
 class App;
 class PlanarView;
 
-[[nodiscard]] uint sceneCameraCount(const App& app);
-[[nodiscard]] uint& selectedCameraIndex(App& app);
+[[nodiscard]] uint32_t sceneCameraCount(const App& app);
+[[nodiscard]] uint32_t& selectedCameraIndex(App& app);
 [[nodiscard]] float cameraVerticalFOV(const App& app);
 [[nodiscard]] const FirstPersonCamera& currentCamera(const App& app);
 [[nodiscard]] const std::shared_ptr<PlanarView>& currentView(const App& app);

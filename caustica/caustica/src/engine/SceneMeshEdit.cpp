@@ -6,6 +6,7 @@
 #include <engine/internal/SceneMeshEditing.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
 #include <render/WorldRenderer.h>

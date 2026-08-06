@@ -4,11 +4,12 @@
 
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/internal/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <render/core/CameraController.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
 #include <scene/SceneManager.h>

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <ecs/World.h>
-#include <scene/Scene.h>
-
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -11,27 +8,36 @@
 namespace caustica
 {
 
-// App-owned committed scene identity. Single source of truth for the live scene
-// pointer, name, and path. SceneManager remains the loader/controller.
+class App;
+class Scene;
+
+namespace scene
+{
+class SceneEntityWorld;
+}
+
+// App-owned committed scene identity (name / path / generation).
+// The live Scene pointer is engine-internal — use entityWorld() / SceneLifecycle,
+// not ActiveScene::scene digs. Prefer EngineApp setScene + EntityWorld for hosts.
 struct ActiveScene
 {
-    std::shared_ptr<Scene> scene;
     std::string name;
     std::filesystem::path path;
     uint64_t generation = 0;
 
-    [[nodiscard]] scene::SceneEntityWorld* entityWorld() const
-    {
-        return scene ? scene->getEntityWorld() : nullptr;
-    }
+    [[nodiscard]] bool isValid() const { return m_scene != nullptr; }
 
-    [[nodiscard]] ecs::World* ecs() const
-    {
-        scene::SceneEntityWorld* ew = entityWorld();
-        return ew ? &ew->world() : nullptr;
-    }
+private:
+    friend std::shared_ptr<Scene> activeScene(const App& app);
+    friend void commitActiveScene(
+        App& app,
+        std::shared_ptr<Scene> scene,
+        std::string name,
+        std::filesystem::path path);
+    friend void clearActiveScene(App& app);
+    friend scene::SceneEntityWorld* entityWorld(const App& app);
 
-    [[nodiscard]] bool isValid() const { return scene != nullptr; }
+    std::shared_ptr<Scene> m_scene;
 };
 
 } // namespace caustica

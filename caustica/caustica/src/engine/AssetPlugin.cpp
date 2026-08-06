@@ -2,6 +2,7 @@
 
 #include <assets/AssetSystem.h>
 #include <engine/App.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSession.h>
 #include <engine/SystemLabels.h>

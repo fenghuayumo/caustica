@@ -13,6 +13,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>

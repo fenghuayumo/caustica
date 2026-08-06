@@ -4,7 +4,7 @@
 accepts the graphics device, installs the default engine plugins, runs the
 application schedules, and exposes focused scene, camera, and render-session
 APIs. New hosts should not assemble `DefaultPlugins`, reach through
-`GpuRenderSubsystem`, or drive `WorldRenderer` directly.
+internal GPU/WR headers, or drive `WorldRenderer` directly.
 
 The complete in-tree example is
 [`application/samples/thin_client/Main.cpp`](../application/samples/thin_client/Main.cpp);
@@ -117,9 +117,10 @@ engine->run();
 
 Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
 `Query<Components...>`, and `SystemContext&`. Prefer `EntityWorld` /
-`Query<>` over digging through `GpuRenderSubsystem` or `WorldRenderer`.
-CameraController (App resource) / path-tracer settings are App resources; do not call
-`worldRenderer()` from host code — use `RenderSessionApi` / `CameraApi`.
+`Query<>` over digging through internal GPU/WR headers, `WorldRenderer`, or a raw
+`Scene*` (extract / GPU APIs). `EngineApp` does not expose `scene()`; use
+`setScene` + `entityWorld` / `isSceneLoaded`. CameraController and path-tracer
+settings are App resources — use `RenderSessionApi` / `CameraApi`.
 
 An `update` system with no explicit set joins
 `system_set::Simulation`. The per-frame order is:
@@ -147,14 +148,12 @@ Prefer system parameters, then focused application headers:
 | --- | --- |
 | `EntityWorld` (system param) | `spawn` / `spawnNamed` bundles, `setLocalTransform`, scene ECS access. |
 | `Query<...>` (system param) | Bevy-style `each` over scene components (`Changed<>` / `With<>` supported). |
-| `engine/SceneQuery.h` | Active scene, load status, materials, and entity lookup. |
+| `engine/SceneQuery.h` | `entityWorld`, load status, materials, entity lookup (no diggable `Scene*`). |
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
 | `engine/SceneMeshEdit.h` | Vertex reads/deformation and geometry-sequence playback (**entity** overloads). |
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
-
-`EngineApp.h` does not pull `Scene.h`; use `SceneQuery` / system params for scene access.
 | `engine/CameraApi.h` | Camera selection state, pose, FOV, and intrinsics. |
 | `engine/SceneLifecycle.h` | Scene selection/reload operations. |
 | `engine/RenderSessionApi.h` | Session-level render controls. |

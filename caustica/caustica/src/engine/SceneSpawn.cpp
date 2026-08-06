@@ -6,6 +6,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneSpawn.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderSessionApi.h>

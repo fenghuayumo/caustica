@@ -2,6 +2,7 @@
 
 #include <engine/ActiveScene.h>
 #include <ecs/Entity.h>
+#include <scene/SceneEcs.h>
 
 #include <filesystem>
 #include <memory>
@@ -13,19 +14,9 @@ namespace caustica
 
 class App;
 class Material;
-class Scene;
 
-[[nodiscard]] std::shared_ptr<Scene> activeScene(const App& app);
+// Metadata only — does not expose extract/GPU Scene digs.
 [[nodiscard]] const ActiveScene* tryActiveScene(const App& app);
-
-// Commit / clear the app-owned ActiveScene (single source of truth).
-void commitActiveScene(
-    App& app,
-    std::shared_ptr<Scene> scene,
-    std::string name,
-    std::filesystem::path path);
-void commitActiveSceneFromManager(App& app);
-void clearActiveScene(App& app);
 
 [[nodiscard]] scene::SceneEntityWorld* entityWorld(const App& app);
 [[nodiscard]] ecs::World* sceneEcs(const App& app);

@@ -6,6 +6,7 @@
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
 #include <render/WorldRenderer.h>

@@ -12,7 +12,7 @@ class App;
 namespace detail
 {
 
-// Load / switch / structure-edit only. Prefer SceneQuery / activeScene for reads.
+// Load / switch / structure-edit only. Prefer SceneQuery / ActiveSceneAccess for reads.
 [[nodiscard]] ::SceneManager* sessionManager(App& app);
 [[nodiscard]] ::SceneManager* sessionManager(const App& app);
 

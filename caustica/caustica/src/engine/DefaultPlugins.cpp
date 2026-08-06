@@ -1,7 +1,7 @@
 #include <engine/DefaultPlugins.h>
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/internal/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
 #include <render/core/CameraController.h>
 #include <engine/ResolvedActiveCamera.h>

@@ -6,7 +6,6 @@
 #include <core/path_utils.h>
 #include <core/log.h>
 #include <platform/window.h>
-#include <scene/Scene.h>
 
 #include <array>
 #include <utility>
@@ -297,11 +296,6 @@ void EngineApp::setScene(const std::string& name, bool forceReload)
 {
     if (m_app)
         caustica::setCurrentScene(*m_app, name, forceReload);
-}
-
-std::shared_ptr<Scene> EngineApp::scene() const
-{
-    return m_app ? caustica::activeScene(*m_app) : nullptr;
 }
 
 bool EngineApp::isSceneLoaded() const

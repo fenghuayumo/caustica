@@ -122,7 +122,7 @@ While `structureGpuBuildInFlight()`:
 - RT commits with `finishStructureGpuBuild` after binding-set recreate
 
 First structure publish with no prior extract still uses exclusive `flushPendingStructureGpuSync`.
-Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
+Full scene load remains exclusive (`SceneLifecycle` / internal `GpuRenderSubsystem`).
 
 ## Current status and boundaries
 
@@ -134,7 +134,7 @@ Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
 | Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `SceneMeshEdit` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
-| Scene query path | Engine plugins + editor use `activeScene`/`entityWorld`; do not dig `gpu->sceneManager()->getScene()` |
+| Scene query path | Hosts use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
 | Camera wrappers | `SceneCameraController` removed; interactive side effects live on `CameraController::bindSideEffects` |

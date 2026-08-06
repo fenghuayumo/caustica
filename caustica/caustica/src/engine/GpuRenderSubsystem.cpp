@@ -1,4 +1,4 @@
-#include <engine/GpuRenderSubsystem.h>
+#include <engine/internal/GpuRenderSubsystem.h>
 #include <engine/SceneGaussianSplatLogic.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SceneSession.h>

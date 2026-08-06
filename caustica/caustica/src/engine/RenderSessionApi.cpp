@@ -2,6 +2,7 @@
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneGaussianSplatLogic.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <cassert>

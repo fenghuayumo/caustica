@@ -6,6 +6,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/ResolvedActiveCamera.h>
 #include <render/core/CameraController.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>

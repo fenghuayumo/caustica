@@ -2,6 +2,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/SceneSession.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <core/path_utils.h>

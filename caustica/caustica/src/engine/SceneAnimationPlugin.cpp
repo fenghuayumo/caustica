@@ -4,6 +4,7 @@
 #include <engine/AppSchedules.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SystemLabels.h>

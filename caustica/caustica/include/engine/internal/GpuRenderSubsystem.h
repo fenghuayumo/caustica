@@ -1,5 +1,8 @@
 #pragma once
 
+// Engine-internal GPU bind / scene-load steps. Hosts must not include this.
+// Prefer SceneLifecycle / RenderSessionApi / EntityWorld.
+
 #include <cstddef>
 #include <render/core/PathTracerSettings.h>
 #include <render/AppDiagnostics.h>

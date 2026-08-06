@@ -1,4 +1,4 @@
-#include <engine/GpuRenderScheduleRegistration.h>
+#include <engine/internal/GpuRenderScheduleRegistration.h>
 #include <engine/SceneStartup.h>
 
 #include <engine/App.h>

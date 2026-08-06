@@ -6,6 +6,7 @@
 #include <engine/RenderFrameApi.h>
 #include <engine/RenderFramebufferOverride.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>

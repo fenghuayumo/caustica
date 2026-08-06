@@ -26,8 +26,6 @@
 namespace caustica
 {
 
-class Scene;
-
 // Minimal config for embedding caustica in a new application.
 // Prefer EngineApp::create() over assembling SceneAppConfig / DefaultPlugins yourself.
 struct EngineAppDesc
@@ -87,7 +85,7 @@ struct EngineAppDesc
 //   while (running) engine->stepFrame(); // also auto-starts
 //
 // Scene mutations: EntityWorld::spawn / setLocalTransform, or SceneSpawn / SceneTransform.
-// Scene queries: EntityWorld / Query<> system params -- not GpuRenderSubsystem.
+// Scene queries: EntityWorld / Query<> system params — not Scene extract/GPU digs.
 // Systems on update default to system_set::Simulation; hierarchy refresh is TransformPropagate.
 // Occasional RT work: EnqueueRenderCommand (non-blocking).
 class EngineApp
@@ -135,7 +133,6 @@ public:
     [[nodiscard]] GpuDevice* device() const;
 
     void setScene(const std::string& name, bool forceReload = false);
-    [[nodiscard]] std::shared_ptr<Scene> scene() const;
     [[nodiscard]] bool isSceneLoaded() const;
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] PathTracerSettings& settings();

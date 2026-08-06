@@ -3,6 +3,7 @@
 #include "SceneEditor.h"
 #include "EditorAccess.h"
 #include "EditorUndoCommands.h"
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>

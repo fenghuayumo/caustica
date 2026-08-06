@@ -16,6 +16,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
@@ -23,6 +24,7 @@
 #include <engine/AppResources.h>
 #include <math/box.h>
 #include <math/math.h>
+#include <scene/Scene.h>
 
 #include <stdexcept>
 #include <vector>
