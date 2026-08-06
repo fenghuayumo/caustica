@@ -24,10 +24,14 @@ namespace caustica::editor
 namespace
 {
 
-bool ApplyConsoleSets(EditorHost& host, bool registeredOnly)
+bool ApplyConsoleSets(SceneEditor& editor, bool registeredOnly)
 {
+    auto* console = editor.console();
+    if (!console)
+        return true;
+
     bool success = true;
-    for (const std::string& assignment : host.cmdLine.consoleSets)
+    for (const std::string& assignment : editor.cmdLine().consoleSets)
     {
         std::string command = assignment;
         if (const size_t equals = command.find('='); equals != std::string::npos)
@@ -44,7 +48,7 @@ bool ApplyConsoleSets(EditorHost& host, bool registeredOnly)
         }
 
         std::string output;
-        if (!host.console->execute(
+        if (!console->execute(
                 command,
                 &output,
                 caustica::console::VariableState::COMMAND_LINE))
@@ -56,12 +60,16 @@ bool ApplyConsoleSets(EditorHost& host, bool registeredOnly)
     return success;
 }
 
-void ApplyConsoleExec(EditorHost& host)
+void ApplyConsoleExec(SceneEditor& editor)
 {
-    for (const std::string& command : host.cmdLine.consoleExec)
+    auto* console = editor.console();
+    if (!console)
+        return;
+
+    for (const std::string& command : editor.cmdLine().consoleExec)
     {
         std::string output;
-        if (!host.console->execute(
+        if (!console->execute(
                 command,
                 &output,
                 caustica::console::VariableState::COMMAND_LINE))
@@ -77,58 +85,84 @@ void ApplyConsoleExec(EditorHost& host)
 
 } // namespace
 
+void installEditorLogFilter()
+{
+    Callback defaultCallback = getCallback();
+    setCallback([defaultCallback](Severity severity, const char* message) {
+        if (severity == Severity::Error)
+        {
+            std::string msg(message);
+            if (msg.find("Don't know the size") != std::string::npos)
+                severity = Severity::Warning;
+            if (msg.find("dlss_gEntry.cpp") != std::string::npos)
+            {
+                if (msg.find("Unable to find DRS context") != std::string::npos
+                    || msg.find("NGX indicates DLSS-G is not available") != std::string::npos)
+                    severity = Severity::Warning;
+            }
+            if (msg.find("Missing NGX context") != std::string::npos
+                || msg.find("Unable to find NGX ") != std::string::npos
+                || msg.find("NvAPI_D3D_Sleep") != std::string::npos)
+                severity = Severity::Warning;
+        }
+
+        if (defaultCallback)
+            defaultCallback(severity, message);
+    });
+}
+
 std::unique_ptr<caustica::EngineApp> createEditorEngine(
-    EditorHost& host,
+    SceneEditor& editor,
     int argc,
     const char* const* argv,
     caustica::AppHook preGpuDeviceInit)
 {
     korgi::init();
-    installEditorLogFilter(host);
+    installEditorLogFilter();
 
     GpuDeviceCreateDesc createDesc{};
     std::string preferredScene = "default.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    if (!ProcessEditorStartupCommandLine(argc, argv, host.cmdLine, createDesc, preferredScene))
+    if (!ProcessEditorStartupCommandLine(argc, argv, editor.cmdLine(), createDesc, preferredScene))
         return nullptr;
 
-    InitializeEditorUIDataFromCommandLine(host.editorUiData, host.cmdLine);
-    host.console = std::make_unique<RenderSettingsConsoleBinding>(host.editorUiData);
-    ApplyConsoleSets(host, true);
+    InitializeEditorUIDataFromCommandLine(editor.uiData(), editor.cmdLine());
+    editor.setConsole(std::make_unique<RenderSettingsConsoleBinding>(editor.uiData()));
+    ApplyConsoleSets(editor, true);
 
-    const bool automatedRun = host.cmdLine.nonInteractive
-        || host.cmdLine.captureSimple
-        || host.cmdLine.captureSequence;
+    const bool automatedRun = editor.cmdLine().nonInteractive
+        || editor.cmdLine().captureSimple
+        || editor.cmdLine().captureSequence;
 
     // Owned by SceneRuntimePlugin via EngineAppDesc — single source for Scene.Startup.
     EngineSceneCallbacks sceneCallbacks{
-        .OnSceneLoaded = [&host]() {
-            host.sceneEditor.onSceneLoadedFromLoader();
+        .OnSceneLoaded = [&editor]() {
+            editor.onSceneLoadedFromLoader();
         },
-        .OnSceneUnloading = [&host]() {
-            if (App* editorApp = host.sceneEditor.app())
+        .OnSceneUnloading = [&editor]() {
+            if (App* editorApp = editor.app())
                 caustica::onSceneUnloading(*editorApp);
-            host.sceneEditor.onSceneUnloading();
+            editor.onSceneUnloading();
         },
     };
 
     caustica::EngineAppDesc desc{};
     desc.width = createDesc.backBufferWidth;
     desc.height = createDesc.backBufferHeight;
-    desc.headless = host.cmdLine.noWindow;
-    desc.dedicatedRenderThread = !host.cmdLine.syncRender;
-    desc.debugDevice = host.cmdLine.debug || createDesc.enableDebug;
-    desc.adapterIndex = host.cmdLine.adapterIndex;
-    desc.useVulkan = host.cmdLine.useVulkan;
-    desc.fullscreen = host.cmdLine.fullscreen;
+    desc.headless = editor.cmdLine().noWindow;
+    desc.dedicatedRenderThread = !editor.cmdLine().syncRender;
+    desc.debugDevice = editor.cmdLine().debug || createDesc.enableDebug;
+    desc.adapterIndex = editor.cmdLine().adapterIndex;
+    desc.useVulkan = editor.cmdLine().useVulkan;
+    desc.fullscreen = editor.cmdLine().fullscreen;
     desc.scene = preferredScene;
     desc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
-    desc.viewState = &host.sceneEditor.viewState();
-    desc.diagnostics = &host.diagnostics;
-    desc.renderState = &host.editorUiData.render;
-    desc.cmdLine = &host.cmdLine;
-    desc.applyCmdLineToRenderState = host.cmdLine.noWindow || automatedRun;
+    desc.viewState = &editor.viewState();
+    desc.diagnostics = &editor.diagnostics();
+    desc.renderState = &editor.uiData().render;
+    desc.cmdLine = &editor.cmdLine();
+    desc.applyCmdLineToRenderState = editor.cmdLine().noWindow || automatedRun;
     desc.hasSceneCallbacks = true;
     desc.sceneCallbacks = std::move(sceneCallbacks);
     desc.preGpuDeviceInit = preGpuDeviceInit;
@@ -154,32 +188,32 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     // EditorPlugin only needs renderState for PostAppInit; scene callbacks live on EngineAppDesc.
     const SceneAppConfig sceneConfig{
-        .viewState = host.sceneEditor.viewState(),
-        .diagnostics = host.diagnostics,
+        .viewState = editor.viewState(),
+        .diagnostics = editor.diagnostics(),
         .preferredScene = preferredScene,
-        .renderState = &host.editorUiData.render,
-        .cmdLine = &host.cmdLine,
-        .applyCmdLineToRenderState = host.cmdLine.noWindow || automatedRun,
+        .renderState = &editor.uiData().render,
+        .cmdLine = &editor.cmdLine(),
+        .applyCmdLineToRenderState = editor.cmdLine().noWindow || automatedRun,
     };
 
-    if (!host.cmdLine.noWindow)
+    if (!editor.cmdLine().noWindow)
     {
         EditorUISubsystemConfig uiConfig{
             .app = *app,
-            .sceneEditor = host.sceneEditor,
-            .editorUiData = host.editorUiData,
-            .cmdLine = host.cmdLine,
-            .console = *host.console,
+            .sceneEditor = editor,
+            .editorUiData = editor.uiData(),
+            .cmdLine = editor.cmdLine(),
+            .console = *editor.console(),
         };
-        app->addPlugin<EditorPlugin>(sceneConfig, host.sceneEditor, &uiConfig);
+        app->addPlugin<EditorPlugin>(sceneConfig, editor, &uiConfig);
     }
     else
     {
-        app->addPlugin<EditorPlugin>(sceneConfig, host.sceneEditor, static_cast<const EditorUISubsystemConfig*>(nullptr));
+        app->addPlugin<EditorPlugin>(sceneConfig, editor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
 
-    app->setEventHandler([&host, app](Event& event) {
-        host.sceneEditor.onEvent(event);
+    app->setEventHandler([&editor, app](Event& event) {
+        editor.onEvent(event);
 
         EventDispatcher dispatcher(event);
         dispatcher.dispatch<WindowCloseEvent>([app](WindowCloseEvent&) {
@@ -209,8 +243,8 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     // Re-apply assignments after scene/subsystem startup so late registrations
     // and scene-provided render settings still receive command-line priority.
-    ApplyConsoleSets(host, false);
-    ApplyConsoleExec(host);
+    ApplyConsoleSets(editor, false);
+    ApplyConsoleExec(editor);
     caustica::console::lockStartupVariables();
 
     return engine;

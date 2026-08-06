@@ -2,7 +2,7 @@
 #include <engine/EntryPoint.h>
 
 #include "EditorLaunch.h"
-#include "EditorHost.h"
+#include "SceneEditor.h"
 
 #include <render/passes/debug/Korgi.h>
 
@@ -149,14 +149,14 @@ int main(int argc, char** argv)
 
     caustica::initializeAppPlatform();
 
-    caustica::editor::EditorHost host;
+    caustica::editor::SceneEditor editor;
 
 #ifdef _WIN32
     auto engine = caustica::editor::createEditorEngine(
-        host, __argc, (const char**)__argv, StopSplashBeforeGpuInit);
+        editor, __argc, (const char**)__argv, StopSplashBeforeGpuInit);
 #else
     auto engine = caustica::editor::createEditorEngine(
-        host, argc, const_cast<const char* const*>(argv));
+        editor, argc, const_cast<const char* const*>(argv));
 #endif
 
     if (!engine)

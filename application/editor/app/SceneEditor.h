@@ -1,5 +1,6 @@
 #pragma once
 
+#include <core/command_line.h>
 #include <core/progress.h>
 
 #include <engine/SceneViewState.h>
@@ -40,20 +41,16 @@ namespace caustica::editor
 {
 
 class CaptureScriptManager;
+class RenderSettingsConsoleBinding;
 
 using namespace caustica::math;
 
-// Editor shell: selection/UI/capture/game/content. Scene/render queries go through
-// App + EditorAccess helpers (cameraController / pathTracing / gpuSharedCaches), not this class.
+// Editor application shell: owns cmdline / UI / diagnostics / console, plus
+// selection/capture/game/content. Scene/render queries go through App + EditorAccess.
 class SceneEditor
 {
 public:
-    SceneEditor(const CommandLineOptions& cmdLine,
-        caustica::render::RenderAppState& renderAppState,
-        EditorUIState& editorState,
-        caustica::render::AppDiagnostics& diagnostics);
-    SceneEditor(const CommandLineOptions& cmdLine, EditorUIData& ui, caustica::render::AppDiagnostics& diagnostics);
-
+    SceneEditor();
     ~SceneEditor();
 
     [[nodiscard]] SceneViewState& viewState() { return m_viewState; }
@@ -68,15 +65,21 @@ public:
     [[nodiscard]] const PathTracerSettings& pathTracerSettings() const { return m_settings; }
     [[nodiscard]] render::RenderRuntimeState& renderRuntimeState() { return m_renderState; }
     [[nodiscard]] const render::RenderRuntimeState& renderRuntimeState() const { return m_renderState; }
+    [[nodiscard]] CommandLineOptions& cmdLine() { return m_cmdLine; }
     [[nodiscard]] const CommandLineOptions& cmdLine() const { return m_cmdLine; }
+    [[nodiscard]] render::AppDiagnostics& diagnostics() { return m_diagnostics; }
+    [[nodiscard]] const render::AppDiagnostics& diagnostics() const { return m_diagnostics; }
+
+    [[nodiscard]] RenderSettingsConsoleBinding* console() const { return m_console.get(); }
+    void setConsole(std::unique_ptr<RenderSettingsConsoleBinding> console);
 
     const std::unique_ptr<::GameScene>& game() const { return m_sampleGame; }
 
-    EditorUIData& uiData() { assert(m_editorUi); return *m_editorUi; }
-    const EditorUIData& uiData() const { assert(m_editorUi); return *m_editorUi; }
+    EditorUIData& uiData() { return m_editorUiData; }
+    const EditorUIData& uiData() const { return m_editorUiData; }
     EditorUIState& editorUIState() { return m_editor; }
     const EditorUIState& editorUIState() const { return m_editor; }
-    [[nodiscard]] bool hasEditorUiData() const { return m_editorUi != nullptr; }
+    [[nodiscard]] bool hasEditorUiData() const { return true; }
     [[nodiscard]] EditorState& editorState() { return m_editorState; }
     [[nodiscard]] const EditorState& editorState() const { return m_editorState; }
     [[nodiscard]] CaptureScriptState& captureScriptState() { return m_captureScriptState; }
@@ -199,19 +202,23 @@ private:
     void onSceneLoadedAfterCollectTextures();
     void onSceneLoadedComplete();
 
-    const CommandLineOptions& m_cmdLine;
+    // Owned editor lifetime (formerly EditorHost bag).
+    CommandLineOptions m_cmdLine;
+    EditorUIData m_editorUiData;
+    render::AppDiagnostics m_diagnostics;
+    std::unique_ptr<RenderSettingsConsoleBinding> m_console;
+
+    // Aliases into m_editorUiData for existing call sites.
     render::RenderAppState& m_renderAppState;
     PathTracerSettings& m_settings;
     render::RenderRuntimeState& m_renderState;
-    render::AppDiagnostics& m_diagnostics;
+    EditorUIState& m_editor;
 
     SceneViewState m_viewState;
     EditorState m_editorState;
 
     App* m_app = nullptr;
 
-    EditorUIState& m_editor;
-    EditorUIData* m_editorUi = nullptr;
     SelectionState m_selectionState;
     EditorCameraState m_editorCameraState;
 

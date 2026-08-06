@@ -4,6 +4,7 @@
 #include "common/LocalConfig.h"
 #include "common/CaptureScriptManager.h"
 #include "common/TransformGizmo.h"
+#include "ui/RenderSettingsConsole.h"
 
 #include <render/WorldRenderer.h>
 #include <render/core/TextureUtils.h>
@@ -242,17 +243,12 @@ void RecalculateAnimationsForTarget(
 
 } // namespace
 
-SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
-    caustica::render::RenderAppState& renderAppState,
-    EditorUIState& editorState,
-    caustica::render::AppDiagnostics& diagnostics)
-    : m_cmdLine(cmdLine)
-    , m_renderAppState(renderAppState)
-    , m_settings(renderAppState.settings)
-    , m_renderState(renderAppState.runtime)
-    , m_diagnostics(diagnostics)
-    , m_editor(editorState)
-    , m_selectionState(editorState)
+SceneEditor::SceneEditor()
+    : m_renderAppState(m_editorUiData.render)
+    , m_settings(m_editorUiData.render.settings)
+    , m_renderState(m_editorUiData.render.runtime)
+    , m_editor(m_editorUiData.editor)
+    , m_selectionState(m_editorUiData.editor)
     , m_editorCameraState(m_viewState)
     , m_inputRouter()
     , m_contentEditor(*this)
@@ -264,19 +260,16 @@ SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
     m_captureScriptState.manager = m_captureScriptManager.get();
 }
 
-SceneEditor::SceneEditor(const CommandLineOptions& cmdLine,
-    EditorUIData& ui,
-    caustica::render::AppDiagnostics& diagnostics)
-    : SceneEditor(cmdLine, ui.render, ui.editor, diagnostics)
-{
-    m_editorUi = &ui;
-}
-
 SceneEditor::~SceneEditor()
 {
 #if CAUSTICA_WITH_PYTHON
     m_pythonScripting.reset();
 #endif
+}
+
+void SceneEditor::setConsole(std::unique_ptr<RenderSettingsConsoleBinding> console)
+{
+    m_console = std::move(console);
 }
 
 
