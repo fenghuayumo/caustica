@@ -45,10 +45,12 @@ void SceneLightingPasses::sceneUnloading()
 {
     m_environment = nullptr;
     m_lightSampling = nullptr;
-    m_materials = nullptr;
+    // Keep MaterialGpuCache (+ content) and compute pipeline registry alive across
+    // Open Scene. Nulling/clearing forces coldInit or a full material rebake inside
+    // onSceneLoaded's render-thread wait — that is the "Loading scene..." hang.
+    // Next load reconciles via reloadMaterialsForSceneSwitch / ensureMaterialsFromScene.
     if (m_opacityMaps != nullptr)
         m_opacityMaps->sceneUnloading();
-    m_computePipelines = nullptr;
 }
 
 void SceneLightingPasses::onSceneLoaded(const caustica::scene::SceneRenderData& renderData, PathTracerSettings& settings)
@@ -70,8 +72,7 @@ void SceneLightingPasses::onSceneLoaded(const caustica::scene::SceneRenderData& 
 
 void SceneLightingPasses::notifySceneReloaded(size_t geometryCount)
 {
-    if (m_materials != nullptr)
-        m_materials->sceneReloaded();
+    // Do not clear MaterialGpuCache here — Open Scene reloads materials in-place.
     if (m_environment != nullptr)
         m_environment->sceneReloaded();
     if (m_lightSampling != nullptr)

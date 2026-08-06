@@ -11,6 +11,7 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
+#include <scene/SceneManager.h>
 
 #include <core/log.h>
 #include <core/path_utils.h>
@@ -77,6 +78,16 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     {
         caustica::error("SceneSession::create failed");
         return;
+    }
+
+    if (sceneSession->manager)
+    {
+        sceneSession->manager->setLoadFailedCallback([&app, &viewState]() {
+            caustica::error("Scene load failed");
+            clearActiveScene(app);
+            viewState.progressLoading.stop();
+            viewState.sceneGpuSuspended.store(false, std::memory_order_release);
+        });
     }
 
     if (!worldRenderer->create(render::WorldRenderer::createParams{

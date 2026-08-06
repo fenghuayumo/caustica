@@ -2,12 +2,15 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/SceneApiInternal.h>
+#include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
 
 #include <scene/Scene.h>
+#include <scene/SceneManager.h>
 
 namespace caustica
 {
@@ -23,9 +26,14 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void SceneAnimationPlugin::configureSchedules(App& app)
 {
+    // Runs while sceneGpuSuspended: join CPU import + advance multi-frame GPU bind.
     app.addSystem<system_label::SceneAnimate>(
         AppSchedule::update,
         [](SystemContext& ctx) {
+            if (::SceneManager* manager = detail::sessionManager(ctx.app))
+                manager->updateLoading();
+            tickSceneGpuBind(ctx.app);
+
             if (!ctx.windowFocused)
                 return;
 

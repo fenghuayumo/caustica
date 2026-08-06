@@ -3076,6 +3076,11 @@ namespace caustica::rhi
         // Minimum size of memory chunks created to upload data to the device on DX12.
         size_t uploadChunkSize = 64 * 1024;
 
+        // Cap total UPLOAD heap memory owned by this command list. When exceeded,
+        // UploadManager waits on the queue fence and reuses completed chunks.
+        // (0 = unlimited - not recommended; large scene loads can OOM.)
+        size_t uploadMaxMemory = 256 * 1024 * 1024;
+
         // Minimum size of memory chunks created for AS build scratch buffers.
         size_t scratchChunkSize = 64 * 1024;
 
@@ -3088,6 +3093,7 @@ namespace caustica::rhi
 
         CommandListParameters& setEnableImmediateExecution(bool value) { enableImmediateExecution = value; return *this; }
         CommandListParameters& setUploadChunkSize(size_t value) { uploadChunkSize = value; return *this; }
+        CommandListParameters& setUploadMaxMemory(size_t value) { uploadMaxMemory = value; return *this; }
         CommandListParameters& setScratchChunkSize(size_t value) { scratchChunkSize = value; return *this; }
         CommandListParameters& setScratchMaxMemory(size_t value) { scratchMaxMemory = value; return *this; }
         CommandListParameters& setQueueType(CommandQueue value) { queueType = value; return *this; }

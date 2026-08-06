@@ -143,9 +143,13 @@ public:
     [[nodiscard]] EditorUndoStack& undoStack() { return m_undoStack; }
     [[nodiscard]] const EditorUndoStack& undoStack() const { return m_undoStack; }
 
-    // Queue undo/redo so it runs after EditorUI/gizmo commit (same-frame safe).
+    // Queue undo/redo / file dialogs so they run after EditorUI/gizmo commit
+    // (same-frame safe; FileDialog must not block inside ImGui buildUI).
     void requestUndo();
     void requestRedo();
+    void requestOpenSceneFromDialog();
+    void requestSaveScene();
+    void requestSaveSceneAsFromDialog();
     void processPendingEditActions();
 
     bool undo();
@@ -224,7 +228,10 @@ private:
     {
         None,
         Undo,
-        Redo
+        Redo,
+        OpenScene,
+        SaveScene,
+        SaveSceneAs,
     };
     PendingEditAction m_pendingEditAction = PendingEditAction::None;
     ecs::Entity m_editorAnimationEntity = ecs::NullEntity;

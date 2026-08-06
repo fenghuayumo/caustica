@@ -37,7 +37,11 @@ bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName)
         ofn.Flags |= OFN_FILEMUSTEXIST;
     ofn.lpstrDefExt = "";
 
-    if (BOOL b = bOpen ? GetOpenFileNameA(&ofn) : GetSaveFileNameA(&ofn))
+    const BOOL ok = bOpen ? GetOpenFileNameA(&ofn) : GetSaveFileNameA(&ofn);
+    // Common file dialogs often break freopen'd CONOUT$ bindings; restore before
+    // any subsequent info()/error() so Open Scene logs show up in the F1 console.
+    refreshNativeConsoleStdio();
+    if (ok)
     {
         fileName = chars;
         return true;

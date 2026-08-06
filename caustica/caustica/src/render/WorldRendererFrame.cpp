@@ -398,7 +398,10 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         // on every dock drag is poor UX and causes visible flicker.
         const bool coldInit = (m_context->scenePasses.lighting.materials() == nullptr);
         if (coldInit)
+        {
+            caustica::info("WorldRenderer: coldInit begin (materials were null)");
             m_context->diagnostics.progressInitializingRenderer.start("Preparing renderer...");
+        }
 
         if (coldInit)
         {
@@ -414,6 +417,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             m_context->scenePasses.lighting.computePipelines() = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
 
             m_context->scenePasses.rayTracing.createRTPipelines();
+            caustica::info("WorldRenderer: coldInit pipelines created");
         }
 
         std::span<const scene::MaterialRenderResourceSnapshot> materialResources;
@@ -449,24 +453,29 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     {
         if (m_context->diagnostics.progressInitializingRenderer.Active())
             m_context->diagnostics.progressInitializingRenderer.Set(40);
+        caustica::info("WorldRenderer: needNewPasses waitForIdle (pre createRenderPasses)");
         // THREADING: sync-point, RT-only.
         const bool preCreatePassesWaitOk = device()->waitForIdle();
         if (!preCreatePassesWaitOk)
         {
+            caustica::error("WorldRenderer: pre-createRenderPasses waitForIdle failed");
             ctx.aborted = true;
             return;
         }
         m_frameCommands->beginPrimary();
         createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
         m_frameCommands->endFrame();
+        caustica::info("WorldRenderer: needNewPasses waitForIdle (post createRenderPasses)");
         const bool createPassesWaitOk = device()->waitForIdle();
         if (!createPassesWaitOk)
         {
+            caustica::error("WorldRenderer: post-createRenderPasses waitForIdle failed");
             ctx.aborted = true;
             return;
         }
         if (m_context->diagnostics.progressInitializingRenderer.Active())
             m_context->diagnostics.progressInitializingRenderer.Set(70);
+        caustica::info("WorldRenderer: needNewPasses complete");
     }
 }
 
@@ -501,9 +510,12 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         // After update() has primed hit-group exports: bind cooked preset.
         // CreateStateObject only on cold miss / switch (never during createRTPipelines).
         // No per-frame background warmup — that belongs in cook/load precacheAll.
+        // Also rebind when live pointers were cleared (scene unload) while the
+        // cooked preset remains ready — otherwise MainPathTrace gets null PSOs.
         if (m_pathTracingShaderCompiler->hasUniqueHitGroups()
             && (m_rtPipelineCache->activePreset() != desiredPreset
-                || !m_rtPipelineCache->isReady(desiredPreset)))
+                || !m_rtPipelineCache->isReady(desiredPreset)
+                || !m_ptPipelineReference))
         {
             m_context->scenePasses.rayTracing.ensureFeaturePresetReady(
                 desiredPreset,

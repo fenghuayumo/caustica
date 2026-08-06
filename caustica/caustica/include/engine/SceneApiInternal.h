@@ -22,5 +22,8 @@ namespace detail
 
 void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload);
 
+// Survives GetOpenFileName breaking stdout — also appends bin/scene_switch.log.
+void sceneSwitchTrace(const char* fmt, ...);
+
 } // namespace detail
 } // namespace caustica

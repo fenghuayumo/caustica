@@ -202,12 +202,22 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
             commandsExecuted += 1;
 
             if (!m_CommandList)
-                m_CommandList = m_Device->createCommandList();
+            {
+                // Long-lived CL: UploadManager fences+reuses UPLOAD under uploadMaxMemory.
+                caustica::rhi::CommandListParameters params;
+                params.uploadChunkSize = 4 * 1024 * 1024;
+                params.uploadMaxMemory = 256 * 1024 * 1024;
+                m_CommandList = m_Device->createCommandList(params);
+            }
 
             m_CommandList->open();
             finalizeTexture(pTexture, &renderDevice, m_CommandList);
             m_CommandList->close();
             m_Device->executeCommandList(m_CommandList);
+            // Must drain GPU per texture on large scenes. Polling GC alone lets
+            // hundreds of CreateCommittedResource/copy ops pile up and freeze the OS.
+            if (!m_Device->waitForIdle())
+                caustica::error("TextureLoader: waitForIdle failed");
             m_Device->runGarbageCollection();
         }
     }
@@ -218,6 +228,12 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
 void TextureLoader::loadingFinished()
 {
     m_CommandList = nullptr;
+}
+
+size_t TextureLoader::pendingFinalizeCount()
+{
+    std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
+    return m_TexturesToFinalize.size();
 }
 
 bool saveTextureToFile(

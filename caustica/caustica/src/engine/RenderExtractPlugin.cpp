@@ -26,9 +26,13 @@ void prepareRenderFrame(App& app)
     auto* worldRendererResource = app.tryResource<render::WorldRenderer>();
     auto* sessionCam = app.tryResource<SessionCamera>();
     GpuDevice* device = app.getGpuDevice();
-    if (vs)
+    // Do not tear down the native loading card while a scene switch is in flight —
+    // Extract can resume before onSceneLoaded finishes painting 50→100.
+    const bool sceneSwitchInFlight = (vs && vs->sceneGpuSuspended.load(std::memory_order_acquire))
+        || isSceneLoading(app);
+    if (vs && !sceneSwitchInFlight)
         vs->progressLoading.stop();
-    if (diag)
+    if (diag && !sceneSwitchInFlight)
         diag->asyncLoadingInProgress = false;
 
     const std::shared_ptr<Scene> scene = activeScene(app);

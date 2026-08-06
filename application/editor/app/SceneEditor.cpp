@@ -19,6 +19,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/SceneApiInternal.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneSession.h>
 #include <core/path_utils.h>
@@ -423,6 +424,21 @@ void SceneEditor::requestRedo()
     m_pendingEditAction = PendingEditAction::Redo;
 }
 
+void SceneEditor::requestOpenSceneFromDialog()
+{
+    m_pendingEditAction = PendingEditAction::OpenScene;
+}
+
+void SceneEditor::requestSaveScene()
+{
+    m_pendingEditAction = PendingEditAction::SaveScene;
+}
+
+void SceneEditor::requestSaveSceneAsFromDialog()
+{
+    m_pendingEditAction = PendingEditAction::SaveSceneAs;
+}
+
 void SceneEditor::processPendingEditActions()
 {
     const PendingEditAction action = m_pendingEditAction;
@@ -431,16 +447,39 @@ void SceneEditor::processPendingEditActions()
     if (action == PendingEditAction::None || !m_app)
         return;
 
+    // File dialogs / scene switches must run after ImGui::Render (this system is
+    // ordered after EditorUIAnimate). Running them inside buildUI freezes the
+    // update thread mid-frame and makes Open Scene look like a hang/crash.
+    if (action == PendingEditAction::OpenScene)
+    {
+        openSceneFromDialog();
+        return;
+    }
+    if (action == PendingEditAction::SaveScene)
+    {
+        saveScene();
+        return;
+    }
+    if (action == PendingEditAction::SaveSceneAs)
+    {
+        saveSceneAsFromDialog();
+        return;
+    }
+
     // Transform undo reverses a change that may still be referenced by one of the
-    // two pipelined render frames. Drain both the render thread and GPU queue before
-    // publishing the reverse transform; otherwise the shared TLAS can be rebuilt
-    // while an older frame is still using it.
+    // two pipelined render frames. Drain the render thread before publishing the
+    // reverse transform. GPU waitForIdle for undo runs on the render thread.
     m_app->waitForRenderThreadIdle();
     GpuDevice* gpuDevice = m_app->getGpuDevice();
     if (!gpuDevice || gpuDevice->isShuttingDown())
         return;
 
-    if (!gpuDevice->getDevice()->waitForIdle())
+    bool waitOk = true;
+    m_app->runGpuWorkOnRenderThread([gpuDevice, &waitOk]() {
+        if (caustica::rhi::Device* rhi = gpuDevice->getDevice())
+            waitOk = rhi->waitForIdle();
+    });
+    if (!waitOk)
     {
         gpuDevice->setShuttingDown(true);
         return;
@@ -832,15 +871,31 @@ bool SceneEditor::openSceneFromDialog()
 {
     if (!m_app)
         return false;
+    if (caustica::isSceneStructureBusy(*m_app))
+    {
+        caustica::warning("Open Scene: ignored, scene structure busy");
+        return false;
+    }
+    if (m_viewState.sceneGpuSuspended.load(std::memory_order_acquire))
+    {
+        caustica::warning("Open Scene: ignored, sceneGpuSuspended");
+        return false;
+    }
 
+    caustica::detail::sceneSwitchTrace("Open Scene: showing file dialog");
     std::string picked;
     if (!caustica::FileDialog(
             true,
             "Scene files (*.scene.json;*.json)\0*.scene.json;*.json\0All files\0*.*\0",
             picked))
+    {
+        caustica::detail::sceneSwitchTrace("Open Scene: cancelled");
         return false;
+    }
 
-    caustica::setCurrentScene(*m_app, picked);
+    caustica::detail::sceneSwitchTrace("Open Scene: picked '%s'", picked.c_str());
+    // forceReload: dialog pick must always reload even if the path string matches.
+    caustica::setCurrentScene(*m_app, picked, true);
     return true;
 }
 

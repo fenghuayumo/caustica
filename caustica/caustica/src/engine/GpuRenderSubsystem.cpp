@@ -7,11 +7,16 @@
 
 #include <assets/AssetSystem.h>
 #include <backend/GpuDevice.h>
+#include <core/log.h>
+#include <core/path_utils.h>
+#include <engine/SceneApiInternal.h>
 #include <render/core/BindingCache.h>
 #include <render/core/SceneGpuUpdater.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneRenderData.h>
 
 namespace caustica
 {
@@ -62,35 +67,77 @@ void GpuRenderSubsystem::onSceneUnloading()
         m_gpuSharedCaches->bindingCache->clear();
 }
 
-void GpuRenderSubsystem::onSceneLoadedGpuPrep(const scene::SceneRenderData& renderData)
+size_t GpuRenderSubsystem::pendingTextureFinalizeCount()
+{
+    if (!m_gpuSharedCaches || !m_gpuSharedCaches->textureLoader)
+        return 0;
+    return m_gpuSharedCaches->textureLoader->pendingFinalizeCount();
+}
+
+void GpuRenderSubsystem::flushTextures(float timeLimitMs)
+{
+    if (!m_gpuSharedCaches || !m_gpuSharedCaches->textureLoader || !m_gpuSharedCaches->renderDevice || !m_assetSystem)
+        return;
+    m_assetSystem->processRenderingThreadCommands(*m_gpuSharedCaches->renderDevice, timeLimitMs);
+    if (timeLimitMs <= 0.f)
+        m_assetSystem->loadingFinished();
+}
+
+void GpuRenderSubsystem::bindWorld(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     auto scene = manager ? manager->getScene() : nullptr;
     const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
-
+    (void)renderData;
     if (m_worldRenderer)
         m_worldRenderer->onSceneLoaded(scene, scenePath);
+}
 
-    if (m_gpuSharedCaches && m_gpuSharedCaches->textureLoader && m_gpuSharedCaches->renderDevice && m_assetSystem)
-    {
-        m_assetSystem->processRenderingThreadCommands(*m_gpuSharedCaches->renderDevice, 0.f);
-        m_assetSystem->loadingFinished();
-    }
+size_t GpuRenderSubsystem::uploadMeshes(
+    const scene::SceneRenderData& renderData,
+    size_t meshBegin,
+    size_t maxMeshes)
+{
+    if (!m_worldRenderer)
+        return renderData.meshSnapshots.size();
+    return render::SceneGpuUpdater::uploadMeshesAfterLoad(
+        renderData,
+        m_worldRenderer->sceneGpuResources(),
+        m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
+        meshBegin,
+        maxMeshes);
+}
 
-    if (scene && m_worldRenderer)
+void GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
+{
+    ::SceneManager* manager = sessionManager(m_sceneSession);
+    auto scene = manager ? manager->getScene() : nullptr;
+    const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
+    if (!scene || !m_worldRenderer)
+        return;
+
+    render::SceneGpuUpdater::finalizeAfterLoad(
+        *scene,
+        renderData,
+        m_worldRenderer->sceneGpuResources(),
+        m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
+        0);
+    m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.geometryCount);
+
+    if (m_gpuSharedCaches && m_gpuSharedCaches->renderDevice)
     {
-        render::SceneGpuUpdater::refreshAfterLoad(
-            *scene,
-            renderData,
-            m_worldRenderer->sceneGpuResources(),
-            m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
-            0);
-        if (m_worldRenderer)
-            m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.geometryCount);
+        if (auto materials = m_worldRenderer->lightingPasses().materials())
+        {
+            materials->reloadMaterialsForSceneSwitch(
+                *m_gpuSharedCaches->renderDevice,
+                renderData.materialSnapshots,
+                scenePath,
+                getLocalPath(c_AssetsFolder));
+        }
     }
 }
 
-void GpuRenderSubsystem::onSceneLoadedGpuFinish(const scene::SceneRenderData& renderData)
+void GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!manager || !m_settings || !m_runtimeState || !m_worldRenderer)
@@ -102,13 +149,12 @@ void GpuRenderSubsystem::onSceneLoadedGpuFinish(const scene::SceneRenderData& re
 
     SceneGaussianSplatLogic::onSceneLoaded(m_worldRenderer->gaussianSplatPasses());
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
-
     SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
     m_worldRenderer->accelStructs().resetSubInstanceCount();
+    // onSceneUnloading clears m_ptPipeline*; without this the RT cache stays
+    // "ready" and never rebinds, so MainPathTrace dispatches a null pipeline.
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
-
     m_settings->MaterialVariantIndex = 0;
-
     if (m_diagnostics)
         m_diagnostics->asyncLoadingInProgress = true;
 }
@@ -136,6 +182,8 @@ void GpuRenderSubsystem::shutdown()
             scene->prepareForUnload();
     }
 
+    if (m_worldRenderer)
+        m_worldRenderer->releaseStreamlineTemporalResources();
     onSceneUnloading();
 
     if (m_gpuDevice)

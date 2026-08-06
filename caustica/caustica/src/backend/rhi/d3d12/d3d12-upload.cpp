@@ -92,6 +92,75 @@ namespace caustica::rhi::d3d12
 
         return chunk;
     }
+
+    // Wait for a submitted chunk's fence, then reuse it. Scratch needs a UAV barrier;
+    // UPLOAD heaps are CPU-writable after the copy has completed on the GPU.
+    bool UploadManager::acquireReusableChunk(size_t sizeToAllocate, ID3D12GraphicsCommandList* pCommandList)
+    {
+        std::shared_ptr<BufferChunk> bestChunk;
+        for (const auto& candidateChunk : m_ChunkPool)
+        {
+            if (candidateChunk->bufferSize < sizeToAllocate)
+                continue;
+
+            if (!bestChunk)
+            {
+                bestChunk = candidateChunk;
+                continue;
+            }
+
+            const bool candidateSubmitted = VersionGetSubmitted(candidateChunk->version);
+            const bool bestSubmitted = VersionGetSubmitted(bestChunk->version);
+            const uint64_t candidateInstance = VersionGetInstance(candidateChunk->version);
+            const uint64_t bestInstance = VersionGetInstance(bestChunk->version);
+
+            if ((candidateSubmitted && !bestSubmitted) ||
+                (candidateSubmitted == bestSubmitted && candidateInstance < bestInstance) ||
+                (candidateSubmitted == bestSubmitted && candidateInstance == bestInstance
+                    && candidateChunk->bufferSize > bestChunk->bufferSize))
+            {
+                bestChunk = candidateChunk;
+            }
+        }
+
+        if (!bestChunk)
+            return false;
+
+        // Still being recorded into the current CL - cannot reclaim until submit.
+        if (!VersionGetSubmitted(bestChunk->version) && bestChunk->version != 0)
+            return false;
+
+        if (VersionGetSubmitted(bestChunk->version))
+        {
+            uint64_t latestCompletedInstance = m_Queue->updateLastCompletedInstance();
+            const uint64_t chunkInstance = VersionGetInstance(bestChunk->version);
+            if (chunkInstance > latestCompletedInstance)
+            {
+                HANDLE waitEvent = CreateEvent(nullptr, false, false, nullptr);
+                if (!waitEvent)
+                    return false;
+
+                WaitForFence(m_Queue->fence, chunkInstance, waitEvent);
+                CloseHandle(waitEvent);
+                m_Queue->lastCompletedInstance = std::max(m_Queue->lastCompletedInstance, chunkInstance);
+            }
+        }
+
+        m_ChunkPool.erase(std::find(m_ChunkPool.begin(), m_ChunkPool.end(), bestChunk));
+        m_CurrentChunk = bestChunk;
+        bestChunk->version = 0;
+
+        if (m_IsScratchBuffer)
+        {
+            assert(pCommandList);
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+            barrier.UAV.pResource = bestChunk->buffer;
+            pCommandList->ResourceBarrier(1, &barrier);
+        }
+
+        return true;
+    }
         
     bool UploadManager::suballocateBuffer(uint64_t size, ID3D12GraphicsCommandList* pCommandList, ID3D12Resource** pBuffer, size_t* pOffset,
         void** pCpuVA, D3D12_GPU_VIRTUAL_ADDRESS* pGpuVA, uint64_t currentVersion, uint32_t alignment)
@@ -156,86 +225,21 @@ namespace caustica::rhi::d3d12
         {
             uint64_t sizeToAllocate = align(std::max(size, m_DefaultChunkSize), BufferChunk::c_sizeAlignment);
 
-            // See if we're allowed to allocate more memory
-            if ((m_MemoryLimit > 0) && (m_AllocatedMemory + sizeToAllocate > m_MemoryLimit))
+            const bool overBudget = (m_MemoryLimit > 0) && (m_AllocatedMemory + sizeToAllocate > m_MemoryLimit);
+            if (overBudget)
             {
-                if (m_IsScratchBuffer)
-                {
-                    // Nope, need to reuse something.
-                    // Find the largest least recently used chunk that can fit our buffer.
-
-                    std::shared_ptr<BufferChunk> bestChunk;
-                    for (const auto& candidateChunk : m_ChunkPool)
-                    {
-                        if (candidateChunk->bufferSize >= sizeToAllocate)
-                        {
-                            // Pick the first fitting chunk if we have nothing so far
-                            if (!bestChunk)
-                            {
-                                bestChunk = candidateChunk;
-                                continue;
-                            }
-
-                            bool candidateSubmitted = VersionGetSubmitted(candidateChunk->version);
-                            bool bestSubmitted = VersionGetSubmitted(bestChunk->version);
-                            uint64_t candidateInstance = VersionGetInstance(candidateChunk->version);
-                            uint64_t bestInstance = VersionGetInstance(bestChunk->version);
-
-                            // Compare chunks: submitted is better than current, old is better than new, large is better than small
-                            if ((candidateSubmitted && !bestSubmitted) ||
-                                (candidateSubmitted == bestSubmitted && candidateInstance < bestInstance) ||
-                                (candidateSubmitted == bestSubmitted && candidateInstance == bestInstance
-                                    && candidateChunk->bufferSize > bestChunk->bufferSize))
-                            {
-                                bestChunk = candidateChunk;
-                            }
-                        }
-                    }
-
-                    if (!bestChunk)
-                    {
-                        // No chunk found that can be reused. And we can't allocate. :(
-                        return false;
-                    }
-
-                    if (VersionGetSubmitted(bestChunk->version))
-                    {
-                        uint64_t latestCompletedInstance = m_Queue->updateLastCompletedInstance();
-                        const uint64_t chunkInstance = VersionGetInstance(bestChunk->version);
-                        if (chunkInstance > latestCompletedInstance)
-                        {
-                            HANDLE waitEvent = CreateEvent(nullptr, false, false, nullptr);
-                            if (!waitEvent)
-                                return false;
-
-                            WaitForFence(m_Queue->fence, chunkInstance, waitEvent);
-                            CloseHandle(waitEvent);
-                            m_Queue->lastCompletedInstance = std::max(m_Queue->lastCompletedInstance, chunkInstance);
-                        }
-                    }
-
-                    // Move the found chunk from the pool to the current chunk
-                    m_ChunkPool.erase(std::find(m_ChunkPool.begin(), m_ChunkPool.end(), bestChunk));
-                    m_CurrentChunk = bestChunk;
-
-                    // Place a UAV barrier on the chunk.
-                    D3D12_RESOURCE_BARRIER barrier = {};
-                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                    barrier.UAV.pResource = bestChunk->buffer;
-                    pCommandList->ResourceBarrier(1, &barrier);
-                }
-                else // !m_IsScratchBuffer
-                {
-                    // Can't reuse in-flight buffers for uploads.
-                    // But uploads have no memory limit, so this should never execute.
+                if (!acquireReusableChunk(sizeToAllocate, pCommandList))
                     return false;
-                }
             }
             else
             {
                 m_CurrentChunk = createChunk(sizeToAllocate);
                 if (!m_CurrentChunk)
-                    return false;
+                {
+                    // Driver OOM: fall back to waiting on an in-flight chunk.
+                    if (!acquireReusableChunk(sizeToAllocate, pCommandList))
+                        return false;
+                }
             }
         }
 

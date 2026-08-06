@@ -415,17 +415,13 @@ void caustica::render::WorldRenderer::createDeviceResources()
 }
 
 
-void caustica::render::WorldRenderer::onSceneUnloading()
+void caustica::render::WorldRenderer::releaseStreamlineTemporalResources()
 {
-    m_scenePasses.gaussianSplats.clearSession();
-    m_context->sceneGpuResources.clearSceneResources();
-    m_context->sessionScene = nullptr;
-    m_context->sessionScenePath.clear();
-    m_context->frameScene = nullptr;
-    m_context->frameGpu = {};
-
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_context->gpuDevice.isHeadless())
+    // Render-thread only. Caller must have waitForIdle()'d — DLSS-RR/G keep
+    // temporal history against path-trace outputs; freeing scene AS/textures
+    // while those features are live hard-hangs the GPU.
+    if (m_context && !m_context->gpuDevice.isHeadless())
     {
         auto& streamline = m_context->gpuDevice.getStreamline();
         if (streamline.isDLSSRRAvailable())
@@ -438,10 +434,29 @@ void caustica::render::WorldRenderer::onSceneUnloading()
 
     m_recommendedDLSSSettings = {};
     m_lastDLSSRROptions = {};
-    m_context->activeSettings().DLSSFGOptions = {};
-    m_context->activeSettings().DLSSFGMultiplier = 1;
-    m_context->activeSettings().DLSSFGMaxNumFramesToGenerate = 1;
+    if (m_context)
+    {
+        m_context->activeSettings().DLSSFGOptions = {};
+        m_context->activeSettings().DLSSFGMultiplier = 1;
+        m_context->activeSettings().DLSSFGMaxNumFramesToGenerate = 1;
+        m_context->activeSettings().DLSSLastMode = SI::DLSSMode::eOff;
+        m_context->activeSettings().DLSSLastDisplaySize = { 0, 0 };
+        m_context->activeSettings().DLSSLastRealtimeAA = 0;
+    }
+    m_lastScheduledRealtimeAA = -1;
 #endif
+}
+
+void caustica::render::WorldRenderer::onSceneUnloading()
+{
+    // Streamline must already have been released by the caller (after waitForIdle).
+    m_scenePasses.gaussianSplats.clearSession();
+    m_context->sceneGpuResources.clearSceneResources();
+    m_context->sessionScene = nullptr;
+    m_context->sessionScenePath.clear();
+    m_context->frameScene = nullptr;
+    m_context->frameGpu = {};
+
     m_context->activeSettings().DLSSMode = PathTracerSettings::DLSSModeDefault;
     m_context->activeSettings().DLSSLastMode = SI::DLSSMode::eOff;
     m_context->activeSettings().DLSSLastDisplaySize = { 0, 0 };
@@ -456,8 +471,11 @@ void caustica::render::WorldRenderer::onSceneUnloading()
     m_gaussianSplatEmissionProxies.clear();
     if (m_rtxdiPass != nullptr)
         m_rtxdiPass->reset();
-    m_rtPipelineCache = nullptr;
-    m_pathTracingShaderCompiler = nullptr;
+
+    // Keep PathTracingShaderCompiler + RtPipelineCache across scene switches.
+    // Destroying them forces coldInit CreateStateObject / waitForIdle and is the
+    // usual Open Scene hard-hang (progress card "Preparing renderer...").
+    // Drop only per-frame pipeline bindings; hit groups refresh on the next update.
     m_ptPipelineReference = nullptr;
     m_ptPipelineBuildStablePlanes = nullptr;
     m_ptPipelineFillStablePlanes = nullptr;

@@ -180,9 +180,21 @@ namespace caustica
         g_NativeConsoleInitialized = true;
         g_NativeConsoleOwned = !attachedToParent;
         g_OutputToConsole = true;
+        // Keep OutputDebugString on so scene-switch logs remain visible in DebugView
+        // even if a common file dialog breaks CRT→console redirection.
+        g_OutputToDebug = true;
         setNativeConsoleVisible(visibleByDefault);
 
         info("Native console ready (F1 toggles visibility)");
+    }
+
+    void refreshNativeConsoleStdio()
+    {
+        if (!g_NativeConsoleInitialized)
+            return;
+        RedirectStdioToConsole();
+        g_OutputToConsole = true;
+        g_OutputToDebug = true;
     }
 
     void shutdownNativeConsole()
@@ -233,6 +245,7 @@ namespace caustica
 #else
     void initNativeConsole(bool) {}
     void shutdownNativeConsole() {}
+    void refreshNativeConsoleStdio() {}
     void setNativeConsoleVisible(bool) {}
     bool isNativeConsoleVisible() { return true; }
     bool toggleNativeConsoleVisible() { return true; }

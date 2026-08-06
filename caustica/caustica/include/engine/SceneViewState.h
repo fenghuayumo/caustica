@@ -3,6 +3,8 @@
 #include <core/progress.h>
 #include <render/core/TextureUtils.h>
 
+#include <atomic>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -11,6 +13,8 @@
 
 namespace caustica
 {
+
+namespace scene { class SceneRenderData; }
 
 // Mutable per-session view state (scene time, loading UI, scene switches).
 // Interactive camera lives on SessionCamera (see CameraApi / bindSideEffects).
@@ -24,6 +28,30 @@ struct SceneViewState
     std::string fpsInfo;
 
     ProgressBar progressLoading;
+
+    // When true, App must not submit/present. Scene switch tears down AS / materials /
+    // Streamline history; overlapping DispatchRays or DLSS-RR hard-hangs the GPU.
+    std::atomic<bool> sceneGpuSuspended{false};
+
+    // UE-style multi-frame GPU bind after CPU import. Advanced by tickSceneGpuBind().
+    enum class GpuBindPhase : uint8_t
+    {
+        None = 0,
+        Textures,
+        World,
+        Meshes,
+        Finalize,
+        LogicFinish,
+    };
+    struct GpuBindJob
+    {
+        GpuBindPhase phase = GpuBindPhase::None;
+        const scene::SceneRenderData* renderData = nullptr;
+        size_t texturesTotal = 0;
+        size_t meshBegin = 0;
+        size_t meshTotal = 0;
+    };
+    GpuBindJob gpuBind;
 
     std::mutex pendingSceneSwitchMutex;
     struct PendingSceneSwitch

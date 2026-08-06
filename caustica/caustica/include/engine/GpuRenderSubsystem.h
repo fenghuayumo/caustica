@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <render/core/PathTracerSettings.h>
 #include <render/AppDiagnostics.h>
 #include <render/RenderRuntimeState.h>
@@ -18,9 +19,6 @@ class WorldRenderer;
 }
 namespace scene { class SceneRenderData; }
 
-// Wire already-created App resources for scene load/unload GPU orchestration.
-// Bootstrap (caches / SceneSession / WorldRenderer create): SceneStartup
-// Sample settings / hierarchy / cmdline overrides / asset register: SceneLifecycle / AssetSystem
 struct gpuRenderSubsystemInitParams
 {
     GpuDevice& gpuDevice;
@@ -33,6 +31,8 @@ struct gpuRenderSubsystemInitParams
     render::AppDiagnostics& diagnostics;
 };
 
+// Scene GPU bind steps for multi-frame loading (see tickSceneGpuBind).
+// Each method is RT-only except finishLoadedScene (logic thread).
 class GpuRenderSubsystem
 {
 public:
@@ -43,13 +43,19 @@ public:
     GpuRenderSubsystem& operator=(const GpuRenderSubsystem&) = delete;
 
     void shutdown();
-
-    // Store pointers only; callers must create GpuSharedCaches / SceneSession / WorldRenderer first.
     bool initialize(const gpuRenderSubsystemInitParams& params);
 
     void onSceneUnloading();
-    void onSceneLoadedGpuPrep(const scene::SceneRenderData& renderData);
-    void onSceneLoadedGpuFinish(const scene::SceneRenderData& renderData);
+
+    [[nodiscard]] size_t pendingTextureFinalizeCount();
+    // timeLimitMs > 0: budgeted finalize; <= 0: drain + loadingFinished.
+    void flushTextures(float timeLimitMs);
+    void bindWorld(const scene::SceneRenderData& renderData);
+    // Returns next mesh index.
+    size_t uploadMeshes(const scene::SceneRenderData& renderData, size_t meshBegin, size_t maxMeshes);
+    void finalizeBind(const scene::SceneRenderData& renderData);
+    // Logic-thread post-bind (AS flags, splat, etc.).
+    void finishLoadedScene(const scene::SceneRenderData& renderData);
 
 private:
     GpuSharedCaches* m_gpuSharedCaches = nullptr;

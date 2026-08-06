@@ -223,9 +223,6 @@ void animate(App& app, float fElapsedTimeSeconds)
 
     vs->lastDeltaTime = fElapsedTimeSeconds;
 
-    if (::SceneManager* manager = detail::sessionManager(app))
-        manager->updateLoading();
-
     if (runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0)
     {
         runtime->Invalidation.ShaderAndACRefreshDelayedRequest -= fElapsedTimeSeconds;

@@ -520,6 +520,14 @@ void App::render()
 
 bool App::skipRenderPhase() const
 {
+    // Scene-switch barrier: stop all GPU submit/present while AS / Streamline /
+    // material buffers are torn down or rebound (see onSceneUnloading).
+    if (const SceneViewState* vs = tryResource<SceneViewState>())
+    {
+        if (vs->sceneGpuSuspended.load(std::memory_order_acquire))
+            return true;
+    }
+
     if (tryResource<SceneViewState>())
         return caustica::shouldSkipRender(*this);
 
@@ -766,7 +774,10 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
 
     if (scheduleContext.runUpdate)
     {
-        scheduleContext.windowFocused = scheduleContext.runRender;
+        // Collapse focus to "actually presenting" so camera/anim pause when not
+        // drawing — but keep systems pumping while sceneGpuSuspended skips render
+        // (async scene import joins via updateLoading).
+        scheduleContext.windowFocused = scheduleContext.runRender || skipRenderPhase();
         runSchedule(AppSchedule::First, scheduleContext);
         if (scheduleContext.abortFrame)
             return false;

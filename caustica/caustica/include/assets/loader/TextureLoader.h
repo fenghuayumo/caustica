@@ -81,6 +81,7 @@ public:
 
     bool processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds);
     void loadingFinished();
+    [[nodiscard]] size_t pendingFinalizeCount();
 
     void setMaxTextureSize(uint32_t size);
     void setGenerateMipmaps(bool generateMipmaps);

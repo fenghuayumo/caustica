@@ -152,12 +152,12 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         }
         if (key == ToGlfwKey(caustica::Key::O) && !shiftDown)
         {
-            sceneEditor.openSceneFromDialog();
+            sceneEditor.requestOpenSceneFromDialog();
             return true;
         }
         if (key == ToGlfwKey(caustica::Key::S) && !shiftDown)
         {
-            sceneEditor.saveScene();
+            sceneEditor.requestSaveScene();
             return true;
         }
     }

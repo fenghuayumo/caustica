@@ -311,7 +311,11 @@ namespace
             while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
             {
                 if (msg.message == WM_QUIT)
+                {
+                    std::lock_guard guard(slot.Mutex);
+                    slot.hMainWindow = nullptr;
                     return;
+                }
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
@@ -324,7 +328,35 @@ namespace
             InvalidateRect(hwnd, nullptr, FALSE);
             Sleep(16);
         }
-        SendMessageW(hwnd, WM_CLOSE, 0, 0);
+        // Prefer DestroyWindow via WM_CLOSE; ignore if stop() already posted it.
+        if (IsWindow(hwnd))
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+        // Never block forever on GetMessage — stop()'s join would deadlock the
+        // logic thread during Open Scene if WM_QUIT is lost.
+        for (int spin = 0; spin < 250; ++spin)
+        {
+            MSG msg;
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+            {
+                if (msg.message == WM_QUIT)
+                {
+                    std::lock_guard guard(slot.Mutex);
+                    slot.hMainWindow = nullptr;
+                    return;
+                }
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            if (!IsWindow(hwnd))
+                break;
+            Sleep(1);
+        }
+        if (IsWindow(hwnd))
+            DestroyWindow(hwnd);
+        {
+            std::lock_guard guard(slot.Mutex);
+            slot.hMainWindow = nullptr;
+        }
     }
 
     void ProgressBarSetTitleImpl(int slotIndex, const char* statusText)
@@ -364,17 +396,28 @@ namespace
     {
         assert(slotIndex >= 0 && slotIndex < g_ProgressSlotCount);
         std::thread threadToJoin;
+        HWND hwnd = nullptr;
         {
             ProgressBarGlobals& slot = g_ProgressSlots[slotIndex];
             std::lock_guard guard(slot.Mutex);
             slot.Active = false;
             slot.Title = "";
             slot.Value = 0;
-            slot.hMainWindow = nullptr;
+            hwnd = slot.hMainWindow;
+            // Keep hMainWindow until the UI thread exits — nulling it first made
+            // stop()'s join race the progress thread's own WM_CLOSE/SendMessage path.
             threadToJoin.swap(slot.Thread);
         }
+        // Wake the progress UI thread even if it is blocked in GetMessage-style work.
+        if (hwnd)
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
         if (threadToJoin.joinable())
             threadToJoin.join();
+        {
+            ProgressBarGlobals& slot = g_ProgressSlots[slotIndex];
+            std::lock_guard guard(slot.Mutex);
+            slot.hMainWindow = nullptr;
+        }
     }
 
     void ProgressBarUpdateImpl(int slotIndex, int percentage)

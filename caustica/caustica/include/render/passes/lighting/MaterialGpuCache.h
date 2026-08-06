@@ -315,6 +315,11 @@ public:
 
     void                            createRenderPassesAndLoadMaterials(caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path & sceneFilePath, const std::filesystem::path & mediaPath);
 
+    // Open Scene / scene switch: retarget paths and reconcile materials in-place.
+    // Must not clear the cache or rebake specialized PT permutations — that path
+    // blocks the logic thread inside onSceneLoaded and looks like a hard hang.
+    void                            reloadMaterialsForSceneSwitch(caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path& mediaPath);
+
     // this update can happen in parallel with any other ray preparatory tracing work - anything from BVH building to laying down denoising layers
     void                            update(caustica::rhi::CommandList* commandList,
                                            const caustica::scene::SceneRenderData& renderData,
@@ -372,6 +377,8 @@ private:
     void                            recordTexture(const StandardMaterialTexture& texture);
     bool                            reconcileLiveMaterials(std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials);
     void                            rebuildActiveTextureIndex();
+    void                            applyScenePaths(const std::filesystem::path& sceneFilePath, const std::filesystem::path& mediaPath);
+    void                            ensureUbershaderAssignments();
 
     void                            bakeShaderPermutations();
 

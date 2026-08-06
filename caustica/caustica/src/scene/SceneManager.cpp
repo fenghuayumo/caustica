@@ -40,7 +40,9 @@ SceneManager::SceneManager(caustica::GpuDevice&                     device,
     m_loader.setLoadFunc([this](std::shared_ptr<caustica::IFileSystem> fs,
                                 const std::filesystem::path& path)
     {
-        return loadScene(std::move(fs), path) != nullptr;
+        // Import into pending only — never publish m_scene from the worker thread.
+        m_pendingScene = loadSceneToPending(std::move(fs), path);
+        return m_pendingScene != nullptr;
     });
 }
 
@@ -110,6 +112,7 @@ void SceneManager::onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebui
 void SceneManager::clearScene()
 {
     m_scene.reset();
+    m_pendingScene.reset();
 }
 
 void SceneManager::retargetCurrentScene(
@@ -140,7 +143,7 @@ bool SceneManager::beginSceneSwitch(const std::string&           sceneName,
     return true;
 }
 
-std::shared_ptr<caustica::Scene> SceneManager::loadScene(
+std::shared_ptr<caustica::Scene> SceneManager::loadSceneToPending(
     std::shared_ptr<caustica::IFileSystem> fs,
     const std::filesystem::path&           sceneFileName)
 {
@@ -156,22 +159,33 @@ std::shared_ptr<caustica::Scene> SceneManager::loadScene(
         if (scene->loadFromJsonString(m_inlineSceneJson))
         {
             scene->processNodesRecursive();
-            m_scene = scene;
             return scene;
         }
-        m_scene.reset();
         return nullptr;
     }
 
     if (scene->load(sceneFileName))
     {
         scene->processNodesRecursive();
-        m_scene = scene;
         return scene;
     }
 
-    m_scene.reset();
     return nullptr;
+}
+
+std::shared_ptr<caustica::Scene> SceneManager::loadScene(
+    std::shared_ptr<caustica::IFileSystem> fs,
+    const std::filesystem::path&           sceneFileName)
+{
+    m_pendingScene = loadSceneToPending(std::move(fs), sceneFileName);
+    promotePendingScene();
+    return m_scene;
+}
+
+void SceneManager::promotePendingScene()
+{
+    m_scene = std::move(m_pendingScene);
+    m_pendingScene.reset();
 }
 
 void SceneManager::setAsyncLoadingEnabled(bool enabled)
@@ -182,18 +196,30 @@ void SceneManager::setAsyncLoadingEnabled(bool enabled)
 void SceneManager::setLoadingCallbacks(std::function<void()> onLoaded,
                                        std::function<void()> onUnloading)
 {
-    m_loader.onLoaded = std::move(onLoaded);
-    m_loader.onUnloading = std::move(onUnloading);
+    m_loader.onLoaded = [this, onLoaded = std::move(onLoaded)]() {
+        promotePendingScene();
+        if (onLoaded)
+            onLoaded();
+    };
+    m_loader.onUnloading = [this, onUnloading = std::move(onUnloading)]() {
+        if (onUnloading)
+            onUnloading();
+        m_scene.reset();
+        m_pendingScene.reset();
+    };
+}
+
+void SceneManager::setLoadFailedCallback(std::function<void()> onLoadFailed)
+{
+    m_onLoadFailed = std::move(onLoadFailed);
 }
 
 void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                                      const std::filesystem::path& sceneFileName)
 {
-    // After RT drain: safe to touch RHI from the caller (logic) thread for load barriers.
+    // Drain the dedicated render thread only. Device::waitForIdle belongs on the
+    // render thread inside onSceneUnloading — never from the logic thread.
     m_device.waitForRenderThreadIdle();
-    // THREADING: sync-point — RT is idle; one-shot GC before scene load.
-    m_device.getDevice()->waitForIdle();
-    m_device.getDevice()->runGarbageCollection();
 
     m_loader.beginLoading(std::move(fs), sceneFileName);
 
@@ -203,7 +229,16 @@ void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
 
 void SceneManager::updateLoading()
 {
+    const bool wasLoading = m_loader.isLoading();
     m_loader.update();
+
+    if (wasLoading && !m_loader.isLoading() && !m_loader.isLoaded())
+    {
+        m_pendingScene.reset();
+        m_scene.reset();
+        if (m_onLoadFailed)
+            m_onLoadFailed();
+    }
 }
 
 bool SceneManager::isSceneLoading() const

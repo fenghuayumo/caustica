@@ -49,6 +49,9 @@ namespace caustica
     // No-op on non-Windows. Safe to call more than once.
     void initNativeConsole(bool visibleByDefault);
     void shutdownNativeConsole();
+    // Re-bind stdout/stderr to the native console. Call after Win32 common dialogs
+    // (GetOpenFileName etc.) which can invalidate CRT console redirection.
+    void refreshNativeConsoleStdio();
     void setNativeConsoleVisible(bool visible);
     [[nodiscard]] bool isNativeConsoleVisible();
     bool toggleNativeConsoleVisible();

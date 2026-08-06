@@ -16,6 +16,9 @@ void setCurrentScene(App& app, const std::string& sceneName, bool forceReload = 
 void onSceneLoaded(App& app);
 void onSceneUnloading(App& app);
 
+// One small GPU-bind step per call (textures / meshes / finalize). Safe to call every frame.
+void tickSceneGpuBind(App& app);
+
 void collectUncompressedTextures(App& app);
 [[nodiscard]] bool hasAsyncLoadingInProgress(const App& app);
 

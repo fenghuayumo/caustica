@@ -31,10 +31,24 @@ public:
         caustica::rhi::CommandList* commandList,
         uint32_t frameIndex);
 
-    // Exclusive GPU setup from logic-thread staging data. Does not publish snapshots.
-    // pruneRemovedResources=false keeps GPU records referenced by a live/retired TLAS
-    // during async double-buffered structure rebuild.
+    // Spawn / sync helpers: upload all meshes then finalize (each mesh drains GPU).
     static void refreshAfterLoad(
+        Scene& scene,
+        const scene::SceneRenderData& renderData,
+        SceneGpuResources& gpuResources,
+        IDescriptorTableManager* descriptorTable,
+        uint32_t frameIndex,
+        bool pruneRemovedResources = true);
+
+    // Multi-frame bind building blocks (RT-only).
+    static size_t uploadMeshesAfterLoad(
+        const scene::SceneRenderData& renderData,
+        SceneGpuResources& gpuResources,
+        IDescriptorTableManager* descriptorTable,
+        size_t meshBegin,
+        size_t maxMeshes);
+
+    static void finalizeAfterLoad(
         Scene& scene,
         const scene::SceneRenderData& renderData,
         SceneGpuResources& gpuResources,

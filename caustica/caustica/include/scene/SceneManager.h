@@ -54,6 +54,7 @@ public:
 
     void setAsyncLoadingEnabled(bool enabled);
     void setLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
+    void setLoadFailedCallback(std::function<void()> onLoadFailed);
     void beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                            const std::filesystem::path&           sceneFileName);
     void updateLoading();
@@ -112,10 +113,17 @@ private:
 
     std::vector<std::string>                  m_sceneFilesAvailable;
     std::shared_ptr<caustica::Scene>          m_scene;
+    std::shared_ptr<caustica::Scene>          m_pendingScene;
     std::string                               m_currentSceneName;
     std::filesystem::path                     m_currentScenePath;
     std::string                               m_inlineSceneJson;
 
     caustica::SceneLoader                     m_loader;
+    std::function<void()>                     m_onLoadFailed;
     int                                       m_structureEditDepth = 0;
+
+    std::shared_ptr<caustica::Scene> loadSceneToPending(
+        std::shared_ptr<caustica::IFileSystem> fs,
+        const std::filesystem::path&           sceneFileName);
+    void promotePendingScene();
 };

@@ -64,7 +64,7 @@ inline void AppendBufferRange(caustica::rhi::BufferRange& range, size_t size, ui
 {
     range.byteOffset = currentBufferSize;
     // GPU allocation is 16-byte aligned, but writeBuffer must copy only `size` source
-    // bytes — using the padded range.byteSize reads past the end of CPU vectors.
+    // bytes - using the padded range.byteSize reads past the end of CPU vectors.
     range.byteSize = size;
     currentBufferSize += caustica::rhi::align(size, size_t(16));
 }
@@ -246,7 +246,7 @@ void UpdateInstance(SceneGpuResources& gpu, const scene::MeshInstanceRenderProxy
     affineToColumnMajor(proxy.transformFloat, idata.transform);
     affineToColumnMajor(proxy.previousTransformFloat, idata.prevTransform);
 
-    // Must match TLAS instanceID / MaterialGpuCache dense prefix — not a possibly
+    // Must match TLAS instanceID / MaterialGpuCache dense prefix - not a possibly
     // stale proxy.geometryInstanceIndex from a mid-import snapshot.
     idata.firstGeometryInstanceIndex = int32_t(compactedGeometryInstanceIndex);
     idata.numGeometries = proxy.geometryCount;
@@ -267,10 +267,19 @@ void EnsureMeshGpuBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
-    caustica::rhi::CommandList* commandList)
+    caustica::rhi::CommandList* commandList,
+    size_t meshBegin = 0,
+    size_t meshEnd = size_t(-1))
 {
-    for (const auto& mesh : renderData.meshSnapshots)
+    const size_t meshCount = renderData.meshSnapshots.size();
+    if (meshEnd > meshCount)
+        meshEnd = meshCount;
+    if (meshBegin > meshEnd)
+        meshBegin = meshEnd;
+
+    for (size_t meshIndex = meshBegin; meshIndex < meshEnd; ++meshIndex)
     {
+        const auto& mesh = renderData.meshSnapshots[meshIndex];
         const auto& buffers = mesh.upload;
 
         if (!buffers)
@@ -411,6 +420,10 @@ void EnsureMeshGpuBuffers(
                     caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
         }
     }
+
+    // Skinned setup needs the full prototype mesh set; skip on partial upload batches.
+    if (meshBegin != 0 || meshEnd != meshCount)
+        return;
 
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
@@ -931,7 +944,42 @@ void SceneGpuUpdater::refresh(
         scene.acknowledgeGpuStructureConsumed(frameIndex);
 }
 
-void SceneGpuUpdater::refreshAfterLoad(
+size_t SceneGpuUpdater::uploadMeshesAfterLoad(
+    const scene::SceneRenderData& renderData,
+    SceneGpuResources& gpu,
+    IDescriptorTableManager* descriptorTable,
+    size_t meshBegin,
+    size_t maxMeshes)
+{
+    const size_t meshCount = renderData.meshSnapshots.size();
+    if (meshBegin >= meshCount || maxMeshes == 0)
+        return meshCount;
+
+    const size_t end = std::min(meshBegin + maxMeshes, meshCount);
+
+    caustica::rhi::CommandListParameters uploadParams;
+    uploadParams.uploadChunkSize = 4 * 1024 * 1024;
+    uploadParams.uploadMaxMemory = 128 * 1024 * 1024;
+
+    caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList(uploadParams);
+    commandList->open();
+    EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList, meshBegin, end);
+    commandList->close();
+    gpu.device->executeCommandList(commandList);
+    commandList = nullptr;
+
+    // Drain before returning so the next logic-thread Sleep can let DWM run.
+    // Without this, flooding CreateCommittedResource + copies hard-locks the desktop.
+    if (!gpu.device->waitForIdle())
+    {
+        caustica::error("uploadMeshesAfterLoad: waitForIdle failed at %zu-%zu", meshBegin, end);
+        return meshBegin;
+    }
+    gpu.device->runGarbageCollection();
+    return end;
+}
+
+void SceneGpuUpdater::finalizeAfterLoad(
     Scene& scene,
     const scene::SceneRenderData& renderData,
     SceneGpuResources& gpu,
@@ -943,22 +991,36 @@ void SceneGpuUpdater::refreshAfterLoad(
 
     caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
-    {
-        EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);
-        UpdateGpuSceneBuffers(
-            gpu,
-            renderData,
-            descriptorTable,
-            commandList,
-            frameIndex,
-            /*structureChanged=*/true,
-            /*transformsChanged=*/true,
-            pruneRemovedResources);
-    }
+    UpdateGpuSceneBuffers(
+        gpu,
+        renderData,
+        descriptorTable,
+        commandList,
+        frameIndex,
+        /*structureChanged=*/true,
+        /*transformsChanged=*/true,
+        pruneRemovedResources);
     commandList->close();
-    // Same-queue submit order makes the subsequent AS-build CL see these uploads
-    // without a device-wide waitForIdle (overlaps prior frame GPU work).
     gpu.device->executeCommandList(commandList);
+    if (!gpu.device->waitForIdle())
+        caustica::error("finalizeAfterLoad: waitForIdle failed");
+    gpu.device->runGarbageCollection();
+}
+
+void SceneGpuUpdater::refreshAfterLoad(
+    Scene& scene,
+    const scene::SceneRenderData& renderData,
+    SceneGpuResources& gpu,
+    IDescriptorTableManager* descriptorTable,
+    uint32_t frameIndex,
+    bool pruneRemovedResources)
+{
+    constexpr size_t kMeshesPerSubmit = 2;
+    const size_t meshCount = renderData.meshSnapshots.size();
+    for (size_t begin = 0; begin < meshCount; )
+        begin = uploadMeshesAfterLoad(renderData, gpu, descriptorTable, begin, kMeshesPerSubmit);
+
+    finalizeAfterLoad(scene, renderData, gpu, descriptorTable, frameIndex, pruneRemovedResources);
 }
 
 } // namespace caustica::render

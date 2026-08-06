@@ -1410,6 +1410,77 @@ void MaterialGpuCache::sceneReloaded()
     clear();
 }
 
+void MaterialGpuCache::applyScenePaths(
+    const std::filesystem::path& sceneFilePath,
+    const std::filesystem::path& mediaPath)
+{
+    m_mediaPath = mediaPath;
+    m_sceneDirectory = sceneFilePath.parent_path();
+    if (!sceneFilePath.empty() && isInlineScenePath(sceneFilePath))
+        m_sceneDirectory = std::filesystem::path();
+    if (!m_sceneDirectory.empty())
+    {
+        m_sceneMaterialsPath = m_sceneDirectory / std::string(c_MaterialsSubFolder);
+        std::filesystem::path justName = sceneFilePath.filename().stem();
+        if (!justName.empty())
+            m_sceneMaterialsSceneSpecializedPath = m_sceneMaterialsPath / justName;
+    }
+    else
+    {
+        m_sceneMaterialsPath.clear();
+        m_sceneMaterialsSceneSpecializedPath.clear();
+    }
+
+    m_materialsPath = mediaPath / std::string(c_MaterialsSubFolder);
+    std::filesystem::path justName = sceneFilePath.filename().stem();
+    m_materialsSceneSpecializedPath = m_materialsPath / justName;
+}
+
+void MaterialGpuCache::ensureUbershaderAssignments()
+{
+    if (!m_ubershader)
+        return;
+    for (auto& standardMaterial : m_materials)
+    {
+        if (standardMaterial && !standardMaterial->bakedShaderPermutation)
+            standardMaterial->bakedShaderPermutation = m_ubershader;
+    }
+}
+
+void MaterialGpuCache::reloadMaterialsForSceneSwitch(
+    caustica::render::RenderDevice& renderDevice,
+    std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials,
+    const std::filesystem::path& sceneFilePath,
+    const std::filesystem::path& mediaPath)
+{
+    info("MaterialGpuCache: reloadMaterialsForSceneSwitch begin (live=%zu, incoming=%zu)",
+        m_materials.size(), materials.size());
+    m_renderDevice = &renderDevice;
+
+    if (!m_materialData)
+    {
+        caustica::rhi::BufferDesc bufferDesc;
+        bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
+        bufferDesc.keepInitialState = true;
+        bufferDesc.canHaveUAVs = true;
+        bufferDesc.byteSize = sizeof(StandardMaterialData) * CAUSTICA_MATERIAL_MAX_COUNT;
+        bufferDesc.structStride = sizeof(StandardMaterialData);
+        bufferDesc.debugName = "StandardMaterialDataStorage";
+        m_materialData = m_device->createBuffer(bufferDesc);
+        m_materialDataWasReset = true;
+    }
+
+    applyScenePaths(sceneFilePath, mediaPath);
+    ensureMaterialsFromScene(materials);
+    ensureUbershaderAssignments();
+
+    // New material JSON / engine imports may have queued texture uploads.
+    m_deferredTextureLoadInProgress = true;
+    completeDeferredTexturesLoad(nullptr);
+
+    info("MaterialGpuCache: reloadMaterialsForSceneSwitch end (materials=%zu)", m_materials.size());
+}
+
 void MaterialGpuCache::notifyMaterialEdited()
 {
     ++m_materialStateRevision;
@@ -1704,9 +1775,9 @@ void MaterialGpuCache::bakeShaderPermutations()
 
 void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::BindingLayout* bindlessLayout, caustica::render::RenderDevice& renderDevice, std::span<const caustica::scene::MaterialRenderResourceSnapshot> materials, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath )
 {
+    (void)bindlessLayout;
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials begin");
     assert(!mediaPath.empty());
-    //m_bindlessLayout = bindlessLayout;
     m_renderDevice = &renderDevice;
 
     static_assert(sizeof(StandardMaterialData) == 272,
@@ -1726,31 +1797,15 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
         m_materialDataWasReset = true;
     }
 
-    // Runtime imports can add materials after the first load. Keep existing PT
-    // materials and only create missing ones (same path as ensureMaterialsFromScene).
-    if (m_mediaPath != "")
-        ensureMaterialsFromScene(materials);
+    const bool coldMaterialBootstrap = m_mediaPath.empty() || !m_ubershader;
+    applyScenePaths(sceneFilePath, mediaPath);
 
-    if (m_mediaPath == "") // first time load all
+    // Runtime imports / scene switches: keep existing PT materials and only create
+    // missing ones. A full rebake here blocks Open Scene for a long time (or hangs
+    // when hit-group tables are rebuilt against a live PathTracingShaderCompiler).
+    if (coldMaterialBootstrap)
     {
         info("MaterialGpuCache: first material load begin");
-        m_mediaPath = mediaPath;
-        m_sceneDirectory = sceneFilePath.parent_path();
-        if (!sceneFilePath.empty() && isInlineScenePath(sceneFilePath))
-            m_sceneDirectory = std::filesystem::path();
-        if (!m_sceneDirectory.empty())
-        {
-            m_sceneMaterialsPath = m_sceneDirectory / std::string(c_MaterialsSubFolder);
-            std::filesystem::path justName = sceneFilePath.filename().stem();
-            if (!justName.empty())
-                m_sceneMaterialsSceneSpecializedPath = m_sceneMaterialsPath / justName;
-        }
-        m_materialsPath = mediaPath / std::string(c_MaterialsSubFolder);
-
-        std::filesystem::path justName = sceneFilePath.filename().stem();
-
-        m_materialsSceneSpecializedPath = m_materialsPath / justName;
-  
         const int initializedFromEngineCount = ensureMaterialsFromScene(materials);
 
         // sort by name so when we're saving it's consistent
@@ -1760,6 +1815,10 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
 
         m_deferredTextureLoadInProgress = true;
         info("MaterialGpuCache: first material load end, materials=%zu", m_materials.size());
+    }
+    else
+    {
+        ensureMaterialsFromScene(materials);
     }
 
     completeDeferredTexturesLoad(nullptr);
@@ -1777,9 +1836,17 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
         initializeUniqueDeterministicName(standardMaterial);
     }
     info("MaterialGpuCache: record material textures end, uniqueTextures=%zu", m_textures.size());
-    info("MaterialGpuCache: bake shader permutations begin");
-    bakeShaderPermutations();
-    info("MaterialGpuCache: bake shader permutations end");
+    if (coldMaterialBootstrap || !m_ubershader)
+    {
+        info("MaterialGpuCache: bake shader permutations begin");
+        bakeShaderPermutations();
+        info("MaterialGpuCache: bake shader permutations end");
+    }
+    else
+    {
+        ensureUbershaderAssignments();
+        info("MaterialGpuCache: skip permutation rebake (scene switch / incremental)");
+    }
     info("MaterialGpuCache: createRenderPassesAndLoadMaterials end");
 }
 

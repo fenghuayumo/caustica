@@ -286,6 +286,8 @@ void registerPathTracePrePass(FrameGraphContext ctx)
             declarePathTracePrePassAccess(setup, handles);
         },
         [ctx](rg::RenderPassContext& passCtx) {
+            if (!ctx.ptBuildStablePlanes || !ctx.bindingSet || !ctx.descriptorTable)
+                return;
             ctx.pathTrace->prePass(
                 passCtx.commandList(),
                 ctx.bindingSet,
@@ -398,6 +400,8 @@ void registerMainPathTracePass(FrameGraphContext ctx)
             PTPipelineVariant* pipeline = ctx.settings->RealtimeMode
                 ? ctx.ptFillStablePlanes
                 : ctx.ptReference;
+            if (!pipeline || !ctx.bindingSet || !ctx.descriptorTable)
+                return;
             ctx.pathTrace->mainPass(
                 passCtx.commandList(),
                 ctx.bindingSet,

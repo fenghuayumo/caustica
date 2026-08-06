@@ -729,6 +729,8 @@ namespace caustica::rhi::d3d12
         std::shared_ptr<BufferChunk> m_CurrentChunk;
 
         [[nodiscard]] std::shared_ptr<BufferChunk> createChunk(size_t size);
+        // Fence-wait + reuse when over budget or CreateCommittedResource fails.
+        bool acquireReusableChunk(size_t sizeToAllocate, ID3D12GraphicsCommandList* pCommandList);
     };
 
     class OpacityMicromap : public RefCounter<rt::OpacityMicromap>

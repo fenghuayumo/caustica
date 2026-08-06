@@ -8,6 +8,7 @@ namespace caustica::rhi::vulkan
         , m_Context(context)
         , m_CommandListParameters(parameters)
         , m_StateTracker(context.messageCallback)
+        // Vulkan UploadManager does not yet fence-wait on uploadMaxMemory; keep unlimited.
         , m_UploadManager(std::make_unique<UploadManager>(device, parameters.uploadChunkSize, 0, false))
         , m_ScratchManager(std::make_unique<UploadManager>(device, parameters.scratchChunkSize, parameters.scratchMaxMemory, true))
     {

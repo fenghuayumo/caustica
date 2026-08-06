@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cfloat>
+#include <thread>
+#include <chrono>
 
 
 namespace
@@ -188,7 +190,13 @@ void initializeScene(App& app, const std::string& preferredScene)
             : findPreferredScene(manager->getAvailableScenes(), preferredScene);
     }
 
+    caustica::info("initializeScene: loading '%s'", sceneArg.c_str());
     setCurrentScene(app, sceneArg);
+    // Do not block Startup on CPU import + GPU bind. The render thread and frame
+    // loop are not running yet; sync-waiting here freezes the window and piles
+    // upload work onto the wrong thread. SceneAnimate::updateLoading finishes
+    // the load after App::run starts (same path as Open Scene).
+    caustica::info("initializeScene: async load started for '%s'", sceneArg.c_str());
 }
 
 void setCurrentScene(App& app, const std::string& sceneName, bool forceReload)
@@ -214,6 +222,13 @@ void onSceneUnloading(App& app)
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     vs->sceneTime = 0.0;
     vs->uncompressedTextures.clear();
+    vs->gpuBind = {};
+
+    // Contract: stop submit → RT idle → (RT) waitForIdle → Streamline → tear down.
+    vs->sceneGpuSuspended.store(true, std::memory_order_release);
+    if (vs->progressLoading.Active())
+        vs->progressLoading.Set(15);
+    detail::sceneSwitchTrace("onSceneUnloading: draining GPU");
 
     // Scene::prepareForUnload mutates live ECS/resource ownership. Drain render
     // work first, then perform that mutation in the logic domain.
@@ -224,10 +239,34 @@ void onSceneUnloading(App& app)
             scene->prepareForUnload();
     }
 
+    detail::sceneSwitchTrace("onSceneUnloading: GPU teardown on render thread");
     runGpuWorkOnRenderThread(app, [&app]() {
+        GpuDevice* device = gpuDevice(app);
+        caustica::rhi::Device* rhi = device ? device->getDevice() : nullptr;
+        // THREADING: sync-point, RT-only — never waitForIdle from the logic thread.
+        if (rhi && !rhi->waitForIdle())
+        {
+            if (device)
+                device->setShuttingDown(true);
+            return;
+        }
+
+        if (render::WorldRenderer* wr = worldRenderer(app))
+            wr->releaseStreamlineTemporalResources();
+
         if (GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>())
             gr->onSceneUnloading();
+
+        if (rhi)
+        {
+            rhi->waitForIdle();
+            rhi->runGarbageCollection();
+        }
     });
+
+    if (vs->progressLoading.Active())
+        vs->progressLoading.Set(30);
+    detail::sceneSwitchTrace("onSceneUnloading: GPU drain complete");
 
     clearActiveScene(app);
 }
@@ -371,67 +410,160 @@ void registerLoadedSceneAssets(App& app, ::SceneManager& manager)
     }
 }
 
+void abortGpuBind(SceneViewState& vs)
+{
+    vs.gpuBind = {};
+    vs.sceneGpuSuspended.store(false, std::memory_order_release);
+    if (vs.progressLoading.Active())
+        vs.progressLoading.stop();
+}
+
 } // namespace
 
 void onSceneLoaded(App& app)
 {
-    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
-    if (!gr)
-        return;
-
-    ::SceneManager* manager = detail::sessionManager(app);
     SceneViewState* vs = viewState(app);
+    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
+    ::SceneManager* manager = detail::sessionManager(app);
     const CommandLineOptions* cmd = cmdLine(app);
     PathTracerSettings* cfg = settings(app);
-    if (!manager || !vs || !cmd || !cfg)
+    if (!manager || !vs || !cmd || !cfg || !gr)
+    {
+        if (vs)
+            vs->sceneGpuSuspended.store(false, std::memory_order_release);
         return;
-
-    // ActiveScene is committed before this callback (see SceneStartup loader wrap).
+    }
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
     if (render::WorldRenderer* wrResource = worldRenderer(app))
         wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, currentScenePath(app));
 
     vs->progressLoading.Set(50);
-    vs->progressLoading.Set(55);
-
+    detail::sceneSwitchTrace("onSceneLoaded: logic setup");
     applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
 
-    const scene::SceneRenderData* gpuSetupData = nullptr;
+    const scene::SceneRenderData* renderData = nullptr;
     if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
     {
         if (GpuDevice* device = gpuDevice(app))
-            gpuSetupData = &scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex());
+            renderData = &scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex());
+    }
+    if (!renderData)
+    {
+        detail::sceneSwitchTrace("onSceneLoaded: no renderData");
+        abortGpuBind(*vs);
+        return;
     }
 
-    runGpuWorkOnRenderThread(app, [&app, gpuSetupData]() {
-        if (GpuRenderSubsystem* gpu = app.tryResource<GpuRenderSubsystem>(); gpu && gpuSetupData)
-            gpu->onSceneLoadedGpuPrep(*gpuSetupData);
-    });
-
     registerLoadedSceneAssets(app, *manager);
-
     syncCameraFromScene(app);
 
-    vs->progressLoading.Set(60);
+    // Start multi-frame bind; sceneGpuSuspended stays true until LogicFinish.
+    const size_t texturesPending = gr->pendingTextureFinalizeCount();
+    vs->gpuBind = {
+        .phase = texturesPending > 0
+            ? SceneViewState::GpuBindPhase::Textures
+            : SceneViewState::GpuBindPhase::World,
+        .renderData = renderData,
+        .texturesTotal = texturesPending,
+        .meshBegin = 0,
+        .meshTotal = renderData->meshSnapshots.size(),
+    };
+    vs->progressLoading.Set(55);
+    detail::sceneSwitchTrace("onSceneLoaded: bind job textures=%zu meshes=%zu",
+        texturesPending, vs->gpuBind.meshTotal);
+}
 
-    if (gpuSetupData)
-        gr->onSceneLoadedGpuFinish(*gpuSetupData);
+void tickSceneGpuBind(App& app)
+{
+    SceneViewState* vs = viewState(app);
+    if (!vs || vs->gpuBind.phase == SceneViewState::GpuBindPhase::None)
+        return;
 
-    collectUncompressedTextures(app);
+    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
+    const scene::SceneRenderData* data = vs->gpuBind.renderData;
+    if (!gr || !data)
+    {
+        abortGpuBind(*vs);
+        return;
+    }
 
-    vs->progressLoading.Set(70);
-    vs->progressLoading.Set(90);
+    using Phase = SceneViewState::GpuBindPhase;
+    auto& job = vs->gpuBind;
 
-    applyCmdLinePostLoadOverrides(*cfg, *cmd);
-    if (!cmd->cameraPosDirUp.empty())
-        setCurrentCameraPosDirUp(app, cmd->cameraPosDirUp);
-
-    if (CameraController* cam = detail::sessionCamera(app))
-        cam->syncPreviousViewFromCurrent();
-
-    vs->progressLoading.Set(100);
-
+    switch (job.phase)
+    {
+    case Phase::Textures:
+    {
+        runGpuWorkOnRenderThread(app, [gr]() { gr->flushTextures(8.f); });
+        const size_t remaining = gr->pendingTextureFinalizeCount();
+        if (job.texturesTotal > 0)
+        {
+            const float done = float(job.texturesTotal - remaining) / float(job.texturesTotal);
+            vs->progressLoading.Set(55 + int(done * 15.f));
+        }
+        if (remaining == 0)
+        {
+            runGpuWorkOnRenderThread(app, [gr]() { gr->flushTextures(0.f); });
+            job.phase = Phase::World;
+        }
+        break;
+    }
+    case Phase::World:
+        runGpuWorkOnRenderThread(app, [gr, data]() { gr->bindWorld(*data); });
+        job.phase = Phase::Meshes;
+        vs->progressLoading.Set(72);
+        break;
+    case Phase::Meshes:
+    {
+        const size_t start = job.meshBegin;
+        size_t next = start;
+        runGpuWorkOnRenderThread(app, [gr, data, start, &next]() {
+            next = gr->uploadMeshes(*data, start, 1);
+        });
+        job.meshBegin = next;
+        if (job.meshTotal > 0)
+            vs->progressLoading.Set(72 + int(float(next) / float(job.meshTotal) * 18.f));
+        if (next <= start && next < job.meshTotal)
+        {
+            detail::sceneSwitchTrace("tickSceneGpuBind: mesh stall at %zu", start);
+            abortGpuBind(*vs);
+            break;
+        }
+        if (next >= job.meshTotal)
+            job.phase = Phase::Finalize;
+        break;
+    }
+    case Phase::Finalize:
+        runGpuWorkOnRenderThread(app, [gr, data]() { gr->finalizeBind(*data); });
+        vs->progressLoading.Set(93);
+        job.phase = Phase::LogicFinish;
+        break;
+    case Phase::LogicFinish:
+    {
+        PathTracerSettings* cfg = settings(app);
+        const CommandLineOptions* cmd = cmdLine(app);
+        gr->finishLoadedScene(*data);
+        collectUncompressedTextures(app);
+        if (cfg && cmd)
+        {
+            applyCmdLinePostLoadOverrides(*cfg, *cmd);
+            if (!cmd->cameraPosDirUp.empty())
+                setCurrentCameraPosDirUp(app, cmd->cameraPosDirUp);
+        }
+        if (CameraController* cam = detail::sessionCamera(app))
+            cam->syncPreviousViewFromCurrent();
+        vs->progressLoading.Set(100);
+        vs->progressLoading.stop();
+        vs->gpuBind = {};
+        vs->sceneGpuSuspended.store(false, std::memory_order_release);
+        detail::sceneSwitchTrace("onSceneLoaded: complete");
+        break;
+    }
+    case Phase::None:
+    default:
+        break;
+    }
 }
 
 void collectUncompressedTextures(App& app)
@@ -468,6 +600,10 @@ void collectUncompressedTextures(App& app)
 
 bool hasAsyncLoadingInProgress(const App& app)
 {
+    if (const SceneViewState* vs = viewState(app);
+        vs && vs->gpuBind.phase != SceneViewState::GpuBindPhase::None)
+        return true;
+
     AppDiagnostics* diag = diagnostics(app);
     RenderRuntimeState* runtime = runtimeState(app);
     if (!diag || !runtime)

@@ -129,6 +129,8 @@ public:
     [[nodiscard]] GaussianSplatFramePass* getGaussianSplatFramePass() { return m_gaussianFramePass.get(); }
     [[nodiscard]] const GaussianSplatFramePass* getGaussianSplatFramePass() const { return m_gaussianFramePass.get(); }
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
+    // Render-thread only. Caller must waitForIdle() first.
+    void releaseStreamlineTemporalResources();
     void onSceneUnloading();
     void onSceneLoaded(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
     void invalidateBindingSet() { m_bindingSet = nullptr; }

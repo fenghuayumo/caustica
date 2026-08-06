@@ -11,7 +11,7 @@ namespace caustica::rhi::d3d12
         , m_Resources(resources)
         , m_Device(device)
         , m_Queue(device->getQueue(params.queueType))
-        , m_UploadManager(context, m_Queue, params.uploadChunkSize, 0, false)
+        , m_UploadManager(context, m_Queue, params.uploadChunkSize, params.uploadMaxMemory, false)
         , m_DxrScratchManager(context, m_Queue, params.scratchChunkSize, params.scratchMaxMemory, true)
         , m_StateTracker(context.messageCallback)
         , m_Desc(params)
