@@ -24,7 +24,7 @@ PathTracerSettings   (already App resource)  one-shot clear
 
 1. Render-thread frame work must consume `Scene::getRenderData()` (or typed proxies inside it).
 2. Render thread must **not** call `Scene::getEntityWorld()` for per-frame lighting / emissive / mesh enumeration.
-3. Light history (NEE-AT remapping) lives in render-side maps (`LightSamplingCache`), not in typed `*LightComponent::lightLink`.
+3. Light history (NEE-AT remapping) lives in render-side maps (`LightSamplingCache`), keyed by entity / instance hash — not on ECS light/mesh components.
 4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
 5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
 6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.

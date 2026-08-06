@@ -113,7 +113,6 @@ struct MeshInstanceComponent
     std::shared_ptr<MeshInfo> mesh;
     int instanceIndex = -1;
     int geometryInstanceIndex = -1;
-    std::vector<LightSamplerLink> perGeometryLightSamplerLinks;
     ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
     // Hierarchy / Inspector visibility. Hidden instances keep their TLAS slot
     // (instanceMask = 0) so InstanceIndex stays aligned with ECS.
@@ -176,7 +175,6 @@ using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightDa
 struct DirectionalLightComponent
 {
     dm::float3 color = dm::colors::white;
-    LightSamplerLink lightLink;
     float irradiance = 1.f;
     float angularSize = 0.f;
 };
@@ -184,7 +182,6 @@ struct DirectionalLightComponent
 struct SpotLightComponent
 {
     dm::float3 color = dm::colors::white;
-    LightSamplerLink lightLink;
     std::vector<std::string> proxies;
     float intensity = 1.f;
     float radius = 0.f;
@@ -196,7 +193,6 @@ struct SpotLightComponent
 struct PointLightComponent
 {
     dm::float3 color = dm::colors::white;
-    LightSamplerLink lightLink;
     std::vector<std::string> proxies;
     float intensity = 1.f;
     float radius = 0.f;
@@ -206,7 +202,6 @@ struct PointLightComponent
 struct EnvironmentLightComponent
 {
     dm::float3 color = dm::colors::white;
-    LightSamplerLink lightLink;
     dm::float3 radianceScale = dm::float3(1.f);
     int textureIndex = -1;
     float rotation = 0.f;

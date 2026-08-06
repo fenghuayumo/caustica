@@ -15,14 +15,6 @@ namespace caustica
 {
     class SceneTypeFactory;
 
-    // Per-light and per-geometry link into the light sampling system.
-    // Render-side caches own history; do not treat these as game-thread authority.
-    struct LightSamplerLink
-    {
-        int IndexOrBase = -1;   // index of the corresponding PolymorphicLight in the light sampler
-        int LastUpdateTag = -1; // identifier of when IndexOrBase was last updated
-    };
-
     // Joint reference for skinned meshes; uses an ECS entity instead of a scene graph node.
     struct SkinnedMeshJoint
     {

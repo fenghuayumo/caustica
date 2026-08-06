@@ -59,9 +59,6 @@ void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std
     component.geometryInstanceIndex = -1;
     component.proxiedAnalyticLight = ecs::NullEntity;
     component.enabled = true;
-    component.perGeometryLightSamplerLinks.clear();
-    if (mesh)
-        component.perGeometryLightSamplerLinks.resize(mesh->geometries.size(), LightSamplerLink{ -1, -1 });
 }
 
 std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
