@@ -44,7 +44,7 @@ class CaptureScriptManager;
 using namespace caustica::math;
 
 // Editor shell: selection/UI/capture/game/content. Scene/render queries go through
-// App + EditorAccess helpers (sessionCamera / pathTracing / gpuSharedCaches), not this class.
+// App + EditorAccess helpers (cameraController / pathTracing / gpuSharedCaches), not this class.
 class SceneEditor
 {
 public:
@@ -109,7 +109,7 @@ public:
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
 
-    void bindSessionCameraSideEffects();
+    void bindCameraControllerSideEffects();
 
     void onBeforeInitialSceneLoad();
     void onAnimateBegin(float& elapsedTimeSeconds);

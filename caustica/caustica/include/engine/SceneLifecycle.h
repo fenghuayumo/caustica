@@ -7,8 +7,8 @@ namespace caustica
 
 class App;
 
-// Bind session-camera side effects (accumulation reset / splat temporal reset) to WorldRenderer.
-void bindSessionCameraSideEffects(App& app);
+// Bind CameraController side effects (accumulation reset / splat temporal reset) to WorldRenderer.
+void bindCameraControllerSideEffects(App& app);
 void initStreamlineAndWindow(App& app);
 void initializeScene(App& app, const std::string& preferredScene);
 void setCurrentScene(App& app, const std::string& sceneName, bool forceReload = false);

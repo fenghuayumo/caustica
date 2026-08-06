@@ -1,4 +1,4 @@
-#include <scene/GameModel.h>
+#include "GameModel.h"
 #include <scene/SceneImport.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
@@ -11,7 +11,7 @@
 
 using namespace caustica::math;
 using namespace caustica;
-using namespace game;
+using namespace demo;
 
 namespace
 {

@@ -10,6 +10,9 @@ The complete in-tree example is
 [`application/samples/thin_client/Main.cpp`](../application/samples/thin_client/Main.cpp);
 its CMake target is `caustica_thin_client`.
 
+Do **not** copy `application/editor/game` (`demo::Prop*`, `GameModel`, `LightController`) —
+that folder is an editor SampleGame script layer, not an embedding API.
+
 ## Lifecycle
 
 For a host that only needs the default engine:
@@ -115,7 +118,7 @@ engine->run();
 Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
 `Query<Components...>`, and `SystemContext&`. Prefer `EntityWorld` /
 `Query<>` over digging through `GpuRenderSubsystem` or `WorldRenderer`.
-Session camera / path-tracer settings are App resources; do not call
+CameraController (App resource) / path-tracer settings are App resources; do not call
 `worldRenderer()` from host code — use `RenderSessionApi` / `CameraApi`.
 
 An `update` system with no explicit set joins

@@ -11,15 +11,15 @@ namespace caustica
 class App;
 class GpuDevice;
 class SceneViewState;
+class CameraController;
 struct GpuSharedCaches;
-struct SessionCamera;
 struct SceneSession;
 
 // Prefer RenderSessionApi; WorldRenderer is engine-internal via internal/WorldRendererAccess.h.
 
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
 [[nodiscard]] GpuSharedCaches* gpuSharedCaches(const App& app);
-[[nodiscard]] SessionCamera* sessionCameraResource(const App& app);
+[[nodiscard]] CameraController* cameraController(const App& app);
 [[nodiscard]] SceneSession* sceneSession(const App& app);
 
 [[nodiscard]] PathTracerSettings* settings(const App& app);

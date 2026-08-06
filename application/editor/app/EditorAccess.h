@@ -6,7 +6,6 @@
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
-#include <engine/SessionCamera.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
 #include <render/WorldRenderer.h>
@@ -55,28 +54,24 @@ namespace caustica::editor
     return editor.app() ? caustica::entityWorld(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline SessionCamera* editorSessionCamera(SceneEditor& editor)
+[[nodiscard]] inline CameraController* editorCameraController(SceneEditor& editor)
 {
-    return editor.app() ? caustica::sessionCameraResource(*editor.app()) : nullptr;
+    return editor.app() ? caustica::cameraController(*editor.app()) : nullptr;
 }
 
-[[nodiscard]] inline const SessionCamera* editorSessionCamera(const SceneEditor& editor)
+[[nodiscard]] inline const CameraController* editorCameraController(const SceneEditor& editor)
 {
-    return editor.app() ? caustica::sessionCameraResource(*editor.app()) : nullptr;
+    return editor.app() ? caustica::cameraController(*editor.app()) : nullptr;
 }
 
 [[nodiscard]] inline CameraController* editorCamera(SceneEditor& editor)
 {
-    if (SessionCamera* session = editorSessionCamera(editor))
-        return &session->camera;
-    return nullptr;
+    return editorCameraController(editor);
 }
 
 [[nodiscard]] inline const CameraController* editorCamera(const SceneEditor& editor)
 {
-    if (const SessionCamera* session = editorSessionCamera(editor))
-        return &session->camera;
-    return nullptr;
+    return editorCameraController(editor);
 }
 
 [[nodiscard]] inline render::WorldRenderer* editorWorldRenderer(SceneEditor& editor)

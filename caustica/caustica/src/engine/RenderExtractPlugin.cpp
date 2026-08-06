@@ -68,17 +68,17 @@ void prepareRenderFrame(App& app)
     const bool haveCommittedServeTarget =
         !canStartStructure || static_cast<bool>(scene->committedRenderData());
 
-    // Pure session copy: camera already resolved after TransformPropagate.
-    scene::SessionRenderExtractInputs sessionInputs;
-    sessionInputs.activeCamera = &resolvedCamera->camera;
-    sessionInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
-    sessionInputs.settings = app.tryResource<PathTracerSettings>();
-    sessionInputs.runtime = app.tryResource<render::RenderRuntimeState>();
+    // Pure frame copy: active camera already resolved after TransformPropagate.
+    scene::FrameExtractInputs frameInputs;
+    frameInputs.activeCamera = &resolvedCamera->camera;
+    frameInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
+    frameInputs.settings = app.tryResource<PathTracerSettings>();
+    frameInputs.runtime = app.tryResource<render::RenderRuntimeState>();
     if (vs)
-        sessionInputs.sceneTime = vs->sceneTime;
+        frameInputs.sceneTime = vs->sceneTime;
 
-    // Sole Extract publish for this frame (includes session camera/settings).
-    scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &sessionInputs);
+    // Sole Extract publish for this frame (includes active camera/settings).
+    scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &frameInputs);
 
     if (!canStartStructure)
         return;

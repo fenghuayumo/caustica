@@ -35,7 +35,7 @@ using namespace caustica;
 using namespace caustica;
 using namespace caustica::render;
 
-using namespace game;
+using namespace demo;
 
 PropBase::PropBase(GameScene& gameScene, const std::string & name)
     : m_gameScene(gameScene) 
@@ -58,9 +58,9 @@ std::string PropBase::getName() const
     return ew->getEntityName(m_entity);
 }
 
-std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling )
+std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling )
 {
-    auto ret = std::make_shared<game::ModelInstance>(instanceName, modelType, m_entity);
+    auto ret = std::make_shared<demo::ModelInstance>(instanceName, modelType, m_entity);
     ret->setTransform(translation, rotation, scaling);
     return ret;
 }

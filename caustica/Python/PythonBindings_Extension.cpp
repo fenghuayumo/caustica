@@ -20,6 +20,7 @@
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/App.h>
+#include <engine/AppResources.h>
 #include <math/box.h>
 #include <math/math.h>
 

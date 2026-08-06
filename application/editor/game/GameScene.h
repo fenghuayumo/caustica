@@ -7,7 +7,7 @@
 #include <scene/Scene.h>
 #include <core/command_line.h>
 
-#include <scene/GameModel.h>
+#include "GameModel.h"
 #include "GameProps.h"
 
 #ifdef _DEBUG
@@ -16,7 +16,8 @@
 
 namespace caustica::editor { class SceneEditor; }
 
-// this is kind of a parallel item to ExtendedScene, but built on top - perhaps a better name is needed; GameStage? GameLevel?
+// DEMO-ONLY editor SampleGame stage loader (not an embedding API).
+// Prefer EngineApp + EntityWorld / SceneSpawn for new hosts (thin_client).
 class GameScene
 {
 public:
@@ -31,10 +32,10 @@ public:
     bool                    CameraActive() const            { return m_gameCameraAttached.lock() != nullptr; }
     const caustica::FirstPersonCamera &
                             GetCamera() const               { return m_gameCamera; }
-    std::shared_ptr<game::PropBase>
+    std::shared_ptr<demo::PropBase>
                             GetCameraAttached() const       { return m_gameCameraAttached.lock(); }
-    void                    AttachCamera(const std::shared_ptr<game::PropBase> & prop);
-    const game::Pose &      GetLastRenderCameraPose() const { return m_lastRenderCameraPose; }
+    void                    AttachCamera(const std::shared_ptr<demo::PropBase> & prop);
+    const demo::Pose &      GetLastRenderCameraPose() const { return m_lastRenderCameraPose; }
 
     // active means animating / physics is enabled
     //void                    SetActive(bool active);
@@ -52,20 +53,20 @@ public:
     double                  gameTime() const             { return m_gameTime; }
     void                    SetGameTime(double t)           { m_gameTime = t; }
 
-    std::shared_ptr<game::ModelType>
+    std::shared_ptr<demo::ModelType>
                             FindModelType(const std::string & name);
 
-    std::shared_ptr<game::PropBase>
+    std::shared_ptr<demo::PropBase>
                             GetSelectedProp() const { return m_selectedProp.lock(); }
 
     GLFWwindow *            GetGLFWWindow() const;
 
-    const std::vector<game::Pose> & GetCamRecAnimation() const { return m_recordedCameraPoses; }
+    const std::vector<demo::Pose> & GetCamRecAnimation() const { return m_recordedCameraPoses; }
 
     const CommandLineOptions & GetCmdLine() const           { return m_cmdLine; }
 
 private:
-    std::shared_ptr<game::PropBase> CreatePropFromFile(const std::string& name, const std::filesystem::path& storagePath, const Json::Value& jsonRoot);
+    std::shared_ptr<demo::PropBase> CreatePropFromFile(const std::string& name, const std::filesystem::path& storagePath, const Json::Value& jsonRoot);
     void                    Deinitialize( );
     void                    ResetGame( );
 
@@ -75,11 +76,11 @@ private:
                             m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x
 
-    std::vector<std::shared_ptr<game::ModelType>> m_modelTypes;
+    std::vector<std::shared_ptr<demo::ModelType>> m_modelTypes;
 
-    std::vector<std::shared_ptr<game::PropBase>>
+    std::vector<std::shared_ptr<demo::PropBase>>
                             m_props;
-    std::weak_ptr<game::PropBase>
+    std::weak_ptr<demo::PropBase>
                             m_selectedProp;
 
     double                  m_gameTime = 0.0;
@@ -95,11 +96,11 @@ private:
     bool                    m_camRecEnabled = false;
     float                   m_camRecKeyframeStep = 1.0f;
     float                   m_camRecTimeToNextKeyframe = 0.0f;
-    std::vector<game::Pose> m_recordedCameraPoses;
-    game::Pose              m_lastRenderCameraPose; // useful for stuff like "set prop to camera pose"
+    std::vector<demo::Pose> m_recordedCameraPoses;
+    demo::Pose              m_lastRenderCameraPose; // useful for stuff like "set prop to camera pose"
 
     caustica::FirstPersonCamera   m_gameCamera;
-    std::weak_ptr<game::PropBase>   m_gameCameraAttached;
+    std::weak_ptr<demo::PropBase>   m_gameCameraAttached;
 
     bool                            m_wasGameCameraActive = false;
     float3                          m_sceneCameraLastPos;

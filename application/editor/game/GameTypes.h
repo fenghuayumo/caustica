@@ -1,7 +1,7 @@
 #pragma once
 
-// DEMO-ONLY (editor SampleGame / LightController sidecar). Not engine ECS.
-// Prefer typed *LightComponent + systems for new applications.
+// DEMO-ONLY — editor SampleGame scripts. Not engine ECS. Not an embedding API.
+// Canonical host sample: application/samples/thin_client (EntityWorld / SceneSpawn).
 
 #include <math/math.h>
 #include <ecs/Entity.h>
@@ -9,6 +9,7 @@
 
 #include <json/json-forwards.h>
 
+#include <cfloat>
 #include <tuple>
 #include <vector>
 
@@ -17,7 +18,7 @@ class GameScene;
 
 using namespace caustica::math;
 
-namespace game
+namespace demo
 {
     class ModelInstance;
 
@@ -81,4 +82,4 @@ namespace game
     };
 }
 
-inline void operator>>(const Json::Value& node, game::Pose& p) { p.read(node); }
+inline void operator>>(const Json::Value& node, demo::Pose& p) { p.read(node); }

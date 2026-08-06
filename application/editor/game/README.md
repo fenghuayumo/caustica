@@ -1,24 +1,24 @@
-# Editor game props (sample scripts) — DEMO ONLY
+# Editor SampleGame -- DEMO ONLY
 
-`PropBase` / `PropComponentBase` / `GameScene` are **demo gameplay scripts** over the
-engine ECS — not a second component system and not a supported embedding API.
+This folder is **not** an embedding API and **not** a second ECS.
 
 | Layer | Owns |
 | --- | --- |
-| `SceneEntityWorld` | Hierarchy, meshes, lights, transforms (engine truth) |
-| `game::Prop*` / `ModelInstance` / `LightController` | Sample Tick / UI that reads and writes that ECS |
+| Engine (`SceneEntityWorld`, `EntityWorld`, `SceneSpawn`) | Hierarchy, meshes, lights, transforms |
+| `demo::*` in this folder | Editor SampleGame scripts that Tick / drive UI over that ECS |
 
-Also demo-only (still linked from `causScene` for historical reasons):
+Contents (editor-linked only; **not** in `causScene` / thin_client):
 
-- `scene/GameModel.h` — prototype import worlds for props
-- `scene/GameTypes.h` — `Pose`, `KeyframeAnimation`, `LightController`
+- `GameScene` -- SampleGame stage loader (`GameSettings` + `SampleGame/` media)
+- `PropBase` / `PropComponentBase` -- OO script objects (`PoliceLightingOnRX6`, `BasicInteractableUI`)
+- `GameModel` / `GameTypes` -- model instance + `LightController` sidecars
 
-Prefer engine APIs for real applications:
+## For new applications
 
-- `EntityWorld` / `Query<>` system parameters
-- `caustica::load` / `spawn` / `despawn` (`SceneSpawn.h`)
-- `caustica::setEntityLocalTransform` (`SceneTransform.h`)
-- `caustica::setMeshVertices` (`SceneMeshEdit.h`)
+Use the official sample instead:
 
-Do not grow new engine components or render digs inside this folder.
-SampleGame only activates when a scene carries `GameSettings` and prop/model JSON.
+- [`application/samples/thin_client`](../../samples/thin_client/Main.cpp)
+- `EntityWorld` / `Query<>` / `SceneSpawn` / `SceneTransform`
+
+Do **not** copy `PropComponentBase`, `ModelInstance`, or `LightController` into engine or host code.
+Do not grow new engine features in this folder.

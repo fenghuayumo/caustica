@@ -1,7 +1,7 @@
 #include "GamePropComponent.h"
 #include "GameScene.h"
 #include "GameProps.h"
-#include <scene/GameModel.h>
+#include "GameModel.h"
 
 #include <core/log.h>
 #include <core/json.h>
@@ -17,7 +17,7 @@ using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
 
-using namespace game;
+using namespace demo;
 
 PropComponentBase::PropComponentBase(class PropBase& prop, const std::string & type)
     : m_prop(prop), m_type(type)

@@ -17,7 +17,7 @@ namespace caustica
 namespace scene { class SceneRenderData; }
 
 // Mutable per-session view state (scene time, loading UI, scene switches).
-// Interactive camera lives on SessionCamera (see CameraApi / bindSideEffects).
+// Interactive camera lives on CameraController App resource (see CameraApi / bindSideEffects).
 struct SceneViewState
 {
     double sceneTime = 0.;

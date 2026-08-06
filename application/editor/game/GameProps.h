@@ -4,14 +4,14 @@
 #include <EditorUI.h>
 
 #include <scene/camera/Camera.h>
-#include <scene/GameModel.h>
+#include "GameModel.h"
 #include <ecs/Entity.h>
 
-namespace game
+namespace demo
 {
     class PropComponentBase;
 
-    // base class for other game props
+    // DEMO-ONLY SampleGame OO prop -- not an engine ECS component.
     class PropBase
     {
     public:
@@ -42,7 +42,7 @@ namespace game
         caustica::scene::SceneEntityWorld* EntityWorld() const;
 
     protected:
-        std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<game::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation = dm::quat::identity(), const dm::float3& scaling = dm::float3(1,1,1) );
+        std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation = dm::quat::identity(), const dm::float3& scaling = dm::float3(1,1,1) );
         
     protected:
         class GameScene & m_gameScene;

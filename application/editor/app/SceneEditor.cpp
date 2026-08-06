@@ -14,7 +14,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
 #include <engine/GpuSharedCaches.h>
-#include <engine/SessionCamera.h>
+#include <engine/AppResources.h>
 #include "EditorAccess.h"
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
@@ -370,10 +370,10 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) cons
     return bestEntity;
 }
 
-void SceneEditor::bindSessionCameraSideEffects()
+void SceneEditor::bindCameraControllerSideEffects()
 {
     if (m_app)
-        caustica::bindSessionCameraSideEffects(*m_app);
+        caustica::bindCameraControllerSideEffects(*m_app);
 #if CAUSTICA_WITH_PYTHON
     if (!m_pythonScripting)
         m_pythonScripting = std::make_unique<PythonScripting>(*this);
@@ -972,9 +972,9 @@ void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool e
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
-    auto* sessionCam = m_app ? caustica::sessionCameraResource(*m_app) : nullptr;
-    if (m_sampleGame && sessionCam)
-        m_sampleGame->TickCamera(fElapsedTimeSeconds, sessionCam->camera.camera());
+    auto* cam = m_app ? caustica::cameraController(*m_app) : nullptr;
+    if (m_sampleGame && cam)
+        m_sampleGame->TickCamera(fElapsedTimeSeconds, cam->camera());
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)

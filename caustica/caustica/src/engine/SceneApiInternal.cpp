@@ -1,7 +1,6 @@
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/App.h>
 #include <engine/AppResources.h>
-#include <engine/SessionCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
@@ -12,7 +11,6 @@
 #include <cstdio>
 #include <fstream>
 #include <memory>
-#include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/SceneManager.h>
 
@@ -39,18 +37,6 @@ void sceneSwitchTrace(const char* fmt, ...)
     std::ofstream f("scene_switch.log", std::ios::app);
     if (f)
         f << buf << '\n';
-}
-
-CameraController* sessionCamera(App& app)
-{
-    if (SessionCamera* session = sessionCameraResource(app))
-        return &session->camera;
-    return nullptr;
-}
-
-const CameraController* sessionCamera(const App& app)
-{
-    return sessionCamera(const_cast<App&>(app));
 }
 
 ::SceneManager* sessionManager(App& app)

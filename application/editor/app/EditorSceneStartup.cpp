@@ -33,7 +33,7 @@ void registerEditorSceneStartup(caustica::App& app, const EditorSceneStartupConf
 
             if (config.sceneEditor)
             {
-                config.sceneEditor->bindSessionCameraSideEffects();
+                config.sceneEditor->bindCameraControllerSideEffects();
             }
 
             if (config.appConfig.renderState && config.postAppInit)

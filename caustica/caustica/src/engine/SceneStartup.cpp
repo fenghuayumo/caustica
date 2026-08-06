@@ -6,7 +6,7 @@
 #include <engine/App.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
-#include <engine/SessionCamera.h>
+#include <render/core/CameraController.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
@@ -27,11 +27,11 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     GpuDevice* gpuDevice = app.getGpuDevice();
     auto* assetSystem = app.tryResource<AssetSystem>();
     auto* gpuSharedCaches = app.tryResource<GpuSharedCaches>();
-    auto* sessionCamera = app.tryResource<SessionCamera>();
+    auto* cam = app.tryResource<CameraController>();
     auto* sceneSession = app.tryResource<SceneSession>();
     auto* worldRenderer = app.tryResource<render::WorldRenderer>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
-    if (!gpuDevice || !assetSystem || !gpuSharedCaches || !sessionCamera || !sceneSession
+    if (!gpuDevice || !assetSystem || !gpuSharedCaches || !cam || !sceneSession
         || !worldRenderer || !gpuRenderSubsystem)
         return;
 
@@ -53,7 +53,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         return;
     }
 
-    sessionCamera->camera.camera().setRotateSpeed(.003f);
+    cam->camera().setRotateSpeed(.003f);
 
     // Commit ActiveScene before host/editor loaded callbacks so early hooks see SSOT.
     auto onLoadedCb = std::move(sceneCallbacks.OnSceneLoaded);
@@ -118,7 +118,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
         return;
     }
 
-    caustica::bindSessionCameraSideEffects(app);
+    caustica::bindCameraControllerSideEffects(app);
     caustica::initializeScene(app, config.preferredScene);
 
     if (config.refreshEnvMapMediaList)

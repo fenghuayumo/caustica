@@ -3,7 +3,7 @@
 #include <engine/AssetPlugin.h>
 #include <engine/GpuRenderSubsystem.h>
 #include <engine/GpuSharedCaches.h>
-#include <engine/SessionCamera.h>
+#include <render/core/CameraController.h>
 #include <engine/ResolvedActiveCamera.h>
 #include <engine/SceneSession.h>
 #include <engine/ScenePlugins.h>
@@ -20,7 +20,7 @@ void SceneRuntimePlugin::build(App& app)
     registerSceneAppResources(app, appConfig);
     app.emplaceResource<ActiveScene>();
     app.emplaceResource<GpuSharedCaches>();
-    app.emplaceResource<SessionCamera>();
+    app.emplaceResource<CameraController>();
     app.emplaceResource<ResolvedActiveCamera>();
     app.emplaceResource<SceneSession>();
     app.emplaceResource<render::WorldRenderer>();

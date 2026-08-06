@@ -11,7 +11,6 @@
 #include "common/imoguizmo.hpp"
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <engine/SessionCamera.h>
 #include <math/affine.h>
 #include <math/quat.h>
 #include <scene/SceneEcs.h>

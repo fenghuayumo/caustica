@@ -1,19 +1,18 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include "../common/SampleCommon.h"
-#include <scene/GameTypes.h>
+#include "GameTypes.h"
 
 namespace caustica
 {
     class PlanarView;
 }
 
-namespace game
+namespace demo
 {
-    // Sample/demo gameplay *script* attached to a PropBase - NOT an engine ECS component.
+    // DEMO-ONLY editor SampleGame script on PropBase -- NOT an engine ECS component.
     // Scene truth lives in SceneEntityWorld; scripts only Tick / drive UI over that ECS.
-    // Prefer caustica::spawn / SceneMeshEdit / SceneTransform for mesh and transform edits.
+    // Prefer EntityWorld / SceneSpawn / SceneTransform (see thin_client).
     class PropComponentBase
     {
     public:

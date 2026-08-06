@@ -3,7 +3,6 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
-#include <engine/SessionCamera.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneLifecycle.h>
@@ -61,7 +60,7 @@ namespace
     void syncCameraFromScene(App& app)
     {
         auto scenePtr = caustica::activeScene(app);
-        CameraController* cam = detail::sessionCamera(app);
+        CameraController* cam = cameraController(app);
         if (!scenePtr || !cam)
             return;
 
@@ -107,10 +106,10 @@ using namespace caustica::render;
 namespace caustica
 {
 
-void bindSessionCameraSideEffects(App& app)
+void bindCameraControllerSideEffects(App& app)
 {
     PathTracerSettings* cfg = settings(app);
-    CameraController* cam = detail::sessionCamera(app);
+    CameraController* cam = cameraController(app);
     assert(cfg);
     assert(cam);
     cam->bindSideEffects(*cfg, worldRenderer(app));
@@ -146,9 +145,9 @@ void initializeScene(App& app, const std::string& preferredScene)
     GpuSharedCaches* caches = gpuSharedCaches(app);
     render::WorldRenderer* wrResource = worldRenderer(app);
     if (!caches || !caches->shaderFactory || !caches->descriptorTable || !caches->textureLoader
-        || !detail::sessionCamera(app) || !wrResource)
+        || !cameraController(app) || !wrResource)
     {
-        caustica::fatal("caustica::initializeScene requires GpuSharedCaches / SessionCamera / WorldRenderer wiring");
+        caustica::fatal("caustica::initializeScene requires GpuSharedCaches / CameraController / WorldRenderer wiring");
         return;
     }
     const auto shaderFactory = caches->shaderFactory;
@@ -279,8 +278,8 @@ namespace
 void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
 {
     PathTracerSettings* cfg = settings(app);
-    SessionCamera* sessionCam = sessionCameraResource(app);
-    if (!cfg || !sessionCam)
+    CameraController* cam = cameraController(app);
+    if (!cfg || !cam)
         return;
 
     const auto scene = manager.getScene();
@@ -292,7 +291,7 @@ void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
         cfg->RealtimeMode = sampleSettings->realtimeMode.value_or(cfg->RealtimeMode);
         cfg->EnableAnimations = sampleSettings->enableAnimations.value_or(cfg->EnableAnimations);
         if (sampleSettings->startingCamera.has_value())
-            sessionCam->camera.setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
+            cam->setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
         if (sampleSettings->realtimeFireflyFilter.has_value())
         {
             cfg->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
@@ -553,7 +552,7 @@ void tickSceneGpuBind(App& app)
             if (!cmd->cameraPosDirUp.empty())
                 setCurrentCameraPosDirUp(app, cmd->cameraPosDirUp);
         }
-        if (CameraController* cam = detail::sessionCamera(app))
+        if (CameraController* cam = cameraController(app))
             cam->syncPreviousViewFromCurrent();
         vs->progressLoading.Set(100);
         vs->progressLoading.stop();

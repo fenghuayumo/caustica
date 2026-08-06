@@ -121,14 +121,14 @@ namespace caustica
         void refreshEntityWorldForFrame(uint32_t frameIndex);
 
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
-        // Optional session inputs copy pre-resolved ActiveCamera + settings into the slot.
+        // Optional frame inputs copy pre-resolved ActiveCamera + settings into the slot.
         void extractAndPublishRenderSnapshot(
-            uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
+            uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs = nullptr);
 
         // Extract + publish for exclusive GPU setup (load / structure flush).
         // Returns published snapshot for frameIndex. Sole extract channel with prepareRenderFrame.
         [[nodiscard]] const scene::SceneRenderData& extractAndPublishForGpuSetup(
-            uint32_t frameIndex, const scene::SessionRenderExtractInputs* session = nullptr);
+            uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs = nullptr);
 
         // Returns true when extractAndPublishRenderSnapshot already ran for `frameIndex`.
         [[nodiscard]] bool wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const;

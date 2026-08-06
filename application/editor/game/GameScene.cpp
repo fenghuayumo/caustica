@@ -112,24 +112,24 @@ void GameScene::ResetGame()
 //     }
 // }
 
-std::shared_ptr<game::ModelType> GameScene::FindModelType(const std::string& modelTypeName)
+std::shared_ptr<demo::ModelType> GameScene::FindModelType(const std::string& modelTypeName)
 {
     if (modelTypeName == "")
         return nullptr;
-    auto it = std::find_if(m_modelTypes.begin(), m_modelTypes.end(), [ &modelTypeName ](const std::shared_ptr<game::ModelType>& pt) { return pt->getModelName() == modelTypeName; });
+    auto it = std::find_if(m_modelTypes.begin(), m_modelTypes.end(), [ &modelTypeName ](const std::shared_ptr<demo::ModelType>& pt) { return pt->getModelName() == modelTypeName; });
     if (it == m_modelTypes.end())
         return nullptr;
     return *it;
 }
 
-std::shared_ptr<game::PropBase> GameScene::CreatePropFromFile(const std::string& name, const std::filesystem::path& storagePath, const Json::Value& jsonRoot)
+std::shared_ptr<demo::PropBase> GameScene::CreatePropFromFile(const std::string& name, const std::filesystem::path& storagePath, const Json::Value& jsonRoot)
 {
     std::string propType;
     jsonRoot["propType"] >> propType;
 
-    std::shared_ptr<game::PropBase> prop = nullptr;
+    std::shared_ptr<demo::PropBase> prop = nullptr;
     if (propType == "SimpleProp")
-        prop = std::make_shared<game::SimpleProp>(*this, name);
+        prop = std::make_shared<demo::SimpleProp>(*this, name);
     if (prop == nullptr)
         { assert( false ); return nullptr; }
     prop->SetStoragePath(storagePath);
@@ -180,7 +180,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         Json::Value modelRoot;
         if (!caustica::json::loadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
             continue;
-        m_modelTypes.push_back( std::make_shared<game::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
+        m_modelTypes.push_back( std::make_shared<demo::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
     }
 
     auto propFiles = enumerateFilesWithWildcard(m_gameStoragePath / "props", "*.prop.json");
@@ -195,14 +195,14 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         if (!caustica::json::loadFromFile(propPath, propRoot) || propRoot.empty() || !propRoot.isObject() )
             continue;
         
-        std::shared_ptr<game::PropBase> newProp = CreatePropFromFile(fileNoExt.string(), propPath, propRoot);
+        std::shared_ptr<demo::PropBase> newProp = CreatePropFromFile(fileNoExt.string(), propPath, propRoot);
         if (newProp != nullptr)
             m_props.push_back( newProp );
     }
 
     if( m_cmdLine.PropCameraAttach != "" )
     {
-        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<game::PropBase> & prop ) { return caustica::equalsIgnoreCase(prop->getName(), m_cmdLine.PropCameraAttach); } );
+        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<demo::PropBase> & prop ) { return caustica::equalsIgnoreCase(prop->getName(), m_cmdLine.PropCameraAttach); } );
         if (it != m_props.end())
             AttachCamera(*it);
     }
@@ -249,7 +249,7 @@ static float GetPlaySpeedK(int playSpeed)
     return playSpeedK;
 }
 
-void GameScene::AttachCamera(const std::shared_ptr<game::PropBase> & prop)
+void GameScene::AttachCamera(const std::shared_ptr<demo::PropBase> & prop)
 {
     if (prop == nullptr)
         m_gameCameraAttached.reset();
@@ -324,7 +324,7 @@ bool GameScene::debugGUI(float indent)
 
         for (int i = 0; i < (int)m_props.size(); i++)
         {
-            const std::shared_ptr<game::PropBase> & prop = m_props[i];
+            const std::shared_ptr<demo::PropBase> & prop = m_props[i];
 
             bool selected = m_selectedProp.lock() == prop;
             if (ImGui::Selectable(prop->getName().c_str(), &selected, ImGuiSelectableFlags_None))
@@ -336,7 +336,7 @@ bool GameScene::debugGUI(float indent)
         //ImGui::Text("Selected:");
         ImGui::BeginChild("Properties", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * itemDisplaySize), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
         
-        std::shared_ptr<game::PropBase> selectedProp = m_selectedProp.lock();
+        std::shared_ptr<demo::PropBase> selectedProp = m_selectedProp.lock();
         if (selectedProp)
         {
             bool cameraAttached = m_gameCameraAttached.lock() == selectedProp;
@@ -376,7 +376,7 @@ bool GameScene::debugGUI(float indent)
     {
         if (ImGui::Button("Copy first to last for looping"))
         {
-            game::Pose term = m_recordedCameraPoses[0];
+            demo::Pose term = m_recordedCameraPoses[0];
             term.KeyTime = m_recordedCameraPoses.back().KeyTime+m_camRecKeyframeStep;
             m_recordedCameraPoses.push_back(term);
         }
@@ -513,7 +513,7 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
 
         if (m_camRecTimeToNextKeyframe <= 0)
         {
-            game::Pose pose;
+            demo::Pose pose;
             pose.setTransformFromCamera(renderCamera.getPosition(), renderCamera.getDir(), renderCamera.getUp());
             pose.Scaling = { 1,1,1 };
             pose.KeyTime = m_gameTime;
@@ -593,14 +593,14 @@ void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view
     }
 
     auto currentlyAttachedProp = m_gameCameraAttached.lock();
-    game::ScreenGUISel selArea{}; std::shared_ptr<game::PropBase> selProp;
+    demo::ScreenGUISel selArea{}; std::shared_ptr<demo::PropBase> selProp;
     float2 mousePos = { ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y };
     for (auto& prop : m_props)
     {
         if (prop == currentlyAttachedProp)
             continue;
 
-        game::ScreenGUISel selC = prop->StandaloneGUI(view, mousePos, displaySize);
+        demo::ScreenGUISel selC = prop->StandaloneGUI(view, mousePos, displaySize);
         if (selC.Selected && selC.RangeToCamera < selArea.RangeToCamera)
         {
             selArea = selC;

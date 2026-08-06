@@ -1,4 +1,4 @@
-#include <scene/GameTypes.h>
+#include "GameTypes.h"
 #include <core/log.h>
 #include <core/json.h>
 #include <math/math.h>
@@ -7,7 +7,7 @@
 
 using namespace caustica::math;
 using namespace caustica;
-using namespace game;
+using namespace demo;
 
 bool Pose::read( const Json::Value & node )
 {
@@ -83,7 +83,7 @@ Json::Value KeyframeAnimation::write()
     return nodesArray;
 }
 
-void KeyframeAnimation::fromKeys(const std::vector<game::Pose> & keys)
+void KeyframeAnimation::fromKeys(const std::vector<demo::Pose> & keys)
 {
     KeyTimeMin = FLT_MAX;
     KeyTimeMax = -FLT_MAX;

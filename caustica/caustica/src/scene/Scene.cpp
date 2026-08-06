@@ -1237,13 +1237,13 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
 }
 
 const scene::SceneRenderData& Scene::extractAndPublishForGpuSetup(
-    uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
+    uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
 {
-    extractAndPublishRenderSnapshot(frameIndex, session);
+    extractAndPublishRenderSnapshot(frameIndex, frameInputs);
     return m_RenderSnapshot.readBufferForFrame(frameIndex);
 }
 
-void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::SessionRenderExtractInputs* session)
+void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
 {
     assertLogicThread();
 
@@ -1281,8 +1281,8 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Se
     scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
 
     writeBuffer = m_LogicExtractCache;
-    if (session)
-        scene::extractSessionRenderState(*session, writeBuffer);
+    if (frameInputs)
+        scene::extractFrameRenderState(*frameInputs, writeBuffer);
 
     m_RenderSnapshot.publish(frameIndex);
 

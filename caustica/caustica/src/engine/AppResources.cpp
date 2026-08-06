@@ -2,7 +2,7 @@
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/GpuSharedCaches.h>
-#include <engine/SessionCamera.h>
+#include <render/core/CameraController.h>
 #include <engine/SceneSession.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
@@ -24,9 +24,9 @@ GpuSharedCaches* gpuSharedCaches(const App& app)
     return const_cast<GpuSharedCaches*>(app.tryResource<GpuSharedCaches>());
 }
 
-SessionCamera* sessionCameraResource(const App& app)
+CameraController* cameraController(const App& app)
 {
-    return const_cast<SessionCamera*>(app.tryResource<SessionCamera>());
+    return const_cast<CameraController*>(app.tryResource<CameraController>());
 }
 
 SceneSession* sceneSession(const App& app)

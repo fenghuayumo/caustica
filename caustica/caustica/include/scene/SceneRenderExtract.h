@@ -15,7 +15,7 @@ class CameraController;
 namespace caustica::scene
 {
     class SceneEntityWorld;
-    struct SessionRenderExtractInputs;
+    struct FrameExtractInputs;
 
     // What changed since the last extract into the logic-side cache.
     // Structure → rebuild proxy lists + mesh/material snapshots;
@@ -37,7 +37,7 @@ namespace caustica::scene
 
     // Logic-thread only. Pure copy of settings / runtime / pre-resolved active camera.
     // Consumes one-shot flags on the live settings object after copy.
-    void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out);
+    void extractFrameRenderState(const FrameExtractInputs& inputs, SceneRenderData& out);
 
     // Logic-thread helpers shared by Update (UI preview) and ResolveActiveCamera.
     [[nodiscard]] CameraRenderProxy makeCameraRenderProxy(

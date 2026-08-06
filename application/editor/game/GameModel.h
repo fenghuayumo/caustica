@@ -1,10 +1,9 @@
 #pragma once
 
-// DEMO-ONLY (editor SampleGame). Not part of the engine ECS authoring surface.
+// DEMO-ONLY editor SampleGame. Not part of the engine ECS authoring surface.
 // Prefer SceneSpawn / SceneTransform / EntityWorld::spawn for new applications.
-// Lives in causScene for historical linkage; do not grow new engine features here.
 
-#include <scene/GameTypes.h>
+#include "GameTypes.h"
 #include <ecs/Entity.h>
 
 #include <map>
@@ -16,7 +15,7 @@ namespace caustica { class Scene; }
 
 namespace caustica::scene { class SceneEntityWorld; }
 
-namespace game
+namespace demo
 {
     class ModelInstance;
 

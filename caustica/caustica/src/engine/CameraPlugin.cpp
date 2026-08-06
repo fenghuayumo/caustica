@@ -5,12 +5,11 @@
 #include <engine/AppResources.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/ResolvedActiveCamera.h>
-#include <engine/SessionCamera.h>
+#include <render/core/CameraController.h>
 #include <engine/SceneQuery.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
 #include <backend/GpuDevice.h>
-#include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
 #include <scene/SceneCameraAccess.h>
@@ -25,12 +24,11 @@ namespace caustica
 void updateCamera(App& app, float elapsedTimeSeconds)
 {
     auto* cfg = app.tryResource<PathTracerSettings>();
-    auto* sessionCam = app.tryResource<SessionCamera>();
-    if (!cfg || !sessionCam)
+    auto* cam = app.tryResource<CameraController>();
+    if (!cfg || !cam)
         return;
 
-    CameraController& cam = sessionCam->camera;
-    cam.camera().setMoveSpeed(cfg->CameraMoveSpeed);
+    cam->camera().setMoveSpeed(cfg->CameraMoveSpeed);
 
     const std::shared_ptr<Scene> scene = activeScene(app);
     const auto* ew = scene ? scene->getEntityWorld() : nullptr;
@@ -38,12 +36,12 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     const uint cameraCount = cameraEntities
         ? static_cast<uint>(cameraEntities->size()) + 1
         : 1;
-    cam.selectedCameraIndex() = std::min(cam.selectedCameraIndex(), cameraCount - 1);
+    cam->selectedCameraIndex() = std::min(cam->selectedCameraIndex(), cameraCount - 1);
 
     // Logic-side preview of the selected scene camera (same proxy math as ResolveActiveCamera).
-    if (cam.selectedCameraIndex() > 0 && cameraEntities)
+    if (cam->selectedCameraIndex() > 0 && cameraEntities)
     {
-        const uint32_t camIdx = cam.selectedCameraIndex() - 1;
+        const uint32_t camIdx = cam->selectedCameraIndex() - 1;
         if (camIdx < cameraEntities->size())
         {
             const ecs::Entity camEntity = (*cameraEntities)[camIdx];
@@ -53,12 +51,12 @@ void updateCamera(App& app, float elapsedTimeSeconds)
             {
                 const scene::CameraRenderProxy proxy =
                     scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
-                scene::applyCameraRenderProxyToController(proxy, cam, cfg);
+                scene::applyCameraRenderProxyToController(proxy, *cam, cfg);
             }
         }
     }
 
-    cam.camera().animate(elapsedTimeSeconds);
+    cam->camera().animate(elapsedTimeSeconds);
 
     if (cfg->CameraAntiRRSleepJitter > 0)
     {
@@ -66,15 +64,26 @@ void updateCamera(App& app, float elapsedTimeSeconds)
             ? (-cfg->CameraAntiRRSleepJitter)
             : cfg->CameraAntiRRSleepJitter);
 
-        math::float3 dir = cam.camera().getDir();
-        math::float3 right = math::normalize(math::cross(dir, cam.camera().getUp()));
+        math::float3 dir = cam->camera().getDir();
+        math::float3 right = math::normalize(math::cross(dir, cam->camera().getUp()));
         math::affine3 rot = math::rotation(right, off);
         dir = rot.transformVector(dir);
 
-        cam.camera().lookTo(cam.camera().getPosition(), dir, cam.camera().getUp());
+        cam->camera().lookTo(cam->camera().getPosition(), dir, cam->camera().getUp());
     }
 
-    // SessionCamera's PlanarView is logic-side only (gizmo / 3DGS CPU pick).
+    // Must run before updateViews: default CameraUpdateParams::frameIndex == 0 makes
+    // updateViews() call syncPreviousViewFromCurrent() → updateLastCameraState(), which
+    // would hide movement and skip PathTracer ResetAccumulation (ghosted accumulation).
+    if (cam->cameraMovedSinceLastFrame())
+    {
+        cam->updateLastCameraState();
+        if (!cfg->RealtimeMode)
+            cfg->ResetAccumulation = true;
+        setGaussianSplatTemporalReset(app, true);
+    }
+
+    // Logic-thread CameraController PlanarView is logic-side only (gizmo / 3DGS CPU pick).
     if (GpuDevice* device = app.getGpuDevice(); device && !device->isHeadless())
     {
         int width = 0;
@@ -85,36 +94,29 @@ void updateCamera(App& app, float elapsedTimeSeconds)
             CameraUpdateParams viewParams;
             viewParams.renderSize = math::uint2{ uint(width), uint(height) };
             viewParams.displayAspectRatio = float(width) / float(height);
-            cam.updateViews(viewParams);
+            // Non-zero so updateViews does not treat this as "frame 0" and rewrite last pose.
+            viewParams.frameIndex = 1;
+            cam->updateViews(viewParams);
         }
-    }
-
-    if (cam.cameraMovedSinceLastFrame())
-    {
-        cam.updateLastCameraState();
-        if (!cfg->RealtimeMode)
-            cfg->ResetAccumulation = true;
-        setGaussianSplatTemporalReset(app, true);
     }
 }
 
 void resolveActiveCamera(App& app)
 {
-    auto* sessionCam = app.tryResource<SessionCamera>();
+    auto* cam = app.tryResource<CameraController>();
     auto* resolved = app.tryResource<ResolvedActiveCamera>();
-    if (!sessionCam || !resolved)
+    if (!cam || !resolved)
         return;
 
-    CameraController& cam = sessionCam->camera;
     const std::shared_ptr<Scene> scene = activeScene(app);
     scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
 
     // selectedIndex 0 = free camera; 1..N = scene cameras in registration order.
     // Runs after TransformPropagate so GlobalTransform is current for RT.
-    if (cam.selectedCameraIndex() > 0 && ew)
+    if (cam->selectedCameraIndex() > 0 && ew)
     {
         const auto& cameraEntities = ew->cameraEntitiesInRegistrationOrder();
-        const uint32_t camIdx = cam.selectedCameraIndex() - 1;
+        const uint32_t camIdx = cam->selectedCameraIndex() - 1;
         if (camIdx < cameraEntities.size())
         {
             const ecs::Entity camEntity = cameraEntities[camIdx];
@@ -127,14 +129,14 @@ void resolveActiveCamera(App& app)
                 if (proxy.projection == scene::CameraProjectionKind::Perspective)
                 {
                     scene::fillActiveCameraFromPerspectiveProxy(
-                        proxy, cam.selectedCameraIndex(), resolved->camera);
+                        proxy, cam->selectedCameraIndex(), resolved->camera);
                     return;
                 }
             }
         }
     }
 
-    scene::fillActiveCameraFromFreeController(cam, resolved->camera);
+    scene::fillActiveCameraFromFreeController(*cam, resolved->camera);
 }
 
 void CameraPlugin::configureSchedules(App& app)

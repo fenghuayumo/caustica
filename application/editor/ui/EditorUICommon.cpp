@@ -19,7 +19,6 @@
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/passes/debug/Korgi.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <game/GameScene.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 

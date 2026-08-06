@@ -650,7 +650,7 @@ void extractSceneRenderData(
     // Material snapshots are structure-owned; skip the full copy on transform-only frames.
 }
 
-void extractSessionRenderState(const SessionRenderExtractInputs& inputs, SceneRenderData& out)
+void extractFrameRenderState(const FrameExtractInputs& inputs, SceneRenderData& out)
 {
     if (inputs.settings)
     {

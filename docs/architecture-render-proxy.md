@@ -5,7 +5,7 @@ Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game
 | Layer | Responsibility | Thread |
 | --- | --- | --- |
 | `SceneEntityWorld` (ECS) | Entities, components, queries, animation, hierarchy, `Changed<>` | Logic / game |
-| Extract | Copy ECS + session camera/settings → flat proxies | Logic (Extract schedule) |
+| Extract | Copy ECS + active camera/settings → flat proxies | Logic (Extract schedule) |
 | `SceneRenderData` / `SceneRenderSnapshot` | Triple-buffered, ECS-free frame packet | Logic writes, render reads |
 | `WorldRenderer` + passes | AS build, path trace, denoise, present | Render thread |
 
@@ -16,7 +16,7 @@ SceneWorld (ECS)     PostUpdate resolve      Extract (copy)         SceneRenderD
 ─────────────────    ──────────────────      ──────────────         ────────────────────     ─────────────
 TransformComponent   ResolvedActiveCamera ─► ActiveCamera copy  ──► ActiveCameraRenderProxy  read-only
 *LightComponent      (App resource)          Light/mesh proxies ──► LightRenderProxy          no getEntityWorld()
-SessionCamera        after TransformPropagate PathTracerSettings ─► RenderSettingsSnapshot    activeSettings()
+CameraController      after TransformPropagate PathTracerSettings ─► RenderSettingsSnapshot    activeSettings()
 PathTracerSettings   (already App resource)  one-shot clear
 ```
 
@@ -28,11 +28,11 @@ PathTracerSettings   (already App resource)  one-shot clear
 4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
 5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
 6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
-7. Structure-only republish (runtime drag-drop import) must not stomp `CameraSnapshot` — either pass `SessionRenderExtractInputs`, preserve a same-frame session extract, or leave `camera.valid == false` so WorldRenderer skips apply.
+7. Structure-only republish (runtime drag-drop import) must not stomp `CameraSnapshot` — either pass `FrameExtractInputs`, preserve a same-frame frame extract, or leave `camera.valid == false` so WorldRenderer skips apply.
 
 ## What is extracted today
 
-`extractSceneRenderData()` + `extractSessionRenderState()`
+`extractSceneRenderData()` + `extractFrameRenderState()`
 (`caustica/caustica/src/scene/SceneRenderExtract.cpp`):
 
 - `MeshInstanceRenderProxy` — transform, bounds, mesh, `proxiedAnalyticLight`, `parentLightEntity`
@@ -45,7 +45,7 @@ PathTracerSettings   (already App resource)  one-shot clear
 - Immutable material, geometry, and mesh resource snapshots when scene structure changes
 - Entity id lists for cameras / animations
 
-Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &sessionInputs)` into a **3-slot** snapshot.
+Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &frameInputs)` into a **3-slot** snapshot.
 
 ## Game-thread-only ECS paths (intentional)
 
@@ -71,7 +71,8 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 `SetSceneMeshVerticesParams` / `SceneMeshEditing.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
-Editor `game::PropComponentBase` is a sample script layer over ECS, not a second component system.
+Editor `demo::PropComponentBase` / `GameModel` live only under `application/editor/game`
+(not in `causScene`). Sample scripts over ECS — not a second component system.
 For a host-side walkthrough, see [C++ embedding](embedding-cpp.md).
 
 ## SystemSet + thin client
@@ -87,14 +88,14 @@ Host systems can take Bevy-style parameters: `EntityWorld`, `Query<...>`, `Res` 
 lights/meshes still go through the existing `set*` bookkeeping). `EngineApp::run` /
 `stepFrame` auto-run `finishStartup` after the host registers systems.
 
-Session camera / settings stay **App resources** (`SessionCamera`, `ResolvedActiveCamera`,
-`PathTracerSettings`). Free vs scene camera resolve runs in PostUpdate
-(`SceneResolveActiveCamera` after `TransformPropagate`); Extract only copies into the snapshot.
+Logic-thread `CameraController` and settings stay **App resources** (`CameraController`, `ResolvedActiveCamera`,
+`PathTracerSettings`). Extract copies them via `FrameExtractInputs`. Free vs scene camera resolve runs in
+PostUpdate (`SceneResolveActiveCamera` after `TransformPropagate`).
 Applications must not dig `worldRenderer()` — use `RenderSessionApi` / `CameraApi` /
 `SceneLifecycle`. `WorldRenderer` access is `engine/internal/WorldRendererAccess.h`.
 
 `Scene` owns `SceneEntityWorld` + `SceneRenderSnapshot` + `SceneStructureGpuSync` (async AS
-handoff). Editor `application/editor/game` and `scene/GameModel` / `GameTypes` are demo-only.
+handoff). Editor SampleGame (`application/editor/game`, `demo::`) is demo-only and editor-linked.
 
 Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).
@@ -137,7 +138,7 @@ Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`).
 
 | Piece | Path |
 | --- | --- |
-| Proxy + session snapshot types | `caustica/caustica/include/scene/SceneRenderData.h` |
+| Proxy + frame extract types | `caustica/caustica/include/scene/SceneRenderData.h` |
 | Extract | `caustica/caustica/src/scene/SceneRenderExtract.cpp` |
 | Extract schedule | `caustica/caustica/src/engine/RenderExtractPlugin.cpp` |
 | Snapshot buffer | `caustica/caustica/include/scene/SceneRenderSnapshot.h` |

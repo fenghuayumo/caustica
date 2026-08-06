@@ -717,7 +717,7 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
             !structureBuildInFlight && scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
 
         // Apply extracted camera pose before view update (RT owns view matrices).
-        // Skip when snapshot has no session camera (structure-only republish / scene-load extract).
+        // Skip when snapshot has no active camera (structure-only republish / scene-load extract).
         if (sessionData.camera.valid)
         {
             m_context->camera.camera().lookTo(
@@ -738,6 +738,15 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
             else
             {
                 m_context->camera.clearIntrinsics();
+            }
+
+            // Belt-and-suspenders for PathTracer: if Extract pose moved vs last RT camera
+            // and logic missed ResetAccumulation, still clear accumulation (no ghosting).
+            if (!m_frameSettingsSnapshot.RealtimeMode
+                && m_context->camera.cameraMovedSinceLastFrame())
+            {
+                m_frameSettingsSnapshot.ResetAccumulation = true;
+                m_context->camera.updateLastCameraState();
             }
         }
     }

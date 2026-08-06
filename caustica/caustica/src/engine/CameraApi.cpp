@@ -3,7 +3,6 @@
 #include <cassert>
 #include <engine/CameraApi.h>
 #include <engine/SceneQuery.h>
-#include <engine/internal/SceneApiInternal.h>
 #include <render/core/CameraController.h>
 
 namespace caustica
@@ -19,74 +18,74 @@ uint sceneCameraCount(const App& app)
 
 uint& selectedCameraIndex(App& app)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->selectedCameraIndex();
+    assert(cameraController(app));
+    return cameraController(app)->selectedCameraIndex();
 }
 
 float cameraVerticalFOV(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->verticalFOV();
+    assert(cameraController(app));
+    return cameraController(app)->verticalFOV();
 }
 
 const FirstPersonCamera& currentCamera(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->camera();
+    assert(cameraController(app));
+    return cameraController(app)->camera();
 }
 
 const std::shared_ptr<PlanarView>& currentView(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->view();
+    assert(cameraController(app));
+    return cameraController(app)->view();
 }
 
 const PlanarView& view(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    return *detail::sessionCamera(app)->view();
+    assert(cameraController(app));
+    return *cameraController(app)->view();
 }
 
 std::string currentCameraPosDirUp(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->getPosDirUpString();
+    assert(cameraController(app));
+    return cameraController(app)->getPosDirUpString();
 }
 
 bool setCurrentCameraPosDirUp(App& app, const std::string& val)
 {
-    assert(detail::sessionCamera(app));
-    return detail::sessionCamera(app)->setFromPosDirUpString(val);
+    assert(cameraController(app));
+    return cameraController(app)->setFromPosDirUpString(val);
 }
 
 void setCameraVerticalFOV(App& app, float cameraFOV)
 {
-    assert(detail::sessionCamera(app));
-    detail::sessionCamera(app)->setVerticalFOVInteractive(cameraFOV);
+    assert(cameraController(app));
+    cameraController(app)->setVerticalFOVInteractive(cameraFOV);
 }
 
 void setCameraIntrinsics(App& app, float fx, float fy, float cx, float cy, float width, float height)
 {
-    assert(detail::sessionCamera(app));
-    detail::sessionCamera(app)->setIntrinsicsInteractive(fx, fy, cx, cy, width, height);
+    assert(cameraController(app));
+    cameraController(app)->setIntrinsicsInteractive(fx, fy, cx, cy, width, height);
 }
 
 void clearCameraIntrinsics(App& app)
 {
-    assert(detail::sessionCamera(app));
-    detail::sessionCamera(app)->clearIntrinsicsInteractive();
+    assert(cameraController(app));
+    cameraController(app)->clearIntrinsicsInteractive();
 }
 
 void saveCurrentCamera(const App& app)
 {
-    assert(detail::sessionCamera(app));
-    detail::sessionCamera(app)->saveToDefaultFile();
+    assert(cameraController(app));
+    cameraController(app)->saveToDefaultFile();
 }
 
 void loadCurrentCamera(App& app)
 {
-    assert(detail::sessionCamera(app));
-    detail::sessionCamera(app)->loadFromDefaultFile();
+    assert(cameraController(app));
+    cameraController(app)->loadFromDefaultFile();
 }
 
 } // namespace caustica
