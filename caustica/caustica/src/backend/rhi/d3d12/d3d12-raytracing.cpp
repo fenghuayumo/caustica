@@ -944,6 +944,14 @@ namespace caustica::rhi::d3d12
 
     void AccelStruct::createSRV(size_t descriptor) const
     {
+        if (!dataBuffer)
+        {
+            // Caller should not bind an AS without storage; avoid AV during LoadSession
+            // empty-present / teardown races.
+            assert(!"AccelStruct::createSRV: dataBuffer is null");
+            return;
+        }
+
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;

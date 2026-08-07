@@ -34,8 +34,8 @@ struct gpuRenderSubsystemInitParams
     render::AppDiagnostics& diagnostics;
 };
 
-// Scene GPU bind steps for LoadSession GpuStreaming (see tickLoadSession).
-// Each method is RT-only except finishLoadedScene (logic thread).
+// RT/logic step executor for LoadSession (owner: SceneLifecycle::tickLoadSession).
+// Do not add new Open Scene phase flags here — extend LoadSession.
 class GpuRenderSubsystem
 {
 public:

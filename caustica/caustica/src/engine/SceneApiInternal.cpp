@@ -2,6 +2,7 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/SceneSession.h>
+#include <engine/SceneLifecycle.h>
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
@@ -81,11 +82,6 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    // Importing begins; exclusive suspend is only held across onSceneUnloading teardown.
-    vs->loadSession.reset();
-    vs->loadSession.phase = LoadSessionPhase::Importing;
-    vs->sceneGpuSuspended.store(true, std::memory_order_release);
-
     cfg->ResetAccumulation = true;
     cfg->ResetRealtimeCaches = true;
     // Keep DLSS/DLSS-RR off across the switch so Streamline is not recreated
@@ -93,13 +89,29 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     if (cfg->RealtimeAA >= 2)
         cfg->RealtimeAA = 1;
 
-    // CPU import on a worker so the logic/UI thread keeps pumping. GPU bind still
-    // runs on the logic thread when the worker finishes (via updateLoading).
     manager->setAsyncLoadingEnabled(true);
 
     vs->progressLoading.stop();
     vs->progressLoading.start("Loading scene...");
     vs->progressLoading.Set(5);
+
+    vs->loadSession.reset();
+    vs->loadSession.deferredImportPending = true;
+
+    // If a live scene exists, finish GPU teardown before starting the CPU import worker
+    // (async Teardown → tickLoadSession begins the deferred import).
+    if (manager->getScene())
+    {
+        sceneSwitchTrace("applySceneSwitch: Teardown then deferred import '%s'", sceneName.c_str());
+        caustica::onSceneUnloading(app); // LoadSession::Teardown, non-blocking GPU release
+        manager->clearScene();
+        return;
+    }
+
+    vs->loadSession.phase = LoadSessionPhase::Importing;
+    vs->loadSession.deferredImportPending = false;
+    vs->sceneGpuSuspended.store(false, std::memory_order_release);
+
     sceneSwitchTrace("applySceneSwitch: begin async load '%s'", sceneName.c_str());
     manager->beginLoadingScene(
         std::make_shared<caustica::NativeFileSystem>(),
@@ -107,8 +119,6 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     sceneSwitchTrace("applySceneSwitch: beginLoadingScene returned (async worker running=%d)",
         manager->isSceneLoading() ? 1 : 0);
 
-    // Async: scene stays null until the worker finishes and updateLoading promotes it.
-    // Sync fallback (if async disabled elsewhere): detect immediate failure.
     if (!manager->isSceneLoading() && manager->getScene() == nullptr)
     {
         caustica::error("Unable to load scene '%s'", sceneName.c_str());

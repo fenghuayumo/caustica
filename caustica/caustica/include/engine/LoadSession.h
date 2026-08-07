@@ -12,15 +12,16 @@ namespace scene
 class SceneRenderData;
 }
 
-// ADR 0001 P3 — sole "are we loading?" session for Open Scene.
-// Progress UI and switch gates should read this, not overlapping bools.
+// ADR 0001 P3 — sole "are we loading / streaming?" session for Open Scene.
+// Progress UI and switch gates should read this (isBusy), not overlapping bools.
 enum class LoadSessionPhase : uint8_t
 {
     Idle = 0,
+    Teardown,      // exclusive GPU unload; sceneGpuSuspended held until RT completes
     Importing,     // CPU worker (SceneLoader)
     GpuStreaming,  // budgeted texture/mesh/bind on Render domain
-    FirstPresent,  // present already restored; structure enqueue / gate
-    Finalizing,    // logic-thread post-bind
+    Finalizing,    // logic-thread post-bind; requests StructureGpu AccelOnly
+    FirstPresent,  // wait until StructureGpu committed serve is ready
     Ready,         // terminal → cleared to Idle same tick
 };
 
@@ -50,6 +51,16 @@ struct LoadSession
     std::atomic<size_t> stepMeshNext{0};
     std::atomic<size_t> stepTexturesRemaining{0};
 
+    // Teardown: RT sets true when Streamline/AS release + GC finished.
+    std::atomic<bool> teardownGpuDone{false};
+
+    // After Teardown, tickLoadSession calls beginLoadingScene (avoids racing GPU unload).
+    bool deferredImportPending = false;
+
+    // OMM / opacity builds and similar work outside the Open Scene phase machine.
+    // Mirrored from RT diagnostics each Logic tick; do not add a second load bool.
+    std::atomic<bool> secondaryStreaming{false};
+
     // Logic-tick budgets; RT upload pressure is gated by StreamingUploadBudget (ADR 0001 R1).
     static constexpr float kTextureBudgetMs = 8.f;
     static constexpr size_t kMeshesPerStep = 1;
@@ -57,6 +68,11 @@ struct LoadSession
     [[nodiscard]] bool isActive() const noexcept
     {
         return phase != LoadSessionPhase::Idle;
+    }
+
+    [[nodiscard]] bool isBusy() const noexcept
+    {
+        return isActive() || secondaryStreaming.load(std::memory_order_acquire);
     }
 
     void reset() noexcept
@@ -72,6 +88,9 @@ struct LoadSession
         stepStatus.store(0, std::memory_order_relaxed);
         stepMeshNext.store(0, std::memory_order_relaxed);
         stepTexturesRemaining.store(0, std::memory_order_relaxed);
+        teardownGpuDone.store(false, std::memory_order_relaxed);
+        deferredImportPending = false;
+        secondaryStreaming.store(false, std::memory_order_relaxed);
     }
 
     // Rough 0..100 for ProgressBar while the session is active.
@@ -81,11 +100,12 @@ struct LoadSession
         {
         case LoadSessionPhase::Idle:
             return 0;
+        case LoadSessionPhase::Teardown:
+            return 15;
         case LoadSessionPhase::Importing:
-            return 20;
+            return 30;
         case LoadSessionPhase::GpuStreaming:
         {
-            int base = 55;
             switch (streamStep)
             {
             case LoadStreamStep::Textures:
@@ -103,14 +123,14 @@ struct LoadSession
                     return 72 + int(float(meshBegin) / float(meshTotal) * 18.f);
                 return 72;
             case LoadStreamStep::Finalize:
-                return 93;
+                return 90;
             }
-            return base;
+            return 55;
         }
-        case LoadSessionPhase::FirstPresent:
-            return 96;
         case LoadSessionPhase::Finalizing:
-            return 98;
+            return 93;
+        case LoadSessionPhase::FirstPresent:
+            return 97;
         case LoadSessionPhase::Ready:
             return 100;
         }

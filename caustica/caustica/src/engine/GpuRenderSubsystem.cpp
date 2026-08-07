@@ -159,8 +159,10 @@ void GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
     m_settings->MaterialVariantIndex = 0;
     scene->requestGpuStructureSync(StructureGpuUploadMode::AccelOnly);
-    if (m_diagnostics)
-        m_diagnostics->asyncLoadingInProgress = true;
+    // Open-scene "still loading" is LoadSession::FirstPresent (wait for StructureGpu commit).
+    // OMM / opacity queue writes AppDiagnostics::asyncLoadingInProgress as RT scratch,
+    // mirrored into LoadSession::secondaryStreaming on Logic.
+    (void)m_diagnostics;
 }
 
 void GpuRenderSubsystem::shutdown()

@@ -8,10 +8,12 @@
 namespace caustica::render
 {
 
-// Host-owned diagnostics consumed by the path tracer (progress UI, benchmarks, async load).
+// Host-owned diagnostics consumed by the path tracer (progress UI, benchmarks).
 struct AppDiagnostics
 {
     ProgressBar progressInitializingRenderer;
+    // RT scratch for OMM / opacity queue; Logic mirrors into LoadSession::secondaryStreaming.
+    // Do not gate Open Scene UI on this alone — use LoadSession::isBusy().
     bool asyncLoadingInProgress = false;
     // RT feature-preset PSO readiness (updated each render frame; active during precache).
     RtPipelineWarmupStatus rtPipelineWarmup{};

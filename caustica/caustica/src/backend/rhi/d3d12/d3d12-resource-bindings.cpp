@@ -227,6 +227,15 @@ namespace caustica::rhi::d3d12
                         else if (range.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SRV && bindingType == ResourceType::RayTracingAccelStruct)
                         {
                             AccelStruct* accelStruct = checked_cast<AccelStruct*>(binding.resourceHandle);
+                            if (!accelStruct || !accelStruct->dataBuffer)
+                            {
+                                std::stringstream ss;
+                                ss << "Attempted to bind a null / incomplete ray tracing accel struct at slot t"
+                                    << binding.slot;
+                                m_Context.error(ss.str());
+                                found = false;
+                                break;
+                            }
                             accelStruct->createSRV(descriptorHandle.ptr);
                             pResource = accelStruct;
 

@@ -798,6 +798,15 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     if (!m_context->scenePasses.lighting.materials() || !m_renderTargets)
         return;
 
+    // LoadSession GpuStreaming / StructureGpu AccelOnly can present before TLAS exists.
+    // Binding a null AS crashes in AccelStruct::createSRV (dataBuffer deref).
+    if (!m_context->accelStructs.hasTopLevelAS()
+        || m_context->accelStructs.getSubInstanceBuffer() == nullptr)
+    {
+        m_bindingSet = nullptr;
+        return;
+    }
+
     caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
     caustica::rhi::Buffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.

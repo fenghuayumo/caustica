@@ -228,22 +228,21 @@ void onSceneUnloading(App& app)
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     vs->sceneTime = 0.0;
     vs->uncompressedTextures.clear();
-    // Keep Importing if a switch already started; otherwise mark teardown window.
-    if (!vs->loadSession.isActive())
-        vs->loadSession.phase = LoadSessionPhase::Importing;
     vs->loadSession.streamStep = LoadStreamStep::Textures;
     vs->loadSession.renderData = nullptr;
     vs->loadSession.stepInFlight = false;
+    vs->loadSession.teardownGpuDone.store(false, std::memory_order_release);
+    vs->loadSession.phase = LoadSessionPhase::Teardown;
     task::bumpLoadGeneration();
 
-    // Exclusive teardown window only (ADR 0001 P3) — cleared before Importing resumes present.
+    // Exclusive teardown window — cleared by tickLoadSession when RT finishes (no AndWait).
     vs->sceneGpuSuspended.store(true, std::memory_order_release);
     if (vs->progressLoading.Active())
-        vs->progressLoading.Set(15);
-    detail::sceneSwitchTrace("onSceneUnloading: draining GPU");
+        vs->progressLoading.Set(vs->loadSession.progressPercent());
+    detail::sceneSwitchTrace("onSceneUnloading: draining render queue");
 
-    // Scene::prepareForUnload mutates live ECS/resource ownership. Drain render
-    // work first, then perform that mutation in the logic domain.
+    // Scene::prepareForUnload mutates live ECS/resource ownership. Drain scheduled
+    // render work first, then mutate on Logic; GPU resource release is async on RT.
     app.waitForRenderThreadIdle();
     if (::SceneManager* manager = detail::sessionManager(app))
     {
@@ -251,8 +250,8 @@ void onSceneUnloading(App& app)
             scene->prepareForUnload();
     }
 
-    detail::sceneSwitchTrace("onSceneUnloading: GPU teardown on render thread");
-    EnqueueRenderCommandAndWait(app, [&app]() {
+    detail::sceneSwitchTrace("onSceneUnloading: enqueue GPU teardown");
+    EnqueueRenderCommand(app, [&app, vs]() {
         GpuDevice* device = gpuDevice(app);
         caustica::rhi::Device* rhi = device ? device->getDevice() : nullptr;
         // THREADING: sync-point, RT-only — never waitForIdle from the logic thread.
@@ -260,6 +259,7 @@ void onSceneUnloading(App& app)
         {
             if (device)
                 device->setShuttingDown(true);
+            vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
             return;
         }
 
@@ -274,17 +274,12 @@ void onSceneUnloading(App& app)
             rhi->waitForIdle();
             rhi->runGarbageCollection();
         }
+        vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
     });
 
-    if (vs->progressLoading.Active())
-        vs->progressLoading.Set(30);
-    detail::sceneSwitchTrace("onSceneUnloading: GPU drain complete");
-
+    // Drop logic-side active scene immediately; GPU teardown runs under suspension.
     clearActiveScene(app);
-
-    // Present / UI tick again while CPU import continues (empty scene is fine).
-    vs->sceneGpuSuspended.store(false, std::memory_order_release);
-    vs->loadSession.phase = LoadSessionPhase::Importing;
+    detail::sceneSwitchTrace("onSceneUnloading: waiting for RT teardown via LoadSession::Teardown");
 }
 
 namespace
@@ -535,11 +530,55 @@ void onSceneLoaded(App& app)
 void tickLoadSession(App& app)
 {
     SceneViewState* vs = viewState(app);
-    if (!vs || !vs->loadSession.isActive())
+    if (!vs)
         return;
 
     auto& session = vs->loadSession;
+
+    // Mirror RT OMM / opacity streaming into LoadSession (sole busy signal).
+    if (AppDiagnostics* diag = diagnostics(app))
+    {
+        session.secondaryStreaming.store(diag->asyncLoadingInProgress, std::memory_order_relaxed);
+        // Prefer session.secondaryStreaming; keep diag as RT scratch only.
+    }
+
+    if (!session.isActive())
+        return;
+
     syncLoadProgress(*vs);
+
+    if (session.phase == LoadSessionPhase::Teardown)
+    {
+        if (!session.teardownGpuDone.load(std::memory_order_acquire))
+            return;
+
+        vs->sceneGpuSuspended.store(false, std::memory_order_release);
+        session.phase = LoadSessionPhase::Importing;
+        session.teardownGpuDone.store(false, std::memory_order_relaxed);
+        syncLoadProgress(*vs);
+        detail::sceneSwitchTrace("LoadSession: Teardown complete → Importing");
+
+        if (session.deferredImportPending)
+        {
+            session.deferredImportPending = false;
+            if (::SceneManager* manager = detail::sessionManager(app))
+            {
+                detail::sceneSwitchTrace("LoadSession: starting deferred CPU import");
+                manager->setAsyncLoadingEnabled(true);
+                manager->beginLoadingScene(
+                    std::make_shared<caustica::NativeFileSystem>(),
+                    manager->getCurrentScenePath());
+                if (!manager->isSceneLoading() && manager->getScene() == nullptr)
+                {
+                    caustica::error("Unable to load deferred scene");
+                    manager->clearScene();
+                    clearActiveScene(app);
+                    abortLoadSession(*vs);
+                }
+            }
+        }
+        return;
+    }
 
     if (session.phase == LoadSessionPhase::Importing)
         return; // CPU worker; onSceneLoaded advances to GpuStreaming
@@ -565,6 +604,7 @@ void tickLoadSession(App& app)
 
         PathTracerSettings* cfg = settings(app);
         const CommandLineOptions* cmd = cmdLine(app);
+        // LoadSession owns orchestration; GpuRenderSubsystem is the RT/logic step executor.
         gr->finishLoadedScene(*data); // requests StructureGpu AccelOnly
         collectUncompressedTextures(app);
         if (cfg && cmd)
@@ -576,15 +616,34 @@ void tickLoadSession(App& app)
         if (CameraController* cam = cameraController(app))
             cam->syncPreviousViewFromCurrent();
 
-        session.phase = LoadSessionPhase::Ready;
+        session.phase = LoadSessionPhase::FirstPresent;
         syncLoadProgress(*vs);
+        detail::sceneSwitchTrace("LoadSession: Finalizing → FirstPresent (wait StructureGpu)");
         return;
     }
 
     if (session.phase == LoadSessionPhase::FirstPresent)
     {
-        // Present already restored; Extract will enqueue StructureGpu. Move to logic finish.
-        session.phase = LoadSessionPhase::Finalizing;
+        // Hold progress until StructureGpu AccelOnly finishes (committed serve ready).
+        const std::shared_ptr<Scene> scene = activeScene(app);
+        if (!scene)
+        {
+            abortLoadSession(*vs);
+            return;
+        }
+        if (scene->needsGpuStructureSync() || scene->structureGpuBuildInFlight())
+        {
+            syncLoadProgress(*vs);
+            return;
+        }
+        if (!scene->committedRenderData())
+        {
+            // Extract may still freeze/enqueue this frame; wait one more tick.
+            syncLoadProgress(*vs);
+            return;
+        }
+
+        session.phase = LoadSessionPhase::Ready;
         syncLoadProgress(*vs);
         return;
     }
@@ -637,7 +696,7 @@ void tickLoadSession(App& app)
             break;
         }
         case LoadStreamStep::Finalize:
-            session.phase = LoadSessionPhase::FirstPresent;
+            session.phase = LoadSessionPhase::Finalizing;
             syncLoadProgress(*vs);
             return;
         }
@@ -744,16 +803,13 @@ void collectUncompressedTextures(App& app)
 
 bool hasAsyncLoadingInProgress(const App& app)
 {
-    if (const SceneViewState* vs = viewState(app); vs && vs->loadSession.isActive())
+    if (const SceneViewState* vs = viewState(app); vs && vs->loadSession.isBusy())
         return true;
 
-    AppDiagnostics* diag = diagnostics(app);
     RenderRuntimeState* runtime = runtimeState(app);
-    if (!diag || !runtime)
+    if (!runtime)
         return false;
-    // Opacity-map / shader refresh still use the diag flag outside LoadSession.
-    return diag->asyncLoadingInProgress
-        || runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0;
+    return runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0;
 }
 
 void sceneSwitchTrace(const char* fmt, ...)

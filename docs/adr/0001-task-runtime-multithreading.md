@@ -266,7 +266,7 @@ Rules:
 2. [x] Budgeted texture/mesh upload via non-blocking `EnqueueRenderCommand` (+ R1 `StreamingUploadBudget` fences).
 3. [x] Narrow `sceneGpuSuspended` to teardown window; present resumes for Importing/GpuStreaming.
 4. [x] FirstPresent → StructureGpu `AccelOnly` (shared committed-serve path; no mesh re-upload).
-5. [x] Progress / switch gates read `LoadSession`; `asyncLoadingInProgress` only for opacity/shader refresh outside session.
+5. [x] Progress / switch gates read `LoadSession::isBusy()`; OMM uses `secondaryStreaming` (diag scratch mirrored); FirstPresent waits StructureGpu commit; Teardown is async enqueue + poll (no AndWait).
 
 **Exit:** large scene open keeps UI/render ticking; no multi-second hard freeze from bind steps.
 

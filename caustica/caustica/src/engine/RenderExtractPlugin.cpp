@@ -35,8 +35,12 @@ void prepareRenderFrame(App& app)
         || isSceneLoading(app);
     if (vs && !sceneSwitchInFlight)
         vs->progressLoading.stop();
-    if (diag && !loadSessionActive && !sceneSwitchInFlight)
+    // Clear RT OMM scratch when no Open Scene session; secondaryStreaming is re-mirrored
+    // from diag after the render phase if opacity builds remain.
+    if (diag && !loadSessionActive)
         diag->asyncLoadingInProgress = false;
+    if (vs && !loadSessionActive && !(diag && diag->asyncLoadingInProgress))
+        vs->loadSession.secondaryStreaming.store(false, std::memory_order_relaxed);
 
     const std::shared_ptr<Scene> scene = activeScene(app);
     auto endChangeDetection = [&]() {

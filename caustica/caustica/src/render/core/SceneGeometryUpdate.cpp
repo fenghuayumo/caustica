@@ -67,7 +67,11 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
 {
     caustica::rhi::CommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;
-    if (scene == nullptr)
+    if (scene == nullptr || commandList == nullptr)
+        return;
+
+    // StructureGpu cold start / AccelOnly: committed serve may be null while build is in flight.
+    if (params.renderData == nullptr)
         return;
 
     const scene::SceneRenderData& renderData = resolveRenderData(params);
