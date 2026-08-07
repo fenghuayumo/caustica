@@ -125,9 +125,9 @@ While `structureGpuBuildInFlight()`:
 - RT commits with `finishStructureGpuBuild` after binding-set recreate
 
 First structure publish with no committed packet enqueues async build; WorldRenderer serves
-null structure (empty/placeholder present) until commit. `flushPendingStructureGpuSync` is
-deprecated. Full scene open uses `LoadSession` budgeted GpuStreaming + StructureGpu
-`AccelOnly` (same committed-serve path as runtime spawn).
+null structure (empty/placeholder present) until commit. Full scene open uses `LoadSession`
+budgeted GpuStreaming + StructureGpu `AccelOnly` (same committed-serve path as runtime spawn).
+Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps it).
 
 ## Current status and boundaries
 
@@ -137,7 +137,7 @@ deprecated. Full scene open uses `LoadSession` budgeted GpuStreaming + Structure
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
 | Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
-| TaskRuntime + Logic→RT enqueue | P1 landed — `caustica::task`, sole `EnqueueRenderCommand*`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| TaskRuntime + Logic→RT enqueue | Landed — `caustica::task`, sole `EnqueueRenderCommand*` → `Affinity::Render`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | LoadSession amortized streaming | P3 landed — `LoadSession` / `tickLoadSession`; present during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |

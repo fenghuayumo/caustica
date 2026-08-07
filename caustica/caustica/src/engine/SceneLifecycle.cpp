@@ -457,17 +457,27 @@ bool pollLoadStreamStep(LoadSession& session)
     return false;
 }
 
-void beginLoadStreamStep(App& app, LoadSession& session, std::function<void()> body)
+void beginLoadStreamStep(App& /*app*/, LoadSession& session, std::function<void()> body)
 {
     session.stepStatus.store(0, std::memory_order_release);
     session.stepInFlight = true;
-    EnqueueRenderCommand(app, [body = std::move(body), &session]() {
+
+    // Formal LoadSession pipe + Render affinity (ADR 0001). Serialized with other
+    // LoadSession-pipe work; executed by pumpRender on the render domain.
+    task::TaskDesc desc;
+    desc.name = "LoadSession.StreamStep";
+    desc.priority = task::Priority::High;
+    desc.affinity = task::Affinity::Render;
+    desc.pipe = task::loadSessionPipe();
+    task::stampLoadGeneration(desc);
+    desc.body = [body = std::move(body), &session]() {
         body();
         // body sets stepStatus to ok/fail; default ok if left pending.
         uint8_t expected = 0;
         session.stepStatus.compare_exchange_strong(
             expected, 1, std::memory_order_release, std::memory_order_relaxed);
-    });
+    };
+    (void)task::launch(std::move(desc));
 }
 
 } // namespace

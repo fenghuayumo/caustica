@@ -91,7 +91,7 @@ void prepareRenderFrame(App& app)
 
     // Cold start (no committed serve target): still enqueue. WorldRenderer serves
     // nullptr structure while the build is in flight (empty/placeholder present).
-    // Do not flushPendingStructureGpuSync — ADR 0001 P2.
+    // Structure cold start: enqueue-only + empty present (ADR 0001 P2).
     enqueuePendingStructureGpu(app);
 }
 

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **Accepted**; P1–P3 + R1 upload fences landed (R2/R3 follow) |
+| Status | **Accepted**; P1–P3 + R1 + domain pumps / LoadSession pipe / sole Affinity::Render Logic→RT queue landed (R2/R3 follow) |
 | Date | 2026-08-07 |
 | Deciders | Caustica engine |
 | Relates | [architecture-render-proxy.md](../architecture-render-proxy.md), [architecture-rhi-threading.md](../architecture-rhi-threading.md) |
@@ -51,10 +51,10 @@ Required semantics (implementation may start with mutex queues; lock-free steal 
 | Dependencies | prerequisite / subsequent (or equivalent fence chaining) |
 | Pipe | tasks on the same `Pipe` run serially in submission order |
 | Priority | at least `High` / `Normal` / `Background` (frame record must not starve under load decode) |
-| Affinity | `Any` \| `Logic` \| `Render` \| `IO` (IO optional in P1) |
+| Affinity | `Any` \| `Logic` (`pumpLogic`) \| `Render` (`pumpRender`) \| `IO` (dedicated worker) |
 | Wait / poll | `wait(handle)`, `poll(handle)`, context/group wait |
 | Generation | `FrameGen` / `LoadGen` so abandoned work can be discarded |
-| Observability | task name, queue depth, wait time (Tracy or internal counters) |
+| Observability | `snapshotStats()` queue depths + LoadSession phase in editor Debugging panel |
 
 Conceptual API (names may shift; shape must not):
 
@@ -72,7 +72,9 @@ struct TaskDesc {
     Affinity affinity = Affinity::Any;
     Pipe* pipe = nullptr;          // if set, serializes with other tasks on this pipe
     uint64_t generation = 0;       // FrameGen / LoadGen; 0 = immortal
-    std::function<void()> body;    // P1 may keep std::function; P1.1 can add fixed jobs
+    TaskFn fn = nullptr;           // P1.1 fixed job (preferred)
+    void* user = nullptr;
+    std::function<void()> body;    // capture-heavy / legacy
 };
 
 TaskHandle launch(TaskDesc);
@@ -152,19 +154,16 @@ Rules:
 
 | Symbol | Path | Fate |
 | --- | --- | --- |
-| `JobSystem::*` | `caustica/caustica/include/core/JobSystem.h`, `src/core/JobSystem.cpp` | Replace with TaskRuntime; keep thin shim only during migration |
-| `ThreadPool` / `ThreadPoolTask` | `include/core/ThreadPool.h`, `src/core/ThreadPool.cpp` | **Delete** after call sites migrate |
-| `JobSystem::Initialize` | `src/engine/EntryPoint.cpp` | → `task::initialize` |
+| `JobSystem::*` / `ThreadPool` | (removed) | Deleted; sole scheduler is `caustica::task` |
 
 ### Logic → Render
 
 | Symbol | Path | Fate |
 | --- | --- | --- |
-| `RenderThread` | `include/engine/RenderThread.h` | Keep as Render-pipe executor (dedicated thread optional) |
-| `EnqueueRenderCommand*` | `include/engine/EnqueueRenderCommand.h` | **Keep as sole public API** |
-| `App::enqueueGpuWork*` / `runGpuWork*` | `include/engine/App.h` | Deprecate → remove |
-| `enqueueGpuWorkOnRenderThread(App&)` | `RenderSessionApi` | Deprecate → remove |
-| `GpuDevice::waitForRenderThreadIdle` | device / frame driver | Route through one wait helper |
+| `RenderThread` | `include/engine/RenderThread.h` | Dedicated OS thread that **only** pumps `Affinity::Render` (+ frame in-flight pacing); no side `m_queue` |
+| `EnqueueRenderCommand*` | `include/engine/EnqueueRenderCommand.h` | **Keep as sole public API** → launches Affinity::Render |
+| `App::enqueueGpuWork*` / `runGpuWork*` | `include/engine/App.h` | Private impl behind `EnqueueRenderCommand*` |
+| `GpuDevice::waitForRenderThreadIdle` | device / frame driver | Drains Affinity::Render (+ paced in-flight) |
 
 ### Frame / structure
 
@@ -172,7 +171,7 @@ Rules:
 | --- | --- | --- |
 | `SceneRenderSnapshot` | `include/scene/SceneRenderSnapshot.h` | Keep |
 | `SceneStructureGpuSync` | `include/scene/SceneStructureGpu.h` | Keep; become default for full load too |
-| `enqueuePendingStructureGpu` / `flushPendingStructureGpuSync` | `src/engine/SceneSpawn.cpp` | Prefer enqueue; retire sync flush |
+| `enqueuePendingStructureGpu` | `src/engine/SceneSpawn.cpp` | Keep; sync flush removed |
 | `GraphBuilder` + `parallelWaves` | `include/render/graph/GraphBuilder.h` | Keep; dispatch via TaskRuntime |
 | `FrameCommandContext` | `include/backend/rhi/command_list_pool.h` | Keep |
 | Volatile CB rewrite | `GraphBuilder::addVolatileConstantRewrite` | Keep until R2 binder |
@@ -255,10 +254,11 @@ Rules:
 
 1. [x] `RenderThread` pumps `task::Affinity::Render` (dedicated thread remains default; `--syncRender` pumps in `executeRenderPhase`).
 2. [x] One GC path: end of `executeRenderPhase` only (removed sync-only GC from `finalizeFrameTiming`).
-3. [x] Structure cold start enqueue-only + empty present; `flushPendingStructureGpuSync` `[[deprecated]]` and unused.
+3. [x] Structure cold start enqueue-only + empty present; `flushPendingStructureGpuSync` removed.
 4. [x] Unify `isRenderThread` → `ThreadDomain::Render` (`RenderThread::isRenderThread` delegates to free function).
+5. [x] Sole Logic→RT queue: `RenderThread::dispatch` / `--syncRender` enqueue → `Affinity::Render` (no parallel `m_queue`).
 
-**Exit:** no dual GC; structure sync flush deprecated/unused.
+**Exit:** no dual GC; one Affinity::Render domain for frames + LoadSession + commands.
 
 ### P3 — LoadSession amortized streaming
 
@@ -269,6 +269,15 @@ Rules:
 5. [x] Progress / switch gates read `LoadSession::isBusy()`; OMM uses `secondaryStreaming` (diag scratch mirrored); FirstPresent waits StructureGpu commit; Teardown is async enqueue + poll (no AndWait).
 
 **Exit:** large scene open keeps UI/render ticking; no multi-second hard freeze from bind steps.
+
+### P1 follow-up — domain pumps / pipes / observability (landed)
+
+1. [x] `Affinity::Logic` / `Affinity::IO` own queues; `pumpLogic()` each App update; dedicated IO worker(s).
+2. [x] Well-known pipes registered at `task::initialize`: `LoadSession`, `Logic`, `RHI.Submit`.
+3. [x] LoadSession import (`SceneLoader`) + GpuStreaming steps launch on `loadSessionPipe()` with `stampLoadGeneration`.
+4. [x] P1.1 `TaskFn` + `void* user` on `TaskDesc` (alongside `std::function` body).
+5. [x] Texture / audio async decode: `Affinity::IO` + Load generation stamp.
+6. [x] Editor Debugging → TaskRuntime / LoadSession queue depths + phase (success metric).
 
 ### P4 — RHI deepen (may split ADRs)
 
@@ -292,7 +301,7 @@ Rules:
 | Load UX | Logic + present continue during GpuStreaming (P3) |
 | Correctness | No Streamline/AS hard-hang on scene switch; PIX `--syncRender` green |
 | Perf | P1 may be neutral; P3 reduces hitch length / peak stall ms during large open |
-| Observability | Queue depth + load session phase visible in debug UI or log |
+| Observability | Queue depth + load session phase visible in debug UI or log — **landed** (Debugging → TaskRuntime / LoadSession) |
 
 ## References
 

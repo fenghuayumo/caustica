@@ -25,13 +25,8 @@ void RenderThread::start()
     {
         std::lock_guard lock(m_mutex);
         m_stop = false;
-        m_queue.clear();
-        m_syncPending = false;
-        m_syncDone = false;
+        m_inFlight = 0;
     }
-    m_syncTask = nullptr;
-    m_inFlight = 0;
-    m_executing = false;
 
     {
         std::lock_guard lock(m_completionMutex);
@@ -93,14 +88,28 @@ void RenderThread::dispatch(std::function<void()> task)
         return;
     }
 
-    std::unique_lock lock(m_mutex);
-    m_cv.wait(lock, [this] { return m_inFlight < kMaxInFlightFrames || m_stop; });
-    if (m_stop)
-        return;
+    {
+        std::unique_lock lock(m_mutex);
+        m_cv.wait(lock, [this] { return m_inFlight < kMaxInFlightFrames || m_stop; });
+        if (m_stop)
+            return;
+        ++m_inFlight;
+    }
 
-    m_queue.push_back(std::move(task));
-    ++m_inFlight;
-    m_cv.notify_one();
+    task::TaskDesc desc;
+    desc.name = "RenderThread.Dispatch";
+    desc.priority = task::Priority::High;
+    desc.affinity = task::Affinity::Render;
+    desc.body = [this, body = std::move(task)]() {
+        body();
+        {
+            std::lock_guard lock(m_mutex);
+            assert(m_inFlight > 0);
+            --m_inFlight;
+        }
+        m_cv.notify_all();
+    };
+    (void)task::launch(std::move(desc));
 }
 
 void RenderThread::dispatchAndWait(std::function<void()> task)
@@ -122,14 +131,13 @@ void RenderThread::dispatchAndWait(std::function<void()> task)
 
     waitForIdle();
 
-    std::unique_lock lock(m_mutex);
-    assert(!m_syncPending && "RenderThread: nested dispatchAndWait is not supported");
-    m_syncTask = std::move(task);
-    m_syncDone = false;
-    m_syncPending = true;
-    m_cv.notify_one();
-    m_cv.wait(lock, [this] { return m_syncDone; });
-    m_syncTask = nullptr;
+    task::TaskDesc desc;
+    desc.name = "RenderThread.Sync";
+    desc.priority = task::Priority::Critical;
+    desc.affinity = task::Affinity::Render;
+    desc.body = std::move(task);
+    task::TaskHandle handle = task::launch(std::move(desc));
+    task::wait(handle);
 }
 
 void RenderThread::waitForIdle()
@@ -145,8 +153,7 @@ void RenderThread::waitForIdle()
 
     std::unique_lock lock(m_mutex);
     m_cv.wait(lock, [this] {
-        return m_queue.empty() && !m_executing && m_inFlight == 0 && !m_syncPending
-            && !task::isRenderDomainBusy();
+        return m_inFlight == 0 && !task::isRenderDomainBusy();
     });
 }
 
@@ -176,52 +183,15 @@ void RenderThread::threadMain()
     while (true)
     {
         m_cv.wait(lock, [this] {
-            return m_stop || m_syncPending || !m_queue.empty() || task::isRenderDomainBusy();
+            return m_stop || task::isRenderDomainBusy();
         });
 
-        if (m_stop && !m_syncPending && m_queue.empty() && !task::isRenderDomainBusy())
+        if (m_stop && !task::isRenderDomainBusy())
             break;
 
-        // Pump Affinity::Render tasks before frame/sync work (ADR 0001 P2).
-        if (task::isRenderDomainBusy())
-        {
-            lock.unlock();
-            task::pumpRender();
-            lock.lock();
-            m_cv.notify_all();
-            continue;
-        }
-
-        if (m_syncPending)
-        {
-            std::function<void()> task = std::move(m_syncTask);
-            m_syncPending = false;
-            lock.unlock();
-
-            task();
-            task::pumpRender();
-
-            lock.lock();
-            m_syncDone = true;
-            m_cv.notify_one();
-            continue;
-        }
-
-        if (m_queue.empty())
-            continue;
-
-        std::function<void()> task = std::move(m_queue.front());
-        m_queue.pop_front();
-        m_executing = true;
         lock.unlock();
-
-        task();
         task::pumpRender();
-
         lock.lock();
-        m_executing = false;
-        assert(m_inFlight > 0);
-        --m_inFlight;
         m_cv.notify_all();
     }
 

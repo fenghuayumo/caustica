@@ -400,12 +400,21 @@ void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
         return;
 
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
-        m_renderThread.dispatchAndWait(work);
-    else
     {
-        const ThreadDomainScope renderDomain(ThreadDomain::Render);
-        work();
+        m_renderThread.dispatchAndWait(work);
+        return;
     }
+
+    // --syncRender: Logic thread pumps the sole Affinity::Render domain queue.
+    const ThreadDomainScope renderDomain(ThreadDomain::Render);
+    task::TaskDesc desc;
+    desc.name = "SyncRender.Command";
+    desc.priority = task::Priority::Critical;
+    desc.affinity = task::Affinity::Render;
+    desc.body = work;
+    task::TaskHandle handle = task::launch(std::move(desc));
+    while (!task::poll(handle))
+        task::pumpRender();
 }
 
 void App::enqueueGpuWorkOnRenderThread(const std::function<void()>& work)
@@ -414,12 +423,20 @@ void App::enqueueGpuWorkOnRenderThread(const std::function<void()>& work)
         return;
 
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
-        m_renderThread.dispatch(work);
-    else
     {
-        const ThreadDomainScope renderDomain(ThreadDomain::Render);
-        work();
+        m_renderThread.dispatch(work);
+        return;
     }
+
+    // --syncRender: same Affinity::Render queue as LoadSession / dedicated RT.
+    const ThreadDomainScope renderDomain(ThreadDomain::Render);
+    task::TaskDesc desc;
+    desc.name = "SyncRender.Command";
+    desc.priority = task::Priority::High;
+    desc.affinity = task::Affinity::Render;
+    desc.body = work;
+    (void)task::launch(std::move(desc));
+    task::pumpRender();
 }
 
 void App::requestExit()
@@ -761,6 +778,9 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
 
     if (scheduleContext.runUpdate)
     {
+        // Affinity::Logic domain pump (ADR 0001) — before First/update systems.
+        task::pumpLogic();
+
         // Collapse focus to "actually presenting" so camera/anim pause when not
         // drawing — but keep systems pumping while sceneGpuSuspended skips render
         // (async scene import joins via updateLoading).

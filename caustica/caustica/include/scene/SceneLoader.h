@@ -1,22 +1,22 @@
 #pragma once
 
+#include <core/task/TaskRuntime.h>
 #include <core/vfs/VFS.h>
 
 #include <atomic>
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <thread>
 
 namespace caustica
 {
 
 // =============================================================================
-// SceneLoader — async/sync scene loading with thread management.
+// SceneLoader — async/sync scene loading via TaskRuntime (ADR 0001).
 //
-// Owns the loading thread and loading state. The actual load work is
+// Owns the load TaskHandle and loading state. The actual load work is
 // injected via setLoadFunc(). Call update() once per frame to join a
-// finished thread and fire the onLoaded callback.
+// finished task and fire the onLoaded callback.
 //
 // SceneManager wires this as:
 //   setLoadFunc → load into m_pendingScene (worker must not publish m_scene)
@@ -41,19 +41,19 @@ public:
 
     // --- State ---
     bool isLoaded() const { return m_loaded.load(std::memory_order_acquire); }
-    bool isLoading() const { return m_thread != nullptr; }
+    bool isLoading() const { return static_cast<bool>(m_task); }
 
     // --- Lifecycle ---
     //
-    // Starts loading.  In async mode, spawns a thread and returns immediately;
-    // the caller should poll update() each frame.  In sync mode the load
-    // function runs on the calling thread and the function returns with the
-    // work already done (isLoaded() will be true, but onLoaded is NOT fired
-    // automatically — the caller decides when to invoke it).
+    // Starts loading.  In async mode, launches Affinity::IO on the LoadSession
+    // pipe and returns immediately; the caller should poll update() each frame.
+    // In sync mode the load function runs on the calling thread and the function
+    // returns with the work already done (isLoaded() will be true, but onLoaded
+    // is NOT fired automatically — the caller decides when to invoke it).
     void beginLoading(std::shared_ptr<IFileSystem> fs,
         const std::filesystem::path& path);
 
-    // Call once per frame.  If an async load completed, joins the thread
+    // Call once per frame.  If an async load completed, clears the task
     // and fires onLoaded().
     void update();
 
@@ -65,8 +65,8 @@ public:
     std::function<void()> onUnloading;
 
 private:
-    LoadFunc                       m_loadFunc;
-    std::unique_ptr<std::thread>    m_thread;
+    LoadFunc m_loadFunc;
+    task::TaskHandle m_task;
     std::atomic<bool> m_loaded{false};
     std::atomic<bool> m_loadFinished{false};
     bool m_asyncLoad = true;

@@ -7,8 +7,8 @@ namespace caustica
 
 SceneLoader::~SceneLoader()
 {
-    if (m_thread && m_thread->joinable())
-        m_thread->join();
+    if (m_task)
+        task::wait(m_task);
 }
 
 void SceneLoader::beginLoading(std::shared_ptr<IFileSystem> fs,
@@ -24,14 +24,19 @@ void SceneLoader::beginLoading(std::shared_ptr<IFileSystem> fs,
 
     if (m_asyncLoad)
     {
-        m_thread = std::make_unique<std::thread>(
-            [this, fs = std::move(fs), path]() mutable
-            {
-                const bool ok = m_loadFunc(std::move(fs), path);
-                m_loaded.store(ok, std::memory_order_release);
-                // Always signal completion so update() can join failed loads too.
-                m_loadFinished.store(true, std::memory_order_release);
-            });
+        task::TaskDesc desc;
+        desc.name = "LoadSession.Import";
+        desc.priority = task::Priority::Background;
+        desc.affinity = task::Affinity::IO;
+        desc.pipe = task::loadSessionPipe();
+        task::stampLoadGeneration(desc);
+        desc.body = [this, fs = std::move(fs), path]() mutable {
+            const bool ok = m_loadFunc(std::move(fs), path);
+            m_loaded.store(ok, std::memory_order_release);
+            // Always signal completion so update() can clear failed loads too.
+            m_loadFinished.store(true, std::memory_order_release);
+        };
+        m_task = task::launch(std::move(desc));
     }
     else
     {
@@ -43,21 +48,24 @@ void SceneLoader::beginLoading(std::shared_ptr<IFileSystem> fs,
 
 void SceneLoader::update()
 {
-    if (m_loadFinished.load(std::memory_order_acquire) && m_thread && m_thread->joinable())
-    {
-        m_thread->join();
-        m_thread = nullptr;
+    if (!m_task)
+        return;
+    if (!task::poll(m_task))
+        return;
 
-        if (m_loaded.load(std::memory_order_acquire) && onLoaded)
-            onLoaded();
-    }
+    m_task = {};
+
+    if (m_loaded.load(std::memory_order_acquire) && onLoaded)
+        onLoaded();
 }
 
 void SceneLoader::reset()
 {
-    if (m_thread && m_thread->joinable())
-        m_thread->join();
-    m_thread = nullptr;
+    if (m_task)
+    {
+        task::wait(m_task);
+        m_task = {};
+    }
     m_loaded.store(false, std::memory_order_release);
     m_loadFinished.store(false, std::memory_order_release);
 }

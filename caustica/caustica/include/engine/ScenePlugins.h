@@ -53,8 +53,5 @@ void refreshEntityWorld(App& app, uint32_t frameIndex);
 // Applications must not call this -- spawn/despawn only mark dirty; Extract enqueues.
 // Returns false when a prior structure build is still in flight (pending flag kept).
 bool enqueuePendingStructureGpu(App& app);
-// Deprecated (ADR 0001 P2): cold start uses enqueue + empty present. Prefer enqueuePendingStructureGpu.
-[[deprecated("Use enqueuePendingStructureGpu; cold start no longer needs a sync flush")]]
-void flushPendingStructureGpuSync(App& app);
 
 } // namespace caustica

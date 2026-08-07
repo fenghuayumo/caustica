@@ -127,34 +127,6 @@ bool enqueuePendingStructureGpu(App& app)
     return true;
 }
 
-void flushPendingStructureGpuSync(App& app)
-{
-    render::WorldRenderer* worldRendererResource = worldRenderer(app);
-    GpuSharedCaches* caches = gpuSharedCaches(app);
-    GpuDevice* device = gpuDevice(app);
-    auto scenePtr = activeScene(app);
-    if (!worldRendererResource || !caches || !device || !scenePtr || !scenePtr->needsGpuStructureSync())
-        return;
-
-    if (scenePtr->structureGpuBuildInFlight())
-        return;
-
-    const uint32_t frameIndex = device->getPreparedRenderFrameIndex();
-    assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
-
-    auto gpuSetupData = std::make_shared<const scene::SceneRenderData>(
-        scenePtr->getRenderDataForFrame(frameIndex));
-    const StructureGpuUploadMode uploadMode = scenePtr->structureGpuUploadMode();
-
-    scenePtr->beginStructureGpuBuild();
-    scenePtr->clearGpuStructureSyncRequest();
-
-    EnqueueRenderCommandAndWait(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode]() {
-        runStructureGpuBuild(
-            worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode);
-    });
-}
-
 Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
 {
     AssetSystem* assets = app.tryResource<AssetSystem>();

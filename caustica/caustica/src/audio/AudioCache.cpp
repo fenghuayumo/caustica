@@ -197,7 +197,8 @@ std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesy
     task::TaskDesc desc;
     desc.name = "Audio.LoadFile";
     desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::Any;
+    desc.affinity = task::Affinity::IO;
+    task::stampLoadGeneration(desc);
     desc.body = [this, path]()
     {
         if (auto loaded = loadAudioFile(path))

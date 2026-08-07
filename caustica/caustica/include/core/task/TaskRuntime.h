@@ -9,10 +9,11 @@
 // caustica::task — product-facing TaskRuntime (ADR 0001)
 //
 // Sole scheduler hub for background / parallel work.
-// Affinity::Any (+ optional Pipe) runs on worker threads.
-// Affinity::Render is pumped on the render domain via pumpRender() (ADR 0001 P2)
-// — call from RenderThread::threadMain and sync executeRenderPhase.
-// Affinity::Logic / IO currently share Any workers (domain pumps TBD).
+//   Affinity::Any    — worker pool
+//   Affinity::Logic  — pumpLogic() on the Logic thread (App update)
+//   Affinity::Render — pumpRender() on the render domain
+//   Affinity::IO     — dedicated IO worker(s)
+// Well-known pipes (created at initialize): "LoadSession", "Logic", "RHI.Submit".
 // =============================================================================
 
 namespace caustica::task
@@ -61,6 +62,9 @@ private:
     std::shared_ptr<void> m_state;
 };
 
+// P1.1 fixed job — preferred over std::function when the callee is a plain function.
+using TaskFn = void (*)(void* user);
+
 struct TaskDesc
 {
     const char* name = nullptr;
@@ -72,7 +76,23 @@ struct TaskDesc
     uint64_t generation = 0;
     enum class GenerationDomain : uint8_t { Frame, Load } generationDomain =
         GenerationDomain::Frame;
+
+    // Prefer fn when set; otherwise body (legacy / capture-heavy work).
+    TaskFn fn = nullptr;
+    void* user = nullptr;
     std::function<void()> body;
+};
+
+struct RuntimeStats
+{
+    uint32_t anyQueued = 0;
+    uint32_t logicQueued = 0;
+    uint32_t renderQueued = 0;
+    uint32_t ioQueued = 0;
+    uint32_t workerCount = 0;
+    uint32_t ioWorkerCount = 0;
+    uint64_t frameGeneration = 0;
+    uint64_t loadGeneration = 0;
 };
 
 void initialize(uint32_t numWorkers = 0, uint32_t reservedThreads = 1);
@@ -81,29 +101,57 @@ void shutdown();
 [[nodiscard]] uint32_t workerCount();
 
 [[nodiscard]] Pipe* getPipe(const char* name);
+// Well-known pipes (non-null after initialize).
+[[nodiscard]] Pipe* loadSessionPipe();
+[[nodiscard]] Pipe* logicPipe();
+[[nodiscard]] Pipe* rhiSubmitPipe();
 
 [[nodiscard]] TaskHandle create(TaskDesc desc);
 void submit(TaskHandle handle);
 [[nodiscard]] TaskHandle launch(TaskDesc desc);
 
+// Convenience: fixed-job launch without filling TaskDesc by hand.
+[[nodiscard]] TaskHandle launch(
+    const char* name,
+    Priority priority,
+    Affinity affinity,
+    TaskFn fn,
+    void* user,
+    Pipe* pipe = nullptr,
+    uint64_t generation = 0,
+    TaskDesc::GenerationDomain generationDomain = TaskDesc::GenerationDomain::Frame);
+
 void then(TaskHandle prerequisite, TaskHandle subsequent);
 
-void wait(TaskHandle handle);
-[[nodiscard]] bool poll(TaskHandle handle);
+void wait(TaskHandle);
+[[nodiscard]] bool poll(TaskHandle);
 
 void helpOnce();
 
-// --- Render domain queue (Affinity::Render) --------------------------------
-// Optional wake when a Render task is queued (e.g. RenderThread::wake).
+// --- Domain pumps ----------------------------------------------------------
 void setRenderWake(std::function<void()> wake);
-// Run pending Affinity::Render tasks on the calling thread (must be render domain).
 void pumpRender();
 [[nodiscard]] bool isRenderDomainBusy();
+
+// Call from the Logic thread once per App update tick.
+void pumpLogic();
+[[nodiscard]] bool isLogicDomainBusy();
+
+[[nodiscard]] bool isIoDomainBusy();
+
+[[nodiscard]] RuntimeStats snapshotStats();
 
 [[nodiscard]] uint64_t frameGeneration();
 void bumpFrameGeneration();
 [[nodiscard]] uint64_t loadGeneration();
 void bumpLoadGeneration();
+
+// Stamp current Load generation onto a desc (scene-switch cancellation).
+inline void stampLoadGeneration(TaskDesc& desc)
+{
+    desc.generation = loadGeneration();
+    desc.generationDomain = TaskDesc::GenerationDomain::Load;
+}
 
 struct Group
 {

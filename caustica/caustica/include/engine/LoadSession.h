@@ -25,6 +25,21 @@ enum class LoadSessionPhase : uint8_t
     Ready,         // terminal → cleared to Idle same tick
 };
 
+[[nodiscard]] inline const char* loadSessionPhaseName(LoadSessionPhase phase) noexcept
+{
+    switch (phase)
+    {
+    case LoadSessionPhase::Idle: return "Idle";
+    case LoadSessionPhase::Teardown: return "Teardown";
+    case LoadSessionPhase::Importing: return "Importing";
+    case LoadSessionPhase::GpuStreaming: return "GpuStreaming";
+    case LoadSessionPhase::Finalizing: return "Finalizing";
+    case LoadSessionPhase::FirstPresent: return "FirstPresent";
+    case LoadSessionPhase::Ready: return "Ready";
+    }
+    return "?";
+}
+
 // Internal GpuStreaming substeps (not part of the public phase enum).
 enum class LoadStreamStep : uint8_t
 {

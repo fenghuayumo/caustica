@@ -5,6 +5,8 @@
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/LoadSession.h>
+#include <core/task/TaskRuntime.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
@@ -239,6 +241,33 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 
                 ImGui::Checkbox("Discard path (non-NEE) lighting", &m_settings.DbgDiscardNonNEELighting);
                 ImGui::Checkbox("Discard NEE lighting", &m_settings.DbgDiscardNEELighting);
+            }
+
+            if (ImGui::CollapsingHeader("TaskRuntime / LoadSession"))
+            {
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+
+                const task::RuntimeStats stats = task::snapshotStats();
+                ImGui::Text("Workers: Any %u  IO %u", stats.workerCount, stats.ioWorkerCount);
+                ImGui::Text("Queued: Any %u  Logic %u  Render %u  IO %u",
+                    stats.anyQueued, stats.logicQueued, stats.renderQueued, stats.ioQueued);
+                ImGui::Text("Generation: Frame %llu  Load %llu",
+                    (unsigned long long)stats.frameGeneration,
+                    (unsigned long long)stats.loadGeneration);
+
+                const LoadSession& session = m_sceneEditor.viewState().loadSession;
+                ImGui::Text("LoadSession: %s  busy=%s  progress=%d%%",
+                    loadSessionPhaseName(session.phase),
+                    session.isBusy() ? "yes" : "no",
+                    session.progressPercent());
+                if (session.phase == LoadSessionPhase::GpuStreaming)
+                {
+                    ImGui::Text("  stream step=%u  textures rem=%zu  meshes %zu/%zu  inFlight=%s",
+                        (unsigned)session.streamStep,
+                        session.stepTexturesRemaining.load(std::memory_order_relaxed),
+                        session.meshBegin, session.meshTotal,
+                        session.stepInFlight ? "yes" : "no");
+                }
             }
 
 

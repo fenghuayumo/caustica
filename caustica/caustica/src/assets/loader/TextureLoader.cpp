@@ -363,7 +363,8 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     task::TaskDesc desc;
     desc.name = "Texture.DecodeFile";
     desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::Any;
+    desc.affinity = task::Affinity::IO;
+    task::stampLoadGeneration(desc);
     desc.body = [this, texture, path]() {
         auto fileData = readTextureFile(path);
         if (fileData)
@@ -402,7 +403,8 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     task::TaskDesc desc;
     desc.name = "Texture.DecodeMemory";
     desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::Any;
+    desc.affinity = task::Affinity::IO;
+    task::stampLoadGeneration(desc);
     desc.body = [this, texture, data, mimeType]() {
         if (fillTextureData(data, texture, "", mimeType))
         {
