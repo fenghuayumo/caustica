@@ -630,7 +630,7 @@ bool GltfImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader& textureCache,
     SceneLoadingStats& stats,
-    ThreadPool* threadPool,
+    bool asyncTextures,
     SceneImportResult& result,
     const std::filesystem::path& sceneDirectory) const
 {
@@ -812,7 +812,7 @@ bool GltfImporter::load(
 
     std::unordered_map<const cgltf_image*, Handle<ImageAsset>> imageCache;
 
-    auto load_image = [&imageCache, &textureCache, threadPool, &load_image_data]
+    auto load_image = [&imageCache, &textureCache, asyncTextures, &load_image_data]
         (const cgltf_image* image, bool sRGB, bool searchForDDS)
     {
         auto it = imageCache.find(image);
@@ -824,17 +824,17 @@ bool GltfImporter::load(
 
         if (textureSource.data)
         {
-            if (threadPool)
+            if (asyncTextures)
                 imageAsset = textureCache.loadTextureFromMemoryAsync(textureSource.data->buffer,
-                    textureSource.data->name, textureSource.data->mimeType, sRGB, *threadPool);
+                    textureSource.data->name, textureSource.data->mimeType, sRGB);
             else
                 imageAsset = textureCache.loadTextureFromMemoryDeferred(textureSource.data->buffer,
                     textureSource.data->name, textureSource.data->mimeType, sRGB);
         }
         else if (!textureSource.path.empty())
         {
-            if (threadPool)
-                imageAsset = textureCache.loadTextureFromFileAsync(textureSource.path, sRGB, *threadPool);
+            if (asyncTextures)
+                imageAsset = textureCache.loadTextureFromFileAsync(textureSource.path, sRGB);
             else
                 imageAsset = textureCache.loadTextureFromFileDeferred(textureSource.path, sRGB);
         }

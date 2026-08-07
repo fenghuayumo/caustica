@@ -799,7 +799,7 @@ bool UrdfImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader&,
     SceneLoadingStats&,
-    ThreadPool*,
+    bool /*asyncTextures*/,
     SceneImportResult& result,
     const std::filesystem::path&) const
 {

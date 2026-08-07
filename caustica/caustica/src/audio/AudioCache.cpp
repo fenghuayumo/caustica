@@ -1,6 +1,6 @@
 #include <audio/AudioCache.h>
 
-#include <core/ThreadPool.h>
+#include <core/task/TaskRuntime.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -187,20 +187,29 @@ std::shared_ptr<AudioData const> AudioCache::loadFromFile(const std::filesystem:
     return audio;
 }
 
-std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool)
+std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesystem::path & path)
 {
     std::shared_ptr<AudioData const> audio;
 
     if (findInCache(path, audio))
         return audio;
 
-    threadPool.addTask([this, &audio, path]()
+    task::TaskDesc desc;
+    desc.name = "Audio.LoadFile";
+    desc.priority = task::Priority::Background;
+    desc.affinity = task::Affinity::Any;
+    desc.body = [this, path]()
     {
-        if ((audio = loadAudioFile(path)))
+        if (auto loaded = loadAudioFile(path))
         {
-            sendAudioLoadedMessage(audio, path.generic_string().c_str());
+            {
+                std::lock_guard<std::mutex> guard(m_LoadedDataMutex);
+                m_LoadedAudioData[path.generic_string()] = loaded;
+            }
+            sendAudioLoadedMessage(loaded, path.generic_string().c_str());
         }
-    });
+    };
+    (void)task::launch(std::move(desc));
     return audio;
 }
 

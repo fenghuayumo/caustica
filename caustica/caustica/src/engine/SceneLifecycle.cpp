@@ -10,6 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/EnqueueRenderCommand.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <engine/ActiveScene.h>
@@ -234,7 +235,7 @@ void onSceneUnloading(App& app)
 
     // Scene::prepareForUnload mutates live ECS/resource ownership. Drain render
     // work first, then perform that mutation in the logic domain.
-    app.waitForDedicatedRenderThreadIdle();
+    app.waitForRenderThreadIdle();
     if (::SceneManager* manager = detail::sessionManager(app))
     {
         if (const std::shared_ptr<Scene> scene = manager->getScene())
@@ -242,7 +243,7 @@ void onSceneUnloading(App& app)
     }
 
     detail::sceneSwitchTrace("onSceneUnloading: GPU teardown on render thread");
-    runGpuWorkOnRenderThread(app, [&app]() {
+    EnqueueRenderCommandAndWait(app, [&app]() {
         GpuDevice* device = gpuDevice(app);
         caustica::rhi::Device* rhi = device ? device->getDevice() : nullptr;
         // THREADING: sync-point, RT-only — never waitForIdle from the logic thread.
@@ -502,7 +503,7 @@ void tickSceneGpuBind(App& app)
     {
     case Phase::Textures:
     {
-        runGpuWorkOnRenderThread(app, [gr]() { gr->flushTextures(8.f); });
+        EnqueueRenderCommandAndWait(app, [gr]() { gr->flushTextures(8.f); });
         const size_t remaining = gr->pendingTextureFinalizeCount();
         if (job.texturesTotal > 0)
         {
@@ -511,13 +512,13 @@ void tickSceneGpuBind(App& app)
         }
         if (remaining == 0)
         {
-            runGpuWorkOnRenderThread(app, [gr]() { gr->flushTextures(0.f); });
+            EnqueueRenderCommandAndWait(app, [gr]() { gr->flushTextures(0.f); });
             job.phase = Phase::World;
         }
         break;
     }
     case Phase::World:
-        runGpuWorkOnRenderThread(app, [gr, data]() { gr->bindWorld(*data); });
+        EnqueueRenderCommandAndWait(app, [gr, data]() { gr->bindWorld(*data); });
         job.phase = Phase::Meshes;
         vs->progressLoading.Set(72);
         break;
@@ -525,7 +526,7 @@ void tickSceneGpuBind(App& app)
     {
         const size_t start = job.meshBegin;
         size_t next = start;
-        runGpuWorkOnRenderThread(app, [gr, data, start, &next]() {
+        EnqueueRenderCommandAndWait(app, [gr, data, start, &next]() {
             next = gr->uploadMeshes(*data, start, 1);
         });
         job.meshBegin = next;
@@ -542,7 +543,7 @@ void tickSceneGpuBind(App& app)
         break;
     }
     case Phase::Finalize:
-        runGpuWorkOnRenderThread(app, [gr, data]() { gr->finalizeBind(*data); });
+        EnqueueRenderCommandAndWait(app, [gr, data]() { gr->finalizeBind(*data); });
         vs->progressLoading.Set(93);
         job.phase = Phase::LogicFinish;
         break;

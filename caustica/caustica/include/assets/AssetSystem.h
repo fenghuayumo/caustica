@@ -24,7 +24,6 @@ class TextureLoader;
 class IFileSystem;
 class IDescriptorTableManager;
 class IBlob;
-class ThreadPool;
 
 namespace render { class RenderDevice; }
 
@@ -75,8 +74,7 @@ public:
 
     Handle<ImageAsset> loadTextureFromFileAsync(
         const std::filesystem::path& path,
-        bool sRGB,
-        ThreadPool& threadPool);
+        bool sRGB);
 
     Handle<ImageAsset> loadTextureFromMemory(
         const std::shared_ptr<IBlob>& data,
@@ -96,8 +94,7 @@ public:
         const std::shared_ptr<IBlob>& data,
         const std::string& name,
         const std::string& mimeType,
-        bool sRGB,
-        ThreadPool& threadPool);
+        bool sRGB);
 
     std::shared_ptr<ImageAsset> getLoadedTexture(const std::filesystem::path& path);
     bool unloadTexture(const Handle<ImageAsset>& texture);

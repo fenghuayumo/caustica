@@ -393,11 +393,6 @@ void App::waitForRenderThreadIdle()
         m_renderThread.waitForIdle();
 }
 
-void App::waitForDedicatedRenderThreadIdle()
-{
-    waitForRenderThreadIdle();
-}
-
 void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
 {
     if (!work)

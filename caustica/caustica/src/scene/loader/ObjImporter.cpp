@@ -800,7 +800,7 @@ namespace
     }
 }
 
-bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, ThreadPool*, SceneImportResult& result, const std::filesystem::path&) const
+bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, bool /*asyncTextures*/, SceneImportResult& result, const std::filesystem::path&) const
 {
     std::ifstream file(filePath);
     if (!file)

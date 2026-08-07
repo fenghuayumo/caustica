@@ -1,6 +1,5 @@
 #include <assets/AssetSystem.h>
 #include <assets/loader/TextureLoader.h>
-#include <core/ThreadPool.h>
 #include <core/log.h>
 
 #include <cstdint>
@@ -80,10 +79,9 @@ Handle<ImageAsset> AssetSystem::loadTextureFromFileDeferred(
 
 Handle<ImageAsset> AssetSystem::loadTextureFromFileAsync(
     const std::filesystem::path& path,
-    bool sRGB,
-    ThreadPool& threadPool)
+    bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromFileAsync(path, sRGB, threadPool);
+    return m_TextureLoader->loadTextureFromFileAsync(path, sRGB);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromMemory(
@@ -110,10 +108,9 @@ Handle<ImageAsset> AssetSystem::loadTextureFromMemoryAsync(
     const std::shared_ptr<IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
-    bool sRGB,
-    ThreadPool& threadPool)
+    bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromMemoryAsync(data, name, mimeType, sRGB, threadPool);
+    return m_TextureLoader->loadTextureFromMemoryAsync(data, name, mimeType, sRGB);
 }
 
 std::shared_ptr<ImageAsset> AssetSystem::getLoadedTexture(const std::filesystem::path& path)

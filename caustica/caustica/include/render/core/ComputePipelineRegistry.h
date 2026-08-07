@@ -4,7 +4,6 @@
 #include <memory>
 #include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <core/ThreadPool.h>
 #include <unordered_map>
 
 #include <assets/loader/ShaderCompilerUtils.h>
@@ -78,8 +77,6 @@ private:
     // For parallel compilation
     std::vector<ComputeShaderVariant*> m_parallelCompileListAll;
     std::unordered_map<std::string, ComputeShaderVariant*> m_parallelCompileListUnique;
-    
-    caustica::ThreadPool m_threadPool;
     
     std::optional<std::filesystem::file_time_type> m_lastUpdatedSourceTimestamp;
     

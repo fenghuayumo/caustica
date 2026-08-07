@@ -12,7 +12,6 @@
 #include <scene/loader/UrdfImporter.h>
 #include <scene/scene_utils.h>
 #include <core/ThreadContext.h>
-#include <core/ThreadPool.h>
 #include <core/json.h>
 #include <core/log.h>
 #include <core/string_utils.h>
@@ -585,15 +584,10 @@ Scene::Scene(
 
 }
 
-bool Scene::load(const std::filesystem::path& jsonFileName)
+bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
 {
-    // Texture and typed-asset registration are shared across model imports and are
-    // not safe to mutate from multiple importer tasks.
-    return loadWithThreadPool(jsonFileName, nullptr);
-}
-
-bool Scene::loadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool)
-{
+    // Model import is always serial: texture and typed-asset registration are
+    // shared across models and are not safe to mutate from concurrent importer tasks.
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
 
@@ -606,10 +600,7 @@ bool Scene::loadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         m_textureSearchDirectory = sceneFileName.parent_path();
         ++g_LoadingStats.ObjectsTotal;
         m_Models.resize(1);
-        loadModelAsync(0, sceneFileName, threadPool);
-
-        if (threadPool)
-            threadPool->waitForTasks();
+        loadModelAsync(0, sceneFileName, asyncTextures);
 
         const auto& modelResult = m_Models[0];
         if (!modelResult.entityWorld || !ecs::isValid(modelResult.rootEntity))
@@ -626,7 +617,7 @@ bool Scene::loadWithThreadPool(const std::filesystem::path& sceneFileName, Threa
         if (!caustica::json::loadFromFile(*m_fs, sceneFileName, documentRoot))
             return false;
 
-        if (!loadJsonDocument(documentRoot, scenePath, threadPool))
+        if (!loadJsonDocument(documentRoot, scenePath, asyncTextures))
             return false;
     }
 
@@ -652,10 +643,10 @@ bool Scene::loadFromJsonString(const std::string& sceneJson, const std::filesyst
         return false;
     }
 
-    return loadJsonDocument(documentRoot, scenePath, nullptr);
+    return loadJsonDocument(documentRoot, scenePath, false);
 }
 
-bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, ThreadPool* threadPool)
+bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::path& scenePath, bool asyncTextures)
 {
     m_textureSearchDirectory = scenePath;
 
@@ -666,10 +657,10 @@ bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
 
     if (documentRoot.isObject())
     {
-        if (!loadCustomData(documentRoot, threadPool))
+        if (!loadCustomData(documentRoot, asyncTextures))
             return false;
 
-        loadModels(documentRoot["models"], scenePath, threadPool);
+        loadModels(documentRoot["models"], scenePath, asyncTextures);
         loadSceneEntities(documentRoot["graph"], m_EntityWorld->root());
         loadAnimations(documentRoot["animations"]);
         m_EntityWorld->rebuildPathsFromRoot();
@@ -686,48 +677,35 @@ bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
 void Scene::loadModelAsync(
     uint32_t index,
     const std::filesystem::path& fileName,
-    ThreadPool* threadPool)
-{   
-    if (threadPool)
-    {
-        threadPool->addTask([this, index, threadPool, fileName]()
-        {
-            SceneImportResult result;
-            loadModelFile(fileName, threadPool, result);
-            ++g_LoadingStats.ObjectsLoaded;
-            m_Models[index] = result;
-        });
-    }
-    else
-    {
-        SceneImportResult result;
-        loadModelFile(fileName, threadPool, result);
-        ++g_LoadingStats.ObjectsLoaded;
-        m_Models[index] = result;
-    }
+    bool asyncTextures)
+{
+    SceneImportResult result;
+    loadModelFile(fileName, asyncTextures, result);
+    ++g_LoadingStats.ObjectsLoaded;
+    m_Models[index] = result;
 }
 
 bool Scene::loadModelFile(
     const std::filesystem::path& fileName,
-    ThreadPool* threadPool,
+    bool asyncTextures,
     SceneImportResult& result)
 {
     std::string ext = fileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".obj")
-        return m_ObjImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_ObjImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
-        return m_CausUsdImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_CausUsdImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
     if (ext == ".urdf")
-        return m_UrdfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+        return m_UrdfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
 
-    return m_GltfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, threadPool, result, m_textureSearchDirectory);
+    return m_GltfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
 }
 
 void Scene::loadModels(
     const Json::Value& modelList,
     const std::filesystem::path& scenePath,
-    ThreadPool* threadPool)
+    bool asyncTextures)
 {
     if (!modelList.isArray())
     {
@@ -753,14 +731,11 @@ void Scene::loadModels(
         else
         {
             std::filesystem::path fileName = scenePath / std::filesystem::path(model.asString());
-            loadModelAsync(index, fileName, threadPool);
+            loadModelAsync(index, fileName, asyncTextures);
         }
 
         ++index;
     }
-
-    if (threadPool)
-        threadPool->waitForTasks();
 }
 
 SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
@@ -1208,7 +1183,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
     }
 }
 
-bool Scene::loadCustomData(Json::Value& rootNode, ThreadPool* threadPool)
+bool Scene::loadCustomData(Json::Value& /*rootNode*/, bool /*asyncTextures*/)
 {
     // Reserved for derived classes
     return true;

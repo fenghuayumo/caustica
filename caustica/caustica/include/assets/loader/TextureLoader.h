@@ -18,7 +18,6 @@ namespace caustica
 {
 class IBlob;
 class IFileSystem;
-class ThreadPool;
 
 namespace render { class RenderDevice; }
 
@@ -49,17 +48,16 @@ public:
         const std::filesystem::path& path,
         bool sRGB);
 
+    // CPU decode on TaskRuntime (Background). GPU finalize still via processRenderingThreadCommands.
     Handle<ImageAsset> loadTextureFromFileAsync(
         const std::filesystem::path& path,
-        bool sRGB,
-        ThreadPool& threadPool);
+        bool sRGB);
 
     Handle<ImageAsset> loadTextureFromMemoryAsync(
         const std::shared_ptr<IBlob>& data,
         const std::string& name,
         const std::string& mimeType,
-        bool sRGB,
-        ThreadPool& threadPool);
+        bool sRGB);
 
     Handle<ImageAsset> loadTextureFromMemory(
         const std::shared_ptr<IBlob>& data,

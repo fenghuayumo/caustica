@@ -13,11 +13,6 @@ namespace caustica
     class IFileSystem;
 }
 
-namespace caustica
-{
-    class ThreadPool;
-}
-
 namespace caustica::audio
 {
 
@@ -81,8 +76,8 @@ public:
     // Synchronous read
     std::shared_ptr<AudioData const> loadFromFile(const std::filesystem::path & path);
 
-    // Asynchronous read
-    std::shared_ptr<AudioData const> loadFromFileAsync(const std::filesystem::path & path, ThreadPool& threadPool);
+    // Asynchronous read (Background priority via caustica::task)
+    std::shared_ptr<AudioData const> loadFromFileAsync(const std::filesystem::path & path);
 
 private:
 

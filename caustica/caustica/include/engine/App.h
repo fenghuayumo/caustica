@@ -24,8 +24,12 @@
 namespace caustica
 {
 
+class App;
 class GpuDevice;
 class Window;
+
+void EnqueueRenderCommand(App& app, std::function<void()> command);
+void EnqueueRenderCommandAndWait(App& app, std::function<void()> command);
 
 namespace detail
 {
@@ -319,11 +323,6 @@ public:
     [[nodiscard]] RenderThread& renderThread() { return m_renderThread; }
     [[nodiscard]] const RenderThread& renderThread() const { return m_renderThread; }
 
-    void waitForDedicatedRenderThreadIdle();
-    // Blocks until the work finishes on the render thread (resize / exclusive setup).
-    void runGpuWorkOnRenderThread(const std::function<void()>& work);
-    // Fire-and-forget RT work. Blocks only when the frame queue is full (same as dispatch).
-    void enqueueGpuWorkOnRenderThread(const std::function<void()>& work);
     void requestExit();
     void requestRenderUnfocused();
 
@@ -356,6 +355,10 @@ public:
 
     void queueEvent(std::unique_ptr<Event> event);
     void processEventQueue();
+
+    // Implementation for EnqueueRenderCommand* only (ADR 0001).
+    friend void EnqueueRenderCommand(App&, std::function<void()>);
+    friend void EnqueueRenderCommandAndWait(App&, std::function<void()>);
 
 protected:
     virtual void onBeforeAnimate(GpuDevice& gpuDevice, uint32_t frameIndex) {}
@@ -396,6 +399,9 @@ private:
     void syncDpiScaleFromWindow();
     bool isWindowVisible() const;
     bool isWindowFocused() const;
+
+    void runGpuWorkOnRenderThread(const std::function<void()>& work);
+    void enqueueGpuWorkOnRenderThread(const std::function<void()>& work);
 
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);

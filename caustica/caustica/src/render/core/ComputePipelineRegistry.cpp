@@ -12,6 +12,7 @@
 #include <core/path_utils.h>
 #include <core/progress.h>
 #include <core/system_utils.h>
+#include <core/task/TaskRuntime.h>
 
 using namespace caustica;
 
@@ -252,6 +253,9 @@ void ComputePipelineRegistry::update(bool forceReload)
             progressCompilingShaders.start("Preparing shaders...");
 
         // Compile shaders (potentially in parallel)
+#if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
+        task::Group compileGroup;
+#endif
         for (auto& [name, variant] : m_parallelCompileListUnique)
         {
             if (variant->m_compileCmdLine == "")
@@ -261,18 +265,23 @@ void ComputePipelineRegistry::update(bool forceReload)
             }
 
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
-            m_threadPool.addTask([this, variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
+            task::TaskDesc desc;
+            desc.name = "Compute.CompileShader";
+            desc.priority = task::Priority::Low;
+            desc.affinity = task::Affinity::Any;
+            desc.body = [variant, &progressCompilingShaders, &progressCounterCompleted, progressTotal]() {
 #endif
                 variant->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
                 progressCompilingShaders.Set(100 * completed / progressTotal);
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
-            });
+            };
+            task::launch(compileGroup, std::move(desc));
 #endif
         }
 
 #if COMPUTE_REGISTRY_ENABLE_MULTITHREADED_COMPILE
-        m_threadPool.waitForTasks();
+        task::wait(compileGroup);
 #endif
 
         // Check for errors and load shaders

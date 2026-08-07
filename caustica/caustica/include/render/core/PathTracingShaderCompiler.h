@@ -4,7 +4,6 @@
 #include <memory>
 #include <rhi/rhi.h>
 #include <assets/loader/ShaderFactory.h>
-#include <core/ThreadPool.h>
 #include <scene/SceneRenderData.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -204,8 +203,6 @@ private:
 
     bool                                            m_verbose = false;
     bool                                            m_enableNVAPIShaderExtension = false;
-
-    caustica::ThreadPool                       m_threadPool;
 
     int64_t                                         m_version = -1;
     // Once RT pipelines exist, runtime imports only remap hit-group table entries onto

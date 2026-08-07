@@ -22,7 +22,7 @@ bool CausUsdImporter::load(
     const std::filesystem::path& fileName,
     TextureLoader& /*textureCache*/,
     SceneLoadingStats& /*stats*/,
-    ThreadPool* /*threadPool*/,
+    bool /*asyncTextures*/,
     SceneImportResult& result,
     const std::filesystem::path& /*sceneDirectory*/) const
 {

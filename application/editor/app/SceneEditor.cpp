@@ -23,6 +23,7 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/EnqueueRenderCommand.h>
 #include <engine/SceneSession.h>
 #include <core/path_utils.h>
 #include <core/json.h>
@@ -469,7 +470,7 @@ void SceneEditor::processPendingEditActions()
         return;
 
     bool waitOk = true;
-    m_app->runGpuWorkOnRenderThread([gpuDevice, &waitOk]() {
+    caustica::EnqueueRenderCommandAndWait(*m_app, [gpuDevice, &waitOk]() {
         if (caustica::rhi::Device* rhi = gpuDevice->getDevice())
             waitOk = rhi->waitForIdle();
     });

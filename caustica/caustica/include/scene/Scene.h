@@ -33,7 +33,6 @@ namespace caustica
 {
     class ShaderFactory;
     class TextureLoader;
-    class ThreadPool;
     class GltfImporter;
     class ObjImporter;
     class CausUsdImporter;
@@ -76,17 +75,17 @@ namespace caustica
         void loadModelAsync(
             uint32_t index,
             const std::filesystem::path& fileName,
-            ThreadPool* threadPool);
+            bool asyncTextures);
 
         virtual bool loadModelFile(
             const std::filesystem::path& fileName,
-            ThreadPool* threadPool,
+            bool asyncTextures,
             SceneImportResult& result);
 
         void loadModels(
             const Json::Value& modelList, 
             const std::filesystem::path& scenePath, 
-            ThreadPool* threadPool);
+            bool asyncTextures);
 
         SceneImportResult loadBuiltinModel(
             const std::string& builtinName);
@@ -94,12 +93,12 @@ namespace caustica
         bool loadJsonDocument(
             Json::Value documentRoot,
             const std::filesystem::path& scenePath,
-            ThreadPool* threadPool);
+            bool asyncTextures);
 
         void loadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
         void loadAnimations(const Json::Value& nodeList);
         
-        virtual bool loadCustomData(Json::Value& rootNode, ThreadPool* threadPool);
+        virtual bool loadCustomData(Json::Value& rootNode, bool asyncTextures);
 
         std::optional<SampleSettings> m_loadedSettings;
         std::optional<GameSettings>   m_loadedGameSettings;
@@ -164,9 +163,9 @@ namespace caustica
         [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
         [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;
 
-        bool load(const std::filesystem::path& jsonFileName);
-
-        virtual bool loadWithThreadPool(const std::filesystem::path& sceneFileName, ThreadPool* threadPool);
+        // Model import is always serial. asyncTextures selects Async vs Deferred texture loads
+        // inside importers (default Deferred — concurrent texture mutation is unsafe across models).
+        virtual bool load(const std::filesystem::path& sceneFileName, bool asyncTextures = false);
         virtual bool loadFromJsonString(const std::string& sceneJson, const std::filesystem::path& scenePath = {});
 
         static const SceneLoadingStats& getLoadingStats();

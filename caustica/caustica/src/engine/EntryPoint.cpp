@@ -3,7 +3,7 @@
 #include <engine/EngineApp.h>
 
 #include <assets/loader/TextureLoader.h>
-#include <core/JobSystem.h>
+#include <core/task/TaskRuntime.h>
 #include <core/log.h>
 #include <platform/engine/os.h>
 
@@ -37,12 +37,12 @@ void initializeAppPlatform()
 #endif
 
     OS::initialize();
-    JobSystem::Initialize();
+    task::initialize();
 }
 
 void shutdownAppPlatform()
 {
-    JobSystem::shutdown();
+    task::shutdown();
 
 #ifdef _WIN32
     if (s_comNeedsUninit)

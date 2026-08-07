@@ -10,6 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/EnqueueRenderCommand.h>
 #include <engine/ScenePlugins.h>
 #include <assets/AssetSystem.h>
 #include <assets/RuntimeMeshLoadTypes.h>
@@ -109,7 +110,7 @@ bool enqueuePendingStructureGpu(App& app)
     scenePtr->beginStructureGpuBuild();
     scenePtr->clearGpuStructureSyncRequest();
 
-    enqueueGpuWorkOnRenderThread(
+    EnqueueRenderCommand(
         app,
         [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
             runStructureGpuBuild(
@@ -140,7 +141,7 @@ void flushPendingStructureGpuSync(App& app)
     scenePtr->beginStructureGpuBuild();
     scenePtr->clearGpuStructureSyncRequest();
 
-    runGpuWorkOnRenderThread(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
+    EnqueueRenderCommandAndWait(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
         runStructureGpuBuild(
             worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData);
     });

@@ -8,7 +8,6 @@ namespace caustica
     struct SceneImportResult;
     struct SceneLoadingStats;
     class TextureLoader;
-    class ThreadPool;
     class SceneTypeFactory;
 
     class ObjImporter
@@ -23,7 +22,7 @@ namespace caustica
             const std::filesystem::path& fileName,
             TextureLoader& textureCache,
             SceneLoadingStats& stats,
-            ThreadPool* threadPool,
+            bool asyncTextures,
             SceneImportResult& result,
             const std::filesystem::path& sceneDirectory = std::filesystem::path()) const;
     };

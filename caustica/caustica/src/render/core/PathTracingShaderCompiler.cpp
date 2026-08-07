@@ -18,6 +18,7 @@
 #include <core/path_utils.h>
 #include <core/progress.h>
 #include <core/system_utils.h>
+#include <core/task/TaskRuntime.h>
 #include <core/vfs/VFS.h>
 
 #include <atomic>
@@ -913,6 +914,9 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             caustica::info("PathTracingShaderCompiler: loading precompiled RT shader libraries...");
             fflush(stdout);
 
+#if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
+        task::Group compileGroup;
+#endif
         for (auto it : m_parallelCompileListUnique)
         {
             PTPipelineVariant::ShaderPermutation* permutation = it.second;
@@ -922,20 +926,25 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             } // not sure why this would happen
 
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-            m_threadPool.addTask([ this, permutation, &progressPreparing, &progressCounterCompleted, progressTotal ]() {
+            task::TaskDesc desc;
+            desc.name = "PT.CompileShader";
+            desc.priority = task::Priority::Low;
+            desc.affinity = task::Affinity::Any;
+            desc.body = [permutation, &progressPreparing, &progressCounterCompleted, progressTotal]() {
 #endif
                 permutation->compileIfNeeded();
                 int completed = progressCounterCompleted.fetch_add(1) + 1;
                 progressPreparing.Set(0 + 100 * completed / progressTotal);
 
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-            });
+            };
+            task::launch(compileGroup, std::move(desc));
 #endif
         }
 
 // wait for all to complete
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-        m_threadPool.waitForTasks();
+        task::wait(compileGroup);
 #endif
  
         std::string firstError = "";
@@ -976,20 +985,28 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         {
             int updateQueueSize = (int)updateQueue.size();
 
+    #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
+            task::Group psoGroup;
+    #endif
             for (const std::shared_ptr<PTPipelineVariant>& variant : updateQueue)
             {
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-                m_threadPool.addTask([this, variant, &progressPreparing, &progressCounterCompleted, progressTotal ](){
+                task::TaskDesc desc;
+                desc.name = "PT.CompilePSO";
+                desc.priority = task::Priority::Low;
+                desc.affinity = task::Affinity::Any;
+                desc.body = [variant, &progressPreparing, &progressCounterCompleted, progressTotal]() {
     #endif
                 variant->updateFinalize();
                 int completed = progressCounterCompleted.fetch_add(1)+1;
                 progressPreparing.Set(0 + 99 * completed / progressTotal);
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-                });
+                };
+                task::launch(psoGroup, std::move(desc));
     #endif
             }
     #if BAKER_ENABLE_MULTITHREADED_COMPILE_PSO
-            m_threadPool.waitForTasks();
+            task::wait(psoGroup);
     #endif
 
             progressPreparing.Set(100);
@@ -1083,22 +1100,30 @@ void PathTracingShaderCompiler::buildPipelines(
 
     std::atomic_int progressCounterCompleted = 0;
     const int progressTotal = (int)m_parallelCompileListUnique.size();
+#if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
+    task::Group compileGroup;
+#endif
     for (auto it : m_parallelCompileListUnique)
     {
         PTPipelineVariant::ShaderPermutation* permutation = it.second;
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-        m_threadPool.addTask([permutation, &progressMissing, &progressCounterCompleted, progressTotal, showProgress]() {
+        task::TaskDesc desc;
+        desc.name = "PT.CompileMissing";
+        desc.priority = task::Priority::Low;
+        desc.affinity = task::Affinity::Any;
+        desc.body = [permutation, &progressMissing, &progressCounterCompleted, progressTotal, showProgress]() {
 #endif
             permutation->compileIfNeeded();
             const int completed = progressCounterCompleted.fetch_add(1) + 1;
             if (showProgress && progressTotal > 0)
                 progressMissing.Set(50 * completed / progressTotal);
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-        });
+        };
+        task::launch(compileGroup, std::move(desc));
 #endif
     }
 #if BAKER_ENABLE_MULTITHREADED_COMPILE_SHADER
-    m_threadPool.waitForTasks();
+    task::wait(compileGroup);
 #endif
 
     std::string firstError;

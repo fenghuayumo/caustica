@@ -61,6 +61,9 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md).
 
+TaskRuntime + enqueue collapse (P1) and planned LoadSession streaming:
+[ADR 0001](adr/0001-task-runtime-multithreading.md).
+
 ## App scene-edit API
 
 Prefer these for application / Python / editor scene edits (no WorldRenderer / AS words):
@@ -113,7 +116,7 @@ Official sample (no editor): `application/samples/thin_client` → target `caust
 Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous
 proxy packet as `Scene::committedRenderData()`, publishes the new generation, and
 `enqueuePendingStructureGpu` builds meshes/AS/SBT/bindings on the render thread via
-`enqueueGpuWorkOnRenderThread` (non-blocking for Logic).
+`EnqueueRenderCommand` (non-blocking for Logic).
 
 While `structureGpuBuildInFlight()`:
 
@@ -132,6 +135,8 @@ Full scene load remains exclusive (`SceneLifecycle` / internal `GpuRenderSubsyst
 | `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
 | Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
+| TaskRuntime + Logic→RT enqueue | P1 landed — `caustica::task`, sole `EnqueueRenderCommand*`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| LoadSession amortized streaming | Planned — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `SceneMeshEdit` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Hosts use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |

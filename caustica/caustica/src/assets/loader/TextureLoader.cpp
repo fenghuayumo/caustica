@@ -1,7 +1,7 @@
 #include <assets/loader/TextureLoader.h>
 
 #include <assets/loader/DDSFile.h>
-#include <core/ThreadPool.h>
+#include <core/task/TaskRuntime.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -350,8 +350,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileDeferred(
 
 Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     const std::filesystem::path& path,
-    bool sRGB,
-    ThreadPool& threadPool)
+    bool sRGB)
 {
     std::shared_ptr<ImageAsset> texture;
 
@@ -361,8 +360,11 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
 
-    threadPool.addTask([this, texture, path]()
-    {
+    task::TaskDesc desc;
+    desc.name = "Texture.DecodeFile";
+    desc.priority = task::Priority::Background;
+    desc.affinity = task::Affinity::Any;
+    desc.body = [this, texture, path]() {
         auto fileData = readTextureFile(path);
         if (fileData)
         {
@@ -376,7 +378,8 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
         }
 
         ++m_TexturesLoaded;
-    });
+    };
+    (void)task::launch(std::move(desc));
 
     return makeHandle(texture);
 }
@@ -385,8 +388,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     const std::shared_ptr<IBlob>& data,
     const std::string& name,
     const std::string& mimeType,
-    bool sRGB,
-    ThreadPool& threadPool)
+    bool sRGB)
 {
     std::shared_ptr<ImageAsset> texture = createTextureData();
 
@@ -397,8 +399,11 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     texture->id = id;
     (void)m_Images->insert(id, texture);
 
-    threadPool.addTask([this, texture, data, mimeType]()
-    {
+    task::TaskDesc desc;
+    desc.name = "Texture.DecodeMemory";
+    desc.priority = task::Priority::Background;
+    desc.affinity = task::Affinity::Any;
+    desc.body = [this, texture, data, mimeType]() {
         if (fillTextureData(data, texture, "", mimeType))
         {
             textureLoaded(texture);
@@ -408,7 +413,8 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
         }
 
         ++m_TexturesLoaded;
-    });
+    };
+    (void)task::launch(std::move(desc));
 
     return makeHandle(texture);
 }

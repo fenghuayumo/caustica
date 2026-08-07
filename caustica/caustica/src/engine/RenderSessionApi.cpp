@@ -7,6 +7,7 @@
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/RenderSessionApi.h>
+#include <engine/EnqueueRenderCommand.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
@@ -66,20 +67,6 @@ uint32_t gaussianSplatObjectCount(const App& app)
 const std::string& gaussianSplatFileName(const App& app)
 {
     return worldRenderer(app)->gaussianSplatPasses().fileNameSummary();
-}
-
-void runGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
-{
-    if (!work)
-        return;
-    app.runGpuWorkOnRenderThread(work);
-}
-
-void enqueueGpuWorkOnRenderThread(App& app, const std::function<void()>& work)
-{
-    if (!work)
-        return;
-    app.enqueueGpuWorkOnRenderThread(work);
 }
 
 std::string resolutionInfo(const App& app)
@@ -186,7 +173,7 @@ uint32_t precacheRtFeaturePresets(App& app, bool showProgress)
     if (!wr)
         return 0;
     uint32_t ready = 0;
-    runGpuWorkOnRenderThread(app, [wr, showProgress, &ready]() {
+    EnqueueRenderCommandAndWait(app, [wr, showProgress, &ready]() {
         ready = wr->precacheAllRtFeaturePresets(showProgress);
     });
     return ready;

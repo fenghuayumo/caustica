@@ -2,7 +2,7 @@
 #include <render/graph/RenderBufferPool.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/TransientResourceAllocator.h>
-#include <core/JobSystem.h>
+#include <core/task/TaskRuntime.h>
 
 #include <algorithm>
 #include <cassert>
@@ -1087,22 +1087,27 @@ void GraphBuilder::executeWaveParallel(caustica::rhi::FrameCommandContext& frame
         }
     }
 
-    JobSystem::Context jobs;
-    JobSystem::dispatch(jobs, static_cast<uint32_t>(wave.size()), 1, [&](JobDispatchArgs args) {
-        const uint32_t slot = args.jobIndex;
-        const uint32_t passIndex = wave[slot];
-        if (passIndex >= m_passes.size())
-            return;
+    caustica::task::Group jobs;
+    caustica::task::parallelFor(
+        jobs,
+        static_cast<uint32_t>(wave.size()),
+        caustica::task::Priority::High,
+        caustica::task::Affinity::Any,
+        [&](uint32_t slot) {
+            const uint32_t passIndex = wave[slot];
+            if (passIndex >= m_passes.size())
+                return;
 
-        const Pass& pass = m_passes[passIndex];
-        if (!pass.active)
-            return;
+            const Pass& pass = m_passes[passIndex];
+            if (!pass.active)
+                return;
 
-        auto localTex = waveTextureStates;
-        auto localBuf = waveBufferStates;
-        recordPass(forks[slot].Get(), pass, &localTex, &localBuf);
-    });
-    JobSystem::wait(jobs);
+            auto localTex = waveTextureStates;
+            auto localBuf = waveBufferStates;
+            recordPass(forks[slot].Get(), pass, &localTex, &localBuf);
+        },
+        1);
+    caustica::task::wait(jobs);
 
     frameCtx.submitForks();
 

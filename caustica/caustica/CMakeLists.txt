@@ -147,9 +147,9 @@ add_library(causMath STATIC ${caus_math_headers} ${caus_math_sources})
 caus_configure_static(causMath)
 
 # ── causCore ──────────────────────────────────────────────────────────────
-# Foundation utilities: logging, threading (JobSystem/ThreadPool), VFS,
-# JSON, Timer, UUID, command line, format, string/path/file utils, chunk I/O.
-# Depends on math for serialization and formatting helpers.
+# Foundation utilities: logging, TaskRuntime (ADR 0001), VFS, JSON, Timer,
+# UUID, command line, format, string/path/file utils, chunk I/O. Depends on
+# math for serialization and formatting helpers.
 
 file(GLOB caus_core_headers include/core/*.h)
 file(GLOB caus_core_sources src/core/*.cpp)
@@ -157,11 +157,13 @@ file(GLOB_RECURSE caus_core_sub_headers
     include/core/chunk/*.h
     include/core/vfs/*.h
     include/core/console/*.h
+    include/core/task/*.h
 )
 file(GLOB_RECURSE caus_core_sub_sources
     src/core/chunk/*.cpp
     src/core/vfs/*.cpp
     src/core/console/*.cpp
+    src/core/task/*.cpp
 )
 list(APPEND caus_core_headers ${caus_core_sub_headers})
 list(APPEND caus_core_sources ${caus_core_sub_sources})

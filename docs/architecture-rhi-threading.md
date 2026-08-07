@@ -2,6 +2,10 @@
 
 Caustica already splits **logic** and **render** via Extract + `RenderThread` (see [architecture-render-proxy.md](architecture-render-proxy.md)). This document defines the RHI rules that make that split and parallel command-list recording safe.
 
+> **Evolution:** Scheduling, enqueue API collapse, and LoadSession streaming are planned in
+> [ADR 0001: TaskRuntime + unified streaming / render threading](adr/0001-task-runtime-multithreading.md).
+> Until that lands, this Phase-1 RHI contract remains authoritative.
+
 ## Thread roles
 
 | Role | Responsibility |
@@ -49,7 +53,7 @@ Headers: `caustica/caustica/include/backend/rhi/command_list_pool.h`.
 frameCtx.beginPrimary();
 // ... scene / path-trace prep on frameCtx.primary() ...
 
-// GraphBuilder: parallel waves fork + JobSystem record + submitForks
+// GraphBuilder: parallel waves fork + task::parallelFor record + submitForks
 graph.execute(frameCtx);
 
 frameCtx.endFrame(); // close + execute primary (and any leftover forks)
@@ -66,7 +70,7 @@ frameCtx.endFrame(); // close + execute primary (and any leftover forks)
 `GraphBuilder::compile` builds dependency waves (including WAR edges). `execute(FrameCommandContext&, ExecuteParams)`:
 
 - Serial / single-pass / `serialOnPrimary` waves record on the open primary list.
-- Multi-pass waves (when `ExecuteParams::parallelWaves`) fork one deferred list per pass, record on JobSystem workers with **local** resource-state snapshots (no shared `currentState` mutation), then `submitForks` on the RT before the next wave.
+- Multi-pass waves (when `ExecuteParams::parallelWaves`) fork one deferred list per pass, record on `caustica::task` workers (`Priority::High`) with **local** resource-state snapshots (no shared `currentState` mutation), then `submitForks` on the RT before the next wave.
 
 Passes that close/execute/wait mid-body (e.g. ToneMapping auto-exposure) must set `PassOptions::serialOnPrimary = true`.
 

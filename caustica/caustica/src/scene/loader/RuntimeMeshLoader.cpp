@@ -73,7 +73,7 @@ RuntimeMeshLoadResult loadRuntimeMeshFile(
         auto importer = std::make_shared<caustica::CausUsdImporter>(params.SceneTypes);
         caustica::SceneLoadingStats stats;
         auto importResult = std::make_shared<caustica::SceneImportResult>();
-        if (!importer->load(absPath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+        if (!importer->load(absPath, *params.TextureCache, stats, false, *importResult, params.TextureSearchDirectory))
         {
             caustica::error("CausUsdImporter failed to load '%s'", absPath.string().c_str());
             return FailedRuntimeMeshLoad(absPath);
@@ -108,7 +108,7 @@ RuntimeMeshLoadResult loadRuntimeGltfMeshFile(
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
 
-    if (!importer->load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+    if (!importer->load(filePath, *params.TextureCache, stats, false, *importResult, params.TextureSearchDirectory))
     {
         caustica::error("GltfImporter failed to load '%s'", filePath.string().c_str());
         return FailedRuntimeMeshLoad(filePath);
@@ -141,7 +141,7 @@ RuntimeMeshLoadResult loadRuntimeObjMeshFile(
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
-    if (!importer.load(filePath, *params.TextureCache, stats, nullptr, *importResult))
+    if (!importer.load(filePath, *params.TextureCache, stats, false, *importResult))
         return FailedRuntimeMeshLoad(filePath);
 
     if (!ecs::isValid(importResult->rootEntity) || !importResult->entityWorld)
@@ -165,7 +165,7 @@ RuntimeMeshLoadResult loadRuntimeUrdfMeshFile(
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
-    if (!importer.load(filePath, *params.TextureCache, stats, nullptr, *importResult, params.TextureSearchDirectory))
+    if (!importer.load(filePath, *params.TextureCache, stats, false, *importResult, params.TextureSearchDirectory))
     {
         caustica::error("UrdfImporter failed to load '%s'", filePath.string().c_str());
         return FailedRuntimeMeshLoad(filePath);
