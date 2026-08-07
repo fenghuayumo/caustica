@@ -104,10 +104,13 @@ private:
 
     caustica::rhi::Object getNativeCommandList(caustica::rhi::CommandList* commandList);
     void waitForDLSSGInputsProcessing();
+    // ADR 0002 S4: graphics fence when freeResources requests a wait.
+    void waitGraphicsBeforeFreeResources(bool wfi);
 
     bool m_slInitialized = false;
     caustica::rhi::GraphicsAPI m_api = caustica::rhi::GraphicsAPI::D3D12;
     caustica::rhi::Device* m_device = nullptr;
+    caustica::rhi::EventQueryHandle m_graphicsSyncQuery;
 
 #ifdef CAUSTICA_WITH_DX11
     LUID m_d3d11Luid = {};

@@ -1,6 +1,7 @@
 #if CAUSTICA_WITH_DLSS
 
 #include <render/passes/geometry/DLSS.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <assets/loader/ShaderFactory.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
@@ -70,6 +71,13 @@ bool DLSS::isRayReconstructionSupported() const
 bool DLSS::isRayReconstructionInitialized() const
 {
     return m_rayReconstructionInitialized;
+}
+
+void DLSS::waitBeforeReleaseFeature()
+{
+    // THREADING: queue fence, RT-only — ADR 0002 S4 (NGX feature recreate).
+    (void)caustica::render::syncGraphicsQueueFence(
+        m_device, m_featureSyncQuery, /*runGc=*/false, "DLSS ReleaseFeature");
 }
 
 void DLSS::computeExposure(caustica::rhi::CommandList* commandList, caustica::rhi::Buffer* toneMapperExposureBuffer, float exposureScale)

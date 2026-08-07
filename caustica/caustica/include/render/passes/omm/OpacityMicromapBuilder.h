@@ -124,6 +124,8 @@ private:
     void                            ensureGeometryDebugCapacity(size_t geometryCount);
 
     caustica::rhi::DeviceHandle             m_device;
+    // ADR 0002 S3: graphics fence before clearing OMM GPU resources.
+    caustica::rhi::EventQueryHandle         m_destroySyncQuery;
     caustica::render::SceneGpuResources* m_sceneGpuResources = nullptr;
     MaterialGpuCache*               m_materialGpuCache = nullptr;
     uint64_t                        m_materialStateRevision = 0;

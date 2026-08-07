@@ -505,12 +505,13 @@ void App::updateWindowSize()
     if (!gpuDevice)
         return;
 
-    // THREADING: Logic↔RT wait — ADR 0002 S5 (resize only when size changed).
+    // ADR 0002 S5: non-blocking resize — do not AndWait behind a path-trace frame.
+    // RT applies swapchain resize before the next present; Logic continues immediately.
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
     {
         if (!gpuDevice->needsWindowSizeSync())
             return;
-        m_renderThread.dispatchAndWait([gpuDevice]() { gpuDevice->updateWindowSize(); });
+        enqueueRenderCommandImpl([gpuDevice]() { gpuDevice->updateWindowSize(); });
     }
     else
     {
@@ -800,7 +801,7 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         // Snapshot slots use the logic frame index. A no-render gap can advance that
         // index onto a slot still owned by an older render frame, so drain once before
         // resuming Extract. Consecutive render frames keep the normal two-frame pipeline.
-        // THREADING: Logic↔RT wait — ADR 0002 S5 (resume Extract after skip-render gap).
+        // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (rare; skip-render gap only).
         if (m_renderSkippedSinceLastSubmission)
         {
             waitForRenderThreadIdle();

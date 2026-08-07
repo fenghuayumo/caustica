@@ -37,6 +37,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/debug/ShaderDebug.h>
 #include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/core/FramebufferFactory.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
 #include <backend/GpuDevice.h>
@@ -816,33 +817,7 @@ void caustica::render::WorldRenderer::mapDebugFeedbackReadback()
 
 bool caustica::render::WorldRenderer::waitGraphicsQueueFence(const char* reason, bool runGc)
 {
-    caustica::rhi::Device* dev = device();
-    if (!dev)
-        return false;
-
-    if (!m_graphicsSyncQuery)
-        m_graphicsSyncQuery = dev->createEventQuery();
-    if (!m_graphicsSyncQuery)
-    {
-        caustica::error(
-            "WorldRenderer: createEventQuery failed (%s); falling back to waitForIdle",
-            reason ? reason : "graphics sync");
-        // THREADING: sync-point, RT-only — ADR 0002 S2 fallback.
-        const bool ok = dev->waitForIdle();
-        if (runGc)
-            dev->runGarbageCollection();
-        return ok;
-    }
-
-    // THREADING: queue fence, RT-only — ADR 0002 S2 (needNewPasses / RT recreate).
-    // Snapshots last graphics submit; does not drain compute/copy queues.
-    dev->resetEventQuery(m_graphicsSyncQuery);
-    dev->setEventQuery(m_graphicsSyncQuery, caustica::rhi::CommandQueue::Graphics);
-    dev->waitEventQuery(m_graphicsSyncQuery);
-    dev->resetEventQuery(m_graphicsSyncQuery);
-    if (runGc)
-        dev->runGarbageCollection();
-    return true;
+    return syncGraphicsQueueFence(device(), m_graphicsSyncQuery, runGc, reason);
 }
 
 void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext& ctx)

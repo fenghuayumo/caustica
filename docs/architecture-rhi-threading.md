@@ -7,8 +7,10 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 > out of scope. Phase-1 RHI create/submit rules below remain authoritative.
 > Frame-path sync (replace device-wide idle with fence/retire; Logic no frame-path
 > `AndWait`) is [ADR 0002](adr/0002-frame-path-rhi-sync.md) — not LoadSession debt;
-> do not drive-by delete annotated RT sync-points. **S0–S2 landed** (AE/feedback +
-> `needNewPasses` / RT recreate use graphics `EventQuery`; see ADR 0002).
+> do not drive-by delete annotated RT sync-points. **S0–S5 (partial) landed** — AE /
+> feedback / needNewPasses / OMM / DLSS+SL freeResources use graphics `EventQuery`
+> (`syncGraphicsQueueFence`); frame resize is non-blocking. Remaining Logic waits:
+> skip-render gap, splat Pass create, precache/editor tools (see ADR 0002).
 
 ## Thread roles
 

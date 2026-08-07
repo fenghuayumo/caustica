@@ -173,13 +173,17 @@ implementations are out of scope (API definition only).
    - AE: lagged ring; removed mid-pass close/execute/`waitForIdle`; `serialOnPrimary=false`
    - Feedback: graphics `EventQuery` after `endFrame`; ContinuousDebug 1-frame lag; pick waits queue fence
    - F3–F6 (env/OIDN/texture readback helpers) remain S1-adjacent follow-ups
-3. [x] S2: `needNewPasses` / RT recreate → `waitGraphicsQueueFence` (graphics EventQuery)
+3. [x] S2: `needNewPasses` / RT recreate → `waitGraphicsQueueFence` / `syncGraphicsQueueFence`
    - pre/post createRenderPasses, init stage flush, final submit, ensureRenderTargets, onBackBufferResizing
    - F9 light-cache / GPUSort recreate remain S2-adjacent
-4. [ ] S3: OMM builder fence handoff
-5. [ ] S4: DLSS / Streamline fence-gated swap (or documented NGX exception)
-6. [ ] S5: remove frame-path Logic `AndWait` / RT idle from resize, splat load, precache
-7. [ ] Update [architecture-rhi-threading.md](../architecture-rhi-threading.md) when each phase lands
+4. [x] S3: OMM baker init + `destroyOpacityMicromaps` → `syncGraphicsQueueFence`
+5. [x] S4: DLSS `waitBeforeReleaseFeature` + Streamline `waitGraphicsBeforeFreeResources`
+   - Full SL plugin shutdown may still device-idle (allowed)
+6. [x] S5 (partial): frame-path resize → non-blocking `EnqueueRenderCommand`
+   - Remaining tool/rare Logic waits (documented): skip-render gap RT idle, splat Pass
+     create/remove drain, precache `AndWait`, editor undo — need RT-owned Pass factory
+     / async host APIs before removal
+7. [x] Update [architecture-rhi-threading.md](../architecture-rhi-threading.md) when each phase lands
 
 ## References
 

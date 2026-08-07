@@ -20,6 +20,7 @@
 #endif
 
 #include <core/log.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <filesystem>
 #include <map>
 #include <dxgi.h>
@@ -896,6 +897,15 @@ void StreamlineIntegration::queryDLSSRROptimalSettings(const DLSSRROptions& opti
 #endif
 }
 
+void StreamlineIntegration::waitGraphicsBeforeFreeResources(bool wfi)
+{
+    if (!wfi || !m_device)
+        return;
+    // THREADING: queue fence, RT-only — ADR 0002 S4 (SL freeResources).
+    (void)caustica::render::syncGraphicsQueueFence(
+        m_device, m_graphicsSyncQuery, /*runGc=*/false, "Streamline freeResources");
+}
+
 void StreamlineIntegration::cleanupDLSSRR(bool wfi)
 {
 #if STREAMLINE_HAS_DLSS_RR
@@ -908,11 +918,7 @@ void StreamlineIntegration::cleanupDLSSRR(bool wfi)
     if (!m_dlssrrAvailable)
         return;
 
-    if (wfi)
-    {
-        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
-        m_device->waitForIdle();
-    }
+    waitGraphicsBeforeFreeResources(wfi);
 
     sl::Result status = slFreeResources(sl::kFeatureDLSS_RR, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
@@ -939,11 +945,7 @@ void StreamlineIntegration::cleanupDLSS(bool wfi)
         return;
     }
 
-    if (wfi)
-    {
-        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
-        m_device->waitForIdle();
-    }
+    waitGraphicsBeforeFreeResources(wfi);
 
     sl::Result status = slFreeResources(sl::kFeatureDLSS, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
@@ -990,11 +992,7 @@ void StreamlineIntegration::cleanupNIS(bool wfi)
         return;
     }
 
-    if (wfi)
-    {
-        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
-        m_device->waitForIdle();
-    }
+    waitGraphicsBeforeFreeResources(wfi);
 
     successCheck(slFreeResources(sl::kFeatureNIS, m_viewport), "slFreeResources_NIS");
 }
@@ -1033,8 +1031,7 @@ void StreamlineIntegration::cleanupDeepDVC()
         return;
     }
 
-    // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
-    m_device->waitForIdle();
+    waitGraphicsBeforeFreeResources(/*wfi=*/true);
     successCheck(slFreeResources(sl::kFeatureDeepDVC, m_viewport), "slFreeResources_DeepDVC");
 }
 
@@ -1143,11 +1140,7 @@ void StreamlineIntegration::cleanupDLSSG(bool wfi)
         return;
     }
 
-    if (wfi)
-    {
-        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
-        m_device->waitForIdle();
-    }
+    waitGraphicsBeforeFreeResources(wfi);
 
     waitForDLSSGInputsProcessing();
 
@@ -1209,9 +1202,8 @@ void StreamlineIntegration::waitForDLSSGInputsProcessing()
     }
 #endif
 
-    // THREADING: sync-point, RT-only — ADR 0002 S4 (DLSS-G fence fallback).
-    if (m_device)
-        m_device->waitForIdle();
+    // Non-D3D12 path: graphics fence instead of device-wide idle.
+    waitGraphicsBeforeFreeResources(/*wfi=*/true);
 }
 
 sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device)

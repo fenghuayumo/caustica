@@ -57,7 +57,8 @@ void ApplyGaussianSplatLocalBounds(
 void SceneGaussianSplatLogic::onSceneLoaded(SceneGaussianSplatPasses& passes)
 {
     assertLogicThread();
-    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat Pass create still on Logic).
+    // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic;
+    // move GaussianSplatPass factory to RT before removing this drain).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
     loadFromSceneEntities(passes);
@@ -69,7 +70,7 @@ bool SceneGaussianSplatLogic::loadFromFile(
     bool convertRdfToRub)
 {
     assertLogicThread();
-    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat file load).
+    // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
     return attachToScene(passes, fileName, convertRdfToRub);
@@ -80,7 +81,7 @@ bool SceneGaussianSplatLogic::removeObjectsUnderEntity(
     ecs::Entity rootEntity)
 {
     assertLogicThread();
-    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat remove under entity).
+    // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass shared_ptr drop vs RT use).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
 

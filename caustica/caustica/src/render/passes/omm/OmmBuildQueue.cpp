@@ -5,6 +5,7 @@
 #include <assets/loader/ShaderFactory.h>
 #include <rhi/common/misc.h>
 #include <rhi/utils.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 
@@ -184,8 +185,10 @@ OmmBuildQueue::OmmBuildQueue(
     // Submit baker init command list
     initCommandList->close();
     m_device->executeCommandList(initCommandList);
-    // THREADING: sync-point, RT-only — ADR 0002 S3 (OMM baker init; replace with EventQuery).
-    m_device->waitForIdle();
+    // ADR 0002 S3: wait baker-init submit on graphics fence (not device-wide idle).
+    m_InFlightQuery = m_device->createEventQuery();
+    (void)caustica::render::syncGraphicsQueueFence(
+        m_device, m_InFlightQuery, /*runGc=*/false, "OMM baker init");
 }
 
 OmmBuildQueue::~OmmBuildQueue()

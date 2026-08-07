@@ -88,8 +88,7 @@ public:
 
         if (m_dlssHandle)
         {
-            // THREADING: sync-point, RT-only — ADR 0002 S4 (NGX feature recreate).
-            m_device->waitForIdle();
+            waitBeforeReleaseFeature();
             NVSDK_NGX_D3D12_ReleaseFeature(m_dlssHandle);
             m_dlssHandle = nullptr;
             m_dlssInitialized = false;

@@ -1,4 +1,5 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <render/core/RenderDevice.h>
 #include <render/SceneGpuResources.h>
 #include <render/passes/lighting/MaterialGpuCache.h> // for StandardMaterial full definition
@@ -217,8 +218,9 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
-    // THREADING: sync-point, RT-only — ADR 0002 S3 (OMM destroy before mesh clear).
-    m_device->waitForIdle();
+    // ADR 0002 S3: wait destroy-flush submit before clearing OMM handles.
+    (void)caustica::render::syncGraphicsQueueFence(
+        m_device, m_destroySyncQuery, /*runGc=*/true, "OMM destroyOpacityMicromaps");
     commandList.open();
 
     for (const auto& mesh : renderData.meshSnapshots)

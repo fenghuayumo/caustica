@@ -101,6 +101,10 @@ namespace caustica::render
         caustica::rhi::CommandListHandle m_featureCommandList;
 
         void computeExposure(caustica::rhi::CommandList* commandList, caustica::rhi::Buffer* toneMapperExposureBuffer, float exposureScale);
+
+        // ADR 0002 S4: graphics fence before NGX ReleaseFeature (not device-wide idle).
+        void waitBeforeReleaseFeature();
+        caustica::rhi::EventQueryHandle m_featureSyncQuery;
         
     #if CAUSTICA_WITH_DX11
         static std::unique_ptr<DLSS> createDX11(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
