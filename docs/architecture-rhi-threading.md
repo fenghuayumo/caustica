@@ -2,19 +2,22 @@
 
 Caustica already splits **logic** and **render** via Extract + `RenderThread` (see [architecture-render-proxy.md](architecture-render-proxy.md)). This document defines the RHI rules that make that split and parallel command-list recording safe.
 
-> **Evolution:** Scheduling, enqueue API collapse, and LoadSession streaming are planned in
-> [ADR 0001: TaskRuntime + unified streaming / render threading](adr/0001-task-runtime-multithreading.md).
-> Until that lands, this Phase-1 RHI contract remains authoritative.
+> **Evolution:** P1 (TaskRuntime + enqueue collapse) and P2 (unified GC, Render affinity pump,
+> structure enqueue-only) are in
+> [ADR 0001](adr/0001-task-runtime-multithreading.md). LoadSession streaming remains P3.
+> Phase-1 RHI create/submit rules below remain authoritative.
 
 ## Thread roles
 
 | Role | Responsibility |
 | --- | --- |
 | Logic thread | ECS, Extract, snapshot publish. No `executeCommandLists` / `present` / `runGarbageCollection`. |
-| Render thread (`RenderThread`) | Sole owner of queue submit, present, and RHI GC. Owns `FrameCommandContext` fork/join/submit. |
+| Render thread (`RenderThread`) | Sole owner of queue submit, present, and RHI GC. Owns `FrameCommandContext` fork/join/submit. Pumps `task::Affinity::Render`. |
 | RHI workers | May **record** into deferred command lists that were forked on the render thread. Must not close/submit/present/GC. |
 
-`caustica::isRenderThread()` is true on the dedicated render thread. When the dedicated thread is disabled, the logic thread temporarily acts as the render thread for GPU work.
+`caustica::isRenderThread()` means `ThreadDomain::Render` (not OS thread id). When the dedicated
+thread is disabled (`--syncRender`), Logic temporarily enters the Render domain for GPU work and
+pumps Affinity::Render inside `executeRenderPhase`.
 
 ## Core API rules
 
@@ -34,6 +37,7 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 - **DX12 / Vulkan:** Prefer `CommandListParameters::enableImmediateExecution = false` (the default). Multiple deferred lists may be open at once (validation allows this).
 - **DX11:** Immediate only. The D3D11 backend upgrades deferred requests to immediate.
 - Mid-frame `close → execute → waitForIdle → open` on a shared list is a **sync point**. Keep it rare, RT-only, and annotated `// THREADING: sync-point, RT-only`. Mark such graph passes `PassOptions::serialOnPrimary`.
+- `runGarbageCollection` runs once at the end of `App::executeRenderPhase` for both dedicated RT and `--syncRender` (not in `finalizeFrameTiming`).
 
 ## CommandListPool / FrameCommandContext
 

@@ -63,11 +63,11 @@ void prepareRenderFrame(App& app)
     // Serve the last committed (TLAS-compatible) packet during build. Only freeze from
     // the pre-edit cache when we have never committed before — never overwrite an
     // existing committed snapshot with newer ECS state that is not AS-ready yet.
+    // Freeze a serve target when possible so path tracing can keep the old TLAS
+    // while the new structure builds. Cold start with no prior commit still enqueues
+    // (WorldRenderer presents without structure until commit).
     if (canStartStructure && !scene->committedRenderData())
         scene->freezeCommittedFromLogicCache();
-
-    const bool haveCommittedServeTarget =
-        !canStartStructure || static_cast<bool>(scene->committedRenderData());
 
     // Pure frame copy: active camera already resolved after TransformPropagate.
     scene::FrameExtractInputs frameInputs;
@@ -84,14 +84,9 @@ void prepareRenderFrame(App& app)
     if (!canStartStructure)
         return;
 
-    // No prior proxies to serve during build (first structure publish) — exclusive sync.
-    if (!haveCommittedServeTarget)
-    {
-        device->waitForRenderThreadIdle();
-        flushPendingStructureGpuSync(app);
-        return;
-    }
-
+    // Cold start (no committed serve target): still enqueue. WorldRenderer serves
+    // nullptr structure while the build is in flight (empty/placeholder present).
+    // Do not flushPendingStructureGpuSync — ADR 0001 P2.
     enqueuePendingStructureGpu(app);
 }
 

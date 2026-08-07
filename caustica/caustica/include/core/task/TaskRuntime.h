@@ -9,9 +9,10 @@
 // caustica::task — product-facing TaskRuntime (ADR 0001)
 //
 // Sole scheduler hub for background / parallel work.
-// P1: workers + priority + Pipe serialization + groups + parallelFor.
-// Affinity::Logic/Render/IO are accepted but currently share the Any worker
-// pool unless a Pipe is set (true domain pumping is P2 / Render pipe).
+// Affinity::Any (+ optional Pipe) runs on worker threads.
+// Affinity::Render is pumped on the render domain via pumpRender() (ADR 0001 P2)
+// — call from RenderThread::threadMain and sync executeRenderPhase.
+// Affinity::Logic / IO currently share Any workers (domain pumps TBD).
 // =============================================================================
 
 namespace caustica::task
@@ -91,6 +92,13 @@ void wait(TaskHandle handle);
 [[nodiscard]] bool poll(TaskHandle handle);
 
 void helpOnce();
+
+// --- Render domain queue (Affinity::Render) --------------------------------
+// Optional wake when a Render task is queued (e.g. RenderThread::wake).
+void setRenderWake(std::function<void()> wake);
+// Run pending Affinity::Render tasks on the calling thread (must be render domain).
+void pumpRender();
+[[nodiscard]] bool isRenderDomainBusy();
 
 [[nodiscard]] uint64_t frameGeneration();
 void bumpFrameGeneration();

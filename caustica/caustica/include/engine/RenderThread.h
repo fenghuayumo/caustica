@@ -45,6 +45,9 @@ public:
 
     void waitForIdle();
 
+    // Wake the worker so it can pump Affinity::Render tasks (task::setRenderWake).
+    void wake();
+
     void notifyFrameCompleted(RenderFrameCompletion completion);
     [[nodiscard]] std::optional<RenderFrameCompletion> consumeCompletedFrame();
 

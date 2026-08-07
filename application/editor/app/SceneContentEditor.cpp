@@ -170,3 +170,4 @@ void SceneContentEditor::setMeshVertices(caustica::ecs::Entity entity,
 
 
 
+

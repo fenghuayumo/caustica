@@ -10,6 +10,7 @@
 
 #include <backend/GpuDevice.h>
 #include <core/ThreadContext.h>
+#include <core/task/TaskRuntime.h>
 #include <engine/cmdline_utils.h>
 #include <platform/window.h>
 
@@ -674,13 +675,7 @@ bool App::dispatchScheduledRender(SystemContext& context)
 void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
-    // When the dedicated render thread is active, GC already ran at the end of executeRenderPhase.
-    // Only GC here for the single-threaded (no dedicated RT) path.
-    if (!m_useDedicatedRenderThread || !m_renderThread.isRunning())
-    {
-        if (caustica::rhi::Device* rhiDevice = gpuDevice.getDevice())
-            rhiDevice->runGarbageCollection();
-    }
+    // RHI GC always runs at the end of executeRenderPhase (dedicated and --syncRender).
     gpuDevice.updateAverageFrameTime(elapsedTime);
     gpuDevice.m_PreviousFrameTimestamp = curTime;
     ++gpuDevice.m_FrameIndex;
@@ -689,6 +684,8 @@ void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double c
 bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex)
 {
     const ThreadDomainScope renderDomain(ThreadDomain::Render);
+    // --syncRender: Logic thread is the render domain pump for Affinity::Render.
+    task::pumpRender();
 
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
@@ -730,13 +727,9 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (!gpuDevice->m_DeviceParams.headlessDevice)
         StreamlineIntegration::Get().presentEnd(*gpuDevice);
 #endif
-    // RHI GC is render-thread-owned when the dedicated RT is active
-    // (see docs/architecture-rhi-threading.md). Single-threaded mode GCs in finalizeFrameTiming.
-    if (m_useDedicatedRenderThread && m_renderThread.isRunning())
-    {
-        if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice())
-            rhiDevice->runGarbageCollection();
-    }
+    // Sole GC site for both dedicated RT and --syncRender (ADR 0001 P2).
+    if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice())
+        rhiDevice->runGarbageCollection();
     return ok;
 }
 

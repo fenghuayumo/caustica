@@ -1,5 +1,6 @@
 #include <engine/RenderThread.h>
 #include <core/ThreadContext.h>
+#include <core/task/TaskRuntime.h>
 
 #include <cassert>
 
@@ -27,10 +28,10 @@ void RenderThread::start()
         m_queue.clear();
         m_syncPending = false;
         m_syncDone = false;
-        m_syncTask = nullptr;
-        m_inFlight = 0;
-        m_executing = false;
     }
+    m_syncTask = nullptr;
+    m_inFlight = 0;
+    m_executing = false;
 
     {
         std::lock_guard lock(m_completionMutex);
@@ -39,6 +40,8 @@ void RenderThread::start()
 
     m_thread = std::thread([this] { threadMain(); });
     m_running.store(true, std::memory_order_release);
+
+    task::setRenderWake([this]() { wake(); });
 }
 
 void RenderThread::stop()
@@ -59,13 +62,18 @@ void RenderThread::stop()
 
     m_running.store(false, std::memory_order_release);
     m_renderThreadId.store(std::thread::id{}, std::memory_order_release);
+    task::setRenderWake(nullptr);
 }
 
 bool RenderThread::isRenderThread() const
 {
-    if (!m_running.load(std::memory_order_acquire))
-        return false;
-    return std::this_thread::get_id() == m_renderThreadId.load(std::memory_order_acquire);
+    // Unified with caustica::isRenderThread() / assertRenderThread (ThreadDomain).
+    return caustica::isRenderThread();
+}
+
+void RenderThread::wake()
+{
+    m_cv.notify_one();
 }
 
 void RenderThread::dispatch(std::function<void()> task)
@@ -130,11 +138,15 @@ void RenderThread::waitForIdle()
         return;
 
     if (isRenderThread())
+    {
+        task::pumpRender();
         return;
+    }
 
     std::unique_lock lock(m_mutex);
     m_cv.wait(lock, [this] {
-        return m_queue.empty() && !m_executing && m_inFlight == 0 && !m_syncPending;
+        return m_queue.empty() && !m_executing && m_inFlight == 0 && !m_syncPending
+            && !task::isRenderDomainBusy();
     });
 }
 
@@ -164,11 +176,21 @@ void RenderThread::threadMain()
     while (true)
     {
         m_cv.wait(lock, [this] {
-            return m_stop || m_syncPending || !m_queue.empty();
+            return m_stop || m_syncPending || !m_queue.empty() || task::isRenderDomainBusy();
         });
 
-        if (m_stop && !m_syncPending && m_queue.empty())
+        if (m_stop && !m_syncPending && m_queue.empty() && !task::isRenderDomainBusy())
             break;
+
+        // Pump Affinity::Render tasks before frame/sync work (ADR 0001 P2).
+        if (task::isRenderDomainBusy())
+        {
+            lock.unlock();
+            task::pumpRender();
+            lock.lock();
+            m_cv.notify_all();
+            continue;
+        }
 
         if (m_syncPending)
         {
@@ -177,6 +199,7 @@ void RenderThread::threadMain()
             lock.unlock();
 
             task();
+            task::pumpRender();
 
             lock.lock();
             m_syncDone = true;
@@ -193,6 +216,7 @@ void RenderThread::threadMain()
         lock.unlock();
 
         task();
+        task::pumpRender();
 
         lock.lock();
         m_executing = false;
@@ -201,6 +225,7 @@ void RenderThread::threadMain()
         m_cv.notify_all();
     }
 
+    task::pumpRender();
     m_renderThreadId.store(std::thread::id{}, std::memory_order_release);
 }
 

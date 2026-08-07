@@ -75,6 +75,11 @@ struct Runtime
     std::condition_variable wakeCv;
     std::deque<std::shared_ptr<TaskState>> queues[kPriorityCount];
 
+    std::mutex renderQueueMutex;
+    std::deque<std::shared_ptr<TaskState>> renderQueue;
+    std::atomic<uint32_t> renderPending{0}; // queued + currently pumping
+    std::function<void()> renderWake;
+
     std::mutex pipeMutex;
     std::unordered_map<std::string, std::unique_ptr<Pipe>> pipes;
 
@@ -86,6 +91,18 @@ Runtime& runtime()
 {
     static Runtime r;
     return r;
+}
+
+void enqueueRenderDomain(std::shared_ptr<TaskState> task)
+{
+    auto& rt = runtime();
+    rt.renderPending.fetch_add(1, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(rt.renderQueueMutex);
+        rt.renderQueue.push_back(std::move(task));
+    }
+    if (rt.renderWake)
+        rt.renderWake();
 }
 
 void completeTask(const std::shared_ptr<TaskState>& task);
@@ -127,6 +144,12 @@ void queueReadyTask(const std::shared_ptr<TaskState>& task)
     if (task->pipe)
     {
         task->pipe->enqueue(task);
+        return;
+    }
+
+    if (task->affinity == Affinity::Render)
+    {
+        enqueueRenderDomain(task);
         return;
     }
 
@@ -243,6 +266,12 @@ void Pipe::scheduleNextUnlocked()
     auto next = std::move(m_pending.front());
     m_pending.pop_front();
 
+    if (next->affinity == Affinity::Render)
+    {
+        detail::enqueueRenderDomain(std::move(next));
+        return;
+    }
+
     auto& rt = detail::runtime();
     const size_t prio = std::min(static_cast<size_t>(next->priority), detail::kPriorityCount - 1);
     {
@@ -307,6 +336,12 @@ void shutdown()
             q.clear();
     }
     {
+        std::lock_guard<std::mutex> lock(rt.renderQueueMutex);
+        rt.renderQueue.clear();
+        rt.renderWake = nullptr;
+        rt.renderPending.store(0, std::memory_order_release);
+    }
+    {
         std::lock_guard<std::mutex> lock(rt.pipeMutex);
         rt.pipes.clear();
     }
@@ -349,7 +384,6 @@ TaskHandle create(TaskDesc desc)
     state->pipe = desc.pipe;
     state->generation = desc.generation;
     state->generationDomain = desc.generationDomain;
-    (void)state->affinity;
 
     TaskHandle handle;
     handle.m_state = std::static_pointer_cast<void>(std::move(state));
@@ -423,6 +457,39 @@ bool poll(TaskHandle handle)
 void helpOnce()
 {
     detail::helpOnceInternal();
+}
+
+void setRenderWake(std::function<void()> wake)
+{
+    auto& rt = detail::runtime();
+    std::lock_guard<std::mutex> lock(rt.renderQueueMutex);
+    rt.renderWake = std::move(wake);
+}
+
+void pumpRender()
+{
+    auto& rt = detail::runtime();
+    for (;;)
+    {
+        std::shared_ptr<detail::TaskState> task;
+        {
+            std::lock_guard<std::mutex> lock(rt.renderQueueMutex);
+            if (rt.renderQueue.empty())
+                break;
+            task = std::move(rt.renderQueue.front());
+            rt.renderQueue.pop_front();
+        }
+        if (task)
+        {
+            detail::runTaskBody(task);
+            rt.renderPending.fetch_sub(1, std::memory_order_release);
+        }
+    }
+}
+
+bool isRenderDomainBusy()
+{
+    return detail::runtime().renderPending.load(std::memory_order_acquire) > 0;
 }
 
 uint64_t frameGeneration()

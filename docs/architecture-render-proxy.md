@@ -124,8 +124,9 @@ While `structureGpuBuildInFlight()`:
 - `SceneGpuUpdater::refresh` skips so it cannot race prune/upload against the old TLAS
 - RT commits with `finishStructureGpuBuild` after binding-set recreate
 
-First structure publish with no prior extract still uses exclusive `flushPendingStructureGpuSync`.
-Full scene load remains exclusive (`SceneLifecycle` / internal `GpuRenderSubsystem`).
+First structure publish with no committed packet enqueues async build; WorldRenderer serves
+null structure (empty/placeholder present) until commit. `flushPendingStructureGpuSync` is
+deprecated. Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`) — P3.
 
 ## Current status and boundaries
 

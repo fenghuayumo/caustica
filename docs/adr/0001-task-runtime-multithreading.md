@@ -253,12 +253,12 @@ Rules:
 
 ### P2 — Render frame as tasks
 
-1. `RenderThread` executes Render-pipe tasks (dedicated thread remains default).
-2. One `executeRenderPhase` completion + GC path for dedicated and sync modes.
-3. Structure path: enqueue-only; cold start placeholder or empty present; deprecate `flushPendingStructureGpuSync`.
-4. Unify `isRenderThread` (domain vs thread id — pick one).
+1. [x] `RenderThread` pumps `task::Affinity::Render` (dedicated thread remains default; `--syncRender` pumps in `executeRenderPhase`).
+2. [x] One GC path: end of `executeRenderPhase` only (removed sync-only GC from `finalizeFrameTiming`).
+3. [x] Structure cold start enqueue-only + empty present; `flushPendingStructureGpuSync` `[[deprecated]]` and unused.
+4. [x] Unify `isRenderThread` → `ThreadDomain::Render` (`RenderThread::isRenderThread` delegates to free function).
 
-**Exit:** no dual GC; structure sync flush gone or `[[deprecated]]` unused.
+**Exit:** no dual GC; structure sync flush deprecated/unused.
 
 ### P3 — LoadSession amortized streaming
 
