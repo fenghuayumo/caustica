@@ -28,8 +28,8 @@ Before P1–P3 the engine already had Logic / Extract / RenderThread, triple-buf
 | Open Scene | `LoadSession` + budgeted GpuStreaming; host busy = `LoadSession::isBusy()` |
 | Structure | Enqueue-only + committed-serve; sync flush **removed** |
 | Upload happy path | R1 `StreamingUploadBudget` (no per-batch `waitForIdle`) |
-| Remaining sync | Frame-path `waitForIdle` (DLSS / OMM / ToneMapping AE / needNewPasses / teardown) — **not** LoadSession glue; leave until a dedicated RHI sync ADR |
-| Next | R3 free-threaded create (new ADR + profiling); frame-path sync ADR if needed |
+| Remaining sync | Frame-path sync → **[ADR 0002](0002-frame-path-rhi-sync.md)** (fence/retire; not LoadSession glue) |
+| Next | ADR 0002 S1–S5; R3 free-threaded create (separate ADR + profiling) |
 
 ## Decision
 
@@ -198,13 +198,9 @@ Rules:
 
 ### Remaining frame-path sync (out of R1 scope)
 
-Upload streaming no longer per-batch idles. These RT-only `waitForIdle` / serial points stay until a later RHI sync pass (not LoadSession glue):
-
-- DLSS / Streamline feature init & teardown paths
-- OMM builder sync points
-- ToneMapping auto-exposure mid-pass close/execute
-- `WorldRenderer` needNewPasses / pipeline recreate
-- Teardown / shutdown / editor undo device idle
+Upload streaming no longer per-batch idles. Frame-path RT sync is owned by
+**[ADR 0002](0002-frame-path-rhi-sync.md)** (fence / timeline / retire; Logic no
+frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 
 ## Non-goals
 
@@ -303,7 +299,7 @@ Upload streaming no longer per-batch idles. These RT-only `waitForIdle` / serial
 3. **Do not** add another “are we loading?” bool — extend `LoadSession` (phase / `secondaryStreaming` / `isBusy`) only.
 4. **Do not** widen RHI create to AnyThread without a new ADR (R3).
 5. Full scene GPU bind changes stay on StructureGpu / LoadSession budgets — no new Logic-thread `dispatchAndWait` / device `waitForIdle` on the happy path.
-6. Frame-path sync points (DLSS / OMM / AE / needNewPasses) may keep annotated RT `waitForIdle` until a dedicated RHI sync ADR; do not “fix” them drive-by in LoadSession PRs.
+6. Frame-path sync follows [ADR 0002](0002-frame-path-rhi-sync.md); do not “fix” annotated RT idles drive-by in LoadSession PRs.
 
 ## Success metrics
 

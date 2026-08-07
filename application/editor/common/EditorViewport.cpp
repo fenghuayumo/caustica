@@ -31,6 +31,7 @@ void EditorViewport::flushRetired(caustica::GpuDevice& device)
         return;
 
     // Prior path-trace / ImGui frames may still reference the retired color on the GPU.
+    // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (editor viewport retire).
     if (caustica::rhi::Device* rhiDevice = device.getDevice())
         rhiDevice->waitForIdle();
 
@@ -52,6 +53,7 @@ void EditorViewport::ensureSize(caustica::GpuDevice& device, uint32_t width, uin
     // Drop any already-retired buffers (from a previous resize) before retiring the current ones.
     if (m_retiredFramebuffer || m_retiredColor || m_retiredDepth)
     {
+        // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (editor viewport resize).
         rhiDevice->waitForIdle();
         clearRetired();
     }

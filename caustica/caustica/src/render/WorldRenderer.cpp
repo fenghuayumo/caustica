@@ -361,6 +361,8 @@ void caustica::render::WorldRenderer::createDeviceResources()
         bufferDesc.initialState = caustica::rhi::ResourceStates::Unknown;
         bufferDesc.debugName = "Feedback_Buffer_Cpu";
         m_feedback_Buffer_Cpu = device->createBuffer(bufferDesc);
+        m_feedbackReadbackQuery = device->createEventQuery();
+        m_feedbackReadbackPending = false;
 
         bufferDesc.byteSize = sizeof(DebugLineStruct) * MAX_DEBUG_LINES;
         bufferDesc.isVertexBuffer = true;
@@ -524,8 +526,7 @@ void caustica::render::WorldRenderer::onSceneLoaded(
 
 void caustica::render::WorldRenderer::onBackBufferResizing()
 {
-    device()->waitForIdle();
-    device()->runGarbageCollection();
+    (void)waitGraphicsQueueFence("onBackBufferResizing", /*runGc=*/true);
     m_context->bindingCache.clear();
     m_renderTargets = nullptr;
     m_linesPipeline = nullptr; // the pipeline is based on the framebuffer so needs a reset

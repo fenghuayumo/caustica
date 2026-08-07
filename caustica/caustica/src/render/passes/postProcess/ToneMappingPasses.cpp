@@ -3,6 +3,7 @@
 #include <backend/ViewRhiConversion.h>
 #include <scene/View.h>
 #include <sstream>
+#include <algorithm>
 #include <assert.h>
 #include <render/core/FramebufferFactory.h>
 #include <core/log.h>
@@ -194,7 +195,8 @@ bool ToneMappingPass::render(
     assert(constantsBuffer);
     m_FrameParamsSet = false;
 
-    bool commandListWasClosed = false; // to track the need to re-create volatile constant buffers
+    // Formerly set when AE closed the primary list mid-pass (removed in ADR 0002 S1).
+    constexpr bool commandListWasClosed = false;
 
     for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
@@ -259,25 +261,29 @@ bool ToneMappingPass::render(
                 commandList->setComputeState(cstate);
                 commandList->dispatch(1, 1);
 
-                if (viewData.avgLuminanceLastWritten == -1)  // first time init, we want correct data so wait & sync
-                {
-                    for (int i = 0; i < PerViewData::cReadbackLag; i++)
-                        commandList->copyBuffer( viewData.avgLuminanceBufferReadback[i], 0, viewData.avgLuminanceBufferGPU, 0, viewData.avgLuminanceBufferReadback[i]->getDesc().byteSize);
-                    commandList->close();
-                    m_device->executeCommandList(commandList);
-                    m_device->waitForIdle();
-                    commandList->open();
-                    commandListWasClosed = true;
-                }
-                viewData.avgLuminanceLastWritten = (viewData.avgLuminanceLastWritten + 1) % PerViewData::cReadbackLag;
-                commandList->copyBuffer(viewData.avgLuminanceBufferReadback[viewData.avgLuminanceLastWritten], 0, viewData.avgLuminanceBufferGPU, 0,
+                // ADR 0002 S1: lagged ring readback — no mid-pass close/execute/waitForIdle.
+                // First cReadbackLag frames keep the seeded exposure until GPU copies retire.
+                viewData.avgLuminanceLastWritten =
+                    (viewData.avgLuminanceLastWritten + 1) % PerViewData::cReadbackLag;
+                commandList->copyBuffer(
+                    viewData.avgLuminanceBufferReadback[viewData.avgLuminanceLastWritten],
+                    0,
+                    viewData.avgLuminanceBufferGPU,
+                    0,
                     viewData.avgLuminanceBufferReadback[viewData.avgLuminanceLastWritten]->getDesc().byteSize);
-                {   // map/read/unmap CPU readable buffer
-                    assert( viewData.avgLuminanceLastWritten >= 0 );
-                    int toReadIndex = (viewData.avgLuminanceLastWritten + 1)%PerViewData::cReadbackLag;
-                    void* pData = m_device->mapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex], caustica::rhi::CpuAccessMode::Read);
+                if (viewData.avgLuminanceFramesWritten < PerViewData::cReadbackLag)
+                {
+                    ++viewData.avgLuminanceFramesWritten;
+                }
+                else
+                {
+                    const int toReadIndex =
+                        (viewData.avgLuminanceLastWritten + 1) % PerViewData::cReadbackLag;
+                    void* pData = m_device->mapBuffer(
+                        viewData.avgLuminanceBufferReadback[toReadIndex],
+                        caustica::rhi::CpuAccessMode::Read);
                     assert(pData);
-                    viewData.avgLuminanceLastCaptured = std::exp2f( *static_cast<float*>(pData) );
+                    viewData.avgLuminanceLastCaptured = std::exp2f(*static_cast<float*>(pData));
                     m_device->unmapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex]);
                 }
             }
@@ -385,7 +391,8 @@ void ToneMappingPass::registerGraphPass(
         },
         caustica::rg::PassOptions{
             .sideEffect = true,
-            .serialOnPrimary = true, // mid-pass close/execute/waitForIdle/open for AE
+            // ADR 0002 S1: AE no longer closes the primary list mid-pass.
+            .serialOnPrimary = false,
         });
 }
 
@@ -482,7 +489,8 @@ float3 ToneMappingPass::getPreExposedGray(uint viewIndex)
     float3 result = inverse(m_ColorTransform) * float3(0.18f, 0.18f, 0.18f);
     if (m_AutoExposure)
     {
-        result /= float3((float)TONEMAPPING_EXPOSURE_KEY / m_PerView[viewIndex].avgLuminanceLastCaptured);
+        const float avgLum = std::max(m_PerView[viewIndex].avgLuminanceLastCaptured, 1e-6f);
+        result /= float3((float)TONEMAPPING_EXPOSURE_KEY / avgLum);
     }
     return result;
 }

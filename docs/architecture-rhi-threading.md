@@ -5,8 +5,10 @@ Caustica already splits **logic** and **render** via Extract + `RenderThread` (s
 > **Evolution:** P1–P3 + R1 upload fences + R2 `VolatileConstantBinder` are in
 > [ADR 0001](adr/0001-task-runtime-multithreading.md). R3 free-threaded create remains
 > out of scope. Phase-1 RHI create/submit rules below remain authoritative.
-> Frame-path `waitForIdle` (DLSS / OMM / ToneMapping AE / needNewPasses) is intentional
-> RT sync — not LoadSession debt; track under a future RHI sync ADR, not drive-by deletes.
+> Frame-path sync (replace device-wide idle with fence/retire; Logic no frame-path
+> `AndWait`) is [ADR 0002](adr/0002-frame-path-rhi-sync.md) — not LoadSession debt;
+> do not drive-by delete annotated RT sync-points. **S0–S2 landed** (AE/feedback +
+> `needNewPasses` / RT recreate use graphics `EventQuery`; see ADR 0002).
 
 ## Thread roles
 

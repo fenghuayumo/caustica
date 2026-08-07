@@ -345,9 +345,12 @@ void caustica::render::WorldRenderer::framePassEnsureRenderTargets(PathTracingFr
 {
     if (m_renderTargets == nullptr || m_renderTargets->isUpdateRequired(m_renderSize, m_displaySize))
     {
-        // THREADING: sync-point, RT-only (resize / recreate render targets).
-        device()->waitForIdle();
-        device()->runGarbageCollection();
+        if (!waitGraphicsQueueFence("recreate render targets", /*runGc=*/true))
+        {
+            caustica::error("WorldRenderer: graphics fence failed before render-target recreate");
+            ctx.aborted = true;
+            return;
+        }
         if (m_denoisePass)
         {
             m_denoisePass->invalidateNrdIntegrations();
@@ -454,23 +457,20 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     {
         if (m_context->diagnostics.progressInitializingRenderer.Active())
             m_context->diagnostics.progressInitializingRenderer.Set(40);
-        caustica::info("WorldRenderer: needNewPasses waitForIdle (pre createRenderPasses)");
-        // THREADING: sync-point, RT-only.
-        const bool preCreatePassesWaitOk = device()->waitForIdle();
-        if (!preCreatePassesWaitOk)
+        caustica::info("WorldRenderer: needNewPasses graphics fence (pre createRenderPasses)");
+        if (!waitGraphicsQueueFence("pre createRenderPasses", /*runGc=*/true))
         {
-            caustica::error("WorldRenderer: pre-createRenderPasses waitForIdle failed");
+            caustica::error("WorldRenderer: pre-createRenderPasses graphics fence failed");
             ctx.aborted = true;
             return;
         }
         m_frameCommands->beginPrimary();
         createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
         m_frameCommands->endFrame();
-        caustica::info("WorldRenderer: needNewPasses waitForIdle (post createRenderPasses)");
-        const bool createPassesWaitOk = device()->waitForIdle();
-        if (!createPassesWaitOk)
+        caustica::info("WorldRenderer: needNewPasses graphics fence (post createRenderPasses)");
+        if (!waitGraphicsQueueFence("post createRenderPasses", /*runGc=*/false))
         {
-            caustica::error("WorldRenderer: post-createRenderPasses waitForIdle failed");
+            caustica::error("WorldRenderer: post-createRenderPasses graphics fence failed");
             ctx.aborted = true;
             return;
         }
@@ -540,10 +540,9 @@ void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrame
         if (!ctx.needNewPasses)
             return true;
 
-        // THREADING: sync-point, RT-only.
+        // Flush init work, then wait the graphics fence (not device-wide idle).
         m_frameCommands->flushPrimary();
-        const bool waitOk = device()->waitForIdle();
-        if (!waitOk)
+        if (!waitGraphicsQueueFence(stage, /*runGc=*/false))
         {
             caustica::error("Renderer init synchronization failed after %s", stage);
             return false;
@@ -802,6 +801,50 @@ void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameCont
     (void)ctx;
 }
 
+void caustica::render::WorldRenderer::mapDebugFeedbackReadback()
+{
+    void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, caustica::rhi::CpuAccessMode::Read);
+    assert(pData);
+    memcpy(&m_feedbackData, pData, sizeof(DebugFeedbackStruct) * 1);
+    device()->unmapBuffer(m_feedback_Buffer_Cpu);
+
+    pData = device()->mapBuffer(m_debugDeltaPathTree_Cpu, caustica::rhi::CpuAccessMode::Read);
+    assert(pData);
+    memcpy(&m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
+    device()->unmapBuffer(m_debugDeltaPathTree_Cpu);
+}
+
+bool caustica::render::WorldRenderer::waitGraphicsQueueFence(const char* reason, bool runGc)
+{
+    caustica::rhi::Device* dev = device();
+    if (!dev)
+        return false;
+
+    if (!m_graphicsSyncQuery)
+        m_graphicsSyncQuery = dev->createEventQuery();
+    if (!m_graphicsSyncQuery)
+    {
+        caustica::error(
+            "WorldRenderer: createEventQuery failed (%s); falling back to waitForIdle",
+            reason ? reason : "graphics sync");
+        // THREADING: sync-point, RT-only — ADR 0002 S2 fallback.
+        const bool ok = dev->waitForIdle();
+        if (runGc)
+            dev->runGarbageCollection();
+        return ok;
+    }
+
+    // THREADING: queue fence, RT-only — ADR 0002 S2 (needNewPasses / RT recreate).
+    // Snapshots last graphics submit; does not drain compute/copy queues.
+    dev->resetEventQuery(m_graphicsSyncQuery);
+    dev->setEventQuery(m_graphicsSyncQuery, caustica::rhi::CommandQueue::Graphics);
+    dev->waitEventQuery(m_graphicsSyncQuery);
+    dev->resetEventQuery(m_graphicsSyncQuery);
+    if (runGc)
+        dev->runGarbageCollection();
+    return true;
+}
+
 void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext& ctx)
 {
     caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
@@ -810,8 +853,7 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     m_frameCommands->endFrame();
     if (ctx.needNewPasses)
     {
-        const bool finalWaitOk = device()->waitForIdle();
-        if (!finalWaitOk)
+        if (!waitGraphicsQueueFence("needNewPasses final", /*runGc=*/false))
         {
             caustica::error("Renderer init synchronization failed after final submit");
             ctx.aborted = true;
@@ -819,22 +861,52 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
         }
     }
 
-    // Full-device idle for pick/debug readback is expensive; skip on shutdown so
-    // Close is not blocked behind a path-trace + waitForIdle frame.
-    if (!m_context->gpuDevice.isShuttingDown()
+    // ADR 0002 S1: graphics-queue EventQuery instead of device-wide waitForIdle.
+    // ContinuousDebugFeedback maps last frame (1-frame lag); active pick waits the
+    // just-submitted queue fence so click-to-select stays responsive.
+    const bool wantFeedback = !m_context->gpuDevice.isShuttingDown()
         && (m_context->activeSettings().ContinuousDebugFeedback
-            || m_context->activeRuntime().Picking.hasActivePickRequest()))
-    {
-        device()->waitForIdle();
-        void* pData = device()->mapBuffer(m_feedback_Buffer_Cpu, caustica::rhi::CpuAccessMode::Read);
-        assert(pData);
-        memcpy(&m_feedbackData, pData, sizeof(DebugFeedbackStruct) * 1);
-        device()->unmapBuffer(m_feedback_Buffer_Cpu);
+            || m_context->activeRuntime().Picking.hasActivePickRequest());
+    const bool pickActive = !m_context->gpuDevice.isShuttingDown()
+        && m_context->activeRuntime().Picking.hasActivePickRequest();
 
-        pData = device()->mapBuffer(m_debugDeltaPathTree_Cpu, caustica::rhi::CpuAccessMode::Read);
-        assert(pData);
-        memcpy(&m_debugDeltaPathTree, pData, sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
-        device()->unmapBuffer(m_debugDeltaPathTree_Cpu);
+    if (m_feedbackReadbackPending && m_feedbackReadbackQuery)
+    {
+        if (pickActive)
+        {
+            // Current-frame fence wait below supersedes a lagged ContinuousDebug sample.
+            device()->resetEventQuery(m_feedbackReadbackQuery);
+            m_feedbackReadbackPending = false;
+        }
+        else if (device()->pollEventQuery(m_feedbackReadbackQuery))
+        {
+            mapDebugFeedbackReadback();
+            device()->resetEventQuery(m_feedbackReadbackQuery);
+            m_feedbackReadbackPending = false;
+        }
+    }
+
+    if (wantFeedback)
+    {
+        if (!m_feedbackReadbackQuery)
+            m_feedbackReadbackQuery = device()->createEventQuery();
+        if (m_feedbackReadbackQuery)
+        {
+            // THREADING: queue fence, RT-only — ADR 0002 S1 (debug/pick readback).
+            device()->resetEventQuery(m_feedbackReadbackQuery);
+            device()->setEventQuery(m_feedbackReadbackQuery, caustica::rhi::CommandQueue::Graphics);
+            if (pickActive)
+            {
+                device()->waitEventQuery(m_feedbackReadbackQuery);
+                mapDebugFeedbackReadback();
+                device()->resetEventQuery(m_feedbackReadbackQuery);
+                m_feedbackReadbackPending = false;
+            }
+            else
+            {
+                m_feedbackReadbackPending = true;
+            }
+        }
     }
 
     if (m_temporalAntiAliasingPass != nullptr)

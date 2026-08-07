@@ -245,6 +245,7 @@ void onSceneUnloading(App& app)
 
     // Scene::prepareForUnload mutates live ECS/resource ownership. Drain scheduled
     // render work first, then mutate on Logic; GPU resource release is async on RT.
+    // THREADING: Logic↔RT wait — ADR 0002 allowed (LoadSession exclusive teardown).
     app.waitForRenderThreadIdle();
     if (::SceneManager* manager = detail::sessionManager(app))
     {
@@ -273,6 +274,7 @@ void onSceneUnloading(App& app)
 
         if (rhi)
         {
+            // THREADING: sync-point, shutdown — ADR 0002 allowed (LoadSession teardown).
             rhi->waitForIdle();
             rhi->runGarbageCollection();
         }

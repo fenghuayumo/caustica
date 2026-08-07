@@ -251,6 +251,11 @@ private:
     void framePassPathTrace(PathTracingFrameContext& ctx);
     void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
     void framePassFinalize(PathTracingFrameContext& ctx);
+    // ADR 0002 S1: map CPU feedback after graphics-queue EventQuery (not device idle).
+    void mapDebugFeedbackReadback();
+    // ADR 0002 S2: wait last graphics submit (EventQuery), not device-wide idle.
+    // Falls back to waitForIdle only if EventQuery create fails. runGc retires destroyed resources.
+    [[nodiscard]] bool waitGraphicsQueueFence(const char* reason, bool runGc = false);
 
     void createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
     void createPostProcessRenderPasses();
@@ -330,6 +335,11 @@ private:
 
     caustica::rhi::BufferHandle                         m_feedback_Buffer_Gpu;
     caustica::rhi::BufferHandle                         m_feedback_Buffer_Cpu;
+    // ADR 0002 S1: queue fence for feedback/pick CPU map (replaces device waitForIdle).
+    caustica::rhi::EventQueryHandle                     m_feedbackReadbackQuery;
+    bool                                                m_feedbackReadbackPending = false;
+    // ADR 0002 S2: shared graphics fence for needNewPasses / RT recreate.
+    caustica::rhi::EventQueryHandle                     m_graphicsSyncQuery;
     caustica::rhi::BufferHandle                         m_debugLineBufferCapture;
     caustica::rhi::BufferHandle                         m_debugLineBufferDisplay;
     caustica::rhi::ShaderHandle                         m_linesVertexShader;

@@ -391,6 +391,7 @@ void EnvMapProcessor::preUpdate(caustica::rhi::CommandList* commandList, caustic
             Handle<ImageAsset> image = m_textureCache->loadTextureFromFile(fullPath, false, &renderDevice, commandList);
             commandList->close();
             m_device->executeCommandList(commandList);
+            // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (env map load readback).
             m_device->waitForIdle();
             commandList->open();
 
@@ -629,6 +630,7 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
 
         commandList->close();
         m_device->executeCommandList(commandList);
+        // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (debug bake readback).
         m_device->waitForIdle();
 
         auto blob = saveStagingTextureAsDDS(m_device, cubemapStaging);

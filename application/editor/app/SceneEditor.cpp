@@ -464,6 +464,7 @@ void SceneEditor::processPendingEditActions()
     // Transform undo reverses a change that may still be referenced by one of the
     // two pipelined render frames. Drain the render thread before publishing the
     // reverse transform. GPU waitForIdle for undo runs on the render thread.
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (editor undo/redo; not frame loop).
     m_app->waitForRenderThreadIdle();
     GpuDevice* gpuDevice = m_app->getGpuDevice();
     if (!gpuDevice || gpuDevice->isShuttingDown())

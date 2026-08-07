@@ -100,6 +100,7 @@ void StreamingUploadBudget::trackSubmit(
     if (!query)
     {
         caustica::error("StreamingUploadBudget: createEventQuery failed; falling back to waitForIdle");
+        // THREADING: sync-point, RT-only — ADR 0001 R1 fallback (query create failed).
         if (!device->waitForIdle())
             caustica::error("StreamingUploadBudget: waitForIdle failed after query create failure");
         device->runGarbageCollection();

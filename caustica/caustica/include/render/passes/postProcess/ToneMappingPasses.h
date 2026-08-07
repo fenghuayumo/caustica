@@ -51,12 +51,15 @@ private:
         caustica::rhi::TextureHandle sourceTexture;
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
-        // used for readback
-        static constexpr int cReadbackLag = 3;  // if used once per frame then it should be backbuffer (swapchain) count + 1 to ensure it never blocks
+        // Ring readback: map oldest slot only after cReadbackLag GPU frames (ADR 0002 S1).
+        static constexpr int cReadbackLag = 3;  // swapchain count + 1 so map never blocks
         caustica::rhi::BufferHandle avgLuminanceBufferGPU;
         caustica::rhi::BufferHandle avgLuminanceBufferReadback[cReadbackLag];
         int                 avgLuminanceLastWritten     = -1;
-        float               avgLuminanceLastCaptured    = 0.0;
+        int                 avgLuminanceFramesWritten   = 0;
+        // Seed until the ring is warm — avoids mid-pass waitForIdle on first AE frame.
+        // Matches TONEMAPPING_EXPOSURE_KEY in ToneMapping_cb.h.
+        float               avgLuminanceLastCaptured    = 0.042f;
 #endif
     };
         

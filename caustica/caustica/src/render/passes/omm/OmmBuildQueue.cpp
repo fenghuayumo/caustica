@@ -184,7 +184,7 @@ OmmBuildQueue::OmmBuildQueue(
     // Submit baker init command list
     initCommandList->close();
     m_device->executeCommandList(initCommandList);
-    // TODO: Do we really need to wait for device iddle here, or can we just subscribe a query to ensure resources are up by the time we use them?
+    // THREADING: sync-point, RT-only — ADR 0002 S3 (OMM baker init; replace with EventQuery).
     m_device->waitForIdle();
 }
 

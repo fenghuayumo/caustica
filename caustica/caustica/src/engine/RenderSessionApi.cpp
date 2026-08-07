@@ -173,6 +173,7 @@ uint32_t precacheRtFeaturePresets(App& app, bool showProgress)
     if (!wr)
         return 0;
     uint32_t ready = 0;
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (tool/precache; not frame loop).
     EnqueueRenderCommandAndWait(app, [wr, showProgress, &ready]() {
         ready = wr->precacheAllRtFeaturePresets(showProgress);
     });

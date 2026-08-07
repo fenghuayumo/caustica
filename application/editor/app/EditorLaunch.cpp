@@ -180,6 +180,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
             if (previousAfterPresent)
                 previousAfterPresent(device, frameIndex);
 
+            // THREADING: sync-point, RT-only — ADR 0002 tool path (automated run drain).
             const bool waitOk = device.getDevice()->waitForIdle();
             if (!waitOk)
                 error("Automated run frame sync detected device loss after frame %u", frameIndex);

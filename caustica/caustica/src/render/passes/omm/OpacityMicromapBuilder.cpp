@@ -217,6 +217,7 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
 {
     commandList.close();
     m_device->executeCommandList(&commandList);
+    // THREADING: sync-point, RT-only — ADR 0002 S3 (OMM destroy before mesh clear).
     m_device->waitForIdle();
     commandList.open();
 

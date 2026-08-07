@@ -634,6 +634,7 @@ void StreamlineIntegration::shutdown()
     // Drain GPU before freeing SL-owned resources / plugin unload.
     if (m_device)
     {
+        // THREADING: sync-point, shutdown — ADR 0002 allowed (SL teardown).
         m_device->waitForIdle();
         m_device->runGarbageCollection();
     }
@@ -908,7 +909,10 @@ void StreamlineIntegration::cleanupDLSSRR(bool wfi)
         return;
 
     if (wfi)
+    {
+        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
         m_device->waitForIdle();
+    }
 
     sl::Result status = slFreeResources(sl::kFeatureDLSS_RR, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
@@ -937,6 +941,7 @@ void StreamlineIntegration::cleanupDLSS(bool wfi)
 
     if (wfi)
     {
+        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
         m_device->waitForIdle();
     }
 
@@ -987,6 +992,7 @@ void StreamlineIntegration::cleanupNIS(bool wfi)
 
     if (wfi)
     {
+        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
         m_device->waitForIdle();
     }
 
@@ -1027,6 +1033,7 @@ void StreamlineIntegration::cleanupDeepDVC()
         return;
     }
 
+    // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
     m_device->waitForIdle();
     successCheck(slFreeResources(sl::kFeatureDeepDVC, m_viewport), "slFreeResources_DeepDVC");
 }
@@ -1138,6 +1145,7 @@ void StreamlineIntegration::cleanupDLSSG(bool wfi)
 
     if (wfi)
     {
+        // THREADING: sync-point, RT-only — ADR 0002 S4 (SL freeResources).
         m_device->waitForIdle();
     }
 
@@ -1201,6 +1209,7 @@ void StreamlineIntegration::waitForDLSSGInputsProcessing()
     }
 #endif
 
+    // THREADING: sync-point, RT-only — ADR 0002 S4 (DLSS-G fence fallback).
     if (m_device)
         m_device->waitForIdle();
 }

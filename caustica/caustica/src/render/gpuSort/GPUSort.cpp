@@ -136,6 +136,7 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
 
     if( m_scratchBuffer != nullptr )
     {
+        // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (sort scratch recreate).
         m_device->waitForIdle();    // make sure buffers are no longer used by the GPU
         m_scratchBuffer = nullptr;
         m_reducedScratchBuffer = nullptr;

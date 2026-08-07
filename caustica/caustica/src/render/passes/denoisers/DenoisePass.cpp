@@ -767,6 +767,7 @@ bool DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     commandList->copyTexture(stagingTexture, caustica::rhi::TextureSlice(), sourceTexture, caustica::rhi::TextureSlice());
     commandList->close();
     device->executeCommandList(commandList);
+    // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (OIDN reference readback).
     if (!device->waitForIdle())
     {
         commandList->open();

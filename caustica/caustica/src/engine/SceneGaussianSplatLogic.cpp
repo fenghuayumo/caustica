@@ -57,8 +57,7 @@ void ApplyGaussianSplatLocalBounds(
 void SceneGaussianSplatLogic::onSceneLoaded(SceneGaussianSplatPasses& passes)
 {
     assertLogicThread();
-    // Intentional sync: splat Pass create still runs on Logic after draining
-    // Affinity::Render (RHI Phase-1). Not a duplicate Teardown idle.
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat Pass create still on Logic).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
     loadFromSceneEntities(passes);
@@ -70,6 +69,7 @@ bool SceneGaussianSplatLogic::loadFromFile(
     bool convertRdfToRub)
 {
     assertLogicThread();
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat file load).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
     return attachToScene(passes, fileName, convertRdfToRub);
@@ -80,6 +80,7 @@ bool SceneGaussianSplatLogic::removeObjectsUnderEntity(
     ecs::Entity rootEntity)
 {
     assertLogicThread();
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (splat remove under entity).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
 

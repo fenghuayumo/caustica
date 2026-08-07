@@ -177,6 +177,7 @@ void GpuRenderSubsystem::shutdown()
     // slShutdown and can hang or crash on window close.
     if (m_gpuDevice)
     {
+        // THREADING: sync-point, shutdown — ADR 0002 allowed.
         m_gpuDevice->waitForRenderThreadIdle();
         if (caustica::rhi::Device* device = m_gpuDevice->getDevice())
             device->waitForIdle();
@@ -196,6 +197,7 @@ void GpuRenderSubsystem::shutdown()
     {
         if (caustica::rhi::Device* device = m_gpuDevice->getDevice())
         {
+            // THREADING: sync-point, shutdown — ADR 0002 allowed.
             device->waitForIdle();
             device->runGarbageCollection();
         }

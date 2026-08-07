@@ -505,9 +505,7 @@ void App::updateWindowSize()
     if (!gpuDevice)
         return;
 
-    // Per-frame dispatchAndWait stalls the UI thread behind a full path-trace
-    // frame even when the window size is unchanged — Windows title-bar Close
-    // then looks hung (spinning cursor). Only sync when something changed.
+    // THREADING: Logic↔RT wait — ADR 0002 S5 (resize only when size changed).
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
     {
         if (!gpuDevice->needsWindowSizeSync())
@@ -802,6 +800,7 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         // Snapshot slots use the logic frame index. A no-render gap can advance that
         // index onto a slot still owned by an older render frame, so drain once before
         // resuming Extract. Consecutive render frames keep the normal two-frame pipeline.
+        // THREADING: Logic↔RT wait — ADR 0002 S5 (resume Extract after skip-render gap).
         if (m_renderSkippedSinceLastSubmission)
         {
             waitForRenderThreadIdle();
@@ -872,6 +871,7 @@ void App::run()
 
         gpuDevice->setShuttingDown(true);
 
+        // THREADING: sync-point, shutdown — ADR 0002 allowed.
         if (m_useDedicatedRenderThread)
             m_renderThread.waitForIdle();
 
@@ -912,6 +912,7 @@ void App::run()
     // Signal in-flight RT work to skip long RTPSO / shader rebuilds before we drain.
     gpuDevice->setShuttingDown(true);
 
+    // THREADING: sync-point, shutdown — ADR 0002 allowed.
     if (m_useDedicatedRenderThread)
         m_renderThread.waitForIdle();
 

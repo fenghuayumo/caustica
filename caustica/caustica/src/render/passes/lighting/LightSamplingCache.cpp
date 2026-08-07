@@ -188,6 +188,7 @@ void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFact
     // destroy resources before creating to avoid lifetimes of old and new overlapping (even with itself, due to assignment operator) - avoids fragmentation and peaks
     m_controlBuffer = m_lightsBuffer = m_lightsExBuffer = m_historyRemapCurrentToPastBuffer = m_historyRemapPastToCurrentBuffer = m_scratchBuffer = m_lightWeights = m_perLightProxyCounters = m_scratchList = m_lightSamplingProxies = nullptr;
     //m_lightingConstants = nullptr;
+    // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (light cache recreate).
     m_device->waitForIdle();    // make sure readback buffer is no longer used by the GPU
     m_controlBufferReadback = nullptr;
 
@@ -198,7 +199,10 @@ void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFact
     if (m_NEE_AT_FeedbackTotalWeight == nullptr || m_NEE_AT_FeedbackTotalWeight->getDesc().width != renderResolution.x || m_NEE_AT_FeedbackTotalWeight->getDesc().height != renderResolution.y)
     {
         if (m_NEE_AT_FeedbackTotalWeight)
+        {
+            // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (NEE-AT resize).
             m_device->waitForIdle();    // make sure none of the buffers are used by the GPU
+        }
 
         // destroy before creating to avoid lifetimes of old and new overlapping (even with itself, due to assignment operator) - avoids fragmentation and peaks
         m_NEE_AT_FeedbackTotalWeight = nullptr;
@@ -212,6 +216,7 @@ void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFact
         m_NEE_AT_HistoryDepth = nullptr;
     }
 
+    // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (light cache recreate).
     m_device->waitForIdle();    // make sure everything is deallocated and garbage collected
 
     {
@@ -1319,7 +1324,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
     else
     {
 #if LLB_ENABLE_VALIDATION   // instant feedback but significant perf hit
-        m_device->waitForIdle(); 
+        // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (debug validation).
+        m_device->waitForIdle();
 #else
         if (m_framesFromLastReadbackCopy > 5) // 5 is always safe, we won't have that many frames overlapping
 #endif

@@ -342,6 +342,7 @@ bool saveTextureToFile(
     commandList->close();
     device->executeCommandList(commandList);
 
+    // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (CPU texture readback helper).
     if (!device->waitForIdle())
         return false;
 
