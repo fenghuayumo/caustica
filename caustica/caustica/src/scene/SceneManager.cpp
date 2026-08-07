@@ -173,15 +173,6 @@ std::shared_ptr<caustica::Scene> SceneManager::loadSceneToPending(
     return nullptr;
 }
 
-std::shared_ptr<caustica::Scene> SceneManager::loadScene(
-    std::shared_ptr<caustica::IFileSystem> fs,
-    const std::filesystem::path&           sceneFileName)
-{
-    m_pendingScene = loadSceneToPending(std::move(fs), sceneFileName);
-    promotePendingScene();
-    return m_scene;
-}
-
 void SceneManager::promotePendingScene()
 {
     m_scene = std::move(m_pendingScene);

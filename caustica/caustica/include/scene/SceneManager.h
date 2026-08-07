@@ -49,9 +49,6 @@ public:
                           const std::filesystem::path& assetsPath,
                           bool forceReload);
 
-    std::shared_ptr<caustica::Scene> loadScene(std::shared_ptr<caustica::IFileSystem> fs,
-                                               const std::filesystem::path&           sceneFileName);
-
     void setAsyncLoadingEnabled(bool enabled);
     void setLoadingCallbacks(std::function<void()> onLoaded, std::function<void()> onUnloading);
     void setLoadFailedCallback(std::function<void()> onLoadFailed);

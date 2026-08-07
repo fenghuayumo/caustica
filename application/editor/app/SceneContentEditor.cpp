@@ -166,3 +166,6 @@ void SceneContentEditor::setMeshVertices(caustica::ecs::Entity entity,
 }
 
 } // namespace caustica::editor
+
+
+

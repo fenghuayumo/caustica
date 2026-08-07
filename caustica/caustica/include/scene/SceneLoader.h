@@ -14,16 +14,14 @@ namespace caustica
 // =============================================================================
 // SceneLoader — async/sync scene loading with thread management.
 //
-// Owns the loading thread and loading state.  The actual load work is
-// injected via setLoadFunc().  Call update() once per frame to join a
+// Owns the loading thread and loading state. The actual load work is
+// injected via setLoadFunc(). Call update() once per frame to join a
 // finished thread and fire the onLoaded callback.
 //
-// Typical usage from SceneManager / editor app:
-//   m_Loader.setLoadFunc([this](auto fs, auto& path) {
-//       return LoadScene(fs, path);   // subclass virtual
-//   });
-//   m_Loader.onLoaded   = [this] { sceneLoaded(); };
-//   m_Loader.onUnloading = [this] { sceneUnloading(); };
+// SceneManager wires this as:
+//   setLoadFunc → load into m_pendingScene (worker must not publish m_scene)
+//   onLoaded    → promotePendingScene + owner callback
+//   onUnloading → owner teardown + clear scene pointers
 // =============================================================================
 class SceneLoader
 {
