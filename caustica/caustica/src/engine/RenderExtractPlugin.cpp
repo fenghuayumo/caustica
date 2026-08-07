@@ -2,6 +2,7 @@
 
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/RenderExtractScratch.h>
 #include <engine/ResolvedActiveCamera.h>
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
@@ -17,24 +18,30 @@
 #include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
-
+#include <scene/SceneRenderExtract.h>
 namespace caustica
 {
-
-void prepareRenderFrame(App& app)
+namespace
 {
+
+void beginExtractFrame(App& app)
+{
+    RenderExtractScratch* scratchPtr = app.tryResource<RenderExtractScratch>();
+    if (!scratchPtr)
+        scratchPtr = &app.emplaceResource<RenderExtractScratch>();
+    auto& scratch = *scratchPtr;
+    scratch = {};
+
     auto* vs = app.tryResource<SceneViewState>();
     auto* diag = app.tryResource<render::AppDiagnostics>();
     auto* worldRendererResource = worldRenderer(app);
     auto* resolvedCamera = app.tryResource<ResolvedActiveCamera>();
     GpuDevice* device = app.getGpuDevice();
-    // Progress UI / busy gates read LoadSession only (ADR 0001 P3).
+
     const bool loadBusy = vs && vs->loadSession.isBusy();
     const bool loadSessionActive = vs && vs->loadSession.isActive();
     if (vs && !loadBusy)
         vs->progressLoading.stop();
-    // Clear RT OMM scratch when no Open Scene session; secondaryStreaming is re-mirrored
-    // from diag after the render phase if opacity builds remain.
     if (diag && !loadSessionActive)
         diag->asyncLoadingInProgress = false;
     if (vs && !loadSessionActive && !(diag && diag->asyncLoadingInProgress))
@@ -49,8 +56,6 @@ void prepareRenderFrame(App& app)
         }
     };
 
-    // PostUpdate may have refreshed with the change tick still open. Always close it
-    // after the Extract system — even when we cannot publish a snapshot this frame.
     if (!device || !worldRendererResource || !resolvedCamera)
     {
         endChangeDetection();
@@ -61,50 +66,116 @@ void prepareRenderFrame(App& app)
         return;
 
     const bool structureSync = scene->needsGpuStructureSync();
-    const bool canStartStructure = structureSync && !scene->structureGpuBuildInFlight();
+    scratch.canStartStructure = structureSync && !scene->structureGpuBuildInFlight();
 
-    // Serve the last committed (TLAS-compatible) packet during build. Only freeze from
-    // the pre-edit cache when we have never committed before — never overwrite an
-    // existing committed snapshot with newer ECS state that is not AS-ready yet.
-    // Freeze a serve target when possible so path tracing can keep the old TLAS
-    // while the new structure builds. Cold start with no prior commit still enqueues
-    // (WorldRenderer presents without structure until commit).
-    if (canStartStructure && !scene->committedRenderData())
+    if (scratch.canStartStructure && !scene->committedRenderData())
         scene->freezeCommittedFromLogicCache();
 
-    // Pure frame copy: active camera already resolved after TransformPropagate.
-    scene::FrameExtractInputs frameInputs;
-    frameInputs.activeCamera = &resolvedCamera->camera;
-    frameInputs.gaussianSplatTemporalReset = worldRendererResource->consumeGaussianSplatTemporalReset();
-    frameInputs.settings = app.tryResource<PathTracerSettings>();
-    frameInputs.runtime = app.tryResource<render::RenderRuntimeState>();
+    scratch.frameIndex = device->getPreparedRenderFrameIndex();
+    scratch.frameInputs.activeCamera = &resolvedCamera->camera;
+    scratch.frameInputs.gaussianSplatTemporalReset =
+        worldRendererResource->consumeGaussianSplatTemporalReset();
+    scratch.frameInputs.settings = app.tryResource<PathTracerSettings>();
+    scratch.frameInputs.runtime = app.tryResource<render::RenderRuntimeState>();
     if (vs)
-        frameInputs.sceneTime = vs->sceneTime;
+        scratch.frameInputs.sceneTime = vs->sceneTime;
 
-    // Sole Extract publish for this frame (includes active camera/settings).
-    scene->extractAndPublishRenderSnapshot(device->getPreparedRenderFrameIndex(), &frameInputs);
+    scene->extractLogicRenderCache(scratch.frameIndex);
+    scratch.active = true;
+}
+
+void extractGaussianSplatsSystem(App& app)
+{
+    auto* scratch = app.tryResource<RenderExtractScratch>();
+    if (!scratch || !scratch->active)
+        return;
+
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    if (!scene)
+        return;
+
+    scene::SceneRenderData* cache = scene->logicExtractCache();
+    scene::SceneEntityWorld* world = scene->getEntityWorld();
+    if (!cache || !world)
+        return;
+
+    scene::extractGaussianSplatProxies(*world, *cache);
+}
+
+void publishExtractFrame(App& app)
+{
+    auto* scratch = app.tryResource<RenderExtractScratch>();
+    if (!scratch || !scratch->active)
+        return;
+
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    if (!scene)
+    {
+        *scratch = {};
+        return;
+    }
+
+    scene->publishRenderSnapshot(scratch->frameIndex, &scratch->frameInputs);
+
+    const bool canStartStructure = scratch->canStartStructure;
+    *scratch = {};
 
     if (!canStartStructure)
         return;
 
-    // Cold start (no committed serve target): still enqueue. WorldRenderer serves
-    // nullptr structure while the build is in flight (empty/placeholder present).
-    // Structure cold start: enqueue-only + empty present (ADR 0001 P2).
     enqueuePendingStructureGpu(app);
+}
+
+} // namespace
+
+void prepareRenderFrame(App& app)
+{
+    // Compatibility entry (tests / non-schedule callers): full Extract pipeline.
+    beginExtractFrame(app);
+    extractGaussianSplatsSystem(app);
+    publishExtractFrame(app);
+}
+
+void RenderExtractPlugin::build(App& app)
+{
+    app.emplaceResource<RenderExtractScratch>();
 }
 
 void RenderExtractPlugin::configureSchedules(App& app)
 {
-    app.addSystem<system_label::ScenePrepareRenderFrame>(
+    const AppSystemOrdering extractSet = AppSystemOrdering{}
+        .runAfter<system_label::SetRenderFrameIndex>()
+        .inSet<system_set::Extract>();
+
+    app.addSystem<system_label::SceneExtractCore>(
         AppSchedule::Extract,
         [](SystemContext& ctx) {
             if (!ctx.gpuDevice || !activeScene(ctx.app))
                 return;
-
-            prepareRenderFrame(ctx.app);
+            beginExtractFrame(ctx.app);
         },
+        extractSet);
+
+    app.addSystem<system_label::SceneExtractGaussianSplats>(
+        AppSchedule::Extract,
+        [](SystemContext& ctx) { extractGaussianSplatsSystem(ctx.app); },
         AppSystemOrdering{}
-            .runAfter<system_label::SetRenderFrameIndex>()
+            .runAfter<system_label::SceneExtractCore>()
+            .inSet<system_set::Extract>());
+
+    app.addSystem<system_label::ScenePublishRenderSnapshot>(
+        AppSchedule::Extract,
+        [](SystemContext& ctx) { publishExtractFrame(ctx.app); },
+        AppSystemOrdering{}
+            .runAfter<system_label::SceneExtractGaussianSplats>()
+            .inSet<system_set::Extract>());
+
+    // Legacy label kept as an alias ordering anchor after publish.
+    app.addSystem<system_label::ScenePrepareRenderFrame>(
+        AppSchedule::Extract,
+        [](SystemContext&) {},
+        AppSystemOrdering{}
+            .runAfter<system_label::ScenePublishRenderSnapshot>()
             .inSet<system_set::Extract>());
 }
 

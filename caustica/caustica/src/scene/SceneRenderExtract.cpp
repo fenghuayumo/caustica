@@ -339,19 +339,6 @@ void ExtractCameras(SceneEntityWorld& entityWorld, ecs::World& world, SceneRende
     }
 }
 
-void ExtractGaussianSplats(ecs::World& world, SceneRenderData& out)
-{
-    out.gaussianSplats.clear();
-    world.each<GaussianSplatComponent, GlobalTransformComponent>(
-        [&](ecs::Entity entity, const GaussianSplatComponent& splat, const GlobalTransformComponent& global)
-        {
-            GaussianSplatRenderProxy proxy;
-            proxy.entity = entity;
-            proxy.enabled = splat.splat.enabled;
-            proxy.objectToWorld = global.transformFloat;
-            out.gaussianSplats.push_back(std::move(proxy));
-        });
-}
 
 void ExtractAnimationEntities(ecs::World& world, SceneRenderData& out)
 {
@@ -587,6 +574,19 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
     }
 }
 
+void extractGaussianSplatProxies(SceneEntityWorld& entityWorld, SceneRenderData& out)
+{
+    out.gaussianSplats.clear();
+    entityWorld.world().each<GaussianSplatComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const GaussianSplatComponent& splat, const GlobalTransformComponent& global) {
+            GaussianSplatRenderProxy proxy;
+            proxy.entity = entity;
+            proxy.enabled = splat.splat.enabled;
+            proxy.objectToWorld = global.transformFloat;
+            out.gaussianSplats.push_back(std::move(proxy));
+        });
+}
+
 void extractSceneRenderData(
     SceneEntityWorld& entityWorld,
     SceneRenderData& inout,
@@ -619,7 +619,6 @@ void extractSceneRenderData(
         ExtractSkinnedMeshes(world, inout, frameIndex);
         ExtractLightsFull(world, inout);
         ExtractCameras(entityWorld, world, inout);
-        ExtractGaussianSplats(world, inout);
         ExtractAnimationEntities(world, inout);
         return;
     }
@@ -644,9 +643,8 @@ void extractSceneRenderData(
     ExtractSkinnedMeshes(world, inout, frameIndex);
     // Cameras are few; refresh every frame so animated scene cams stay current.
     ExtractCameras(entityWorld, world, inout);
-    // Gaussian splats are few; refresh transforms and enabled state every frame.
-    ExtractGaussianSplats(world, inout);
     // Material snapshots are structure-owned; skip the full copy on transform-only frames.
+    // Leaf types (GaussianSplat, …): Extract schedule systems after this core pass.
 }
 
 void extractFrameRenderState(const FrameExtractInputs& inputs, SceneRenderData& out)

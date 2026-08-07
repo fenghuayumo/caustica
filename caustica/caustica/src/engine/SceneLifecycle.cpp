@@ -525,7 +525,9 @@ void onSceneLoaded(App& app)
     if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
     {
         if (GpuDevice* device = gpuDevice(app))
-            renderData = &scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex());
+            renderData = &scenePtr->extractAndPublishForGpuSetup(
+                device->getFrameIndex(),
+                nullptr);
     }
     if (!renderData)
     {

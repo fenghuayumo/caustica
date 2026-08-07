@@ -1218,13 +1218,14 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
 }
 
 const scene::SceneRenderData& Scene::extractAndPublishForGpuSetup(
-    uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
+    uint32_t frameIndex,
+    const scene::FrameExtractInputs* frameInputs)
 {
     extractAndPublishRenderSnapshot(frameIndex, frameInputs);
     return m_RenderSnapshot.readBufferForFrame(frameIndex);
 }
 
-void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
+void Scene::extractLogicRenderCache(uint32_t frameIndex)
 {
     assertLogicThread();
 
@@ -1258,9 +1259,23 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Fr
 
     scene::extractSceneRenderData(*m_EntityWorld, m_LogicExtractCache, frameIndex, flags);
     m_LogicExtractCacheValid = true;
+}
+
+scene::SceneRenderData* Scene::logicExtractCache()
+{
+    assertLogicThread();
+    return m_EntityWorld ? &m_LogicExtractCache : nullptr;
+}
+
+void Scene::publishRenderSnapshot(
+    uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
+{
+    assertLogicThread();
+
+    if (!m_EntityWorld)
+        return;
 
     scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
-
     writeBuffer = m_LogicExtractCache;
     if (frameInputs)
         scene::extractFrameRenderState(*frameInputs, writeBuffer);
@@ -1268,8 +1283,16 @@ void Scene::extractAndPublishRenderSnapshot(uint32_t frameIndex, const scene::Fr
     m_RenderSnapshot.publish(frameIndex);
 
     // ChangeDetection contract: mutate -> hierarchy refresh -> Extract(Changed<>) -> end tick.
-    // Ending the tick inside refresh() made incremental Extract always see an empty Changed set.
     m_EntityWorld->endChangeDetectionFrame();
+}
+
+void Scene::extractAndPublishRenderSnapshot(
+    uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
+{
+    extractLogicRenderCache(frameIndex);
+    if (m_EntityWorld)
+        scene::extractGaussianSplatProxies(*m_EntityWorld, m_LogicExtractCache);
+    publishRenderSnapshot(frameIndex, frameInputs);
 }
 
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const

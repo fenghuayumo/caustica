@@ -28,12 +28,15 @@ namespace caustica::scene
     };
 
     // Logic-thread only. Updates `inout` in place (UE SceneProxy sync / Bevy Extract).
-    // Callers keep a persistent cache and copy it into the triple-buffer publish slot.
+    // Core mesh/light/camera/skinned only — leaf types use Extract schedule systems.
     void extractSceneRenderData(
         SceneEntityWorld& entityWorld,
         SceneRenderData& inout,
         uint32_t frameIndex,
         SceneRenderExtractFlags flags = {});
+
+    // Extract-schedule helper (GaussianSplat). Writes `out.gaussianSplats` only.
+    void extractGaussianSplatProxies(SceneEntityWorld& entityWorld, SceneRenderData& out);
 
     // Logic-thread only. Pure copy of settings / runtime / pre-resolved active camera.
     // Consumes one-shot flags on the live settings object after copy.

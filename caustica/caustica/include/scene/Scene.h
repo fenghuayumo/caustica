@@ -123,11 +123,17 @@ namespace caustica
         // SceneLifecycle / SceneQuery — do not obtain Scene* via EngineApp.
         // Main/logic thread: extract and publish (ECS refresh runs in App PostUpdate).
         // Optional frame inputs copy pre-resolved ActiveCamera + settings into the slot.
+        // Bevy-style Extract split: core cache → leaf Extract systems → publish.
+        void extractLogicRenderCache(uint32_t frameIndex);
+        [[nodiscard]] scene::SceneRenderData* logicExtractCache();
+        void publishRenderSnapshot(
+            uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs = nullptr);
+
+        // Convenience: core + gaussian splat extract + publish (load / GpuSetup).
         void extractAndPublishRenderSnapshot(
             uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs = nullptr);
 
         // Extract + publish for exclusive GPU setup (load / structure flush).
-        // Returns published snapshot for frameIndex. Sole extract channel with prepareRenderFrame.
         [[nodiscard]] const scene::SceneRenderData& extractAndPublishForGpuSetup(
             uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs = nullptr);
 

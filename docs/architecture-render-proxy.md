@@ -115,6 +115,21 @@ Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRende
 Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
 (`#include <caustica.h>` + Simulation systems). Frozen surface: [public-api.md](public-api.md).
 
+## Extract schedule (P2)
+
+Leaf Extract is Bevy-style schedule composition on `AppSchedule::Extract`
+(`RenderExtractPlugin`) — no renderable type registry:
+
+1. `Scene.ExtractCore` — mesh/light/camera/skinned into the logic cache
+2. `Scene.ExtractGaussianSplats` — splat proxies (`extractGaussianSplatProxies`)
+3. `Scene.PublishRenderSnapshot` — copy cache + frame inputs into the triple buffer
+
+Add new leaf Extract as systems ordered after Core and before Publish (or after
+sibling leaf systems). Load / GpuSetup still calls `Scene::extractAndPublishRenderSnapshot`
+(core + splat + publish in one shot). GPU prepare for leaf types stays type-local
+in `WorldRenderer` / pass owners (or a future Prepare schedule), not a C++ type table.
+Mesh TLAS / instance indices / committed-serve stay central.
+
 ## Async structure handoff
 
 Runtime spawn/despawn no longer `waitForRenderThreadIdle`. Extract freezes the previous

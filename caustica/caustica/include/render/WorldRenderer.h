@@ -59,7 +59,10 @@ class ICompositeView;
 class IView;
 class Scene;
 struct GpuSharedCaches;
-namespace scene { class SceneRenderData; }
+namespace scene
+{
+class SceneRenderData;
+}
 
 namespace render
 {

@@ -35,6 +35,7 @@ struct PathTracingPlugin : Plugin
 
 struct RenderExtractPlugin : Plugin
 {
+    void build(App& app) override;
     void configureSchedules(App& app) override;
 };
 
