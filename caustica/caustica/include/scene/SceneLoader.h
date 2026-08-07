@@ -17,11 +17,6 @@ namespace caustica
 // Owns the load TaskHandle and loading state. The actual load work is
 // injected via setLoadFunc(). Call update() once per frame to join a
 // finished task and fire the onLoaded callback.
-//
-// SceneManager wires this as:
-//   setLoadFunc → load into m_pendingScene (worker must not publish m_scene)
-//   onLoaded    → promotePendingScene + owner callback
-//   onUnloading → owner teardown + clear scene pointers
 // =============================================================================
 class SceneLoader
 {
@@ -35,36 +30,27 @@ public:
     SceneLoader(const SceneLoader&) = delete;
     SceneLoader& operator=(const SceneLoader&) = delete;
 
-    // --- Configuration ---
     void setLoadFunc(LoadFunc func) { m_loadFunc = std::move(func); }
     void setAsyncEnabled(bool enabled) { m_asyncLoad = enabled; }
 
-    // --- State ---
     bool isLoaded() const { return m_loaded.load(std::memory_order_acquire); }
     bool isLoading() const { return static_cast<bool>(m_task); }
 
-    // --- Lifecycle ---
-    //
-    // Starts loading.  In async mode, launches Affinity::IO on the LoadSession
-    // pipe and returns immediately; the caller should poll update() each frame.
-    // In sync mode the load function runs on the calling thread and the function
-    // returns with the work already done (isLoaded() will be true, but onLoaded
-    // is NOT fired automatically — the caller decides when to invoke it).
     void beginLoading(std::shared_ptr<IFileSystem> fs,
         const std::filesystem::path& path);
 
-    // Call once per frame.  If an async load completed, clears the task
-    // and fires onLoaded().
     void update();
-
-    // Force-reset internal state.  Does NOT fire onUnloading.
     void reset();
 
-    // --- Callbacks ---
     std::function<void()> onLoaded;
     std::function<void()> onUnloading;
 
 private:
+    friend struct ImportJob;
+
+    bool invokeLoadFunc(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& path);
+    void notifyLoadFinished(bool ok);
+
     LoadFunc m_loadFunc;
     task::TaskHandle m_task;
     std::atomic<bool> m_loaded{false};

@@ -28,12 +28,10 @@ void prepareRenderFrame(App& app)
     auto* worldRendererResource = worldRenderer(app);
     auto* resolvedCamera = app.tryResource<ResolvedActiveCamera>();
     GpuDevice* device = app.getGpuDevice();
-    // Progress UI is owned by LoadSession (ADR 0001 P3). Keep the card up while active.
+    // Progress UI / busy gates read LoadSession only (ADR 0001 P3).
+    const bool loadBusy = vs && vs->loadSession.isBusy();
     const bool loadSessionActive = vs && vs->loadSession.isActive();
-    const bool sceneSwitchInFlight = loadSessionActive
-        || (vs && vs->sceneGpuSuspended.load(std::memory_order_acquire))
-        || isSceneLoading(app);
-    if (vs && !sceneSwitchInFlight)
+    if (vs && !loadBusy)
         vs->progressLoading.stop();
     // Clear RT OMM scratch when no Open Scene session; secondaryStreaming is re-mirrored
     // from diag after the render phase if opacity builds remain.

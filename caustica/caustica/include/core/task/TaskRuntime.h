@@ -13,7 +13,8 @@
 //   Affinity::Logic  — pumpLogic() on the Logic thread (App update)
 //   Affinity::Render — pumpRender() on the render domain
 //   Affinity::IO     — dedicated IO worker(s)
-// Well-known pipes (created at initialize): "LoadSession", "Logic", "RHI.Submit".
+// Well-known pipe at initialize: "LoadSession". Other names via getPipe() on demand.
+// Prefer TaskFn + user (fixed job) over std::function body when the callee can own `user`.
 // =============================================================================
 
 namespace caustica::task
@@ -77,7 +78,9 @@ struct TaskDesc
     enum class GenerationDomain : uint8_t { Frame, Load } generationDomain =
         GenerationDomain::Frame;
 
-    // Prefer fn when set; otherwise body (legacy / capture-heavy work).
+    // Prefer fn when set; otherwise body (capture-heavy GraphBuilder / compile waves).
+    // Fixed jobs always invoke fn (even if generation advanced) so fn can free `user`
+    // and complete side effects (e.g. LoadSession stepStatus). Check generation inside fn.
     TaskFn fn = nullptr;
     void* user = nullptr;
     std::function<void()> body;
@@ -101,10 +104,8 @@ void shutdown();
 [[nodiscard]] uint32_t workerCount();
 
 [[nodiscard]] Pipe* getPipe(const char* name);
-// Well-known pipes (non-null after initialize).
+// Well-known LoadSession pipe (non-null after initialize).
 [[nodiscard]] Pipe* loadSessionPipe();
-[[nodiscard]] Pipe* logicPipe();
-[[nodiscard]] Pipe* rhiSubmitPipe();
 
 [[nodiscard]] TaskHandle create(TaskDesc desc);
 void submit(TaskHandle handle);

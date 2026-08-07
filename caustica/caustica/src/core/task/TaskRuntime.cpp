@@ -101,8 +101,6 @@ struct Runtime
     std::mutex pipeMutex;
     std::unordered_map<std::string, std::unique_ptr<Pipe>> pipes;
     Pipe* loadSessionPipe = nullptr;
-    Pipe* logicPipe = nullptr;
-    Pipe* rhiSubmitPipe = nullptr;
 
     std::atomic<uint64_t> frameGen{1};
     std::atomic<uint64_t> loadGen{1};
@@ -130,12 +128,15 @@ bool isStale(const TaskState& task)
 
 void runTaskBody(const std::shared_ptr<TaskState>& task)
 {
-    if (!isStale(*task))
+    if (task->fn)
     {
-        if (task->fn)
-            task->fn(task->user);
-        else if (task->body)
-            task->body();
+        // Always invoke: fixed jobs own `user` lifetime and may need to publish
+        // completion flags even when Load/Frame generation advanced.
+        task->fn(task->user);
+    }
+    else if (task->body && !isStale(*task))
+    {
+        task->body();
     }
 
     if (task->pipe)
@@ -423,8 +424,6 @@ void initialize(uint32_t numWorkers, uint32_t reservedThreads)
     rt.running.store(true, std::memory_order_release);
 
     rt.loadSessionPipe = getPipe("LoadSession");
-    rt.logicPipe = getPipe("Logic");
-    rt.rhiSubmitPipe = getPipe("RHI.Submit");
 
     rt.workers.clear();
     rt.workers.reserve(anyWorkers);
@@ -437,7 +436,7 @@ void initialize(uint32_t numWorkers, uint32_t reservedThreads)
         rt.ioWorkers.emplace_back(detail::ioWorkerMain);
 
     caustica::info(
-        "TaskRuntime initialized: %u Any workers, %u IO workers; pipes LoadSession/Logic/RHI.Submit",
+        "TaskRuntime initialized: %u Any workers, %u IO workers; pipe LoadSession",
         anyWorkers,
         ioWorkers);
 }
@@ -495,8 +494,6 @@ void shutdown()
         std::lock_guard<std::mutex> lock(rt.pipeMutex);
         rt.pipes.clear();
         rt.loadSessionPipe = nullptr;
-        rt.logicPipe = nullptr;
-        rt.rhiSubmitPipe = nullptr;
     }
 }
 
@@ -530,16 +527,6 @@ Pipe* getPipe(const char* name)
 Pipe* loadSessionPipe()
 {
     return detail::runtime().loadSessionPipe;
-}
-
-Pipe* logicPipe()
-{
-    return detail::runtime().logicPipe;
-}
-
-Pipe* rhiSubmitPipe()
-{
-    return detail::runtime().rhiSubmitPipe;
 }
 
 TaskHandle create(TaskDesc desc)

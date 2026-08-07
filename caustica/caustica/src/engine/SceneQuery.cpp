@@ -123,8 +123,11 @@ std::filesystem::path currentScenePath(const App& app)
 
 bool isSceneStructureBusy(const App& app)
 {
+    // LoadSession is the sole Open Scene / secondary-streaming busy signal (ADR 0001).
+    if (const SceneViewState* vs = app.tryResource<SceneViewState>(); vs && vs->loadSession.isBusy())
+        return true;
     ::SceneManager* manager = sessionManager(app);
-    return manager && manager->isSceneStructureBusy();
+    return manager && manager->isStructureEditInFlight();
 }
 
 bool shouldSkipRender(const App& app)
@@ -134,6 +137,10 @@ bool shouldSkipRender(const App& app)
 
 bool isSceneLoading(const App& app)
 {
+    // Prefer LoadSession (Importing / GpuStreaming / Teardown / OMM secondary).
+    // SceneManager::isSceneLoading is Importing-only (SceneLoader task).
+    if (const SceneViewState* vs = app.tryResource<SceneViewState>(); vs && vs->loadSession.isBusy())
+        return true;
     ::SceneManager* manager = sessionManager(app);
     return manager && manager->isSceneLoading();
 }

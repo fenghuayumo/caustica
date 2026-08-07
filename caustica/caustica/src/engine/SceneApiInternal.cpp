@@ -6,6 +6,7 @@
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
+#include <engine/LoadSession.h>
 #include <core/path_utils.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
@@ -64,14 +65,10 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    if (manager->isSceneLoading() || vs->loadSession.isActive())
+    if (vs->loadSession.isBusy())
     {
-        sceneSwitchTrace("applySceneSwitch: ignored, LoadSession/import in flight");
-        return;
-    }
-    if (vs->sceneGpuSuspended.load(std::memory_order_acquire))
-    {
-        sceneSwitchTrace("applySceneSwitch: ignored, sceneGpuSuspended (teardown)");
+        sceneSwitchTrace("applySceneSwitch: ignored, LoadSession busy (phase=%s)",
+            loadSessionPhaseName(vs->loadSession.phase));
         return;
     }
 

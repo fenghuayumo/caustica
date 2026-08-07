@@ -868,12 +868,7 @@ bool SceneEditor::openSceneFromDialog()
         return false;
     if (caustica::isSceneStructureBusy(*m_app))
     {
-        caustica::warning("Open Scene: ignored, scene structure busy");
-        return false;
-    }
-    if (m_viewState.sceneGpuSuspended.load(std::memory_order_acquire))
-    {
-        caustica::warning("Open Scene: ignored, sceneGpuSuspended");
+        caustica::warning("Open Scene: ignored, scene structure / LoadSession busy");
         return false;
     }
 

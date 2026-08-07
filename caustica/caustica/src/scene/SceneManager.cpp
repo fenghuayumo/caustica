@@ -208,10 +208,8 @@ void SceneManager::setLoadFailedCallback(std::function<void()> onLoadFailed)
 void SceneManager::beginLoadingScene(std::shared_ptr<caustica::IFileSystem> fs,
                                      const std::filesystem::path& sceneFileName)
 {
-    // Drain the dedicated render thread only. Device::waitForIdle belongs on the
-    // render thread inside onSceneUnloading — never from the logic thread.
-    m_device.waitForRenderThreadIdle();
-
+    // Teardown already drained Affinity::Render before prepareForUnload. Do not
+    // waitForRenderThreadIdle again here — Import is CPU/IO on LoadSession pipe.
     m_loader.beginLoading(std::move(fs), sceneFileName);
 
     if (!m_loader.isLoading() && m_loader.isLoaded() && m_loader.onLoaded)

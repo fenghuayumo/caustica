@@ -80,6 +80,7 @@ public:
     std::shared_ptr<AudioData const> loadFromFileAsync(const std::filesystem::path & path);
 
 private:
+    friend struct AudioLoadJob;
 
     static std::shared_ptr<AudioData const> importRiff(std::shared_ptr<caustica::IBlob> blob, char const * filepath);
 

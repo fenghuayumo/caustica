@@ -57,6 +57,8 @@ void ApplyGaussianSplatLocalBounds(
 void SceneGaussianSplatLogic::onSceneLoaded(SceneGaussianSplatPasses& passes)
 {
     assertLogicThread();
+    // Intentional sync: splat Pass create still runs on Logic after draining
+    // Affinity::Render (RHI Phase-1). Not a duplicate Teardown idle.
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
     loadFromSceneEntities(passes);

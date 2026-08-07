@@ -94,6 +94,9 @@ public:
     std::shared_ptr<ImageAsset> getImage(const Handle<ImageAsset>& image) const { return image.shared(); }
 
 private:
+    friend struct TextureDecodeFileJob;
+    friend struct TextureDecodeMemoryJob;
+
     caustica::rhi::DeviceHandle m_Device;
     caustica::rhi::CommandListHandle m_CommandList;
 

@@ -19,9 +19,6 @@ void onSceneUnloading(App& app);
 // Advance LoadSession (budgeted GPU bind). Safe to call every frame; never blocks Logic on RT.
 void tickLoadSession(App& app);
 
-// Deprecated alias — prefer tickLoadSession (ADR 0001 P3).
-inline void tickSceneGpuBind(App& app) { tickLoadSession(app); }
-
 void collectUncompressedTextures(App& app);
 [[nodiscard]] bool hasAsyncLoadingInProgress(const App& app);
 

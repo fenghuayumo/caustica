@@ -38,6 +38,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cfloat>
+#include <memory>
+#include <utility>
 #include <functional>
 #include <thread>
 #include <chrono>
@@ -457,27 +459,43 @@ bool pollLoadStreamStep(LoadSession& session)
     return false;
 }
 
+struct LoadStreamStepJob
+{
+    std::function<void()> body;
+    LoadSession* session = nullptr;
+    uint64_t generation = 0;
+
+    static void run(void* user)
+    {
+        std::unique_ptr<LoadStreamStepJob> job(static_cast<LoadStreamStepJob*>(user));
+        if (job->session && job->generation == task::loadGeneration() && job->body)
+            job->body();
+        // Always publish completion so Logic can advance / abort after LoadGen bump.
+        if (job->session)
+        {
+            uint8_t expected = 0;
+            job->session->stepStatus.compare_exchange_strong(
+                expected, 1, std::memory_order_release, std::memory_order_relaxed);
+        }
+    }
+};
+
 void beginLoadStreamStep(App& /*app*/, LoadSession& session, std::function<void()> body)
 {
     session.stepStatus.store(0, std::memory_order_release);
     session.stepInFlight = true;
 
-    // Formal LoadSession pipe + Render affinity (ADR 0001). Serialized with other
-    // LoadSession-pipe work; executed by pumpRender on the render domain.
-    task::TaskDesc desc;
-    desc.name = "LoadSession.StreamStep";
-    desc.priority = task::Priority::High;
-    desc.affinity = task::Affinity::Render;
-    desc.pipe = task::loadSessionPipe();
-    task::stampLoadGeneration(desc);
-    desc.body = [body = std::move(body), &session]() {
-        body();
-        // body sets stepStatus to ok/fail; default ok if left pending.
-        uint8_t expected = 0;
-        session.stepStatus.compare_exchange_strong(
-            expected, 1, std::memory_order_release, std::memory_order_relaxed);
-    };
-    (void)task::launch(std::move(desc));
+    auto job = std::make_unique<LoadStreamStepJob>();
+    job->body = std::move(body);
+    job->session = &session;
+    job->generation = task::loadGeneration();
+    (void)task::launch(
+        "LoadSession.StreamStep",
+        task::Priority::High,
+        task::Affinity::Render,
+        &LoadStreamStepJob::run,
+        job.release(),
+        task::loadSessionPipe());
 }
 
 } // namespace

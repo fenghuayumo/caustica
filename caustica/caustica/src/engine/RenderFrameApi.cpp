@@ -96,7 +96,7 @@ namespace
     {
         AssetSystem* assets = app.tryResource<AssetSystem>();
         ::SceneManager* manager = detail::sessionManager(app);
-        if (!assets || !manager || manager->isSceneLoading())
+        if (!assets || !manager || isSceneLoading(app))
             return false;
 
         const std::vector<HotReloadChange> changes = assets->pollHotReloadChanges();

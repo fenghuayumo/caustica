@@ -182,7 +182,7 @@ Rules:
 | --- | --- | --- |
 | `SceneLoader` | `include/scene/SceneLoader.h` | Keep as CPU import worker host; jobs become Background tasks |
 | `loadSceneToPending` / `promotePendingScene` | `SceneManager` | Keep |
-| `GpuBindPhase` / `tickSceneGpuBind` | `SceneViewState`, `SceneLifecycle.cpp` | Fold into `LoadSession` |
+| `GpuBindPhase` / `tickSceneGpuBind` | (removed) | Folded into `LoadSession` / `tickLoadSession` |
 | `sceneGpuSuspended` | `SceneViewState` / `App::skipRenderPhase` | Narrow window |
 | `GpuRenderSubsystem` trampoline | lifecycle / GPU bind | Thin or absorb into LoadSession owner |
 | `flushTextures(8.f)` / `uploadMeshes(..., 1)` | `SceneLifecycle` / `SceneGpuUpdater` | Budget knobs on LoadSession |
@@ -273,10 +273,10 @@ Rules:
 ### P1 follow-up — domain pumps / pipes / observability (landed)
 
 1. [x] `Affinity::Logic` / `Affinity::IO` own queues; `pumpLogic()` each App update; dedicated IO worker(s).
-2. [x] Well-known pipes registered at `task::initialize`: `LoadSession`, `Logic`, `RHI.Submit`.
-3. [x] LoadSession import (`SceneLoader`) + GpuStreaming steps launch on `loadSessionPipe()` with `stampLoadGeneration`.
-4. [x] P1.1 `TaskFn` + `void* user` on `TaskDesc` (alongside `std::function` body).
-5. [x] Texture / audio async decode: `Affinity::IO` + Load generation stamp.
+2. [x] Well-known pipe at initialize: `LoadSession` only (`Logic` / `RHI.Submit` on demand via `getPipe`).
+3. [x] LoadSession import + GpuStreaming steps on `loadSessionPipe()`; load jobs use `TaskFn` + LoadGen check.
+4. [x] P1.1 `TaskFn` + `void* user` (body kept for capture-heavy compile / GraphBuilder waves).
+5. [x] Host busy gates read `LoadSession::isBusy()` (`isSceneLoading` / `isSceneStructureBusy` / Open Scene / Extract).
 6. [x] Editor Debugging → TaskRuntime / LoadSession queue depths + phase (success metric).
 
 ### P4 — RHI deepen (may split ADRs)

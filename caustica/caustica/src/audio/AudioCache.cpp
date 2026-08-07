@@ -6,6 +6,8 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
+#include <utility>
 
 
 // RIFF (wav) file chunk headers
@@ -187,6 +189,28 @@ std::shared_ptr<AudioData const> AudioCache::loadFromFile(const std::filesystem:
     return audio;
 }
 
+struct AudioLoadJob
+{
+    AudioCache* self = nullptr;
+    std::filesystem::path path;
+    uint64_t generation = 0;
+
+    static void run(void* user)
+    {
+        std::unique_ptr<AudioLoadJob> job(static_cast<AudioLoadJob*>(user));
+        if (!job->self || job->generation != task::loadGeneration())
+            return;
+        if (auto loaded = job->self->loadAudioFile(job->path))
+        {
+            {
+                std::lock_guard<std::mutex> guard(job->self->m_LoadedDataMutex);
+                job->self->m_LoadedAudioData[job->path.generic_string()] = loaded;
+            }
+            job->self->sendAudioLoadedMessage(loaded, job->path.generic_string().c_str());
+        }
+    }
+};
+
 std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesystem::path & path)
 {
     std::shared_ptr<AudioData const> audio;
@@ -194,23 +218,16 @@ std::shared_ptr<AudioData const> AudioCache::loadFromFileAsync(const std::filesy
     if (findInCache(path, audio))
         return audio;
 
-    task::TaskDesc desc;
-    desc.name = "Audio.LoadFile";
-    desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::IO;
-    task::stampLoadGeneration(desc);
-    desc.body = [this, path]()
-    {
-        if (auto loaded = loadAudioFile(path))
-        {
-            {
-                std::lock_guard<std::mutex> guard(m_LoadedDataMutex);
-                m_LoadedAudioData[path.generic_string()] = loaded;
-            }
-            sendAudioLoadedMessage(loaded, path.generic_string().c_str());
-        }
-    };
-    (void)task::launch(std::move(desc));
+    auto job = std::make_unique<AudioLoadJob>();
+    job->self = this;
+    job->path = path;
+    job->generation = task::loadGeneration();
+    (void)task::launch(
+        "Audio.LoadFile",
+        task::Priority::Background,
+        task::Affinity::IO,
+        &AudioLoadJob::run,
+        job.release());
     return audio;
 }
 

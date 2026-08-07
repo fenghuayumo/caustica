@@ -24,8 +24,70 @@
 #endif // CAUSTICA_WITH_TINYEXR
 
 #include <algorithm>
+#include <memory>
+#include <string>
+#include <utility>
 
 using namespace caustica;
+
+namespace caustica
+{
+
+struct TextureDecodeFileJob
+{
+    TextureLoader* self = nullptr;
+    std::shared_ptr<ImageAsset> texture;
+    std::filesystem::path path;
+    uint64_t generation = 0;
+
+    static void run(void* user)
+    {
+        std::unique_ptr<TextureDecodeFileJob> job(static_cast<TextureDecodeFileJob*>(user));
+        if (!job->self)
+            return;
+        if (job->generation == task::loadGeneration())
+        {
+            auto fileData = job->self->readTextureFile(job->path);
+            if (fileData
+                && job->self->fillTextureData(
+                    fileData, job->texture, job->path.extension().generic_string(), ""))
+            {
+                job->self->textureLoaded(job->texture);
+                std::lock_guard<std::mutex> guard(job->self->m_TexturesToFinalizeMutex);
+                job->self->m_TexturesToFinalize.push(job->texture);
+            }
+        }
+        ++job->self->m_TexturesLoaded;
+    }
+};
+
+struct TextureDecodeMemoryJob
+{
+    TextureLoader* self = nullptr;
+    std::shared_ptr<ImageAsset> texture;
+    std::shared_ptr<IBlob> data;
+    std::string mimeType;
+    uint64_t generation = 0;
+
+    static void run(void* user)
+    {
+        std::unique_ptr<TextureDecodeMemoryJob> job(static_cast<TextureDecodeMemoryJob*>(user));
+        if (!job->self)
+            return;
+        if (job->generation == task::loadGeneration())
+        {
+            if (job->self->fillTextureData(job->data, job->texture, "", job->mimeType))
+            {
+                job->self->textureLoaded(job->texture);
+                std::lock_guard<std::mutex> guard(job->self->m_TexturesToFinalizeMutex);
+                job->self->m_TexturesToFinalize.push(job->texture);
+            }
+        }
+        ++job->self->m_TexturesLoaded;
+    }
+};
+
+} // namespace caustica
 
 class StbImageBlob : public IBlob
 {
@@ -360,27 +422,17 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFileAsync(
     texture->forceSRGB = sRGB;
     texture->path = path.generic_string();
 
-    task::TaskDesc desc;
-    desc.name = "Texture.DecodeFile";
-    desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::IO;
-    task::stampLoadGeneration(desc);
-    desc.body = [this, texture, path]() {
-        auto fileData = readTextureFile(path);
-        if (fileData)
-        {
-            if (fillTextureData(fileData, texture, path.extension().generic_string(), ""))
-            {
-                textureLoaded(texture);
-
-                std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
-                m_TexturesToFinalize.push(texture);
-            }
-        }
-
-        ++m_TexturesLoaded;
-    };
-    (void)task::launch(std::move(desc));
+    auto job = std::make_unique<TextureDecodeFileJob>();
+    job->self = this;
+    job->texture = texture;
+    job->path = path;
+    job->generation = task::loadGeneration();
+    (void)task::launch(
+        "Texture.DecodeFile",
+        task::Priority::Background,
+        task::Affinity::IO,
+        &TextureDecodeFileJob::run,
+        job.release());
 
     return makeHandle(texture);
 }
@@ -400,23 +452,18 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemoryAsync(
     texture->id = id;
     (void)m_Images->insert(id, texture);
 
-    task::TaskDesc desc;
-    desc.name = "Texture.DecodeMemory";
-    desc.priority = task::Priority::Background;
-    desc.affinity = task::Affinity::IO;
-    task::stampLoadGeneration(desc);
-    desc.body = [this, texture, data, mimeType]() {
-        if (fillTextureData(data, texture, "", mimeType))
-        {
-            textureLoaded(texture);
-
-            std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
-            m_TexturesToFinalize.push(texture);
-        }
-
-        ++m_TexturesLoaded;
-    };
-    (void)task::launch(std::move(desc));
+    auto job = std::make_unique<TextureDecodeMemoryJob>();
+    job->self = this;
+    job->texture = texture;
+    job->data = data;
+    job->mimeType = mimeType;
+    job->generation = task::loadGeneration();
+    (void)task::launch(
+        "Texture.DecodeMemory",
+        task::Priority::Background,
+        task::Affinity::IO,
+        &TextureDecodeMemoryJob::run,
+        job.release());
 
     return makeHandle(texture);
 }
