@@ -102,7 +102,7 @@ Key code locations:
 | Embed entry | `caustica/caustica/include/engine/EngineApp.h` |
 | App & schedules | `caustica/caustica/include/engine/App.h`, `AppSchedules.h`, `SystemSets.h`, `Plugin.h` |
 | Logic → RT enqueue | `caustica/caustica/include/engine/EnqueueRenderCommand.h` |
-| Scene edit / query APIs | `SceneSpawn.h`, `SceneTransform.h`, `SceneMeshEdit.h`, `SceneQuery.h`, `CameraApi.h`, … |
+| Scene edit / query APIs | `SceneSpawn.h`, `SceneTransform.h`, `MeshDeformApi.h`, `SceneQuery.h`, `CameraApi.h`, … |
 | ECS core | `caustica/caustica/include/ecs/` |
 | Scene ECS | `caustica/caustica/include/scene/SceneEcs.h` |
 | Render proxies | `caustica/caustica/include/scene/SceneRenderData.h`, `docs/architecture-render-proxy.md` |

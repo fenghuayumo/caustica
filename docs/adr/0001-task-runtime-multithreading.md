@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **Accepted** (planning); implementation not started |
+| Status | **Accepted**; P1–P3 + R1 upload fences landed (R2/R3 follow) |
 | Date | 2026-08-07 |
 | Deciders | Caustica engine |
 | Relates | [architecture-render-proxy.md](../architecture-render-proxy.md), [architecture-rhi-threading.md](../architecture-rhi-threading.md) |
@@ -142,7 +142,7 @@ Rules:
 | Stage | Scope |
 | --- | --- |
 | **R0** (with P1–P2) | Keep Phase-1: create/submit/present/GC on Render pipe; parallel record OK |
-| **R1** (with P3) | Fence / timeline instead of `device->waitForIdle` for upload batches |
+| **R1** | Fence / timeline instead of `device->waitForIdle` for upload batches — **landed** (`StreamingUploadBudget`) |
 | **R2** | First-class volatile CB binder (replace scattered `addVolatileConstantRewrite`) |
 | **R3** | Future ADR: free-threaded create / multi-queue — **out of scope here** |
 
@@ -262,17 +262,17 @@ Rules:
 
 ### P3 — LoadSession amortized streaming
 
-1. Implement `LoadSession` state machine; migrate `tickSceneGpuBind`.
-2. Budgeted texture/mesh upload; remove per-item `waitForIdle` on happy path (depends on R1 fences as needed).
-3. Narrow `sceneGpuSuspended`; restore present as soon as a safe frame exists.
-4. (Stretch) FirstPresent with partial AS via StructureGpu committed-serve.
-5. Delete `asyncLoadingInProgress` overlap; progress reads session only.
+1. [x] Implement `LoadSession` state machine; migrate `tickSceneGpuBind` → `tickLoadSession`.
+2. [x] Budgeted texture/mesh upload via non-blocking `EnqueueRenderCommand` (+ R1 `StreamingUploadBudget` fences).
+3. [x] Narrow `sceneGpuSuspended` to teardown window; present resumes for Importing/GpuStreaming.
+4. [x] FirstPresent → StructureGpu `AccelOnly` (shared committed-serve path; no mesh re-upload).
+5. [x] Progress / switch gates read `LoadSession`; `asyncLoadingInProgress` only for opacity/shader refresh outside session.
 
 **Exit:** large scene open keeps UI/render ticking; no multi-second hard freeze from bind steps.
 
 ### P4 — RHI deepen (may split ADRs)
 
-1. R1 upload fences / timeline.
+1. [x] R1 upload fences / timeline — `StreamingUploadBudget` (EventQuery + 256MB / 8-submit cap) on TextureLoader + mesh upload; `waitForIdle` kept for teardown / fallback only.
 2. R2 volatile CB binder.
 3. R3 only with new ADR + profiling justification.
 

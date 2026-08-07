@@ -43,23 +43,29 @@ void runStructureGpuBuild(
     const std::shared_ptr<Scene>& scenePtr,
     GpuDevice* device,
     uint32_t frameIndex,
-    const std::shared_ptr<const scene::SceneRenderData>& gpuSetupData)
+    const std::shared_ptr<const scene::SceneRenderData>& gpuSetupData,
+    StructureGpuUploadMode uploadMode)
 {
-    if (caches->textureLoader && caches->renderDevice)
+    if (uploadMode == StructureGpuUploadMode::UploadMeshes)
     {
-        caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
-        caches->textureLoader->loadingFinished();
-    }
+        if (caches->textureLoader && caches->renderDevice)
+        {
+            caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);
+            caches->textureLoader->loadingFinished();
+        }
 
-    worldRendererResource->lightingPasses().ensureMaterialsFromScene(*gpuSetupData);
-    // Do not prune mesh/material GPU records still referenced by the retired TLAS.
-    render::SceneGpuUpdater::refreshAfterLoad(
-        *scenePtr,
-        *gpuSetupData,
-        worldRendererResource->sceneGpuResources(),
-        caches->descriptorTable.get(),
-        frameIndex,
-        /*pruneRemovedResources=*/false);
+        worldRendererResource->lightingPasses().ensureMaterialsFromScene(*gpuSetupData);
+        // Do not prune mesh/material GPU records still referenced by the retired TLAS.
+        render::SceneGpuUpdater::refreshAfterLoad(
+            *scenePtr,
+            *gpuSetupData,
+            worldRendererResource->sceneGpuResources(),
+            caches->descriptorTable.get(),
+            frameIndex,
+            /*pruneRemovedResources=*/false);
+    }
+    // AccelOnly: LoadSession already flushed textures, uploaded meshes, finalized buffers,
+    // and reloaded materials — only AS / SBT / bindings remain.
 
     // Double-buffered AS rebuild: previous TLAS/BLAS stay alive for in-flight frames
     // while this task builds the new generation (overlaps prior-frame GPU work).
@@ -106,15 +112,16 @@ bool enqueuePendingStructureGpu(App& app)
     // Copy the published packet — the triple-buffer slot may be reused before RT runs.
     auto gpuSetupData = std::make_shared<const scene::SceneRenderData>(
         scenePtr->getRenderDataForFrame(frameIndex));
+    const StructureGpuUploadMode uploadMode = scenePtr->structureGpuUploadMode();
 
     scenePtr->beginStructureGpuBuild();
     scenePtr->clearGpuStructureSyncRequest();
 
     EnqueueRenderCommand(
         app,
-        [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
+        [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode]() {
             runStructureGpuBuild(
-                worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData);
+                worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode);
         });
 
     return true;
@@ -137,13 +144,14 @@ void flushPendingStructureGpuSync(App& app)
 
     auto gpuSetupData = std::make_shared<const scene::SceneRenderData>(
         scenePtr->getRenderDataForFrame(frameIndex));
+    const StructureGpuUploadMode uploadMode = scenePtr->structureGpuUploadMode();
 
     scenePtr->beginStructureGpuBuild();
     scenePtr->clearGpuStructureSyncRequest();
 
-    EnqueueRenderCommandAndWait(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData]() {
+    EnqueueRenderCommandAndWait(app, [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode]() {
         runStructureGpuBuild(
-            worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData);
+            worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode);
     });
 }
 

@@ -149,12 +149,16 @@ void GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
 
     SceneGaussianSplatLogic::onSceneLoaded(m_worldRenderer->gaussianSplatPasses());
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
-    SceneManager::onSceneLoadedGpuPrep(*scene, m_runtimeState->Invalidation.AccelerationStructRebuildRequested);
+    // Animations / prep only — AS comes from StructureGpu AccelOnly (ADR 0001 P3),
+    // not the sync-frame AccelerationStructRebuildRequested path.
+    bool unusedAccelFlag = false;
+    SceneManager::onSceneLoadedGpuPrep(*scene, unusedAccelFlag);
     m_worldRenderer->accelStructs().resetSubInstanceCount();
     // onSceneUnloading clears m_ptPipeline*; without this the RT cache stays
     // "ready" and never rebinds, so MainPathTrace dispatches a null pipeline.
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
     m_settings->MaterialVariantIndex = 0;
+    scene->requestGpuStructureSync(StructureGpuUploadMode::AccelOnly);
     if (m_diagnostics)
         m_diagnostics->asyncLoadingInProgress = true;
 }

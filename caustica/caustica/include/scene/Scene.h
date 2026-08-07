@@ -145,8 +145,15 @@ namespace caustica
         void acknowledgeGpuStructureConsumed(uint32_t frameIndex);
 
         // Bevy-style: mutate ECS only; Extract enqueues async GPU/AS build.
-        void requestGpuStructureSync() { m_structureGpu.requestGpuStructureSync(); }
+        void requestGpuStructureSync(StructureGpuUploadMode uploadMode = StructureGpuUploadMode::UploadMeshes)
+        {
+            m_structureGpu.requestGpuStructureSync(uploadMode);
+        }
         [[nodiscard]] bool needsGpuStructureSync() const { return m_structureGpu.needsGpuStructureSync(); }
+        [[nodiscard]] StructureGpuUploadMode structureGpuUploadMode() const
+        {
+            return m_structureGpu.structureGpuUploadMode();
+        }
         void clearGpuStructureSyncRequest() { m_structureGpu.clearGpuStructureSync(); }
 
         // Async structure handoff: freeze pre-edit proxies, mark build in flight, commit

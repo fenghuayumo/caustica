@@ -108,7 +108,7 @@ struct SceneContentComponent
 
 struct MeshInstanceComponent
 {
-    // Engine CPU mesh record. Apps: meshHandle() + SceneMeshEdit(entity) / SceneSpawn / SceneTransform.
+    // Engine CPU mesh record. Apps: meshHandle() + MeshDeformApi(entity) / SceneSpawn / SceneTransform.
     // GPU keys are private on MeshInfo (scene::internal::RenderResourceAccess only).
     std::shared_ptr<MeshInfo> mesh;
     int instanceIndex = -1;

@@ -223,7 +223,7 @@ namespace caustica
     };
 
     // CPU mesh authoring record (engine-owned).
-    // Apps should use MeshHandle (asset) + MeshInstanceComponent / SceneMeshEdit(entity).
+    // Apps should use MeshHandle (asset) + MeshInstanceComponent / MeshDeformApi(entity).
     // GPU keys live in m_renderResourceId and are only touched via scene::internal::RenderResourceAccess.
     struct MeshInfo
     {

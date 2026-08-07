@@ -2,9 +2,8 @@
 
 Caustica already splits **logic** and **render** via Extract + `RenderThread` (see [architecture-render-proxy.md](architecture-render-proxy.md)). This document defines the RHI rules that make that split and parallel command-list recording safe.
 
-> **Evolution:** P1 (TaskRuntime + enqueue collapse) and P2 (unified GC, Render affinity pump,
-> structure enqueue-only) are in
-> [ADR 0001](adr/0001-task-runtime-multithreading.md). LoadSession streaming remains P3.
+> **Evolution:** P1–P3 + R1 upload fences (`StreamingUploadBudget`) are in
+> [ADR 0001](adr/0001-task-runtime-multithreading.md). R2 volatile CB binder remains.
 > Phase-1 RHI create/submit rules below remain authoritative.
 
 ## Thread roles
@@ -38,6 +37,7 @@ pumps Affinity::Render inside `executeRenderPhase`.
 - **DX11:** Immediate only. The D3D11 backend upgrades deferred requests to immediate.
 - Mid-frame `close → execute → waitForIdle → open` on a shared list is a **sync point**. Keep it rare, RT-only, and annotated `// THREADING: sync-point, RT-only`. Mark such graph passes `PassOptions::serialOnPrimary`.
 - `runGarbageCollection` runs once at the end of `App::executeRenderPhase` for both dedicated RT and `--syncRender` (not in `finalizeFrameTiming`).
+- Streaming texture/mesh uploads use `StreamingUploadBudget` (EventQuery + in-flight byte/submit caps) instead of per-batch `waitForIdle`. Teardown / device-destroy paths may still idle.
 
 ## CommandListPool / FrameCommandContext
 

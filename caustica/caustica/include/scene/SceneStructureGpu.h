@@ -10,14 +10,22 @@
 namespace caustica
 {
 
+// How much mesh/buffer work StructureGpu should redo when the build runs.
+enum class StructureGpuUploadMode : uint8_t
+{
+    UploadMeshes = 0, // runtime spawn / cold path — upload + finalize
+    AccelOnly,        // full-load LoadSession already uploaded meshes / finalized buffers
+};
+
 // Async structure GPU handoff owned by Scene (UE-style committed-serve while AS builds).
 // Extract freezes / publishes; WorldRenderer serves committed proxies until finish.
 class SceneStructureGpuSync
 {
 public:
-    void requestGpuStructureSync();
+    void requestGpuStructureSync(StructureGpuUploadMode uploadMode = StructureGpuUploadMode::UploadMeshes);
     void clearGpuStructureSync();
     [[nodiscard]] bool needsGpuStructureSync() const { return m_pendingGpuStructureSync; }
+    [[nodiscard]] StructureGpuUploadMode structureGpuUploadMode() const { return m_uploadMode; }
 
     void freezeCommittedFromLogicCache(const scene::SceneRenderData& logicCache);
     void beginStructureGpuBuild();
@@ -55,6 +63,7 @@ private:
     std::atomic<uint64_t> m_gpuStructureGeneration{ 0 };
     std::atomic<uint64_t> m_gpuStructureConsumedGeneration{ 0 };
     bool m_pendingGpuStructureSync = false;
+    StructureGpuUploadMode m_uploadMode = StructureGpuUploadMode::UploadMeshes;
     std::atomic<bool> m_structureGpuBuildInFlight{ false };
     mutable std::mutex m_committedRenderDataMutex;
     std::shared_ptr<const scene::SceneRenderData> m_committedRenderData;

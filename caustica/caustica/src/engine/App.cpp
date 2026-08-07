@@ -516,8 +516,7 @@ void App::render()
 
 bool App::skipRenderPhase() const
 {
-    // Scene-switch barrier: stop all GPU submit/present while AS / Streamline /
-    // material buffers are torn down or rebound (see onSceneUnloading).
+    // Exclusive teardown / AS cutover only (ADR 0001 P3). GpuStreaming presents.
     if (const SceneViewState* vs = tryResource<SceneViewState>())
     {
         if (vs->sceneGpuSuspended.load(std::memory_order_acquire))

@@ -2,7 +2,7 @@
 
 // Engine-internal GPU keys for MeshInfo / MeshGeometry / Material.
 // Applications must not include this. Use MeshHandle, MaterialHandle,
-// MeshInstanceComponent, SceneMeshEdit (entity), SceneSpawn, SceneTransform instead.
+// MeshInstanceComponent, MeshDeformApi (entity), SceneSpawn, SceneTransform instead.
 
 #include <scene/SceneTypes.h>
 

@@ -34,7 +34,7 @@ struct gpuRenderSubsystemInitParams
     render::AppDiagnostics& diagnostics;
 };
 
-// Scene GPU bind steps for multi-frame loading (see tickSceneGpuBind).
+// Scene GPU bind steps for LoadSession GpuStreaming (see tickLoadSession).
 // Each method is RT-only except finishLoadedScene (logic thread).
 class GpuRenderSubsystem
 {

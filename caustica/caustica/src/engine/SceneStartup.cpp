@@ -87,6 +87,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
             caustica::error("Scene load failed");
             clearActiveScene(app);
             viewState.progressLoading.stop();
+            viewState.loadSession.reset();
             viewState.sceneGpuSuspended.store(false, std::memory_order_release);
         });
     }

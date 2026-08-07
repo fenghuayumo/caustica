@@ -3,6 +3,7 @@
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
+#include <engine/LoadSession.h>
 #include <engine/SceneViewState.h>
 #include <cassert>
 #include <engine/SceneLifecycle.h>
@@ -14,6 +15,7 @@
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <engine/ActiveScene.h>
+#include <core/task/TaskRuntime.h>
 #include <assets/AssetSystem.h>
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
@@ -36,6 +38,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cfloat>
+#include <functional>
 #include <thread>
 #include <chrono>
 
@@ -225,9 +228,15 @@ void onSceneUnloading(App& app)
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     vs->sceneTime = 0.0;
     vs->uncompressedTextures.clear();
-    vs->gpuBind = {};
+    // Keep Importing if a switch already started; otherwise mark teardown window.
+    if (!vs->loadSession.isActive())
+        vs->loadSession.phase = LoadSessionPhase::Importing;
+    vs->loadSession.streamStep = LoadStreamStep::Textures;
+    vs->loadSession.renderData = nullptr;
+    vs->loadSession.stepInFlight = false;
+    task::bumpLoadGeneration();
 
-    // Contract: stop submit → RT idle → (RT) waitForIdle → Streamline → tear down.
+    // Exclusive teardown window only (ADR 0001 P3) — cleared before Importing resumes present.
     vs->sceneGpuSuspended.store(true, std::memory_order_release);
     if (vs->progressLoading.Active())
         vs->progressLoading.Set(15);
@@ -272,6 +281,10 @@ void onSceneUnloading(App& app)
     detail::sceneSwitchTrace("onSceneUnloading: GPU drain complete");
 
     clearActiveScene(app);
+
+    // Present / UI tick again while CPU import continues (empty scene is fine).
+    vs->sceneGpuSuspended.store(false, std::memory_order_release);
+    vs->loadSession.phase = LoadSessionPhase::Importing;
 }
 
 namespace
@@ -418,12 +431,48 @@ void registerLoadedSceneAssets(App& app, ::SceneManager& manager)
     }
 }
 
-void abortGpuBind(SceneViewState& vs)
+void abortLoadSession(SceneViewState& vs)
 {
-    vs.gpuBind = {};
+    vs.loadSession.reset();
     vs.sceneGpuSuspended.store(false, std::memory_order_release);
+    task::bumpLoadGeneration();
     if (vs.progressLoading.Active())
         vs.progressLoading.stop();
+}
+
+void syncLoadProgress(SceneViewState& vs)
+{
+    if (!vs.loadSession.isActive())
+        return;
+    if (!vs.progressLoading.Active())
+        vs.progressLoading.start("Loading scene...");
+    vs.progressLoading.Set(vs.loadSession.progressPercent());
+}
+
+// Complete one in-flight Render step; returns true if a step was pending (caller should
+// not enqueue another this tick).
+bool pollLoadStreamStep(LoadSession& session)
+{
+    if (!session.stepInFlight)
+        return false;
+    const uint8_t status = session.stepStatus.load(std::memory_order_acquire);
+    if (status == 0)
+        return true; // still running on RT
+    session.stepInFlight = false;
+    return false;
+}
+
+void beginLoadStreamStep(App& app, LoadSession& session, std::function<void()> body)
+{
+    session.stepStatus.store(0, std::memory_order_release);
+    session.stepInFlight = true;
+    EnqueueRenderCommand(app, [body = std::move(body), &session]() {
+        body();
+        // body sets stepStatus to ok/fail; default ok if left pending.
+        uint8_t expected = 0;
+        session.stepStatus.compare_exchange_strong(
+            expected, 1, std::memory_order_release, std::memory_order_relaxed);
+    });
 }
 
 } // namespace
@@ -438,7 +487,7 @@ void onSceneLoaded(App& app)
     if (!manager || !vs || !cmd || !cfg || !gr)
     {
         if (vs)
-            vs->sceneGpuSuspended.store(false, std::memory_order_release);
+            abortLoadSession(*vs);
         return;
     }
 
@@ -446,7 +495,6 @@ void onSceneLoaded(App& app)
     if (render::WorldRenderer* wrResource = worldRenderer(app))
         wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, currentScenePath(app));
 
-    vs->progressLoading.Set(50);
     detail::sceneSwitchTrace("onSceneLoaded: logic setup");
     applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
 
@@ -459,99 +507,65 @@ void onSceneLoaded(App& app)
     if (!renderData)
     {
         detail::sceneSwitchTrace("onSceneLoaded: no renderData");
-        abortGpuBind(*vs);
+        abortLoadSession(*vs);
         return;
     }
 
     registerLoadedSceneAssets(app, *manager);
     syncCameraFromScene(app);
 
-    // Start multi-frame bind; sceneGpuSuspended stays true until LogicFinish.
+    // GpuStreaming with present enabled (suspension already cleared after teardown).
     const size_t texturesPending = gr->pendingTextureFinalizeCount();
-    vs->gpuBind = {
-        .phase = texturesPending > 0
-            ? SceneViewState::GpuBindPhase::Textures
-            : SceneViewState::GpuBindPhase::World,
-        .renderData = renderData,
-        .texturesTotal = texturesPending,
-        .meshBegin = 0,
-        .meshTotal = renderData->meshSnapshots.size(),
-    };
-    vs->progressLoading.Set(55);
-    detail::sceneSwitchTrace("onSceneLoaded: bind job textures=%zu meshes=%zu",
-        texturesPending, vs->gpuBind.meshTotal);
+    vs->loadSession.reset();
+    vs->loadSession.phase = LoadSessionPhase::GpuStreaming;
+    vs->loadSession.streamStep = texturesPending > 0
+        ? LoadStreamStep::Textures
+        : LoadStreamStep::World;
+    vs->loadSession.renderData = renderData;
+    vs->loadSession.texturesTotal = texturesPending;
+    vs->loadSession.stepTexturesRemaining.store(texturesPending, std::memory_order_relaxed);
+    vs->loadSession.meshBegin = 0;
+    vs->loadSession.meshTotal = renderData->meshSnapshots.size();
+    vs->sceneGpuSuspended.store(false, std::memory_order_release);
+    syncLoadProgress(*vs);
+    detail::sceneSwitchTrace("onSceneLoaded: LoadSession GpuStreaming textures=%zu meshes=%zu",
+        texturesPending, vs->loadSession.meshTotal);
 }
 
-void tickSceneGpuBind(App& app)
+void tickLoadSession(App& app)
 {
     SceneViewState* vs = viewState(app);
-    if (!vs || vs->gpuBind.phase == SceneViewState::GpuBindPhase::None)
+    if (!vs || !vs->loadSession.isActive())
         return;
 
-    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
-    const scene::SceneRenderData* data = vs->gpuBind.renderData;
-    if (!gr || !data)
+    auto& session = vs->loadSession;
+    syncLoadProgress(*vs);
+
+    if (session.phase == LoadSessionPhase::Importing)
+        return; // CPU worker; onSceneLoaded advances to GpuStreaming
+
+    if (session.phase == LoadSessionPhase::Ready)
     {
-        abortGpuBind(*vs);
+        session.reset();
+        if (vs->progressLoading.Active())
+            vs->progressLoading.stop();
+        detail::sceneSwitchTrace("LoadSession: Ready");
         return;
     }
 
-    using Phase = SceneViewState::GpuBindPhase;
-    auto& job = vs->gpuBind;
+    if (session.phase == LoadSessionPhase::Finalizing)
+    {
+        GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
+        const scene::SceneRenderData* data = session.renderData;
+        if (!gr || !data)
+        {
+            abortLoadSession(*vs);
+            return;
+        }
 
-    switch (job.phase)
-    {
-    case Phase::Textures:
-    {
-        EnqueueRenderCommandAndWait(app, [gr]() { gr->flushTextures(8.f); });
-        const size_t remaining = gr->pendingTextureFinalizeCount();
-        if (job.texturesTotal > 0)
-        {
-            const float done = float(job.texturesTotal - remaining) / float(job.texturesTotal);
-            vs->progressLoading.Set(55 + int(done * 15.f));
-        }
-        if (remaining == 0)
-        {
-            EnqueueRenderCommandAndWait(app, [gr]() { gr->flushTextures(0.f); });
-            job.phase = Phase::World;
-        }
-        break;
-    }
-    case Phase::World:
-        EnqueueRenderCommandAndWait(app, [gr, data]() { gr->bindWorld(*data); });
-        job.phase = Phase::Meshes;
-        vs->progressLoading.Set(72);
-        break;
-    case Phase::Meshes:
-    {
-        const size_t start = job.meshBegin;
-        size_t next = start;
-        EnqueueRenderCommandAndWait(app, [gr, data, start, &next]() {
-            next = gr->uploadMeshes(*data, start, 1);
-        });
-        job.meshBegin = next;
-        if (job.meshTotal > 0)
-            vs->progressLoading.Set(72 + int(float(next) / float(job.meshTotal) * 18.f));
-        if (next <= start && next < job.meshTotal)
-        {
-            detail::sceneSwitchTrace("tickSceneGpuBind: mesh stall at %zu", start);
-            abortGpuBind(*vs);
-            break;
-        }
-        if (next >= job.meshTotal)
-            job.phase = Phase::Finalize;
-        break;
-    }
-    case Phase::Finalize:
-        EnqueueRenderCommandAndWait(app, [gr, data]() { gr->finalizeBind(*data); });
-        vs->progressLoading.Set(93);
-        job.phase = Phase::LogicFinish;
-        break;
-    case Phase::LogicFinish:
-    {
         PathTracerSettings* cfg = settings(app);
         const CommandLineOptions* cmd = cmdLine(app);
-        gr->finishLoadedScene(*data);
+        gr->finishLoadedScene(*data); // requests StructureGpu AccelOnly
         collectUncompressedTextures(app);
         if (cfg && cmd)
         {
@@ -561,17 +575,139 @@ void tickSceneGpuBind(App& app)
         }
         if (CameraController* cam = cameraController(app))
             cam->syncPreviousViewFromCurrent();
-        vs->progressLoading.Set(100);
-        vs->progressLoading.stop();
-        vs->gpuBind = {};
-        vs->sceneGpuSuspended.store(false, std::memory_order_release);
-        detail::sceneSwitchTrace("onSceneLoaded: complete");
+
+        session.phase = LoadSessionPhase::Ready;
+        syncLoadProgress(*vs);
+        return;
+    }
+
+    if (session.phase == LoadSessionPhase::FirstPresent)
+    {
+        // Present already restored; Extract will enqueue StructureGpu. Move to logic finish.
+        session.phase = LoadSessionPhase::Finalizing;
+        syncLoadProgress(*vs);
+        return;
+    }
+
+    if (session.phase != LoadSessionPhase::GpuStreaming)
+        return;
+
+    GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
+    const scene::SceneRenderData* data = session.renderData;
+    if (!gr || !data)
+    {
+        abortLoadSession(*vs);
+        return;
+    }
+
+    // Still waiting on RT — present keeps running on the render domain.
+    if (session.stepInFlight)
+    {
+        if (pollLoadStreamStep(session))
+            return;
+
+        if (session.stepStatus.load(std::memory_order_relaxed) == 2)
+        {
+            detail::sceneSwitchTrace("tickLoadSession: stream step failed");
+            abortLoadSession(*vs);
+            return;
+        }
+
+        // Advance stream state from the completed step, then fall through to enqueue next.
+        switch (session.streamStep)
+        {
+        case LoadStreamStep::Textures:
+            if (session.textureDrainPending)
+            {
+                session.textureDrainPending = false;
+                session.streamStep = LoadStreamStep::World;
+            }
+            // else budgeted flush; stay on Textures (maybe remaining==0 → drain next)
+            break;
+        case LoadStreamStep::World:
+            session.streamStep = LoadStreamStep::Meshes;
+            session.stepMeshNext.store(session.meshBegin, std::memory_order_relaxed);
+            break;
+        case LoadStreamStep::Meshes:
+        {
+            const size_t next = session.stepMeshNext.load(std::memory_order_relaxed);
+            session.meshBegin = next;
+            if (session.meshBegin >= session.meshTotal)
+                session.streamStep = LoadStreamStep::Finalize;
+            break;
+        }
+        case LoadStreamStep::Finalize:
+            session.phase = LoadSessionPhase::FirstPresent;
+            syncLoadProgress(*vs);
+            return;
+        }
+    }
+
+    switch (session.streamStep)
+    {
+    case LoadStreamStep::Textures:
+    {
+        const size_t remaining = session.stepTexturesRemaining.load(std::memory_order_relaxed);
+        if (remaining == 0)
+        {
+            // Final drain (loadingFinished) before World.
+            session.textureDrainPending = true;
+            beginLoadStreamStep(app, session, [gr, &session]() {
+                gr->flushTextures(0.f);
+                session.stepTexturesRemaining.store(
+                    gr->pendingTextureFinalizeCount(), std::memory_order_relaxed);
+                session.stepStatus.store(1, std::memory_order_release);
+            });
+        }
+        else
+        {
+            beginLoadStreamStep(app, session, [gr, &session]() {
+                gr->flushTextures(LoadSession::kTextureBudgetMs);
+                session.stepTexturesRemaining.store(
+                    gr->pendingTextureFinalizeCount(), std::memory_order_relaxed);
+                session.stepStatus.store(1, std::memory_order_release);
+            });
+        }
         break;
     }
-    case Phase::None:
-    default:
+    case LoadStreamStep::World:
+        beginLoadStreamStep(app, session, [gr, data, &session]() {
+            gr->bindWorld(*data);
+            session.stepStatus.store(1, std::memory_order_release);
+        });
+        break;
+    case LoadStreamStep::Meshes:
+    {
+        if (session.meshBegin >= session.meshTotal)
+        {
+            session.streamStep = LoadStreamStep::Finalize;
+            // Enqueue finalize this same tick.
+            beginLoadStreamStep(app, session, [gr, data, &session]() {
+                gr->finalizeBind(*data);
+                session.stepStatus.store(1, std::memory_order_release);
+            });
+            break;
+        }
+        const size_t start = session.meshBegin;
+        beginLoadStreamStep(app, session, [gr, data, start, &session]() {
+            const size_t next = gr->uploadMeshes(*data, start, LoadSession::kMeshesPerStep);
+            session.stepMeshNext.store(next, std::memory_order_relaxed);
+            if (next <= start && next < data->meshSnapshots.size())
+                session.stepStatus.store(2, std::memory_order_release);
+            else
+                session.stepStatus.store(1, std::memory_order_release);
+        });
         break;
     }
+    case LoadStreamStep::Finalize:
+        beginLoadStreamStep(app, session, [gr, data, &session]() {
+            gr->finalizeBind(*data);
+            session.stepStatus.store(1, std::memory_order_release);
+        });
+        break;
+    }
+
+    syncLoadProgress(*vs);
 }
 
 void collectUncompressedTextures(App& app)
@@ -608,14 +744,14 @@ void collectUncompressedTextures(App& app)
 
 bool hasAsyncLoadingInProgress(const App& app)
 {
-    if (const SceneViewState* vs = viewState(app);
-        vs && vs->gpuBind.phase != SceneViewState::GpuBindPhase::None)
+    if (const SceneViewState* vs = viewState(app); vs && vs->loadSession.isActive())
         return true;
 
     AppDiagnostics* diag = diagnostics(app);
     RenderRuntimeState* runtime = runtimeState(app);
     if (!diag || !runtime)
         return false;
+    // Opacity-map / shader refresh still use the diag flag outside LoadSession.
     return diag->asyncLoadingInProgress
         || runtime->Invalidation.ShaderAndACRefreshDelayedRequest > 0;
 }

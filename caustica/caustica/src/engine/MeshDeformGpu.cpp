@@ -1,4 +1,4 @@
-#include <engine/internal/SceneMeshEditing.h>
+#include <engine/internal/MeshDeformGpu.h>
 #include <render/SceneGpuResources.h>
 
 #include <core/ThreadContext.h>
@@ -369,7 +369,7 @@ bool SyncMeshPrevPositionFromCurrent(
     return true;
 }
 
-void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, const SetSceneMeshVerticesParams& params)
+void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, const MeshDeformGpuParams& params)
 {
     if (!params.device)
         return;
@@ -435,7 +435,7 @@ std::vector<dm::float3> getMeshVerticesWorld(
 void setMeshVertices(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
-    const SetSceneMeshVerticesParams& params)
+    const MeshDeformGpuParams& params)
 {
     assertLogicThread();
 
@@ -495,7 +495,7 @@ void setMeshVertices(
 void setMeshVerticesWorld(
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
-    const SetSceneMeshVerticesParams& params)
+    const MeshDeformGpuParams& params)
 {
     assertLogicThread();
 
@@ -527,7 +527,7 @@ void setMeshVerticesWorld(
 void setMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
     const std::vector<dm::float3>& vertices,
-    const SetSceneMeshVerticesParams& params)
+    const MeshDeformGpuParams& params)
 {
     assertLogicThread();
 
@@ -539,7 +539,7 @@ void setMeshPositionsDirect(
     const std::shared_ptr<MeshInfo>& mesh,
     const dm::float3* positions,
     size_t count,
-    const SetSceneMeshVerticesParams& params)
+    const MeshDeformGpuParams& params)
 {
     assertLogicThread();
 
@@ -604,7 +604,7 @@ void setMeshPositionsDirect(
 bool applyGeometrySequence(
     scene::GeometrySequenceComponent& sequence,
     float timeSeconds,
-    const SetSceneMeshVerticesParams& params)
+    const MeshDeformGpuParams& params)
 {
     assertLogicThread();
 
@@ -689,7 +689,7 @@ bool applyGeometrySequence(
         }
     }
 
-    SetSceneMeshVerticesParams localParams = params;
+    MeshDeformGpuParams localParams = params;
     localParams.recomputeNormals = sequence.recomputeNormals;
     if (loopWrapped)
     {

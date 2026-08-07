@@ -16,8 +16,11 @@ void setCurrentScene(App& app, const std::string& sceneName, bool forceReload = 
 void onSceneLoaded(App& app);
 void onSceneUnloading(App& app);
 
-// One small GPU-bind step per call (textures / meshes / finalize). Safe to call every frame.
-void tickSceneGpuBind(App& app);
+// Advance LoadSession (budgeted GPU bind). Safe to call every frame; never blocks Logic on RT.
+void tickLoadSession(App& app);
+
+// Deprecated alias — prefer tickLoadSession (ADR 0001 P3).
+inline void tickSceneGpuBind(App& app) { tickLoadSession(app); }
 
 void collectUncompressedTextures(App& app);
 [[nodiscard]] bool hasAsyncLoadingInProgress(const App& app);

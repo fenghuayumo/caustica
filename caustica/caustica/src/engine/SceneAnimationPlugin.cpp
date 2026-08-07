@@ -27,13 +27,13 @@ void refreshEntityWorld(App& app, uint32_t frameIndex)
 
 void SceneAnimationPlugin::configureSchedules(App& app)
 {
-    // Runs while sceneGpuSuspended: join CPU import + advance multi-frame GPU bind.
+    // Join CPU import + advance LoadSession (present continues during GpuStreaming).
     app.addSystem<system_label::SceneAnimate>(
         AppSchedule::update,
         [](SystemContext& ctx) {
             if (::SceneManager* manager = detail::sessionManager(ctx.app))
                 manager->updateLoading();
-            tickSceneGpuBind(ctx.app);
+            tickLoadSession(ctx.app);
 
             if (!ctx.windowFocused)
                 return;

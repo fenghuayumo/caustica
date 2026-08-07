@@ -1,6 +1,7 @@
 #include <render/core/SceneGpuUpdater.h>
 
 #include <render/SceneGpuResources.h>
+#include <render/core/StreamingUploadBudget.h>
 #include <assets/loader/ShaderFactory.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
@@ -77,6 +78,32 @@ inline void WriteAttributeRange(caustica::rhi::CommandList* commandList, caustic
         return;
     assert(range.byteSize == data.size() * sizeof(T));
     commandList->writeBuffer(buffer, data.data(), range.byteSize, range.byteOffset);
+}
+
+size_t EstimateMeshUploadBytes(
+    const scene::SceneRenderData& renderData,
+    size_t meshBegin,
+    size_t meshEnd)
+{
+    size_t bytes = 0;
+    const size_t meshCount = renderData.meshSnapshots.size();
+    meshEnd = std::min(meshEnd, meshCount);
+    for (size_t i = meshBegin; i < meshEnd; ++i)
+    {
+        const auto& upload = renderData.meshSnapshots[i].upload;
+        if (!upload)
+            continue;
+        bytes += upload->indexData.size() * sizeof(uint32_t);
+        bytes += upload->positionData.size() * sizeof(upload->positionData[0]) * 2; // pos + prev
+        bytes += upload->normalData.size() * sizeof(upload->normalData[0]);
+        bytes += upload->tangentData.size() * sizeof(upload->tangentData[0]);
+        bytes += upload->texcoord1Data.size() * sizeof(upload->texcoord1Data[0]);
+        bytes += upload->texcoord2Data.size() * sizeof(upload->texcoord2Data[0]);
+        bytes += upload->weightData.size() * sizeof(upload->weightData[0]);
+        bytes += upload->jointData.size() * sizeof(upload->jointData[0]);
+        bytes += upload->radiusData.size() * sizeof(upload->radiusData[0]);
+    }
+    return std::max(bytes, size_t(64 * 1024));
 }
 
 caustica::rhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
@@ -956,6 +983,11 @@ size_t SceneGpuUpdater::uploadMeshesAfterLoad(
         return meshCount;
 
     const size_t end = std::min(meshBegin + maxMeshes, meshCount);
+    const size_t uploadBytes = EstimateMeshUploadBytes(renderData, meshBegin, end);
+
+    auto& budget = streamingUploadBudget();
+    // Gate CreateCommittedResource + copy backlog (ADR 0001 R1); no waitForIdle.
+    budget.waitForBudget(gpu.device, uploadBytes);
 
     caustica::rhi::CommandListParameters uploadParams;
     uploadParams.uploadChunkSize = 4 * 1024 * 1024;
@@ -968,14 +1000,8 @@ size_t SceneGpuUpdater::uploadMeshesAfterLoad(
     gpu.device->executeCommandList(commandList);
     commandList = nullptr;
 
-    // Drain before returning so the next logic-thread Sleep can let DWM run.
-    // Without this, flooding CreateCommittedResource + copies hard-locks the desktop.
-    if (!gpu.device->waitForIdle())
-    {
-        caustica::error("uploadMeshesAfterLoad: waitForIdle failed at %zu-%zu", meshBegin, end);
-        return meshBegin;
-    }
-    gpu.device->runGarbageCollection();
+    budget.trackSubmit(gpu.device, uploadBytes);
+    budget.retire(gpu.device, /*runGc=*/true);
     return end;
 }
 
@@ -988,6 +1014,15 @@ void SceneGpuUpdater::finalizeAfterLoad(
     bool pruneRemovedResources)
 {
     (void)scene;
+
+    auto& budget = streamingUploadBudget();
+    // Mesh uploads must be GPU-complete before scene buffers / AccelOnly AS build.
+    budget.waitAll(gpu.device);
+
+    const size_t finalizeBytes = std::max(
+        size_t(1) * 1024 * 1024,
+        (renderData.meshSnapshots.size() + renderData.materialSnapshots.size() + 1) * size_t(256));
+    budget.waitForBudget(gpu.device, finalizeBytes);
 
     caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList();
     commandList->open();
@@ -1002,9 +1037,9 @@ void SceneGpuUpdater::finalizeAfterLoad(
         pruneRemovedResources);
     commandList->close();
     gpu.device->executeCommandList(commandList);
-    if (!gpu.device->waitForIdle())
-        caustica::error("finalizeAfterLoad: waitForIdle failed");
-    gpu.device->runGarbageCollection();
+
+    budget.trackSubmit(gpu.device, finalizeBytes);
+    budget.waitAll(gpu.device);
 }
 
 void SceneGpuUpdater::refreshAfterLoad(

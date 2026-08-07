@@ -1,9 +1,9 @@
-#include <engine/SceneMeshEdit.h>
+#include <engine/MeshDeformApi.h>
 
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/internal/WorldRendererAccess.h>
-#include <engine/internal/SceneMeshEditing.h>
+#include <engine/internal/MeshDeformGpu.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/internal/ActiveSceneAccess.h>
@@ -29,9 +29,9 @@ std::shared_ptr<MeshInfo> meshFromEntity(App& app, ecs::Entity entity)
     return meshInstance ? meshInstance->mesh : nullptr;
 }
 
-SetSceneMeshVerticesParams makeInternalMeshEditParams(App& app, const SceneMeshEditOptions& options)
+MeshDeformGpuParams makeInternalMeshDeformParams(App& app, const MeshDeformOptions& options)
 {
-    SetSceneMeshVerticesParams params;
+    MeshDeformGpuParams params;
     params.recomputeNormals = options.recomputeNormals;
     params.rebuildAccelerationStructure = options.rebuildAccelerationStructure;
     params.zeroMotionHistory = options.zeroMotionHistory;
@@ -79,25 +79,25 @@ void setMeshVertices(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options)
+    const MeshDeformOptions& options)
 {
-    caustica::setMeshVertices(meshFromEntity(app, entity), vertices, makeInternalMeshEditParams(app, options));
+    caustica::setMeshVertices(meshFromEntity(app, entity), vertices, makeInternalMeshDeformParams(app, options));
 }
 
 void setMeshVerticesWorld(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options)
+    const MeshDeformOptions& options)
 {
-    caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshEditParams(app, options));
+    caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshDeformParams(app, options));
 }
 
 bool applyGeometrySequence(
     App& app,
     ecs::Entity entity,
     float timeSeconds,
-    const SceneMeshEditOptions& options)
+    const MeshDeformOptions& options)
 {
     const std::shared_ptr<Scene> scene = activeScene(app);
     scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
@@ -106,7 +106,7 @@ bool applyGeometrySequence(
     auto* sequence = ew->world().tryGet<scene::GeometrySequenceComponent>(entity);
     if (!sequence)
         return false;
-    return caustica::applyGeometrySequence(*sequence, timeSeconds, makeInternalMeshEditParams(app, options));
+    return caustica::applyGeometrySequence(*sequence, timeSeconds, makeInternalMeshDeformParams(app, options));
 }
 
 } // namespace caustica

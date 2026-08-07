@@ -7,14 +7,16 @@
 namespace caustica
 {
 
-void SceneStructureGpuSync::requestGpuStructureSync()
+void SceneStructureGpuSync::requestGpuStructureSync(StructureGpuUploadMode uploadMode)
 {
     m_pendingGpuStructureSync = true;
+    m_uploadMode = uploadMode;
 }
 
 void SceneStructureGpuSync::clearGpuStructureSync()
 {
     m_pendingGpuStructureSync = false;
+    m_uploadMode = StructureGpuUploadMode::UploadMeshes;
 }
 
 void SceneStructureGpuSync::freezeCommittedFromLogicCache(const scene::SceneRenderData& logicCache)

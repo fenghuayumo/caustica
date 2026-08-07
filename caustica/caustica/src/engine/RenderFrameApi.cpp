@@ -18,7 +18,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/Scene.h>
 #include <scene/scene_utils.h>
-#include <engine/SceneMeshEdit.h>
+#include <engine/MeshDeformApi.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/WorldRenderer.h>
@@ -335,7 +335,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                 if (touchedGaussianVisibility)
                     runtime->Invalidation.AccelerationStructRebuildRequested = true;
 
-                // Fixed-topology USD / soft-body point caches (SceneMeshEdit hides GPU wiring).
+                // Fixed-topology USD / soft-body point caches (MeshDeformApi hides GPU wiring).
                 // Geometry sequences follow imported/skeletal playback, not editor keyframes.
                 if (enableSkeletal)
                 {
@@ -347,7 +347,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                                 app,
                                 entity,
                                 animTime,
-                                SceneMeshEditOptions{ .resetAccumulationOnAccelRebuild = false });
+                                MeshDeformOptions{ .resetAccumulationOnAccelRebuild = false });
                         });
                     // Loop wraps may request accumulation reset via mesh-edit internals.
                     if (cfg && cfg->ResetAccumulation && !hadResetAccumulation)

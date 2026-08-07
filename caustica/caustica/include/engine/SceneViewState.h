@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/progress.h>
+#include <engine/LoadSession.h>
 #include <render/core/TextureUtils.h>
 
 #include <atomic>
@@ -29,29 +30,13 @@ struct SceneViewState
 
     ProgressBar progressLoading;
 
-    // When true, App must not submit/present. Scene switch tears down AS / materials /
-    // Streamline history; overlapping DispatchRays or DLSS-RR hard-hangs the GPU.
+    // Exclusive teardown / AS cutover only (ADR 0001 P3). Not held for whole Open Scene.
+    // When true, App must not submit/present — overlapping DispatchRays or DLSS-RR with
+    // Streamline teardown hard-hangs the GPU.
     std::atomic<bool> sceneGpuSuspended{false};
 
-    // UE-style multi-frame GPU bind after CPU import. Advanced by tickSceneGpuBind().
-    enum class GpuBindPhase : uint8_t
-    {
-        None = 0,
-        Textures,
-        World,
-        Meshes,
-        Finalize,
-        LogicFinish,
-    };
-    struct GpuBindJob
-    {
-        GpuBindPhase phase = GpuBindPhase::None;
-        const scene::SceneRenderData* renderData = nullptr;
-        size_t texturesTotal = 0;
-        size_t meshBegin = 0;
-        size_t meshTotal = 0;
-    };
-    GpuBindJob gpuBind;
+    // Sole Open Scene load state machine (replaces GpuBindPhase).
+    LoadSession loadSession;
 
     std::mutex pendingSceneSwitchMutex;
     struct PendingSceneSwitch

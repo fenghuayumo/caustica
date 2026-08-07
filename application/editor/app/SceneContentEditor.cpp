@@ -9,7 +9,7 @@
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
-#include <engine/SceneMeshEdit.h>
+#include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
 #include <scene/SceneEcs.h>
 
@@ -166,6 +166,8 @@ void SceneContentEditor::setMeshVertices(caustica::ecs::Entity entity,
 }
 
 } // namespace caustica::editor
+
+
 
 
 

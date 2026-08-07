@@ -2,6 +2,7 @@
 
 #include <render/core/RenderDevice.h>
 #include <render/core/FullscreenBlitPass.h>
+#include <render/core/StreamingUploadBudget.h>
 #include <core/vfs/VFS.h>
 
 #include <stb_image_write.h>
@@ -201,6 +202,25 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
         {
             commandsExecuted += 1;
 
+            // Approximate DEFAULT heap + staging pressure for this finalize.
+            size_t uploadBytes = 0;
+            for (const auto& arraySlice : pTexture->dataLayout)
+            {
+                for (const TextureSubresourceData& layout : arraySlice)
+                    uploadBytes += layout.dataSize;
+            }
+            if (uploadBytes == 0 && pTexture->width > 0 && pTexture->height > 0)
+            {
+                uploadBytes = size_t(pTexture->width) * size_t(pTexture->height)
+                    * size_t(std::max(pTexture->depth, 1u)) * 4u;
+                if (pTexture->mipLevels > 1)
+                    uploadBytes += uploadBytes / 2; // rough mip chain
+            }
+            uploadBytes = std::max(uploadBytes, size_t(64 * 1024));
+
+            auto& budget = render::streamingUploadBudget();
+            budget.waitForBudget(m_Device, uploadBytes);
+
             if (!m_CommandList)
             {
                 // Long-lived CL: UploadManager fences+reuses UPLOAD under uploadMaxMemory.
@@ -214,11 +234,9 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
             finalizeTexture(pTexture, &renderDevice, m_CommandList);
             m_CommandList->close();
             m_Device->executeCommandList(m_CommandList);
-            // Must drain GPU per texture on large scenes. Polling GC alone lets
-            // hundreds of CreateCommittedResource/copy ops pile up and freeze the OS.
-            if (!m_Device->waitForIdle())
-                caustica::error("TextureLoader: waitForIdle failed");
-            m_Device->runGarbageCollection();
+            // ADR 0001 R1: EventQuery + in-flight byte cap instead of waitForIdle.
+            budget.trackSubmit(m_Device, uploadBytes);
+            budget.retire(m_Device, /*runGc=*/true);
         }
     }
 
@@ -227,6 +245,8 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
 
 void TextureLoader::loadingFinished()
 {
+    if (m_Device)
+        render::streamingUploadBudget().waitAll(m_Device);
     m_CommandList = nullptr;
 }
 

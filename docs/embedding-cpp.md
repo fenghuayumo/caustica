@@ -151,7 +151,7 @@ Prefer system parameters, then focused application headers:
 | `engine/SceneQuery.h` | `entityWorld`, load status, materials, entity lookup (no diggable `Scene*`). |
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
-| `engine/SceneMeshEdit.h` | Vertex reads/deformation and geometry-sequence playback (entity + MeshHandle only). |
+| `engine/MeshDeformApi.h` | Vertex reads/deformation and geometry-sequence playback (entity + MeshHandle only). |
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
 | `engine/CameraApi.h` | Camera selection state, pose, FOV, and intrinsics. |

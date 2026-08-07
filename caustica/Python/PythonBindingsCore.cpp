@@ -17,7 +17,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
-#include <engine/SceneMeshEdit.h>
+#include <engine/MeshDeformApi.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
 #include <backend/GpuDevice.h>

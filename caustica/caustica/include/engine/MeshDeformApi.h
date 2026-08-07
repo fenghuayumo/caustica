@@ -12,8 +12,8 @@ namespace caustica
 class App;
 
 // App-facing mesh deform options. GPU upload / AS rebuild stay inside the engine.
-// (Low-level GPU wiring: engine/internal/SceneMeshEditing.h — apps must not include.)
-struct SceneMeshEditOptions
+// (Low-level GPU wiring: engine/internal/MeshDeformGpu.h — apps must not include.)
+struct MeshDeformOptions
 {
     bool recomputeNormals = true;
     bool rebuildAccelerationStructure = true;
@@ -31,17 +31,17 @@ void setMeshVertices(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options = {});
+    const MeshDeformOptions& options = {});
 void setMeshVerticesWorld(
     App& app,
     ecs::Entity entity,
     const std::vector<dm::float3>& vertices,
-    const SceneMeshEditOptions& options = {});
+    const MeshDeformOptions& options = {});
 
 bool applyGeometrySequence(
     App& app,
     ecs::Entity entity,
     float timeSeconds,
-    const SceneMeshEditOptions& options = {});
+    const MeshDeformOptions& options = {});
 
 } // namespace caustica

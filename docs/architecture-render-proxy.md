@@ -51,7 +51,7 @@ Published via `Scene::extractAndPublishRenderSnapshot(frameIndex, &frameInputs)`
 
 | Path | Why ECS is OK |
 | --- | --- |
-| `SceneMeshEditing` | Editor / Python deform / geometry sequences on logic thread |
+| `MeshDeformGpu` | Editor / Python deform / geometry sequences on logic thread |
 | `SceneGaussianSplatPasses::loadFromSceneEntities` / `attachToScene` | Load/edit mutates entities then publishes snapshot |
 | JSON / glTF / USD importers | Write typed `*LightComponent` / `CameraComponent` / `AnimationComponent` directly |
 
@@ -61,7 +61,7 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md).
 
-TaskRuntime + enqueue collapse (P1) and planned LoadSession streaming:
+TaskRuntime + LoadSession streaming (P1–P3):
 [ADR 0001](adr/0001-task-runtime-multithreading.md).
 
 ## App scene-edit API
@@ -70,14 +70,14 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 - `SceneSpawn.h` - `load` / `spawn` / `despawn`
 - `SceneTransform.h` - local transform / translation / visibility
-- `SceneMeshEdit.h` - mesh deform / geometry sequence (`SceneMeshEditOptions`) via **entity** only
+- `MeshDeformApi.h` - mesh deform / geometry sequence (`MeshDeformOptions`) via **entity** only
 - `MeshHandle` / `MaterialHandle` + `MeshInstanceComponent::meshHandle()` — app asset identity
 
 `MeshInfo` / `MeshGeometry` / `Material` GPU keys (`m_renderResourceId`) are private; only Extract /
 GPU updater touch them via `scene/internal/RenderResourceAccess.h`. Pick materials with
 `findMaterial(app, gpuDataIndex)` — not dense `Material::materialID`. Hosts use entity +
 `MeshHandle` only — not `shared_ptr<MeshInfo>`.
-`SetSceneMeshVerticesParams` / `engine/internal/SceneMeshEditing.h` remain engine-internal.
+`MeshDeformGpuParams` / `engine/internal/MeshDeformGpu.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
 Editor `demo::PropComponentBase` / `GameModel` live only under `application/editor/game`
 (not in `causScene`). Sample scripts over ECS — not a second component system.
@@ -126,7 +126,8 @@ While `structureGpuBuildInFlight()`:
 
 First structure publish with no committed packet enqueues async build; WorldRenderer serves
 null structure (empty/placeholder present) until commit. `flushPendingStructureGpuSync` is
-deprecated. Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubsystem`) — P3.
+deprecated. Full scene open uses `LoadSession` budgeted GpuStreaming + StructureGpu
+`AccelOnly` (same committed-serve path as runtime spawn).
 
 ## Current status and boundaries
 
@@ -137,9 +138,9 @@ deprecated. Full scene load remains exclusive (`SceneLifecycle` / `GpuRenderSubs
 | Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
 | TaskRuntime + Logic→RT enqueue | P1 landed — `caustica::task`, sole `EnqueueRenderCommand*`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
-| LoadSession amortized streaming | Planned — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| LoadSession amortized streaming | P3 landed — `LoadSession` / `tickLoadSession`; present during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
-| Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `SceneMeshEdit` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
+| Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Hosts use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |

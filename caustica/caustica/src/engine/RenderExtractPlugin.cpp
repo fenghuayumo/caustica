@@ -28,13 +28,14 @@ void prepareRenderFrame(App& app)
     auto* worldRendererResource = worldRenderer(app);
     auto* resolvedCamera = app.tryResource<ResolvedActiveCamera>();
     GpuDevice* device = app.getGpuDevice();
-    // Do not tear down the native loading card while a scene switch is in flight —
-    // Extract can resume before onSceneLoaded finishes painting 50→100.
-    const bool sceneSwitchInFlight = (vs && vs->sceneGpuSuspended.load(std::memory_order_acquire))
+    // Progress UI is owned by LoadSession (ADR 0001 P3). Keep the card up while active.
+    const bool loadSessionActive = vs && vs->loadSession.isActive();
+    const bool sceneSwitchInFlight = loadSessionActive
+        || (vs && vs->sceneGpuSuspended.load(std::memory_order_acquire))
         || isSceneLoading(app);
     if (vs && !sceneSwitchInFlight)
         vs->progressLoading.stop();
-    if (diag && !sceneSwitchInFlight)
+    if (diag && !loadSessionActive && !sceneSwitchInFlight)
         diag->asyncLoadingInProgress = false;
 
     const std::shared_ptr<Scene> scene = activeScene(app);

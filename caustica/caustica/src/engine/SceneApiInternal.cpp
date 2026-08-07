@@ -63,14 +63,14 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    if (manager->isSceneLoading())
+    if (manager->isSceneLoading() || vs->loadSession.isActive())
     {
-        sceneSwitchTrace("applySceneSwitch: ignored, scene already loading");
+        sceneSwitchTrace("applySceneSwitch: ignored, LoadSession/import in flight");
         return;
     }
     if (vs->sceneGpuSuspended.load(std::memory_order_acquire))
     {
-        sceneSwitchTrace("applySceneSwitch: ignored, sceneGpuSuspended");
+        sceneSwitchTrace("applySceneSwitch: ignored, sceneGpuSuspended (teardown)");
         return;
     }
 
@@ -81,7 +81,9 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    // Stop new frame submit before unload/load. Cleared in onSceneLoaded / failure.
+    // Importing begins; exclusive suspend is only held across onSceneUnloading teardown.
+    vs->loadSession.reset();
+    vs->loadSession.phase = LoadSessionPhase::Importing;
     vs->sceneGpuSuspended.store(true, std::memory_order_release);
 
     cfg->ResetAccumulation = true;
@@ -113,6 +115,7 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         manager->clearScene();
         clearActiveScene(app);
         vs->progressLoading.stop();
+        vs->loadSession.reset();
         vs->sceneGpuSuspended.store(false, std::memory_order_release);
     }
 }
