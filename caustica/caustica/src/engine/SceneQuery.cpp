@@ -209,4 +209,17 @@ ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex)
     return SceneManager::findEntityByInstanceIndex(activeScene(app), instanceIndex);
 }
 
+ecs::Entity findEntity(
+    const App& app,
+    const std::filesystem::path& path,
+    ecs::Entity context)
+{
+    scene::SceneEntityWorld* world = entityWorld(app);
+    if (!world)
+        return ecs::NullEntity;
+    if (!ecs::isValid(context))
+        context = world->root();
+    return world->findEntity(path, context);
+}
+
 } // namespace caustica

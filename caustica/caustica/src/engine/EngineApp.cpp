@@ -308,6 +308,11 @@ bool EngineApp::isSceneLoading() const
     return m_app && caustica::isSceneLoading(*m_app);
 }
 
+scene::SceneEntityWorld* EngineApp::entityWorld() const
+{
+    return m_app ? caustica::entityWorld(*m_app) : nullptr;
+}
+
 PathTracerSettings& EngineApp::settings()
 {
     return m_app->resource<PathTracerSettings>();

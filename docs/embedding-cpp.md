@@ -6,9 +6,10 @@ application schedules, and exposes focused scene, camera, and render-session
 APIs. New hosts should not assemble `DefaultPlugins`, reach through
 internal GPU/WR headers, or drive `WorldRenderer` directly.
 
-The complete in-tree example is
-[`application/samples/thin_client/Main.cpp`](../application/samples/thin_client/Main.cpp);
-its CMake target is `caustica_thin_client`.
+**Public API (P0):** prefer `#include <caustica.h>` and stay on the
+allowlist in [public-api.md](public-api.md). The complete in-tree example is
+[`application/samples/thin_client/Main.cpp`](../application/samples/thin_client/Main.cpp)
+(`caustica_thin_client`); CMake also runs `tools/check_public_api_includes.py`.
 
 Do **not** copy `application/editor/game` (`demo::Prop*`, `GameModel`, `LightController`) —
 that folder is an editor SampleGame script layer, not an embedding API.
@@ -18,7 +19,7 @@ that folder is an editor SampleGame script layer, not an embedding API.
 For a host that only needs the default engine:
 
 ```cpp
-#include <engine/EngineApp.h>
+#include <caustica.h>
 
 int main()
 {
@@ -90,19 +91,16 @@ state. `preGpuDeviceInit` runs just before an owned device is created.
 Bevy-style: `create` → `addSystem` / `addPlugin` → `run()` (Startup is automatic):
 
 ```cpp
-#include <engine/EngineApp.h>
-#include <engine/EntityWorld.h>
-#include <engine/SceneSpawn.h>
-#include <engine/SceneQuery.h>
+#include <caustica.h>
 
-struct HostSimulationLabel
+struct AppSimulationLabel
 {
-    static constexpr const char* name = "Host.Simulation";
+    static constexpr const char* name = "App.Simulation";
 };
 
 auto engine = caustica::EngineApp::create({ .scene = "default.json" });
 
-engine->addSystem<HostSimulationLabel>(
+engine->addSystem<AppSimulationLabel>(
     caustica::AppSchedule::update,
     [](caustica::EntityWorld scene, caustica::SystemContext& ctx) {
         if (!scene || !caustica::isSceneLoaded(ctx.app))
@@ -137,7 +135,7 @@ dedicated thread is active. `postRender` and `Last` continue on the logic thread
 after dispatch and do not imply that the asynchronous render work has completed.
 
 Use `AppSystemOrdering::runBefore`, `runAfter`, and `inSet` for explicit ordering.
-Hosts that must run code after Startup but before the loop (e.g. the editor) can
+Apps that must run code after Startup but before the loop (e.g. the editor) can
 still call `finishStartup()` explicitly.
 
 ## Scene access and mutation
@@ -159,7 +157,7 @@ Prefer system parameters, then focused application headers:
 | `engine/RenderSessionApi.h` | Session-level render controls. |
 | `engine/RenderFrameApi.h` | Accumulation and rendered-frame access. |
 
-Bundle spawn example (lights / meshes keep SceneEntityWorld bookkeeping):
+Bundle spawn example (plain component emplace; Extract/refresh syncs resource lists):
 
 ```cpp
 scene.spawn(

@@ -1,5 +1,8 @@
 #pragma once
 
+// ENGINE-INTERNAL — not part of the public API (see docs/public-api.md).
+// Hosts: EngineApp::isSceneLoading / SceneQuery::isSceneLoading — not LoadSession digs.
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>

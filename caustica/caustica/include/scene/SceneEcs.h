@@ -324,8 +324,9 @@ public:
     void destroyEntity(ecs::Entity entity);
     bool setParent(ecs::Entity entity, ecs::Entity parent);
 
-    // Bevy-style bundle spawn on the scene hierarchy (createEntity defaults + components).
-    // Typed lights / mesh / camera go through set* so resource bookkeeping stays correct.
+    // Bevy-style bundle spawn: createEntity defaults + plain component emplace.
+    // Mesh/light/camera resource lists sync in syncSceneResourcesFromEcs()
+    // (beginRefreshFrame / ensureSceneResourcesSynced) from Added<>/Changed<>.
     template<typename... Components>
     ecs::Entity spawn(Components&&... components)
     {
@@ -398,14 +399,19 @@ public:
     [[nodiscard]] bool hasPendingStructureChanges();
     [[nodiscard]] bool hasPendingTransformChanges();
 
+    // Reconcile ResourceTracker / camera list / leaf bounds from Added<>/Changed<>.
+    // Called from beginRefreshFrame; also via ensureSceneResourcesSynced() before mesh reads.
+    void syncSceneResourcesFromEcs();
+    void ensureSceneResourcesSynced();
+
     // Advance ChangeDetection after all Changed<> readers for this logic frame
     // (Extract). refresh()/finalizeRefreshFrame() must NOT end the tick.
     void endChangeDetectionFrame();
 
-    // ChangeDetection is the write path for ECS mutations; m_*Dirty is the
-    // scene-level read path (hydrated lazily inside hasPending*).
+    // ChangeDetection is the component write signal. m_*Dirty are refresh/Extract
+    // caches hydrated from ChangeDetection — not a second host-facing dirty API.
 
-    [[nodiscard]] const std::vector<ecs::Entity>& cameraEntitiesInRegistrationOrder() const { return m_CameraEntities; }
+    [[nodiscard]] const std::vector<ecs::Entity>& cameraEntitiesInRegistrationOrder() const;
 
 private:
     void registerCameraEntity(ecs::Entity entity);
@@ -414,6 +420,7 @@ private:
     void updateLeafContentAndBounds(ecs::Entity entity);
     void ensureChangeDetection();
     void syncDirtyFlagsFromChangeDetection();
+    void reconcileLightExclusivity(ecs::Entity entity);
 
     void insertSpawnComponent(ecs::Entity entity, NameComponent component);
     void insertSpawnComponent(ecs::Entity entity, LocalTransformComponent component);
@@ -446,8 +453,10 @@ private:
     ecs::Entity m_root = ecs::NullEntity;
     std::vector<ecs::Entity> m_CameraEntities;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
-    bool m_structureDirty = true;
-    bool m_transformDirty = true;
+    // Shadow of ResourceTracker registrations keyed by entity (for Changed mesh swaps).
+    std::unordered_map<ecs::Entity, std::shared_ptr<MeshInfo>> m_registeredMeshByEntity;
+    bool m_structureDirty = true;         // refresh/Extract cache (from ChangeDetection)
+    bool m_transformDirty = true;         // refresh/Extract cache (from ChangeDetection)
     bool m_previousTransformDirty = false;
     static inline const std::vector<ecs::Entity> s_emptyChildren{};
 };

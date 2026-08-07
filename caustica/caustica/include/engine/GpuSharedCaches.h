@@ -1,5 +1,7 @@
 #pragma once
 
+// ENGINE-INTERNAL — not part of the public API (see docs/public-api.md).
+
 #include <memory>
 
 #include <rhi/rhi.h>

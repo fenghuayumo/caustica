@@ -1,5 +1,8 @@
 #pragma once
 
+// Public API — session/frame queries and a few render controls (see docs/public-api.md).
+// Prefer entity overloads; MeshInfo overloads are for engine/editor internals.
+
 #include <ecs/Entity.h>
 #include <math/math.h>
 

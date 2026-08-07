@@ -1,5 +1,8 @@
 #pragma once
 
+// ENGINE-INTERNAL — not part of the public API (see docs/public-api.md).
+// Hosts: EngineApp::create configures startup; do not call registerSceneAppResources yourself.
+
 #include <core/command_line.h>
 
 #include <engine/EngineSceneCallbacks.h>

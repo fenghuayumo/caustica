@@ -1,5 +1,8 @@
 #pragma once
 
+// ENGINE-INTERNAL — not part of the public API (see docs/public-api.md).
+// Occasional RT work from hosts: EnqueueRenderCommand / EnqueueRenderCommandAndWait.
+
 #include <atomic>
 #include <condition_variable>
 #include <deque>

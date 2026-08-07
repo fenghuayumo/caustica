@@ -4,6 +4,7 @@
 #include <math/math.h>
 #include <scene/SceneEcs.h>
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <utility>
@@ -59,6 +60,35 @@ public:
     bool setTranslation(ecs::Entity entity, const dm::double3& translation)
     {
         return setLocalTransform(entity, translation, std::nullopt, std::nullopt);
+    }
+
+    // MeshInstanceComponent::enabled — no-op (false) when entity has no mesh instance.
+    bool setVisible(ecs::Entity entity, bool visible)
+    {
+        if (!m_world || !ecs::isValid(entity) || !m_world->world().isAlive(entity))
+            return false;
+        auto* mesh = m_world->world().tryGet<scene::MeshInstanceComponent>(entity);
+        if (!mesh)
+            return false;
+        mesh->enabled = visible;
+        return true;
+    }
+
+    // Walks from scene root when context is null (App-friendly default).
+    [[nodiscard]] ecs::Entity findEntity(
+        const std::filesystem::path& path,
+        ecs::Entity context = ecs::NullEntity) const
+    {
+        if (!m_world)
+            return ecs::NullEntity;
+        if (!ecs::isValid(context))
+            context = m_world->root();
+        return m_world->findEntity(path, context);
+    }
+
+    [[nodiscard]] std::string name(ecs::Entity entity) const
+    {
+        return m_world ? m_world->getEntityName(entity) : std::string{};
     }
 
 private:

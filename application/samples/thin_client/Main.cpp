@@ -1,13 +1,8 @@
-// Official thin client: EngineApp + Simulation update + spawn/transform only.
-// No editor UI, ImGui, or WorldRenderer digs.
+// Official thin client / public API reference (P0 freeze).
+// Depends only on <caustica.h> (+ math). No editor UI, ImGui, or WorldRenderer digs.
+// Coverage checklist: docs/public-api.md
 
-#include <engine/EngineApp.h>
-#include <engine/EntryPoint.h>
-#include <engine/EntityWorld.h>
-#include <engine/SceneSpawn.h>
-#include <engine/SceneQuery.h>
-#include <engine/EnqueueRenderCommand.h>
-#include <engine/SystemSets.h>
+#include <caustica.h>
 
 #include <core/log.h>
 #include <math/math.h>
@@ -31,10 +26,16 @@ struct ThinClientSpinLabel
 
 struct ThinClientState
 {
-    caustica::ecs::Entity spawned = caustica::ecs::NullEntity;
+    caustica::ecs::Entity spawnedMesh = caustica::ecs::NullEntity;
+    caustica::ecs::Entity spawnedLight = caustica::ecs::NullEntity;
     bool spawnRequested = false;
+    bool loggedScene = false;
+    bool loggedQuery = false;
     bool loggedRenderEnqueue = false;
+    bool toggledVisibility = false;
+    bool despawnedLight = false;
     float angleRadians = 0.f;
+    float elapsedSeconds = 0.f;
 };
 
 } // namespace
@@ -64,25 +65,42 @@ int main(int, char**)
         return 1;
     }
 
+    // Settings / camera via EngineApp (PathTracerSettings + CameraApi).
+    engine->setCameraVerticalFOV(dm::radians(55.f));
+    (void)engine->settings();
+
     engine->emplaceResource<ThinClientState>();
     engine->addSystem<ThinClientSpinLabel>(
         caustica::AppSchedule::update,
         [](caustica::ResMut<ThinClientState> state,
            caustica::EntityWorld scene,
+           caustica::Query<
+               caustica::scene::LocalTransformComponent,
+               caustica::scene::MeshInstanceComponent> meshes,
            caustica::SystemContext& ctx) {
             if (!scene)
                 return;
 
-            // Once: spawn an extra mesh into the already-loaded scene.
+            state->elapsedSeconds += ctx.deltaTimeSeconds;
+
+            if (!state->loggedScene && caustica::isSceneLoaded(ctx.app))
+            {
+                state->loggedScene = true;
+                caustica::info(
+                    "thin_client: scene ready name=%s",
+                    caustica::currentSceneName(ctx.app).c_str());
+            }
+
+            // Prefab spawn + ECS bundle spawn (point light).
             if (!state->spawnRequested && caustica::isSceneLoaded(ctx.app))
             {
                 state->spawnRequested = true;
-                state->spawned = caustica::spawnFromFile(
+                state->spawnedMesh = caustica::spawnFromFile(
                     ctx.app, "Models/GlassSphere/GlassSphere.gltf");
-                if (caustica::ecs::isValid(state->spawned))
+                if (caustica::ecs::isValid(state->spawnedMesh))
                 {
                     scene.setLocalTransform(
-                        state->spawned,
+                        state->spawnedMesh,
                         dm::double3{ 2.0, 1.0, 0.0 },
                         std::nullopt,
                         dm::double3{ 0.5, 0.5, 0.5 });
@@ -92,9 +110,34 @@ int main(int, char**)
                 {
                     caustica::warning("thin_client: spawnFromFile failed");
                 }
+
+                state->spawnedLight = scene.spawnNamed(
+                    "ThinClient.PointLight",
+                    caustica::scene::LocalTransformComponent::fromTRS(
+                        dm::double3{ 2.0, 2.5, 0.0 },
+                        dm::dquat::identity(),
+                        dm::double3{ 1.0, 1.0, 1.0 }),
+                    caustica::scene::PointLightComponent{ .intensity = 8.f });
+                if (caustica::ecs::isValid(state->spawnedLight))
+                    caustica::info("thin_client: spawned point light bundle");
+
+                // Path lookup (EntityWorld + free function).
+                const caustica::ecs::Entity byPath = scene.findEntity("ThinClient.PointLight");
+                if (byPath != state->spawnedLight)
+                    caustica::warning("thin_client: findEntity path mismatch");
+                (void)caustica::findEntity(ctx.app, "ThinClient.PointLight");
             }
 
-            if (!caustica::ecs::isValid(state->spawned))
+            // One-shot Query over mesh instances.
+            if (!state->loggedQuery && caustica::isSceneLoaded(ctx.app))
+            {
+                state->loggedQuery = true;
+                std::size_t count = 0;
+                meshes.each([&](caustica::ecs::Entity, auto&, auto&) { ++count; });
+                caustica::info("thin_client: Query mesh instances=%zu", count);
+            }
+
+            if (!caustica::ecs::isValid(state->spawnedMesh))
                 return;
 
             state->angleRadians += ctx.deltaTimeSeconds * 0.8f;
@@ -103,10 +146,30 @@ int main(int, char**)
                 std::cos(half),
                 dm::double3{ 0.0, std::sin(half), 0.0 });
             scene.setLocalTransform(
-                state->spawned,
+                state->spawnedMesh,
                 dm::double3{ 2.0, 1.0, 0.0 },
                 rotation,
                 dm::double3{ 0.5, 0.5, 0.5 });
+
+            // Visibility toggle.
+            if (!state->toggledVisibility && state->elapsedSeconds > 2.f)
+            {
+                state->toggledVisibility = true;
+                scene.setVisible(state->spawnedMesh, true);
+            }
+
+            // Despawn the temporary light (structure edit via SceneSpawn::despawn).
+            if (!state->despawnedLight
+                && caustica::ecs::isValid(state->spawnedLight)
+                && state->elapsedSeconds > 4.f)
+            {
+                if (caustica::despawn(ctx.app, state->spawnedLight))
+                {
+                    state->despawnedLight = true;
+                    state->spawnedLight = caustica::ecs::NullEntity;
+                    caustica::info("thin_client: despawned point light");
+                }
+            }
 
             // Demonstrate the thin RT enqueue once (non-blocking; no Logic ECS).
             if (!state->loggedRenderEnqueue)

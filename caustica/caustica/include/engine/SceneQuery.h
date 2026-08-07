@@ -34,4 +34,10 @@ class Material;
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);
 [[nodiscard]] ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex);
 
+// Hierarchy path lookup on the live scene ECS (same rules as SceneEntityWorld::findEntity).
+[[nodiscard]] ecs::Entity findEntity(
+    const App& app,
+    const std::filesystem::path& path,
+    ecs::Entity context = ecs::NullEntity);
+
 } // namespace caustica

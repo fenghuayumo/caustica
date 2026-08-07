@@ -286,7 +286,10 @@ const ResourceTracker<Material>& Scene::getMaterials() const
     assertLogicThread();
 
     if (m_EntityWorld)
+    {
+        m_EntityWorld->ensureSceneResourcesSynced();
         return m_EntityWorld->getMaterials();
+    }
 
     static const ResourceTracker<Material> s_empty;
     return s_empty;
@@ -297,7 +300,10 @@ const ResourceTracker<MeshInfo>& Scene::getMeshes() const
     assertLogicThread();
 
     if (m_EntityWorld)
+    {
+        m_EntityWorld->ensureSceneResourcesSynced();
         return m_EntityWorld->getMeshes();
+    }
 
     static const ResourceTracker<MeshInfo> s_empty;
     return s_empty;

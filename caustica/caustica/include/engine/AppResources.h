@@ -15,7 +15,9 @@ class CameraController;
 struct GpuSharedCaches;
 struct SceneSession;
 
-// Prefer RenderSessionApi; WorldRenderer is engine-internal via internal/WorldRendererAccess.h.
+// Public: settings / gpuDevice / viewState / diagnostics / cmdLine / runtimeState.
+// ENGINE-INTERNAL: gpuSharedCaches / cameraController / sceneSession — use CameraApi /
+// EngineApp / SceneQuery instead. WorldRenderer: internal/WorldRendererAccess.h only.
 
 [[nodiscard]] GpuDevice* gpuDevice(const App& app);
 [[nodiscard]] GpuSharedCaches* gpuSharedCaches(const App& app);

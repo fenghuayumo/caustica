@@ -1,5 +1,8 @@
 #pragma once
 
+// ENGINE-INTERNAL bootstrap — not part of the public API.
+// Apps use EngineApp::create / <caustica.h>; do not assemble DefaultPlugins yourself.
+
 #include <engine/Plugin.h>
 #include <engine/SceneStartup.h>
 

@@ -1,5 +1,8 @@
 #pragma once
 
+// Public embedding entry. Prefer #include <caustica.h> in new apps.
+// Contract: docs/public-api.md — do not assemble DefaultPlugins or dig WorldRenderer.
+
 #include <backend/GpuDevice.h>
 #include <engine/App.h>
 #include <engine/EntryPoint.h>
@@ -135,6 +138,8 @@ public:
     void setScene(const std::string& name, bool forceReload = false);
     [[nodiscard]] bool isSceneLoaded() const;
     [[nodiscard]] bool isSceneLoading() const;
+    // Live scene ECS (nullptr while unloaded / switching). Prefer EntityWorld system param in systems.
+    [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] PathTracerSettings& settings();
     [[nodiscard]] const PathTracerSettings& settings() const;
     [[nodiscard]] render::RenderAppState& renderAppState();

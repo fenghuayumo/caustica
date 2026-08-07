@@ -1,5 +1,10 @@
 #pragma once
 
+// Public: setCurrentScene / is-loading helpers below.
+// ENGINE-INTERNAL bootstrap: bindCameraControllerSideEffects, initStreamlineAndWindow,
+// initializeScene, onScene*, collectUncompressedTextures — EngineApp owns those.
+// Prefer EngineApp::setScene for applications (see docs/public-api.md).
+
 #include <string>
 
 namespace caustica

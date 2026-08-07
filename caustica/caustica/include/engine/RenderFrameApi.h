@@ -1,5 +1,8 @@
 #pragma once
 
+// ENGINE-INTERNAL schedule helpers — not part of the public API (see docs/public-api.md).
+// Hosts drive frames via EngineApp::run / stepFrame only.
+
 #include <cstdint>
 
 namespace caustica

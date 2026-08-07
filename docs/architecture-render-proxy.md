@@ -75,7 +75,7 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 `MeshInfo` / `MeshGeometry` / `Material` GPU keys (`m_renderResourceId`) are private; only Extract /
 GPU updater touch them via `scene/internal/RenderResourceAccess.h`. Pick materials with
-`findMaterial(app, gpuDataIndex)` — not dense `Material::materialID`. Hosts use entity +
+`findMaterial(app, gpuDataIndex)` — not dense `Material::materialID`. Apps use entity +
 `MeshHandle` only — not `shared_ptr<MeshInfo>`.
 `MeshDeformGpuParams` / `engine/internal/MeshDeformGpu.h` remain engine-internal.
 Import attach/detach is `SceneApply.h` (the old `SceneRuntimeMutation` shim was removed).
@@ -91,9 +91,13 @@ Default SystemSets (`SystemSets.h`):
 - `system_set::TransformPropagate` — hierarchy refresh in `PostUpdate` (after other PostUpdate systems)
 - `system_set::Extract` — Extract publish path
 
-Host systems can take Bevy-style parameters: `EntityWorld`, `Query<...>`, `Res` / `ResMut`,
-`Commands`. Bundle spawn is `EntityWorld::spawn(...)` / `SceneEntityWorld::spawnNamed` (typed
-lights/meshes still go through the existing `set*` bookkeeping). `EngineApp::run` /
+App systems can take Bevy-style parameters: `EntityWorld`, `Query<...>`, `Res` / `ResMut`,
+`Commands`. Bundle spawn is plain ECS emplace via `EntityWorld::spawn(...)` /
+`SceneEntityWorld::spawnNamed`. Mesh/light/camera resource lists and leaf bounds
+are rebuilt in `SceneEntityWorld::syncSceneResourcesFromEcs()` from `Added<>` /
+`Changed<>` (runs in `beginRefreshFrame` / `ensureSceneResourcesSynced`). Sticky
+`m_structureDirty` / `m_transformDirty` are refresh/Extract caches hydrated from
+ChangeDetection — not a second host-facing dirty API. `EngineApp::run` /
 `stepFrame` auto-run `finishStartup` after the host registers systems.
 
 Logic-thread `CameraController` and settings stay **App resources** (`CameraController`, `ResolvedActiveCamera`,
@@ -109,7 +113,7 @@ Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRende
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).
 
 Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
-(`EngineApp` + one Simulation system using `EntityWorld` + `spawnFromFile`).
+(`#include <caustica.h>` + Simulation systems). Frozen surface: [public-api.md](public-api.md).
 
 ## Async structure handoff
 
@@ -141,7 +145,7 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | LoadSession amortized streaming | P3 landed — `LoadSession` / `tickLoadSession`; present during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
-| Scene query path | Hosts use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
+| Scene query path | Apps use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
 | Camera wrappers | `SceneCameraController` removed; interactive side effects live on `CameraController::bindSideEffects` |
