@@ -394,14 +394,14 @@ void App::waitForRenderThreadIdle()
         m_renderThread.waitForIdle();
 }
 
-void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
+void App::enqueueRenderCommandAndWaitImpl(std::function<void()> command)
 {
-    if (!work)
+    if (!command)
         return;
 
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
     {
-        m_renderThread.dispatchAndWait(work);
+        m_renderThread.dispatchAndWait(std::move(command));
         return;
     }
 
@@ -411,20 +411,20 @@ void App::runGpuWorkOnRenderThread(const std::function<void()>& work)
     desc.name = "SyncRender.Command";
     desc.priority = task::Priority::Critical;
     desc.affinity = task::Affinity::Render;
-    desc.body = work;
+    desc.body = std::move(command);
     task::TaskHandle handle = task::launch(std::move(desc));
     while (!task::poll(handle))
         task::pumpRender();
 }
 
-void App::enqueueGpuWorkOnRenderThread(const std::function<void()>& work)
+void App::enqueueRenderCommandImpl(std::function<void()> command)
 {
-    if (!work)
+    if (!command)
         return;
 
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
     {
-        m_renderThread.dispatch(work);
+        m_renderThread.dispatch(std::move(command));
         return;
     }
 
@@ -434,7 +434,7 @@ void App::enqueueGpuWorkOnRenderThread(const std::function<void()>& work)
     desc.name = "SyncRender.Command";
     desc.priority = task::Priority::High;
     desc.affinity = task::Affinity::Render;
-    desc.body = work;
+    desc.body = std::move(command);
     (void)task::launch(std::move(desc));
     task::pumpRender();
 }

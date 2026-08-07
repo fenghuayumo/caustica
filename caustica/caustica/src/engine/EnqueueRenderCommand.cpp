@@ -7,12 +7,12 @@ namespace caustica
 
 void EnqueueRenderCommand(App& app, std::function<void()> command)
 {
-    app.enqueueGpuWorkOnRenderThread(std::move(command));
+    app.enqueueRenderCommandImpl(std::move(command));
 }
 
 void EnqueueRenderCommandAndWait(App& app, std::function<void()> command)
 {
-    app.runGpuWorkOnRenderThread(std::move(command));
+    app.enqueueRenderCommandAndWaitImpl(std::move(command));
 }
 
 } // namespace caustica

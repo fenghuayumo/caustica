@@ -1009,13 +1009,8 @@ void GraphBuilder::recordPass(
     if (!pass.textureReads.empty() || !pass.textureWrites.empty() || !pass.bufferReads.empty() || !pass.bufferWrites.empty())
         commandList->commitBarriers();
 
-    // Volatile CBs are per command-list open session. Parallel waves flush/fork lists,
-    // so rewrite registered CPU shadows before any bind in the pass body.
-    for (const VolatileConstantRewrite& rewrite : m_volatileConstantRewrites)
-    {
-        if (rewrite.buffer && rewrite.data && rewrite.byteSize > 0)
-            commandList->writeBuffer(rewrite.buffer, rewrite.data, rewrite.byteSize);
-    }
+    // Volatile CBs are per command-list open session (ADR 0001 R2 binder).
+    m_volatileConstants.apply(commandList);
 
     if (pass.execute)
     {
@@ -1154,23 +1149,6 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     transitionExtractedResources(primary);
 }
 
-void GraphBuilder::clearVolatileConstantRewrites()
-{
-    m_volatileConstantRewrites.clear();
-}
-
-void GraphBuilder::addVolatileConstantRewrite(
-    caustica::rhi::Buffer* buffer, const void* data, size_t byteSize)
-{
-    if (!buffer || !data || byteSize == 0)
-        return;
-    m_volatileConstantRewrites.push_back(VolatileConstantRewrite{
-        .buffer = buffer,
-        .data = data,
-        .byteSize = byteSize,
-    });
-}
-
 void GraphBuilder::reset()
 {
     releaseTransientResources();
@@ -1183,7 +1161,7 @@ void GraphBuilder::reset()
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();
     m_transientStats = {};
-    m_volatileConstantRewrites.clear();
+    m_volatileConstants.clear();
     m_compiled = false;
 }
 

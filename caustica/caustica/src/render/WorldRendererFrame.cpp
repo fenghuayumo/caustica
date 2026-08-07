@@ -273,16 +273,17 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         validateReferencePathTraceGraph(*ctx.graph, m_context->activeSettings());
 #endif
 
-    // Shared volatiles rewritten on every recordPass so parallel waves (flush + fork)
-    // keep NVRHI per-list addresses valid.
-    ctx.graph->clearVolatileConstantRewrites();
+    // Shared volatiles (ADR 0001 R2 binder): applied on every recordPass so parallel
+    // waves (flush + fork) keep NVRHI per-list addresses valid.
+    auto& volatiles = ctx.graph->volatileConstants();
+    volatiles.clear();
     if (m_constantBuffer)
-        ctx.graph->addVolatileConstantRewrite(m_constantBuffer.Get(), &constants, sizeof(constants));
+        volatiles.bind(m_constantBuffer.Get(), &constants, sizeof(constants));
     if (m_rtxdiPass)
     {
         if (caustica::rhi::BufferHandle rtxdiCb = m_rtxdiPass->getRTXDIConstants())
         {
-            ctx.graph->addVolatileConstantRewrite(
+            volatiles.bind(
                 rtxdiCb.Get(),
                 &m_rtxdiPass->bridgeConstantsCpu(),
                 sizeof(RtxdiBridgeConstants));

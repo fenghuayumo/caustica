@@ -400,8 +400,9 @@ private:
     bool isWindowVisible() const;
     bool isWindowFocused() const;
 
-    void runGpuWorkOnRenderThread(const std::function<void()>& work);
-    void enqueueGpuWorkOnRenderThread(const std::function<void()>& work);
+    // Private backing for EnqueueRenderCommand* (Affinity::Render).
+    void enqueueRenderCommandImpl(std::function<void()> command);
+    void enqueueRenderCommandAndWaitImpl(std::function<void()> command);
 
     bool executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex);
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);

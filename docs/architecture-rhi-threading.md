@@ -2,9 +2,11 @@
 
 Caustica already splits **logic** and **render** via Extract + `RenderThread` (see [architecture-render-proxy.md](architecture-render-proxy.md)). This document defines the RHI rules that make that split and parallel command-list recording safe.
 
-> **Evolution:** P1–P3 + R1 upload fences (`StreamingUploadBudget`) are in
-> [ADR 0001](adr/0001-task-runtime-multithreading.md). R2 volatile CB binder remains.
-> Phase-1 RHI create/submit rules below remain authoritative.
+> **Evolution:** P1–P3 + R1 upload fences + R2 `VolatileConstantBinder` are in
+> [ADR 0001](adr/0001-task-runtime-multithreading.md). R3 free-threaded create remains
+> out of scope. Phase-1 RHI create/submit rules below remain authoritative.
+> Frame-path `waitForIdle` (DLSS / OMM / ToneMapping AE / needNewPasses) is intentional
+> RT sync — not LoadSession debt; track under a future RHI sync ADR, not drive-by deletes.
 
 ## Thread roles
 
@@ -84,11 +86,11 @@ NVRHI tracks volatile CB GPU addresses **per command-list open session**. `close
 
 Implications:
 
-- `ExecuteParams::parallelWaves` defaults to **true**. GraphBuilder rewrites registered
-  volatile CPU shadows (`addVolatileConstantRewrite`) at the start of every `recordPass`
-  so flush/fork open sessions stay valid. WorldRenderer registers `FrameConstants`.
-- WorldRenderer also registers the RTXDI bridge CB CPU shadow (`RtxdiPass::bridgeConstantsCpu`)
-  so ReSTIR consumers stay valid across parallel waves after `FillConstants`.
+- `ExecuteParams::parallelWaves` defaults to **true**. `rg::VolatileConstantBinder`
+  (`GraphBuilder::volatileConstants()`) rewrites registered CPU shadows at the start of
+  every `recordPass` so flush/fork open sessions stay valid.
+- WorldRenderer binds `FrameConstants` and the RTXDI bridge CB
+  (`RtxdiPass::bridgeConstantsCpu`) on the binder before `execute`.
 - `FrameConstants` is graph-owned (`UploadFrameConstants`, refreshed again by `UploadSubInstanceData` / after serial sync-points like ToneMapping and ReferenceOIDN).
 
 ## Resource state

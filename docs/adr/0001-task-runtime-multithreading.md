@@ -2,24 +2,34 @@
 
 | Field | Value |
 | --- | --- |
-| Status | **Accepted**; P1–P3 + R1 + domain pumps / LoadSession pipe / sole Affinity::Render Logic→RT queue landed (R2/R3 follow) |
+| Status | **Accepted**; P1–P3 + R1/R2 + TaskRuntime domain pumps / LoadSession / sole Affinity::Render queue landed (R3 follow) |
 | Date | 2026-08-07 |
 | Deciders | Caustica engine |
 | Relates | [architecture-render-proxy.md](../architecture-render-proxy.md), [architecture-rhi-threading.md](../architecture-rhi-threading.md) |
 
 ## Context
 
-Caustica already has a real Logic / Extract / RenderThread split, triple-buffered `SceneRenderSnapshot`, `FrameCommandContext` parallel waves, and async structure GPU handoff for runtime spawn. Those pieces are intentional and should be kept.
+### Historical problem (why this ADR existed)
 
-What is not product-grade:
+Before P1–P3 the engine already had Logic / Extract / RenderThread, triple-buffered `SceneRenderSnapshot`, and `FrameCommandContext` waves — but scheduling and Open Scene orchestration were not product-grade:
 
-1. **`JobSystem` / `ThreadPool`** — a mutex-per-worker pool with `std::function`, a counter-only “context”, no priorities, no dependencies, no cancellation / generation, no named domains. `ThreadPool` is an explicit legacy wrapper; GraphBuilder already bypasses it, while importers / textures / shaders still pass `ThreadPool*`.
-2. **Logic → Render enqueue surface** — four overlapping layers (`RenderThread::dispatch*`, `App::enqueueGpuWork*` / `runGpuWork*`, `RenderSessionApi` free functions, `EnqueueRenderCommand*`) plus `waitForDedicatedRenderThreadIdle` aliases.
-3. **Full scene load vs runtime structure** — two philosophies. Open Scene uses `GpuBindPhase` + per-step `dispatchAndWait` / `waitForIdle` under `sceneGpuSuspended`. Runtime spawn uses `enqueuePendingStructureGpu` + committed-serve. Same upload helpers, opposite orchestration.
-4. **Sync escapes everywhere** — `--syncRender` duplicates GC / completion paths; structure keeps `flushPendingStructureGpuSync`; load path drains with device `waitForIdle` per texture / mesh.
-5. **Overlapping load flags** — `isSceneLoading`, `sceneGpuSuspended`, `GpuBindPhase`, `asyncLoadingInProgress`, `SceneStructureGpuSync` all answer “are we loading?” differently.
+1. **`JobSystem` / `ThreadPool`** — mutex pool, no priorities / deps / generation / domains.
+2. **Overlapping Logic→Render enqueue layers** — `RenderThread::dispatch*`, App “GpuWork” helpers, session free functions, plus idle aliases.
+3. **Divergent full-load vs runtime structure** — `GpuBindPhase` + per-step waits under `sceneGpuSuspended` vs StructureGpu committed-serve.
+4. **Sync escapes** — dual GC paths, `flushPendingStructureGpuSync`, per-upload `waitForIdle`.
+5. **Overlapping “are we loading?” flags** — loader / suspended / bind phase / diag bools.
 
-Large-scene load feels like a blocking burst because Render stays suspended until `LogicFinish`, and each bind step synchronously waits the render thread. Fixing that without a single task model will only add more glue.
+### Current state (post P1–P3 + follow-ups)
+
+| Area | Status |
+| --- | --- |
+| Scheduler | `caustica::task` only; `JobSystem` / `ThreadPool` **deleted** |
+| Logic→RT | Sole public API `EnqueueRenderCommand*` → App private impl → **one** `Affinity::Render` queue (`RenderThread` pumps; `--syncRender` pumps on Logic) |
+| Open Scene | `LoadSession` + budgeted GpuStreaming; host busy = `LoadSession::isBusy()` |
+| Structure | Enqueue-only + committed-serve; sync flush **removed** |
+| Upload happy path | R1 `StreamingUploadBudget` (no per-batch `waitForIdle`) |
+| Remaining sync | Frame-path `waitForIdle` (DLSS / OMM / ToneMapping AE / needNewPasses / teardown) — **not** LoadSession glue; leave until a dedicated RHI sync ADR |
+| Next | R3 free-threaded create (new ADR + profiling); frame-path sync ADR if needed |
 
 ## Decision
 
@@ -92,13 +102,13 @@ void shutdown();
 } // namespace caustica::task
 ```
 
-**Pipes that must exist early:**
+**Pipes:**
 
-| Pipe | Owner / meaning |
+| Pipe | Status |
 | --- | --- |
-| `Logic` | Game / ECS mutations that must not race Extract |
-| `Render` / `RHI.Submit` | submit, present, GC, create, `FrameCommandContext` fork/join |
-| `LoadSession` | orders LoadSession phase advances (may share Render pipe for GPU work) |
+| `LoadSession` | Registered at `task::initialize`; Import + GpuStreaming steps |
+| `Logic` / `RHI.Submit` | Reserved names via `getPipe()` on demand (not eagerly registered) |
+| Affinity::Render | Sole Logic→RT domain queue (frames, commands, LoadSession GPU steps) |
 
 Workers never close / submit / present / GC. That stays the RHI threading contract.
 
@@ -109,14 +119,13 @@ Public / engine-facing surface collapses to **one** pair:
 - `EnqueueRenderCommand(App&, Fn)` — non-blocking onto Render pipe
 - `EnqueueRenderCommandAndWait(App&, Fn)` — sync point; rare; annotated
 
-Delete or inline as private after migration:
+Private / internal (not a second public API):
 
-- `App::enqueueGpuWorkOnRenderThread` / `runGpuWorkOnRenderThread` (become implementation details or aliases marked deprecated then removed)
-- `RenderSessionApi` GPU-work free functions (same)
-- `waitForDedicatedRenderThreadIdle` alias
-- Direct `RenderThread::dispatch*` from scene/editor code (only TaskRuntime / App internals)
+- `App::enqueueRenderCommandImpl` / `enqueueRenderCommandAndWaitImpl` — backing for the public pair
+- `RenderThread::dispatch*` — only TaskRuntime / App internals
+- Scene/editor code must not call `RenderThread` or invent new enqueue helpers
 
-`--syncRender` becomes: **Render pipe is pumped on the Logic thread** (same `executeRenderPhase` + GC tail). No second completion / GC algorithm.
+`--syncRender`: **Affinity::Render is pumped on the Logic thread** (same `executeRenderPhase` + GC tail). No second completion / GC algorithm.
 
 ### LoadSession (P3; design locked now)
 
@@ -145,7 +154,7 @@ Rules:
 | --- | --- |
 | **R0** (with P1–P2) | Keep Phase-1: create/submit/present/GC on Render pipe; parallel record OK |
 | **R1** | Fence / timeline instead of `device->waitForIdle` for upload batches — **landed** (`StreamingUploadBudget`) |
-| **R2** | First-class volatile CB binder (replace scattered `addVolatileConstantRewrite`) |
+| **R2** | First-class `rg::VolatileConstantBinder` — **landed** (`GraphBuilder::volatileConstants()`) |
 | **R3** | Future ADR: free-threaded create / multi-queue — **out of scope here** |
 
 ## Current inventory (as of this ADR)
@@ -161,8 +170,8 @@ Rules:
 | Symbol | Path | Fate |
 | --- | --- | --- |
 | `RenderThread` | `include/engine/RenderThread.h` | Dedicated OS thread that **only** pumps `Affinity::Render` (+ frame in-flight pacing); no side `m_queue` |
-| `EnqueueRenderCommand*` | `include/engine/EnqueueRenderCommand.h` | **Keep as sole public API** → launches Affinity::Render |
-| `App::enqueueGpuWork*` / `runGpuWork*` | `include/engine/App.h` | Private impl behind `EnqueueRenderCommand*` |
+| `EnqueueRenderCommand*` | `include/engine/EnqueueRenderCommand.h` | **Sole public API** → Affinity::Render |
+| `App::enqueueRenderCommand*Impl` | `include/engine/App.h` (private) | Thin backing; not a second public surface |
 | `GpuDevice::waitForRenderThreadIdle` | device / frame driver | Drains Affinity::Render (+ paced in-flight) |
 
 ### Frame / structure
@@ -174,7 +183,7 @@ Rules:
 | `enqueuePendingStructureGpu` | `src/engine/SceneSpawn.cpp` | Keep; sync flush removed |
 | `GraphBuilder` + `parallelWaves` | `include/render/graph/GraphBuilder.h` | Keep; dispatch via TaskRuntime |
 | `FrameCommandContext` | `include/backend/rhi/command_list_pool.h` | Keep |
-| Volatile CB rewrite | `GraphBuilder::addVolatileConstantRewrite` | Keep until R2 binder |
+| Volatile CB binder | `rg::VolatileConstantBinder` / `GraphBuilder::volatileConstants()` | **R2 landed** |
 
 ### Load path
 
@@ -187,13 +196,15 @@ Rules:
 | `GpuRenderSubsystem` trampoline | lifecycle / GPU bind | Thin or absorb into LoadSession owner |
 | `flushTextures(8.f)` / `uploadMeshes(..., 1)` | `SceneLifecycle` / `SceneGpuUpdater` | Budget knobs on LoadSession |
 
-### ThreadPool call-site families (migrate in P1)
+### Remaining frame-path sync (out of R1 scope)
 
-- Scene: `Scene::load` / `loadWithThreadPool`, glTF / OBJ / USD / URDF importers (`ThreadPool*` args)
-- Assets: `TextureLoader` async path, `AssetSystem`
-- Render: `PathTracingShaderCompiler`, `ComputePipelineRegistry`
-- Audio: `AudioCache`
-- Graph: `GraphBuilder.cpp` (`JobSystem::dispatch` / `wait`)
+Upload streaming no longer per-batch idles. These RT-only `waitForIdle` / serial points stay until a later RHI sync pass (not LoadSession glue):
+
+- DLSS / Streamline feature init & teardown paths
+- OMM builder sync points
+- ToneMapping auto-exposure mid-pass close/execute
+- `WorldRenderer` needNewPasses / pipeline recreate
+- Teardown / shutdown / editor undo device idle
 
 ## Non-goals
 
@@ -282,16 +293,17 @@ Rules:
 ### P4 — RHI deepen (may split ADRs)
 
 1. [x] R1 upload fences / timeline — `StreamingUploadBudget` (EventQuery + 256MB / 8-submit cap) on TextureLoader + mesh upload; `waitForIdle` kept for teardown / fallback only.
-2. R2 volatile CB binder.
+2. [x] R2 volatile CB binder — `rg::VolatileConstantBinder`; `GraphBuilder::volatileConstants()`; `WorldRendererFrame` registers FrameConstants + RTXDI bridge.
 3. R3 only with new ADR + profiling justification.
 
 ## Frozen rules (effective immediately)
 
 1. **Do not** reintroduce `ThreadPool` / `JobSystem` — use `caustica::task` only.
-2. **Do not** add a second Logic→Render enqueue helper — extend `EnqueueRenderCommand` or wait for TaskRuntime pipes.
-3. **Do not** add another “are we loading?” bool — extend `GpuBindPhase` only if LoadSession is not yet available; prefer a comment pointing at this ADR.
-4. **Do not** widen RHI create to AnyThread without a new ADR.
-5. Full scene GPU bind changes should move **toward** StructureGpu / budgets, not more `dispatchAndWait` steps.
+2. **Do not** add a second Logic→Render enqueue helper — extend `EnqueueRenderCommand*` only.
+3. **Do not** add another “are we loading?” bool — extend `LoadSession` (phase / `secondaryStreaming` / `isBusy`) only.
+4. **Do not** widen RHI create to AnyThread without a new ADR (R3).
+5. Full scene GPU bind changes stay on StructureGpu / LoadSession budgets — no new Logic-thread `dispatchAndWait` / device `waitForIdle` on the happy path.
+6. Frame-path sync points (DLSS / OMM / AE / needNewPasses) may keep annotated RT `waitForIdle` until a dedicated RHI sync ADR; do not “fix” them drive-by in LoadSession PRs.
 
 ## Success metrics
 

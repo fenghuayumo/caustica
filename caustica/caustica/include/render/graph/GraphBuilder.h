@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/graph/GpuTypes.h>
+#include <render/graph/VolatileConstantBinder.h>
 #include <rhi/rhi.h>
 
 #include <cstdint>
@@ -57,18 +58,11 @@ struct PassOptions
     const char* executeAfter = nullptr;
 };
 
-struct VolatileConstantRewrite
-{
-    caustica::rhi::Buffer* buffer = nullptr;
-    const void* data = nullptr;
-    size_t byteSize = 0;
-};
-
 struct ExecuteParams
 {
     // Parallel waves flush the primary list between multi-pass waves, which clears
-    // NVRHI volatile CB addresses. GraphBuilder rewrites registered volatiles at the
-    // start of every recordPass so consumers stay valid on forks / after reopen.
+    // NVRHI volatile CB addresses. VolatileConstantBinder rewrites registered
+    // shadows at the start of every recordPass so consumers stay valid on forks.
     bool parallelWaves = true;
 };
 
@@ -144,11 +138,10 @@ public:
     // them before continuing; serial waves / serialOnPrimary record on primary.
     void execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params = {});
 
-    // CPU shadows rewritten onto each command-list open session before pass execute.
-    // Required for parallelWaves (flush/fork clears volatile CB address maps).
-    void clearVolatileConstantRewrites();
-    void addVolatileConstantRewrite(
-        caustica::rhi::Buffer* buffer, const void* data, size_t byteSize);
+    // Frame-scoped volatile CB binder (ADR 0001 R2). Register CPU shadows before
+    // execute(); recordPass applies them on each command list open session.
+    [[nodiscard]] VolatileConstantBinder& volatileConstants() { return m_volatileConstants; }
+    [[nodiscard]] const VolatileConstantBinder& volatileConstants() const { return m_volatileConstants; }
 
     void reset();
 
@@ -284,7 +277,7 @@ private:
     std::vector<TextureAliasingBarrier> m_textureAliasingBarriers;
     std::vector<BufferAliasingBarrier> m_bufferAliasingBarriers;
     TransientResourceStats m_transientStats;
-    std::vector<VolatileConstantRewrite> m_volatileConstantRewrites;
+    VolatileConstantBinder m_volatileConstants;
 };
 
 } // namespace caustica::rg
