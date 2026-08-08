@@ -323,7 +323,10 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
     if (ui.editor.SelectedEntity == entity)
         flags |= ImGuiTreeNodeFlags_Selected;
 
-    if (hasVisibleChildren && !isSelectable)
+    // Only expand the scene root by default. Expanding every imported group
+    // recursively makes deep glTF hierarchies (notably Bistro) turn into an
+    // unreadable diagonal wall of clipped labels.
+    if (hasVisibleChildren && entity == ew->root())
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if (filter && filter[0] != '\0' && hasVisibleChildren)
         ImGui::SetNextItemOpen(true, ImGuiCond_Always);

@@ -151,45 +151,20 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
         )
     {
 
-        std::vector<std::string> materialVariants;
-        if (findSubStringIgnoreCase(caustica::currentSceneName(*m_sceneEditor.app()), "bistro") != std::string::npos)
-            materialVariants = {"dry", "wet", "silly"};
-        int materialVariantIndexPrev = m_settings.MaterialVariantIndex;
-
         // collect toggles
         struct BigButton
         {
-            std::string                 Name;
-            std::optional<std::string>  HoverText;
+            std::string Name;
+            TogglableNode* PropNode = nullptr;
+            bool enabled = true;
 
-            TogglableNode *             PropNode        = nullptr; // type 2
-            std::vector<std::string> *  PropOptions     = nullptr; // type 3
-            int *                       PropOptionIndex = nullptr; // type 3
-            std::function<std::string(std::string)>
-                                        GetItemName     = nullptr;
-
-            bool                        enabled;
-
-            BigButton( const std::string & name, TogglableNode * prop ) : Name(TrimTogglable(name)), PropNode(prop), enabled(true) {}
-            BigButton( const std::string & name, std::vector<std::string>* propOptions, int* propOptionIndex, const std::string& hoverText, const std::function<std::string(std::string)> & getItemName) : Name(name), PropNode(nullptr), PropOptions(propOptions), PropOptionIndex(propOptionIndex), HoverText(hoverText), enabled(true), GetItemName(getItemName) { assert(PropOptions->size()>0); }
-            bool                IsSelected() const            { return (PropOptions != nullptr)?(true):(PropNode->IsSelected()); }
-            void                SetSelected( bool selected )  { if (PropNode != nullptr ) PropNode->SetSelected(selected); else *PropOptionIndex = ( ((*PropOptionIndex)+1) % PropOptions->size() ); }
-            std::string         GetText() const 
-            {
-                if (PropOptions != nullptr)
-                {
-                    if (GetItemName!=nullptr)
-                        return Name + (((*PropOptionIndex) >= 0) ? (GetItemName((*PropOptions)[*PropOptionIndex])) : (std::string("other")));
-                    else
-                        return Name + (((*PropOptionIndex)>=0)?((*PropOptions)[*PropOptionIndex]):(std::string("other")));
-                }
-                else
-                    return Name;
-            }
-
+            BigButton(const std::string& name, TogglableNode* prop)
+                : Name(TrimTogglable(name)), PropNode(prop)
+            {}
+            bool IsSelected() const { return PropNode->IsSelected(); }
+            void SetSelected(bool selected) { PropNode->SetSelected(selected); }
         };
         std::vector<BigButton> buttons;
-        if (materialVariants.size()>0) buttons.push_back(BigButton("Variant: ", &materialVariants, &m_settings.MaterialVariantIndex, "Material or other scene variants", nullptr));
         for (int i = 0; m_editorUI.TogglableNodes != nullptr && i < m_editorUI.TogglableNodes->size(); i++)
             buttons.push_back(BigButton((*m_editorUI.TogglableNodes)[i].UIName, &(*m_editorUI.TogglableNodes)[i]));
 
@@ -216,75 +191,17 @@ void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 
                     ImGui::PushID(i);
                     PushToolbarButtonColors(selected);
-                    if (ImGui::Button(buttons[i].GetText().c_str(), ImVec2(buttonWidth, texSizeA.y * 2)))
+                    if (ImGui::Button(buttons[i].Name.c_str(), ImVec2(buttonWidth, texSizeA.y * 2)))
                     {
                         buttons[i].SetSelected(!selected);
                         m_settings.ResetAccumulation = true;
                     }
                     PopToolbarButtonColors();
                     ImGui::PopID();
-
-                    if (buttons[i].HoverText.has_value())
-                    {
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) 
-                            ImGui::SetTooltip("%s", buttons[i].HoverText.value().c_str());
-                    }
                 }
             }
             ImGui::End();
         }
-
-        if (m_settings.MaterialVariantIndex != materialVariantIndexPrev)
-        {
-            if (findSubStringIgnoreCase(caustica::currentSceneName(*m_sceneEditor.app()), "bistro") != std::string::npos)
-            {
-                // bistro dry-wet test
-                std::vector<std::string> pavementList = { "LMBR0000163Cobbl_a1d987f5", "LMBR000016bCobbl_8652c51e", "LMBR0000162Paris_c30c71f1", "LMBR0000162Paris_c30c71f1", "LMBR000016cCobbl_f202ecfa", "LMBR0000161Pavem_e2e87964", "LMBR0000168Cobbl_a5a7f4b4", "LMBR0000160Pavem_613287fe", "LMBR000016aCobbl_e1c68d26" };
-                for (std::string& id : pavementList)
-                    if (auto m = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
-                    {
-                        if (m_settings.MaterialVariantIndex == 0) // reset to default
-                            caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
-                        else
-                        {   // make wet-looking
-                            m->roughness = 0.0f;
-                            //m->specularColor = float3(0.08f, 0.08f, 0.08f);
-                        }
-                        m->gpuDataDirty = true;
-                    }
-
-                std::vector<std::string> emissivesList = { "LMBR0000172Paris_1d83765c" /*bollards*/, "LMBR00000aeGreen_04f5ae02" /*green leaves*/, "LMBR00000afOrang_a907f305" /*yellow leaves*/, "LMBR00000b0Branc_5990161e" /*branches*/ };
-                for (std::string& id : emissivesList)
-                    if (auto m = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->findByUniqueId(id))
-                    {
-                        if (m_settings.MaterialVariantIndex == 0 || m_settings.MaterialVariantIndex == 1) // reset to default
-                            caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().materials()->loadSingle(*m);
-                        else
-                        {   // silly stuff
-                            if (id == "LMBR0000172Paris_1d83765c")
-                            {
-                                m->emissiveColor = float3( 0.01f, 1.0f, 0.1f );
-                                m->emissiveIntensity = 0.5f;
-                            }
-                            if (id == "LMBR00000aeGreen_04f5ae02" || id == "LMBR00000afOrang_a907f305")
-                            {
-                                m->emissiveColor = (id == "LMBR00000aeGreen_04f5ae02")?float3(0.9f, 0.3f, 0.01f):float3(0.001f, 1.0f, 0.01f);
-                                m->emissiveIntensity = 0.6f;
-                            }
-                            if (id == "LMBR00000b0Branc_5990161e")
-                            {
-                                m->emissiveColor = float3(1.0f, 0.001f, 0.005f);
-                                m->emissiveIntensity = 1.0f;
-                            }
-                        }
-                        m->gpuDataDirty = true;
-                    }
-
-                if (m_settings.MaterialVariantIndex != 1 && materialVariantIndexPrev != 0) // this one doesn't change emissives so no TLAS/BLAS update needed
-                    m_runtime.Invalidation.ShaderAndACRefreshDelayedRequest = 0.01f;
-            }
-        }
-        
     }
 
 
@@ -311,11 +228,18 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
                 IM_ARRAYSIZE(m_editorUI.Viewport.HierarchyFilter));
             ImGui::Spacing();
 
+            // Entity ids are reused by each imported ECS world. Namespace the
+            // ImGui tree state by scene path so expansion state cannot leak from
+            // Kitchen (or another scene) into Bistro after Open Scene.
+            const std::string hierarchySceneId =
+                caustica::currentScenePath(*m_sceneEditor.app()).generic_string();
+            ImGui::PushID(hierarchySceneId.c_str());
             if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
             {
                 BuildHierarchyNodeUI(m_ui, *scene, ew->root(), m_editorUI.Viewport.HierarchyFilter);
                 ImGui::TreePop();
             }
+            ImGui::PopID();
 
             const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
             const ecs::Entity selected = m_editorUI.SelectedEntity;
@@ -358,4 +282,3 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
 
 
 } // namespace caustica::editor
-
