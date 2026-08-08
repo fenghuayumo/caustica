@@ -31,6 +31,7 @@ public:
     void beginStructureGpuBuild();
     // Optionally replaces the committed serve packet, then clears in-flight.
     void finishStructureGpuBuild(std::shared_ptr<const scene::SceneRenderData> built = {});
+    void failStructureGpuBuild();
     [[nodiscard]] bool structureGpuBuildInFlight() const
     {
         return m_structureGpuBuildInFlight.load(std::memory_order_acquire);

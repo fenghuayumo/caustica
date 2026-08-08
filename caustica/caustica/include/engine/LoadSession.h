@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace caustica
 {
@@ -22,7 +23,7 @@ enum class LoadSessionPhase : uint8_t
     Idle = 0,
     Teardown,      // exclusive GPU unload; sceneGpuSuspended held until RT completes
     Importing,     // CPU worker (SceneLoader)
-    GpuStreaming,  // budgeted texture/mesh/bind on Render domain
+    GpuStreaming,  // exclusive, fence-bounded texture/mesh/bind on Render domain
     Finalizing,    // logic-thread post-bind; requests StructureGpu AccelOnly
     FirstPresent,  // wait until StructureGpu committed serve is ready
     Ready,         // terminal → cleared to Idle same tick
@@ -57,10 +58,13 @@ struct LoadSession
     LoadSessionPhase phase = LoadSessionPhase::Idle;
     LoadStreamStep streamStep = LoadStreamStep::Textures;
 
-    const scene::SceneRenderData* renderData = nullptr;
+    // Immutable owned packet. Render jobs must never borrow a triple-buffer
+    // slot whose lifetime is controlled by normal frame extraction.
+    std::shared_ptr<const scene::SceneRenderData> renderData;
     size_t texturesTotal = 0;
     size_t meshBegin = 0;
     size_t meshTotal = 0;
+    uint32_t gpuSetupFrameIndex = 0;
 
     // One non-blocking Render step at a time (Logic never EnqueueRenderCommandAndWait).
     bool stepInFlight = false;
@@ -81,7 +85,10 @@ struct LoadSession
 
     // Logic-tick budgets; RT upload pressure is gated by StreamingUploadBudget (ADR 0001 R1).
     static constexpr float kTextureBudgetMs = 8.f;
-    static constexpr size_t kMeshesPerStep = 1;
+    // Cold scene load favors throughput: record every unique immutable geometry
+    // blob in one render task and submit once. Runtime streaming retains its
+    // process-wide in-flight byte/fence budget.
+    static constexpr size_t kMeshUploadTargetBytes = size_t(-1);
 
     [[nodiscard]] bool isActive() const noexcept
     {
@@ -101,6 +108,7 @@ struct LoadSession
         texturesTotal = 0;
         meshBegin = 0;
         meshTotal = 0;
+        gpuSetupFrameIndex = 0;
         stepInFlight = false;
         textureDrainPending = false;
         stepStatus.store(0, std::memory_order_relaxed);

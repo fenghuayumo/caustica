@@ -28,6 +28,12 @@ struct AccelStructBuildSettings
     bool forceOpaque         = false;
 };
 
+struct BlasBuildBatchPlan
+{
+    size_t endIndex = 0;
+    uint64_t scratchBytes = 0;
+};
+
 struct OmmAccelStructState
 {
     bool enabled           = false;
@@ -48,11 +54,21 @@ public:
     void bindSceneGpuResources(render::SceneGpuResources* resources) { m_sceneGpuResources = resources; }
     void bindMaterialGpuCache(MaterialGpuCache* materials) { m_materialGpuCache = materials; }
 
-    void createBlases(caustica::rhi::CommandList* commandList,
+    [[nodiscard]] bool createBlases(caustica::rhi::CommandList* commandList,
                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                       const AccelStructBuildSettings& settings);
 
-    void createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData);
+    // Plans a contiguous BLAS batch using backend prebuild requirements. The
+    // first non-empty BLAS is always admitted so a single oversized asset can
+    // make progress without turning object count into a hidden memory policy.
+    [[nodiscard]] bool planBlasBatch(
+        std::span<const scene::MeshRenderResourceSnapshot> meshes,
+        const AccelStructBuildSettings& settings,
+        size_t beginIndex,
+        uint64_t targetScratchBytes,
+        BlasBuildBatchPlan& plan) const;
+
+    [[nodiscard]] bool createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData);
 
     void uploadSubInstanceData(caustica::rhi::CommandList* commandList) const;
 

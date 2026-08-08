@@ -234,8 +234,16 @@ namespace caustica::rhi::d3d12
             m_ActiveCommandList->commandList->SetComputeRoot32BitConstants(rootsig->rootParameterPushConstants, UINT(byteSize / 4), data, 0);
     }
 
-    void CommandList::open()
+    bool CommandList::open()
     {
+        // Never leave a previous recording instance visible after a failed
+        // reopen. A void open() used to let callers continue into the first
+        // recording command and crash while dereferencing m_Instance.
+        m_Instance.reset();
+        m_ActiveCommandList.reset();
+        m_ReadyForExecute = false;
+        m_RecordingFailed = false;
+
         uint64_t completedInstance = m_Queue->updateLastCompletedInstance();
 
         std::shared_ptr<InternalCommandList> chunk;
@@ -258,7 +266,7 @@ namespace caustica::rhi::d3d12
                         << ", commandListHRESULT=0x" << commandListHr
                         << ", deviceRemovedReason=0x" << m_Context.device->GetDeviceRemovedReason();
                     m_Context.messageCallback->message(MessageSeverity::Fatal, ss.str().c_str());
-                    return;
+                    return false;
                 }
                 m_CommandListPool.pop_front();
             }
@@ -274,7 +282,7 @@ namespace caustica::rhi::d3d12
         }
 
         if (!chunk)
-            return;
+            return false;
 
         m_ActiveCommandList = chunk;
 
@@ -284,6 +292,7 @@ namespace caustica::rhi::d3d12
         m_Instance->commandQueue = m_Desc.queueType;
 
         m_RecordingVersion = MakeVersion(m_Queue->recordingInstance++, m_Desc.queueType, false);
+        return true;
     }
 
     void CommandList::clearStateCache()
@@ -324,6 +333,13 @@ namespace caustica::rhi::d3d12
 
     void CommandList::close()
     {
+        if (!m_Instance || !m_ActiveCommandList || !m_ActiveCommandList->commandList)
+        {
+            m_Context.messageCallback->message(
+                MessageSeverity::Error,
+                "Cannot close a D3D12 command list that failed to open");
+            return;
+        }
         m_StateTracker.keepBufferInitialStates();
         m_StateTracker.keepTextureInitialStates();
         commitBarriers();
@@ -335,7 +351,23 @@ namespace caustica::rhi::d3d12
         }
 #endif
 
-        m_ActiveCommandList->commandList->Close();
+        const HRESULT closeHr = m_ActiveCommandList->commandList->Close();
+        if (FAILED(closeHr))
+        {
+            std::ostringstream ss;
+            ss << "Failed to close D3D12 command list, HRESULT=0x" << std::hex << closeHr
+                << ", deviceRemovedReason=0x" << m_Context.device->GetDeviceRemovedReason();
+            m_Context.messageCallback->message(MessageSeverity::Fatal, ss.str().c_str());
+            m_ReadyForExecute = false;
+            return;
+        }
+        m_ReadyForExecute = !m_RecordingFailed;
+        if (m_RecordingFailed)
+        {
+            m_Context.messageCallback->message(
+                MessageSeverity::Error,
+                "D3D12 command list recording failed; submission was rejected");
+        }
 
         clearStateCache();
 
@@ -350,6 +382,7 @@ namespace caustica::rhi::d3d12
         instance->fence = pQueue->fence;
         instance->submittedInstance = pQueue->lastSubmittedInstance;
         m_Instance.reset();
+        m_ReadyForExecute = false;
 
         m_ActiveCommandList->lastSubmittedInstance = pQueue->lastSubmittedInstance;
         m_CommandListPool.push_back(m_ActiveCommandList);

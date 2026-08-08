@@ -29,6 +29,7 @@ namespace caustica
 #endif
 
     static std::mutex g_LogMutex;
+    static std::mutex g_CallbackMutex;
     
     void DefaultCallback(Severity severity, const char* message)
     {
@@ -59,7 +60,13 @@ namespace caustica
 
             if (g_OutputToMessageBox)
             {
-                if (severity == Severity::Error || severity == Severity::Fatal)
+                // Error callbacks may originate on the render thread or while
+                // the main window is being destroyed. A modal Win32 dialog
+                // pumps window messages and can re-enter editor input against
+                // partially torn-down state; DRED also emits many error lines.
+                // Keep fatal startup failures visible, but ordinary errors are
+                // diagnostic output and must never become a modal GPU stall.
+                if (severity == Severity::Fatal)
                 {
                     MessageBoxA(0, buf, g_ErrorMessageCaption.c_str(), MB_ICONERROR);
                 }
@@ -100,18 +107,27 @@ namespace caustica
 
     void setCallback(Callback func)
     {
+		std::lock_guard<std::mutex> lockGuard(g_CallbackMutex);
         g_Callback = func ? std::move(func) : Callback(&DefaultCallback);
     }
 
 	Callback getCallback()
 	{
+		std::lock_guard<std::mutex> lockGuard(g_CallbackMutex);
 		return g_Callback;
 	}
 
     void resetCallback()
     {
+		std::lock_guard<std::mutex> lockGuard(g_CallbackMutex);
         g_Callback = &DefaultCallback;
     }
+
+    static Callback snapshotCallback()
+    {
+		std::lock_guard<std::mutex> lockGuard(g_CallbackMutex);
+		return g_Callback ? g_Callback : Callback(&DefaultCallback);
+	}
     
     void enableOutputToMessageBox(bool enable)
     {
@@ -261,7 +277,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(severity, buffer);
+        snapshotCallback()(severity, buffer);
 
         va_end(args);
     }
@@ -276,7 +292,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Debug, buffer);
+        snapshotCallback()(Severity::Debug, buffer);
 
         va_end(args);
     }
@@ -291,7 +307,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Info, buffer);
+        snapshotCallback()(Severity::Info, buffer);
 
         va_end(args);
     }
@@ -306,7 +322,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Warning, buffer);
+        snapshotCallback()(Severity::Warning, buffer);
 
         va_end(args);
     }
@@ -321,7 +337,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Error, buffer);
+        snapshotCallback()(Severity::Error, buffer);
 
         va_end(args);
     }
@@ -333,7 +349,7 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
-        (g_Callback ? g_Callback : Callback(&DefaultCallback))(Severity::Fatal, buffer);
+        snapshotCallback()(Severity::Fatal, buffer);
 
         va_end(args);
     }

@@ -43,6 +43,7 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
         m_config.console);
     m_ui->init(gpuSharedCaches->shaderFactory);
     m_viewport = std::make_unique<EditorViewport>();
+    m_compositeCommandList = gpuDevice.getDevice()->createCommandList();
 
     app.emplaceResource<caustica::RenderFramebufferOverride>();
 
@@ -71,6 +72,7 @@ void EditorUISubsystem::shutdown()
         m_viewport->release();
     }
     m_viewport.reset();
+    m_compositeCommandList = nullptr;
     m_ui.reset();
 }
 
@@ -137,6 +139,10 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
     if (!m_ui)
         return;
 
+    caustica::rhi::Device* rhiDevice = gpuDevice.getDevice();
+    if (!rhiDevice || !rhiDevice->isDeviceHealthy())
+        return;
+
     caustica::rhi::Framebuffer* swapchainFb = gpuDevice.getCurrentFramebuffer(m_ui->supportsDepthBuffer());
     // Swapchain FB vectors are cleared during backBufferResizing(); skip UI GPU submit.
     if (!swapchainFb)
@@ -146,35 +152,52 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
         return;
     }
 
-    // Clear the window back buffer to editor chrome background; scene lives in the viewport texture.
-    if (m_viewport && m_viewport->isValid())
+    ZoomTool* zoom = m_config.sceneEditor.getOrCreateZoomTool();
+    const bool clearChrome = m_viewport && m_viewport->isValid();
+    const bool renderZoom = zoom && zoom->enabled();
+    if ((clearChrome || renderZoom) && m_compositeCommandList)
     {
-        caustica::rhi::CommandListHandle cmd = gpuDevice.getDevice()->createCommandList();
-        cmd->open();
-        caustica::rhi::utils::ClearColorAttachment(cmd, swapchainFb, 0, caustica::rhi::Color(0.08f, 0.09f, 0.11f, 1.f));
-        cmd->close();
-        gpuDevice.getDevice()->executeCommandList(cmd);
-    }
+        if (!m_compositeCommandList->open())
+        {
+            caustica::error("Editor compositor command list failed to open; stopping GPU submissions");
+            gpuDevice.setShuttingDown(true);
+            return;
+        }
 
-    if (ZoomTool* zoom = m_config.sceneEditor.getOrCreateZoomTool())
-    {
-        if (zoom->enabled())
+        if (clearChrome)
+        {
+            caustica::rhi::utils::ClearColorAttachment(
+                m_compositeCommandList,
+                swapchainFb,
+                0,
+                caustica::rhi::Color(0.08f, 0.09f, 0.11f, 1.f));
+        }
+
+        if (renderZoom)
         {
             caustica::rhi::Texture* color = (m_viewport && m_viewport->isValid())
                 ? m_viewport->colorTexture()
                 : swapchainFb->getDesc().colorAttachments[0].texture;
             if (color)
-            {
-                caustica::rhi::CommandListHandle commandList = gpuDevice.getDevice()->createCommandList();
-                commandList->open();
-                zoom->render(commandList, color);
-                commandList->close();
-                gpuDevice.getDevice()->executeCommandList(commandList);
-            }
+                zoom->render(m_compositeCommandList, color);
+        }
+
+        m_compositeCommandList->close();
+        const uint64_t submission = rhiDevice->executeCommandList(m_compositeCommandList);
+        if ((rhiDevice->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
+            || !rhiDevice->isDeviceHealthy())
+        {
+            gpuDevice.setShuttingDown(true);
+            return;
         }
     }
 
+    if (!rhiDevice->isDeviceHealthy())
+        return;
+
     m_ui->render(swapchainFb);
+    if (!rhiDevice->isDeviceHealthy())
+        gpuDevice.setShuttingDown(true);
 
     // ImGui draw cmds from this frame may still reference the pre-resize color texture.
     if (m_viewport)

@@ -49,16 +49,20 @@ public:
     bool initialize(const gpuRenderSubsystemInitParams& params);
 
     void onSceneUnloading();
+    void beginSceneGpuLoad();
 
     [[nodiscard]] size_t pendingTextureFinalizeCount();
     // timeLimitMs > 0: budgeted finalize; <= 0: drain + loadingFinished.
-    void flushTextures(float timeLimitMs);
-    void bindWorld(const scene::SceneRenderData& renderData);
+    [[nodiscard]] bool flushTextures(float timeLimitMs);
+    [[nodiscard]] bool bindWorld(const scene::SceneRenderData& renderData);
     // Returns next mesh index.
-    size_t uploadMeshes(const scene::SceneRenderData& renderData, size_t meshBegin, size_t maxMeshes);
-    void finalizeBind(const scene::SceneRenderData& renderData);
+    size_t uploadMeshes(
+        const scene::SceneRenderData& renderData,
+        size_t meshBegin,
+        size_t targetUploadBytes);
+    [[nodiscard]] bool finalizeBind(const scene::SceneRenderData& renderData);
     // Logic-thread post-bind (AS flags, splat, etc.).
-    void finishLoadedScene(const scene::SceneRenderData& renderData);
+    [[nodiscard]] bool finishLoadedScene(const scene::SceneRenderData& renderData);
 
 private:
     GpuSharedCaches* m_gpuSharedCaches = nullptr;

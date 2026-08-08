@@ -1092,7 +1092,7 @@ namespace caustica::rhi::vulkan
         EventQueryHandle createEventQuery() override;
         void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
         bool pollEventQuery(rhi::EventQuery* query) override;
-        void waitEventQuery(rhi::EventQuery* query) override;
+        bool waitEventQuery(rhi::EventQuery* query) override;
         void resetEventQuery(rhi::EventQuery* query) override;
 
         // timer queries
@@ -1193,7 +1193,7 @@ namespace caustica::rhi::vulkan
 
         // CommandList implementation
 
-        void open() override;
+        [[nodiscard]] bool open() override;
         void close() override;
         void clearState() override;
 

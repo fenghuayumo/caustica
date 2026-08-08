@@ -6,6 +6,8 @@
 #include <core/string_utils.h>
 
 #include <algorithm>
+#include <deque>
+#include <mutex>
 #include <cstdarg>
 #include <cctype>
 #include <cstring>
@@ -172,18 +174,32 @@ inline std::string_view isolateKeyword(std::string_view line)
 }
 } // namespace
 
+struct ImGui_Console::LogCaptureState
+{
+	static constexpr size_t MaxPendingItems = 5000;
+
+	std::mutex mutex;
+	std::deque<LogItem> pending;
+};
+
 ImGui_Console::ImGui_Console(std::shared_ptr<console::Interpreter> interpreter, Options const& options) 
-	: m_Options(options)
+	: m_LogCapture(std::make_shared<LogCaptureState>())
+	, m_Options(options)
 	, m_Interpreter(interpreter)
 {
 	if (options.capture_log)
 	{
-		// Keep a raw this pointer only while alive; destructor must resetCallback()
-		// before GpuDevice/Streamline shutdown logs can fire into a destroyed buffer.
-		caustica::setCallback([this](caustica::Severity severity, char const* msg) {
-				ImVec4 color = getSeverityColor(severity);
-				this->m_ItemsLog.push_back({severity, color, msg});
-			});
+		// Capture shared ingress state, never the console object. A callback that
+		// was already copied by another thread may outlive resetCallback(), but
+		// the state remains alive until that invocation completes.
+		const std::shared_ptr<LogCaptureState> capture = m_LogCapture;
+		caustica::setCallback([capture](caustica::Severity severity, char const* msg) {
+			LogItem item{ severity, getSeverityColor(severity), msg ? msg : "" };
+			std::lock_guard lock(capture->mutex);
+			if (capture->pending.size() >= LogCaptureState::MaxPendingItems)
+				capture->pending.pop_front();
+			capture->pending.push_back(std::move(item));
+		});
 	}
 }
 
@@ -206,7 +222,7 @@ void ImGui_Console::Print(char const* fmt, ...)
 	LogItem item;
 	item.text = buf.data();
 	item.textColor = (item.text.rfind("> ", 0) == 0) ? kColCommand : kColLog;
-	m_ItemsLog.push_back(item);
+	enqueueLog(std::move(item));
 }
 
 void ImGui_Console::Print(std::string_view line)
@@ -214,12 +230,44 @@ void ImGui_Console::Print(std::string_view line)
 	LogItem item;
 	item.text = line;
 	item.textColor = (item.text.rfind("> ", 0) == 0) ? kColCommand : kColLog;
-	m_ItemsLog.push_back(item);
+	enqueueLog(std::move(item));
 }
 
 void ImGui_Console::clearLog()
 {
 	m_ItemsLog.clear();
+	if (m_LogCapture)
+	{
+		std::lock_guard lock(m_LogCapture->mutex);
+		m_LogCapture->pending.clear();
+	}
+}
+
+void ImGui_Console::enqueueLog(LogItem item)
+{
+	const std::shared_ptr<LogCaptureState> capture = m_LogCapture;
+	if (!capture)
+		return;
+
+	std::lock_guard lock(capture->mutex);
+	if (capture->pending.size() >= LogCaptureState::MaxPendingItems)
+		capture->pending.pop_front();
+	capture->pending.push_back(std::move(item));
+}
+
+void ImGui_Console::drainPendingLog()
+{
+	const std::shared_ptr<LogCaptureState> capture = m_LogCapture;
+	if (!capture)
+		return;
+
+	std::deque<LogItem> pending;
+	{
+		std::lock_guard lock(capture->mutex);
+		pending.swap(capture->pending);
+	}
+	for (LogItem& item : pending)
+		m_ItemsLog.push_back(std::move(item));
 }
 
 void ImGui_Console::clearHistory()
@@ -230,6 +278,8 @@ void ImGui_Console::clearHistory()
 
 void ImGui_Console::render(bool* open, bool requestFocus)
 {
+	drainPendingLog();
+
 	ImGui::SetNextWindowSize(ImVec2(860, 420), ImGuiCond_FirstUseEver);
 	if (requestFocus)
 	{
@@ -486,6 +536,8 @@ void ImGui_Console::renderCommandBar(
 	ImVec2 anchorPos,
 	ImVec2 anchorSize)
 {
+	drainPendingLog();
+
 	if (!open || !*open)
 		return;
 

@@ -36,7 +36,7 @@ private:
     caustica::rhi::BindingSetHandle         m_geometryBindingSet;
 
     caustica::rhi::TextureHandle            m_debugVizOutput;
-    bool                            m_hasReadbackHistory = false;
+    std::array<bool, c_swapchainCount>   m_readbackSlotValid{};
 
     caustica::rhi::ShaderHandle             m_blendDebugVizPS;
     caustica::rhi::GraphicsPipelineHandle   m_blendDebugVizPSO;

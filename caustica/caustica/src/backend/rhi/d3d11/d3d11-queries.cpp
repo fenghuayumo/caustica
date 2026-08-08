@@ -74,13 +74,13 @@ bool Device::pollEventQuery(rhi::EventQuery* _query)
     }
 }
 
-void Device::waitEventQuery(rhi::EventQuery* _query)
+bool Device::waitEventQuery(rhi::EventQuery* _query)
 {
     EventQuery* query = checked_cast<EventQuery*>(_query);
 
     if (query->resolved)
     {
-        return;
+        return true;
     }
 
     HRESULT hr;
@@ -90,6 +90,7 @@ void Device::waitEventQuery(rhi::EventQuery* _query)
     } while (hr == S_FALSE);
 
     assert(SUCCEEDED(hr));
+    return SUCCEEDED(hr);
 }
 
 void Device::resetEventQuery(rhi::EventQuery* _query)

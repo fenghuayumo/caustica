@@ -515,6 +515,16 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
     out.meshSnapshots.clear();
     out.meshSnapshotIndex.clear();
     out.meshSnapshots.reserve(entityWorld.getMeshes().size());
+
+    // glTF importers intentionally let many MeshInfo records share one BufferGroup.
+    // Deep-copying that whole group once per mesh turns a few hundred MB of source
+    // data into tens of GB for scenes with hundreds of primitives (e.g. kitchen).
+    // Keep the render snapshot immutable, but copy each distinct authoring buffer
+    // group only once and share its upload blob between mesh-range snapshots.
+    std::unordered_map<const BufferGroup*, std::shared_ptr<const MeshUploadBlob>>
+        uploadByBufferGroup;
+    uploadByBufferGroup.reserve(entityWorld.getMeshes().size());
+
     for (const std::shared_ptr<MeshInfo>& source : entityWorld.getMeshes())
     {
         if (!source || !RenderResourceAccess::meshId(source.get()))
@@ -535,17 +545,23 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& 
         mesh.hasDeformationSourcePositions = !source->DeformationSourcePositionIndices.empty();
         if (source->buffers)
         {
-            auto upload = std::make_shared<MeshUploadBlob>();
-            upload->indexData = source->buffers->indexData;
-            upload->positionData = source->buffers->positionData;
-            upload->texcoord1Data = source->buffers->texcoord1Data;
-            upload->texcoord2Data = source->buffers->texcoord2Data;
-            upload->normalData = source->buffers->normalData;
-            upload->tangentData = source->buffers->tangentData;
-            upload->jointData = source->buffers->jointData;
-            upload->weightData = source->buffers->weightData;
-            upload->radiusData = source->buffers->radiusData;
-            mesh.upload = std::move(upload);
+            const BufferGroup* const bufferKey = source->buffers.get();
+            auto uploadIt = uploadByBufferGroup.find(bufferKey);
+            if (uploadIt == uploadByBufferGroup.end())
+            {
+                auto upload = std::make_shared<MeshUploadBlob>();
+                upload->indexData = source->buffers->indexData;
+                upload->positionData = source->buffers->positionData;
+                upload->texcoord1Data = source->buffers->texcoord1Data;
+                upload->texcoord2Data = source->buffers->texcoord2Data;
+                upload->normalData = source->buffers->normalData;
+                upload->tangentData = source->buffers->tangentData;
+                upload->jointData = source->buffers->jointData;
+                upload->weightData = source->buffers->weightData;
+                upload->radiusData = source->buffers->radiusData;
+                uploadIt = uploadByBufferGroup.emplace(bufferKey, std::move(upload)).first;
+            }
+            mesh.upload = uploadIt->second;
         }
         mesh.geometries.reserve(source->geometries.size());
         for (const std::shared_ptr<MeshGeometry>& sourceGeometry : source->geometries)

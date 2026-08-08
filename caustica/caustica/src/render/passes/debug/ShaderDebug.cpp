@@ -182,21 +182,32 @@ void ShaderDebug::endFrameAndOutput( caustica::rhi::CommandList* commandList, ca
 {
     RAII_SCOPE( commandList->beginMarker("ShaderDebug");, commandList->endMarker(); );
 
-    const bool hadReadbackHistory = m_hasReadbackHistory;
-    if (hadReadbackHistory)
+    bool readbackAvailable = m_readbackSlotValid[m_currentBufferIndex];
+    if (readbackAvailable)
     {
-        // map and copy CPU side buffer so we can process it (later)
+        // Only read a slot after the ring has wrapped and that exact slot has
+        // previously received a GPU copy. A single global history bit caused
+        // frame 2 to map an unwritten slot in the three-buffer ring.
         void* pData = m_device->mapBuffer(m_bufferCPU[m_currentBufferIndex], caustica::rhi::CpuAccessMode::Read);
-        memcpy(&m_lastBuffer, pData, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES); assert( m_lastBuffer.size() == SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
-        m_device->unmapBuffer(m_bufferCPU[m_currentBufferIndex]);
+        if (pData)
+        {
+            memcpy(&m_lastBuffer, pData, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES);
+            assert(m_lastBuffer.size() == SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES);
+            m_device->unmapBuffer(m_bufferCPU[m_currentBufferIndex]);
+        }
+        else
+        {
+            caustica::warning("ShaderDebug: readback buffer map failed; skipping debug output for this frame");
+            readbackAvailable = false;
+        }
     }
 
     // copy latest GPU side buffer 
     commandList->copyBuffer(m_bufferCPU[m_currentBufferIndex], 0, m_bufferGPU, 0, SHADER_DEBUG_BUFFER_IN_BYTES_NO_TRIANGLES );
-    m_hasReadbackHistory = true;
+    m_readbackSlotValid[m_currentBufferIndex] = true;
     m_currentBufferIndex = (m_currentBufferIndex+1)%c_swapchainCount;
 
-    if (hadReadbackHistory)
+    if (readbackAvailable)
         outputLastBufferPrints();
     
     drawCurrentBufferGeometry(commandList, frameBuffer, depthBuffer, viewport );

@@ -770,7 +770,8 @@ bool DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (OIDN reference readback).
     if (!device->waitForIdle())
     {
-        commandList->open();
+        if (!commandList->open())
+            caustica::error("OIDN: failed to reopen command list after device loss");
         caustica::warning("OIDN reference denoiser readback failed because the GPU device was lost.");
         m_oidnDenoiserFailed = true;
         return true;
@@ -781,7 +782,8 @@ bool DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
         stagingTexture, caustica::rhi::TextureSlice(), caustica::rhi::CpuAccessMode::Read, &rowPitch));
     if (mappedData == nullptr)
     {
-        commandList->open();
+        if (!commandList->open())
+            caustica::error("OIDN: failed to reopen command list after readback map failure");
         caustica::warning("OIDN reference denoiser failed to map the accumulation buffer.");
         m_oidnDenoiserFailed = true;
         return true;
@@ -827,7 +829,11 @@ bool DenoisePass::applyReferenceOIDN(caustica::rhi::CommandList* commandList)
     std::vector<float> outputRgb;
     const bool success = m_oidnDenoiser->denoise(inputRgb.data(), width, height, oidnOptions, outputRgb);
 
-    commandList->open();
+    if (!commandList->open())
+    {
+        m_oidnDenoiserFailed = true;
+        return true;
+    }
 
     if (!success)
     {

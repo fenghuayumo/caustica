@@ -100,7 +100,8 @@ public:
             m_rayReconstructionInitialized = false;
         }
 
-        m_featureCommandList->open();
+        if (!m_featureCommandList || !m_featureCommandList->open())
+            return;
         VkCommandBuffer vkCmdBuf = m_featureCommandList->getNativeObject(caustica::rhi::ObjectTypes::VK_CommandBuffer);
 
         m_parameters->Set(NVSDK_NGX_Parameter_CreationNodeMask, 1u);

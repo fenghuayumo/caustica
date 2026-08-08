@@ -4,7 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <stdint.h>
-#include <atomic>
+#include <mutex>
 
 #include <rhi/rhi.h>
 
@@ -75,8 +75,14 @@ namespace caustica
         caustica::rhi::BindingSet* getBindingSet(caustica::rhi::Texture* texture);
         bool updateGeometry(caustica::rhi::CommandList* commandList, const CapturedFrame& frame);
 
-        CapturedFrame m_frames[2];
-        std::atomic<int> m_readSlot{ -1 };
-        int m_writeSlot = 0;
+        // The update thread publishes complete snapshots into m_pendingFrame;
+        // the render thread moves a new generation into its exclusively-owned
+        // m_renderFrame before recording GPU work. This ownership handoff is
+        // required because update can run multiple times while render is busy.
+        std::mutex m_frameMutex;
+        CapturedFrame m_pendingFrame;
+        CapturedFrame m_renderFrame;
+        uint64_t m_pendingGeneration = 0;
+        uint64_t m_renderGeneration = 0;
     };
 }

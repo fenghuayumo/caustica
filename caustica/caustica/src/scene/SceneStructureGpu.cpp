@@ -43,6 +43,15 @@ void SceneStructureGpuSync::finishStructureGpuBuild(std::shared_ptr<const scene:
     m_structureGpuBuildInFlight.store(false, std::memory_order_release);
 }
 
+void SceneStructureGpuSync::failStructureGpuBuild()
+{
+    assertRenderThread();
+    // Leave the pending request set so a healthy runtime may retry. The scene
+    // load transaction treats this as terminal and never resumes rendering.
+    m_pendingGpuStructureSync = true;
+    m_structureGpuBuildInFlight.store(false, std::memory_order_release);
+}
+
 std::shared_ptr<const scene::SceneRenderData> SceneStructureGpuSync::committedRenderData() const
 {
     std::lock_guard lock(m_committedRenderDataMutex);

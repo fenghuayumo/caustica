@@ -21,7 +21,59 @@ AccelStructManager::AccelStructManager(caustica::rhi::Device* device)
 {
 }
 
-void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
+bool AccelStructManager::planBlasBatch(
+    std::span<const scene::MeshRenderResourceSnapshot> meshes,
+    const AccelStructBuildSettings& settings,
+    size_t beginIndex,
+    uint64_t targetScratchBytes,
+    BlasBuildBatchPlan& plan) const
+{
+    plan = { .endIndex = beginIndex, .scratchBytes = 0 };
+    if (!m_device || !m_sceneGpuResources || beginIndex >= meshes.size())
+        return beginIndex >= meshes.size();
+
+    const uint64_t budget = std::max<uint64_t>(targetScratchBytes, 1);
+    for (size_t index = beginIndex; index < meshes.size(); ++index)
+    {
+        const scene::MeshRenderResourceSnapshot& mesh = meshes[index];
+        uint64_t meshScratch = 0;
+        if (!mesh.isSkinPrototype)
+        {
+            const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
+            if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
+            {
+                if (!mesh.geometries.empty())
+                {
+                    error("Cannot plan BLAS for mesh '%s': GPU mesh record is missing.", mesh.debugName.c_str());
+                    return false;
+                }
+            }
+            else
+            {
+                bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
+                const caustica::rhi::rt::AccelStructDesc desc =
+                    bvh::getMeshBlasDesc(cfg, mesh, meshGpuIt->second, nullptr, false, m_materialGpuCache);
+                if (!desc.bottomLevelGeometries.empty())
+                    meshScratch = m_device->getAccelStructBuildMemoryRequirements(desc).buildScratchSize;
+            }
+        }
+
+        const bool hasRecordedWork = plan.endIndex > beginIndex && plan.scratchBytes > 0;
+        if (meshScratch > 0 && hasRecordedWork && plan.scratchBytes + meshScratch > budget)
+            break;
+
+        plan.scratchBytes += meshScratch;
+        plan.endIndex = index + 1;
+    }
+
+    // A run of empty/skinned meshes is still consumed; otherwise guarantee
+    // forward progress even if a backend reports no prebuild information.
+    if (plan.endIndex == beginIndex)
+        plan.endIndex = std::min(beginIndex + 1, meshes.size());
+    return true;
+}
+
+bool AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
                                       std::span<const scene::MeshRenderResourceSnapshot> meshes,
                                       const AccelStructBuildSettings& settings)
 {
@@ -33,11 +85,18 @@ void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
 
     for (const scene::MeshRenderResourceSnapshot& mesh : meshes)
     {
-        if (mesh.isSkinPrototype || m_sceneGpuResources == nullptr)
+        if (m_sceneGpuResources == nullptr)
+            return false;
+        if (mesh.isSkinPrototype)
             continue;
         const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
         if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
-            continue;
+        {
+            if (mesh.geometries.empty())
+                continue;
+            error("Cannot build BLAS for mesh '%s': GPU mesh record is missing.", mesh.debugName.c_str());
+            return false;
+        }
         render::MeshGpuRecord& meshGpu = meshGpuIt->second;
 
         bvh::Config cfg = { .excludeTransmissive = settings.excludeTransmissive };
@@ -66,10 +125,10 @@ void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
         caustica::rhi::rt::AccelStructHandle as = m_device->createAccelStruct(blasDesc);
         if (!as)
         {
-            error("Failed to create BLAS for mesh '%s' (triangles=%llu). Skipping mesh AS.",
+            error("Failed to create BLAS for mesh '%s' (triangles=%llu).",
                 mesh.debugName.c_str(),
                 static_cast<unsigned long long>(meshTriangleCount));
-            continue;
+            return false;
         }
         caustica::rhi::utils::BuildBottomLevelAccelStruct(commandList, as, blasDesc);
         // Retire the previous BLAS so in-flight frames that still reference the old
@@ -89,9 +148,10 @@ void AccelStructManager::createBlases(caustica::rhi::CommandList* commandList,
         static_cast<unsigned long long>(builtTriangleCount),
         static_cast<unsigned long long>(maxMeshTriangleCount),
         maxMeshName.c_str());
+    return m_device && m_device->isDeviceHealthy();
 }
 
-void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData)
+bool AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, const scene::SceneRenderData& renderData)
 {
     (void)commandList;
 
@@ -112,7 +172,7 @@ void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, con
     if (!newTlas)
     {
         error("Failed to create TLAS for %zu instances.", renderData.meshInstanceEntities.size());
-        return;
+        return false;
     }
 
     caustica::rhi::BufferDesc bufferDesc;
@@ -125,6 +185,12 @@ void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, con
     bufferDesc.initialState = caustica::rhi::ResourceStates::Common;
     bufferDesc.keepInitialState = true;
     caustica::rhi::BufferHandle newSubInstanceBuffer = m_device->createBuffer(bufferDesc);
+    if (!newSubInstanceBuffer)
+    {
+        error("Failed to create TLAS sub-instance buffer (%llu bytes).",
+            static_cast<unsigned long long>(bufferDesc.byteSize));
+        return false;
+    }
 
     // Keep the previous TLAS/sub-instance buffer alive for in-flight frames.
     if (m_topLevelAS)
@@ -136,6 +202,7 @@ void AccelStructManager::createTlas(caustica::rhi::CommandList* commandList, con
     m_subInstanceBuffer = std::move(newSubInstanceBuffer);
     m_subInstanceData.clear();
     m_subInstanceData.assign(m_subInstanceCount, SubInstanceData{});
+    return m_device && m_device->isDeviceHealthy();
 }
 
 void AccelStructManager::uploadSubInstanceData(caustica::rhi::CommandList* commandList) const
@@ -469,13 +536,11 @@ void AccelStructManager::buildTlas(caustica::rhi::CommandList*            comman
 
         if (bottomLevelAS == nullptr)
         {
-            static bool warnedNullBlas = false;
-            if (!warnedNullBlas)
-            {
-                warning("BuildTLAS: one or more mesh instances have null BLAS; "
-                    "inserting empty TLAS slots so InstanceIndex stays aligned with ECS.");
-                warnedNullBlas = true;
-            }
+            warning("BuildTLAS: null BLAS for mesh '%s' (skinPrototype=%d, geometries=%zu); "
+                "inserting an empty TLAS slot.",
+                mesh->debugName.c_str(),
+                mesh->isSkinPrototype ? 1 : 0,
+                mesh->geometries.size());
             instanceDesc.bottomLevelAS = nullptr;
             instanceDesc.instanceMask = 0;
             subInstanceCount += meshSubInstanceCount;

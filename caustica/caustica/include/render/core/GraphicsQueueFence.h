@@ -38,11 +38,11 @@ inline bool syncGraphicsQueueFence(
     // THREADING: queue fence, RT-only — ADR 0002.
     device->resetEventQuery(query);
     device->setEventQuery(query, caustica::rhi::CommandQueue::Graphics);
-    device->waitEventQuery(query);
+    const bool ok = device->waitEventQuery(query);
     device->resetEventQuery(query);
     if (runGc)
         device->runGarbageCollection();
-    return true;
+    return ok && device->isDeviceHealthy();
 }
 
 } // namespace caustica::render

@@ -43,7 +43,11 @@ namespace bvh
             return false;
         }
 
-        if (!mesh.upload || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
+        // GPU buffers are the source of truth for acceleration-structure input.
+        // Runtime-deformed meshes (for example skinned mesh instances) have no
+        // CPU upload blob of their own: their index buffer comes from the skin
+        // prototype and their vertex buffer is produced by the skinning pass.
+        if (!meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return false;
 
         const caustica::rhi::BufferDesc& indexBufferDesc = meshGpu.indexBuffer->getDesc();
@@ -81,7 +85,9 @@ namespace bvh
             return false;
         }
 
-        if (!mesh.upload->indexData.empty())
+        // CPU index data is useful as an additional authoring-data check when it
+        // exists, but it must not make GPU-generated geometry invalid.
+        if (mesh.upload && !mesh.upload->indexData.empty())
         {
             const uint64_t indexDataStart = uint64_t(mesh.indexOffset + geometry.indexOffsetInMesh);
             const uint64_t indexDataEnd = indexDataStart + geometry.numIndices;
@@ -115,7 +121,7 @@ namespace bvh
         blasDesc.isTopLevel = false;
         blasDesc.debugName = mesh.debugName;
 
-        if (!mesh.upload || !meshGpu.indexBuffer || !meshGpu.vertexBuffer)
+        if (!meshGpu.indexBuffer || !meshGpu.vertexBuffer)
             return blasDesc;
 
         for (uint32_t geomIt = 0; geomIt < mesh.geometries.size(); ++geomIt)

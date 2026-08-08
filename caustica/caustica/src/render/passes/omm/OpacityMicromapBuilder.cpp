@@ -221,7 +221,8 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
     // ADR 0002 S3: wait destroy-flush submit before clearing OMM handles.
     (void)caustica::render::syncGraphicsQueueFence(
         m_device, m_destroySyncQuery, /*runGc=*/true, "OMM destroyOpacityMicromaps");
-    commandList.open();
+    if (!commandList.open())
+        return;
 
     for (const auto& mesh : renderData.meshSnapshots)
     {
@@ -608,4 +609,3 @@ bool OpacityMicromapBuilder::debugGUI(
 
     return resetAccumulation;
 }
-

@@ -950,6 +950,13 @@ namespace caustica::rhi::d3d12
     void CommandList::clearTextureFloat(rhi::Texture* _t, TextureSubresourceSet subresources, const Color & clearColor)
     {
         Texture* t = checked_cast<Texture*>(_t);
+        if (!t || !m_Instance || !m_ActiveCommandList || !m_ActiveCommandList->commandList)
+        {
+            m_Context.messageCallback->message(
+                MessageSeverity::Error,
+                "clearTextureFloat rejected: texture is null or command list is not recording");
+            return;
+        }
 
 #ifdef _DEBUG
         const FormatInfo& formatInfo = getFormatInfo(t->desc.format);
@@ -1321,6 +1328,7 @@ namespace caustica::rhi::d3d12
             m_RecordingVersion, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT))
         {
             m_Context.error("Couldn't suballocate an upload buffer");
+            m_RecordingFailed = true;
             return;
         }
         footprint.Offset = uint64_t(offsetInUploadBuffer);

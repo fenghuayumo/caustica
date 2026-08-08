@@ -566,6 +566,12 @@ bool GpuDevice_DX12::beginFrame()
     if (m_DeviceParams.headlessDevice)
         return beginHeadlessFrame();
 
+    if (!m_RhiDevice || !m_RhiDevice->isDeviceHealthy())
+    {
+        caustica::error("D3D12 beginFrame rejected: GPU device is removed or unavailable");
+        return false;
+    }
+
     DXGI_SWAP_CHAIN_DESC1 newSwapChainDesc;
     DXGI_SWAP_CHAIN_FULLSCREEN_DESC newFullScreenDesc;
     if (SUCCEEDED(m_SwapChain->GetDesc1(&newSwapChainDesc)) && SUCCEEDED(m_SwapChain->GetFullscreenDesc(&newFullScreenDesc)))
@@ -590,7 +596,24 @@ bool GpuDevice_DX12::beginFrame()
 
     auto bufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 
-    WaitForSingleObject(m_FrameFenceEvents[bufferIndex], INFINITE);
+    // Never wait forever on a fence whose device has been removed. The old
+    // infinite wait made a GPU failure look like a whole-machine hang.
+    for (;;)
+    {
+        const DWORD waitResult = WaitForSingleObject(m_FrameFenceEvents[bufferIndex], 100);
+        if (waitResult == WAIT_OBJECT_0)
+            break;
+        if (waitResult == WAIT_FAILED)
+        {
+            caustica::error("D3D12 beginFrame fence wait failed (Win32=%lu)", GetLastError());
+            return false;
+        }
+        if (isShuttingDown() || !m_RhiDevice->isDeviceHealthy())
+        {
+            caustica::error("D3D12 beginFrame fence wait aborted after device removal");
+            return false;
+        }
+    }
 
     return true;
 }
@@ -636,6 +659,9 @@ bool GpuDevice_DX12::present()
 
     if (!m_CanPresentSwapChain)
         return true;
+
+    if (!m_RhiDevice || !m_RhiDevice->isDeviceHealthy())
+        return false;
 
     auto bufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 

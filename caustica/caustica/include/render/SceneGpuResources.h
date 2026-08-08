@@ -19,6 +19,8 @@ using namespace caustica::math;
 #include <unordered_map>
 #include <vector>
 
+namespace caustica::scene { struct MeshUploadBlob; }
+
 namespace caustica::render
 {
 
@@ -52,6 +54,10 @@ struct MeshGeometryGpuDebugData
 
 struct MeshGpuRecord
 {
+    // Meshes imported from one glTF commonly address different ranges of the
+    // same BufferGroup. Keep the immutable upload identity so their base GPU
+    // index/vertex buffers can be shared instead of allocated once per mesh.
+    std::shared_ptr<const scene::MeshUploadBlob> uploadSource;
     caustica::rhi::BufferHandle indexBuffer;
     caustica::rhi::BufferHandle vertexBuffer;
     caustica::rhi::BufferHandle instanceBuffer;

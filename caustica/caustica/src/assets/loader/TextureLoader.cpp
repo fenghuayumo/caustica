@@ -374,7 +374,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromFile(
         if (fillTextureData(fileData, texture, path.extension().generic_string(), ""))
         {
             textureLoaded(texture);
-            finalizeTexture(texture, renderDevice, commandList);
+            (void)finalizeTexture(texture, renderDevice, commandList);
         }
     }
 
@@ -488,7 +488,7 @@ Handle<ImageAsset> TextureLoader::loadTextureFromMemory(
     if (fillTextureData(data, texture, "", mimeType))
     {
         textureLoaded(texture);
-        finalizeTexture(texture, renderDevice, commandList);
+        (void)finalizeTexture(texture, renderDevice, commandList);
     }
 
     ++m_TexturesLoaded;

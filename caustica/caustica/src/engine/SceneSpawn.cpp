@@ -37,15 +37,22 @@ namespace caustica
 namespace
 {
 
-void runStructureGpuBuild(
+bool runStructureGpuBuild(
     render::WorldRenderer* worldRendererResource,
     GpuSharedCaches* caches,
     const std::shared_ptr<Scene>& scenePtr,
     GpuDevice* device,
     uint32_t frameIndex,
     const std::shared_ptr<const scene::SceneRenderData>& gpuSetupData,
-    StructureGpuUploadMode uploadMode)
+    StructureGpuUploadMode uploadMode,
+    bool waitForCompletion)
 {
+    if (!worldRendererResource || !caches || !scenePtr || !device || !gpuSetupData)
+        return false;
+    caustica::rhi::Device* rhiDevice = device->getDevice();
+    if (!rhiDevice || !rhiDevice->isDeviceHealthy())
+        return false;
+
     if (uploadMode == StructureGpuUploadMode::UploadMeshes)
     {
         if (caches->textureLoader && caches->renderDevice)
@@ -56,13 +63,14 @@ void runStructureGpuBuild(
 
         worldRendererResource->lightingPasses().ensureMaterialsFromScene(*gpuSetupData);
         // Do not prune mesh/material GPU records still referenced by the retired TLAS.
-        render::SceneGpuUpdater::refreshAfterLoad(
+        if (!render::SceneGpuUpdater::refreshAfterLoad(
             *scenePtr,
             *gpuSetupData,
             worldRendererResource->sceneGpuResources(),
             caches->descriptorTable.get(),
             frameIndex,
-            /*pruneRemovedResources=*/false);
+            /*pruneRemovedResources=*/false))
+            return false;
     }
     // AccelOnly: LoadSession already flushed textures, uploaded meshes, finalized buffers,
     // and reloaded materials — only AS / SBT / bindings remain.
@@ -70,28 +78,94 @@ void runStructureGpuBuild(
     // Double-buffered AS rebuild: previous TLAS/BLAS stay alive for in-flight frames
     // while this task builds the new generation (overlaps prior-frame GPU work).
     worldRendererResource->rayTracingResources().requestAccelerationStructureRebuild();
-    caustica::rhi::CommandListHandle commandList = device->getDevice()->createCommandList();
-    worldRendererResource->rayTracingResources().recreateAccelStructs(
-        commandList, *scenePtr, gpuSetupData.get());
-
-    // SBT: rebuildShaderTableOnly allocates a new table; old tables stay referenced by
-    // in-flight DispatchRays (no waitForIdle required).
-    if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
+    detail::sceneSwitchTrace("StructureGpu: begin acceleration structures");
+    if (waitForCompletion)
     {
-        compiler->update(
-            gpuSetupData.get(),
-            static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
-            [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
-                worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
-            },
-            false);
+        if (!worldRendererResource->rayTracingResources().recreateAccelStructsForLoad(
+            *scenePtr,
+            *gpuSetupData,
+            256ull * 1024ull * 1024ull,
+            [](const char* stage, size_t completed, size_t total, uint64_t scratchBytes) {
+                detail::sceneSwitchTrace(
+                    "StructureGpu: AS stage=%s meshes=%zu/%zu scratch=%llu",
+                    stage,
+                    completed,
+                    total,
+                    static_cast<unsigned long long>(scratchBytes));
+            }))
+            return false;
+    }
+    else
+    {
+        caustica::rhi::CommandListHandle commandList = rhiDevice->createCommandList();
+        if (!worldRendererResource->rayTracingResources().recreateAccelStructs(
+            commandList, *scenePtr, gpuSetupData.get()))
+            return false;
+    }
+    detail::sceneSwitchTrace("StructureGpu: acceleration structures complete");
+
+    // Runtime structure edits can refresh SBT/bindings immediately because the
+    // renderer is already initialized. During exclusive scene load those
+    // resources are deliberately owned by the first renderer-init frame: cold
+    // startup has no compiler/environment/light-sampling objects yet, and scene
+    // unload clears the scene-scoped lighting resources.
+    if (!waitForCompletion)
+    {
+        // SBT: rebuildShaderTableOnly allocates a new table; old tables stay
+        // referenced by in-flight DispatchRays (no waitForIdle required).
+        if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
+        {
+            detail::sceneSwitchTrace("StructureGpu: begin SBT/pipeline update");
+            compiler->update(
+                gpuSetupData.get(),
+                static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
+                [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
+                    worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
+                },
+                false);
+            detail::sceneSwitchTrace("StructureGpu: SBT/pipeline update complete");
+        }
+
+        detail::sceneSwitchTrace("StructureGpu: begin binding set");
+        worldRendererResource->rayTracingResources().recreateBindingSet(gpuSetupData.get());
+        if (!worldRendererResource->getBindingSet() || !rhiDevice->isDeviceHealthy())
+            return false;
+        detail::sceneSwitchTrace("StructureGpu: binding set complete");
+    }
+    else
+    {
+        detail::sceneSwitchTrace("StructureGpu: defer SBT/binding to renderer-init frame");
     }
 
-    worldRendererResource->rayTracingResources().recreateBindingSet(gpuSetupData.get());
+    // The exclusive load AS scheduler has already waited its own graphics
+    // fences. A device-wide idle here can wait on unrelated frame/present work
+    // owned by this render thread and deadlock startup.
+    detail::sceneSwitchTrace("StructureGpu: transaction complete");
+
     scenePtr->finishStructureGpuBuild(frameIndex, gpuSetupData);
+    return true;
 }
 
 } // namespace
+
+bool buildSceneGpuStructure(
+    App& app,
+    const std::shared_ptr<Scene>& scene,
+    const std::shared_ptr<const scene::SceneRenderData>& renderData,
+    StructureGpuUploadMode uploadMode,
+    uint32_t frameIndex,
+    bool waitForCompletion)
+{
+    return runStructureGpuBuild(
+        worldRenderer(app),
+        gpuSharedCaches(app),
+        scene,
+        gpuDevice(app),
+        frameIndex,
+        renderData,
+        uploadMode,
+        waitForCompletion);
+}
 
 bool enqueuePendingStructureGpu(App& app)
 {
@@ -120,8 +194,13 @@ bool enqueuePendingStructureGpu(App& app)
     EnqueueRenderCommand(
         app,
         [worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode]() {
-            runStructureGpuBuild(
-                worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode);
+            if (!runStructureGpuBuild(
+                worldRendererResource, caches, scenePtr, device, frameIndex, gpuSetupData, uploadMode,
+                /*waitForCompletion=*/false))
+            {
+                caustica::error("Asynchronous scene structure GPU build failed");
+                scenePtr->failStructureGpuBuild();
+            }
         });
 
     return true;

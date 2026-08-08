@@ -47,11 +47,11 @@ void StreamingUploadBudget::retire(caustica::rhi::Device* device, bool runGc)
         device->runGarbageCollection();
 }
 
-void StreamingUploadBudget::waitForBudget(caustica::rhi::Device* device, size_t nextBytes)
+bool StreamingUploadBudget::waitForBudget(caustica::rhi::Device* device, size_t nextBytes)
 {
     caustica::assertRenderThread();
     if (!device)
-        return;
+        return false;
 
     retire(device, /*runGc=*/true);
 
@@ -70,11 +70,13 @@ void StreamingUploadBudget::waitForBudget(caustica::rhi::Device* device, size_t 
         if (m_entries.empty())
             break;
 
-        device->waitEventQuery(m_entries.front().query);
+        if (!device->waitEventQuery(m_entries.front().query))
+            return false;
         retireFront(device);
         device->runGarbageCollection();
         retire(device, /*runGc=*/false);
     }
+    return device->isDeviceHealthy();
 }
 
 void StreamingUploadBudget::trackSubmit(
@@ -118,18 +120,20 @@ void StreamingUploadBudget::trackSubmit(
     m_entries.push_back(std::move(entry));
 }
 
-void StreamingUploadBudget::waitAll(caustica::rhi::Device* device)
+bool StreamingUploadBudget::waitAll(caustica::rhi::Device* device)
 {
     caustica::assertRenderThread();
     if (!device)
-        return;
+        return false;
 
     while (!m_entries.empty())
     {
-        device->waitEventQuery(m_entries.front().query);
+        if (!device->waitEventQuery(m_entries.front().query))
+            return false;
         retireFront(device);
     }
     device->runGarbageCollection();
+    return device->isDeviceHealthy();
 }
 
 StreamingUploadBudget& streamingUploadBudget()

@@ -105,7 +105,7 @@ namespace caustica::rhi::d3d12
     D3D12_LINEAR_ALGEBRA_MATRIX_LAYOUT convertCoopVecMatrixLayout(coopvec::MatrixLayout layout);
 #endif
 
-    void WaitForFence(ID3D12Fence* fence, uint64_t value, HANDLE event);
+    bool WaitForFence(ID3D12Fence* fence, uint64_t value, HANDLE event);
     uint32_t calcSubresource(uint32_t MipSlice, uint32_t ArraySlice, uint32_t PlaneSlice, uint32_t MipLevels, uint32_t ArraySize);
     void TranslateBlendState(const BlendState& inState, D3D12_BLEND_DESC& outState);
     void TranslateDepthStencilState(const DepthStencilState& inState, D3D12_DEPTH_STENCIL_DESC& outState);
@@ -946,7 +946,12 @@ namespace caustica::rhi::d3d12
         void requireTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
         void requireSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates state);
         void requireBufferState(rhi::Buffer* buffer, ResourceStates state);
-        ID3D12CommandList* getD3D12CommandList() const { return m_ActiveCommandList->commandList; }
+        ID3D12CommandList* getD3D12CommandList() const
+        {
+            return m_ReadyForExecute && m_ActiveCommandList
+                ? m_ActiveCommandList->commandList.Get()
+                : nullptr;
+        }
 
         // Resource implementation
 
@@ -954,7 +959,7 @@ namespace caustica::rhi::d3d12
 
         // CommandList implementation
 
-        void open() override;
+        [[nodiscard]] bool open() override;
         void close() override;
         void clearState() override;
         
@@ -1085,6 +1090,8 @@ namespace caustica::rhi::d3d12
         std::shared_ptr<InternalCommandList> m_ActiveCommandList;
         std::list<std::shared_ptr<InternalCommandList>> m_CommandListPool;
         std::shared_ptr<CommandListInstance> m_Instance;
+        bool m_ReadyForExecute = false;
+        bool m_RecordingFailed = false;
         uint64_t m_RecordingVersion = 0;
 #if CAUSTICA_RHI_WITH_AFTERMATH
         AftermathMarkerTracker m_AftermathTracker;
@@ -1184,7 +1191,7 @@ namespace caustica::rhi::d3d12
         EventQueryHandle createEventQuery() override;
         void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
         bool pollEventQuery(rhi::EventQuery* query) override;
-        void waitEventQuery(rhi::EventQuery* query) override;
+        bool waitEventQuery(rhi::EventQuery* query) override;
         void resetEventQuery(rhi::EventQuery* query) override;
 
         TimerQueryHandle createTimerQuery() override;
@@ -1219,6 +1226,8 @@ namespace caustica::rhi::d3d12
 
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
+        rt::AccelStructBuildMemoryRequirements getAccelStructBuildMemoryRequirements(
+            const rt::AccelStructDesc& desc) override;
         MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
 
@@ -1228,6 +1237,7 @@ namespace caustica::rhi::d3d12
         uint64_t executeCommandLists(caustica::rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
         bool waitForIdle() override;
+        [[nodiscard]] bool isDeviceHealthy() const override;
         void runGarbageCollection() override;
         bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
         FormatSupport queryFormatSupport(Format format) override;

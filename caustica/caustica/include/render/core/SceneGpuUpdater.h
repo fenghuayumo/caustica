@@ -31,8 +31,8 @@ public:
         caustica::rhi::CommandList* commandList,
         uint32_t frameIndex);
 
-    // Spawn / sync helpers: upload all meshes then finalize (each mesh drains GPU).
-    static void refreshAfterLoad(
+    // Spawn / sync helpers: upload all meshes with fence-gated byte budgets, then finalize.
+    [[nodiscard]] static bool refreshAfterLoad(
         Scene& scene,
         const scene::SceneRenderData& renderData,
         SceneGpuResources& gpuResources,
@@ -46,9 +46,9 @@ public:
         SceneGpuResources& gpuResources,
         IDescriptorTableManager* descriptorTable,
         size_t meshBegin,
-        size_t maxMeshes);
+        size_t targetUploadBytes);
 
-    static void finalizeAfterLoad(
+    [[nodiscard]] static bool finalizeAfterLoad(
         Scene& scene,
         const scene::SceneRenderData& renderData,
         SceneGpuResources& gpuResources,

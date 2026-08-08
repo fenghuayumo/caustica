@@ -443,8 +443,13 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         && !m_context->sessionScene->structureGpuBuildInFlight())
     {
         m_frameCommands->ensurePrimary();
-        m_context->scenePasses.rayTracing.recreateAccelStructs(
-            m_frameCommands->primary(), *m_context->sessionScene, m_context->frameScene);
+        if (!m_context->scenePasses.rayTracing.recreateAccelStructs(
+            m_frameCommands->primary(), *m_context->sessionScene, m_context->frameScene))
+        {
+            caustica::error("WorldRenderer: acceleration-structure transaction failed");
+            ctx.aborted = true;
+            return;
+        }
     }
     else if (!m_context->sessionScene || !m_context->frameScene)
         m_context->scenePasses.rayTracing.accelerationStructRebuildRequested() = false;
@@ -662,6 +667,12 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             return;
 
         recreateBindingSet(m_context->frameScene);
+        if (!m_bindingSet)
+        {
+            caustica::error("WorldRenderer: scene binding resources are not ready; aborting frame safely");
+            ctx.aborted = true;
+            return;
+        }
 
         m_context->diagnostics.progressInitializingRenderer.Set(100);
 

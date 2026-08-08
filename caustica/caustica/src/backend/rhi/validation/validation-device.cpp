@@ -607,9 +607,9 @@ namespace caustica::rhi::validation
         return m_Device->pollEventQuery(query);
     }
 
-    void DeviceWrapper::waitEventQuery(EventQuery* query)
+    bool DeviceWrapper::waitEventQuery(EventQuery* query)
     {
-        m_Device->waitEventQuery(query);
+        return m_Device->waitEventQuery(query);
     }
 
     void DeviceWrapper::resetEventQuery(EventQuery* query)
@@ -1961,6 +1961,12 @@ namespace caustica::rhi::validation
         return rt::AccelStructHandle::Create(wrapper);
     }
 
+    rt::AccelStructBuildMemoryRequirements DeviceWrapper::getAccelStructBuildMemoryRequirements(
+        const rt::AccelStructDesc& desc)
+    {
+        return m_Device->getAccelStructBuildMemoryRequirements(desc);
+    }
+
     MemoryRequirements DeviceWrapper::getAccelStructMemoryRequirements(rt::AccelStruct* as)
     {
         if (as == nullptr)
@@ -2265,6 +2271,11 @@ namespace caustica::rhi::validation
     bool DeviceWrapper::waitForIdle()
     {
         return m_Device->waitForIdle();
+    }
+
+    bool DeviceWrapper::isDeviceHealthy() const
+    {
+        return m_Device->isDeviceHealthy();
     }
 
     void DeviceWrapper::runGarbageCollection()

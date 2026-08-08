@@ -1706,6 +1706,13 @@ namespace caustica::rhi
             AccelStructDesc& setIsVirtual(bool value) { isVirtual = value; return *this; }
         };
 
+        struct AccelStructBuildMemoryRequirements
+        {
+            uint64_t resultSize = 0;
+            uint64_t buildScratchSize = 0;
+            uint64_t updateScratchSize = 0;
+        };
+
         //////////////////////////////////////////////////////////////////////////
         // rt::AccelStruct
         //////////////////////////////////////////////////////////////////////////
@@ -3124,7 +3131,10 @@ namespace caustica::rhi
         //   command lists from opening.
         // - DX12, Vulkan: Creates or reuses the command list or buffer object and the command allocator (DX12),
         //   starts tracking the resources being referenced in the command list.
-        virtual void open() = 0;
+        // Returns false when the backend cannot enter the recording state (for
+        // example after device removal or an allocator OOM). Callers must not
+        // record, close, or submit the list after a failed open.
+        [[nodiscard]] virtual bool open() = 0;
 
         // Finalizes the command list and prepares it for execution.
         // Use Device::executeCommandLists(...) to execute it.
@@ -3628,7 +3638,8 @@ namespace caustica::rhi
         virtual EventQueryHandle createEventQuery() = 0;
         virtual void setEventQuery(EventQuery* query, CommandQueue queue) = 0;
         virtual bool pollEventQuery(EventQuery* query) = 0;
-        virtual void waitEventQuery(EventQuery* query) = 0;
+        // Returns false when the wait cannot complete (notably device removal).
+        virtual bool waitEventQuery(EventQuery* query) = 0;
         virtual void resetEventQuery(EventQuery* query) = 0;
 
         // Timer queries - see also begin/endTimerQuery in CommandList
@@ -3668,6 +3679,11 @@ namespace caustica::rhi
 
         virtual rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) = 0;
         virtual rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) = 0;
+        // Used by streaming AS schedulers to form command batches by actual
+        // temporary-memory cost instead of an arbitrary object count. Backends
+        // that cannot query this may return zero and retain their legacy path.
+        virtual rt::AccelStructBuildMemoryRequirements getAccelStructBuildMemoryRequirements(
+            const rt::AccelStructDesc& desc) { (void)desc; return {}; }
         virtual MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) = 0;
         virtual rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) = 0;
         virtual bool bindAccelStructMemory(rt::AccelStruct* as, Heap* heap, uint64_t offset) = 0;
@@ -3677,6 +3693,11 @@ namespace caustica::rhi
         virtual void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) = 0;
         // returns true if the wait completes successfully, false if detecting a problem (e.g. device removal)
         virtual bool waitForIdle() = 0;
+
+        // Cheap, non-blocking health probe. Backends that can report device
+        // removal should override this; frame and load orchestration use it as
+        // a global submission gate after the first GPU failure.
+        [[nodiscard]] virtual bool isDeviceHealthy() const { return true; }
 
         // Releases the resources that were referenced in the command lists that have finished executing.
         // IMPORTANT: Call this method at least once per frame.

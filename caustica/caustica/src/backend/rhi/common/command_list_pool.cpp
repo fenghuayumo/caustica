@@ -87,7 +87,8 @@ namespace caustica::rhi
         assert(!m_primaryOpen);
         if (!m_primary)
             m_primary = m_pool->acquire(m_queue);
-        m_primary->open();
+        if (!m_primary || !m_primary->open())
+            return nullptr;
         m_primaryOpen = true;
         m_forks.clear();
         return m_primary.Get();
@@ -101,8 +102,8 @@ namespace caustica::rhi
         m_primary->close();
         m_primaryOpen = false;
         const uint64_t instance = m_pool->device()->executeCommandList(m_primary, m_queue);
-        m_primary->open();
-        m_primaryOpen = true;
+        if (m_primary->open())
+            m_primaryOpen = true;
         return instance;
     }
 
@@ -111,7 +112,8 @@ namespace caustica::rhi
         assert(m_pool);
         CommandListHandle list = m_pool->acquire(m_queue);
         assert(list);
-        list->open();
+        if (!list || !list->open())
+            return nullptr;
         m_forks.push_back(ForkEntry{ list, false });
         return list;
     }

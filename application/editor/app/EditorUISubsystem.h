@@ -2,6 +2,7 @@
 
 #include <core/command_line.h>
 #include <engine/App.h>
+#include <rhi/rhi.h>
 
 #include <chrono>
 #include <cstdint>
@@ -53,6 +54,9 @@ private:
     EditorUISubsystemConfig m_config;
     std::unique_ptr<EditorUI> m_ui;
     std::unique_ptr<EditorViewport> m_viewport;
+    // Persistent compositor list: its backend allocator/list pool is reused
+    // across frames instead of allocating a new D3D12 pair for every clear.
+    caustica::rhi::CommandListHandle m_compositeCommandList;
 
     // Debounce viewport FB recreation while the user is dragging a dock split.
     uint32_t m_pendingViewportWidth = 0;

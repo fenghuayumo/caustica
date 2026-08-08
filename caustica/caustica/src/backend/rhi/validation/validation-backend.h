@@ -172,7 +172,7 @@ namespace caustica::rhi::validation
 
         // CommandList implementation
 
-        void open() override;
+        [[nodiscard]] bool open() override;
         void close() override;
         void clearState() override;
 
@@ -323,7 +323,7 @@ namespace caustica::rhi::validation
         EventQueryHandle createEventQuery() override;
         void setEventQuery(EventQuery* query, CommandQueue queue) override;
         bool pollEventQuery(EventQuery* query) override;
-        void waitEventQuery(EventQuery* query) override;
+        bool waitEventQuery(EventQuery* query) override;
         void resetEventQuery(EventQuery* query) override;
 
         // timer queries
@@ -359,6 +359,8 @@ namespace caustica::rhi::validation
 
         rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc)  override;
         rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
+        rt::AccelStructBuildMemoryRequirements getAccelStructBuildMemoryRequirements(
+            const rt::AccelStructDesc& desc) override;
         MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
         rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
         bool bindAccelStructMemory(rt::AccelStruct* as, Heap* heap, uint64_t offset) override;
@@ -367,6 +369,7 @@ namespace caustica::rhi::validation
         uint64_t executeCommandLists(CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
         bool waitForIdle() override;
+        [[nodiscard]] bool isDeviceHealthy() const override;
         void runGarbageCollection() override;
         bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
         FormatSupport queryFormatSupport(Format format) override;

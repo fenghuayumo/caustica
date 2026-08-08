@@ -9,6 +9,7 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
+#include <engine/ScenePlugins.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
@@ -439,6 +440,21 @@ void abortLoadSession(SceneViewState& vs)
         vs.progressLoading.stop();
 }
 
+void failGpuLoad(App& app, SceneViewState& vs, const char* stage)
+{
+    caustica::error("Scene GPU transaction failed during %s; rendering will not resume with partial resources",
+        stage ? stage : "unknown stage");
+    detail::sceneSwitchTrace("LoadSession: GPU transaction failed at %s",
+        stage ? stage : "unknown stage");
+    // Partial texture/mesh/AS state is deliberately never published to a
+    // normal frame. Exit through the bounded shutdown path; continuing the UI
+    // against that state was the source of the follow-on access violation.
+    vs.sceneGpuSuspended.store(true, std::memory_order_release);
+    if (GpuDevice* device = gpuDevice(app))
+        device->setShuttingDown(true);
+    app.requestExit();
+}
+
 void syncLoadProgress(SceneViewState& vs)
 {
     if (!vs.loadSession.isActive())
@@ -523,13 +539,12 @@ void onSceneLoaded(App& app)
     detail::sceneSwitchTrace("onSceneLoaded: logic setup");
     applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
 
-    const scene::SceneRenderData* renderData = nullptr;
+    std::shared_ptr<const scene::SceneRenderData> renderData;
     if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
     {
         if (GpuDevice* device = gpuDevice(app))
-            renderData = &scenePtr->extractAndPublishForGpuSetup(
-                device->getFrameIndex(),
-                nullptr);
+            renderData = std::make_shared<const scene::SceneRenderData>(
+                scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex(), nullptr));
     }
     if (!renderData)
     {
@@ -540,8 +555,11 @@ void onSceneLoaded(App& app)
 
     registerLoadedSceneAssets(app, *manager);
     syncCameraFromScene(app);
+    gr->beginSceneGpuLoad();
 
-    // GpuStreaming with present enabled (suspension already cleared after teardown).
+    // Keep path tracing/present suspended while texture and mesh allocations are
+    // being created. Running full frames concurrently with a large upload stream
+    // can push D3D12 over the local-memory budget and page tens of GB through RAM.
     const size_t texturesPending = gr->pendingTextureFinalizeCount();
     vs->loadSession.reset();
     vs->loadSession.phase = LoadSessionPhase::GpuStreaming;
@@ -553,7 +571,8 @@ void onSceneLoaded(App& app)
     vs->loadSession.stepTexturesRemaining.store(texturesPending, std::memory_order_relaxed);
     vs->loadSession.meshBegin = 0;
     vs->loadSession.meshTotal = renderData->meshSnapshots.size();
-    vs->sceneGpuSuspended.store(false, std::memory_order_release);
+    vs->loadSession.gpuSetupFrameIndex = gpuDevice(app) ? gpuDevice(app)->getFrameIndex() : 0;
+    vs->sceneGpuSuspended.store(true, std::memory_order_release);
     syncLoadProgress(*vs);
     detail::sceneSwitchTrace("onSceneLoaded: LoadSession GpuStreaming textures=%zu meshes=%zu",
         texturesPending, vs->loadSession.meshTotal);
@@ -627,7 +646,7 @@ void tickLoadSession(App& app)
     if (session.phase == LoadSessionPhase::Finalizing)
     {
         GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
-        const scene::SceneRenderData* data = session.renderData;
+        const std::shared_ptr<const scene::SceneRenderData> data = session.renderData;
         if (!gr || !data)
         {
             abortLoadSession(*vs);
@@ -636,8 +655,6 @@ void tickLoadSession(App& app)
 
         PathTracerSettings* cfg = settings(app);
         const CommandLineOptions* cmd = cmdLine(app);
-        // LoadSession owns orchestration; GpuRenderSubsystem is the RT/logic step executor.
-        gr->finishLoadedScene(*data); // requests StructureGpu AccelOnly
         collectUncompressedTextures(app);
         if (cfg && cmd)
         {
@@ -648,15 +665,63 @@ void tickLoadSession(App& app)
         if (CameraController* cam = cameraController(app))
             cam->syncPreviousViewFromCurrent();
 
+        const std::shared_ptr<Scene> scene = activeScene(app);
+        if (!scene)
+        {
+            failGpuLoad(app, *vs, "structure setup");
+            return;
+        }
+
+        // This is logic-owned post-bind state (scene animation prep, settings,
+        // invalidation flags). Running it inside a Render-domain job can recurse
+        // into logic/session state and stall that same domain.
+        detail::sceneSwitchTrace("StructureGpu: begin finishLoadedScene");
+        const bool prepared = gr->finishLoadedScene(*data);
+        detail::sceneSwitchTrace("StructureGpu: finishLoadedScene complete (ok=%d)", prepared ? 1 : 0);
+        if (!prepared)
+        {
+            failGpuLoad(app, *vs, "scene finalize");
+            return;
+        }
+
+        // BLAS/TLAS/SBT/bindings are part of the same exclusive transaction.
+        // An ordinary frame must not observe the scene before this completes.
+        scene->beginStructureGpuBuild();
+        scene->clearGpuStructureSyncRequest();
+        const uint32_t setupFrameIndex = session.gpuSetupFrameIndex;
+        beginLoadStreamStep(app, session, [&app, scene, data, setupFrameIndex, &session]() {
+            // finishLoadedScene requests AccelOnly; this explicit transaction
+            // consumes the request without requiring a normal Extract/render frame.
+            scene->clearGpuStructureSyncRequest();
+            const bool built = buildSceneGpuStructure(
+                app,
+                scene,
+                data,
+                StructureGpuUploadMode::AccelOnly,
+                setupFrameIndex,
+                /*waitForCompletion=*/true);
+            if (!built)
+                scene->failStructureGpuBuild();
+            session.stepStatus.store(built ? 1 : 2, std::memory_order_release);
+        });
         session.phase = LoadSessionPhase::FirstPresent;
         syncLoadProgress(*vs);
-        detail::sceneSwitchTrace("LoadSession: Finalizing → FirstPresent (wait StructureGpu)");
+        detail::sceneSwitchTrace("LoadSession: Finalizing -> FirstPresent (transactional StructureGpu)");
         return;
     }
 
     if (session.phase == LoadSessionPhase::FirstPresent)
     {
-        // Hold progress until StructureGpu AccelOnly finishes (committed serve ready).
+        // Hold render suspension until the explicit structure transaction and
+        // its graphics fence are complete.
+        if (session.stepInFlight && pollLoadStreamStep(session))
+            return;
+        if (session.stepStatus.load(std::memory_order_relaxed) == 2)
+        {
+            failGpuLoad(app, *vs, "BLAS/TLAS/SBT");
+            return;
+        }
+
         const std::shared_ptr<Scene> scene = activeScene(app);
         if (!scene)
         {
@@ -670,11 +735,11 @@ void tickLoadSession(App& app)
         }
         if (!scene->committedRenderData())
         {
-            // Extract may still freeze/enqueue this frame; wait one more tick.
-            syncLoadProgress(*vs);
+            failGpuLoad(app, *vs, "scene publication");
             return;
         }
 
+        vs->sceneGpuSuspended.store(false, std::memory_order_release);
         session.phase = LoadSessionPhase::Ready;
         syncLoadProgress(*vs);
         return;
@@ -684,7 +749,7 @@ void tickLoadSession(App& app)
         return;
 
     GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>();
-    const scene::SceneRenderData* data = session.renderData;
+    const std::shared_ptr<const scene::SceneRenderData> data = session.renderData;
     if (!gr || !data)
     {
         abortLoadSession(*vs);
@@ -700,7 +765,7 @@ void tickLoadSession(App& app)
         if (session.stepStatus.load(std::memory_order_relaxed) == 2)
         {
             detail::sceneSwitchTrace("tickLoadSession: stream step failed");
-            abortLoadSession(*vs);
+            failGpuLoad(app, *vs, "streaming");
             return;
         }
 
@@ -712,16 +777,20 @@ void tickLoadSession(App& app)
             {
                 session.textureDrainPending = false;
                 session.streamStep = LoadStreamStep::World;
+                detail::sceneSwitchTrace("GpuStreaming: textures complete");
             }
             // else budgeted flush; stay on Textures (maybe remaining==0 → drain next)
             break;
         case LoadStreamStep::World:
             session.streamStep = LoadStreamStep::Meshes;
             session.stepMeshNext.store(session.meshBegin, std::memory_order_relaxed);
+            detail::sceneSwitchTrace("GpuStreaming: world bind complete");
             break;
         case LoadStreamStep::Meshes:
         {
             const size_t next = session.stepMeshNext.load(std::memory_order_relaxed);
+            detail::sceneSwitchTrace("GpuStreaming: mesh upload %zu/%zu",
+                next, session.meshTotal);
             session.meshBegin = next;
             if (session.meshBegin >= session.meshTotal)
                 session.streamStep = LoadStreamStep::Finalize;
@@ -744,27 +813,26 @@ void tickLoadSession(App& app)
             // Final drain (loadingFinished) before World.
             session.textureDrainPending = true;
             beginLoadStreamStep(app, session, [gr, &session]() {
-                gr->flushTextures(0.f);
+                const bool ok = gr->flushTextures(0.f);
                 session.stepTexturesRemaining.store(
                     gr->pendingTextureFinalizeCount(), std::memory_order_relaxed);
-                session.stepStatus.store(1, std::memory_order_release);
+                session.stepStatus.store(ok ? 1 : 2, std::memory_order_release);
             });
         }
         else
         {
             beginLoadStreamStep(app, session, [gr, &session]() {
-                gr->flushTextures(LoadSession::kTextureBudgetMs);
+                const bool ok = gr->flushTextures(LoadSession::kTextureBudgetMs);
                 session.stepTexturesRemaining.store(
                     gr->pendingTextureFinalizeCount(), std::memory_order_relaxed);
-                session.stepStatus.store(1, std::memory_order_release);
+                session.stepStatus.store(ok ? 1 : 2, std::memory_order_release);
             });
         }
         break;
     }
     case LoadStreamStep::World:
         beginLoadStreamStep(app, session, [gr, data, &session]() {
-            gr->bindWorld(*data);
-            session.stepStatus.store(1, std::memory_order_release);
+            session.stepStatus.store(gr->bindWorld(*data) ? 1 : 2, std::memory_order_release);
         });
         break;
     case LoadStreamStep::Meshes:
@@ -774,14 +842,16 @@ void tickLoadSession(App& app)
             session.streamStep = LoadStreamStep::Finalize;
             // Enqueue finalize this same tick.
             beginLoadStreamStep(app, session, [gr, data, &session]() {
-                gr->finalizeBind(*data);
-                session.stepStatus.store(1, std::memory_order_release);
+                session.stepStatus.store(gr->finalizeBind(*data) ? 1 : 2, std::memory_order_release);
             });
             break;
         }
         const size_t start = session.meshBegin;
+        detail::sceneSwitchTrace("GpuStreaming: begin mesh upload %zu/%zu",
+            start, session.meshTotal);
         beginLoadStreamStep(app, session, [gr, data, start, &session]() {
-            const size_t next = gr->uploadMeshes(*data, start, LoadSession::kMeshesPerStep);
+            const size_t next = gr->uploadMeshes(
+                *data, start, LoadSession::kMeshUploadTargetBytes);
             session.stepMeshNext.store(next, std::memory_order_relaxed);
             if (next <= start && next < data->meshSnapshots.size())
                 session.stepStatus.store(2, std::memory_order_release);
@@ -792,8 +862,7 @@ void tickLoadSession(App& app)
     }
     case LoadStreamStep::Finalize:
         beginLoadStreamStep(app, session, [gr, data, &session]() {
-            gr->finalizeBind(*data);
-            session.stepStatus.store(1, std::memory_order_release);
+            session.stepStatus.store(gr->finalizeBind(*data) ? 1 : 2, std::memory_order_release);
         });
         break;
     }

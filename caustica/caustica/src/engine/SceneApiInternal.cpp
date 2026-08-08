@@ -11,6 +11,7 @@
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <cstdarg>
+#include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <memory>
@@ -32,14 +33,20 @@ void sceneSwitchTrace(const char* fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    caustica::info("%s", buf);
+    static const auto traceStart = std::chrono::steady_clock::now();
+    const double elapsedSeconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - traceStart).count();
+    char line[1100];
+    snprintf(line, sizeof(line), "[+%8.3fs] %s", elapsedSeconds, buf);
+
+    caustica::info("%s", line);
 #ifdef _WIN32
-    OutputDebugStringA(buf);
+    OutputDebugStringA(line);
     OutputDebugStringA("\n");
 #endif
     std::ofstream f("scene_switch.log", std::ios::app);
     if (f)
-        f << buf << '\n';
+        f << line << '\n';
 }
 
 ::SceneManager* sessionManager(App& app)

@@ -922,6 +922,20 @@ namespace caustica::rhi::d3d12
         return rt::AccelStructHandle::Create(as);
     }
 
+    rt::AccelStructBuildMemoryRequirements Device::getAccelStructBuildMemoryRequirements(
+        const rt::AccelStructDesc& desc)
+    {
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
+        if (!GetAccelStructPreBuildInfo(info, desc))
+            return {};
+
+        return {
+            .resultSize = info.ResultDataMaxSizeInBytes,
+            .buildScratchSize = info.ScratchDataSizeInBytes,
+            .updateScratchSize = info.UpdateScratchDataSizeInBytes,
+        };
+    }
+
     MemoryRequirements Device::getAccelStructMemoryRequirements(rt::AccelStruct* _as)
     {
         AccelStruct* as = checked_cast<AccelStruct*>(_as);
@@ -1697,6 +1711,7 @@ namespace caustica::rhi::d3d12
             if (!allocated)
             {
                 m_Context.error("Couldn't suballocate an upload buffer");
+                m_RecordingFailed = true;
                 return;
             }
 
@@ -1840,6 +1855,7 @@ namespace caustica::rhi::d3d12
                     "The build requires " << ommPreBuildInfo.ScratchDataSizeInBytes << " bytes of scratch space.";
 
                 m_Context.error(ss.str());
+                m_RecordingFailed = true;
                 return;
             }
         }
@@ -1877,6 +1893,7 @@ namespace caustica::rhi::d3d12
                     "The build requires " << vmPreBuildInfo.scratchDataSizeInBytes << " bytes of scratch space.";
 
                 m_Context.error(ss.str());
+                m_RecordingFailed = true;
                 return;
             }
         }
@@ -2010,6 +2027,7 @@ namespace caustica::rhi::d3d12
                     &cpuVA, &gpuVA, m_RecordingVersion, D3D12_RAYTRACING_TRANSFORM3X4_BYTE_ALIGNMENT))
                 {
                     m_Context.error("Couldn't suballocate an upload buffer");
+                    m_RecordingFailed = true;
                     return;
                 }
 
@@ -2088,6 +2106,7 @@ namespace caustica::rhi::d3d12
                 << as->dataBuffer->desc.byteSize << " bytes";
 
             m_Context.error(ss.str());
+            m_RecordingFailed = true;
             return;
         }
 
@@ -2104,6 +2123,7 @@ namespace caustica::rhi::d3d12
                 "The build requires " << scratchSize << " bytes of scratch space.";
 
             m_Context.error(ss.str());
+            m_RecordingFailed = true;
             return;
         }
 
@@ -2202,6 +2222,7 @@ namespace caustica::rhi::d3d12
                 << as->dataBuffer->desc.byteSize << " bytes";
 
             m_Context.error(ss.str());
+            m_RecordingFailed = true;
             return;
         }
 
@@ -2218,6 +2239,7 @@ namespace caustica::rhi::d3d12
                 "The build requires " << scratchSize << " bytes of scratch space.";
 
             m_Context.error(ss.str());
+            m_RecordingFailed = true;
             return;
         }
 
@@ -2246,15 +2268,19 @@ namespace caustica::rhi::d3d12
             const rt::InstanceDesc& instance = pInstances[i];
             D3D12_RAYTRACING_INSTANCE_DESC& dxrInstance = as->dxrInstances[i];
 
+            // Copy every field on every rebuild. The instance vector is retained
+            // between updates, so only overwriting AccelerationStructure for an
+            // empty slot leaves a stale non-zero mask (and stale IDs/transform)
+            // when a formerly valid BLAS disappears.
+            static_assert(sizeof(dxrInstance) == sizeof(instance));
+            memcpy(&dxrInstance, &instance, sizeof(instance));
+
             if (instance.bottomLevelAS)
             {
                 AccelStruct* blas = checked_cast<AccelStruct*>(instance.bottomLevelAS);
 
                 if (blas->desc.trackLiveness)
                     as->bottomLevelASes.push_back(blas);
-
-                static_assert(sizeof(dxrInstance) == sizeof(instance));
-                memcpy(&dxrInstance, &instance, sizeof(instance));
 
 #ifdef CAUSTICA_RHI_WITH_RTXMU
                 dxrInstance.AccelerationStructure = m_Context.rtxMemUtil->GetAccelStructGPUVA(blas->rtxmuId);
@@ -2270,6 +2296,7 @@ namespace caustica::rhi::d3d12
             else // !instance.bottomLevelAS
             {
                 dxrInstance.AccelerationStructure = 0;
+                dxrInstance.InstanceMask = 0;
             }
         }
 
@@ -2285,6 +2312,7 @@ namespace caustica::rhi::d3d12
             m_RecordingVersion, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT))
         {
             m_Context.error("Couldn't suballocate an upload buffer");
+            m_RecordingFailed = true;
             return;
         }
 
@@ -2370,6 +2398,7 @@ namespace caustica::rhi::d3d12
                 "The operation requires " << desc.scratchSizeInBytes << " bytes of scratch space.";
 
             m_Context.error(ss.str());
+            m_RecordingFailed = true;
             return;
         }
 

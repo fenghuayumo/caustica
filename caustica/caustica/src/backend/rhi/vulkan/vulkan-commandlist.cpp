@@ -37,9 +37,11 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    void CommandList::open()
+    bool CommandList::open()
     {
         m_CurrentCmdBuf = m_Device->getQueue(m_CommandListParameters.queueType)->getOrCreateCommandBuffer();
+        if (!m_CurrentCmdBuf)
+            return false;
 
         auto beginInfo = vk::CommandBufferBeginInfo()
             .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -48,6 +50,7 @@ namespace caustica::rhi::vulkan
         m_CurrentCmdBuf->referencedResources.push_back(this); // prevent deletion of e.g. UploadManager
 
         clearState();
+        return true;
     }
 
     void CommandList::close()

@@ -167,6 +167,7 @@ namespace caustica
         void freezeCommittedFromLogicCache();
         void beginStructureGpuBuild() { m_structureGpu.beginStructureGpuBuild(); }
         void finishStructureGpuBuild(uint32_t frameIndex, std::shared_ptr<const scene::SceneRenderData> built);
+        void failStructureGpuBuild() { m_structureGpu.failStructureGpuBuild(); }
         [[nodiscard]] bool structureGpuBuildInFlight() const { return m_structureGpu.structureGpuBuildInFlight(); }
         [[nodiscard]] std::shared_ptr<const scene::SceneRenderData> committedRenderData() const
         {

@@ -30,9 +30,9 @@ struct SceneViewState
 
     ProgressBar progressLoading;
 
-    // Exclusive teardown / AS cutover only (ADR 0001 P3). Not held for whole Open Scene.
-    // When true, App must not submit/present — overlapping DispatchRays or DLSS-RR with
-    // Streamline teardown hard-hangs the GPU.
+    // Exclusive teardown and high-pressure streaming window. When true, App must not
+    // submit/present: overlapping DispatchRays/DLSS-RR with teardown or hundreds of
+    // scene allocations can remove the device or exhaust system commit.
     std::atomic<bool> sceneGpuSuspended{false};
 
     // Sole Open Scene load state machine (replaces GpuBindPhase).

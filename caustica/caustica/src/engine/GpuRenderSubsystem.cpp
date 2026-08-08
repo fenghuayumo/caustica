@@ -74,16 +74,24 @@ size_t GpuRenderSubsystem::pendingTextureFinalizeCount()
     return m_gpuSharedCaches->textureLoader->pendingFinalizeCount();
 }
 
-void GpuRenderSubsystem::flushTextures(float timeLimitMs)
+bool GpuRenderSubsystem::flushTextures(float timeLimitMs)
 {
     if (!m_gpuSharedCaches || !m_gpuSharedCaches->textureLoader || !m_gpuSharedCaches->renderDevice || !m_assetSystem)
-        return;
+        return false;
     m_assetSystem->processRenderingThreadCommands(*m_gpuSharedCaches->renderDevice, timeLimitMs);
     if (timeLimitMs <= 0.f)
         m_assetSystem->loadingFinished();
+    return !m_gpuSharedCaches->textureLoader->gpuFinalizeFailed()
+        && m_gpuSharedCaches->renderDevice->getDevice()->isDeviceHealthy();
 }
 
-void GpuRenderSubsystem::bindWorld(const scene::SceneRenderData& renderData)
+void GpuRenderSubsystem::beginSceneGpuLoad()
+{
+    if (m_gpuSharedCaches && m_gpuSharedCaches->textureLoader)
+        m_gpuSharedCaches->textureLoader->clearGpuFinalizeFailure();
+}
+
+bool GpuRenderSubsystem::bindWorld(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     auto scene = manager ? manager->getScene() : nullptr;
@@ -91,12 +99,14 @@ void GpuRenderSubsystem::bindWorld(const scene::SceneRenderData& renderData)
     (void)renderData;
     if (m_worldRenderer)
         m_worldRenderer->onSceneLoaded(scene, scenePath);
+    return scene && m_worldRenderer && m_gpuSharedCaches && m_gpuSharedCaches->renderDevice
+        && m_gpuSharedCaches->renderDevice->getDevice()->isDeviceHealthy();
 }
 
 size_t GpuRenderSubsystem::uploadMeshes(
     const scene::SceneRenderData& renderData,
     size_t meshBegin,
-    size_t maxMeshes)
+    size_t targetUploadBytes)
 {
     if (!m_worldRenderer)
         return renderData.meshSnapshots.size();
@@ -105,23 +115,24 @@ size_t GpuRenderSubsystem::uploadMeshes(
         m_worldRenderer->sceneGpuResources(),
         m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
         meshBegin,
-        maxMeshes);
+        targetUploadBytes);
 }
 
-void GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
+bool GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     auto scene = manager ? manager->getScene() : nullptr;
     const std::filesystem::path scenePath = manager ? manager->getCurrentScenePath() : std::filesystem::path{};
     if (!scene || !m_worldRenderer)
-        return;
+        return false;
 
-    render::SceneGpuUpdater::finalizeAfterLoad(
+    if (!render::SceneGpuUpdater::finalizeAfterLoad(
         *scene,
         renderData,
         m_worldRenderer->sceneGpuResources(),
         m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
-        0);
+        0))
+        return false;
     m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.geometryCount);
 
     if (m_gpuSharedCaches && m_gpuSharedCaches->renderDevice)
@@ -135,17 +146,19 @@ void GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
                 getLocalPath(c_AssetsFolder));
         }
     }
+    return m_gpuSharedCaches && m_gpuSharedCaches->renderDevice
+        && m_gpuSharedCaches->renderDevice->getDevice()->isDeviceHealthy();
 }
 
-void GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderData)
+bool GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderData)
 {
     ::SceneManager* manager = sessionManager(m_sceneSession);
     if (!manager || !m_settings || !m_runtimeState || !m_worldRenderer)
-        return;
+        return false;
 
     const auto scene = manager->getScene();
     if (!scene)
-        return;
+        return false;
 
     SceneGaussianSplatLogic::onSceneLoaded(m_worldRenderer->gaussianSplatPasses());
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
@@ -163,6 +176,8 @@ void GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
     // OMM / opacity queue writes AppDiagnostics::asyncLoadingInProgress as RT scratch,
     // mirrored into LoadSession::secondaryStreaming on Logic.
     (void)m_diagnostics;
+    return m_gpuDevice && m_gpuDevice->getDevice()
+        && m_gpuDevice->getDevice()->isDeviceHealthy();
 }
 
 void GpuRenderSubsystem::shutdown()

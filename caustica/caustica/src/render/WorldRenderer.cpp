@@ -791,13 +791,39 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
 void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRenderData* renderData)
 {
 	// WARNING: this must match the layout of the m_bindingLayout (or switch to CreateBindingSetAndLayout)
+    // Never retain a binding set from an older scene when rebuilding fails or has
+    // to be deferred.  In particular, StructureGpu runs before the first new-scene
+    // render pass and sceneUnloading() deliberately releases environment/light
+    // sampling resources.
+    m_bindingSet = nullptr;
+
     const SceneGpuFrameHandles gpuHandles = m_context->resolveGpuHandles();
     if (!gpuHandles.valid())
         return;
 
-    // Cold init / early structure sync can run before MaterialGpuCache exists.
-    if (!m_context->scenePasses.lighting.materials() || !m_renderTargets)
+    // Cold init and scene-switch StructureGpu can run before the lighting passes
+    // have recreated their scene-scoped resources.  Do not dereference them (or
+    // pass null RHI resources into DXR); the first renderer-init frame retries.
+    auto& lighting = m_context->scenePasses.lighting;
+    const std::shared_ptr<MaterialGpuCache> materials = lighting.materials();
+    const std::shared_ptr<EnvMapProcessor> environment = lighting.environment();
+    const std::shared_ptr<LightSamplingCache> lightSampling = lighting.lightSampling();
+    const std::shared_ptr<EnvMapImportanceSamplingCache> importanceSampling =
+        environment ? environment->getImportanceSampling() : nullptr;
+    if (!materials || !environment || !lightSampling || !importanceSampling
+        || !m_renderTargets || !m_constantBuffer || !m_bindingLayout || !m_shaderDebug)
         return;
+
+    const caustica::rhi::BufferHandle materialDataBuffer = materials->getMaterialDataBuffer();
+    if (!materialDataBuffer)
+        return;
+
+    caustica::rhi::Buffer* geometryDebugBuffer = materialDataBuffer.Get();
+    if (const std::shared_ptr<OpacityMicromapBuilder> opacityMaps = lighting.opacityMaps())
+    {
+        if (caustica::rhi::Buffer* const opacityDebugBuffer = opacityMaps->getGeometryDebugBuffer())
+            geometryDebugBuffer = opacityDebugBuffer;
+    }
 
     // LoadSession GpuStreaming / StructureGpu AccelOnly can present before TLAS exists.
     // Binding a null AS crashes in AccelStruct::createSRV (dataBuffer deref).
@@ -809,7 +835,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     }
 
     caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
-    caustica::rhi::Buffer* gaussianSplatBuffer = m_context->scenePasses.lighting.materials()->getMaterialDataBuffer();
+    caustica::rhi::Buffer* gaussianSplatBuffer = materialDataBuffer;
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
@@ -836,26 +862,26 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(1, m_context->accelStructs.getSubInstanceBuffer()),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(2, gpuHandles.instanceBuffer),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, m_context->scenePasses.lighting.opacityMaps() ?(m_context->scenePasses.lighting.opacityMaps()->getGeometryDebugBuffer()):(m_context->scenePasses.lighting.materials()->getMaterialDataBuffer().Get()) ),   // YUCK
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, m_context->scenePasses.lighting.materials()->getMaterialDataBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, geometryDebugBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, materialDataBuffer),
         caustica::rhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, caustica::rhi::Format::SRGBA8_UNORM),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        caustica::rhi::BindingSetItem::Texture_SRV(10, m_context->scenePasses.lighting.environment()->getEnvMapCube()),
-        caustica::rhi::BindingSetItem::Texture_SRV(11, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapOnly()),
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(12, m_context->scenePasses.lighting.lightSampling()->getControlBuffer()),
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(13, m_context->scenePasses.lighting.lightSampling()->getLightBuffer()),
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(14, m_context->scenePasses.lighting.lightSampling()->getLightExBuffer()),
-        caustica::rhi::BindingSetItem::TypedBuffer_SRV(15, m_context->scenePasses.lighting.lightSampling()->getLightProxyCounters()),     // t_tightProxyCounters
-        caustica::rhi::BindingSetItem::TypedBuffer_SRV(16, m_context->scenePasses.lighting.lightSampling()->getLightSamplingProxies()),   // t_LightProxyIndices
-        caustica::rhi::BindingSetItem::TypedBuffer_SRV(17, m_context->scenePasses.lighting.lightSampling()->getLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
-        caustica::rhi::BindingSetItem::Texture_SRV(18, m_context->scenePasses.lighting.lightSampling()->getEnvLightLookupMap()),          // t_EnvLookupMap
+        caustica::rhi::BindingSetItem::Texture_SRV(10, environment->getEnvMapCube()),
+        caustica::rhi::BindingSetItem::Texture_SRV(11, importanceSampling->getImportanceMapOnly()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(12, lightSampling->getControlBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(13, lightSampling->getLightBuffer()),
+        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(14, lightSampling->getLightExBuffer()),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(15, lightSampling->getLightProxyCounters()),     // t_tightProxyCounters
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(16, lightSampling->getLightSamplingProxies()),   // t_LightProxyIndices
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(17, lightSampling->getLocalSamplingBuffer()),    // t_LightLocalSamplingBuffer
+        caustica::rhi::BindingSetItem::Texture_SRV(18, lightSampling->getEnvLightLookupMap()),          // t_EnvLookupMap
         //caustica::rhi::BindingSetItem::TypedBuffer_SRV(19, ),
-        caustica::rhi::BindingSetItem::Texture_UAV(20, m_context->scenePasses.lighting.lightSampling()->getFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
-        caustica::rhi::BindingSetItem::Texture_UAV(21, m_context->scenePasses.lighting.lightSampling()->getFeedbackCandidates()),         // u_LightFeedbackCandidates
+        caustica::rhi::BindingSetItem::Texture_UAV(20, lightSampling->getFeedbackTotalWeight()),        // u_LightFeedbackTotalWeight
+        caustica::rhi::BindingSetItem::Texture_UAV(21, lightSampling->getFeedbackCandidates()),         // u_LightFeedbackCandidates
         caustica::rhi::BindingSetItem::Sampler(0, m_context->renderDevice.samplers().anisotropicWrap()),
-        caustica::rhi::BindingSetItem::Sampler(1, m_context->scenePasses.lighting.environment()->getEnvMapCubeSampler()),
-        caustica::rhi::BindingSetItem::Sampler(2, m_context->scenePasses.lighting.environment()->getImportanceSampling()->getImportanceMapSampler()),
+        caustica::rhi::BindingSetItem::Sampler(1, environment->getEnvMapCubeSampler()),
+        caustica::rhi::BindingSetItem::Sampler(2, importanceSampling->getImportanceMapSampler()),
         caustica::rhi::BindingSetItem::Texture_UAV(0, m_renderTargets->outputColor),
         caustica::rhi::BindingSetItem::Texture_UAV(1, m_renderTargets->processedOutputColor),
         caustica::rhi::BindingSetItem::Texture_UAV(2, m_renderTargets->ldrColor, caustica::rhi::Format::RGBA8_UNORM),
@@ -920,7 +946,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(80, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_LocalCubemapGGX
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(81, m_context->renderDevice.builtins().blackCubeMapArray()));  // t_DiffuseIrradianceCube
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(82, m_context->renderDevice.builtins().blackTexture()));  // t_SSRBlurChain
-        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(83, (m_context->scenePasses.lighting.environment()->getBRDFLUT()!=nullptr)?m_context->scenePasses.lighting.environment()->getBRDFLUT():m_context->renderDevice.builtins().blackTexture() ));  // t_BRDFLUT
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(83, (environment->getBRDFLUT()!=nullptr)?environment->getBRDFLUT():m_context->renderDevice.builtins().blackTexture() ));  // t_BRDFLUT
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(84, m_context->renderDevice.builtins().blackTexture()));  // t_DepthHierarchy placeholder
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::ConstantBuffer(10, m_constantBuffer)); // ReflectionConstants (reuse main constant buffer as placeholder)
         
@@ -933,6 +959,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
 
         m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
+        if (!m_bindingSet)
+            caustica::error("WorldRenderer: failed to create the scene binding set; GPU resources may be exhausted");
     }
 }
 

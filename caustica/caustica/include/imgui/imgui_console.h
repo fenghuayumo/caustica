@@ -96,6 +96,15 @@ namespace caustica
 		typedef caustica::core::circular_buffer<LogItem, 5000> ItemsLog;
 		ItemsLog m_ItemsLog;
 
+		// Log callbacks run on import, render, and logic threads. Producers only
+		// append to this shared ingress state; the UI thread drains it into
+		// m_ItemsLog before reading or rendering the visible log.
+		struct LogCaptureState;
+		std::shared_ptr<LogCaptureState> m_LogCapture;
+
+		void enqueueLog(LogItem item);
+		void drainPendingLog();
+
 		std::vector<std::string> m_Suggestions;
 		int m_SuggestionIndex = -1;
 		char m_FilterBuf[128] = {};

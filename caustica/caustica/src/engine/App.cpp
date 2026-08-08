@@ -532,7 +532,7 @@ void App::render()
 
 bool App::skipRenderPhase() const
 {
-    // Exclusive teardown / AS cutover only (ADR 0001 P3). GpuStreaming presents.
+    // Exclusive teardown and high-pressure GPU streaming skip full frame submission.
     if (const SceneViewState* vs = tryResource<SceneViewState>())
     {
         if (vs->sceneGpuSuspended.load(std::memory_order_acquire))
@@ -699,8 +699,11 @@ void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double c
 bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex)
 {
     const ThreadDomainScope renderDomain(ThreadDomain::Render);
-    // --syncRender: Logic thread is the render domain pump for Affinity::Render.
-    task::pumpRender();
+    // In --syncRender mode the logic thread must pump Affinity::Render work.
+    // A dedicated render thread is already inside task::pumpRender() here: pumping
+    // again would recursively execute queued frames and overlap beginFrame/present.
+    if (!m_useDedicatedRenderThread || !m_renderThread.isRunning())
+        task::pumpRender();
 
     if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
         return true;
@@ -712,7 +715,16 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     gpuDevice->setRenderPhaseFrameIndex(frameIndex);
 
     if (!gpuDevice->beginFrame())
-        return true;
+    {
+        caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
+        if (rhiDevice && !rhiDevice->isDeviceHealthy())
+        {
+            caustica::error("Render phase stopped because the GPU device is no longer healthy");
+            gpuDevice->setShuttingDown(true);
+            return false;
+        }
+        return true; // recoverable acquire/minimize condition
+    }
 
     uint32_t fi = frameIndex;
     if (gpuDevice->m_SkipRenderOnFirstFrame)
@@ -726,6 +738,14 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     render();
     if (afterRender)
         afterRender(*gpuDevice, fi);
+
+    if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
+        rhiDevice && !rhiDevice->isDeviceHealthy())
+    {
+        caustica::error("Render phase aborted before present after a GPU device failure");
+        gpuDevice->setShuttingDown(true);
+        return false;
+    }
 #if CAUSTICA_WITH_STREAMLINE
     if (!gpuDevice->m_DeviceParams.headlessDevice)
     {

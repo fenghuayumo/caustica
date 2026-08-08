@@ -111,6 +111,11 @@ void SceneManager::onSceneLoadedGpuPrep(caustica::Scene& scene, bool& accelRebui
 
 void SceneManager::clearScene()
 {
+    // Keep SceneLoader's public loaded state consistent with the scene pointers.
+    // Scene switches explicitly tear down the current scene before their deferred
+    // import starts. Leaving m_loader loaded made beginLoading() fire onUnloading
+    // a second time, racing a duplicate GPU teardown with the new import/frame.
+    m_loader.reset();
     m_scene.reset();
     m_pendingScene.reset();
 }

@@ -595,7 +595,8 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
     caustica::rhi::FramebufferHandle tempFramebuffer;
 
     caustica::rhi::CommandListHandle commandList = device->createCommandList();
-    commandList->open();
+    if (!commandList || !commandList->open())
+        return std::nullopt;
 
     if (textureState != caustica::rhi::ResourceStates::Unknown)
         commandList->beginTrackingTextureState(texture, caustica::rhi::TextureSubresourceSet(0, 1, 0, 1), textureState);

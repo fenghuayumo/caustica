@@ -37,6 +37,8 @@ class SceneLightingPasses;
 struct ScenePassWireParams;
 
 using AdditionalAccelStructBuilder = std::function<void(caustica::rhi::CommandList*)>;
+using AccelBuildProgress = std::function<void(
+    const char* stage, size_t completedMeshes, size_t totalMeshes, uint64_t scratchBytes)>;
 
 // RT pipeline variants, shader macros, and acceleration-structure lifecycle.
 class SceneRayTracingResources
@@ -58,14 +60,21 @@ public:
 
     void uploadSubInstanceData(caustica::rhi::CommandList* commandList);
     // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.
-    void createAccelStructs(
+    [[nodiscard]] bool createAccelStructs(
         caustica::rhi::CommandList* commandList,
         caustica::Scene& scene,
         const caustica::scene::SceneRenderData* renderData = nullptr);
-    void recreateAccelStructs(
+    [[nodiscard]] bool recreateAccelStructs(
         caustica::rhi::CommandList* commandList,
         caustica::Scene& scene,
         const caustica::scene::SceneRenderData* renderData = nullptr);
+    // Exclusive load path: form BLAS submissions from backend-reported scratch
+    // bytes and apply bounded in-flight fence backpressure.
+    [[nodiscard]] bool recreateAccelStructsForLoad(
+        caustica::Scene& scene,
+        const caustica::scene::SceneRenderData& renderData,
+        uint64_t targetScratchBytesPerSubmit = 256ull * 1024ull * 1024ull,
+        AccelBuildProgress progress = {});
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
 
     // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
@@ -89,10 +98,10 @@ public:
 
 private:
     void wireSession(const ScenePassWireParams& params);
-    void createBlases(
+    [[nodiscard]] bool createBlases(
         caustica::rhi::CommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
-    void createTlas(
+    [[nodiscard]] bool createTlas(
         caustica::rhi::CommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
 

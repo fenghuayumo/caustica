@@ -111,18 +111,18 @@ namespace caustica::rhi::validation
         return m_CommandList->getNativeObject(objectType);
     }
 
-    void CommandListWrapper::open()
+    bool CommandListWrapper::open()
     {
         switch (m_State)
         {
         case CommandListState::OPEN:
             error("Cannot open a command list that is already open");
-            return;
+            return false;
         case CommandListState::CLOSED:
             if (m_IsImmediate)
             {
                 error("An immediate command list cannot be abandoned and must be executed before it is re-opened");
-                return;
+                return false;
             }
             else
             {
@@ -140,16 +140,23 @@ namespace caustica::rhi::validation
             {
                 error("Two or more immediate command lists cannot be open at the same time");
                 --m_Device->m_NumOpenImmediateCommandLists;
-                return;
+                return false;
             }
         }
 
-        m_CommandList->open();
+        if (!m_CommandList->open())
+        {
+            if (m_IsImmediate)
+                --m_Device->m_NumOpenImmediateCommandLists;
+            error("The backend failed to open the command list");
+            return false;
+        }
 
         m_State = CommandListState::OPEN;
         m_GraphicsStateSet = false;
         m_ComputeStateSet = false;
         m_MeshletStateSet = false;
+        return true;
     }
 
     void CommandListWrapper::close()

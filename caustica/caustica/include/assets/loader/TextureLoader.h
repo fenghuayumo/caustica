@@ -80,6 +80,14 @@ public:
     bool processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds);
     void loadingFinished();
     [[nodiscard]] size_t pendingFinalizeCount();
+    [[nodiscard]] bool gpuFinalizeFailed() const noexcept
+    {
+        return m_GpuFinalizeFailed.load(std::memory_order_acquire);
+    }
+    void clearGpuFinalizeFailure() noexcept
+    {
+        m_GpuFinalizeFailed.store(false, std::memory_order_release);
+    }
 
     void setMaxTextureSize(uint32_t size);
     void setGenerateMipmaps(bool generateMipmaps);
@@ -118,6 +126,7 @@ private:
     std::atomic<uint32_t> m_TexturesRequested = 0;
     std::atomic<uint32_t> m_TexturesLoaded = 0;
     uint32_t m_TexturesFinalized = 0;
+    std::atomic<bool> m_GpuFinalizeFailed{ false };
 
     bool findTextureInCache(const std::filesystem::path& path, std::shared_ptr<ImageAsset>& texture);
     std::shared_ptr<IBlob> readTextureFile(const std::filesystem::path& path) const;
@@ -128,7 +137,7 @@ private:
         const std::string& extension,
         const std::string& mimeType) const;
 
-    void finalizeTexture(
+    [[nodiscard]] bool finalizeTexture(
         std::shared_ptr<ImageAsset> texture,
         render::RenderDevice* renderDevice,
         caustica::rhi::CommandList* commandList);

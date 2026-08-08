@@ -13,9 +13,11 @@
 
 #include <cassert>
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -80,30 +82,117 @@ inline void WriteAttributeRange(caustica::rhi::CommandList* commandList, caustic
     commandList->writeBuffer(buffer, data.data(), range.byteSize, range.byteOffset);
 }
 
-size_t EstimateMeshUploadBytes(
-    const scene::SceneRenderData& renderData,
-    size_t meshBegin,
-    size_t meshEnd)
+size_t SaturatingAdd(size_t lhs, size_t rhs)
+{
+    return rhs > std::numeric_limits<size_t>::max() - lhs
+        ? std::numeric_limits<size_t>::max()
+        : lhs + rhs;
+}
+
+template <typename T>
+void AddVectorBytes(size_t& bytes, const std::vector<T>& data, size_t copies = 1)
+{
+    if (data.size() > std::numeric_limits<size_t>::max() / sizeof(T))
+    {
+        bytes = std::numeric_limits<size_t>::max();
+        return;
+    }
+
+    const size_t oneCopy = data.size() * sizeof(T);
+    for (size_t i = 0; i < copies; ++i)
+        bytes = SaturatingAdd(bytes, oneCopy);
+}
+
+size_t MeshUploadBytes(const scene::MeshUploadBlob& upload)
 {
     size_t bytes = 0;
+    AddVectorBytes(bytes, upload.indexData);
+    AddVectorBytes(bytes, upload.positionData, 2); // current + previous position
+    AddVectorBytes(bytes, upload.normalData);
+    AddVectorBytes(bytes, upload.tangentData);
+    AddVectorBytes(bytes, upload.texcoord1Data);
+    AddVectorBytes(bytes, upload.texcoord2Data);
+    AddVectorBytes(bytes, upload.weightData);
+    AddVectorBytes(bytes, upload.jointData);
+    AddVectorBytes(bytes, upload.radiusData);
+    return bytes;
+}
+
+bool IsMeshGpuRecordReady(
+    const MeshGpuRecord& record,
+    const std::shared_ptr<const scene::MeshUploadBlob>& upload)
+{
+    if (!upload)
+        return true;
+
+    const bool indexReady = upload->indexData.empty() || record.indexBuffer != nullptr;
+    const bool needsVertex = !upload->positionData.empty()
+        || !upload->normalData.empty()
+        || !upload->tangentData.empty()
+        || !upload->texcoord1Data.empty()
+        || !upload->texcoord2Data.empty()
+        || !upload->weightData.empty()
+        || !upload->jointData.empty()
+        || !upload->radiusData.empty();
+    return indexReady && (!needsVertex || record.vertexBuffer != nullptr);
+}
+
+struct MeshUploadPlan
+{
+    size_t end = 0;
+    size_t bytes = 0;
+};
+
+MeshUploadPlan PlanMeshUpload(
+    const scene::SceneRenderData& renderData,
+    const SceneGpuResources& gpu,
+    size_t meshBegin,
+    size_t targetUploadBytes)
+{
     const size_t meshCount = renderData.meshSnapshots.size();
-    meshEnd = std::min(meshEnd, meshCount);
-    for (size_t i = meshBegin; i < meshEnd; ++i)
+    MeshUploadPlan plan{ std::min(meshBegin, meshCount), 0 };
+    if (meshBegin >= meshCount)
+        return plan;
+
+    const size_t target = std::max<size_t>(targetUploadBytes, 1);
+    std::unordered_set<const scene::MeshUploadBlob*> plannedUploads;
+    std::unordered_set<const scene::MeshUploadBlob*> gpuReadyUploads;
+    plannedUploads.reserve(meshCount - meshBegin);
+    gpuReadyUploads.reserve(gpu.meshRegistry.size());
+    for (const auto& [id, candidate] : gpu.meshRegistry)
+    {
+        (void)id;
+        if (candidate.uploadSource
+            && IsMeshGpuRecordReady(candidate, candidate.uploadSource))
+        {
+            gpuReadyUploads.insert(candidate.uploadSource.get());
+        }
+    }
+
+    for (size_t i = meshBegin; i < meshCount; ++i)
     {
         const auto& upload = renderData.meshSnapshots[i].upload;
-        if (!upload)
-            continue;
-        bytes += upload->indexData.size() * sizeof(uint32_t);
-        bytes += upload->positionData.size() * sizeof(upload->positionData[0]) * 2; // pos + prev
-        bytes += upload->normalData.size() * sizeof(upload->normalData[0]);
-        bytes += upload->tangentData.size() * sizeof(upload->tangentData[0]);
-        bytes += upload->texcoord1Data.size() * sizeof(upload->texcoord1Data[0]);
-        bytes += upload->texcoord2Data.size() * sizeof(upload->texcoord2Data[0]);
-        bytes += upload->weightData.size() * sizeof(upload->weightData[0]);
-        bytes += upload->jointData.size() * sizeof(upload->jointData[0]);
-        bytes += upload->radiusData.size() * sizeof(upload->radiusData[0]);
+        size_t addedBytes = 0;
+        if (upload && plannedUploads.insert(upload.get()).second
+            && !gpuReadyUploads.contains(upload.get()))
+        {
+            addedBytes = MeshUploadBytes(*upload);
+        }
+
+        // A single immutable BufferGroup may be larger than the target. It still
+        // has to make forward progress, while the global streaming budget makes
+        // sure that oversized submit runs without other uploads in flight.
+        if (plan.end > meshBegin && addedBytes > target - std::min(plan.bytes, target))
+            break;
+
+        plan.bytes = SaturatingAdd(plan.bytes, addedBytes);
+        plan.end = i + 1;
     }
-    return std::max(bytes, size_t(64 * 1024));
+
+    // Event-query accounting needs a non-zero weight even when this batch only
+    // attaches mesh records to a BufferGroup uploaded by an earlier record.
+    plan.bytes = std::max(plan.bytes, size_t(64 * 1024));
+    return plan;
 }
 
 caustica::rhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
@@ -215,9 +304,6 @@ void UpdateMaterial(
 
 void UpdateGeometry(SceneGpuResources& gpu, const scene::MeshRenderResourceSnapshot& mesh)
 {
-    if (!mesh.upload)
-        return;
-
     const auto recordIt = gpu.meshRegistry.find(mesh.id);
     if (recordIt == gpu.meshRegistry.end())
         return;
@@ -290,7 +376,7 @@ void UpdateInstance(SceneGpuResources& gpu, const scene::MeshInstanceRenderProxy
     }
 }
 
-void EnsureMeshGpuBuffers(
+bool EnsureMeshGpuBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
@@ -304,6 +390,17 @@ void EnsureMeshGpuBuffers(
     if (meshBegin > meshEnd)
         meshBegin = meshEnd;
 
+    // Index immutable BufferGroups once. The old per-mesh registry scan made
+    // shared-buffer scenes O(meshes^2), which is catastrophic long before the
+    // renderer reaches million-mesh scale.
+    std::unordered_map<const scene::MeshUploadBlob*, scene::MeshRenderResourceId> uploadedSources;
+    uploadedSources.reserve(gpu.meshRegistry.size() + (meshEnd - meshBegin));
+    for (const auto& [candidateId, candidate] : gpu.meshRegistry)
+    {
+        if (candidate.uploadSource && IsMeshGpuRecordReady(candidate, candidate.uploadSource))
+            uploadedSources.try_emplace(candidate.uploadSource.get(), candidateId);
+    }
+
     for (size_t meshIndex = meshBegin; meshIndex < meshEnd; ++meshIndex)
     {
         const auto& mesh = renderData.meshSnapshots[meshIndex];
@@ -313,6 +410,39 @@ void EnsureMeshGpuBuffers(
             continue;
 
         MeshGpuRecord& meshGpu = gpu.meshRegistry[mesh.id];
+
+        if (meshGpu.uploadSource != buffers)
+        {
+            // A structure refresh may replace the immutable upload blob. Drop
+            // only the shared base-buffer view; BLAS/OMM state remains per mesh
+            // and is rebuilt by the structure path.
+            meshGpu.uploadSource = buffers;
+            meshGpu.indexBuffer = nullptr;
+            meshGpu.vertexBuffer = nullptr;
+            meshGpu.indexBufferDescriptor.reset();
+            meshGpu.vertexBufferDescriptor.reset();
+            meshGpu.vertexBufferRanges = {};
+            meshGpu.morphTargetBufferRanges.clear();
+
+            // Reuse a buffer set already uploaded for another mesh range from
+            // the same authoring BufferGroup. This is critical for glTF scenes
+            // where hundreds of MeshInfo records share one large buffer group.
+            if (const auto sourceIt = uploadedSources.find(buffers.get());
+                sourceIt != uploadedSources.end())
+            {
+                const auto candidateIt = gpu.meshRegistry.find(sourceIt->second);
+                if (candidateIt != gpu.meshRegistry.end())
+                {
+                    const MeshGpuRecord& candidate = candidateIt->second;
+                    meshGpu.indexBuffer = candidate.indexBuffer;
+                    meshGpu.vertexBuffer = candidate.vertexBuffer;
+                    meshGpu.indexBufferDescriptor = candidate.indexBufferDescriptor;
+                    meshGpu.vertexBufferDescriptor = candidate.vertexBufferDescriptor;
+                    meshGpu.vertexBufferRanges = candidate.vertexBufferRanges;
+                    meshGpu.morphTargetBufferRanges = candidate.morphTargetBufferRanges;
+                }
+            }
+        }
 
         if (!buffers->indexData.empty() && !meshGpu.indexBuffer)
         {
@@ -330,7 +460,7 @@ void EnsureMeshGpuBuffers(
             {
                 caustica::error("Failed to create index buffer for mesh '%s' (%zu indices).",
                     mesh.debugName.c_str(), buffers->indexData.size());
-                continue;
+                return false;
             }
 
             if (descriptorTable)
@@ -404,7 +534,7 @@ void EnsureMeshGpuBuffers(
                 caustica::error("Failed to create vertex buffer for mesh '%s' (%llu bytes).",
                     mesh.debugName.c_str(),
                     static_cast<unsigned long long>(bufferDesc.byteSize));
-                continue;
+                return false;
             }
             if (descriptorTable)
             {
@@ -446,11 +576,14 @@ void EnsureMeshGpuBuffers(
                 descriptorTable->createDescriptorHandle(
                     caustica::rhi::BindingSetItem::RawBuffer_SRV(0, meshGpu.vertexBuffer)));
         }
+
+        if (IsMeshGpuRecordReady(meshGpu, buffers))
+            uploadedSources.try_emplace(buffers.get(), mesh.id);
     }
 
     // Skinned setup needs the full prototype mesh set; skip on partial upload batches.
     if (meshBegin != 0 || meshEnd != meshCount)
-        return;
+        return true;
 
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
@@ -501,6 +634,11 @@ void EnsureMeshGpuBuffers(
             bufferDesc.initialState = caustica::rhi::ResourceStates::VertexBuffer;
 
             skinnedGpuMesh.vertexBuffer = gpu.device->createBuffer(bufferDesc);
+            if (!skinnedGpuMesh.vertexBuffer)
+            {
+                caustica::error("Failed to create skinned vertex buffer (%zu bytes).", skinnedVertexBufferSize);
+                return false;
+            }
 
             if (descriptorTable)
             {
@@ -528,6 +666,12 @@ void EnsureMeshGpuBuffers(
             jointBufferDesc.canHaveRawViews = true;
             jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, proxy.jointMatrices.size());
             skinnedGpu.jointBuffer = gpu.device->createBuffer(jointBufferDesc);
+            if (!skinnedGpu.jointBuffer)
+            {
+                caustica::error("Failed to create skinning joint buffer (%llu bytes).",
+                    static_cast<unsigned long long>(jointBufferDesc.byteSize));
+                return false;
+            }
         }
 
         if (!skinnedGpu.skinningBindingSet)
@@ -541,8 +685,14 @@ void EnsureMeshGpuBuffers(
             };
 
             skinnedGpu.skinningBindingSet = gpu.device->createBindingSet(setDesc, gpu.skinningBindingLayout);
+            if (!skinnedGpu.skinningBindingSet)
+            {
+                caustica::error("Failed to create skinning binding set.");
+                return false;
+            }
         }
     }
+    return true;
 }
 
 void DispatchSkinnedMeshUpdates(
@@ -736,7 +886,7 @@ void PruneRemovedGpuResources(
     });
 }
 
-void UpdateGpuSceneBuffers(
+bool UpdateGpuSceneBuffers(
     SceneGpuResources& gpu,
     const scene::SceneRenderData& renderData,
     IDescriptorTableManager* descriptorTable,
@@ -769,7 +919,8 @@ void UpdateGpuSceneBuffers(
             if (pruneRemovedResources)
                 PruneRemovedGpuResources(gpu, renderData);
         }
-        EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList);
+        if (!EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList))
+            return false;
     }
     ApplyMeshGpuUploadCommands(gpu, meshUploads, commandList);
 
@@ -780,6 +931,8 @@ void UpdateGpuSceneBuffers(
     {
         gpu.geometryData.resize(caustica::rhi::align<size_t>(renderData.geometryCount, allocationGranularity));
         gpu.geometryBuffer = CreateGeometryBuffer(gpu);
+        if (!gpu.geometryBuffer)
+            return false;
         arraysAllocated = true;
     }
 
@@ -788,6 +941,8 @@ void UpdateGpuSceneBuffers(
         gpu.materialData.resize(caustica::rhi::align<size_t>(renderData.materialSnapshots.size(), allocationGranularity));
         if (gpu.enableBindlessResources)
             gpu.materialBuffer = CreateMaterialBuffer(gpu);
+        if (gpu.enableBindlessResources && !gpu.materialBuffer)
+            return false;
         arraysAllocated = true;
     }
 
@@ -795,6 +950,8 @@ void UpdateGpuSceneBuffers(
     {
         gpu.instanceData.resize(caustica::rhi::align<size_t>(renderData.meshInstanceEntities.size(), allocationGranularity));
         gpu.instanceBuffer = CreateInstanceBuffer(gpu);
+        if (!gpu.instanceBuffer)
+            return false;
         arraysAllocated = true;
     }
 
@@ -818,6 +975,9 @@ void UpdateGpuSceneBuffers(
 
         if (!materialGpu.constantsBuffer)
             materialGpu.constantsBuffer = CreateMaterialConstantBuffer(gpu, material.debugName);
+
+        if (!materialGpu.constantsBuffer)
+            return false;
 
         if (needsUpload)
         {
@@ -864,9 +1024,6 @@ void UpdateGpuSceneBuffers(
     {
         for (const auto& mesh : renderData.meshSnapshots)
         {
-            if (!mesh.upload)
-                continue;
-
             gpu.meshRegistry[mesh.id].instanceBuffer = gpu.instanceBuffer;
 
             if (gpu.enableBindlessResources)
@@ -893,6 +1050,7 @@ void UpdateGpuSceneBuffers(
         WriteMaterialBuffer(commandList, gpu);
 
     DispatchSkinnedMeshUpdates(gpu, renderData, commandList, frameIndex);
+    return gpu.device && gpu.device->isDeviceHealthy();
 }
 
 } // namespace
@@ -958,7 +1116,7 @@ void SceneGpuUpdater::refresh(
     const bool transformsChanged = scene.hasSceneTransformsChanged(frameIndex);
     const scene::SceneRenderData& renderData = scene.getRenderData();
 
-    UpdateGpuSceneBuffers(
+    (void)UpdateGpuSceneBuffers(
         gpu,
         renderData,
         descriptorTable,
@@ -976,36 +1134,61 @@ size_t SceneGpuUpdater::uploadMeshesAfterLoad(
     SceneGpuResources& gpu,
     IDescriptorTableManager* descriptorTable,
     size_t meshBegin,
-    size_t maxMeshes)
+    size_t targetUploadBytes)
 {
     const size_t meshCount = renderData.meshSnapshots.size();
-    if (meshBegin >= meshCount || maxMeshes == 0)
+    if (meshBegin >= meshCount)
         return meshCount;
 
-    const size_t end = std::min(meshBegin + maxMeshes, meshCount);
-    const size_t uploadBytes = EstimateMeshUploadBytes(renderData, meshBegin, end);
+    const MeshUploadPlan plan = PlanMeshUpload(
+        renderData, gpu, meshBegin, targetUploadBytes);
+    if (plan.end <= meshBegin)
+        return meshBegin;
 
     auto& budget = streamingUploadBudget();
     // Gate CreateCommittedResource + copy backlog (ADR 0001 R1); no waitForIdle.
-    budget.waitForBudget(gpu.device, uploadBytes);
+    if (!budget.waitForBudget(gpu.device, plan.bytes))
+        return meshBegin;
 
     caustica::rhi::CommandListParameters uploadParams;
     uploadParams.uploadChunkSize = 4 * 1024 * 1024;
-    uploadParams.uploadMaxMemory = 128 * 1024 * 1024;
+    // The byte planner and process-wide StreamingUploadBudget are the memory
+    // authority. Keep the per-command-list pool large enough for one planned
+    // batch (including chunk rounding), otherwise UploadManager tries to reuse
+    // a chunk that belongs to the command list currently being recorded.
+    constexpr size_t kUploadHeadroom = 16 * 1024 * 1024;
+    uploadParams.uploadMaxMemory = std::max(
+        size_t(128) * 1024 * 1024,
+        SaturatingAdd(plan.bytes, kUploadHeadroom));
 
     caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList(uploadParams);
-    commandList->open();
-    EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList, meshBegin, end);
+    if (!commandList)
+    {
+        caustica::error("uploadMeshesAfterLoad: failed to create upload command list at mesh %zu", meshBegin);
+        return meshBegin;
+    }
+    if (!commandList->open())
+    {
+        caustica::error("uploadMeshesAfterLoad: failed to open upload command list at mesh %zu", meshBegin);
+        return meshBegin;
+    }
+    if (!EnsureMeshGpuBuffers(gpu, renderData, descriptorTable, commandList, meshBegin, plan.end))
+    {
+        commandList->close();
+        return meshBegin;
+    }
     commandList->close();
-    gpu.device->executeCommandList(commandList);
+    const uint64_t submission = gpu.device->executeCommandList(commandList);
+    if ((gpu.device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
+        || !gpu.device->isDeviceHealthy())
+        return meshBegin;
     commandList = nullptr;
 
-    budget.trackSubmit(gpu.device, uploadBytes);
-    budget.retire(gpu.device, /*runGc=*/true);
-    return end;
+    budget.trackSubmit(gpu.device, plan.bytes);
+    return plan.end;
 }
 
-void SceneGpuUpdater::finalizeAfterLoad(
+bool SceneGpuUpdater::finalizeAfterLoad(
     Scene& scene,
     const scene::SceneRenderData& renderData,
     SceneGpuResources& gpu,
@@ -1017,16 +1200,27 @@ void SceneGpuUpdater::finalizeAfterLoad(
 
     auto& budget = streamingUploadBudget();
     // Mesh uploads must be GPU-complete before scene buffers / AccelOnly AS build.
-    budget.waitAll(gpu.device);
+    if (!budget.waitAll(gpu.device))
+        return false;
 
     const size_t finalizeBytes = std::max(
         size_t(1) * 1024 * 1024,
         (renderData.meshSnapshots.size() + renderData.materialSnapshots.size() + 1) * size_t(256));
-    budget.waitForBudget(gpu.device, finalizeBytes);
+    if (!budget.waitForBudget(gpu.device, finalizeBytes))
+        return false;
 
     caustica::rhi::CommandListHandle commandList = gpu.device->createCommandList();
-    commandList->open();
-    UpdateGpuSceneBuffers(
+    if (!commandList)
+    {
+        caustica::error("finalizeAfterLoad: failed to create command list");
+        return false;
+    }
+    if (!commandList->open())
+    {
+        caustica::error("finalizeAfterLoad: failed to open command list");
+        return false;
+    }
+    if (!UpdateGpuSceneBuffers(
         gpu,
         renderData,
         descriptorTable,
@@ -1034,15 +1228,22 @@ void SceneGpuUpdater::finalizeAfterLoad(
         frameIndex,
         /*structureChanged=*/true,
         /*transformsChanged=*/true,
-        pruneRemovedResources);
+        pruneRemovedResources))
+    {
+        commandList->close();
+        return false;
+    }
     commandList->close();
-    gpu.device->executeCommandList(commandList);
+    const uint64_t submission = gpu.device->executeCommandList(commandList);
+    if ((gpu.device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
+        || !gpu.device->isDeviceHealthy())
+        return false;
 
     budget.trackSubmit(gpu.device, finalizeBytes);
-    budget.waitAll(gpu.device);
+    return budget.waitAll(gpu.device) && gpu.device->isDeviceHealthy();
 }
 
-void SceneGpuUpdater::refreshAfterLoad(
+bool SceneGpuUpdater::refreshAfterLoad(
     Scene& scene,
     const scene::SceneRenderData& renderData,
     SceneGpuResources& gpu,
@@ -1050,12 +1251,18 @@ void SceneGpuUpdater::refreshAfterLoad(
     uint32_t frameIndex,
     bool pruneRemovedResources)
 {
-    constexpr size_t kMeshesPerSubmit = 2;
+    constexpr size_t kMeshUploadTargetBytes = std::numeric_limits<size_t>::max();
     const size_t meshCount = renderData.meshSnapshots.size();
     for (size_t begin = 0; begin < meshCount; )
-        begin = uploadMeshesAfterLoad(renderData, gpu, descriptorTable, begin, kMeshesPerSubmit);
+    {
+        const size_t next = uploadMeshesAfterLoad(
+            renderData, gpu, descriptorTable, begin, kMeshUploadTargetBytes);
+        if (next <= begin)
+            return false;
+        begin = next;
+    }
 
-    finalizeAfterLoad(scene, renderData, gpu, descriptorTable, frameIndex, pruneRemovedResources);
+    return finalizeAfterLoad(scene, renderData, gpu, descriptorTable, frameIndex, pruneRemovedResources);
 }
 
 } // namespace caustica::render

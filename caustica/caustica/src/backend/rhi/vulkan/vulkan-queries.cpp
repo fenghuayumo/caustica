@@ -29,18 +29,18 @@ namespace caustica::rhi::vulkan
         return queue.pollCommandList(query->commandListID);
     }
 
-    void Device::waitEventQuery(rhi::EventQuery* _query)
+    bool Device::waitEventQuery(rhi::EventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
 
         if (query->commandListID == 0)
-            return;
+            return true;
 
         auto& queue = *m_Queues[uint32_t(query->queue)];
 
         bool success = queue.waitCommandList(query->commandListID, ~0ull);
         assert(success);
-        (void)success;
+        return success;
     }
 
     void Device::resetEventQuery(rhi::EventQuery* _query)

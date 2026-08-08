@@ -53,7 +53,8 @@ BuiltinTextures::BuiltinTextures(caustica::rhi::Device* device)
     m_blackDepthStencilTexture2DArray = m_device->createTexture(textureDesc);
 
     caustica::rhi::CommandListHandle commandList = m_device->createCommandList();
-    commandList->open();
+    if (!commandList || !commandList->open())
+        return;
 
     commandList->beginTrackingTextureState(m_blackTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
     commandList->beginTrackingTextureState(m_grayTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);

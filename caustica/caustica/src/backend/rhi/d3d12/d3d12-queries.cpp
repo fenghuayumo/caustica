@@ -47,16 +47,16 @@ namespace caustica::rhi::d3d12
         return query->resolved;
     }
 
-    void Device::waitEventQuery(rhi::EventQuery* _query)
+    bool Device::waitEventQuery(rhi::EventQuery* _query)
     {
         EventQuery* query = checked_cast<EventQuery*>(_query);
 
         if (!query->started || query->resolved)
-            return;
+            return true;
 
         assert(query->fence);
 
-        WaitForFence(query->fence, query->fenceCounter, m_FenceEvent);
+        return WaitForFence(query->fence, query->fenceCounter, m_FenceEvent);
     }
 
     void Device::resetEventQuery(rhi::EventQuery* _query)

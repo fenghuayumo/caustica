@@ -273,7 +273,7 @@ namespace caustica::rhi::d3d11
 
         // CommandList implementation
 
-        void open() override;
+        [[nodiscard]] bool open() override;
         void close() override;
         void clearState() override;
 
@@ -457,7 +457,7 @@ namespace caustica::rhi::d3d11
         EventQueryHandle createEventQuery(void) override;
         void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
         bool pollEventQuery(rhi::EventQuery* query) override;
-        void waitEventQuery(rhi::EventQuery* query) override;
+        bool waitEventQuery(rhi::EventQuery* query) override;
         void resetEventQuery(rhi::EventQuery* query) override;
 
         // timer queries
@@ -501,6 +501,7 @@ namespace caustica::rhi::d3d11
         uint64_t executeCommandLists(rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override { (void)pCommandLists; (void)numCommandLists; (void)executionQueue; return 0; }
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override { (void)waitQueue; (void)executionQueue; (void)instance; }
         bool waitForIdle() override;
+        [[nodiscard]] bool isDeviceHealthy() const override;
         void runGarbageCollection() override { }
         bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
         FormatSupport queryFormatSupport(Format format) override;

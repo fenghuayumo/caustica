@@ -509,6 +509,7 @@ namespace caustica::rhi::d3d12
             m_RecordingVersion, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT))
         {
             m_Context.error("Couldn't suballocate an upload buffer");
+            m_RecordingFailed = true;
             return;
         }
 

@@ -154,15 +154,28 @@ namespace caustica::rhi::d3d12
         messageCallback->message(MessageSeverity::Info, message.c_str());
     }
 
-    void WaitForFence(ID3D12Fence* fence, uint64_t value, HANDLE event)
+    bool WaitForFence(ID3D12Fence* fence, uint64_t value, HANDLE event)
     {
-        // Test if the fence has been reached
-        if (fence->GetCompletedValue() < value)
+        if (!fence || !event)
+            return false;
+
+        for (;;)
         {
-            // If it's not, wait for it to finish using an event
+            const uint64_t completed = fence->GetCompletedValue();
+            // D3D12 reports UINT64_MAX when the fence's device was removed.
+            if (completed == UINT64_MAX)
+                return false;
+            if (completed >= value)
+                return true;
+
             ResetEvent(event);
-            fence->SetEventOnCompletion(value, event);
-            WaitForSingleObject(event, INFINITE);
+            if (FAILED(fence->SetEventOnCompletion(value, event)))
+                return false;
+            const DWORD result = WaitForSingleObject(event, 100);
+            if (result == WAIT_OBJECT_0)
+                continue;
+            if (result != WAIT_TIMEOUT)
+                return false;
         }
     }
 
@@ -446,7 +459,12 @@ namespace caustica::rhi::d3d12
 
             if (pQueue->updateLastCompletedInstance() < pQueue->lastSubmittedInstance)
             {
-                WaitForFence(pQueue->fence, pQueue->lastSubmittedInstance, m_FenceEvent);
+                if (!WaitForFence(pQueue->fence, pQueue->lastSubmittedInstance, m_FenceEvent))
+                {
+                    m_Context.error("Fence wait aborted because the D3D12 device was removed");
+                    DumpDredIfAvailable(m_Context);
+                    return false;
+                }
             }
         }
 
@@ -458,6 +476,11 @@ namespace caustica::rhi::d3d12
             return false;
         }
         return true;
+    }
+
+    bool Device::isDeviceHealthy() const
+    {
+        return m_Context.device && SUCCEEDED(m_Context.device->GetDeviceRemovedReason());
     }
     
     Object RootSignature::getNativeObject(ObjectType objectType)
@@ -550,6 +573,9 @@ namespace caustica::rhi::d3d12
     
     uint64_t Device::executeCommandLists(caustica::rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue)
     {
+        if (!pCommandLists || numCommandLists == 0 || !isDeviceHealthy())
+            return 0;
+
         // Serialize submit + permanentState writeback (CommandList::executed) for MT readiness.
         std::lock_guard lockGuard(m_Mutex);
 
@@ -557,6 +583,11 @@ namespace caustica::rhi::d3d12
         for (size_t i = 0; i < numCommandLists; i++)
         {
             d3dCommandLists[i] = checked_cast<CommandList*>(pCommandLists[i])->getD3D12CommandList();
+            if (!d3dCommandLists[i])
+            {
+                m_Context.error("Rejected execution of a D3D12 command list that is not ready");
+                return 0;
+            }
         }
 
         Queue* pQueue = getQueue(executionQueue);

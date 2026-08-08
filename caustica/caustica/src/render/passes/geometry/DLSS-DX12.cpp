@@ -95,7 +95,8 @@ public:
             m_rayReconstructionInitialized = false;
         }
 
-        m_featureCommandList->open();
+        if (!m_featureCommandList || !m_featureCommandList->open())
+            return;
         ID3D12GraphicsCommandList* d3dcmdlist = m_featureCommandList->getNativeObject(caustica::rhi::ObjectTypes::D3D12_GraphicsCommandList);
 
         m_parameters->Set(NVSDK_NGX_Parameter_CreationNodeMask, 1u);

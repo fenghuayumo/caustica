@@ -31,7 +31,7 @@ uint32_t GetMipLevelsNum(uint32_t width, uint32_t height)
 
 } // namespace
 
-void TextureLoader::finalizeTexture(
+bool TextureLoader::finalizeTexture(
     std::shared_ptr<ImageAsset> texture,
     render::RenderDevice* renderDevice,
     caustica::rhi::CommandList* commandList)
@@ -97,6 +97,18 @@ void TextureLoader::finalizeTexture(
     textureDesc.debugName = texture->path;
     textureDesc.isRenderTarget = texture->isRenderTarget;
     texture->gpu.texture = m_Device->createTexture(textureDesc);
+    if (!texture->gpu.texture)
+    {
+        caustica::error(
+            "TextureLoader: GPU allocation failed for '%s' (%ux%u, mips=%u, array=%u)",
+            texture->path.c_str(),
+            textureDesc.width,
+            textureDesc.height,
+            textureDesc.mipLevels,
+            textureDesc.arraySize);
+        texture->data.reset();
+        return false;
+    }
 
     commandList->beginTrackingTextureState(texture->gpu.texture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
@@ -116,7 +128,14 @@ void TextureLoader::finalizeTexture(
         tempTextureDesc.dimension = textureDesc.dimension;
 
         caustica::rhi::TextureHandle tempTexture = m_Device->createTexture(tempTextureDesc);
-        assert(tempTexture);
+        if (!tempTexture)
+        {
+            caustica::error(
+                "TextureLoader: temporary GPU allocation failed while scaling '%s' (%ux%u)",
+                texture->path.c_str(), originalWidth, originalHeight);
+            texture->data.reset();
+            return false;
+        }
         commandList->beginTrackingTextureState(tempTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
         for (uint32_t arraySlice = 0; arraySlice < texture->arraySize; arraySlice++)
@@ -129,6 +148,13 @@ void TextureLoader::finalizeTexture(
 
         caustica::rhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(
             caustica::rhi::FramebufferDesc().addColorAttachment(texture->gpu.texture));
+        if (!framebuffer)
+        {
+            caustica::error("TextureLoader: framebuffer allocation failed while scaling '%s'",
+                texture->path.c_str());
+            texture->data.reset();
+            return false;
+        }
 
         renderDevice->blit().blitTexture(commandList, framebuffer, tempTexture);
     }
@@ -155,6 +181,12 @@ void TextureLoader::finalizeTexture(
                 .setTexture(texture->gpu.texture)
                 .setArraySlice(0)
                 .setMipLevel(mipLevel)));
+        if (!framebuffer)
+        {
+            caustica::error("TextureLoader: mip framebuffer allocation failed for '%s' at mip %u",
+                texture->path.c_str(), mipLevel);
+            return false;
+        }
 
         render::BlitParameters blitParams;
         blitParams.sourceTexture = texture->gpu.texture;
@@ -167,6 +199,7 @@ void TextureLoader::finalizeTexture(
     commandList->commitBarriers();
 
     ++m_TexturesFinalized;
+    return true;
 }
 
 bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds)
@@ -219,7 +252,11 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
             uploadBytes = std::max(uploadBytes, size_t(64 * 1024));
 
             auto& budget = render::streamingUploadBudget();
-            budget.waitForBudget(m_Device, uploadBytes);
+            if (!budget.waitForBudget(m_Device, uploadBytes))
+            {
+                m_GpuFinalizeFailed.store(true, std::memory_order_release);
+                break;
+            }
 
             if (!m_CommandList)
             {
@@ -230,13 +267,36 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
                 m_CommandList = m_Device->createCommandList(params);
             }
 
-            m_CommandList->open();
-            finalizeTexture(pTexture, &renderDevice, m_CommandList);
+            if (!m_CommandList || !m_CommandList->open())
+            {
+                caustica::error("TextureLoader: failed to open the GPU upload command list");
+                m_GpuFinalizeFailed.store(true, std::memory_order_release);
+                m_CommandList = nullptr;
+                break;
+            }
+            const bool finalized = finalizeTexture(pTexture, &renderDevice, m_CommandList);
             m_CommandList->close();
-            m_Device->executeCommandList(m_CommandList);
-            // ADR 0001 R1: EventQuery + in-flight byte cap instead of waitForIdle.
+            if (!finalized)
+            {
+                m_GpuFinalizeFailed.store(true, std::memory_order_release);
+                m_CommandList = nullptr;
+                break;
+            }
+            const uint64_t submission = m_Device->executeCommandList(m_CommandList);
+            if ((m_Device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
+                || !m_Device->isDeviceHealthy())
+            {
+                caustica::error("TextureLoader: GPU upload submission failed");
+                m_GpuFinalizeFailed.store(true, std::memory_order_release);
+                m_CommandList = nullptr;
+                break;
+            }
+            // Keep uploads pipelined. StreamingUploadBudget retires completed event
+            // queries and waits only when its in-flight byte/submit window is full;
+            // loadingFinished() performs the single required drain before mesh/AS
+            // consumers run. Waiting here serialized every texture and dominated
+            // cold-load time even though the queue and UploadManager support reuse.
             budget.trackSubmit(m_Device, uploadBytes);
-            budget.retire(m_Device, /*runGc=*/true);
         }
     }
 
@@ -245,8 +305,8 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
 
 void TextureLoader::loadingFinished()
 {
-    if (m_Device)
-        render::streamingUploadBudget().waitAll(m_Device);
+    if (m_Device && !render::streamingUploadBudget().waitAll(m_Device))
+        m_GpuFinalizeFailed.store(true, std::memory_order_release);
     m_CommandList = nullptr;
 }
 
@@ -291,7 +351,8 @@ bool saveTextureToFile(
     caustica::rhi::FramebufferHandle tempFramebuffer;
 
     caustica::rhi::CommandListHandle commandList = device->createCommandList();
-    commandList->open();
+    if (!commandList || !commandList->open())
+        return false;
 
     if (textureState != caustica::rhi::ResourceStates::Unknown)
     {

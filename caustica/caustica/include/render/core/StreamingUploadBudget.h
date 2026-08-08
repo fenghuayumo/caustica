@@ -28,7 +28,7 @@ public:
     void retire(caustica::rhi::Device* device, bool runGc = true);
 
     // CPU-wait oldest submits until nextBytes fits (or until empty if nextBytes > cap).
-    void waitForBudget(caustica::rhi::Device* device, size_t nextBytes);
+    [[nodiscard]] bool waitForBudget(caustica::rhi::Device* device, size_t nextBytes);
 
     // Call immediately after executeCommandList — snapshots the queue fence via EventQuery.
     void trackSubmit(
@@ -37,7 +37,7 @@ public:
         caustica::rhi::CommandQueue queue = caustica::rhi::CommandQueue::Graphics);
 
     // Drain all tracked submits (finalize / loadingFinished / teardown).
-    void waitAll(caustica::rhi::Device* device);
+    [[nodiscard]] bool waitAll(caustica::rhi::Device* device);
 
     [[nodiscard]] size_t inFlightBytes() const noexcept { return m_inFlightBytes; }
     [[nodiscard]] size_t inFlightCount() const noexcept { return m_entries.size(); }

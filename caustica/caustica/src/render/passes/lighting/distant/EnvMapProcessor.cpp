@@ -393,7 +393,8 @@ void EnvMapProcessor::preUpdate(caustica::rhi::CommandList* commandList, caustic
             m_device->executeCommandList(commandList);
             // THREADING: sync-point, RT-only — ADR 0002 S1-adjacent (env map load readback).
             m_device->waitForIdle();
-            commandList->open();
+            if (!commandList->open())
+                return;
 
             if (image && image->format != caustica::rhi::Format::UNKNOWN)
             {
@@ -653,7 +654,8 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
 
         m_dbgSaveBaked = "<<REFRESH>>"; // need to re-bake one more time with normal settings
 
-        commandList->open();
+        if (!commandList->open())
+            return false;
     }
 
     return contentsChanged;

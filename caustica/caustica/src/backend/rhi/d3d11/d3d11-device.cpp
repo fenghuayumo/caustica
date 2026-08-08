@@ -330,9 +330,15 @@ namespace caustica::rhi::d3d11
             return false;
 
         setEventQuery(m_WaitForIdleQuery, CommandQueue::Graphics);
-        waitEventQuery(m_WaitForIdleQuery);
+        if (!waitEventQuery(m_WaitForIdleQuery))
+            return false;
         resetEventQuery(m_WaitForIdleQuery);
         return true;
+    }
+
+    bool Device::isDeviceHealthy() const
+    {
+        return m_Context.device && SUCCEEDED(m_Context.device->GetDeviceRemovedReason());
     }
 
     SamplerHandle Device::createSampler(const SamplerDesc& d)

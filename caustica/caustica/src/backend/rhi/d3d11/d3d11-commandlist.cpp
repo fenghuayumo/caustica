@@ -34,9 +34,10 @@ namespace caustica::rhi::d3d11
         }
     }
 
-    void CommandList::open()
+    bool CommandList::open()
     {
         clearState();
+        return true;
     }
 
     void CommandList::close()

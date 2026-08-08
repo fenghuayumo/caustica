@@ -1696,7 +1696,8 @@ void MaterialGpuCache::completeDeferredTexturesLoad(caustica::rhi::CommandList* 
 
         if (commandList != nullptr)
         {
-            commandList->open();
+            if (!commandList->open())
+                caustica::error("MaterialGpuCache: failed to reopen command list after texture flush");
         }
     }
 }

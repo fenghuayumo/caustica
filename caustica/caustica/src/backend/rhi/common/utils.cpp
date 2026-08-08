@@ -93,6 +93,8 @@ namespace caustica::rhi::utils
 
     void ClearColorAttachment(CommandList* commandList, Framebuffer* framebuffer, uint32_t attachmentIndex, Color color)
     {
+        if (!commandList || !framebuffer || attachmentIndex >= framebuffer->getDesc().colorAttachments.size())
+            return;
         const FramebufferAttachment& att = framebuffer->getDesc().colorAttachments[attachmentIndex];
         if (att.texture)
         {

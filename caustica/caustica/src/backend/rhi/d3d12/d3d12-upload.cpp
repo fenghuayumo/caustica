@@ -140,7 +140,11 @@ namespace caustica::rhi::d3d12
                 if (!waitEvent)
                     return false;
 
-                WaitForFence(m_Queue->fence, chunkInstance, waitEvent);
+                if (!WaitForFence(m_Queue->fence, chunkInstance, waitEvent))
+                {
+                    CloseHandle(waitEvent);
+                    return false;
+                }
                 CloseHandle(waitEvent);
                 m_Queue->lastCompletedInstance = std::max(m_Queue->lastCompletedInstance, chunkInstance);
             }

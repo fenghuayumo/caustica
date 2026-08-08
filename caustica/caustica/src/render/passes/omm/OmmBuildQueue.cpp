@@ -179,7 +179,8 @@ OmmBuildQueue::OmmBuildQueue(
 
     // Intialize the the internal baker, which records some buffer updates into a command list
     caustica::rhi::CommandListHandle initCommandList = m_device->createCommandList();
-    initCommandList->open();
+    if (!initCommandList || !initCommandList->open())
+        return;
     m_baker = std::make_unique<caustica::omm::GpuBakeRhi>(m_device, initCommandList, false /*debug*/, &provider, messageCb);
 
     // Submit baker init command list
@@ -452,7 +453,8 @@ void OmmBuildQueue::submitAndSubscribeQuery(caustica::rhi::CommandList& commandL
     // Need to submit the command list for the event query to be relevant. Ideally, we would have the query point to the next fence value instead of the last submitted one, or we would defer query set up to happen on command list submission.
     commandList.close();
     m_device->executeCommandList(&commandList, caustica::rhi::CommandQueue::Graphics);
-    commandList.open();
+    if (!commandList.open())
+        return;
 
     // Subscribe to this submission
     m_device->setEventQuery(m_InFlightQuery, caustica::rhi::CommandQueue::Graphics);

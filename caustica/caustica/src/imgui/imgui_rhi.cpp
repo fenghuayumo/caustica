@@ -57,7 +57,8 @@ bool ImGui_RHI::updateFontTexture()
     if (fontTexture == nullptr)
         return false;
 
-    m_commandList->open();
+    if (!m_commandList || !m_commandList->open())
+        return false;
 
     m_commandList->beginTrackingTextureState(fontTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
@@ -220,15 +221,13 @@ caustica::rhi::BindingSet* ImGui_RHI::getBindingSet(caustica::rhi::Texture* text
 void ImGui_RHI::captureDrawData()
 {
     ImDrawData* drawData = ImGui::GetDrawData();
-    CapturedFrame& frame = m_frames[m_writeSlot];
-    frame.vtx.clear();
-    frame.idx.clear();
-    frame.cmds.clear();
-    frame.valid = false;
+    CapturedFrame frame;
 
     if (!drawData || drawData->CmdListsCount == 0 || drawData->TotalVtxCount == 0)
     {
-        m_readSlot.store(-1, std::memory_order_release);
+        std::lock_guard lock(m_frameMutex);
+        m_pendingFrame = std::move(frame);
+        ++m_pendingGeneration;
         return;
     }
 
@@ -237,7 +236,9 @@ void ImGui_RHI::captureDrawData()
     frame.framebufferScale = io.DisplayFramebufferScale;
     if (frame.displaySize.x <= 0.f || frame.displaySize.y <= 0.f)
     {
-        m_readSlot.store(-1, std::memory_order_release);
+        std::lock_guard lock(m_frameMutex);
+        m_pendingFrame = std::move(frame);
+        ++m_pendingGeneration;
         return;
     }
 
@@ -283,9 +284,11 @@ void ImGui_RHI::captureDrawData()
     }
 
     frame.valid = !frame.cmds.empty();
-    const int published = m_writeSlot;
-    m_writeSlot = 1 - m_writeSlot;
-    m_readSlot.store(frame.valid ? published : -1, std::memory_order_release);
+    {
+        std::lock_guard lock(m_frameMutex);
+        m_pendingFrame = std::move(frame);
+        ++m_pendingGeneration;
+    }
 }
 
 bool ImGui_RHI::updateGeometry(caustica::rhi::CommandList* commandList, const CapturedFrame& frame)
@@ -320,15 +323,21 @@ bool ImGui_RHI::render(caustica::rhi::Framebuffer* framebuffer)
     if (!framebuffer)
         return false;
 
-    const int slot = m_readSlot.load(std::memory_order_acquire);
-    if (slot < 0 || slot > 1)
-        return false;
+    {
+        std::lock_guard lock(m_frameMutex);
+        if (m_renderGeneration != m_pendingGeneration)
+        {
+            m_renderFrame = std::move(m_pendingFrame);
+            m_renderGeneration = m_pendingGeneration;
+        }
+    }
 
-    const CapturedFrame& frame = m_frames[slot];
+    const CapturedFrame& frame = m_renderFrame;
     if (!frame.valid || frame.cmds.empty())
         return false;
 
-    m_commandList->open();
+    if (!m_commandList || !m_commandList->open())
+        return false;
     m_commandList->beginMarker("ImGUI");
 
     if (!updateGeometry(m_commandList, frame))
