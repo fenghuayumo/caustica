@@ -13,7 +13,7 @@ struct AppDiagnostics
 {
     ProgressBar progressInitializingRenderer;
     // RT scratch for OMM / opacity queue; Logic mirrors into LoadSession::secondaryStreaming.
-    // Do not gate Open Scene UI on this alone — use LoadSession::isBusy().
+    // Do not gate Open Scene on this: scene teardown cancels secondary streaming.
     bool asyncLoadingInProgress = false;
     // RT feature-preset PSO readiness (updated each render frame; active during precache).
     RtPipelineWarmupStatus rtPipelineWarmup{};

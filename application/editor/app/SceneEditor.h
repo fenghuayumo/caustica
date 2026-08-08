@@ -159,6 +159,8 @@ public:
 
     void setSceneTime(double sceneTime);
     double sceneTime() const;
+    void setTimelineTime(double timelineTime);
+    double timelineTime() const;
     bool insertTransformKeyframe(ecs::Entity entity, float timeSeconds);
     bool deleteTransformKeyframe(ecs::Entity entity, float timeSeconds);
     [[nodiscard]] bool hasTransformKeyframe(ecs::Entity entity, float timeSeconds) const;

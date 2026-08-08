@@ -68,6 +68,8 @@ scene::AnimationChannelData* FindAnimationChannel(
     scene::AnimationChannelData* result = nullptr;
     entityWorld.world().each<scene::AnimationComponent>(
         [&](ecs::Entity, scene::AnimationComponent& animation) {
+            if (!animation.editorAuthored)
+                return;
             if (result)
                 return;
             for (auto& channel : animation.channels)
@@ -173,6 +175,8 @@ std::vector<float> CollectKeyframeTimes(
     std::vector<float> result;
     entityWorld.world().each<scene::AnimationComponent>(
         [&](ecs::Entity, scene::AnimationComponent& animation) {
+            if (!animation.editorAuthored)
+                return;
             for (const auto& channel : animation.channels)
             {
                 if (ecs::isValid(entity) && channel.targetEntity != entity)
@@ -867,9 +871,9 @@ bool SceneEditor::openSceneFromDialog()
 {
     if (!m_app)
         return false;
-    if (caustica::isSceneStructureBusy(*m_app))
+    if (caustica::isSceneSwitchBusy(*m_app))
     {
-        caustica::warning("Open Scene: ignored, scene structure / LoadSession busy");
+        caustica::warning("Open Scene: ignored, scene switch / structure edit busy");
         return false;
     }
 
@@ -1009,6 +1013,16 @@ double SceneEditor::sceneTime() const
     if (m_sampleGame && m_sampleGame->IsInitialized())
         return m_sampleGame->gameTime();
     return m_viewState.sceneTime;
+}
+
+void SceneEditor::setTimelineTime(double timelineTime)
+{
+    m_viewState.keyframeTime = timelineTime;
+}
+
+double SceneEditor::timelineTime() const
+{
+    return m_viewState.keyframeTime;
 }
 
 bool SceneEditor::insertTransformKeyframe(ecs::Entity entity, float timeSeconds)
@@ -1212,6 +1226,8 @@ std::vector<float> SceneEditor::keyframeTimes(ecs::Entity entity) const
     std::vector<float> result;
     entityWorld->world().each<scene::AnimationComponent>(
         [&](ecs::Entity, scene::AnimationComponent& animation) {
+            if (!animation.editorAuthored)
+                return;
             for (const auto& channel : animation.channels)
             {
                 if (ecs::isValid(entity) && channel.targetEntity != entity)
@@ -1256,6 +1272,8 @@ float SceneEditor::animationDuration() const
 
     entityWorld->world().each<scene::AnimationComponent>(
         [&](ecs::Entity, scene::AnimationComponent& animation) {
+            if (!animation.editorAuthored)
+                return;
             duration = std::max(duration, scene::getAnimationDuration(animation));
         });
     return duration;
@@ -1263,13 +1281,18 @@ float SceneEditor::animationDuration() const
 
 void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode mode)
 {
-    setSceneTime(std::max(0.f, timeSeconds));
+    setTimelineTime(std::max(0.f, timeSeconds));
     bool touchedGaussianVisibility = false;
     if (m_app)
     {
         if (auto* entityWorld = caustica::entityWorld(*m_app))
         {
-            entityWorld->applyAnimations(std::max(0.f, timeSeconds));
+            entityWorld->world().each<scene::AnimationComponent>(
+                [&](ecs::Entity, scene::AnimationComponent& animation) {
+                    if (animation.editorAuthored)
+                        (void)scene::applyAnimation(
+                            animation, std::max(0.f, timeSeconds), *entityWorld);
+                });
 
             if (mode == AnimationEvaluateMode::ContinuousScrub)
             {
@@ -1287,6 +1310,8 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode 
 
             entityWorld->world().each<scene::AnimationComponent>(
                 [&](ecs::Entity, scene::AnimationComponent& animation) {
+                    if (!animation.editorAuthored)
+                        return;
                     for (const auto& channel : animation.channels)
                     {
                         if (channel.attribute != AnimationAttribute::Visibility)

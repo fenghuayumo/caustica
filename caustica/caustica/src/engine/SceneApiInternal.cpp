@@ -72,9 +72,9 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    if (vs->loadSession.isBusy())
+    if (isSceneSwitchBusy(app))
     {
-        sceneSwitchTrace("applySceneSwitch: ignored, LoadSession busy (phase=%s)",
+        sceneSwitchTrace("applySceneSwitch: ignored, switch busy (phase=%s)",
             loadSessionPhaseName(vs->loadSession.phase));
         return;
     }

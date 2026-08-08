@@ -21,7 +21,10 @@ namespace scene { class SceneRenderData; }
 // Interactive camera lives on CameraController App resource (see CameraApi / bindSideEffects).
 struct SceneViewState
 {
+    // Runtime/imported animation clock. Editor-authored keyframes deliberately use
+    // a separate clock so enabling scene animations cannot move the editor timeline.
     double sceneTime = 0.;
+    double keyframeTime = 0.;
     float lastDeltaTime = 0.0f;
 
     std::map<Handle<ImageAsset>, TextureCompressionType> uncompressedTextures;

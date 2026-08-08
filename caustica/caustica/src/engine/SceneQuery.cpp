@@ -123,11 +123,23 @@ std::filesystem::path currentScenePath(const App& app)
 
 bool isSceneStructureBusy(const App& app)
 {
-    // LoadSession is the sole Open Scene / secondary-streaming busy signal (ADR 0001).
+    // Full structure edits must wait for both the load transaction and secondary
+    // GPU streaming. Scene switching uses the narrower isSceneSwitchBusy below.
     if (const SceneViewState* vs = app.tryResource<SceneViewState>(); vs && vs->loadSession.isBusy())
         return true;
     ::SceneManager* manager = sessionManager(app);
     return manager && manager->isStructureEditInFlight();
+}
+
+bool isSceneSwitchBusy(const App& app)
+{
+    // Secondary streaming (OMM / opacity) belongs to the currently displayed
+    // scene and is safely cancelled by the normal scene teardown transaction.
+    if (const SceneViewState* vs = app.tryResource<SceneViewState>();
+        vs && vs->loadSession.isActive())
+        return true;
+    ::SceneManager* manager = sessionManager(app);
+    return manager && manager->isSceneStructureBusy();
 }
 
 bool shouldSkipRender(const App& app)

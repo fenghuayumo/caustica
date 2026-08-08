@@ -173,7 +173,7 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
         {
             const int fps = std::max(1, editor.FramesPerSecond);
             const float frameSeconds = 1.f / static_cast<float>(fps);
-            float displayTime = static_cast<float>(sceneEditor.sceneTime());
+            float displayTime = static_cast<float>(sceneEditor.timelineTime());
             const float duration = sceneEditor.animationDuration();
             if (duration > 0.f && displayTime > duration)
                 displayTime = std::fmod(displayTime, duration);

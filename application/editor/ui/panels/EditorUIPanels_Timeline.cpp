@@ -146,7 +146,7 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
             std::max(m_editorUI.EndFrame, static_cast<int>(std::ceil(duration * fps)));
     m_editorUI.EndFrame = std::max(m_editorUI.StartFrame + 1, m_editorUI.EndFrame);
 
-    float displayTime = static_cast<float>(m_sceneEditor.sceneTime());
+    float displayTime = static_cast<float>(m_sceneEditor.timelineTime());
     if (duration > 0.f && displayTime > duration)
         displayTime = std::fmod(displayTime, duration);
     int currentFrame = std::clamp(
@@ -164,9 +164,9 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         const int delta = std::abs(frame - currentFrame);
         const bool continuous = continuousScrub || delta <= 1;
 
-        // Freeze the shared scene clock while scrubbing (skeletal uses the same time).
+        // Scrubbing only pauses editor-keyframe playback. Imported/skeletal
+        // animation has its own clock and remains controlled by EnableAnimations.
         m_settings.EnableKeyframes = false;
-        m_settings.EnableAnimations = false;
         m_sceneEditor.evaluateAnimationsAt(
             static_cast<float>(frame) * frameSeconds,
             continuous
@@ -364,37 +364,42 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
     const std::vector<float> selectedVisibilityTimes =
         hasSelection ? m_sceneEditor.visibilityKeyframeTimes(selected) : std::vector<float>{};
 
-    const float transformKeyY = canvasPos.y + canvasSize.y * 0.52f;
-    const float visibilityKeyY = canvasPos.y + canvasSize.y * 0.78f;
-    for (float time : transformTimes)
+    // Blender-style Timeline: one compact key strip. Channel names and separate
+    // TRS/visibility rows belong in a future Dope Sheet, not in Timeline itself.
+    std::vector<float> keyTimes = transformTimes;
+    keyTimes.insert(keyTimes.end(), visibilityTimes.begin(), visibilityTimes.end());
+    std::sort(keyTimes.begin(), keyTimes.end());
+    keyTimes.erase(
+        std::unique(keyTimes.begin(), keyTimes.end(), [](float a, float b) {
+            return std::fabs(a - b) <= 1e-4f;
+        }),
+        keyTimes.end());
+
+    std::vector<float> selectedKeyTimes = selectedTransformTimes;
+    selectedKeyTimes.insert(
+        selectedKeyTimes.end(), selectedVisibilityTimes.begin(), selectedVisibilityTimes.end());
+    std::sort(selectedKeyTimes.begin(), selectedKeyTimes.end());
+    selectedKeyTimes.erase(
+        std::unique(selectedKeyTimes.begin(), selectedKeyTimes.end(), [](float a, float b) {
+            return std::fabs(a - b) <= 1e-4f;
+        }),
+        selectedKeyTimes.end());
+
+    const float keyY = canvasPos.y + canvasSize.y * 0.68f;
+    for (float time : keyTimes)
     {
         const float frame = time * fps;
         if (frame < startFrame || frame > endFrame)
             continue;
         const float x = frameToX(frame);
-        const bool selectedKey = ContainsTime(selectedTransformTimes, time, 1e-4f);
+        const bool selectedKey = ContainsTime(selectedKeyTimes, time, 1e-4f);
         DrawDiamond(
             drawList,
-            ImVec2(x, transformKeyY),
+            ImVec2(x, keyY),
             selectedKey ? 5.f : 3.5f,
             selectedKey
                 ? ImGui::GetColorU32(GetEditorColors().Accent)
                 : ImGui::GetColorU32(ImGuiCol_TextDisabled));
-    }
-    for (float time : visibilityTimes)
-    {
-        const float frame = time * fps;
-        if (frame < startFrame || frame > endFrame)
-            continue;
-        const float x = frameToX(frame);
-        const bool selectedKey = ContainsTime(selectedVisibilityTimes, time, 1e-4f);
-        DrawDiamond(
-            drawList,
-            ImVec2(x, visibilityKeyY),
-            selectedKey ? 5.f : 3.5f,
-            selectedKey
-                ? IM_COL32(230, 160, 70, 255)
-                : IM_COL32(140, 110, 70, 220));
     }
 
     const float playheadX = frameToX(static_cast<float>(currentFrame));
@@ -417,23 +422,12 @@ void EditorUI::BuildTimelinePanel(const PanelLayout& layout)
         setFrame(targetFrame, /*continuousScrub=*/!ImGui::IsItemActivated());
     }
 
-    if (transformTimes.empty() && visibilityTimes.empty())
+    if (keyTimes.empty())
     {
         drawList->AddText(
             ImVec2(canvasPos.x + 12.f, canvasMax.y - ImGui::GetTextLineHeight() - 8.f),
             ImGui::GetColorU32(ImGuiCol_TextDisabled),
             "Select an entity, set a frame, then Insert Transform or Visibility key.");
-    }
-    else
-    {
-        drawList->AddText(
-            ImVec2(canvasPos.x + 8.f, transformKeyY - 14.f),
-            ImGui::GetColorU32(ImGuiCol_TextDisabled),
-            "TRS");
-        drawList->AddText(
-            ImVec2(canvasPos.x + 8.f, visibilityKeyY - 14.f),
-            IM_COL32(180, 140, 80, 220),
-            "Vis");
     }
 
     ImGui::End();

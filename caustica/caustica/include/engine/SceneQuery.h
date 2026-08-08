@@ -24,6 +24,9 @@ class Material;
 [[nodiscard]] const std::vector<std::string>& availableScenes(const App& app);
 [[nodiscard]] std::string currentSceneName(const App& app);
 [[nodiscard]] std::filesystem::path currentScenePath(const App& app);
+// True only while starting another scene switch would race an active load or
+// structure edit. Background OMM/opacity streaming is cancelled by teardown.
+[[nodiscard]] bool isSceneSwitchBusy(const App& app);
 [[nodiscard]] bool isSceneStructureBusy(const App& app);
 [[nodiscard]] bool isSceneLoading(const App& app);
 [[nodiscard]] bool isSceneLoaded(const App& app);

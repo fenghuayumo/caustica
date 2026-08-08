@@ -16,8 +16,9 @@ namespace scene
 class SceneRenderData;
 }
 
-// ADR 0001 P3 — sole "are we loading / streaming?" session for Open Scene.
-// Progress UI and switch gates should read this (isBusy), not overlapping bools.
+// ADR 0001 P3 — sole "are we loading / streaming?" session. Progress and
+// structure-edit gates read isBusy; scene switching reads isActive because its
+// teardown transaction cancels secondary OMM/opacity streaming.
 enum class LoadSessionPhase : uint8_t
 {
     Idle = 0,

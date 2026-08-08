@@ -283,7 +283,7 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 2. [x] Well-known pipe at initialize: `LoadSession` only (`Logic` / `RHI.Submit` on demand via `getPipe`).
 3. [x] LoadSession import + GpuStreaming steps on `loadSessionPipe()`; load jobs use `TaskFn` + LoadGen check.
 4. [x] P1.1 `TaskFn` + `void* user` (body kept for capture-heavy compile / GraphBuilder waves).
-5. [x] Host busy gates read `LoadSession::isBusy()` (`isSceneLoading` / `isSceneStructureBusy` / Open Scene / Extract).
+5. [x] Host load/edit gates read `LoadSession::isBusy()`; Open Scene uses the narrower `isSceneSwitchBusy()` so teardown can cancel secondary OMM streaming.
 6. [x] Editor Debugging → TaskRuntime / LoadSession queue depths + phase (success metric).
 
 ### P4 — RHI deepen (may split ADRs)

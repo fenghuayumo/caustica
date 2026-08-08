@@ -259,39 +259,56 @@ void animate(App& app, float fElapsedTimeSeconds)
             if (ew)
             {
                 auto& world = ew->world();
-                float loopDuration = 0.f;
+                float importedDuration = 0.f;
+                float keyframeDuration = 0.f;
                 bool hasImportedAnim = false;
+                bool hasEditorKeyframes = false;
                 bool hasGeometrySequence = false;
                 for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (!animation)
                         continue;
-                    loopDuration = std::max(loopDuration, scene::getAnimationDuration(*animation));
-                    if (!animation->editorAuthored)
-                        hasImportedAnim = true;
+                    const float duration = scene::getAnimationDuration(*animation);
+                    if (animation->editorAuthored)
+                    {
+                        keyframeDuration = std::max(keyframeDuration, duration);
+                        hasEditorKeyframes = hasEditorKeyframes
+                            || (!animation->channels.empty() && duration > 0.f);
+                    }
+                    else
+                    {
+                        importedDuration = std::max(importedDuration, duration);
+                        hasImportedAnim = hasImportedAnim
+                            || (!animation->channels.empty() && duration > 0.f);
+                    }
                 }
                 world.each<scene::GeometrySequenceComponent>(
                     [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
                         if (!sequence.timesSeconds.empty())
                         {
                             hasGeometrySequence = true;
-                            loopDuration = std::max(loopDuration, sequence.timesSeconds.back());
+                            importedDuration =
+                                std::max(importedDuration, sequence.timesSeconds.back());
                         }
                     });
 
-                // Timeline Play always drives the shared clock. EnableAnimations only does
-                // when imported/skeletal (or geometry-sequence) content exists — otherwise
-                // SampleSettings.enableAnimations would drag the editor playhead on
-                // keyframe-only scenes.
-                const bool advanceClock = enableKeyframes
-                    || (enableSkeletal && (hasImportedAnim || hasGeometrySequence));
-                if (advanceClock)
+                // Imported/skeletal playback and editor keyframes have independent
+                // clocks. SampleSettings.enableAnimations must never move Timeline.
+                const bool advanceImportedClock =
+                    enableSkeletal && (hasImportedAnim || hasGeometrySequence);
+                const bool advanceKeyframeClock = enableKeyframes && hasEditorKeyframes;
+                if (advanceImportedClock)
                     vs->sceneTime += fElapsedTimeSeconds;
+                if (advanceKeyframeClock)
+                    vs->keyframeTime += fElapsedTimeSeconds;
 
-                const float animTime = (loopDuration > 0.f)
-                    ? float(fmod(vs->sceneTime, double(loopDuration)))
+                const float importedTime = (importedDuration > 0.f)
+                    ? float(fmod(vs->sceneTime, double(importedDuration)))
                     : float(vs->sceneTime);
+                const float keyframeTime = (keyframeDuration > 0.f)
+                    ? float(fmod(vs->keyframeTime, double(keyframeDuration)))
+                    : float(vs->keyframeTime);
 
                 bool touchedGaussianVisibility = false;
                 for (ecs::Entity animEntity : scene->getAnimationEntities())
@@ -308,7 +325,10 @@ void animate(App& app, float fElapsedTimeSeconds)
                     if (!applyThis)
                         continue;
 
-                    (void)scene::applyAnimation(*animation, animTime, *ew);
+                    (void)scene::applyAnimation(
+                        *animation,
+                        animation->editorAuthored ? keyframeTime : importedTime,
+                        *ew);
                     for (const auto& channel : animation->channels)
                     {
                         if (channel.attribute != AnimationAttribute::Visibility)
@@ -320,14 +340,14 @@ void animate(App& app, float fElapsedTimeSeconds)
                     }
                 }
 
-                if (advanceClock)
+                if (advanceImportedClock || advanceKeyframeClock)
                 {
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
                 }
                 else
                 {
-                    // Playback gated but clock not advancing (e.g. EnableAnimations with
-                    // no imported content): keep previous==current so filters stay quiet.
+                    // Playback gated but neither clock is advancing: keep
+                    // previous==current so temporal filters stay quiet.
                     ew->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
                     ew->syncPreviousTransformsFromCurrent();
                 }
@@ -346,7 +366,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                             (void)applyGeometrySequence(
                                 app,
                                 entity,
-                                animTime,
+                                importedTime,
                                 MeshDeformOptions{ .resetAccumulationOnAccelRebuild = false });
                         });
                     // Loop wraps may request accumulation reset via mesh-edit internals.

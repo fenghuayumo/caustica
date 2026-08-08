@@ -230,6 +230,7 @@ void onSceneUnloading(App& app)
 
     cfg->EnvironmentMapParams = EnvironmentMapRuntimeParameters();
     vs->sceneTime = 0.0;
+    vs->keyframeTime = 0.0;
     vs->uncompressedTextures.clear();
     vs->loadSession.streamStep = LoadStreamStep::Textures;
     vs->loadSession.renderData = nullptr;
@@ -327,6 +328,7 @@ void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const Com
         return;
 
     vs->sceneTime = 0.0;
+    vs->keyframeTime = 0.0;
     cfg->EnableAnimations = false;
     cfg->EnableKeyframes = false;
     cfg->RealtimeMode = false;
