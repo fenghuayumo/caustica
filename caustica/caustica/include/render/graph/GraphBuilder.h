@@ -60,7 +60,8 @@ struct PassOptions
     // Relative CPU recording cost. The compiler groups independent passes into
     // a bounded number of worker command lists instead of one list per pass.
     uint16_t recordingCost = 1;
-    const char* executeAfter = nullptr;
+    // Explicit ordering for side effects not represented by resource accesses.
+    PassHandle after;
 };
 
 struct ExecuteParams
@@ -147,7 +148,7 @@ public:
     void extractBuffer(BufferHandle handle, caustica::rhi::ResourceStates finalState);
     void extractBuffer(BufferHandle handle, BufferAccess finalAccess);
 
-    void addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options = {});
+    PassHandle addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options = {});
 
     void compile();
     // Primary must already be open. Parallel waves fork deferred lists and submit
@@ -181,6 +182,8 @@ public:
     [[nodiscard]] bool lastCompileCacheHit() const { return m_lastCompileCacheHit; }
     [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
     [[nodiscard]] size_t activePassCount() const;
+    [[nodiscard]] PassHandle findPass(std::string_view name) const;
+    [[nodiscard]] PassHandle requirePass(std::string_view name) const;
     [[nodiscard]] bool isPassRegistered(std::string_view name) const;
     [[nodiscard]] bool isPassActive(std::string_view name) const;
 

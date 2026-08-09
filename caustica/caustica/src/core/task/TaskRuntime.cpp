@@ -2,7 +2,6 @@
 #include <core/log.h>
 
 #include <algorithm>
-#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -55,6 +54,7 @@ struct TaskState
     Pipe* pipe = nullptr;
     uint64_t generation = 0;
     TaskDesc::GenerationDomain generationDomain = TaskDesc::GenerationDomain::Frame;
+    Group* group = nullptr;
 
     std::atomic<int> unmetPrereqs{0};
     std::atomic<bool> submitted{false};
@@ -64,8 +64,6 @@ struct TaskState
     std::mutex successorMutex;
     std::vector<std::shared_ptr<TaskState>> successors;
 
-    std::mutex doneMutex;
-    std::condition_variable doneCv;
 };
 
 constexpr size_t kPriorityCount = static_cast<size_t>(Priority::Count);
@@ -73,7 +71,7 @@ constexpr size_t kPriorityCount = static_cast<size_t>(Priority::Count);
 struct DomainQueue
 {
     std::mutex mutex;
-    std::deque<std::shared_ptr<TaskState>> queue;
+    std::deque<std::shared_ptr<TaskState>> queues[kPriorityCount];
     std::atomic<uint32_t> pending{0};
     std::function<void()> wake;
 };
@@ -147,13 +145,16 @@ void runTaskBody(const std::shared_ptr<TaskState>& task)
 
 void enqueueDomain(DomainQueue& domain, std::shared_ptr<TaskState> task)
 {
+    const size_t prio = std::min(static_cast<size_t>(task->priority), kPriorityCount - 1);
     domain.pending.fetch_add(1, std::memory_order_release);
+    std::function<void()> wake;
     {
         std::lock_guard<std::mutex> lock(domain.mutex);
-        domain.queue.push_back(std::move(task));
+        domain.queues[prio].push_back(std::move(task));
+        wake = domain.wake;
     }
-    if (domain.wake)
-        domain.wake();
+    if (wake)
+        wake();
 }
 
 void enqueueIo(std::shared_ptr<TaskState> task)
@@ -221,11 +222,8 @@ void queueReadyTask(const std::shared_ptr<TaskState>& task)
 
 void completeTask(const std::shared_ptr<TaskState>& task)
 {
-    {
-        std::lock_guard<std::mutex> lock(task->doneMutex);
-        task->done.store(true, std::memory_order_release);
-    }
-    task->doneCv.notify_all();
+    task->done.store(true, std::memory_order_release);
+    task->done.notify_all();
 
     std::vector<std::shared_ptr<TaskState>> successors;
     {
@@ -240,6 +238,12 @@ void completeTask(const std::shared_ptr<TaskState>& task)
         {
             queueReadyTask(succ);
         }
+    }
+
+    if (task->group)
+    {
+        task->group->pending.fetch_sub(1, std::memory_order_acq_rel);
+        task->group->pending.notify_all();
     }
 }
 
@@ -271,11 +275,17 @@ void pumpDomain(DomainQueue& domain)
         std::shared_ptr<TaskState> task;
         {
             std::lock_guard<std::mutex> lock(domain.mutex);
-            if (domain.queue.empty())
+            for (size_t p = 0; p < kPriorityCount; ++p)
+            {
+                if (domain.queues[p].empty())
+                    continue;
+                task = std::move(domain.queues[p].front());
+                domain.queues[p].pop_front();
                 break;
-            task = std::move(domain.queue.front());
-            domain.queue.pop_front();
+            }
         }
+        if (!task)
+            break;
         if (task)
         {
             runTaskBody(task);
@@ -300,7 +310,7 @@ void workerMain()
         std::shared_ptr<TaskState> task;
         {
             std::unique_lock<std::mutex> lock(rt.queueMutex);
-            rt.wakeCv.wait_for(lock, std::chrono::milliseconds(2), [&] {
+            rt.wakeCv.wait(lock, [&] {
                 if (!rt.running.load(std::memory_order_acquire))
                     return true;
                 for (size_t p = 0; p < kPriorityCount; ++p)
@@ -337,7 +347,7 @@ void ioWorkerMain()
         std::shared_ptr<TaskState> task;
         {
             std::unique_lock<std::mutex> lock(rt.ioMutex);
-            rt.ioWakeCv.wait_for(lock, std::chrono::milliseconds(2), [&] {
+            rt.ioWakeCv.wait(lock, [&] {
                 if (!rt.running.load(std::memory_order_acquire))
                     return true;
                 for (size_t p = 0; p < kPriorityCount; ++p)
@@ -474,13 +484,15 @@ void shutdown()
     }
     {
         std::lock_guard<std::mutex> lock(rt.render.mutex);
-        rt.render.queue.clear();
+        for (auto& q : rt.render.queues)
+            q.clear();
         rt.render.wake = nullptr;
         rt.render.pending.store(0, std::memory_order_release);
     }
     {
         std::lock_guard<std::mutex> lock(rt.logic.mutex);
-        rt.logic.queue.clear();
+        for (auto& q : rt.logic.queues)
+            q.clear();
         rt.logic.wake = nullptr;
         rt.logic.pending.store(0, std::memory_order_release);
     }
@@ -618,12 +630,7 @@ void wait(TaskHandle handle)
     while (!state->done.load(std::memory_order_acquire))
     {
         if (!detail::helpOnceInternal())
-        {
-            std::unique_lock<std::mutex> lock(state->doneMutex);
-            state->doneCv.wait_for(lock, std::chrono::milliseconds(1), [&] {
-                return state->done.load(std::memory_order_acquire);
-            });
-        }
+            state->done.wait(false, std::memory_order_acquire);
     }
 }
 
@@ -712,45 +719,33 @@ void launch(Group& group, TaskDesc desc)
 {
     group.pending.fetch_add(1, std::memory_order_release);
 
-    // Wrap completion for both fixed-fn and std::function bodies.
-    if (desc.fn)
-    {
-        TaskFn fn = desc.fn;
-        void* user = desc.user;
-        desc.fn = nullptr;
-        desc.user = nullptr;
-        desc.body = [&group, fn, user]() {
-            if (fn)
-                fn(user);
-            group.pending.fetch_sub(1, std::memory_order_release);
-        };
-    }
-    else
-    {
-        auto body = std::move(desc.body);
-        desc.body = [&group, body = std::move(body)]() {
-            if (body)
-                body();
-            group.pending.fetch_sub(1, std::memory_order_release);
-        };
-    }
-
     if (!isInitialized())
     {
-        if (desc.body)
+        if (desc.fn)
+            desc.fn(desc.user);
+        else if (desc.body)
             desc.body();
+        group.pending.fetch_sub(1, std::memory_order_acq_rel);
+        group.pending.notify_all();
         return;
     }
 
-    (void)launch(std::move(desc));
+    TaskHandle handle = create(std::move(desc));
+    auto state = std::static_pointer_cast<detail::TaskState>(handle.m_state);
+    state->group = &group;
+    submit(std::move(handle));
 }
 
 void wait(Group& group)
 {
-    while (group.pending.load(std::memory_order_acquire) > 0)
+    for (;;)
     {
-        if (!detail::helpOnceInternal())
-            std::this_thread::yield();
+        const uint32_t pending = group.pending.load(std::memory_order_acquire);
+        if (pending == 0)
+            return;
+        if (detail::helpOnceInternal())
+            continue;
+        group.pending.wait(pending, std::memory_order_acquire);
     }
 }
 

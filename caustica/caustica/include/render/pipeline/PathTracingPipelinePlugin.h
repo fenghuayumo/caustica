@@ -11,7 +11,7 @@ public:
     [[nodiscard]] const char* name() const override { return "PathTracing"; }
 
     void onPrepareFrame(WorldRenderer& renderer, RenderFrameContext& ctx) override;
-    void registerGraphPasses(RenderGraphRegistry& registry, WorldRenderer& renderer, RenderFrameContext& ctx) override;
+    void buildGraph(FrameGraphContext& ctx) override;
     void onFinalizeFrame(WorldRenderer& renderer, RenderFrameContext& ctx) override;
 };
 

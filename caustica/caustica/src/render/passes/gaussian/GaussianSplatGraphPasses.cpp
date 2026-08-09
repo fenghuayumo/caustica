@@ -99,7 +99,7 @@ namespace
         if (resources.empty())
             return false;
 
-        ctx.graph->addPass(
+        const rg::PassHandle uploadPass = ctx.graph->addPass(
             uploadPassName,
             [resources](rg::PassBuilder& setup) {
                 for (const GaussianSplatGraphHandles& item : resources)
@@ -116,7 +116,7 @@ namespace
             },
             rg::PassOptions{ .sideEffect = true });
 
-        ctx.graph->addPass(
+        const rg::PassHandle sortPass = ctx.graph->addPass(
             sortPassName,
             [resources](rg::PassBuilder& setup) {
                 for (const GaussianSplatGraphHandles& item : resources)
@@ -141,16 +141,16 @@ namespace
                 if (gaussianSplatsEnabled(ctx))
                     ctx.gaussian->executeSort(passCtx.commandList());
             },
-            rg::PassOptions{ .sideEffect = true, .executeAfter = uploadPassName });
+            rg::PassOptions{ .sideEffect = true, .after = uploadPass });
 
         const bool referenceGammaCompositing =
             !renderToOutputColor
             && ctx.settings->GaussianSplatSortingMode == 0
             && ctx.settings->GaussianSplatReferenceGammaCompositing;
-        const char* rasterExecuteAfter = sortPassName;
+        rg::PassHandle rasterPredecessor = sortPass;
         if (referenceGammaCompositing)
         {
-            ctx.graph->addPass(
+            rasterPredecessor = ctx.graph->addPass(
                 encodePassName,
                 [colorTarget](rg::PassBuilder& setup) {
                     setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
@@ -160,11 +160,10 @@ namespace
                     if (gaussianSplatsEnabled(ctx))
                         ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), false);
                 },
-                rg::PassOptions{ .sideEffect = true, .executeAfter = sortPassName });
-            rasterExecuteAfter = encodePassName;
+                rg::PassOptions{ .sideEffect = true, .after = sortPass });
         }
 
-        ctx.graph->addPass(
+        const rg::PassHandle rasterPass = ctx.graph->addPass(
             rasterPassName,
             [resources, colorTarget, sceneDepth](rg::PassBuilder& setup) {
                 setup.read(sceneDepth, rg::TextureAccess::ShaderResource);
@@ -186,7 +185,7 @@ namespace
                 if (gaussianSplatsEnabled(ctx))
                     ctx.gaussian->executeRaster(passCtx.commandList(), renderToOutputColor);
             },
-            rg::PassOptions{ .sideEffect = true, .executeAfter = rasterExecuteAfter });
+            rg::PassOptions{ .sideEffect = true, .after = rasterPredecessor });
 
         if (referenceGammaCompositing)
         {
@@ -200,7 +199,7 @@ namespace
                     if (gaussianSplatsEnabled(ctx))
                         ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), true);
                 },
-                rg::PassOptions{ .sideEffect = true, .executeAfter = rasterPassName });
+                rg::PassOptions{ .sideEffect = true, .after = rasterPass });
         }
         return true;
     }
@@ -246,7 +245,7 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
     if (!needsGaussianSplatAccelBuild(*ctx.settings))
         return;
 
-    // AABB buffers are the AS build inputs. executeAfter still carries MainPathTrace
+    // AABB buffers are the AS build inputs. The explicit edge still carries MainPathTrace
     // readiness (LightingEnd / VBuffer) until TLAS/BLAS are first-class graph resources.
     std::vector<rg::BufferHandle> aabbBuffers;
     for (const GaussianSplatGraphResources& resources :
@@ -262,10 +261,10 @@ void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
     // AS handles are not graph resources yet; sideEffect keeps the build alive for PT bindings.
     passOptions.sideEffect = true;
     if (needsPathTraceLightingEndPass(*ctx.settings))
-        passOptions.executeAfter = kPathTraceLightingEndPass;
+        passOptions.after = ctx.graph->requirePass(kPathTraceLightingEndPass);
     else
-        passOptions.executeAfter =
-            ctx.settings->RealtimeMode ? kVBufferExportPass : kLightingReadyPass;
+        passOptions.after = ctx.graph->requirePass(
+            ctx.settings->RealtimeMode ? kVBufferExportPass : kLightingReadyPass);
 
     ctx.graph->addPass(
         kGaussianSplatsAccelBuildPass,
@@ -328,7 +327,7 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         accumulatedColorTexture,
         rg::TextureAccess::UnorderedAccess);
 
-    ctx.graph->addPass(
+    const rg::PassHandle copyCurrentPass = ctx.graph->addPass(
         "GaussianSplatsCopyCurrent",
         [processedOutputColor, currentColor](rg::PassBuilder& setup) {
             setup.read(processedOutputColor, rg::TextureAccess::CopySource);
@@ -343,7 +342,7 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         },
         rg::PassOptions{
             .sideEffect = true,
-            .executeAfter = "GaussianSplatsComposite",
+            .after = ctx.graph->requirePass("GaussianSplatsComposite"),
         });
 
     ctx.graph->addPass(
@@ -361,7 +360,7 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         },
         rg::PassOptions{
             .sideEffect = true,
-            .executeAfter = "GaussianSplatsCopyCurrent",
+            .after = copyCurrentPass,
         });
 }
 

@@ -72,6 +72,13 @@ struct BufferHandle
     [[nodiscard]] bool isValid() const { return index != UINT32_MAX; }
 };
 
+struct PassHandle
+{
+    uint32_t index = UINT32_MAX;
+
+    [[nodiscard]] bool isValid() const { return index != UINT32_MAX; }
+};
+
 struct TransientResourceStats
 {
     uint32_t transientTextureCount = 0;

@@ -15,6 +15,8 @@ set(CMAKE_POLICY_DEFAULT_CMP0175 OLD) # streamline error
 
 project(caustica)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)

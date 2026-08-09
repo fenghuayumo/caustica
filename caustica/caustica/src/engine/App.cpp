@@ -648,6 +648,14 @@ bool App::dispatchScheduledRender(SystemContext& context)
     const uint32_t renderFrameIndex = context.frameIndex;
     const double elapsedTime = context.elapsedTime;
     const double curTime = context.currentTime;
+    const PathTracerSettings* frameSettings = caustica::settings(*this);
+    // Imported animation poses are sampled on the logic thread. Until all
+    // skinning frame resources are isolated per in-flight frame, do not let
+    // Logic(N+1) advance animation state while Render(N) consumes it.
+    const bool synchronizeAnimationFrame = isSceneLoaded(*this)
+        && frameSettings
+        && frameSettings->RealtimeMode
+        && frameSettings->EnableAnimations;
 #if CAUSTICA_WITH_STREAMLINE
     void* slFrameToken = nullptr;
     if (!gpuDevice->m_DeviceParams.headlessDevice)
@@ -674,11 +682,10 @@ bool App::dispatchScheduledRender(SystemContext& context)
             }
             m_renderThread.notifyFrameCompleted({ ok, elapsedTime, curTime });
         };
-        // Animation is extracted into the frame-indexed snapshot. Keeping the
-        // normal two-frame pipeline is safe and avoids serializing Logic(N+1)
-        // behind Render(N); offline callers that require a completed frame use
-        // the explicit synchronous render APIs instead.
-        m_renderThread.dispatch(std::move(renderWork));
+        if (synchronizeAnimationFrame)
+            m_renderThread.dispatchAndWait(std::move(renderWork));
+        else
+            m_renderThread.dispatch(std::move(renderWork));
         return true;
     }
 

@@ -1,5 +1,6 @@
 #include <render/pipeline/PathTracingPipelinePlugin.h>
 
+#include <render/FrameGraphContext.h>
 #include <render/FrameGraphPasses.h>
 #include <render/WorldRenderer.h>
 
@@ -46,14 +47,9 @@ void PathTracingPipelinePlugin::onPrepareFrame(WorldRenderer& renderer, RenderFr
     renderer.framePassDenoiseAndAA(ctx.frame);
 }
 
-void PathTracingPipelinePlugin::registerGraphPasses(
-    RenderGraphRegistry& registry,
-    WorldRenderer& /*renderer*/,
-    RenderFrameContext& /*ctx*/)
+void PathTracingPipelinePlugin::buildGraph(FrameGraphContext& ctx)
 {
-    registry.add([](FrameGraphContext& featureCtx) {
-        registerDefaultFrameGraphPasses(featureCtx);
-    });
+    registerDefaultFrameGraphPasses(ctx);
 }
 
 void PathTracingPipelinePlugin::onFinalizeFrame(WorldRenderer& renderer, RenderFrameContext& ctx)

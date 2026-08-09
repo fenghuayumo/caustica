@@ -175,6 +175,15 @@ target_link_libraries(causCore
     PUBLIC jsoncpp_static cxxopts
 )
 
+if (BUILD_TESTING)
+    add_executable(causTaskRuntimeTests tests/TaskRuntimeTests.cpp)
+    target_link_libraries(causTaskRuntimeTests PRIVATE causCore)
+    if (MSVC)
+        target_compile_options(causTaskRuntimeTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causTaskRuntimeTests COMMAND causTaskRuntimeTests)
+endif()
+
 # ── causEvents ────────────────────────────────────────────────────────────
 # Event system (Event, EventDispatcher, key/mouse/application events).
 # Header-only. Depends on causCore for key_codes types.
@@ -581,3 +590,12 @@ if (WIN32)
 endif()
 caustica_compile_shaders(${omm_shader_compile_args})
 add_dependencies(causRender omm_shaders)
+
+if (BUILD_TESTING)
+    add_executable(causRenderGraphTests tests/RenderGraphTests.cpp)
+    target_link_libraries(causRenderGraphTests PRIVATE causRender)
+    if (MSVC)
+        target_compile_options(causRenderGraphTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causRenderGraphTests COMMAND causRenderGraphTests)
+endif()

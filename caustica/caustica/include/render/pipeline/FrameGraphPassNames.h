@@ -5,7 +5,7 @@
 namespace caustica::render
 {
 
-// Stable pass names used as executeAfter targets. Prefer these over empty fence nodes.
+// Stable pass names used to resolve cross-module PassHandles. Prefer these over empty fence nodes.
 
 inline constexpr const char* kClearFrameTargetsPass = "ClearFrameTargets";
 inline constexpr const char* kUploadFrameConstantsPass = "UploadFrameConstants";

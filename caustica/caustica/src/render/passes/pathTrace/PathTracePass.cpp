@@ -276,9 +276,10 @@ void registerPathTracePrePass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = ctx.settings->actualUseRTXDIPasses()
-        ? rtxdiBeginReadyPass(ctx.settings->actualUseReSTIRDI())
-        : kLightingReadyPass;
+    passOptions.after = ctx.graph->requirePass(
+        ctx.settings->actualUseRTXDIPasses()
+            ? rtxdiBeginReadyPass(ctx.settings->actualUseReSTIRDI())
+            : kLightingReadyPass);
 
     ctx.graph->addPass(
         "PathTracePrePass",
@@ -311,7 +312,7 @@ void registerVBufferExportPass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = "PathTracePrePass";
+    passOptions.after = ctx.graph->requirePass("PathTracePrePass");
 
     ctx.graph->addPass(
         "VBufferExport",
@@ -346,7 +347,8 @@ void registerPathTraceLightingEndPass(FrameGraphContext ctx)
         ctx.subInstanceDataBuffer);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = pathTraceLightingEndExecuteAfterPass(*ctx.settings);
+    passOptions.after = ctx.graph->requirePass(
+        pathTraceLightingEndExecuteAfterPass(*ctx.settings));
 
     ctx.graph->addPass(
         kPathTraceLightingEndPass,
@@ -389,7 +391,7 @@ void registerMainPathTracePass(FrameGraphContext ctx)
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.executeAfter = pathTraceMainExecuteAfterPass(*ctx.settings);
+    passOptions.after = ctx.graph->requirePass(pathTraceMainExecuteAfterPass(*ctx.settings));
 
     ctx.graph->addPass(
         "MainPathTrace",

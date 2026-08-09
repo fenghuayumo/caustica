@@ -39,6 +39,7 @@ enum class Affinity : uint8_t
 };
 
 class Pipe;
+struct Group;
 
 struct TaskHandle
 {
@@ -59,6 +60,7 @@ private:
     friend void then(TaskHandle, TaskHandle);
     friend void wait(TaskHandle);
     friend bool poll(TaskHandle);
+    friend void launch(Group&, struct TaskDesc);
 
     std::shared_ptr<void> m_state;
 };

@@ -70,7 +70,6 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
-class RenderGraphRegistry;
 class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
 struct FrameGraphContext;
@@ -221,7 +220,6 @@ public:
 
     void denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const;
 
-    void buildFrameGraphPasses(RenderFrameContext& ctx, const RenderGraphRegistry& graphRegistry);
     void executeFrameRenderGraph(RenderFrameContext& ctx);
 
     void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
@@ -234,6 +232,7 @@ private:
     friend class RenderPipelineRegistry;
 
     [[nodiscard]] caustica::rhi::Device* device() const { return m_context->gpuDevice.getDevice(); }
+    [[nodiscard]] FrameGraphContext beginFrameGraph(RenderFrameContext& ctx);
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();

@@ -776,7 +776,7 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 		return;
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
-	const char* prevPass = kLightingReadyPass;
+	rg::PassHandle previousPass = ctx.graph->requirePass(kLightingReadyPass);
 
 	rg::BufferHandle rtxdiConstants{};
 	if (rtxdiPass != nullptr)
@@ -789,14 +789,13 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 	{
 		rg::PassOptions passOptions{};
 		passOptions.sideEffect = true;
-		passOptions.executeAfter = prevPass;
+		passOptions.after = previousPass;
 
-		ctx.graph->addPass(
+		previousPass = ctx.graph->addPass(
 			name,
 			std::move(declareAccess),
 			std::move(execute),
 			passOptions);
-		prevPass = name;
 	};
 
 	if (usingLightSampling)
@@ -891,20 +890,19 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	static constexpr bool enableFusedDIGIFinal = true;
 	const bool useFusedDIGIFinal = useDI && useGI && enableFusedDIGIFinal;
 
-	const char* prevPass = "MainPathTrace";
+	rg::PassHandle previousPass = ctx.graph->requirePass("MainPathTrace");
 
 	auto addRtxdiExecuteStage = [&](const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
 	{
 		rg::PassOptions passOptions{};
 		passOptions.sideEffect = true;
-		passOptions.executeAfter = prevPass;
+		passOptions.after = previousPass;
 
-		ctx.graph->addPass(
+		previousPass = ctx.graph->addPass(
 			name,
 			std::move(declareAccess),
 			std::move(execute),
 			passOptions);
-		prevPass = name;
 	};
 
 	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, settings]() {

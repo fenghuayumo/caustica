@@ -1,7 +1,7 @@
 #include <render/pipeline/RenderPipelineRegistry.h>
 
+#include <render/FrameGraphContext.h>
 #include <render/pipeline/PathTracingPipelinePlugin.h>
-#include <render/pipeline/RenderGraphRegistry.h>
 #include <render/WorldRenderer.h>
 
 namespace caustica::render
@@ -38,14 +38,13 @@ void RenderPipelineRegistry::runFrame(WorldRenderer& renderer, RenderFrameContex
     if (ctx.frame.aborted)
         return;
 
-    RenderGraphRegistry graphRegistry;
+    FrameGraphContext graphContext = renderer.beginFrameGraph(ctx);
     for (IRenderPipelinePlugin* plugin : m_plugins)
     {
-        if (plugin)
-            plugin->registerGraphPasses(graphRegistry, renderer, ctx);
+        if (!plugin || ctx.frame.aborted)
+            break;
+        plugin->buildGraph(graphContext);
     }
-
-    renderer.buildFrameGraphPasses(ctx, graphRegistry);
     if (ctx.frame.aborted)
         return;
 

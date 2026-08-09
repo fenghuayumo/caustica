@@ -167,14 +167,26 @@ size_t GraphBuilder::activePassCount() const
     return count;
 }
 
+PassHandle GraphBuilder::findPass(const std::string_view name) const
+{
+    for (uint32_t i = 0; i < static_cast<uint32_t>(m_passes.size()); ++i)
+    {
+        if (m_passes[i].name == name)
+            return PassHandle{ i };
+    }
+    return {};
+}
+
+PassHandle GraphBuilder::requirePass(const std::string_view name) const
+{
+    const PassHandle handle = findPass(name);
+    assert(handle.isValid() && "RenderGraph dependency target was not registered");
+    return handle;
+}
+
 bool GraphBuilder::isPassRegistered(const std::string_view name) const
 {
-    for (const Pass& pass : m_passes)
-    {
-        if (pass.name == name)
-            return true;
-    }
-    return false;
+    return findPass(name).isValid();
 }
 
 bool GraphBuilder::isPassActive(const std::string_view name) const
@@ -335,8 +347,10 @@ void GraphBuilder::extractBuffer(BufferHandle handle, BufferAccess finalAccess)
     extractBuffer(handle, accessToState(finalAccess));
 }
 
-void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options)
+PassHandle GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options)
 {
+    assert(!isPassRegistered(name) && "RenderGraph pass names must be unique");
+
     Pass pass;
     const size_t passIndex = m_passes.size();
     if (passIndex < m_recycledPasses.size())
@@ -365,6 +379,7 @@ void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execu
     m_passNames.push_back(pass.name);
     m_passes.push_back(std::move(pass));
     m_compiled = false;
+    return PassHandle{ static_cast<uint32_t>(passIndex) };
 }
 
 uint64_t GraphBuilder::compiledPlanKey() const
@@ -423,7 +438,7 @@ uint64_t GraphBuilder::compiledPlanKey() const
         mixValue(pass.options.sideEffect);
         mixValue(pass.options.serialOnPrimary);
         mixValue(pass.options.recordingCost);
-        mixString(pass.options.executeAfter ? std::string_view(pass.options.executeAfter) : std::string_view{});
+        mixValue(pass.options.after.index);
         const auto mixAccesses = [&](const auto& accesses) {
             mixValue(accesses.size());
             for (const auto& [handle, access] : accesses)
@@ -600,18 +615,14 @@ void GraphBuilder::compile()
     for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
     {
         const Pass& pass = m_passes[passIndex];
-        if (!pass.options.enabled || pass.options.executeAfter == nullptr)
+        if (!pass.options.enabled || !pass.options.after.isValid())
             continue;
 
-        const auto predecessor = std::find_if(
-            m_passes.begin(),
-            m_passes.end(),
-            [&](const Pass& candidate) { return candidate.name == pass.options.executeAfter; });
-        if (predecessor == m_passes.end())
+        assert(pass.options.after.index < m_passes.size()
+            && "RenderGraph PassOptions::after references an invalid pass");
+        if (pass.options.after.index >= m_passes.size())
             continue;
-
-        const uint32_t predecessorIndex = static_cast<uint32_t>(std::distance(m_passes.begin(), predecessor));
-        addDependency(predecessorIndex, passIndex);
+        addDependency(pass.options.after.index, passIndex);
     }
 
     std::vector<bool> needed(m_passes.size(), false);
@@ -819,6 +830,24 @@ void GraphBuilder::allocateTransientResources(
     m_textureAliasingBarriers.clear();
     m_bufferAliasingBarriers.clear();
     m_transientStats = {};
+
+    const auto hasReferencedTransient = [](const auto& resources, const std::vector<bool>& referenced) {
+        for (size_t i = 0; i < resources.size() && i < referenced.size(); ++i)
+        {
+            if (referenced[i] && resources[i].lifetime == ResourceLifetime::Transient)
+                return true;
+        }
+        return false;
+    };
+    if (!hasReferencedTransient(m_textures, referencedTextures)
+        && !hasReferencedTransient(m_buffers, referencedBuffers))
+    {
+        return;
+    }
+
+    assert(m_device && "RenderGraph transient resources require an RHI device");
+    if (!m_device)
+        return;
 
     TransientResourceAllocator allocator;
     allocator.allocate(*this, referencedTextures, referencedBuffers, textureLifetimes, bufferLifetimes);

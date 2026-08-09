@@ -120,7 +120,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 
                 commandList->endMarker();
             },
-            rg::PassOptions{ .sideEffect = true, .executeAfter = "Blit" });
+            rg::PassOptions{ .sideEffect = true, .after = ctx.graph->requirePass("Blit") });
     }
 
     if (copyDebugFeedback)
@@ -172,7 +172,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             },
             rg::PassOptions{
                 .sideEffect = true,
-                .executeAfter = showDebugLines ? "DebugLines" : "Blit",
+                .after = ctx.graph->requirePass(showDebugLines ? "DebugLines" : "Blit"),
             });
     }
 }

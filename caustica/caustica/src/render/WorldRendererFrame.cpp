@@ -3,7 +3,6 @@
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
-#include <render/pipeline/RenderGraphRegistry.h>
 #include <render/pipeline/RenderPipelineRegistry.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
@@ -224,9 +223,7 @@ void caustica::render::WorldRenderer::addRenderPipelinePlugin(IRenderPipelinePlu
     m_pipelineRegistry.addPlugin(plugin);
 }
 
-void caustica::render::WorldRenderer::buildFrameGraphPasses(
-    RenderFrameContext& ctx,
-    const RenderGraphRegistry& graphRegistry)
+FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameContext& ctx)
 {
     assert(ctx.graph != nullptr);
     const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
@@ -264,8 +261,7 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
             fbinfo.getViewport());
     }
 
-    FrameGraphContext featureCtx = makeFrameGraphContext(ctx);
-    graphRegistry.build(featureCtx);
+    return makeFrameGraphContext(ctx);
 }
 
 void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext& ctx)
@@ -991,7 +987,7 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
         ctx.renderTargets->combinedHistoryClampRelax,
         rg::TextureAccess::UnorderedAccess);
 
-    ctx.graph->addPass(
+    const rg::PassHandle clearFrameTargets = ctx.graph->addPass(
         "ClearFrameTargets",
         [depth, combinedHistoryClampRelax](rg::PassBuilder& setup) {
             setup.write(depth, rg::TextureAccess::UnorderedAccess);
@@ -1019,7 +1015,7 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
                     caustica::rhi::AllSubresources,
                     caustica::rhi::Color(1, 1, 0, 0));
             },
-            rg::PassOptions{ .sideEffect = true, .executeAfter = "ClearFrameTargets" });
+            rg::PassOptions{ .sideEffect = true, .after = clearFrameTargets });
     }
 }
 

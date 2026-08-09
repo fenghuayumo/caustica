@@ -52,7 +52,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
         : "MainPathTrace";
 
     rg::PassOptions specHitPassOptions{};
-    specHitPassOptions.executeAfter = afterPathTrace;
+    specHitPassOptions.after = ctx.graph->requirePass(afterPathTrace);
 
     ctx.graph->addPass(
         kDenoiseSpecHitTPass,
@@ -67,7 +67,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
         specHitPassOptions);
 
     rg::PassOptions avgLayerPassOptions{};
-    avgLayerPassOptions.executeAfter = kDenoiseSpecHitTPass;
+    avgLayerPassOptions.after = ctx.graph->requirePass(kDenoiseSpecHitTPass);
 
     ctx.graph->addPass(
         kAvgLayerRadiancePass,
@@ -82,7 +82,7 @@ void registerDenoiserPreparePass(FrameGraphContext ctx)
     if (needsStablePlanesDebugViz(*ctx.settings))
     {
         rg::PassOptions debugVizPassOptions{};
-        debugVizPassOptions.executeAfter = denoiseGuidesReadyPass();
+        debugVizPassOptions.after = ctx.graph->requirePass(denoiseGuidesReadyPass());
 
         ctx.graph->addPass(
             kStablePlanesDebugVizPass,
@@ -234,7 +234,7 @@ void registerNrdPass(FrameGraphContext ctx)
 
     // Highest plane first (initializes outputColor from stable radiance), then lower planes
     // accumulate. Within/across planes, resource edges (guides / outDiff / outputColor) order
-    // Prepare → Run → Merge; only the first Prepare needs an external executeAfter.
+    // Prepare → Run → Merge; only the first Prepare needs an explicit external edge.
     const char* guidesReadyPass = needsStablePlanesDebugViz(*ctx.settings)
         ? kStablePlanesDebugVizPass
         : denoiseGuidesReadyPass();
@@ -255,7 +255,7 @@ void registerNrdPass(FrameGraphContext ctx)
         rg::PassOptions prepareOptions{};
         if (firstPrepare)
         {
-            prepareOptions.executeAfter = guidesReadyPass;
+            prepareOptions.after = ctx.graph->requirePass(guidesReadyPass);
             firstPrepare = false;
         }
         ctx.graph->addPass(
@@ -574,7 +574,7 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
         rg::PassOptions oidnOptions{};
         oidnOptions.sideEffect = true;
         oidnOptions.serialOnPrimary = true;
-        oidnOptions.executeAfter = afterDenoiseAa;
+        oidnOptions.after = ctx.graph->requirePass(afterDenoiseAa);
 
         ctx.graph->addPass(
             "ReferenceOIDN",

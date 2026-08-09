@@ -40,7 +40,7 @@ void registerUploadFrameConstantsPass(FrameGraphContext ctx)
         },
         rg::PassOptions{
             .sideEffect = true,
-            .executeAfter = kClearFrameTargetsPass,
+            .after = ctx.graph->requirePass(kClearFrameTargetsPass),
         });
 }
 
@@ -57,7 +57,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.executeAfter = kUploadFrameConstantsPass;
+        passOptions.after = ctx.graph->requirePass(kUploadFrameConstantsPass);
 
         rg::TextureHandle envCube{};
         rg::TextureHandle radianceImportance{};
@@ -92,7 +92,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.executeAfter = kEnvMapUpdatePass;
+        passOptions.after = ctx.graph->requirePass(kEnvMapUpdatePass);
 
         rg::TextureHandle radianceImportance{};
         rg::BufferHandle lightBuffer{};
@@ -140,7 +140,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.executeAfter = kLightSamplingUpdateBeginPass;
+        passOptions.after = ctx.graph->requirePass(kLightSamplingUpdateBeginPass);
 
         rg::BufferHandle subInstance{};
         rg::BufferHandle constants{};
