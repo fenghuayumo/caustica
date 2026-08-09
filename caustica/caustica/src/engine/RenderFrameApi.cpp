@@ -30,6 +30,7 @@
 #include <cmath>
 #include <algorithm>
 #include <optional>
+#include <unordered_set>
 
 
 using namespace caustica::math;
@@ -259,17 +260,20 @@ void animate(App& app, float fElapsedTimeSeconds)
             if (ew)
             {
                 auto& world = ew->world();
-                float importedDuration = 0.f;
                 float keyframeDuration = 0.f;
                 bool hasImportedAnim = false;
                 bool hasEditorKeyframes = false;
                 bool hasGeometrySequence = false;
+                std::unordered_set<uint64_t> claimedImportedTransformChannels;
+                std::unordered_set<uint32_t> activeImportedAnimations;
                 for (ecs::Entity animEntity : scene->getAnimationEntities())
                 {
                     auto* animation = scene::tryGetAnimation(world, animEntity);
                     if (!animation)
                         continue;
                     const float duration = scene::getAnimationDuration(*animation);
+                    if (animation->channels.empty() || !(duration > 0.f))
+                        continue;
                     if (animation->editorAuthored)
                     {
                         keyframeDuration = std::max(keyframeDuration, duration);
@@ -278,7 +282,34 @@ void animate(App& app, float fElapsedTimeSeconds)
                     }
                     else
                     {
-                        importedDuration = std::max(importedDuration, duration);
+                        // glTF animations are clips, not layers. Do not evaluate
+                        // Idle/Walk/Run simultaneously onto the same joint channel.
+                        // Clips whose transform targets are disjoint (for example,
+                        // animations from separate imported models) remain active.
+                        std::vector<uint64_t> channelKeys;
+                        bool conflictsWithActiveClip = false;
+                        channelKeys.reserve(animation->channels.size());
+                        for (const scene::AnimationChannelData& channel : animation->channels)
+                        {
+                            if (!ecs::isValid(channel.targetEntity)
+                                || (channel.attribute != AnimationAttribute::Translation
+                                    && channel.attribute != AnimationAttribute::Rotation
+                                    && channel.attribute != AnimationAttribute::Scaling))
+                            {
+                                continue;
+                            }
+
+                            const uint64_t key =
+                                (uint64_t(static_cast<uint32_t>(channel.targetEntity)) << 32u)
+                                | uint64_t(channel.attribute);
+                            channelKeys.push_back(key);
+                            conflictsWithActiveClip |= claimedImportedTransformChannels.contains(key);
+                        }
+                        if (conflictsWithActiveClip)
+                            continue;
+
+                        claimedImportedTransformChannels.insert(channelKeys.begin(), channelKeys.end());
+                        activeImportedAnimations.insert(static_cast<uint32_t>(animEntity));
                         hasImportedAnim = hasImportedAnim
                             || (!animation->channels.empty() && duration > 0.f);
                     }
@@ -288,8 +319,6 @@ void animate(App& app, float fElapsedTimeSeconds)
                         if (!sequence.timesSeconds.empty())
                         {
                             hasGeometrySequence = true;
-                            importedDuration =
-                                std::max(importedDuration, sequence.timesSeconds.back());
                         }
                     });
 
@@ -298,14 +327,69 @@ void animate(App& app, float fElapsedTimeSeconds)
                 const bool advanceImportedClock =
                     enableSkeletal && (hasImportedAnim || hasGeometrySequence);
                 const bool advanceKeyframeClock = enableKeyframes && hasEditorKeyframes;
+                const double previousImportedClock = vs->sceneTime;
+                const double previousKeyframeClock = vs->keyframeTime;
                 if (advanceImportedClock)
                     vs->sceneTime += fElapsedTimeSeconds;
                 if (advanceKeyframeClock)
                     vs->keyframeTime += fElapsedTimeSeconds;
 
-                const float importedTime = (importedDuration > 0.f)
-                    ? float(fmod(vs->sceneTime, double(importedDuration)))
-                    : float(vs->sceneTime);
+                const auto crossedLoopBoundary = [](double previous, double current, float duration) {
+                    if (!(duration > 0.f))
+                        return false;
+                    if (!std::isfinite(previous) || !std::isfinite(current))
+                        return true;
+                    const double d = double(duration);
+                    return std::floor(previous / d) != std::floor(current / d);
+                };
+                // A loop wrap/seek (or a long stall) has no meaningful adjacent
+                // pose for temporal reprojection. Reset both the realtime filters
+                // and the skinned PrevPosition written by the compute pass.
+                bool importedLoopBoundary = false;
+                if (advanceImportedClock)
+                {
+                    // Imported clips share a playback clock, but each asset loops at
+                    // its own duration. Using the longest clip for every asset makes
+                    // short clips clamp at their last keyframe for most of the cycle.
+                    for (ecs::Entity animEntity : scene->getAnimationEntities())
+                    {
+                        if (!activeImportedAnimations.contains(static_cast<uint32_t>(animEntity)))
+                            continue;
+                        const auto* animation = scene::tryGetAnimation(world, animEntity);
+                        if (animation)
+                        {
+                            importedLoopBoundary |= crossedLoopBoundary(
+                                previousImportedClock,
+                                vs->sceneTime,
+                                scene::getAnimationDuration(*animation));
+                        }
+                    }
+                    world.each<scene::GeometrySequenceComponent>(
+                        [&](ecs::Entity, scene::GeometrySequenceComponent& sequence) {
+                            if (!sequence.timesSeconds.empty())
+                            {
+                                importedLoopBoundary |= crossedLoopBoundary(
+                                    previousImportedClock,
+                                    vs->sceneTime,
+                                    sequence.timesSeconds.back());
+                            }
+                        });
+                }
+
+                const bool animationDiscontinuity =
+                    importedLoopBoundary
+                    || (advanceKeyframeClock && crossedLoopBoundary(
+                        previousKeyframeClock, vs->keyframeTime, keyframeDuration))
+                    || ((advanceImportedClock || advanceKeyframeClock)
+                        && (!std::isfinite(fElapsedTimeSeconds) || fElapsedTimeSeconds < 0.f
+                            || fElapsedTimeSeconds > 0.25f));
+                if (animationDiscontinuity)
+                {
+                    ew->resetSkinnedMeshMotionHistory();
+                    cfg->ResetAccumulation = true;
+                    cfg->ResetRealtimeCaches = true;
+                }
+
                 const float keyframeTime = (keyframeDuration > 0.f)
                     ? float(fmod(vs->keyframeTime, double(keyframeDuration)))
                     : float(vs->keyframeTime);
@@ -321,14 +405,18 @@ void animate(App& app, float fElapsedTimeSeconds)
                         continue;
 
                     const bool applyThis =
-                        animation->editorAuthored ? enableKeyframes : enableSkeletal;
+                        animation->editorAuthored
+                            ? enableKeyframes
+                            : (enableSkeletal && activeImportedAnimations.contains(
+                                static_cast<uint32_t>(animEntity)));
                     if (!applyThis)
                         continue;
 
-                    (void)scene::applyAnimation(
-                        *animation,
-                        animation->editorAuthored ? keyframeTime : importedTime,
-                        *ew);
+                    const float duration = scene::getAnimationDuration(*animation);
+                    const float sampleTime = animation->editorAuthored
+                        ? keyframeTime
+                        : float(fmod(vs->sceneTime, double(duration)));
+                    (void)scene::applyAnimation(*animation, sampleTime, *ew);
                     for (const auto& channel : animation->channels)
                     {
                         if (channel.attribute != AnimationAttribute::Visibility)
@@ -340,17 +428,11 @@ void animate(App& app, float fElapsedTimeSeconds)
                     }
                 }
 
-                if (advanceImportedClock || advanceKeyframeClock)
-                {
-                    ew->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
-                }
-                else
-                {
-                    // Playback gated but neither clock is advancing: keep
-                    // previous==current so temporal filters stay quiet.
-                    ew->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
+                // SceneRefreshEntityWorld owns the single hierarchy propagation in
+                // PostUpdate. Refreshing here as well captures previous=current on
+                // the second traversal and destroys animation motion vectors.
+                if (!advanceImportedClock && !advanceKeyframeClock)
                     ew->syncPreviousTransformsFromCurrent();
-                }
 
                 if (touchedGaussianVisibility)
                     runtime->Invalidation.AccelerationStructRebuildRequested = true;
@@ -362,11 +444,17 @@ void animate(App& app, float fElapsedTimeSeconds)
                     const PathTracerSettings* before = cfg;
                     const bool hadResetAccumulation = before && before->ResetAccumulation;
                     world.each<scene::GeometrySequenceComponent>(
-                        [&](ecs::Entity entity, scene::GeometrySequenceComponent&) {
+                        [&](ecs::Entity entity, scene::GeometrySequenceComponent& sequence) {
+                            const float duration = sequence.timesSeconds.empty()
+                                ? 0.f
+                                : sequence.timesSeconds.back();
+                            const float sampleTime = duration > 0.f
+                                ? float(fmod(vs->sceneTime, double(duration)))
+                                : float(vs->sceneTime);
                             (void)applyGeometrySequence(
                                 app,
                                 entity,
-                                importedTime,
+                                sampleTime,
                                 MeshDeformOptions{ .resetAccumulationOnAccelRebuild = false });
                         });
                     // Loop wraps may request accumulation reset via mesh-edit internals.
