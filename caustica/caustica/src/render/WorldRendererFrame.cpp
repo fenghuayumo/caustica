@@ -99,7 +99,6 @@ void caustica::render::WorldRenderer::populateRenderFrameContext(
     RenderFrameContext& ctx)
 {
     ctx = {};
-    ctx.frame.renderer = this;
     ctx.frame.framebuffer = framebuffer;
     ctx.frame.displaySize = m_displaySize;
     ctx.frame.renderSize = m_renderSize;

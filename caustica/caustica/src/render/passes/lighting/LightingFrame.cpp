@@ -130,13 +130,3 @@ void caustica::render::updateLightSamplingBeginFrame(
         makeUpdateLightingParams(context, commandList, frameIndex, gaussianSplatEmissionProxies);
     caustica::updateLightSamplingBegin(context.camera, context.accelStructs, params);
 }
-
-void caustica::render::updateLightingFrame(
-    PathTracingContext& context,
-    caustica::rhi::CommandListHandle commandList,
-    uint64_t frameIndex,
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
-{
-    updateEnvMapFrame(context, commandList, frameIndex);
-    updateLightSamplingBeginFrame(context, commandList, frameIndex, gaussianSplatEmissionProxies);
-}

@@ -99,8 +99,6 @@ public:
     bool create(const createParams& params);
     void destroy();
 
-    [[nodiscard]] CameraController& renderCamera() { return m_renderCamera; }
-    [[nodiscard]] const CameraController& renderCamera() const { return m_renderCamera; }
     [[nodiscard]] AccelStructManager& accelStructs() { return m_accelStructs; }
     [[nodiscard]] const AccelStructManager& accelStructs() const { return m_accelStructs; }
     [[nodiscard]] SceneLightingPasses& lightingPasses() { return m_scenePasses.lighting; }
@@ -121,14 +119,6 @@ public:
 
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
-    [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& gaussianSplatEmissionProxies() const
-    {
-        return m_gaussianSplatEmissionProxies;
-    }
-    [[nodiscard]] DenoisePass* getDenoisePass() { return m_denoisePass.get(); }
-    [[nodiscard]] const DenoisePass* getDenoisePass() const { return m_denoisePass.get(); }
-    [[nodiscard]] GaussianSplatFramePass* getGaussianSplatFramePass() { return m_gaussianFramePass.get(); }
-    [[nodiscard]] const GaussianSplatFramePass* getGaussianSplatFramePass() const { return m_gaussianFramePass.get(); }
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
     // Render-thread only. Caller must waitForIdle() first.
     void releaseStreamlineTemporalResources();
@@ -149,14 +139,7 @@ public:
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
-    caustica::rhi::BindingLayoutHandle getBindingLayout() const { return m_bindingLayout; }
-    caustica::rhi::BindingLayoutHandle getBindlessLayout() const { return m_bindlessLayout; }
     caustica::rhi::BindingSetHandle getBindingSet() const { return m_bindingSet; }
-
-    RtxdiPass* getRtxdiPass() { return m_rtxdiPass.get(); }
-    const RtxdiPass* getRtxdiPass() const { return m_rtxdiPass.get(); }
-    PathTracePass* getPathTracePass() { return m_pathTracePass.get(); }
-    const PathTracePass* getPathTracePass() const { return m_pathTracePass.get(); }
 
     std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
     std::shared_ptr<RtPipelineCache> getRtPipelineCache() const { return m_rtPipelineCache; }
@@ -164,36 +147,18 @@ public:
     // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
     // Call on the render thread after the first PT update has a hit-group set.
     uint32_t precacheAllRtFeaturePresets(bool showProgress = true);
-    std::shared_ptr<ShaderDebug> getShaderDebug() const { return m_shaderDebug; }
 
     std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineBuildStablePlanes() { return m_ptPipelineBuildStablePlanes; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineFillStablePlanes() { return m_ptPipelineFillStablePlanes; }
     std::shared_ptr<PTPipelineVariant>& ptPipelineEdgeDetection() { return m_ptPipelineEdgeDetection; }
 
-    caustica::rhi::CommandListHandle getCommandList() const
-    {
-        return m_frameCommands ? m_frameCommands->primaryHandle() : nullptr;
-    }
-    caustica::rhi::BufferHandle getConstantBuffer() const { return m_constantBuffer; }
-
-    [[nodiscard]] caustica::rhi::CommandListPool* commandListPool() { return m_commandListPool.get(); }
-    [[nodiscard]] caustica::rhi::FrameCommandContext* frameCommands() { return m_frameCommands.get(); }
-
-    TemporalAntiAliasingPass* getTemporalAntiAliasingPass() { return m_temporalAntiAliasingPass.get(); }
-    AccumulationPass* getAccumulationPass() { return m_accumulationPass.get(); }
-    BloomPass* getBloomPass() { return m_bloomPass.get(); }
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
-    CameraController& getCameraController() { return m_context->camera; }
-    PathTracingContext& getPathTracingContext() { return *m_context; }
-    const PathTracingContext& getPathTracingContext() const { return *m_context; }
 
     dm::uint2 getRenderSize() const { return m_renderSize; }
     dm::uint2 getDisplaySize() const { return m_displaySize; }
-    float getDisplayAspectRatio() const { return m_displayAspectRatio; }
 
     uint64_t getFrameIndex() const { return m_frameIndex; }
-    uint getSampleIndex() const { return m_sampleIndex; }
     int getAccumulationSampleIndex() const { return m_accumulationSampleIndex; }
     bool getAccumulationCompleted() const { return m_accumulationCompleted; }
 
@@ -211,10 +176,6 @@ public:
         m_gaussianSplatTemporalReset = false;
         return value;
     }
-
-#if CAUSTICA_WITH_NATIVE_DLSS
-    DLSS* getNativeDLSS() { return m_nativeDLSS.get(); }
-#endif
 
     void denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const;
 

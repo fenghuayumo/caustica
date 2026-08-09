@@ -13,12 +13,9 @@ class RenderTargets;
 namespace caustica::render
 {
 
-class WorldRenderer;
-
 // Per-frame mutable state threaded through the path-tracing pass pipeline.
 struct PathTracingFrameContext
 {
-    WorldRenderer* renderer = nullptr;
     caustica::rhi::Framebuffer*      framebuffer = nullptr;
 
     dm::uint2 displaySize{};

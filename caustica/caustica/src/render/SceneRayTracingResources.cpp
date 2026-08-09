@@ -387,15 +387,6 @@ void SceneRayTracingResources::recreateBindingSet(
     m_worldRenderer->recreateBindingSet(renderData);
 }
 
-void SceneRayTracingResources::sampleRenderCode(caustica::rhi::Framebuffer* framebuffer,
-    caustica::rhi::CommandListHandle commandList,
-    const FrameConstants& constants)
-{
-    (void)framebuffer;
-    (void)commandList;
-    (void)constants;
-}
-
 bool SceneRayTracingResources::consumeShaderReloadRequest()
 {
     if (!m_invalidation->ShaderReloadRequested)

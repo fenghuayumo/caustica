@@ -40,10 +40,4 @@ void updateLightSamplingBeginFrame(
     uint64_t frameIndex,
     const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies);
 
-void updateLightingFrame(
-    PathTracingContext& context,
-    caustica::rhi::CommandListHandle commandList,
-    uint64_t frameIndex,
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies);
-
 } // namespace caustica::render

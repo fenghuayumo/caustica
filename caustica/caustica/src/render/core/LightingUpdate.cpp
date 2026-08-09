@@ -170,19 +170,6 @@ void updateLightSamplingBegin(
         params.environment->getImportanceSampling()->getRadianceAndImportanceMap());
 }
 
-void updateLighting(CameraController& camera, AccelStructManager& accelStructs, UpdateLightingParams& params)
-{
-    RAII_SCOPE(
-        if (params.commandList)
-            params.commandList->beginMarker("UpdateLighting");
-        ,
-        if (params.commandList)
-            params.commandList->endMarker(););
-
-    updateEnvMapLighting(params);
-    updateLightSamplingBegin(camera, accelStructs, params);
-}
-
 void syncEnvMapSceneParams(
     const PathTracerSettings& settings,
     EnvMapSceneParams& params,

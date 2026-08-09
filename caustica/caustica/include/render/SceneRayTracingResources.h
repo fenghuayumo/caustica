@@ -5,7 +5,6 @@
 #include <render/core/PtPipelineFeaturePresets.h>
 #include <render/RenderRuntimeState.h>
 #include <rhi/rhi.h>
-#include <shaders/FrameConstantBuffer.h>
 
 #include <functional>
 #include <memory>
@@ -82,10 +81,6 @@ public:
     void requestFullRebuild();
     void invalidateBindingSet();
     void recreateBindingSet(const caustica::scene::SceneRenderData* renderData = nullptr);
-
-    void sampleRenderCode(caustica::rhi::Framebuffer* framebuffer,
-        caustica::rhi::CommandListHandle commandList,
-        const FrameConstants& constants);
 
     bool consumeShaderReloadRequest();
     bool& accelerationStructRebuildRequested();

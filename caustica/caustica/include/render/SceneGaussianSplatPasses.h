@@ -13,7 +13,6 @@
 #include <vector>
 
 class RenderTargets;
-class ShaderDebug;
 
 namespace caustica
 {
@@ -78,7 +77,6 @@ private:
 
     std::function<void()> m_onTemporalReset;
     std::function<RenderTargets*()> m_getRenderTargets;
-    std::function<std::shared_ptr<ShaderDebug>()> m_getShaderDebug;
 
     std::vector<SceneObject> m_objects;
     std::unordered_map<uint32_t, GaussianSplatPass*> m_passByEntity;

@@ -21,7 +21,6 @@ class RenderDevice;
 } // namespace caustica
 
 class RenderTargets;
-class ShaderDebug;
 
 namespace caustica::render
 {
@@ -49,7 +48,6 @@ struct ScenePassWireParams
     caustica::render::RenderDevice& renderDevice;
     std::function<void()> onGaussianSplatTemporalReset;
     std::function<RenderTargets*()> getRenderTargets;
-    std::function<std::shared_ptr<ShaderDebug>()> getShaderDebug;
 };
 
 // Scene-scoped render pass bundles owned by WorldRenderer (not Application hosts).

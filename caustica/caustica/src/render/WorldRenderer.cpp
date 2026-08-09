@@ -145,9 +145,6 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
     sceneWireParams.getRenderTargets = [this]() {
         return getRenderTargets();
     };
-    sceneWireParams.getShaderDebug = [this]() {
-        return getShaderDebug();
-    };
     m_scenePasses.wireSession(sceneWireParams);
     return true;
 }

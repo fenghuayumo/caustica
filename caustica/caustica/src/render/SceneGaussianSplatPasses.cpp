@@ -26,7 +26,6 @@ void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
     m_renderDevice = &params.renderDevice;
     m_onTemporalReset = params.onGaussianSplatTemporalReset;
     m_getRenderTargets = params.getRenderTargets;
-    m_getShaderDebug = params.getShaderDebug;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)

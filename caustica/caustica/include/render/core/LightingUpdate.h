@@ -93,12 +93,6 @@ void updateLightSamplingBegin(
     AccelStructManager& accelStructs,
     UpdateLightingParams& params);
 
-// Convenience: EnvMap then LightSampling begin (legacy callers).
-void updateLighting(
-    CameraController& camera,
-    AccelStructManager& accelStructs,
-    UpdateLightingParams& params);
-
 void updateLightingEnd(UpdateLightingEndParams& params);
 
 } // namespace caustica
