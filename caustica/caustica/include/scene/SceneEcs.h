@@ -131,6 +131,9 @@ struct SkinnedMeshComponent
     std::shared_ptr<MeshInfo> prototypeMesh;
     std::vector<SkinnedMeshJoint> joints;
     uint32_t lastUpdateFrameIndex = 0;
+    // One-shot request consumed by Extract. Used for loop wraps/seeks where the
+    // previous rendered pose is not a valid temporal predecessor.
+    bool resetMotionHistory = false;
 };
 
 struct SkinnedMeshReferenceComponent
@@ -374,6 +377,7 @@ public:
     void applyAnimations(float time);
     void markTransformDirty();
     void markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity);
+    void resetSkinnedMeshMotionHistory();
     void assignGlobalResourceIndices();
     void refreshInstanceIndices();
 

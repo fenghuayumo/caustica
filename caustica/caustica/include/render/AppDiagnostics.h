@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/progress.h>
+#include <render/FrameTelemetry.h>
 #include <render/core/RtPipelineCache.h>
 
 #include <chrono>
@@ -11,6 +12,7 @@ namespace caustica::render
 // Host-owned diagnostics consumed by the path tracer (progress UI, benchmarks).
 struct AppDiagnostics
 {
+    FrameTelemetry frameTelemetry;
     ProgressBar progressInitializingRenderer;
     // RT scratch for OMM / opacity queue; Logic mirrors into LoadSession::secondaryStreaming.
     // Do not gate Open Scene on this: scene teardown cancels secondary streaming.

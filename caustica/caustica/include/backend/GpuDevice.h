@@ -239,6 +239,20 @@ namespace caustica
         uint32_t sampleCount = 1;
     };
 
+    // Snapshot of the presentation policy actually used by the backend. This is
+    // intentionally small and backend-neutral so diagnostics can distinguish
+    // renderer work from display-system pacing without reaching into DXGI/Vulkan.
+    struct PresentRuntimeInfo
+    {
+        bool headless = false;
+        bool requestedVsync = false;
+        bool activeVsync = false;
+        bool windowed = true;
+        bool tearingSupported = false;
+        bool tearingActive = false;
+        uint32_t backBufferCount = 0;
+    };
+
     class GpuDevice
     {
         friend class App;
@@ -298,7 +312,7 @@ namespace caustica
         float m_DPIScaleFactorY = 1.f;
         float m_PrevDPIScaleFactorX = 0.f;
         float m_PrevDPIScaleFactorY = 0.f;
-        bool m_RequestedVSync = false;
+        std::atomic<bool> m_RequestedVSync{false};
         bool m_InstanceCreated = false;
         bool m_RequestedRenderUnfocused = true;
 
@@ -361,8 +375,21 @@ namespace caustica
         void setFrameTimeUpdateInterval(double seconds) { m_AverageTimeUpdateInterval = seconds; }
         [[nodiscard]] bool isHeadless() const { return m_DeviceParams.headlessDevice; }
         [[nodiscard]] bool isVsyncEnabled() const { return m_DeviceParams.vsyncEnabled; }
+        [[nodiscard]] virtual PresentRuntimeInfo getPresentRuntimeInfo() const
+        {
+            PresentRuntimeInfo info;
+            info.headless = m_DeviceParams.headlessDevice;
+            info.requestedVsync = m_RequestedVSync.load(std::memory_order_relaxed);
+            info.activeVsync = m_DeviceParams.vsyncEnabled;
+            info.windowed = !m_DeviceParams.startFullscreen;
+            info.backBufferCount = m_DeviceParams.swapChainBufferCount;
+            return info;
+        }
         [[nodiscard]] bool supportsExplicitDisplayScaling() const { return m_DeviceParams.supportExplicitDisplayScaling; }
-        virtual void setVsyncEnabled(bool enabled) { m_RequestedVSync = enabled; /* will be processed later */ }
+        virtual void setVsyncEnabled(bool enabled)
+        {
+            m_RequestedVSync.store(enabled, std::memory_order_relaxed); // processed during window sync
+        }
         virtual void reportLiveObjects() {}
 
         [[nodiscard]] virtual bool queryVideoMemoryInfo(VideoMemoryInfo& out) const;

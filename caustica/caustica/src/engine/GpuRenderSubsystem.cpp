@@ -109,7 +109,7 @@ size_t GpuRenderSubsystem::uploadMeshes(
     size_t targetUploadBytes)
 {
     if (!m_worldRenderer)
-        return renderData.meshSnapshots.size();
+        return renderData.staticData().meshSnapshots.size();
     return render::SceneGpuUpdater::uploadMeshesAfterLoad(
         renderData,
         m_worldRenderer->sceneGpuResources(),
@@ -133,7 +133,7 @@ bool GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
         m_gpuSharedCaches ? m_gpuSharedCaches->descriptorTable.get() : nullptr,
         0))
         return false;
-    m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.geometryCount);
+    m_worldRenderer->lightingPasses().notifySceneReloaded(renderData.staticData().geometryCount);
 
     if (m_gpuSharedCaches && m_gpuSharedCaches->renderDevice)
     {
@@ -141,7 +141,7 @@ bool GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
         {
             materials->reloadMaterialsForSceneSwitch(
                 *m_gpuSharedCaches->renderDevice,
-                renderData.materialSnapshots,
+                renderData.staticData().materialSnapshots,
                 scenePath,
                 getLocalPath(c_AssetsFolder));
         }

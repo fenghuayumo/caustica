@@ -116,7 +116,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 {
     // Always grow the debug buffer for runtime imports — AS rebuild marks DebugDataDirty
     // and update() will write per-geometry slots even when OMM baking is disabled.
-    ensureGeometryDebugCapacity(renderData.geometryCount);
+    ensureGeometryDebugCapacity(renderData.staticData().geometryCount);
 
     m_ommBuildQueue->cancelPendingBuilds();
 
@@ -133,7 +133,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
 
     // Queue atomically only after every eligible alpha texture is GPU-ready. This
     // avoids duplicate partial queues while still allowing a cheap retry next frame.
-    for (const auto& mesh : renderData.meshSnapshots)
+    for (const auto& mesh : renderData.staticData().meshSnapshots)
     {
         if (mesh.isSkinPrototype || mesh.hasSkinPrototype)
             continue;
@@ -154,7 +154,7 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
     }
 
     m_waitingForMaterialTextures = false;
-    for (const auto& mesh : renderData.meshSnapshots)
+    for (const auto& mesh : renderData.staticData().meshSnapshots)
     {
         if (mesh.isSkinPrototype)
             continue; // skip the skinning prototypes
@@ -224,7 +224,7 @@ void OpacityMicromapBuilder::destroyOpacityMicromaps(
     if (!commandList.open())
         return;
 
-    for (const auto& mesh : renderData.meshSnapshots)
+    for (const auto& mesh : renderData.staticData().meshSnapshots)
     {
         if (m_sceneGpuResources == nullptr)
             continue;
@@ -344,10 +344,10 @@ bool OpacityMicromapBuilder::update(
     RAII_SCOPE( commandList.beginMarker("OpacityMicromapBuilder");, commandList.endMarker(); );
 
     // Runtime drag-drop grows geometry count without sceneLoaded(); resize before any writes.
-    ensureGeometryDebugCapacity(renderData.geometryCount);
+    ensureGeometryDebugCapacity(renderData.staticData().geometryCount);
 
     bool anyDirty = false;
-    for (const auto& mesh : renderData.meshSnapshots)
+    for (const auto& mesh : renderData.staticData().meshSnapshots)
     {
         if (m_sceneGpuResources == nullptr)
             continue;
@@ -558,7 +558,7 @@ bool OpacityMicromapBuilder::debugGUI(
             {
                 UI_SCOPED_INDENT(indent);
 
-                for (const auto& mesh : renderData.meshSnapshots)
+                for (const auto& mesh : renderData.staticData().meshSnapshots)
                 {
                     if (m_sceneGpuResources == nullptr)
                         continue;

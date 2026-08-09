@@ -572,7 +572,7 @@ void onSceneLoaded(App& app)
     vs->loadSession.texturesTotal = texturesPending;
     vs->loadSession.stepTexturesRemaining.store(texturesPending, std::memory_order_relaxed);
     vs->loadSession.meshBegin = 0;
-    vs->loadSession.meshTotal = renderData->meshSnapshots.size();
+    vs->loadSession.meshTotal = renderData->staticData().meshSnapshots.size();
     vs->loadSession.gpuSetupFrameIndex = gpuDevice(app) ? gpuDevice(app)->getFrameIndex() : 0;
     vs->sceneGpuSuspended.store(true, std::memory_order_release);
     syncLoadProgress(*vs);
@@ -855,7 +855,7 @@ void tickLoadSession(App& app)
             const size_t next = gr->uploadMeshes(
                 *data, start, LoadSession::kMeshUploadTargetBytes);
             session.stepMeshNext.store(next, std::memory_order_relaxed);
-            if (next <= start && next < data->meshSnapshots.size())
+            if (next <= start && next < data->staticData().meshSnapshots.size())
                 session.stepStatus.store(2, std::memory_order_release);
             else
                 session.stepStatus.store(1, std::memory_order_release);

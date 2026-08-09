@@ -59,6 +59,7 @@ AppSchedules& AppSchedules::addSystem(
 {
     PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
     phase.systems.push_back(System{ std::move(label), std::move(system), std::move(ordering) });
+    phase.executionOrderDirty = true;
     return *this;
 }
 
@@ -66,6 +67,7 @@ AppSchedules& AppSchedules::configureSets(AppSchedule schedule, SystemLabel earl
 {
     PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
     phase.setOrder.push_back(SetOrderRule{ std::move(earlier), std::move(later), false });
+    phase.executionOrderDirty = true;
     return *this;
 }
 
@@ -73,6 +75,7 @@ AppSchedules& AppSchedules::configureSetAfterOthers(AppSchedule schedule, System
 {
     PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
     phase.setOrder.push_back(SetOrderRule{ {}, std::move(later), true });
+    phase.executionOrderDirty = true;
     return *this;
 }
 
@@ -183,8 +186,12 @@ std::vector<int> AppSchedules::buildExecutionOrder(const PhaseSchedule& phase)
 void AppSchedules::run(AppSchedule schedule, SystemContext& context) const
 {
     const PhaseSchedule& phase = m_phases[phaseIndex(schedule)];
-    const std::vector<int> order = buildExecutionOrder(phase);
-    for (int index : order)
+    if (phase.executionOrderDirty)
+    {
+        phase.cachedExecutionOrder = buildExecutionOrder(phase);
+        phase.executionOrderDirty = false;
+    }
+    for (int index : phase.cachedExecutionOrder)
     {
         const System& system = phase.systems[static_cast<std::size_t>(index)];
         if (system.fn)
@@ -198,6 +205,8 @@ void AppSchedules::clear()
     {
         phase.systems.clear();
         phase.setOrder.clear();
+        phase.cachedExecutionOrder.clear();
+        phase.executionOrderDirty = true;
     }
 }
 

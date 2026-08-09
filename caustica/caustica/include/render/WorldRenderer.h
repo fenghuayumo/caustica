@@ -30,6 +30,7 @@
 #include <render/PathTracingFrameContext.h>
 
 #include <chrono>
+#include <array>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -340,6 +341,14 @@ private:
     bool                                                m_feedbackReadbackPending = false;
     // ADR 0002 S2: shared graphics fence for needNewPasses / RT recreate.
     caustica::rhi::EventQueryHandle                     m_graphicsSyncQuery;
+    struct GpuFrameTimerSlot
+    {
+        caustica::rhi::TimerQueryHandle query;
+        uint32_t frameIndex = 0;
+        bool pending = false;
+    };
+    std::array<GpuFrameTimerSlot, 4>                    m_gpuFrameTimers{};
+    int                                                 m_activeGpuFrameTimer = -1;
     caustica::rhi::BufferHandle                         m_debugLineBufferCapture;
     caustica::rhi::BufferHandle                         m_debugLineBufferDisplay;
     caustica::rhi::ShaderHandle                         m_linesVertexShader;

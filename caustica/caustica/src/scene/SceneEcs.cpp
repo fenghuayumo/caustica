@@ -606,6 +606,14 @@ void SceneEntityWorld::markDirtySkinnedMeshesFromChangedJoints(uint32_t frameInd
         });
 }
 
+void SceneEntityWorld::resetSkinnedMeshMotionHistory()
+{
+    m_world.each<SkinnedMeshComponent>([](ecs::Entity, SkinnedMeshComponent& skinned) {
+        skinned.resetMotionHistory = true;
+        skinned.lastUpdateFrameIndex = kForceSkinnedMeshUpdateFrameIndex;
+    });
+}
+
 void SceneEntityWorld::applyDeferredCommands()
 {
     if (auto* commands = m_world.getResource<ecs::CommandQueue>())

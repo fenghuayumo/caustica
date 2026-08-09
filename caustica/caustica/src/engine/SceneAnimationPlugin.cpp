@@ -35,7 +35,10 @@ void SceneAnimationPlugin::configureSchedules(App& app)
                 manager->updateLoading();
             tickLoadSession(ctx.app);
 
-            if (!ctx.windowFocused)
+            // Keep the animation clock one-to-one with submitted render frames.
+            // During scene streaming/skip-render gaps, windowFocused may remain
+            // true solely to pump loading work.
+            if (!ctx.runRender)
                 return;
 
             animate(ctx.app, ctx.deltaTimeSeconds);

@@ -6,7 +6,11 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <climits>
+#include <cmath>
+#include <cstring>
+#include <numeric>
 #include <vector>
 
 namespace caustica::rg
@@ -26,29 +30,38 @@ namespace
 
 }
 
-PassBuilder::PassBuilder(GraphBuilder& graph)
+PassBuilder::PassBuilder(
+    GraphBuilder& graph,
+    TextureAccessList& textureReads,
+    TextureAccessList& textureWrites,
+    BufferAccessList& bufferReads,
+    BufferAccessList& bufferWrites)
     : m_graph(&graph)
+    , m_textureReads(&textureReads)
+    , m_textureWrites(&textureWrites)
+    , m_bufferReads(&bufferReads)
+    , m_bufferWrites(&bufferWrites)
 {
 }
 
 void PassBuilder::read(TextureHandle texture, TextureAccess access)
 {
-    m_textureReads.emplace_back(texture, access);
+    m_textureReads->emplace_back(texture, access);
 }
 
 void PassBuilder::write(TextureHandle texture, TextureAccess access)
 {
-    m_textureWrites.emplace_back(texture, access);
+    m_textureWrites->emplace_back(texture, access);
 }
 
 void PassBuilder::read(BufferHandle buffer, BufferAccess access)
 {
-    m_bufferReads.emplace_back(buffer, access);
+    m_bufferReads->emplace_back(buffer, access);
 }
 
 void PassBuilder::write(BufferHandle buffer, BufferAccess access)
 {
-    m_bufferWrites.emplace_back(buffer, access);
+    m_bufferWrites->emplace_back(buffer, access);
 }
 
 TextureHandle PassBuilder::createTexture(const TextureDesc& desc)
@@ -135,6 +148,7 @@ void GraphBuilder::setDevice(caustica::rhi::Device* device)
     {
         m_transientHeaps.clear();
         m_transientHeapPool.clear();
+        m_compiledPlanCache.clear();
     }
     m_device = device;
 }
@@ -321,24 +335,95 @@ void GraphBuilder::extractBuffer(BufferHandle handle, BufferAccess finalAccess)
 void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execute, PassOptions options)
 {
     Pass pass;
-    pass.name = std::string(name);
+    const size_t passIndex = m_passes.size();
+    if (passIndex < m_recycledPasses.size())
+        pass = std::move(m_recycledPasses[passIndex]);
+    pass.textureReads.clear();
+    pass.textureWrites.clear();
+    pass.bufferReads.clear();
+    pass.bufferWrites.clear();
+    pass.name.assign(name);
     pass.setup = std::move(setup);
     pass.execute = std::move(execute);
     pass.options = options;
 
     if (pass.options.enabled && pass.setup)
     {
-        PassBuilder builder(*this);
+        PassBuilder builder(
+            *this,
+            pass.textureReads,
+            pass.textureWrites,
+            pass.bufferReads,
+            pass.bufferWrites);
         pass.setup(builder);
-        pass.textureReads = builder.textureReads();
-        pass.textureWrites = builder.textureWrites();
-        pass.bufferReads = builder.bufferReads();
-        pass.bufferWrites = builder.bufferWrites();
     }
 
     m_passNames.push_back(pass.name);
     m_passes.push_back(std::move(pass));
     m_compiled = false;
+}
+
+uint64_t GraphBuilder::compiledPlanKey() const
+{
+    constexpr uint64_t offset = 1469598103934665603ull;
+    constexpr uint64_t prime = 1099511628211ull;
+    uint64_t hash = offset;
+    const auto mix = [&](const void* data, size_t size) {
+        const auto* bytes = static_cast<const uint8_t*>(data);
+        for (size_t i = 0; i < size; ++i)
+        {
+            hash ^= bytes[i];
+            hash *= prime;
+        }
+    };
+    const auto mixValue = [&](const auto& value) { mix(&value, sizeof(value)); };
+    const auto mixString = [&](std::string_view value) {
+        mix(value.data(), value.size());
+        const uint8_t terminator = 0xff;
+        mixValue(terminator);
+    };
+
+    mixValue(m_passes.size());
+    mixValue(m_textures.size());
+    mixValue(m_buffers.size());
+    for (const GraphTexture& texture : m_textures)
+    {
+        mixValue(texture.lifetime);
+        const bool hasFinal = texture.finalState.has_value();
+        mixValue(hasFinal);
+        if (hasFinal)
+            mixValue(*texture.finalState);
+    }
+    for (const GraphBuffer& buffer : m_buffers)
+    {
+        mixValue(buffer.lifetime);
+        const bool hasFinal = buffer.finalState.has_value();
+        mixValue(hasFinal);
+        if (hasFinal)
+            mixValue(*buffer.finalState);
+    }
+    for (const Pass& pass : m_passes)
+    {
+        mixString(pass.name);
+        mixValue(pass.options.enabled);
+        mixValue(pass.options.sideEffect);
+        mixValue(pass.options.serialOnPrimary);
+        mixValue(pass.options.recordingCost);
+        mixString(pass.options.executeAfter ? std::string_view(pass.options.executeAfter) : std::string_view{});
+        const auto mixAccesses = [&](const auto& accesses) {
+            mixValue(accesses.size());
+            for (const auto& [handle, access] : accesses)
+            {
+                mixValue(handle.index);
+                mixValue(access);
+            }
+        };
+        mixAccesses(pass.textureReads);
+        mixAccesses(pass.textureWrites);
+        mixAccesses(pass.bufferReads);
+        mixAccesses(pass.bufferWrites);
+    }
+    return hash;
 }
 
 void GraphBuilder::compile()
@@ -347,6 +432,49 @@ void GraphBuilder::compile()
         pass.active = false;
     m_compiledPassOrder.clear();
     m_compiledWaves.clear();
+    m_lastCompileCacheHit = false;
+
+    const uint64_t planKey = compiledPlanKey();
+    if (const auto cached = m_compiledPlanCache.find(planKey);
+        cached != m_compiledPlanCache.end()
+        && cached->second.activePasses.size() == m_passes.size()
+        && cached->second.referencedTextures.size() == m_textures.size()
+        && cached->second.referencedBuffers.size() == m_buffers.size())
+    {
+        const CompiledPlan& plan = cached->second;
+        for (size_t i = 0; i < m_passes.size(); ++i)
+            m_passes[i].active = plan.activePasses[i];
+        m_compiledPassOrder = plan.passOrder;
+        m_compiledWaves = plan.waves;
+
+        for (size_t i = 0; i < m_textures.size(); ++i)
+        {
+            GraphTexture& resource = m_textures[i];
+            if (resource.lifetime == ResourceLifetime::Transient && !plan.referencedTextures[i])
+            {
+                resource.owned = nullptr;
+                resource.texture = nullptr;
+            }
+        }
+        for (size_t i = 0; i < m_buffers.size(); ++i)
+        {
+            GraphBuffer& resource = m_buffers[i];
+            if (resource.lifetime == ResourceLifetime::Transient && !plan.referencedBuffers[i])
+            {
+                resource.owned = nullptr;
+                resource.buffer = nullptr;
+            }
+        }
+
+        allocateTransientResources(
+            plan.referencedTextures,
+            plan.referencedBuffers,
+            plan.textureLifetimes,
+            plan.bufferLifetimes);
+        m_lastCompileCacheHit = true;
+        m_compiled = true;
+        return;
+    }
 
     std::vector<std::vector<uint32_t>> incoming(m_passes.size());
     std::vector<std::vector<uint32_t>> outgoing(m_passes.size());
@@ -578,6 +706,20 @@ void GraphBuilder::compile()
     std::vector<TransientLifetime> bufferLifetimes;
     computeTransientLifetimes(textureLifetimes, bufferLifetimes);
 
+    CompiledPlan plan;
+    plan.activePasses.reserve(m_passes.size());
+    for (const Pass& pass : m_passes)
+        plan.activePasses.push_back(pass.active);
+    plan.passOrder = m_compiledPassOrder;
+    plan.waves = m_compiledWaves;
+    plan.referencedTextures = referenced;
+    plan.referencedBuffers = referencedBuffers;
+    plan.textureLifetimes = textureLifetimes;
+    plan.bufferLifetimes = bufferLifetimes;
+    if (m_compiledPlanCache.size() >= 16)
+        m_compiledPlanCache.erase(m_compiledPlanCache.begin());
+    m_compiledPlanCache.insert_or_assign(planKey, std::move(plan));
+
     allocateTransientResources(referenced, referencedBuffers, textureLifetimes, bufferLifetimes);
     m_compiled = true;
 }
@@ -589,17 +731,11 @@ void GraphBuilder::computeTransientLifetimes(
     textureLifetimes.assign(m_textures.size(), {});
     bufferLifetimes.assign(m_buffers.size(), {});
 
-    for (size_t passOrder = 0; passOrder < m_compiledPassOrder.size(); ++passOrder)
+    // Passes in one wave may execute concurrently. Give them the same lifetime
+    // coordinate so the transient allocator can never alias their resources.
+    for (size_t waveIndex = 0; waveIndex < m_compiledWaves.size(); ++waveIndex)
     {
-        const uint32_t passIndex = m_compiledPassOrder[passOrder];
-        if (passIndex >= m_passes.size())
-            continue;
-
-        const Pass& pass = m_passes[passIndex];
-        if (!pass.active)
-            continue;
-
-        const int32_t order = static_cast<int32_t>(passOrder);
+        const int32_t order = static_cast<int32_t>(waveIndex);
 
         const auto touchTexture = [&](TextureHandle handle) {
             if (!isValid(handle, m_textures.size()))
@@ -623,25 +759,34 @@ void GraphBuilder::computeTransientLifetimes(
             lifetime.lastPassOrder = std::max(lifetime.lastPassOrder, order);
         };
 
-        for (const auto& [handle, access] : pass.textureReads)
+        for (const uint32_t passIndex : m_compiledWaves[waveIndex])
         {
-            (void)access;
-            touchTexture(handle);
-        }
-        for (const auto& [handle, access] : pass.textureWrites)
-        {
-            (void)access;
-            touchTexture(handle);
-        }
-        for (const auto& [handle, access] : pass.bufferReads)
-        {
-            (void)access;
-            touchBuffer(handle);
-        }
-        for (const auto& [handle, access] : pass.bufferWrites)
-        {
-            (void)access;
-            touchBuffer(handle);
+            if (passIndex >= m_passes.size())
+                continue;
+            const Pass& pass = m_passes[passIndex];
+            if (!pass.active)
+                continue;
+
+            for (const auto& [handle, access] : pass.textureReads)
+            {
+                (void)access;
+                touchTexture(handle);
+            }
+            for (const auto& [handle, access] : pass.textureWrites)
+            {
+                (void)access;
+                touchTexture(handle);
+            }
+            for (const auto& [handle, access] : pass.bufferReads)
+            {
+                (void)access;
+                touchBuffer(handle);
+            }
+            for (const auto& [handle, access] : pass.bufferWrites)
+            {
+                (void)access;
+                touchBuffer(handle);
+            }
         }
     }
 }
@@ -1035,8 +1180,68 @@ void GraphBuilder::executeWaveSerial(caustica::rhi::CommandList* commandList, co
     }
 }
 
-void GraphBuilder::executeWaveParallel(caustica::rhi::FrameCommandContext& frameCtx, const std::vector<uint32_t>& wave)
+uint32_t GraphBuilder::executeWaveParallel(
+    caustica::rhi::FrameCommandContext& frameCtx,
+    const std::vector<uint32_t>& wave,
+    ExecuteParams params)
 {
+    std::vector<uint32_t> activePasses;
+    const auto estimatedCost = [&](uint32_t passIndex) {
+        const Pass& pass = m_passes[passIndex];
+        const auto measured = m_recordingCostHistory.find(pass.name);
+        return std::max<double>(
+            std::max<uint32_t>(1, pass.options.recordingCost),
+            measured == m_recordingCostHistory.end() ? 1.0 : measured->second);
+    };
+    double totalCost = 0.0;
+    for (const uint32_t passIndex : wave)
+    {
+        if (passIndex >= m_passes.size() || !m_passes[passIndex].active)
+            continue;
+        activePasses.push_back(passIndex);
+        totalCost += estimatedCost(passIndex);
+    }
+
+    const uint32_t minCost = std::max(1u, params.minParallelRecordingCost);
+    if (activePasses.size() < 2 || totalCost < minCost)
+    {
+        executeWaveSerial(frameCtx.primary(), wave);
+        return 0;
+    }
+
+    uint32_t maxJobs = params.maxParallelRecordingJobs;
+    if (maxJobs == 0)
+        maxJobs = std::max(1u, caustica::task::workerCount());
+    const uint32_t costJobs = std::max(
+        2u, static_cast<uint32_t>(std::ceil(totalCost / double(minCost))));
+    const uint32_t jobCount = std::min<uint32_t>(
+        static_cast<uint32_t>(activePasses.size()),
+        std::min(maxJobs, costJobs));
+    if (jobCount < 2)
+    {
+        executeWaveSerial(frameCtx.primary(), wave);
+        return 0;
+    }
+
+    struct RecordingBatch
+    {
+        std::vector<uint32_t> passes;
+        double cost = 0.0;
+        caustica::rhi::CommandListHandle commandList;
+    };
+    std::vector<RecordingBatch> batches(jobCount);
+    std::stable_sort(activePasses.begin(), activePasses.end(), [&](uint32_t a, uint32_t b) {
+        return estimatedCost(a) > estimatedCost(b);
+    });
+    for (const uint32_t passIndex : activePasses)
+    {
+        auto target = std::min_element(
+            batches.begin(), batches.end(),
+            [](const RecordingBatch& a, const RecordingBatch& b) { return a.cost < b.cost; });
+        target->passes.push_back(passIndex);
+        target->cost += estimatedCost(passIndex);
+    }
+
     // Prior serial waves may still be pending on the open primary. Flush them
     // before submitting forks so GPU order matches the compiled wave order.
     // WARNING: flush closes the primary and clears volatile CB address maps on
@@ -1051,58 +1256,69 @@ void GraphBuilder::executeWaveParallel(caustica::rhi::FrameCommandContext& frame
     for (size_t i = 0; i < m_buffers.size(); ++i)
         waveBufferStates[i] = m_buffers[i].currentState;
 
-    std::vector<caustica::rhi::CommandListHandle> forks(wave.size());
-    for (size_t i = 0; i < wave.size(); ++i)
+    for (RecordingBatch& batch : batches)
     {
-        forks[i] = frameCtx.fork();
+        batch.commandList = frameCtx.fork();
         // Emit aliasing on the RT before workers touch the lists.
-        const uint32_t passIndex = wave[i];
-        if (passIndex >= m_passes.size() || !m_passes[passIndex].active)
-            continue;
-        const Pass& pass = m_passes[passIndex];
-        for (const auto& [handle, access] : pass.textureReads)
+        for (const uint32_t passIndex : batch.passes)
         {
-            (void)access;
-            emitTextureAliasingBarrier(forks[i].Get(), handle);
-        }
-        for (const auto& [handle, access] : pass.textureWrites)
-        {
-            (void)access;
-            emitTextureAliasingBarrier(forks[i].Get(), handle);
-        }
-        for (const auto& [handle, access] : pass.bufferReads)
-        {
-            (void)access;
-            emitBufferAliasingBarrier(forks[i].Get(), handle);
-        }
-        for (const auto& [handle, access] : pass.bufferWrites)
-        {
-            (void)access;
-            emitBufferAliasingBarrier(forks[i].Get(), handle);
+            const Pass& pass = m_passes[passIndex];
+            for (const auto& [handle, access] : pass.textureReads)
+            {
+                (void)access;
+                emitTextureAliasingBarrier(batch.commandList.Get(), handle);
+            }
+            for (const auto& [handle, access] : pass.textureWrites)
+            {
+                (void)access;
+                emitTextureAliasingBarrier(batch.commandList.Get(), handle);
+            }
+            for (const auto& [handle, access] : pass.bufferReads)
+            {
+                (void)access;
+                emitBufferAliasingBarrier(batch.commandList.Get(), handle);
+            }
+            for (const auto& [handle, access] : pass.bufferWrites)
+            {
+                (void)access;
+                emitBufferAliasingBarrier(batch.commandList.Get(), handle);
+            }
         }
     }
 
     caustica::task::Group jobs;
+    std::vector<double> recordedCost(activePasses.size(), 0.0);
+    std::vector<uint32_t> costSlotByPass(m_passes.size(), UINT32_MAX);
+    for (uint32_t i = 0; i < static_cast<uint32_t>(activePasses.size()); ++i)
+        costSlotByPass[activePasses[i]] = i;
     caustica::task::parallelFor(
         jobs,
-        static_cast<uint32_t>(wave.size()),
+        static_cast<uint32_t>(batches.size()),
         caustica::task::Priority::High,
         caustica::task::Affinity::Any,
         [&](uint32_t slot) {
-            const uint32_t passIndex = wave[slot];
-            if (passIndex >= m_passes.size())
-                return;
-
-            const Pass& pass = m_passes[passIndex];
-            if (!pass.active)
-                return;
-
             auto localTex = waveTextureStates;
             auto localBuf = waveBufferStates;
-            recordPass(forks[slot].Get(), pass, &localTex, &localBuf);
+            RecordingBatch& batch = batches[slot];
+            for (const uint32_t passIndex : batch.passes)
+            {
+                const auto begin = std::chrono::steady_clock::now();
+                recordPass(batch.commandList.Get(), m_passes[passIndex], &localTex, &localBuf);
+                const double microseconds = std::chrono::duration<double, std::micro>(
+                    std::chrono::steady_clock::now() - begin).count();
+                // One cost unit is approximately 100 us of command recording.
+                recordedCost[costSlotByPass[passIndex]] = std::max(1.0, microseconds / 100.0);
+            }
         },
         1);
     caustica::task::wait(jobs);
+
+    for (uint32_t i = 0; i < static_cast<uint32_t>(activePasses.size()); ++i)
+    {
+        const std::string& name = m_passes[activePasses[i]].name;
+        double& history = m_recordingCostHistory[name];
+        history = history > 0.0 ? history * 0.8 + recordedCost[i] * 0.2 : recordedCost[i];
+    }
 
     frameCtx.submitForks();
 
@@ -1114,6 +1330,7 @@ void GraphBuilder::executeWaveParallel(caustica::rhi::FrameCommandContext& frame
         if (pass.active)
             syncPassEndStates(pass);
     }
+    return static_cast<uint32_t>(batches.size());
 }
 
 void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params)
@@ -1123,6 +1340,7 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     assert(frameCtx.primaryOpen());
     if (!m_compiled)
         compile();
+    m_lastParallelBatchCount = 0;
 
     for (const std::vector<uint32_t>& wave : m_compiledWaves)
     {
@@ -1143,7 +1361,7 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
         if (forceSerial || hasSerialPass)
             executeWaveSerial(primary, wave);
         else
-            executeWaveParallel(frameCtx, wave);
+            m_lastParallelBatchCount += executeWaveParallel(frameCtx, wave, params);
     }
 
     transitionExtractedResources(primary);
@@ -1154,7 +1372,20 @@ void GraphBuilder::reset()
     releaseTransientResources();
     m_textures.clear();
     m_buffers.clear();
-    m_passes.clear();
+    // Stable graphs reuse the storage owned by the same pass index. Do not use a
+    // LIFO pool here: exchanging capacities between unrelated passes causes
+    // avoidable reallocations when their access-list shapes differ.
+    m_recycledPasses.clear();
+    m_recycledPasses.swap(m_passes);
+    for (Pass& pass : m_recycledPasses)
+    {
+        pass.setup = {};
+        pass.execute = {};
+        pass.textureReads.clear();
+        pass.textureWrites.clear();
+        pass.bufferReads.clear();
+        pass.bufferWrites.clear();
+    }
     m_compiledPassOrder.clear();
     m_compiledWaves.clear();
     m_passNames.clear();

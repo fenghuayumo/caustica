@@ -143,7 +143,7 @@ bool SceneRayTracingResources::createBlases(
 {
     caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
     m_accelStructs->bindMaterialGpuCache(m_lightingPasses->materials().get());
-    return m_accelStructs->createBlases(commandList, renderData.meshSnapshots, settings);
+    return m_accelStructs->createBlases(commandList, renderData.staticData().meshSnapshots, settings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(caustica::rhi::CommandList* commandList)
@@ -240,10 +240,10 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
     m_accelStructs->clearRetiredAccelStructs();
     m_worldRenderer->invalidateBindingSet();
     if (progress)
-        progress("opacity", 0, renderData.meshSnapshots.size(), 0);
+        progress("opacity", 0, renderData.staticData().meshSnapshots.size(), 0);
     m_lightingPasses->createOpacityMicromaps(renderData);
     if (progress)
-        progress("blas", 0, renderData.meshSnapshots.size(), 0);
+        progress("blas", 0, renderData.staticData().meshSnapshots.size(), 0);
 
     constexpr size_t kMaxInFlightScratchBytes = 768ull * 1024ull * 1024ull;
     constexpr uint32_t kMaxInFlightSubmits = 3;
@@ -251,11 +251,11 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
     const uint64_t batchTarget = std::max<uint64_t>(targetScratchBytesPerSubmit, 1);
     const AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
 
-    for (size_t begin = 0; begin < renderData.meshSnapshots.size();)
+    for (size_t begin = 0; begin < renderData.staticData().meshSnapshots.size();)
     {
         BlasBuildBatchPlan plan;
         if (!m_accelStructs->planBlasBatch(
-                renderData.meshSnapshots, settings, begin, batchTarget, plan)
+                renderData.staticData().meshSnapshots, settings, begin, batchTarget, plan)
             || plan.endIndex <= begin)
         {
             m_invalidation->AccelerationStructRebuildRequested = true;
@@ -281,7 +281,7 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
         }
 
         const auto batch = std::span<const caustica::scene::MeshRenderResourceSnapshot>(
-            renderData.meshSnapshots.data() + begin,
+            renderData.staticData().meshSnapshots.data() + begin,
             plan.endIndex - begin);
         if (!m_accelStructs->createBlases(commandList, batch, settings))
         {
@@ -301,12 +301,12 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
         buildBudget.trackSubmit(rhiDevice, trackedScratch);
         begin = plan.endIndex;
         if (progress)
-            progress("blas", begin, renderData.meshSnapshots.size(), plan.scratchBytes);
+            progress("blas", begin, renderData.staticData().meshSnapshots.size(), plan.scratchBytes);
     }
 
     // TLAS storage is allocated only after every BLAS batch is fence-complete.
     if (progress)
-        progress("tlas", renderData.meshSnapshots.size(), renderData.meshSnapshots.size(), 0);
+        progress("tlas", renderData.staticData().meshSnapshots.size(), renderData.staticData().meshSnapshots.size(), 0);
     caustica::rhi::CommandListHandle finalList = rhiDevice->createCommandList();
     if (!finalList || !finalList->open())
     {
@@ -331,14 +331,14 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
     }
     buildBudget.trackSubmit(rhiDevice, 1);
     if (progress)
-        progress("fence", renderData.meshSnapshots.size(), renderData.meshSnapshots.size(), 0);
+        progress("fence", renderData.staticData().meshSnapshots.size(), renderData.staticData().meshSnapshots.size(), 0);
     if (!buildBudget.waitAll(rhiDevice))
     {
         m_invalidation->AccelerationStructRebuildRequested = true;
         return false;
     }
     if (progress)
-        progress("complete", renderData.meshSnapshots.size(), renderData.meshSnapshots.size(), 0);
+        progress("complete", renderData.staticData().meshSnapshots.size(), renderData.staticData().meshSnapshots.size(), 0);
     return rhiDevice->isDeviceHealthy() && m_accelStructs->hasTopLevelAS();
 }
 

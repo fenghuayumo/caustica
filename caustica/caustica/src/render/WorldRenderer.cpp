@@ -783,6 +783,14 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
 
     if (m_renderFrameCtx.frame.aborted)
     {
+        if (m_activeGpuFrameTimer >= 0)
+        {
+            GpuFrameTimerSlot& timerSlot = m_gpuFrameTimers[size_t(m_activeGpuFrameTimer)];
+            if (timerSlot.query)
+                device()->resetTimerQuery(timerSlot.query);
+            timerSlot.pending = false;
+            m_activeGpuFrameTimer = -1;
+        }
         if (m_frameCommands)
             m_frameCommands->abort();
         postUpdatePathTracing();

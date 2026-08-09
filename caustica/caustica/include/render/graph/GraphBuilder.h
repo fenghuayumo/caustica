@@ -55,6 +55,9 @@ struct PassOptions
     // Force this pass onto the primary list (and alone in its wave). Use for
     // mid-pass close/execute sync-points (e.g. ToneMapping first-frame AE).
     bool serialOnPrimary = false;
+    // Relative CPU recording cost. The compiler groups independent passes into
+    // a bounded number of worker command lists instead of one list per pass.
+    uint16_t recordingCost = 1;
     const char* executeAfter = nullptr;
 };
 
@@ -64,12 +67,22 @@ struct ExecuteParams
     // NVRHI volatile CB addresses. VolatileConstantBinder rewrites registered
     // shadows at the start of every recordPass so consumers stay valid on forks.
     bool parallelWaves = true;
+    uint32_t minParallelRecordingCost = 4;
+    uint32_t maxParallelRecordingJobs = 0; // 0 = TaskRuntime worker count
 };
 
 class PassBuilder
 {
 public:
-    explicit PassBuilder(GraphBuilder& graph);
+    using TextureAccessList = std::vector<std::pair<TextureHandle, TextureAccess>>;
+    using BufferAccessList = std::vector<std::pair<BufferHandle, BufferAccess>>;
+
+    PassBuilder(
+        GraphBuilder& graph,
+        TextureAccessList& textureReads,
+        TextureAccessList& textureWrites,
+        BufferAccessList& bufferReads,
+        BufferAccessList& bufferWrites);
 
     void read(TextureHandle texture, TextureAccess access = TextureAccess::ShaderResource);
     void write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
@@ -79,17 +92,12 @@ public:
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
 
-    [[nodiscard]] const std::vector<std::pair<TextureHandle, TextureAccess>>& textureReads() const { return m_textureReads; }
-    [[nodiscard]] const std::vector<std::pair<TextureHandle, TextureAccess>>& textureWrites() const { return m_textureWrites; }
-    [[nodiscard]] const std::vector<std::pair<BufferHandle, BufferAccess>>& bufferReads() const { return m_bufferReads; }
-    [[nodiscard]] const std::vector<std::pair<BufferHandle, BufferAccess>>& bufferWrites() const { return m_bufferWrites; }
-
 private:
     GraphBuilder* m_graph = nullptr;
-    std::vector<std::pair<TextureHandle, TextureAccess>> m_textureReads;
-    std::vector<std::pair<TextureHandle, TextureAccess>> m_textureWrites;
-    std::vector<std::pair<BufferHandle, BufferAccess>> m_bufferReads;
-    std::vector<std::pair<BufferHandle, BufferAccess>> m_bufferWrites;
+    TextureAccessList* m_textureReads = nullptr;
+    TextureAccessList* m_textureWrites = nullptr;
+    BufferAccessList* m_bufferReads = nullptr;
+    BufferAccessList* m_bufferWrites = nullptr;
 };
 
 class RenderPassContext
@@ -156,6 +164,8 @@ public:
     [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const { return m_compiledPassOrder; }
     [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaves() const { return m_compiledWaves; }
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
+    [[nodiscard]] bool lastCompileCacheHit() const { return m_lastCompileCacheHit; }
+    [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
     [[nodiscard]] size_t activePassCount() const;
     [[nodiscard]] bool isPassRegistered(std::string_view name) const;
     [[nodiscard]] bool isPassActive(std::string_view name) const;
@@ -254,11 +264,26 @@ private:
         std::vector<caustica::rhi::ResourceStates>* localTextureStates = nullptr,
         std::vector<caustica::rhi::ResourceStates>* localBufferStates = nullptr);
     void executeWaveSerial(caustica::rhi::CommandList* commandList, const std::vector<uint32_t>& wave);
-    void executeWaveParallel(caustica::rhi::FrameCommandContext& frameCtx, const std::vector<uint32_t>& wave);
+    uint32_t executeWaveParallel(
+        caustica::rhi::FrameCommandContext& frameCtx,
+        const std::vector<uint32_t>& wave,
+        ExecuteParams params);
     void buildCompiledWaves(
         const std::vector<bool>& needed,
         const std::vector<std::vector<uint32_t>>& incoming,
         const std::vector<std::vector<uint32_t>>& outgoing);
+    [[nodiscard]] uint64_t compiledPlanKey() const;
+
+    struct CompiledPlan
+    {
+        std::vector<bool> activePasses;
+        std::vector<uint32_t> passOrder;
+        std::vector<std::vector<uint32_t>> waves;
+        std::vector<bool> referencedTextures;
+        std::vector<bool> referencedBuffers;
+        std::vector<TransientLifetime> textureLifetimes;
+        std::vector<TransientLifetime> bufferLifetimes;
+    };
 
     caustica::rhi::Device* m_device = nullptr;
     RenderTargetPool* m_renderTargetPool = nullptr;
@@ -267,6 +292,9 @@ private:
     std::vector<GraphTexture> m_textures;
     std::vector<GraphBuffer> m_buffers;
     std::vector<Pass> m_passes;
+    // Keeps Pass-owned strings and access-list capacities alive across reset().
+    // Graph topology is rebuilt each frame, but its allocator footprint is not.
+    std::vector<Pass> m_recycledPasses;
     std::vector<uint32_t> m_compiledPassOrder;
     std::vector<std::vector<uint32_t>> m_compiledWaves;
     std::vector<std::string> m_passNames;
@@ -278,6 +306,10 @@ private:
     std::vector<BufferAliasingBarrier> m_bufferAliasingBarriers;
     TransientResourceStats m_transientStats;
     VolatileConstantBinder m_volatileConstants;
+    std::unordered_map<uint64_t, CompiledPlan> m_compiledPlanCache;
+    std::unordered_map<std::string, double> m_recordingCostHistory;
+    bool m_lastCompileCacheHit = false;
+    uint32_t m_lastParallelBatchCount = 0;
 };
 
 } // namespace caustica::rg

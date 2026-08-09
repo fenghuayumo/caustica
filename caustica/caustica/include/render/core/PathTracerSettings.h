@@ -211,6 +211,9 @@ struct PathTracerSettings
     int                                 actualFPSLimiter() const        { return FPSLimiter; }
 #endif
     int                                 FPSLimiter                              = 0; // 0 - no limit, otherwise limit fps to FPSLimiter and fix scene update deltaTime to 1./FPSLimiter
+    bool                                ParallelRenderGraphRecording            = true;
+    int                                 RenderGraphMinParallelRecordingCost     = 4;
+    int                                 RenderGraphMaxRecordingJobs             = 0; // 0 = TaskRuntime worker count
     bool                                EnableAnimations                        = false; // imported / skeletal (!editorAuthored)
     bool                                EnableKeyframes                         = false; // editor timeline (editorAuthored)
     bool                                EnableVsync                             = false;

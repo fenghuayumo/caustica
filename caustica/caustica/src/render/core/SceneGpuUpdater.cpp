@@ -149,7 +149,7 @@ MeshUploadPlan PlanMeshUpload(
     size_t meshBegin,
     size_t targetUploadBytes)
 {
-    const size_t meshCount = renderData.meshSnapshots.size();
+    const size_t meshCount = renderData.staticData().meshSnapshots.size();
     MeshUploadPlan plan{ std::min(meshBegin, meshCount), 0 };
     if (meshBegin >= meshCount)
         return plan;
@@ -171,7 +171,7 @@ MeshUploadPlan PlanMeshUpload(
 
     for (size_t i = meshBegin; i < meshCount; ++i)
     {
-        const auto& upload = renderData.meshSnapshots[i].upload;
+        const auto& upload = renderData.staticData().meshSnapshots[i].upload;
         size_t addedBytes = 0;
         if (upload && plannedUploads.insert(upload.get()).second
             && !gpuReadyUploads.contains(upload.get()))
@@ -384,7 +384,7 @@ bool EnsureMeshGpuBuffers(
     size_t meshBegin = 0,
     size_t meshEnd = size_t(-1))
 {
-    const size_t meshCount = renderData.meshSnapshots.size();
+    const size_t meshCount = renderData.staticData().meshSnapshots.size();
     if (meshEnd > meshCount)
         meshEnd = meshCount;
     if (meshBegin > meshEnd)
@@ -403,7 +403,7 @@ bool EnsureMeshGpuBuffers(
 
     for (size_t meshIndex = meshBegin; meshIndex < meshEnd; ++meshIndex)
     {
-        const auto& mesh = renderData.meshSnapshots[meshIndex];
+        const auto& mesh = renderData.staticData().meshSnapshots[meshIndex];
         const auto& buffers = mesh.upload;
 
         if (!buffers)
@@ -588,6 +588,7 @@ bool EnsureMeshGpuBuffers(
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
+        const std::span<const dm::float4x4> jointMatrices = renderData.jointMatrices(proxy);
         const scene::MeshRenderResourceSnapshot* skinnedMesh = renderData.findMesh(proxy.meshId);
         const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
         if (!skinnedMesh || !prototypeMesh || !proxy.meshId || !proxy.prototypeMeshId)
@@ -664,7 +665,7 @@ bool EnsureMeshGpuBuffers(
             jointBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
-            jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, proxy.jointMatrices.size());
+            jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, jointMatrices.size());
             skinnedGpu.jointBuffer = gpu.device->createBuffer(jointBufferDesc);
             if (!skinnedGpu.jointBuffer)
             {
@@ -708,6 +709,7 @@ void DispatchSkinnedMeshUpdates(
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
+        const std::span<const dm::float4x4> jointMatrices = renderData.jointMatrices(proxy);
         const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
         if (!proxy.needsSkinningUpdate || !renderData.findMesh(proxy.meshId) || !prototypeMesh
             || !proxy.meshId || !proxy.prototypeMeshId)
@@ -737,8 +739,8 @@ void DispatchSkinnedMeshUpdates(
 
         commandList->writeBuffer(
             skinnedGpu.jointBuffer,
-            proxy.jointMatrices.data(),
-            proxy.jointMatrices.size() * sizeof(float4x4));
+            jointMatrices.data(),
+            jointMatrices.size_bytes());
 
         caustica::rhi::ComputeState state;
         state.pipeline = gpu.skinningPipeline;
@@ -761,7 +763,8 @@ void DispatchSkinnedMeshUpdates(
         if (prototypeBuffers.hasAttribute(VertexAttribute::Tangent)) constants.flags |= SkinningFlag_Tangents;
         if (prototypeBuffers.hasAttribute(VertexAttribute::TexCoord1)) constants.flags |= SkinningFlag_TexCoord1;
         if (prototypeBuffers.hasAttribute(VertexAttribute::TexCoord2)) constants.flags |= SkinningFlag_TexCoord2;
-        if (!skinnedGpu.skinningInitialized) constants.flags |= SkinningFlag_FirstFrame;
+        if (!skinnedGpu.skinningInitialized || proxy.resetMotionHistory)
+            constants.flags |= SkinningFlag_FirstFrame;
         skinnedGpu.skinningInitialized = true;
 
         constants.inputPositionOffset = uint32_t(prototypeBuffers.vertexBufferRange(VertexAttribute::Position).byteOffset + vertexOffset * sizeof(float3));
@@ -863,8 +866,8 @@ void PruneRemovedGpuResources(
 {
     std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash>
         liveMeshIds;
-    liveMeshIds.reserve(renderData.meshSnapshots.size());
-    for (const scene::MeshRenderResourceSnapshot& mesh : renderData.meshSnapshots)
+    liveMeshIds.reserve(renderData.staticData().meshSnapshots.size());
+    for (const scene::MeshRenderResourceSnapshot& mesh : renderData.staticData().meshSnapshots)
     {
         if (mesh.id)
             liveMeshIds.insert(mesh.id);
@@ -875,8 +878,8 @@ void PruneRemovedGpuResources(
 
     std::unordered_set<scene::MaterialRenderResourceId, scene::MaterialRenderResourceId::Hash>
         liveMaterialIds;
-    liveMaterialIds.reserve(renderData.materialSnapshots.size());
-    for (const scene::MaterialRenderResourceSnapshot& material : renderData.materialSnapshots)
+    liveMaterialIds.reserve(renderData.staticData().materialSnapshots.size());
+    for (const scene::MaterialRenderResourceSnapshot& material : renderData.staticData().materialSnapshots)
     {
         if (material.id)
             liveMaterialIds.insert(material.id);
@@ -927,18 +930,18 @@ bool UpdateGpuSceneBuffers(
     const size_t allocationGranularity = 1024;
     bool arraysAllocated = false;
 
-    if (gpu.enableBindlessResources && renderData.geometryCount > gpu.geometryData.size())
+    if (gpu.enableBindlessResources && renderData.staticData().geometryCount > gpu.geometryData.size())
     {
-        gpu.geometryData.resize(caustica::rhi::align<size_t>(renderData.geometryCount, allocationGranularity));
+        gpu.geometryData.resize(caustica::rhi::align<size_t>(renderData.staticData().geometryCount, allocationGranularity));
         gpu.geometryBuffer = CreateGeometryBuffer(gpu);
         if (!gpu.geometryBuffer)
             return false;
         arraysAllocated = true;
     }
 
-    if (renderData.materialSnapshots.size() > gpu.materialData.size())
+    if (renderData.staticData().materialSnapshots.size() > gpu.materialData.size())
     {
-        gpu.materialData.resize(caustica::rhi::align<size_t>(renderData.materialSnapshots.size(), allocationGranularity));
+        gpu.materialData.resize(caustica::rhi::align<size_t>(renderData.staticData().materialSnapshots.size(), allocationGranularity));
         if (gpu.enableBindlessResources)
             gpu.materialBuffer = CreateMaterialBuffer(gpu);
         if (gpu.enableBindlessResources && !gpu.materialBuffer)
@@ -955,7 +958,7 @@ bool UpdateGpuSceneBuffers(
         arraysAllocated = true;
     }
 
-    for (const scene::MaterialRenderResourceSnapshot& material : renderData.materialSnapshots)
+    for (const scene::MaterialRenderResourceSnapshot& material : renderData.staticData().materialSnapshots)
     {
         if (!material.id)
             continue;
@@ -996,7 +999,7 @@ bool UpdateGpuSceneBuffers(
     if (!gpu.geometryData.empty())
     {
         uint32_t geometryResourceIndex = 0;
-        for (const auto& mesh : renderData.meshSnapshots)
+        for (const auto& mesh : renderData.staticData().meshSnapshots)
         {
             if (arraysAllocated)
                 break;
@@ -1022,7 +1025,7 @@ bool UpdateGpuSceneBuffers(
 
     if (structureChanged || arraysAllocated)
     {
-        for (const auto& mesh : renderData.meshSnapshots)
+        for (const auto& mesh : renderData.staticData().meshSnapshots)
         {
             gpu.meshRegistry[mesh.id].instanceBuffer = gpu.instanceBuffer;
 
@@ -1136,7 +1139,7 @@ size_t SceneGpuUpdater::uploadMeshesAfterLoad(
     size_t meshBegin,
     size_t targetUploadBytes)
 {
-    const size_t meshCount = renderData.meshSnapshots.size();
+    const size_t meshCount = renderData.staticData().meshSnapshots.size();
     if (meshBegin >= meshCount)
         return meshCount;
 
@@ -1205,7 +1208,7 @@ bool SceneGpuUpdater::finalizeAfterLoad(
 
     const size_t finalizeBytes = std::max(
         size_t(1) * 1024 * 1024,
-        (renderData.meshSnapshots.size() + renderData.materialSnapshots.size() + 1) * size_t(256));
+        (renderData.staticData().meshSnapshots.size() + renderData.staticData().materialSnapshots.size() + 1) * size_t(256));
     if (!budget.waitForBudget(gpu.device, finalizeBytes))
         return false;
 
@@ -1252,7 +1255,7 @@ bool SceneGpuUpdater::refreshAfterLoad(
     bool pruneRemovedResources)
 {
     constexpr size_t kMeshUploadTargetBytes = std::numeric_limits<size_t>::max();
-    const size_t meshCount = renderData.meshSnapshots.size();
+    const size_t meshCount = renderData.staticData().meshSnapshots.size();
     for (size_t begin = 0; begin < meshCount; )
     {
         const size_t next = uploadMeshesAfterLoad(

@@ -249,6 +249,16 @@ void InitializeEntries()
     AddScalar("r.Animation.Keyframes.Enabled", "Enable editor keyframe timeline playback.",
         SETTING_ACCESS(EnableKeyframes), Invalidation::None);
 
+    AddScalar("r.RenderGraph.ParallelRecording",
+        "Record independent render-graph passes in parallel.",
+        SETTING_ACCESS(ParallelRenderGraphRecording), Invalidation::None);
+    AddScalar("r.RenderGraph.MinParallelRecordingCost",
+        "Minimum estimated wave cost before parallel command recording is used.",
+        SETTING_ACCESS(RenderGraphMinParallelRecordingCost), Invalidation::None, 1, 1024);
+    AddScalar("r.RenderGraph.MaxRecordingJobs",
+        "Maximum parallel recording jobs; zero uses the task worker count.",
+        SETTING_ACCESS(RenderGraphMaxRecordingJobs), Invalidation::None, 0, 64);
+
     AddEnum("r.PathTracing.Mode", "Path tracing operating mode.",
         SETTING_ACCESS(RealtimeMode), { "reference", "realtime" }, resetCaches);
     AddScalar("r.PathTracing.TargetSamples", "Reference accumulation target.",

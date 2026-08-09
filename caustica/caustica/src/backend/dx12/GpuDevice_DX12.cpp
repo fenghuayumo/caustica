@@ -652,6 +652,22 @@ uint32_t GpuDevice_DX12::getBackBufferCount()
     return m_SwapChainDesc.BufferCount;
 }
 
+caustica::PresentRuntimeInfo GpuDevice_DX12::getPresentRuntimeInfo() const
+{
+    caustica::PresentRuntimeInfo info;
+    info.headless = m_DeviceParams.headlessDevice;
+    info.requestedVsync = m_RequestedVSync.load(std::memory_order_relaxed);
+    info.activeVsync = m_DeviceParams.vsyncEnabled;
+    info.windowed = m_DeviceParams.headlessDevice || m_FullScreenDesc.Windowed;
+    info.tearingSupported = m_TearingSupported;
+    info.tearingActive = !info.headless && !info.activeVsync
+        && info.windowed && info.tearingSupported;
+    info.backBufferCount = m_DeviceParams.headlessDevice
+        ? uint32_t(m_HeadlessBackBuffers.size())
+        : m_SwapChainDesc.BufferCount;
+    return info;
+}
+
 bool GpuDevice_DX12::present()
 {
     if (m_DeviceParams.headlessDevice)

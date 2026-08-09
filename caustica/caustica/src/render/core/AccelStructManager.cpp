@@ -273,12 +273,12 @@ void AccelStructManager::rebuildDirtyMeshes(caustica::rhi::CommandList*         
     for (const scene::MeshRenderResourceId meshId : dirtyMeshIds)
     {
         const auto meshIt = std::find_if(
-            renderData.meshSnapshots.begin(),
-            renderData.meshSnapshots.end(),
+            renderData.staticData().meshSnapshots.begin(),
+            renderData.staticData().meshSnapshots.end(),
             [meshId](const scene::MeshRenderResourceSnapshot& candidate) {
                 return candidate.id == meshId;
             });
-        if (meshIt == renderData.meshSnapshots.end() || m_sceneGpuResources == nullptr)
+        if (meshIt == renderData.staticData().meshSnapshots.end() || m_sceneGpuResources == nullptr)
             continue;
         const scene::MeshRenderResourceSnapshot& mesh = *meshIt;
         if (mesh.isSkinPrototype)

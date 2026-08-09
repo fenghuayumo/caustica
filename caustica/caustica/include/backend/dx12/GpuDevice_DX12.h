@@ -70,6 +70,7 @@ public:
     void reportLiveObjects() override;
     bool enumerateAdapters(std::vector<caustica::AdapterInfo>& outAdapters) override;
     [[nodiscard]] bool queryVideoMemoryInfo(caustica::VideoMemoryInfo& out) const override;
+    [[nodiscard]] caustica::PresentRuntimeInfo getPresentRuntimeInfo() const override;
 
     caustica::rhi::GraphicsAPI getGraphicsAPI() const override
     {

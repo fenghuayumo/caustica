@@ -18,18 +18,14 @@ using caustica::scene::internal::RenderResourceAccess;
 namespace caustica::scene
 {
 
-void SceneRenderData::clear()
+void FrameDynamicPacket::clear()
 {
     meshInstances.clear();
     skinnedMeshes.clear();
+    jointPalette.reset();
     lights.clear();
     cameras.clear();
     gaussianSplats.clear();
-    meshSnapshots.clear();
-    materialSnapshots.clear();
-    meshSnapshotIndex.clear();
-    materialSnapshotIndex.clear();
-    geometryCount = 0;
     camera = {};
     renderSettings = {};
     meshInstanceEntities.clear();
@@ -37,6 +33,12 @@ void SceneRenderData::clear()
     lightEntities.clear();
     cameraEntities.clear();
     animationEntities.clear();
+}
+
+void SceneRenderData::clear()
+{
+    FrameDynamicPacket::clear();
+    setStaticData(std::make_shared<SceneStaticPacket>());
 }
 
 const LightRenderProxy* SceneRenderData::findLight(ecs::Entity entity) const
@@ -65,18 +67,32 @@ const CameraRenderProxy* SceneRenderData::findCamera(ecs::Entity entity) const
 
 const MeshRenderResourceSnapshot* SceneRenderData::findMesh(MeshRenderResourceId id) const
 {
-    const auto it = meshSnapshotIndex.find(id);
-    return it == meshSnapshotIndex.end() || it->second >= meshSnapshots.size()
+    const SceneStaticPacket& scene = staticData();
+    const auto it = scene.meshSnapshotIndex.find(id);
+    return it == scene.meshSnapshotIndex.end() || it->second >= scene.meshSnapshots.size()
         ? nullptr
-        : &meshSnapshots[it->second];
+        : &scene.meshSnapshots[it->second];
 }
 
 const MaterialRenderResourceSnapshot* SceneRenderData::findMaterial(MaterialRenderResourceId id) const
 {
-    const auto it = materialSnapshotIndex.find(id);
-    return it == materialSnapshotIndex.end() || it->second >= materialSnapshots.size()
+    const SceneStaticPacket& scene = staticData();
+    const auto it = scene.materialSnapshotIndex.find(id);
+    return it == scene.materialSnapshotIndex.end() || it->second >= scene.materialSnapshots.size()
         ? nullptr
-        : &materialSnapshots[it->second];
+        : &scene.materialSnapshots[it->second];
+}
+
+std::span<const dm::float4x4> SceneRenderData::jointMatrices(
+    const SkinnedMeshRenderProxy& proxy) const
+{
+    if (!jointPalette || proxy.jointMatrixCount == 0
+        || proxy.jointMatrixOffset > jointPalette->size()
+        || proxy.jointMatrixCount > jointPalette->size() - proxy.jointMatrixOffset)
+        return {};
+    return std::span<const dm::float4x4>(
+        jointPalette->data() + proxy.jointMatrixOffset,
+        proxy.jointMatrixCount);
 }
 
 namespace
@@ -209,8 +225,10 @@ bool ExtractMeshInstancesTransforms(ecs::World& world, SceneRenderData& inout)
 
 void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t frameIndex)
 {
+    const size_t previousJointCount = out.jointPalette ? out.jointPalette->size() : 0;
     out.skinnedMeshes.clear();
     out.skinnedMeshInstanceEntities.clear();
+    std::shared_ptr<std::vector<dm::float4x4>> jointPalette;
 
     world.each<SkinnedMeshComponent, MeshInstanceComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, SkinnedMeshComponent& skinned, MeshInstanceComponent& meshInstance,
@@ -227,12 +245,22 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
             const bool forceUpdate = skinned.lastUpdateFrameIndex == kForceSkinnedMeshUpdateFrameIndex;
             proxy.needsSkinningUpdate =
                 forceUpdate || skinned.lastUpdateFrameIndex + 1 >= frameIndex;
+            proxy.resetMotionHistory = skinned.resetMotionHistory;
 
             if (forceUpdate)
                 skinned.lastUpdateFrameIndex = frameIndex;
+            skinned.resetMotionHistory = false;
 
+            if (!jointPalette)
+            {
+                jointPalette = std::make_shared<std::vector<dm::float4x4>>();
+                jointPalette->reserve(previousJointCount);
+            }
             const dm::daffine3 worldToRoot = inverse(ownerGlobal.transform);
-            proxy.jointMatrices.resize(skinned.joints.size());
+            proxy.jointMatrixOffset = uint32_t(jointPalette->size());
+            proxy.jointMatrixCount = uint32_t(skinned.joints.size());
+            jointPalette->resize(jointPalette->size() + skinned.joints.size());
+            dm::float4x4* jointMatrices = jointPalette->data() + proxy.jointMatrixOffset;
 
             for (size_t i = 0; i < skinned.joints.size(); ++i)
             {
@@ -240,18 +268,20 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
                 const auto* jointGlobal = world.get<GlobalTransformComponent>(joint.jointEntity);
                 if (!jointGlobal)
                 {
-                    proxy.jointMatrices[i] = dm::float4x4::identity();
+                    jointMatrices[i] = dm::float4x4::identity();
                     continue;
                 }
 
                 const dm::float4x4 jointLocalToRoot =
                     dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
-                proxy.jointMatrices[i] = joint.inverseBindMatrix * jointLocalToRoot;
+                jointMatrices[i] = joint.inverseBindMatrix * jointLocalToRoot;
             }
 
             out.skinnedMeshes.push_back(std::move(proxy));
             out.skinnedMeshInstanceEntities.push_back(entity);
         });
+
+    out.jointPalette = std::move(jointPalette);
 }
 
 void ExtractLightsFull(ecs::World& world, SceneRenderData& out)
@@ -455,7 +485,7 @@ void applyCameraRenderProxyToController(
 
 void ExtractMaterialSnapshots(
     const SceneEntityWorld& entityWorld,
-    SceneRenderData& out)
+    SceneStaticPacket& out)
 {
     out.materialSnapshots.clear();
     out.materialSnapshotIndex.clear();
@@ -510,7 +540,7 @@ void ExtractMaterialSnapshots(
     }
 }
 
-void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneRenderData& out)
+void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneStaticPacket& out)
 {
     out.meshSnapshots.clear();
     out.meshSnapshotIndex.clear();
@@ -620,16 +650,20 @@ void extractSceneRenderData(
         // Keep active camera/settings; callers preserve them across republish.
         const ActiveCameraRenderProxy camera = inout.camera;
         const RenderSettingsSnapshot renderSettings = inout.renderSettings;
-        uint64_t resourceBindingRevision = inout.resourceBindingRevision + 1;
+        uint64_t resourceBindingRevision = inout.staticData().resourceBindingRevision + 1;
         if (resourceBindingRevision == 0)
             resourceBindingRevision = 1;
-        inout.clear();
+        // A replacement static generation is installed below; clear only the
+        // per-frame packet to avoid allocating an unused empty static packet.
+        inout.FrameDynamicPacket::clear();
         inout.camera = camera;
         inout.renderSettings = renderSettings;
-        inout.resourceBindingRevision = resourceBindingRevision;
-        inout.geometryCount = entityWorld.getGeometryCount();
-        ExtractMeshSnapshots(entityWorld, inout);
-        ExtractMaterialSnapshots(entityWorld, inout);
+        auto staticPacket = std::make_shared<SceneStaticPacket>();
+        staticPacket->resourceBindingRevision = resourceBindingRevision;
+        staticPacket->geometryCount = entityWorld.getGeometryCount();
+        ExtractMeshSnapshots(entityWorld, *staticPacket);
+        ExtractMaterialSnapshots(entityWorld, *staticPacket);
+        inout.setStaticData(std::move(staticPacket));
 
         ExtractMeshInstancesFull(world, inout);
         ExtractSkinnedMeshes(world, inout, frameIndex);

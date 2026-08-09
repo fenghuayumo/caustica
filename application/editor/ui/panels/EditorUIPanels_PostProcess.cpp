@@ -270,6 +270,63 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 }
             }
 
+            if (ImGui::CollapsingHeader("Frame telemetry"))
+            {
+                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+                const render::FrameTelemetry& telemetry =
+                    m_sceneEditor.diagnostics().frameTelemetry;
+                const render::FrameTelemetrySample frame = telemetry.latestRendered();
+                const render::FrameTelemetrySample gpuFrame = telemetry.latestGpu();
+                if (!frame.valid)
+                {
+                    ImGui::TextDisabled("Waiting for the first frame...");
+                }
+                else
+                {
+                    ImGui::Text("CPU/render frame %u", frame.frameIndex);
+                    if (gpuFrame.valid)
+                        ImGui::Text("GPU frame %u  %.3f ms", gpuFrame.frameIndex, gpuFrame.gpuMs);
+                    else
+                        ImGui::Text("GPU pending");
+                    ImGui::Text("Logic %.3f  Extract %.3f  QueueWait %.3f ms",
+                        frame.cpu(render::FrameCpuStage::Logic),
+                        frame.cpu(render::FrameCpuStage::Extract),
+                        frame.cpu(render::FrameCpuStage::FrameQueueWait));
+                    ImGui::Text("Render %.3f  Acquire %.3f  Present %.3f ms",
+                        frame.cpu(render::FrameCpuStage::Render),
+                        frame.cpu(render::FrameCpuStage::Acquire),
+                        frame.cpu(render::FrameCpuStage::Present));
+                    ImGui::Text("Build %.3f  Compile %.3f  Record %.3f ms",
+                        frame.cpu(render::FrameCpuStage::GraphBuild),
+                        frame.cpu(render::FrameCpuStage::GraphCompile),
+                        frame.cpu(render::FrameCpuStage::CommandRecord));
+                    ImGui::Text("Present: %s  requested vsync=%s  active vsync=%s",
+                        frame.presentHeadless ? "headless" : (frame.presentWindowed ? "windowed" : "fullscreen"),
+                        frame.presentRequestedVsync ? "on" : "off",
+                        frame.presentActiveVsync ? "on" : "off");
+                    ImGui::Text("Tearing: supported=%s  active=%s  back buffers=%u",
+                        frame.presentTearingSupported ? "yes" : "no",
+                        frame.presentTearingActive ? "yes" : "no",
+                        frame.presentBackBufferCount);
+                    ImGui::Text("Graph: %u passes  %u waves  %u parallel batches  plan cache %s",
+                        frame.graphPasses,
+                        frame.graphWaves,
+                        frame.parallelBatches,
+                        frame.graphPlanCacheHit ? "hit" : "miss");
+                }
+
+                ImGui::Separator();
+                ImGui::Checkbox("Parallel graph recording", &m_settings.ParallelRenderGraphRecording);
+                ImGui::InputInt("Minimum parallel cost",
+                    &m_settings.RenderGraphMinParallelRecordingCost, 1, 4);
+                m_settings.RenderGraphMinParallelRecordingCost =
+                    std::max(1, m_settings.RenderGraphMinParallelRecordingCost);
+                ImGui::InputInt("Maximum recording jobs (0 = auto)",
+                    &m_settings.RenderGraphMaxRecordingJobs, 1, 4);
+                m_settings.RenderGraphMaxRecordingJobs =
+                    std::max(0, m_settings.RenderGraphMaxRecordingJobs);
+            }
+
 
 #if ENABLE_DEBUG_VIZUALISATIONS
             if (ImGui::Combo("Debug view", (int*)&m_settings.DebugView,
@@ -382,4 +439,3 @@ void EditorUI::BuildQuickToneMappingBar(const PanelLayout& layout)
 
 
 } // namespace caustica::editor
-

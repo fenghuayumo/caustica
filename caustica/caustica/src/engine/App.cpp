@@ -1,4 +1,5 @@
 #include <engine/App.h>
+#include <engine/AppResources.h>
 #include <engine/EntryPoint.h>
 #include <engine/internal/GpuRenderScheduleRegistration.h>
 #include <engine/SceneQuery.h>
@@ -13,6 +14,8 @@
 #include <core/task/TaskRuntime.h>
 #include <engine/cmdline_utils.h>
 #include <platform/window.h>
+#include <render/AppDiagnostics.h>
+#include <render/core/PathTracerSettings.h>
 
 #if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
@@ -645,6 +648,14 @@ bool App::dispatchScheduledRender(SystemContext& context)
     const uint32_t renderFrameIndex = context.frameIndex;
     const double elapsedTime = context.elapsedTime;
     const double curTime = context.currentTime;
+    const PathTracerSettings* frameSettings = caustica::settings(*this);
+    // RTXPT samples animation, refreshes the scene graph, renders and presents
+    // on one thread before advancing the next pose. Preserve that one-to-one
+    // handoff for realtime animation; non-animated frames keep the async pipeline.
+    const bool synchronizeAnimationFrame = isSceneLoaded(*this)
+        && frameSettings
+        && frameSettings->RealtimeMode
+        && frameSettings->EnableAnimations;
 
 #if CAUSTICA_WITH_STREAMLINE
     void* slFrameToken = nullptr;
@@ -654,7 +665,7 @@ bool App::dispatchScheduledRender(SystemContext& context)
 
     if (m_useDedicatedRenderThread)
     {
-        m_renderThread.dispatch([this, gpuDevice, elapsedTime, curTime, renderFrameIndex
+        std::function<void()> renderWork = [this, gpuDevice, elapsedTime, curTime, renderFrameIndex
 #if CAUSTICA_WITH_STREAMLINE
             , slFrameToken
 #endif
@@ -671,7 +682,11 @@ bool App::dispatchScheduledRender(SystemContext& context)
                 gpuDevice->setShuttingDown(true);
             }
             m_renderThread.notifyFrameCompleted({ ok, elapsedTime, curTime });
-        });
+        };
+        if (synchronizeAnimationFrame)
+            m_renderThread.dispatchAndWait(std::move(renderWork));
+        else
+            m_renderThread.dispatch(std::move(renderWork));
         return true;
     }
 
@@ -699,6 +714,10 @@ void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double c
 bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex)
 {
     const ThreadDomainScope renderDomain(ThreadDomain::Render);
+    render::FrameTelemetry* telemetry = nullptr;
+    if (auto* diagnostics = tryResource<render::AppDiagnostics>())
+        telemetry = &diagnostics->frameTelemetry;
+    render::ScopedFrameCpuTimer renderTimer(telemetry, frameIndex, render::FrameCpuStage::Render);
     // In --syncRender mode the logic thread must pump Affinity::Render work.
     // A dedicated render thread is already inside task::pumpRender() here: pumping
     // again would recursively execute queued frames and overlap beginFrame/present.
@@ -714,7 +733,13 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
 
     gpuDevice->setRenderPhaseFrameIndex(frameIndex);
 
-    if (!gpuDevice->beginFrame())
+    bool beganFrame = false;
+    {
+        render::ScopedFrameCpuTimer acquireTimer(
+            telemetry, frameIndex, render::FrameCpuStage::Acquire);
+        beganFrame = gpuDevice->beginFrame();
+    }
+    if (!beganFrame)
     {
         caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
         if (rhiDevice && !rhiDevice->isDeviceHealthy())
@@ -755,7 +780,25 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
 #endif
     if (beforePresent)
         beforePresent(*gpuDevice, fi);
-    const bool ok = gpuDevice->present();
+    bool ok = false;
+    {
+        render::ScopedFrameCpuTimer presentTimer(
+            telemetry, frameIndex, render::FrameCpuStage::Present);
+        ok = gpuDevice->present();
+    }
+    if (telemetry)
+    {
+        const PresentRuntimeInfo present = gpuDevice->getPresentRuntimeInfo();
+        telemetry->setPresentStats(
+            frameIndex,
+            present.headless,
+            present.requestedVsync,
+            present.activeVsync,
+            present.windowed,
+            present.tearingSupported,
+            present.tearingActive,
+            present.backBufferCount);
+    }
     if (afterPresent)
         afterPresent(*gpuDevice, fi);
 #if CAUSTICA_WITH_STREAMLINE
@@ -795,8 +838,17 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     scheduleContext.runUpdate = windowVisible;
     scheduleContext.runRender = windowVisible && wantsRender && !skipRenderPhase();
 
+    render::FrameTelemetry* telemetry = nullptr;
+    if (auto* diagnostics = tryResource<render::AppDiagnostics>())
+    {
+        telemetry = &diagnostics->frameTelemetry;
+        telemetry->beginFrame(scheduleContext.frameIndex);
+    }
+
     if (scheduleContext.runUpdate)
     {
+        render::ScopedFrameCpuTimer logicTimer(
+            telemetry, scheduleContext.frameIndex, render::FrameCpuStage::Logic);
         // Affinity::Logic domain pump (ADR 0001) — before First/update systems.
         task::pumpLogic();
 
@@ -827,9 +879,17 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
             waitForRenderThreadIdle();
             m_renderSkippedSinceLastSubmission = false;
         }
-        runSchedule(AppSchedule::Extract, scheduleContext);
-        if (!dispatchScheduledRender(scheduleContext))
-            scheduleContext.abortFrame = true;
+        {
+            render::ScopedFrameCpuTimer extractTimer(
+                telemetry, scheduleContext.frameIndex, render::FrameCpuStage::Extract);
+            runSchedule(AppSchedule::Extract, scheduleContext);
+        }
+        {
+            render::ScopedFrameCpuTimer queueTimer(
+                telemetry, scheduleContext.frameIndex, render::FrameCpuStage::FrameQueueWait);
+            if (!dispatchScheduledRender(scheduleContext))
+                scheduleContext.abortFrame = true;
+        }
         if (scheduleContext.abortFrame)
             return false;
         runSchedule(AppSchedule::postRender, scheduleContext);

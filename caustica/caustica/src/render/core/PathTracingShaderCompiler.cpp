@@ -688,7 +688,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
     const bool uniqueEmpty = subInstanceCount > 0 && m_uniqueHitGroups.empty();
     const uint64_t materialStateRevision = getMaterialGpuCache()->materialStateRevision();
     const bool materialStateChanged = m_materialStateRevision != materialStateRevision;
-    const uint64_t resourceBindingRevision = sceneData ? sceneData->resourceBindingRevision : 0;
+    const uint64_t resourceBindingRevision = sceneData ? sceneData->staticData().resourceBindingRevision : 0;
     const bool resourceBindingsChanged =
         m_resourceBindingRevision != resourceBindingRevision;
 

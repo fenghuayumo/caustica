@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -67,8 +68,10 @@ namespace caustica::scene
         MeshRenderResourceId prototypeMeshId;
         dm::affine3 transformFloat = dm::affine3::identity();
         std::string debugName;
-        std::vector<dm::float4x4> jointMatrices;
+        uint32_t jointMatrixOffset = 0;
+        uint32_t jointMatrixCount = 0;
         bool needsSkinningUpdate = false;
+        bool resetMotionHistory = false;
     };
 
     // Analytic light fields + world transform. Operate on this directly — do not convert back to ECS.
@@ -251,22 +254,10 @@ namespace caustica::scene
         bool gaussianSplatTemporalReset = false;
     };
 
-    class SceneRenderData
+    // Structure-owned data changes rarely and is shared by all in-flight frame
+    // packets. This is the persistent RenderScene payload, not per-frame state.
+    struct SceneStaticPacket
     {
-    public:
-        void clear();
-
-        [[nodiscard]] const LightRenderProxy* findLight(ecs::Entity entity) const;
-        [[nodiscard]] const CameraRenderProxy* findCamera(ecs::Entity entity) const;
-        [[nodiscard]] const MeshRenderResourceSnapshot* findMesh(MeshRenderResourceId id) const;
-        [[nodiscard]] const MaterialRenderResourceSnapshot* findMaterial(MaterialRenderResourceId id) const;
-
-        std::vector<MeshInstanceRenderProxy> meshInstances;
-        std::vector<SkinnedMeshRenderProxy> skinnedMeshes;
-        std::vector<LightRenderProxy> lights;
-        std::vector<CameraRenderProxy> cameras;
-        std::vector<GaussianSplatRenderProxy> gaussianSplats;
-
         std::vector<MeshRenderResourceSnapshot> meshSnapshots;
         std::vector<MaterialRenderResourceSnapshot> materialSnapshots;
         std::unordered_map<MeshRenderResourceId, uint32_t, MeshRenderResourceId::Hash>
@@ -275,6 +266,23 @@ namespace caustica::scene
             materialSnapshotIndex;
         uint64_t resourceBindingRevision = 0;
         size_t geometryCount = 0;
+    };
+
+    // Frame-varying packet produced by Extract. Keeping this separate prevents
+    // triple-buffer publication from copying meshes, materials, maps and strings.
+    struct FrameDynamicPacket
+    {
+        void clear();
+
+        std::vector<MeshInstanceRenderProxy> meshInstances;
+        std::vector<SkinnedMeshRenderProxy> skinnedMeshes;
+        // One immutable palette per extracted frame. Scene snapshots share it
+        // across the logic cache, frame slot and structure handoff instead of
+        // allocating/copying one vector for every skinned proxy at publication.
+        std::shared_ptr<const std::vector<dm::float4x4>> jointPalette;
+        std::vector<LightRenderProxy> lights;
+        std::vector<CameraRenderProxy> cameras;
+        std::vector<GaussianSplatRenderProxy> gaussianSplats;
 
         ActiveCameraRenderProxy camera;
         RenderSettingsSnapshot renderSettings;
@@ -284,6 +292,30 @@ namespace caustica::scene
         std::vector<ecs::Entity> lightEntities;
         std::vector<ecs::Entity> cameraEntities;
         std::vector<ecs::Entity> animationEntities;
+    };
+
+    // Unified render-facing view: dynamic fields remain directly accessible while
+    // structure data is an immutable shared generation.
+    class SceneRenderData : public FrameDynamicPacket
+    {
+    public:
+        void clear();
+
+        [[nodiscard]] const LightRenderProxy* findLight(ecs::Entity entity) const;
+        [[nodiscard]] const CameraRenderProxy* findCamera(ecs::Entity entity) const;
+        [[nodiscard]] const MeshRenderResourceSnapshot* findMesh(MeshRenderResourceId id) const;
+        [[nodiscard]] const MaterialRenderResourceSnapshot* findMaterial(MaterialRenderResourceId id) const;
+        [[nodiscard]] std::span<const dm::float4x4> jointMatrices(
+            const SkinnedMeshRenderProxy& proxy) const;
+
+        [[nodiscard]] const SceneStaticPacket& staticData() const { return *m_static; }
+        void setStaticData(std::shared_ptr<const SceneStaticPacket> packet)
+        {
+            m_static = packet ? std::move(packet) : std::make_shared<SceneStaticPacket>();
+        }
+
+    private:
+        std::shared_ptr<const SceneStaticPacket> m_static = std::make_shared<SceneStaticPacket>();
     };
 
 } // namespace caustica::scene

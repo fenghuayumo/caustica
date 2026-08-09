@@ -86,7 +86,7 @@ int SceneLightingPasses::ensureMaterialsFromScene(
 {
     if (m_materials == nullptr)
         return 0;
-    return m_materials->ensureMaterialsFromScene(renderData.materialSnapshots);
+    return m_materials->ensureMaterialsFromScene(renderData.staticData().materialSnapshots);
 }
 
 void SceneLightingPasses::applyShaderMacros(std::vector<caustica::ShaderMacro>& macros)

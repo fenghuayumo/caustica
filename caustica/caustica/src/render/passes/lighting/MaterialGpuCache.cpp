@@ -1967,10 +1967,10 @@ void MaterialGpuCache::update(caustica::rhi::CommandList* commandList,
 {
     RAII_SCOPE( commandList->beginMarker("MaterialGpuCache");, commandList->endMarker(); );
 
-    ensureMaterialsFromScene(renderData.materialSnapshots);
+    ensureMaterialsFromScene(renderData.staticData().materialSnapshots);
     completeDeferredTexturesLoad(commandList);
 
-    for (const auto& snapshot : renderData.materialSnapshots)
+    for (const auto& snapshot : renderData.staticData().materialSnapshots)
     {
         const std::shared_ptr<StandardMaterial> standardMaterial = findByResourceId(snapshot.id);
         if (standardMaterial && standardMaterial->useEngineEmissiveIntensity

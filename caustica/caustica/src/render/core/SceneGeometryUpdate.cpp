@@ -80,7 +80,7 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
         return;
 
     if (params.materials != nullptr)
-        params.materials->ensureMaterialsFromScene(renderData.materialSnapshots);
+        params.materials->ensureMaterialsFromScene(renderData.staticData().materialSnapshots);
 
     render::SceneGpuUpdater::refresh(
         *scene,

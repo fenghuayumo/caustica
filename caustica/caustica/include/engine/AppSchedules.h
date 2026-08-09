@@ -173,6 +173,8 @@ private:
     {
         std::vector<System> systems;
         std::vector<SetOrderRule> setOrder;
+        mutable std::vector<int> cachedExecutionOrder;
+        mutable bool executionOrderDirty = true;
     };
 
     [[nodiscard]] static std::size_t phaseIndex(AppSchedule schedule);

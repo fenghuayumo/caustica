@@ -1306,6 +1306,7 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode 
                 // jump as high-speed motion, then drop temporal history once.
                 entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::PreserveExisting);
                 entityWorld->syncPreviousTransformsFromCurrent();
+                entityWorld->resetSkinnedMeshMotionHistory();
             }
 
             entityWorld->world().each<scene::AnimationComponent>(

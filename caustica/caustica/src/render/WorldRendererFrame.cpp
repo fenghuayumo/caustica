@@ -227,6 +227,11 @@ void caustica::render::WorldRenderer::buildFrameGraphPasses(
     const RenderGraphRegistry& graphRegistry)
 {
     assert(ctx.graph != nullptr);
+    const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    ScopedFrameCpuTimer graphBuildTimer(
+        &m_context->diagnostics.frameTelemetry,
+        telemetryFrame,
+        FrameCpuStage::GraphBuild);
 
     // Refresh after framePassSetup (DLSS/native DLSS may have changed m_renderSize and
     // synced camera views). populateRenderFrameContext runs before that and would leave
@@ -266,8 +271,14 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
     assert(ctx.graph != nullptr);
 
     FrameConstants& constants = m_frameConstants;
-
-    ctx.graph->compile();
+    const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    {
+        ScopedFrameCpuTimer graphCompileTimer(
+            &m_context->diagnostics.frameTelemetry,
+            telemetryFrame,
+            FrameCpuStage::GraphCompile);
+        ctx.graph->compile();
+    }
 
 #ifndef NDEBUG
     if (!m_context->activeSettings().RealtimeMode)
@@ -290,7 +301,24 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
                 sizeof(RtxdiBridgeConstants));
         }
     }
-    ctx.graph->execute(*m_frameCommands, { .parallelWaves = true });
+    {
+        ScopedFrameCpuTimer commandRecordTimer(
+            &m_context->diagnostics.frameTelemetry,
+            telemetryFrame,
+            FrameCpuStage::CommandRecord);
+        const PathTracerSettings& settings = m_context->activeSettings();
+        ctx.graph->execute(*m_frameCommands, {
+            .parallelWaves = settings.ParallelRenderGraphRecording,
+            .minParallelRecordingCost = uint32_t(std::max(1, settings.RenderGraphMinParallelRecordingCost)),
+            .maxParallelRecordingJobs = uint32_t(std::max(0, settings.RenderGraphMaxRecordingJobs)),
+        });
+    }
+    m_context->diagnostics.frameTelemetry.setGraphStats(
+        telemetryFrame,
+        static_cast<uint32_t>(ctx.graph->activePassCount()),
+        static_cast<uint32_t>(ctx.graph->compiledWaves().size()),
+        ctx.graph->lastParallelBatchCount(),
+        ctx.graph->lastCompileCacheHit());
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();
 
@@ -427,7 +455,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
         std::span<const scene::MaterialRenderResourceSnapshot> materialResources;
         if (m_context->frameScene)
-            materialResources = m_context->frameScene->materialSnapshots;
+            materialResources = m_context->frameScene->staticData().materialSnapshots;
         m_context->scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context->renderDevice, materialResources,
             m_context->sessionScenePath, getLocalPath(c_AssetsFolder));
@@ -542,6 +570,32 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
 void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrameContext& ctx)
 {
     m_frameCommands->beginPrimary();
+
+    for (GpuFrameTimerSlot& slot : m_gpuFrameTimers)
+    {
+        if (!slot.pending || !slot.query || !device()->pollTimerQuery(slot.query))
+            continue;
+        const float seconds = device()->getTimerQueryTime(slot.query);
+        m_context->diagnostics.frameTelemetry.setGpuTime(slot.frameIndex, double(seconds) * 1000.0);
+        device()->resetTimerQuery(slot.query);
+        slot.pending = false;
+    }
+
+    const uint32_t frameIndex = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    GpuFrameTimerSlot& timerSlot = m_gpuFrameTimers[frameIndex % m_gpuFrameTimers.size()];
+    m_activeGpuFrameTimer = -1;
+    if (!timerSlot.pending)
+    {
+        if (!timerSlot.query)
+            timerSlot.query = device()->createTimerQuery();
+        if (timerSlot.query)
+        {
+            device()->resetTimerQuery(timerSlot.query);
+            timerSlot.frameIndex = frameIndex;
+            m_frameCommands->primary()->beginTimerQuery(timerSlot.query);
+            m_activeGpuFrameTimer = int(frameIndex % m_gpuFrameTimers.size());
+        }
+    }
     ctx.submitInitializationStage = [this, &ctx](const char* stage) -> bool {
         if (!ctx.needNewPasses)
             return true;
@@ -836,7 +890,15 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
     caustica::rhi::Texture* framebufferTexture = framebuffer->getDesc().colorAttachments[0].texture;
 
+    if (m_activeGpuFrameTimer >= 0)
+    {
+        GpuFrameTimerSlot& timerSlot = m_gpuFrameTimers[size_t(m_activeGpuFrameTimer)];
+        m_frameCommands->primary()->endTimerQuery(timerSlot.query);
+        timerSlot.pending = true;
+        m_activeGpuFrameTimer = -1;
+    }
     m_frameCommands->endFrame();
+
     if (ctx.needNewPasses)
     {
         if (!waitGraphicsQueueFence("needNewPasses final", /*runGc=*/false))
