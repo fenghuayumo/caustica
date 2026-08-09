@@ -15,16 +15,17 @@
 namespace caustica::render
 {
 
-void registerUploadFrameConstantsPass(FrameGraphContext ctx)
+rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
+    assert(after.isValid());
     if (!ctx.constantBuffer || !ctx.frameConstants)
-        return;
+        return after;
 
     const rg::BufferHandle constants =
         ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
 
-    ctx.graph->addPass(
+    return ctx.graph->addPass(
         kUploadFrameConstantsPass,
         [constants](rg::PassBuilder& setup) {
             setup.write(constants, rg::BufferAccess::CopyDest);
@@ -40,24 +41,26 @@ void registerUploadFrameConstantsPass(FrameGraphContext ctx)
         },
         rg::PassOptions{
             .sideEffect = true,
-            .after = ctx.graph->requirePass(kClearFrameTargetsPass),
+            .after = after,
         });
 }
 
-void registerLightingGraphPasses(FrameGraphContext ctx)
+rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
+    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return;
+        return after;
 
     // EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData
     // Downstream passes depend on kLightingReadyPass (UploadSubInstanceData).
 
+    rg::PassHandle previous = after;
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.after = ctx.graph->requirePass(kUploadFrameConstantsPass);
+        passOptions.after = previous;
 
         rg::TextureHandle envCube{};
         rg::TextureHandle radianceImportance{};
@@ -73,7 +76,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
             }
         }
 
-        ctx.graph->addPass(
+        previous = ctx.graph->addPass(
             kEnvMapUpdatePass,
             [envCube, radianceImportance](rg::PassBuilder& setup) {
                 if (envCube.isValid())
@@ -92,7 +95,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.after = ctx.graph->requirePass(kEnvMapUpdatePass);
+        passOptions.after = previous;
 
         rg::TextureHandle radianceImportance{};
         rg::BufferHandle lightBuffer{};
@@ -114,7 +117,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
                 lightProxies = ctx.graph->importBuffer(buffer, rg::BufferAccess::UnorderedAccess);
         }
 
-        ctx.graph->addPass(
+        previous = ctx.graph->addPass(
             kLightSamplingUpdateBeginPass,
             [radianceImportance, lightBuffer, lightProxies](rg::PassBuilder& setup) {
                 if (radianceImportance.isValid())
@@ -140,7 +143,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     {
         rg::PassOptions passOptions{};
         passOptions.sideEffect = true;
-        passOptions.after = ctx.graph->requirePass(kLightSamplingUpdateBeginPass);
+        passOptions.after = previous;
 
         rg::BufferHandle subInstance{};
         rg::BufferHandle constants{};
@@ -150,7 +153,7 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
         if (ctx.constantBuffer)
             constants = ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
 
-        ctx.graph->addPass(
+        previous = ctx.graph->addPass(
             kUploadSubInstanceDataPass,
             [subInstance, constants](rg::PassBuilder& setup) {
                 if (subInstance.isValid())
@@ -178,6 +181,8 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
             },
             passOptions);
     }
+
+    return previous;
 }
 
 } // namespace caustica::render

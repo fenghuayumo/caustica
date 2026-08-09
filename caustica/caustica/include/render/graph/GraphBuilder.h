@@ -183,7 +183,6 @@ public:
     [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
     [[nodiscard]] size_t activePassCount() const;
     [[nodiscard]] PassHandle findPass(std::string_view name) const;
-    [[nodiscard]] PassHandle requirePass(std::string_view name) const;
     [[nodiscard]] bool isPassRegistered(std::string_view name) const;
     [[nodiscard]] bool isPassActive(std::string_view name) const;
 

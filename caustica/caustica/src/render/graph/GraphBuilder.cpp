@@ -177,13 +177,6 @@ PassHandle GraphBuilder::findPass(const std::string_view name) const
     return {};
 }
 
-PassHandle GraphBuilder::requirePass(const std::string_view name) const
-{
-    const PassHandle handle = findPass(name);
-    assert(handle.isValid() && "RenderGraph dependency target was not registered");
-    return handle;
-}
-
 bool GraphBuilder::isPassRegistered(const std::string_view name) const
 {
     return findPass(name).isValid();

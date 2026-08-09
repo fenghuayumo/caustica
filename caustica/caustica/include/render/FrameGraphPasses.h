@@ -1,5 +1,7 @@
 #pragma once
 
+#include <render/graph/GpuTypes.h>
+
 namespace caustica::render
 {
 
@@ -7,25 +9,37 @@ struct FrameGraphContext;
 
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx);
 
-void registerClearFrameTargetsPass(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx);
 // Writes FrameConstants after Clear (graph-owned; not pre-graph CL).
-void registerUploadFrameConstantsPass(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerUploadFrameConstantsPass(
+    FrameGraphContext ctx, rg::PassHandle after);
 // Registers EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData.
-void registerLightingGraphPasses(FrameGraphContext ctx);
-void registerRtxdiBeginFramePass(FrameGraphContext ctx);
-void registerPathTracePrePass(FrameGraphContext ctx);
-void registerVBufferExportPass(FrameGraphContext ctx);
-void registerPathTraceLightingEndPass(FrameGraphContext ctx);
-void registerGaussianSplatAccelBuildPass(FrameGraphContext ctx);
-void registerMainPathTracePass(FrameGraphContext ctx);
-void registerRtxdiExecutePass(FrameGraphContext ctx);
-void registerDenoiserPreparePass(FrameGraphContext ctx);
-void registerNrdPass(FrameGraphContext ctx);
-void registerGaussianSplatPreAAPass(FrameGraphContext ctx);
-void registerDenoiseAAPass(FrameGraphContext ctx);
-void registerGaussianSplatCompositePass(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerLightingGraphPasses(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerRtxdiBeginFramePass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerPathTracePrePass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerVBufferExportPass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerPathTraceLightingEndPass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerGaussianSplatAccelBuildPass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerMainPathTracePass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerRtxdiExecutePass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerDenoiserPreparePass(
+    FrameGraphContext ctx, rg::PassHandle after);
+[[nodiscard]] rg::PassHandle registerNrdPass(
+    FrameGraphContext ctx, rg::PassHandle guidesReady);
+[[nodiscard]] rg::PassHandle registerGaussianSplatPreAAPass(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx);
 void registerPostProcessGraphPasses(FrameGraphContext ctx);
-void registerCompositeGraphPasses(FrameGraphContext ctx);
-void registerDebugOverlayGraphPasses(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx);
+[[nodiscard]] rg::PassHandle registerDebugOverlayGraphPasses(
+    FrameGraphContext ctx, rg::PassHandle after);
 
 } // namespace caustica::render

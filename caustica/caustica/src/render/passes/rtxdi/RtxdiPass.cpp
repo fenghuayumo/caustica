@@ -761,22 +761,23 @@ void RtxdiPass::executeFrame(
 namespace caustica::render
 {
 
-void registerRtxdiBeginFramePass(FrameGraphContext ctx)
+rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle after)
 {
 	assert(ctx.graph);
 	assert(ctx.renderTargets);
 	assert(ctx.settings);
+	assert(after.isValid());
 
 	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
-		return;
+		return after;
 
 	RtxdiPass* rtxdiPass = ctx.rtxdi;
 	RtxdiGraphResources rtxdiResources{};
 	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
-		return;
+		return after;
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
-	rg::PassHandle previousPass = ctx.graph->requirePass(kLightingReadyPass);
+	rg::PassHandle previousPass = after;
 
 	rg::BufferHandle rtxdiConstants{};
 	if (rtxdiPass != nullptr)
@@ -864,21 +865,24 @@ void registerRtxdiBeginFramePass(FrameGraphContext ctx)
 					rtxdiPass->presampleReGIR(passCtx.commandList(), ctx.bindingSet);
 			});
 	}
+
+	return previousPass;
 }
 
-void registerRtxdiExecutePass(FrameGraphContext ctx)
+rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle after)
 {
 	assert(ctx.graph);
 	assert(ctx.renderTargets);
 	assert(ctx.settings);
+	assert(after.isValid());
 
 	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
-		return;
+		return after;
 
 	RtxdiPass* rtxdiPass = ctx.rtxdi;
 	RtxdiGraphResources rtxdiResources{};
 	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
-		return;
+		return after;
 
 	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 	const PathTracerSettings settings = *ctx.settings;
@@ -890,7 +894,7 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	static constexpr bool enableFusedDIGIFinal = true;
 	const bool useFusedDIGIFinal = useDI && useGI && enableFusedDIGIFinal;
 
-	rg::PassHandle previousPass = ctx.graph->requirePass("MainPathTrace");
+	rg::PassHandle previousPass = after;
 
 	auto addRtxdiExecuteStage = [&](const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
 	{
@@ -954,6 +958,8 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 					rtxdiPass->executePT(passCtx.commandList(), ctx.bindingSet);
 			});
 	}
+
+	return previousPass;
 }
 
 } // namespace caustica::render

@@ -74,8 +74,6 @@ void declareDenoiserPrepareAccess(rg::PassBuilder& setup, const PathTraceGraphTa
 void declareStablePlanesDebugVizAccess(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 
 [[nodiscard]] bool needsPathTraceLightingEndPass(const PathTracerSettings& settings);
-[[nodiscard]] const char* pathTraceLightingEndExecuteAfterPass(const PathTracerSettings& settings);
-[[nodiscard]] const char* pathTraceMainExecuteAfterPass(const PathTracerSettings& settings);
 
 void validateReferencePathTraceGraph(const rg::GraphBuilder& graph, const PathTracerSettings& settings);
 

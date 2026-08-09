@@ -12,11 +12,12 @@
 namespace caustica::render
 {
 
-void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
+rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
     assert(ctx.targetFramebuffer);
     assert(ctx.renderTargets);
+    assert(after.isValid());
 
     caustica::rhi::Framebuffer* framebuffer = ctx.targetFramebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
@@ -32,6 +33,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 
     rg::BufferHandle debugLineCapture{};
     rg::BufferHandle debugLineDisplay{};
+    rg::PassHandle debugReady = after;
 
     if (showDebugLines || copyDebugFeedback)
     {
@@ -82,7 +84,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
                 rg::PassOptions{ .sideEffect = true });
         }
 
-        ctx.graph->addPass(
+        debugReady = ctx.graph->addPass(
             "DebugLines",
             [targetColorHandle, depth, constantBuffer, debugLineCapture, debugLineDisplay](rg::PassBuilder& setup) {
                 setup.write(targetColorHandle, rg::TextureAccess::RenderTarget);
@@ -120,7 +122,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
 
                 commandList->endMarker();
             },
-            rg::PassOptions{ .sideEffect = true, .after = ctx.graph->requirePass("Blit") });
+            rg::PassOptions{ .sideEffect = true, .after = after });
     }
 
     if (copyDebugFeedback)
@@ -143,7 +145,7 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
         ctx.graph->extractBuffer(debugDeltaPathTreeCpu, rg::BufferAccess::CopyDest);
         ctx.graph->extractBuffer(debugDeltaPathTreeGpu, caustica::rhi::ResourceStates::Common);
 
-        ctx.graph->addPass(
+        debugReady = ctx.graph->addPass(
             "DebugFeedbackCopies",
             [feedbackCpu, feedbackGpu, debugLineCapture, debugLineDisplay,
                 debugDeltaPathTreeCpu, debugDeltaPathTreeGpu](rg::PassBuilder& setup) {
@@ -172,9 +174,11 @@ void registerDebugOverlayGraphPasses(FrameGraphContext ctx)
             },
             rg::PassOptions{
                 .sideEffect = true,
-                .after = ctx.graph->requirePass(showDebugLines ? "DebugLines" : "Blit"),
+                .after = debugReady,
             });
     }
+
+    return debugReady;
 }
 
 } // namespace caustica::render

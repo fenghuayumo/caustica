@@ -170,7 +170,7 @@ void registerPostProcess(FrameGraphContext ctx)
         ctx.settings->PostProcessEdgeDetection && ctx.ptEdgeDetection != nullptr);
 }
 
-void registerCompositeGraphPasses(FrameGraphContext ctx)
+rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.targetFramebuffer);
     assert(ctx.bindingCache);
@@ -188,7 +188,7 @@ void registerCompositeGraphPasses(FrameGraphContext ctx)
     const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(targetColor, rg::TextureAccess::RenderTarget);
     ctx.graph->extractTexture(targetColorHandle, rg::TextureAccess::RenderTarget);
 
-    ctx.graph->addPass(
+    return ctx.graph->addPass(
         "Blit",
         [ldrColor, targetColorHandle](rg::PassBuilder& setup) {
             setup.read(ldrColor, rg::TextureAccess::ShaderResource);

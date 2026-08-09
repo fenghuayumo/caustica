@@ -263,25 +263,23 @@ void PathTracePass::mainPass(
     }
 }
 
-void registerPathTracePrePass(FrameGraphContext ctx)
+rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
+    assert(after.isValid());
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
-        return;
+        return after;
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.after = ctx.graph->requirePass(
-        ctx.settings->actualUseRTXDIPasses()
-            ? rtxdiBeginReadyPass(ctx.settings->actualUseReSTIRDI())
-            : kLightingReadyPass);
+    passOptions.after = after;
 
-    ctx.graph->addPass(
+    return ctx.graph->addPass(
         "PathTracePrePass",
         [handles](rg::PassBuilder& setup) {
             declarePathTracePrePassAccess(setup, handles);
@@ -299,23 +297,24 @@ void registerPathTracePrePass(FrameGraphContext ctx)
         passOptions);
 }
 
-void registerVBufferExportPass(FrameGraphContext ctx)
+rg::PassHandle registerVBufferExportPass(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
+    assert(after.isValid());
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
-        return;
+        return after;
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.after = ctx.graph->requirePass("PathTracePrePass");
+    passOptions.after = after;
 
-    ctx.graph->addPass(
-        "VBufferExport",
+    return ctx.graph->addPass(
+        kVBufferExportPass,
         [handles](rg::PassBuilder& setup) {
             declareVBufferExportAccess(setup, handles);
         },
@@ -330,15 +329,16 @@ void registerVBufferExportPass(FrameGraphContext ctx)
         passOptions);
 }
 
-void registerPathTraceLightingEndPass(FrameGraphContext ctx)
+rg::PassHandle registerPathTraceLightingEndPass(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
     assert(ctx.renderTargets);
     assert(ctx.settings);
     assert(ctx.bindingCache);
+    assert(after.isValid());
 
     if (!ctx.hasScene || !needsPathTraceLightingEndPass(*ctx.settings))
-        return;
+        return after;
 
     const PathTraceLightingEndTargets handles = importPathTraceLightingEndTargets(
         *ctx.graph,
@@ -347,10 +347,9 @@ void registerPathTraceLightingEndPass(FrameGraphContext ctx)
         ctx.subInstanceDataBuffer);
 
     rg::PassOptions passOptions{};
-    passOptions.after = ctx.graph->requirePass(
-        pathTraceLightingEndExecuteAfterPass(*ctx.settings));
+    passOptions.after = after;
 
-    ctx.graph->addPass(
+    return ctx.graph->addPass(
         kPathTraceLightingEndPass,
         [handles](rg::PassBuilder& setup) {
             declarePathTraceLightingEndAccess(setup, handles);
@@ -378,23 +377,24 @@ void registerPathTraceLightingEndPass(FrameGraphContext ctx)
         passOptions);
 }
 
-void registerMainPathTracePass(FrameGraphContext ctx)
+rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx, rg::PassHandle after)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
+    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return;
+        return after;
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
     rg::PassOptions passOptions{};
-    passOptions.after = ctx.graph->requirePass(pathTraceMainExecuteAfterPass(*ctx.settings));
+    passOptions.after = after;
 
-    ctx.graph->addPass(
-        "MainPathTrace",
+    return ctx.graph->addPass(
+        kMainPathTracePass,
         [handles](rg::PassBuilder& setup) {
             declareMainPathTraceAccess(setup, handles);
         },

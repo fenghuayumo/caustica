@@ -1,13 +1,10 @@
 #pragma once
 
-#include <render/core/PathTracerSettings.h>
-
 namespace caustica::render
 {
 
-// Stable pass names used to resolve cross-module PassHandles. Prefer these over empty fence nodes.
+// Stable diagnostic names for GPU markers, telemetry, and graph validation.
 
-inline constexpr const char* kClearFrameTargetsPass = "ClearFrameTargets";
 inline constexpr const char* kUploadFrameConstantsPass = "UploadFrameConstants";
 inline constexpr const char* kEnvMapUpdatePass = "EnvMapUpdate";
 inline constexpr const char* kLightSamplingUpdateBeginPass = "LightSamplingUpdateBegin";
@@ -30,42 +27,13 @@ inline constexpr const char* kRtxdiPresampleLightsPass = "RtxdiPresampleLights";
 inline constexpr const char* kRtxdiPresampleEnvMapPass = "RtxdiPresampleEnvMap";
 inline constexpr const char* kRtxdiPresampleReGIRPass = "RtxdiPresampleReGIR";
 
-[[nodiscard]] inline const char* rtxdiBeginReadyPass(bool usingLightSampling)
-{
-    return usingLightSampling ? kRtxdiPresampleReGIRPass : kRtxdiFillConstantsPass;
-}
-
 inline constexpr const char* kRtxdiDIPass = "RtxdiDI";
 inline constexpr const char* kRtxdiGIPass = "RtxdiGI";
 inline constexpr const char* kRtxdiFusedDIGIFinalPass = "RtxdiFusedDIGIFinal";
 inline constexpr const char* kRtxdiPTPass = "RtxdiPT";
 
-[[nodiscard]] inline const char* rtxdiExecuteReadyPass(const PathTracerSettings& settings)
-{
-    static constexpr bool enableFusedDIGIFinal = true;
-    const bool useDI = settings.actualUseReSTIRDI();
-    const bool useGI = settings.actualUseReSTIRGI();
-    const bool usePT = settings.actualUseReSTIRPT();
-    const bool useFused = useDI && useGI && enableFusedDIGIFinal;
-
-    if (usePT)
-        return kRtxdiPTPass;
-    if (useFused)
-        return kRtxdiFusedDIGIFinalPass;
-    if (useGI)
-        return kRtxdiGIPass;
-    if (useDI)
-        return kRtxdiDIPass;
-    return "MainPathTrace";
-}
-
 inline constexpr const char* kDenoiseSpecHitTPass = "DenoiseSpecHitT";
 inline constexpr const char* kAvgLayerRadiancePass = "AvgLayerRadiance";
-
-[[nodiscard]] inline const char* denoiseGuidesReadyPass()
-{
-    return kAvgLayerRadiancePass;
-}
 
 [[nodiscard]] inline const char* nrdPreparePassName(int planeIndex)
 {

@@ -704,6 +704,31 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (ctx.aborted)
         return;
 
+    // Gaussian BLAS/TLAS construction happens in the frame graph. The first
+    // graph execution can therefore publish a new t7/t8 pair after the global
+    // scene binding set has already been made. Detect that transition (and
+    // later rebuilds/releases) here so the next path-tracing dispatch cannot
+    // accidentally keep the mesh TLAS/material-buffer fallbacks.
+    const GaussianSplatBinding currentGaussianBinding = getPrimaryGaussianSplatBinding(
+        m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats);
+    const GaussianSplatPass* const currentGaussianPass = currentGaussianBinding.splatPass;
+    caustica::rhi::rt::AccelStruct* const currentGaussianAS = currentGaussianPass != nullptr
+        ? currentGaussianPass->getTopLevelAS()
+        : nullptr;
+    caustica::rhi::Buffer* const currentGaussianBuffer = currentGaussianPass != nullptr
+        ? currentGaussianPass->getSplatBuffer()
+        : nullptr;
+    caustica::rhi::Buffer* const currentGaussianShBuffer = currentGaussianPass != nullptr
+        ? currentGaussianPass->getRayTracingShBuffer()
+        : nullptr;
+    if (currentGaussianAS != m_boundGaussianSplatAS
+        || currentGaussianBuffer != m_boundGaussianSplatBuffer
+        || currentGaussianShBuffer != m_boundGaussianSplatShBuffer)
+    {
+        ctx.needNewBindings = true;
+    }
+
     preUpdateLightingFrame(*m_context, m_frameCommands->primaryHandle(), ctx.needNewBindings);
     abortIfSubmitFailed(ctx, "preUpdateLighting");
     if (ctx.aborted)
@@ -1012,10 +1037,10 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
 namespace caustica::render
 {
 
-void registerClearFrameTargetsPass(FrameGraphContext ctx)
+rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
 {
     if (!ctx.graph || !ctx.renderTargets)
-        return;
+        return {};
 
     const rg::TextureHandle depth = ctx.graph->importTexture(
         ctx.renderTargets->depth,
@@ -1054,28 +1079,38 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx)
             },
             rg::PassOptions{ .sideEffect = true, .after = clearFrameTargets });
     }
+
+    return clearFrameTargets;
 }
 
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
-    registerClearFrameTargetsPass(ctx);
-    registerUploadFrameConstantsPass(ctx);
-    registerLightingGraphPasses(ctx);
-    registerRtxdiBeginFramePass(ctx);
-    registerPathTracePrePass(ctx);
-    registerVBufferExportPass(ctx);
-    registerPathTraceLightingEndPass(ctx);
-    registerGaussianSplatAccelBuildPass(ctx);
-    registerMainPathTracePass(ctx);
-    registerRtxdiExecutePass(ctx);
-    registerDenoiserPreparePass(ctx);
-    registerNrdPass(ctx);
-    registerGaussianSplatPreAAPass(ctx);
-    registerDenoiseAAPass(ctx);
-    registerGaussianSplatCompositePass(ctx);
+    assert(ctx.settings);
+
+    const rg::PassHandle clear = registerClearFrameTargetsPass(ctx);
+    const rg::PassHandle frameConstants = registerUploadFrameConstantsPass(ctx, clear);
+    const rg::PassHandle lightingReady = registerLightingGraphPasses(ctx, frameConstants);
+    const rg::PassHandle rtxdiBeginReady = registerRtxdiBeginFramePass(ctx, lightingReady);
+    const rg::PassHandle pathTracePreReady = registerPathTracePrePass(ctx, rtxdiBeginReady);
+    const rg::PassHandle vbufferReady = registerVBufferExportPass(ctx, pathTracePreReady);
+
+    const rg::PassHandle pathTraceInputsReady = ctx.settings->RealtimeMode
+        ? vbufferReady
+        : lightingReady;
+    const rg::PassHandle lightingEndReady =
+        registerPathTraceLightingEndPass(ctx, pathTraceInputsReady);
+    const rg::PassHandle gaussianAccelReady =
+        registerGaussianSplatAccelBuildPass(ctx, lightingEndReady);
+    const rg::PassHandle mainPathTraceReady = registerMainPathTracePass(ctx, gaussianAccelReady);
+    const rg::PassHandle rtxdiExecuteReady = registerRtxdiExecutePass(ctx, mainPathTraceReady);
+    const rg::PassHandle denoiseGuidesReady = registerDenoiserPreparePass(ctx, rtxdiExecuteReady);
+    (void)registerNrdPass(ctx, denoiseGuidesReady);
+    (void)registerGaussianSplatPreAAPass(ctx);
+    (void)registerDenoiseAAPass(ctx);
+    (void)registerGaussianSplatCompositePass(ctx);
     registerPostProcessGraphPasses(ctx);
-    registerCompositeGraphPasses(ctx);
-    registerDebugOverlayGraphPasses(ctx);
+    const rg::PassHandle blitReady = registerCompositeGraphPasses(ctx);
+    (void)registerDebugOverlayGraphPasses(ctx, blitReady);
 }
 
 } // namespace caustica::render
