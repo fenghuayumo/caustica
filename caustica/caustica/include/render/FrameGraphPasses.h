@@ -11,7 +11,6 @@ void registerClearFrameTargetsPass(FrameGraphContext ctx);
 // Writes FrameConstants after Clear (graph-owned; not pre-graph CL).
 void registerUploadFrameConstantsPass(FrameGraphContext ctx);
 // Registers EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData.
-void registerLightingUpdateBeginPass(FrameGraphContext ctx);
 void registerLightingGraphPasses(FrameGraphContext ctx);
 void registerRtxdiBeginFramePass(FrameGraphContext ctx);
 void registerPathTracePrePass(FrameGraphContext ctx);
@@ -28,11 +27,5 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx);
 void registerPostProcessGraphPasses(FrameGraphContext ctx);
 void registerCompositeGraphPasses(FrameGraphContext ctx);
 void registerDebugOverlayGraphPasses(FrameGraphContext ctx);
-
-// Domain helpers (register contiguous subsets; prefer ordered calls above for defaults).
-void registerPathTraceGraphPasses(FrameGraphContext ctx);
-void registerRtxdiGraphPasses(FrameGraphContext ctx);
-void registerDenoiseGraphPasses(FrameGraphContext ctx);
-void registerGaussianSplatGraphPasses(FrameGraphContext ctx);
 
 } // namespace caustica::render

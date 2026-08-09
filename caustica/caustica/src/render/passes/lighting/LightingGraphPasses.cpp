@@ -180,9 +180,4 @@ void registerLightingGraphPasses(FrameGraphContext ctx)
     }
 }
 
-void registerLightingUpdateBeginPass(FrameGraphContext ctx)
-{
-    registerLightingGraphPasses(ctx);
-}
-
 } // namespace caustica::render

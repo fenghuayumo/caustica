@@ -415,12 +415,4 @@ void registerMainPathTracePass(FrameGraphContext ctx)
         passOptions);
 }
 
-void registerPathTraceGraphPasses(FrameGraphContext ctx)
-{
-    registerPathTracePrePass(ctx);
-    registerVBufferExportPass(ctx);
-    registerPathTraceLightingEndPass(ctx);
-    registerMainPathTracePass(ctx);
-}
-
 } // namespace caustica::render

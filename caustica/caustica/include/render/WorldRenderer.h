@@ -24,7 +24,6 @@
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 
 #include <render/ecs/RenderFrameContext.h>
-#include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/RenderBufferPool.h>
 #include <render/PathTracingFrameContext.h>
@@ -70,7 +69,6 @@ namespace render
 class TemporalAntiAliasingPass;
 class BloomPass;
 class DLSS;
-class PathTracingPipelinePlugin;
 struct ExtractedFrameView;
 struct FrameGraphContext;
 
@@ -220,19 +218,11 @@ public:
 
     void denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const;
 
-    void executeFrameRenderGraph(RenderFrameContext& ctx);
-
-    void addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin);
-    void addRenderPipelinePlugin(IRenderPipelinePlugin& plugin);
-    [[nodiscard]] RenderPipelineRegistry& pipelineRegistry() { return m_pipelineRegistry; }
-    [[nodiscard]] const RenderPipelineRegistry& pipelineRegistry() const { return m_pipelineRegistry; }
-
 private:
-    friend class PathTracingPipelinePlugin;
-    friend class RenderPipelineRegistry;
-
     [[nodiscard]] caustica::rhi::Device* device() const { return m_context->gpuDevice.getDevice(); }
     [[nodiscard]] FrameGraphContext beginFrameGraph(RenderFrameContext& ctx);
+    void runFramePipeline(RenderFrameContext& ctx);
+    void executeFrameRenderGraph(RenderFrameContext& ctx);
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
@@ -268,7 +258,6 @@ private:
     std::unique_ptr<PathTracingContext> m_pathTracingContext;
     PathTracingContext*          m_context = nullptr;
 
-    RenderPipelineRegistry       m_pipelineRegistry;
     rg::GraphBuilder             m_frameGraph;
     rg::RenderTargetPool         m_renderTargetPool;
     rg::RenderBufferPool         m_renderBufferPool;

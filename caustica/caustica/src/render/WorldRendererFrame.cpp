@@ -3,7 +3,6 @@
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
-#include <render/pipeline/RenderPipelineRegistry.h>
 
 namespace { constexpr int c_SwapchainCount = 3; }
 
@@ -127,8 +126,6 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
 
     FrameGraphContext featureCtx{
         .graph = ctx.graph,
-        .renderer = this,
-        .frame = &ctx.frame,
         .renderTargets = m_renderTargets.get(),
         .settings = &m_context->activeSettings(),
         .frameConstants = &m_frameConstants,
@@ -159,8 +156,6 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .accumulation = m_accumulationPass.get(),
         .postProcess = m_postProcess.get(),
         .lightSampling = m_context->scenePasses.lighting.lightSampling().get(),
-        .materials = m_context->scenePasses.lighting.materials().get(),
-        .opacityMaps = m_context->scenePasses.lighting.opacityMaps().get(),
         .gpuHandles = m_context->resolveGpuHandles(),
         .subInstanceDataBuffer = m_context->accelStructs.getSubInstanceBuffer(),
         .pathTracingContext = m_context,
@@ -213,14 +208,57 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
     return featureCtx;
 }
 
-void caustica::render::WorldRenderer::addRenderPipelinePlugin(std::unique_ptr<IRenderPipelinePlugin> plugin)
+void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
 {
-    m_pipelineRegistry.addPlugin(std::move(plugin));
-}
+    if (ctx.frame.aborted)
+        return;
 
-void caustica::render::WorldRenderer::addRenderPipelinePlugin(IRenderPipelinePlugin& plugin)
-{
-    m_pipelineRegistry.addPlugin(plugin);
+    framePassSetup(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassEnsureRenderTargets(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassRendererInit(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassShaderUpdate(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassBeginCommandList(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassSceneUpdate(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassPathTracePrepare(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassPathTrace(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassDenoiseAndAA(ctx.frame);
+    if (ctx.frame.aborted)
+        return;
+
+    FrameGraphContext graphContext = beginFrameGraph(ctx);
+    registerDefaultFrameGraphPasses(graphContext);
+    if (ctx.frame.aborted)
+        return;
+
+    executeFrameRenderGraph(ctx);
+    if (ctx.frame.aborted)
+        return;
+
+    framePassFinalize(ctx.frame);
 }
 
 FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameContext& ctx)

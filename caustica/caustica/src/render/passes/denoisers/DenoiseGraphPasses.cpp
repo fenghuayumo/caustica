@@ -602,11 +602,4 @@ void registerDenoiseAAPass(FrameGraphContext ctx)
     }
 }
 
-void registerDenoiseGraphPasses(FrameGraphContext ctx)
-{
-    registerDenoiserPreparePass(ctx);
-    registerNrdPass(ctx);
-    registerDenoiseAAPass(ctx);
-}
-
 } // namespace caustica::render

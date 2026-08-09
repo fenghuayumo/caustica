@@ -19,8 +19,6 @@
 class AccumulationPass;
 class EnvMapProcessor;
 class LightSamplingCache;
-class MaterialGpuCache;
-class OpacityMicromapBuilder;
 class PostProcess;
 class PTPipelineVariant;
 class RenderTargets;
@@ -52,10 +50,8 @@ class FullscreenBlitPass;
 class GaussianSplatFramePass;
 class PathTracePass;
 class PathTracingContext;
-class PathTracingFrameContext;
 class SceneGaussianSplatPasses;
 class TemporalAntiAliasingPass;
-class WorldRenderer;
 
 // Shared graph-pass parameter bag (UE RDG AllocParameters style).
 // Fill once per frame in WorldRenderer::makeFrameGraphContext; execute lambdas
@@ -63,8 +59,6 @@ class WorldRenderer;
 struct FrameGraphContext
 {
     rg::GraphBuilder* graph = nullptr;
-    WorldRenderer* renderer = nullptr; // leftover only; avoid in new execute bodies
-    PathTracingFrameContext* frame = nullptr;
     RenderTargets* renderTargets = nullptr;
     PathTracerSettings* settings = nullptr;
     FrameConstants* frameConstants = nullptr;
@@ -103,8 +97,6 @@ struct FrameGraphContext
 
     // PathTraceLightingEnd → updateLightingEnd
     LightSamplingCache* lightSampling = nullptr;
-    MaterialGpuCache* materials = nullptr;
-    OpacityMicromapBuilder* opacityMaps = nullptr;
     SceneGpuFrameHandles gpuHandles{};
     caustica::rhi::BufferHandle subInstanceDataBuffer;
 

@@ -4,7 +4,6 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/SceneGpuUpdater.h>
 #include <engine/GpuSharedCaches.h>
 #include <scene/Scene.h>
-#include <render/pipeline/RenderPipelineRegistry.h>
 #include <render/SceneGpuResources.h>
 #include <render/PathTracingContext.h>
 #include <render/PathTracerScenePasses.h>
@@ -763,7 +762,7 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
     }
 
     populateRenderFrameContext(framebuffer, m_renderFrameCtx);
-    m_pipelineRegistry.runFrame(*this, m_renderFrameCtx);
+    runFramePipeline(m_renderFrameCtx);
 
     // Preserve snapshot pick flags for AfterWorldRender resolve/clear. Live
     // runtimeState.Picking can change while older frames are still in flight.

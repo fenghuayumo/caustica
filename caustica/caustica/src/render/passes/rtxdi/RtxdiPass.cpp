@@ -956,12 +956,6 @@ void registerRtxdiExecutePass(FrameGraphContext ctx)
 	}
 }
 
-void registerRtxdiGraphPasses(FrameGraphContext ctx)
-{
-	registerRtxdiBeginFramePass(ctx);
-	registerRtxdiExecutePass(ctx);
-}
-
 } // namespace caustica::render
 
 void RtxdiPass::executeComputePass(

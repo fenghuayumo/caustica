@@ -364,11 +364,4 @@ void registerGaussianSplatCompositePass(FrameGraphContext ctx)
         });
 }
 
-void registerGaussianSplatGraphPasses(FrameGraphContext ctx)
-{
-    registerGaussianSplatAccelBuildPass(ctx);
-    registerGaussianSplatPreAAPass(ctx);
-    registerGaussianSplatCompositePass(ctx);
-}
-
 } // namespace caustica::render
