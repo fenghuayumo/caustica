@@ -41,6 +41,51 @@ FPSLimiter g_FPSLimiter;
 
 namespace
 {
+    bool isSpatialAnimationChannel(AnimationAttribute attribute)
+    {
+        return attribute == AnimationAttribute::Translation
+            || attribute == AnimationAttribute::Rotation
+            || attribute == AnimationAttribute::Scaling;
+    }
+
+    bool loopEndpointsMatch(const scene::AnimationChannelData& channel)
+    {
+        if (!channel.sampler)
+            return true;
+
+        const auto& keys = channel.sampler->getKeyframes();
+        if (keys.size() < 2)
+            return true;
+
+        const dm::float4 a = keys.front().value;
+        const dm::float4 b = keys.back().value;
+        if (channel.attribute == AnimationAttribute::Rotation)
+        {
+            const float aLength2 = dot(a, a);
+            const float bLength2 = dot(b, b);
+            if (!(aLength2 > 0.f) || !(bLength2 > 0.f))
+                return false;
+
+            // q and -q encode the same rotation and therefore form a continuous loop.
+            const float normalizedDot = std::abs(dot(a, b)) / std::sqrt(aLength2 * bLength2);
+            return normalizedDot >= 1.f - 1e-5f;
+        }
+
+        const dm::float4 delta = abs(a - b);
+        const dm::float4 scale = max(max(abs(a), abs(b)), dm::float4(1.f));
+        return all(delta <= scale * 1e-5f);
+    }
+
+    bool hasDiscontinuousSpatialLoop(const scene::AnimationComponent& animation)
+    {
+        for (const scene::AnimationChannelData& channel : animation.channels)
+        {
+            if (isSpatialAnimationChannel(channel.attribute) && !loopEndpointsMatch(channel))
+                return true;
+        }
+        return false;
+    }
+
     void updateFpsInfo(App& app, double frameTimeSeconds)
     {
         SceneViewState* vs = caustica::viewState(app);
@@ -356,7 +401,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                         if (!activeImportedAnimations.contains(static_cast<uint32_t>(animEntity)))
                             continue;
                         const auto* animation = scene::tryGetAnimation(world, animEntity);
-                        if (animation)
+                        if (animation && hasDiscontinuousSpatialLoop(*animation))
                         {
                             importedLoopBoundary |= crossedLoopBoundary(
                                 previousImportedClock,
