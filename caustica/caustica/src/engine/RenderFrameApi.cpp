@@ -388,8 +388,9 @@ void animate(App& app, float fElapsedTimeSeconds)
                     return std::floor(previous / d) != std::floor(current / d);
                 };
                 // A loop wrap/seek (or a long stall) has no meaningful adjacent
-                // pose for temporal reprojection. Reset both the realtime filters
-                // and the skinned PrevPosition written by the compute pass.
+                // pose for skinned PrevPosition. Keep this invalidation local:
+                // disocclusion handles animated objects, while clearing NRD/TAA/
+                // ReSTIR here would flash the entire frame for a local animation.
                 bool importedLoopBoundary = false;
                 if (advanceImportedClock)
                 {
@@ -429,11 +430,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                         && (!std::isfinite(fElapsedTimeSeconds) || fElapsedTimeSeconds < 0.f
                             || fElapsedTimeSeconds > 0.25f));
                 if (animationDiscontinuity)
-                {
                     ew->resetSkinnedMeshMotionHistory();
-                    cfg->ResetAccumulation = true;
-                    cfg->ResetRealtimeCaches = true;
-                }
 
                 const float keyframeTime = (keyframeDuration > 0.f)
                     ? float(fmod(vs->keyframeTime, double(keyframeDuration)))
