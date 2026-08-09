@@ -284,13 +284,9 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
 
     while (auto timingFrame = ctx.graph->collectCompletedGpuTimings())
     {
-        std::vector<FrameGpuPassTiming> timings;
-        timings.reserve(timingFrame->passes.size());
-        for (rg::GpuPassTiming& pass : timingFrame->passes)
-            timings.push_back({ std::move(pass.name), pass.milliseconds });
         m_context->diagnostics.frameTelemetry.setGpuPassTimes(
             timingFrame->frameIndex,
-            std::move(timings));
+            std::move(timingFrame->passes));
     }
     ctx.graph->beginGpuTimingFrame(telemetryFrame);
 

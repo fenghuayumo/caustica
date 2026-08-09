@@ -1480,7 +1480,11 @@ void GraphBuilder::beginGpuTimingFrame(uint32_t frameIndex)
     for (Pass& pass : m_passes)
         pass.gpuTimer = nullptr;
 
-    GpuTimingSlot& slot = m_gpuTimingSlots[frameIndex % kGpuTimingSlotCount];
+    if (frameIndex % kGpuTimingSampleInterval != 0)
+        return;
+
+    const size_t slotIndex = (frameIndex / kGpuTimingSampleInterval) % kGpuTimingSlotCount;
+    GpuTimingSlot& slot = m_gpuTimingSlots[slotIndex];
     if (slot.pending)
         return;
 
@@ -1510,7 +1514,7 @@ void GraphBuilder::beginGpuTimingFrame(uint32_t frameIndex)
         return;
 
     slot.frameIndex = frameIndex;
-    m_activeGpuTimingSlot = int32_t(frameIndex % kGpuTimingSlotCount);
+    m_activeGpuTimingSlot = static_cast<int32_t>(slotIndex);
 }
 
 std::optional<GpuTimingFrame> GraphBuilder::collectCompletedGpuTimings()

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <render/FrameTelemetry.h>
 #include <render/graph/GpuTypes.h>
 #include <render/graph/VolatileConstantBinder.h>
 #include <rhi/rhi.h>
@@ -72,16 +73,10 @@ struct ExecuteParams
     uint32_t maxParallelRecordingJobs = 0; // 0 = TaskRuntime worker count
 };
 
-struct GpuPassTiming
-{
-    std::string name;
-    double milliseconds = 0.0;
-};
-
 struct GpuTimingFrame
 {
     uint32_t frameIndex = 0;
-    std::vector<GpuPassTiming> passes;
+    std::vector<render::FrameGpuPassTiming> passes;
 };
 
 class PassBuilder
@@ -335,6 +330,9 @@ private:
     // Three frames may be in flight; one extra slot absorbs a delayed readback
     // without consuming the device's entire timer-query budget.
     static constexpr size_t kGpuTimingSlotCount = 4;
+    // Timestamp instrumentation is diagnostic work. Sampling keeps the panel
+    // responsive without injecting per-pass query resolves into every frame.
+    static constexpr uint32_t kGpuTimingSampleInterval = 8;
 
     caustica::rhi::Device* m_device = nullptr;
     RenderTargetPool* m_renderTargetPool = nullptr;
