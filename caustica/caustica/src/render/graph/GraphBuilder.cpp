@@ -148,7 +148,10 @@ void GraphBuilder::setDevice(caustica::rhi::Device* device)
     {
         m_transientHeaps.clear();
         m_transientHeapPool.clear();
+        m_persistentTransients = {};
         m_compiledPlanCache.clear();
+        m_gpuTimingSlots = {};
+        m_activeGpuTimingSlot = -1;
     }
     m_device = device;
 }
@@ -346,6 +349,7 @@ void GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn execu
     pass.setup = std::move(setup);
     pass.execute = std::move(execute);
     pass.options = options;
+    pass.gpuTimer = nullptr;
 
     if (pass.options.enabled && pass.setup)
     {
@@ -389,6 +393,11 @@ uint64_t GraphBuilder::compiledPlanKey() const
     for (const GraphTexture& texture : m_textures)
     {
         mixValue(texture.lifetime);
+        if (texture.lifetime == ResourceLifetime::Transient)
+        {
+            const uint64_t descHash = hashTextureDesc(texture.desc);
+            mixValue(descHash);
+        }
         const bool hasFinal = texture.finalState.has_value();
         mixValue(hasFinal);
         if (hasFinal)
@@ -397,6 +406,11 @@ uint64_t GraphBuilder::compiledPlanKey() const
     for (const GraphBuffer& buffer : m_buffers)
     {
         mixValue(buffer.lifetime);
+        if (buffer.lifetime == ResourceLifetime::Transient)
+        {
+            const uint64_t descHash = hashBufferDesc(buffer.desc);
+            mixValue(descHash);
+        }
         const bool hasFinal = buffer.finalState.has_value();
         mixValue(hasFinal);
         if (hasFinal)
@@ -466,11 +480,15 @@ void GraphBuilder::compile()
             }
         }
 
-        allocateTransientResources(
-            plan.referencedTextures,
-            plan.referencedBuffers,
-            plan.textureLifetimes,
-            plan.bufferLifetimes);
+        if (!restorePersistentTransientResources(planKey))
+        {
+            allocateTransientResources(
+                plan.referencedTextures,
+                plan.referencedBuffers,
+                plan.textureLifetimes,
+                plan.bufferLifetimes);
+            capturePersistentTransientResources(planKey);
+        }
         m_lastCompileCacheHit = true;
         m_compiled = true;
         return;
@@ -721,6 +739,7 @@ void GraphBuilder::compile()
     m_compiledPlanCache.insert_or_assign(planKey, std::move(plan));
 
     allocateTransientResources(referenced, referencedBuffers, textureLifetimes, bufferLifetimes);
+    capturePersistentTransientResources(planKey);
     m_compiled = true;
 }
 
@@ -803,6 +822,81 @@ void GraphBuilder::allocateTransientResources(
 
     TransientResourceAllocator allocator;
     allocator.allocate(*this, referencedTextures, referencedBuffers, textureLifetimes, bufferLifetimes);
+}
+
+bool GraphBuilder::restorePersistentTransientResources(uint64_t planKey)
+{
+    const PersistentTransientResources& persistent = m_persistentTransients;
+    if (!persistent.valid
+        || persistent.planKey != planKey
+        || persistent.textures.size() != m_textures.size()
+        || persistent.buffers.size() != m_buffers.size())
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < m_textures.size(); ++i)
+    {
+        GraphTexture& resource = m_textures[i];
+        if (resource.lifetime != ResourceLifetime::Transient)
+            continue;
+
+        resource.owned = persistent.textures[i];
+        resource.texture = resource.owned;
+        resource.currentState = caustica::rhi::ResourceStates::Common;
+    }
+
+    for (size_t i = 0; i < m_buffers.size(); ++i)
+    {
+        GraphBuffer& resource = m_buffers[i];
+        if (resource.lifetime != ResourceLifetime::Transient)
+            continue;
+
+        resource.owned = persistent.buffers[i];
+        resource.buffer = resource.owned;
+        resource.currentState = caustica::rhi::ResourceStates::Common;
+    }
+
+    m_textureAliasingBarriers = persistent.textureBarriers;
+    m_bufferAliasingBarriers = persistent.bufferBarriers;
+    m_transientStats = persistent.stats;
+    m_transientStats.createdHeapCount = 0;
+    m_transientStats.reusedHeapCount = static_cast<uint32_t>(persistent.heaps.size());
+    return true;
+}
+
+void GraphBuilder::capturePersistentTransientResources(uint64_t planKey)
+{
+    // Pool entries are frame leases and become available again at endFrame().
+    // Only graph-owned resources can safely outlive a frame.
+    if (m_transientStats.pooledTextureCount != 0 || m_transientStats.pooledBufferCount != 0)
+    {
+        m_persistentTransients = {};
+        return;
+    }
+
+    PersistentTransientResources persistent;
+    persistent.planKey = planKey;
+    persistent.valid = true;
+    persistent.textures.resize(m_textures.size());
+    persistent.buffers.resize(m_buffers.size());
+
+    for (size_t i = 0; i < m_textures.size(); ++i)
+    {
+        if (m_textures[i].lifetime == ResourceLifetime::Transient)
+            persistent.textures[i] = m_textures[i].owned;
+    }
+    for (size_t i = 0; i < m_buffers.size(); ++i)
+    {
+        if (m_buffers[i].lifetime == ResourceLifetime::Transient)
+            persistent.buffers[i] = m_buffers[i].owned;
+    }
+
+    persistent.heaps = std::move(m_transientHeaps);
+    persistent.textureBarriers = m_textureAliasingBarriers;
+    persistent.bufferBarriers = m_bufferAliasingBarriers;
+    persistent.stats = m_transientStats;
+    m_persistentTransients = std::move(persistent);
 }
 
 void GraphBuilder::releaseTransientResources()
@@ -1083,6 +1177,8 @@ void GraphBuilder::recordPass(
     std::vector<caustica::rhi::ResourceStates>* localTextureStates,
     std::vector<caustica::rhi::ResourceStates>* localBufferStates)
 {
+    if (pass.gpuTimer)
+        commandList->beginTimerQuery(pass.gpuTimer);
     commandList->beginMarker(pass.name.c_str());
 
     // Aliasing barriers mutate shared emitted flags — only safe on the render thread
@@ -1164,6 +1260,8 @@ void GraphBuilder::recordPass(
     }
 
     commandList->endMarker();
+    if (pass.gpuTimer)
+        commandList->endTimerQuery(pass.gpuTimer);
 }
 
 void GraphBuilder::executeWaveSerial(caustica::rhi::CommandList* commandList, const std::vector<uint32_t>& wave)
@@ -1365,6 +1463,95 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     }
 
     transitionExtractedResources(primary);
+
+    if (m_activeGpuTimingSlot >= 0)
+    {
+        m_gpuTimingSlots[size_t(m_activeGpuTimingSlot)].pending = true;
+        m_activeGpuTimingSlot = -1;
+    }
+}
+
+void GraphBuilder::beginGpuTimingFrame(uint32_t frameIndex)
+{
+    assert(m_device);
+    assert(m_compiled);
+
+    m_activeGpuTimingSlot = -1;
+    for (Pass& pass : m_passes)
+        pass.gpuTimer = nullptr;
+
+    GpuTimingSlot& slot = m_gpuTimingSlots[frameIndex % kGpuTimingSlotCount];
+    if (slot.pending)
+        return;
+
+    const size_t passCount = m_compiledPassOrder.size();
+    slot.entries.resize(passCount);
+    bool hasQuery = false;
+    for (size_t i = 0; i < passCount; ++i)
+    {
+        const uint32_t passIndex = m_compiledPassOrder[i];
+        if (passIndex >= m_passes.size() || !m_passes[passIndex].active)
+            continue;
+
+        Pass& pass = m_passes[passIndex];
+        GpuTimingEntry& entry = slot.entries[i];
+        entry.name = pass.name;
+        if (!entry.query)
+            entry.query = m_device->createTimerQuery();
+        if (!entry.query)
+            continue;
+
+        m_device->resetTimerQuery(entry.query);
+        pass.gpuTimer = entry.query;
+        hasQuery = true;
+    }
+
+    if (!hasQuery)
+        return;
+
+    slot.frameIndex = frameIndex;
+    m_activeGpuTimingSlot = int32_t(frameIndex % kGpuTimingSlotCount);
+}
+
+std::optional<GpuTimingFrame> GraphBuilder::collectCompletedGpuTimings()
+{
+    if (!m_device)
+        return std::nullopt;
+
+    for (GpuTimingSlot& slot : m_gpuTimingSlots)
+    {
+        if (!slot.pending)
+            continue;
+
+        bool ready = true;
+        for (const GpuTimingEntry& entry : slot.entries)
+        {
+            if (entry.query && !m_device->pollTimerQuery(entry.query))
+            {
+                ready = false;
+                break;
+            }
+        }
+        if (!ready)
+            continue;
+
+        GpuTimingFrame result;
+        result.frameIndex = slot.frameIndex;
+        result.passes.reserve(slot.entries.size());
+        for (const GpuTimingEntry& entry : slot.entries)
+        {
+            if (!entry.query)
+                continue;
+            result.passes.push_back({
+                entry.name,
+                double(m_device->getTimerQueryTime(entry.query)) * 1000.0,
+            });
+        }
+        slot.pending = false;
+        return result;
+    }
+
+    return std::nullopt;
 }
 
 void GraphBuilder::reset()

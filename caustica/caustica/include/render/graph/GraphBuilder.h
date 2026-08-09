@@ -4,6 +4,7 @@
 #include <render/graph/VolatileConstantBinder.h>
 #include <rhi/rhi.h>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -69,6 +70,18 @@ struct ExecuteParams
     bool parallelWaves = true;
     uint32_t minParallelRecordingCost = 4;
     uint32_t maxParallelRecordingJobs = 0; // 0 = TaskRuntime worker count
+};
+
+struct GpuPassTiming
+{
+    std::string name;
+    double milliseconds = 0.0;
+};
+
+struct GpuTimingFrame
+{
+    uint32_t frameIndex = 0;
+    std::vector<GpuPassTiming> passes;
 };
 
 class PassBuilder
@@ -146,6 +159,12 @@ public:
     // them before continuing; serial waves / serialOnPrimary record on primary.
     void execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params = {});
 
+    // Timestamp queries are allocated/reset on the render thread, then written
+    // by whichever command list records each pass. Results are consumed later
+    // without stalling the GPU.
+    void beginGpuTimingFrame(uint32_t frameIndex);
+    [[nodiscard]] std::optional<GpuTimingFrame> collectCompletedGpuTimings();
+
     // Frame-scoped volatile CB binder (ADR 0001 R2). Register CPU shadows before
     // execute(); recordPass applies them on each command list open session.
     [[nodiscard]] VolatileConstantBinder& volatileConstants() { return m_volatileConstants; }
@@ -212,6 +231,7 @@ private:
         std::vector<std::pair<TextureHandle, TextureAccess>> textureWrites;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferReads;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferWrites;
+        caustica::rhi::TimerQuery* gpuTimer = nullptr;
     };
 
     struct TextureAliasingBarrier
@@ -247,6 +267,8 @@ private:
         const std::vector<bool>& referencedBuffers,
         const std::vector<TransientLifetime>& textureLifetimes,
         const std::vector<TransientLifetime>& bufferLifetimes);
+    [[nodiscard]] bool restorePersistentTransientResources(uint64_t planKey);
+    void capturePersistentTransientResources(uint64_t planKey);
     void releaseTransientResources();
     void transitionTexture(caustica::rhi::CommandList* commandList, TextureHandle handle, TextureAccess access);
     void transitionTexture(caustica::rhi::CommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState);
@@ -285,6 +307,35 @@ private:
         std::vector<TransientLifetime> bufferLifetimes;
     };
 
+    struct PersistentTransientResources
+    {
+        uint64_t planKey = 0;
+        bool valid = false;
+        std::vector<caustica::rhi::TextureHandle> textures;
+        std::vector<caustica::rhi::BufferHandle> buffers;
+        std::vector<caustica::rhi::HeapHandle> heaps;
+        std::vector<TextureAliasingBarrier> textureBarriers;
+        std::vector<BufferAliasingBarrier> bufferBarriers;
+        TransientResourceStats stats;
+    };
+
+    struct GpuTimingEntry
+    {
+        std::string name;
+        caustica::rhi::TimerQueryHandle query;
+    };
+
+    struct GpuTimingSlot
+    {
+        uint32_t frameIndex = 0;
+        bool pending = false;
+        std::vector<GpuTimingEntry> entries;
+    };
+
+    // Three frames may be in flight; one extra slot absorbs a delayed readback
+    // without consuming the device's entire timer-query budget.
+    static constexpr size_t kGpuTimingSlotCount = 4;
+
     caustica::rhi::Device* m_device = nullptr;
     RenderTargetPool* m_renderTargetPool = nullptr;
     RenderBufferPool* m_renderBufferPool = nullptr;
@@ -304,10 +355,13 @@ private:
     std::vector<caustica::rhi::HeapHandle> m_transientHeapPool;
     std::vector<TextureAliasingBarrier> m_textureAliasingBarriers;
     std::vector<BufferAliasingBarrier> m_bufferAliasingBarriers;
+    PersistentTransientResources m_persistentTransients;
     TransientResourceStats m_transientStats;
     VolatileConstantBinder m_volatileConstants;
     std::unordered_map<uint64_t, CompiledPlan> m_compiledPlanCache;
     std::unordered_map<std::string, double> m_recordingCostHistory;
+    std::array<GpuTimingSlot, kGpuTimingSlotCount> m_gpuTimingSlots{};
+    int32_t m_activeGpuTimingSlot = -1;
     bool m_lastCompileCacheHit = false;
     uint32_t m_lastParallelBatchCount = 0;
 };

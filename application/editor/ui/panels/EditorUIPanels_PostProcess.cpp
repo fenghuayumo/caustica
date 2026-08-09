@@ -24,6 +24,7 @@
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -277,6 +278,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                     m_sceneEditor.diagnostics().frameTelemetry;
                 const render::FrameTelemetrySample frame = telemetry.latestRendered();
                 const render::FrameTelemetrySample gpuFrame = telemetry.latestGpu();
+                render::FrameTelemetrySample gpuPassFrame = telemetry.latestGpuPasses();
                 if (!frame.valid)
                 {
                     ImGui::TextDisabled("Waiting for the first frame...");
@@ -313,6 +315,22 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                         frame.graphWaves,
                         frame.parallelBatches,
                         frame.graphPlanCacheHit ? "hit" : "miss");
+                    if (gpuPassFrame.gpuPassesValid)
+                    {
+                        std::sort(
+                            gpuPassFrame.gpuPasses.begin(),
+                            gpuPassFrame.gpuPasses.end(),
+                            [](const render::FrameGpuPassTiming& a, const render::FrameGpuPassTiming& b) {
+                                return a.milliseconds > b.milliseconds;
+                            });
+                        ImGui::Text("GPU passes, frame %u", gpuPassFrame.frameIndex);
+                        const size_t visiblePasses = std::min<size_t>(gpuPassFrame.gpuPasses.size(), 12);
+                        for (size_t i = 0; i < visiblePasses; ++i)
+                        {
+                            const render::FrameGpuPassTiming& pass = gpuPassFrame.gpuPasses[i];
+                            ImGui::Text("  %-32s %7.3f ms", pass.name.c_str(), pass.milliseconds);
+                        }
+                    }
                 }
 
                 ImGui::Separator();

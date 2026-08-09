@@ -648,15 +648,6 @@ bool App::dispatchScheduledRender(SystemContext& context)
     const uint32_t renderFrameIndex = context.frameIndex;
     const double elapsedTime = context.elapsedTime;
     const double curTime = context.currentTime;
-    const PathTracerSettings* frameSettings = caustica::settings(*this);
-    // RTXPT samples animation, refreshes the scene graph, renders and presents
-    // on one thread before advancing the next pose. Preserve that one-to-one
-    // handoff for realtime animation; non-animated frames keep the async pipeline.
-    const bool synchronizeAnimationFrame = isSceneLoaded(*this)
-        && frameSettings
-        && frameSettings->RealtimeMode
-        && frameSettings->EnableAnimations;
-
 #if CAUSTICA_WITH_STREAMLINE
     void* slFrameToken = nullptr;
     if (!gpuDevice->m_DeviceParams.headlessDevice)
@@ -683,10 +674,11 @@ bool App::dispatchScheduledRender(SystemContext& context)
             }
             m_renderThread.notifyFrameCompleted({ ok, elapsedTime, curTime });
         };
-        if (synchronizeAnimationFrame)
-            m_renderThread.dispatchAndWait(std::move(renderWork));
-        else
-            m_renderThread.dispatch(std::move(renderWork));
+        // Animation is extracted into the frame-indexed snapshot. Keeping the
+        // normal two-frame pipeline is safe and avoids serializing Logic(N+1)
+        // behind Render(N); offline callers that require a completed frame use
+        // the explicit synchronous render APIs instead.
+        m_renderThread.dispatch(std::move(renderWork));
         return true;
     }
 

@@ -5,6 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace caustica::render
 {
@@ -23,13 +26,21 @@ enum class FrameCpuStage : uint8_t
     Count,
 };
 
+struct FrameGpuPassTiming
+{
+    std::string name;
+    double milliseconds = 0.0;
+};
+
 struct FrameTelemetrySample
 {
     uint32_t frameIndex = 0;
     bool valid = false;
     bool gpuValid = false;
+    bool gpuPassesValid = false;
     std::array<double, static_cast<size_t>(FrameCpuStage::Count)> cpuMs{};
     double gpuMs = 0.0;
+    std::vector<FrameGpuPassTiming> gpuPasses;
     uint32_t graphPasses = 0;
     uint32_t graphWaves = 0;
     uint32_t parallelBatches = 0;
@@ -82,6 +93,15 @@ public:
         FrameTelemetrySample& sample = ensureSlot(frameIndex);
         sample.gpuMs = milliseconds;
         sample.gpuValid = true;
+        publishLatest(frameIndex);
+    }
+
+    void setGpuPassTimes(uint32_t frameIndex, std::vector<FrameGpuPassTiming> timings)
+    {
+        std::lock_guard lock(m_mutex);
+        FrameTelemetrySample& sample = ensureSlot(frameIndex);
+        sample.gpuPasses = std::move(timings);
+        sample.gpuPassesValid = true;
         publishLatest(frameIndex);
     }
 
@@ -141,6 +161,14 @@ public:
     {
         std::lock_guard lock(m_mutex);
         return findLatest([](const FrameTelemetrySample& sample) { return sample.gpuValid; });
+    }
+
+    [[nodiscard]] FrameTelemetrySample latestGpuPasses() const
+    {
+        std::lock_guard lock(m_mutex);
+        return findLatest([](const FrameTelemetrySample& sample) {
+            return sample.gpuPassesValid;
+        });
     }
 
 private:

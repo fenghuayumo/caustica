@@ -49,6 +49,8 @@ namespace { constexpr int c_SwapchainCount = 3; }
 
 #include <cstring>
 #include <functional>
+#include <utility>
+#include <vector>
 
 using namespace caustica;
 using namespace caustica::math;
@@ -279,6 +281,18 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
             FrameCpuStage::GraphCompile);
         ctx.graph->compile();
     }
+
+    while (auto timingFrame = ctx.graph->collectCompletedGpuTimings())
+    {
+        std::vector<FrameGpuPassTiming> timings;
+        timings.reserve(timingFrame->passes.size());
+        for (rg::GpuPassTiming& pass : timingFrame->passes)
+            timings.push_back({ std::move(pass.name), pass.milliseconds });
+        m_context->diagnostics.frameTelemetry.setGpuPassTimes(
+            timingFrame->frameIndex,
+            std::move(timings));
+    }
+    ctx.graph->beginGpuTimingFrame(telemetryFrame);
 
 #ifndef NDEBUG
     if (!m_context->activeSettings().RealtimeMode)
