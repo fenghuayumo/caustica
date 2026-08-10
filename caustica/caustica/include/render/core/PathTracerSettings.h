@@ -404,6 +404,11 @@ struct PathTracerSettings
 
     bool                                EnableGaussianSplats = true;
     bool                                GaussianSplatDepthTest = true;
+    // Stabilize mesh/3DGS intersections under sub-pixel camera jitter. The bias
+    // is relative to reverse-Z depth; edge dilation conservatively extends a
+    // mesh silhouette by one pixel only where the current depth pixel is empty.
+    float                               GaussianSplatDepthBias = 1.0e-4f;
+    bool                                GaussianSplatDepthEdgeDilation = true;
     int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT; legacy values fall back to 3DGUT
     bool                                GaussianSplatShadows = false;
     int                                 GaussianSplatShadowsMode = 0; // 0 = off, 1 = hard, 2 = soft

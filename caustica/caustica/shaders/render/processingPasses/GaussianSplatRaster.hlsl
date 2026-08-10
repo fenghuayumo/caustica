@@ -446,7 +446,29 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
         if (pixel.x < width && pixel.y < height)
         {
             float sceneDepth = t_Depth.Load(int3(pixel, 0));
-            if (sceneDepth > 0.0f && input.position.z < sceneDepth - 1e-6f)
+
+            // The mesh depth is jittered while a Gaussian quad carries one
+            // center depth. At a mesh silhouette, the current pixel can
+            // therefore alternate between clear depth and mesh depth. When
+            // requested, conservatively borrow the closest reverse-Z depth
+            // from the four direct neighbours only for a clear pixel. This
+            // removes the one-pixel visibility flip without thickening mesh
+            // surfaces in their interior.
+            if (sceneDepth <= 0.0f && g_Const.depthEdgeDilation != 0)
+            {
+                int2 maxPixel = int2(int(width) - 1, int(height) - 1);
+                int2 p = int2(pixel);
+                sceneDepth = max(sceneDepth, t_Depth.Load(int3(clamp(p + int2(-1,  0), int2(0, 0), maxPixel), 0)));
+                sceneDepth = max(sceneDepth, t_Depth.Load(int3(clamp(p + int2( 1,  0), int2(0, 0), maxPixel), 0)));
+                sceneDepth = max(sceneDepth, t_Depth.Load(int3(clamp(p + int2( 0, -1), int2(0, 0), maxPixel), 0)));
+                sceneDepth = max(sceneDepth, t_Depth.Load(int3(clamp(p + int2( 0,  1), int2(0, 0), maxPixel), 0)));
+            }
+
+            // Reverse-Z grows toward the camera. Prefer mesh ownership for
+            // nearly coincident depths; scaling by sceneDepth keeps the bias
+            // useful across the view range without a large far-field halo.
+            float depthBias = max(g_Const.depthBias * max(sceneDepth, 1e-3f), 1e-7f);
+            if (sceneDepth > 0.0f && input.position.z <= sceneDepth + depthBias)
                 discard;
         }
     }

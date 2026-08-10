@@ -134,7 +134,8 @@ struct GaussianSplatConstants
 
     float covarianceDilation;
     uint referenceGammaCompositing;
-    float2 padding1;
+    float depthBias;
+    uint depthEdgeDilation;
 };
 
 struct GaussianSplatData

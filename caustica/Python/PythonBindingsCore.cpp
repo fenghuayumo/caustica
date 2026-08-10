@@ -1565,6 +1565,10 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def_rw("enable_gaussian_splats",        &PathTracerSettings::EnableGaussianSplats)
         .def_rw("gaussian_splat_depth_test",     &PathTracerSettings::GaussianSplatDepthTest)
+        .def_rw("gaussian_splat_depth_bias",     &PathTracerSettings::GaussianSplatDepthBias,
+                "Relative reverse-Z bias for stable mesh/3DGS intersections.")
+        .def_rw("gaussian_splat_depth_edge_dilation", &PathTracerSettings::GaussianSplatDepthEdgeDilation,
+                "Use one-pixel conservative mesh depth at silhouettes to reduce temporal flicker.")
         .def_rw("gaussian_splat_primary_method", &PathTracerSettings::GaussianSplatPrimaryMethod,
                 "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT.")
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)

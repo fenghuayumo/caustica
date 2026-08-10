@@ -62,6 +62,8 @@ struct GaussianSplatRenderSettings
 {
     bool enabled = true;
     bool depthTest = true;
+    float depthBias = 1.0e-4f;
+    bool depthEdgeDilation = true;
     bool shadowsEnabled = false;
     GaussianSplatPrimaryMethod primaryMethod = GaussianSplatPrimaryMethod::GS;
     GaussianSplatSortMode sortingMode = GaussianSplatSortMode::GpuSort;

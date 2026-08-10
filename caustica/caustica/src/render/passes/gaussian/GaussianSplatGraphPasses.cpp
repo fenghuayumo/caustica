@@ -208,7 +208,7 @@ rg::PassHandle registerGaussianSplatPreAAPass(FrameGraphContext ctx)
     assert(ctx.renderTargets);
     assert(ctx.settings);
 
-    if (!needsStochasticGaussianSplatsBeforeAA(*ctx.settings))
+    if (!needsTemporalGaussianSplatsBeforeAA(*ctx.settings))
         return {};
 
     RenderTargets& targets = *ctx.renderTargets;
@@ -318,7 +318,7 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
     if (!compositeReady.isValid())
         return {};
 
-    if (!needsGaussianSplatStochasticAccumulate(*ctx.settings))
+    if (!needsGaussianSplatTemporalAccumulate(*ctx.settings))
         return compositeReady;
 
     caustica::rhi::Texture* currentColorTexture = ctx.gaussian->currentColor();

@@ -702,6 +702,13 @@ void DispatchSkinnedMeshUpdates(
     caustica::rhi::CommandList* commandList,
     uint32_t /*frameIndex*/)
 {
+    // Skinning is optional for scenes that contain only static geometry. Never
+    // submit a null PSO when an engine shader is missing or rejected by the
+    // driver; doing so used to crash during startup before an error could be
+    // reported. Skinned meshes remain in their uploaded/rest pose in this case.
+    if (!gpu.skinningPipeline || !gpu.skinningBindingLayout)
+        return;
+
     bool skinningMarkerPlaced = false;
     std::vector<caustica::rhi::BufferHandle> skinnedVertexBuffersWritten;
     std::unordered_set<scene::MeshRenderResourceId, scene::MeshRenderResourceId::Hash> skinnedMeshesWritten;
@@ -1065,6 +1072,12 @@ void SceneGpuUpdater::initialize(
 {
     gpu.clearSceneResources();
     gpu.device = device;
+    if (device == nullptr)
+    {
+        caustica::error("SceneGpuUpdater: cannot initialize without a GPU device.");
+        return;
+    }
+
     gpu.rayTracingSupported = device->queryFeatureSupport(caustica::rhi::Feature::RayTracingAccelStruct);
     gpu.skinningShader = shaderFactory.createAutoShader(
         "engine/skinning_cs",
@@ -1072,6 +1085,12 @@ void SceneGpuUpdater::initialize(
         CAUSTICA_MAKE_PLATFORM_SHADER(g_skinning_cs),
         nullptr,
         caustica::rhi::ShaderType::Compute);
+    if (!gpu.skinningShader)
+    {
+        caustica::error(
+            "SceneGpuUpdater: engine/skinning_cs is unavailable; disabling GPU skinning instead of creating a null PSO.");
+        return;
+    }
 
     caustica::rhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
@@ -1082,11 +1101,25 @@ void SceneGpuUpdater::initialize(
         caustica::rhi::BindingLayoutItem::RawBuffer_UAV(0)
     };
     gpu.skinningBindingLayout = device->createBindingLayout(layoutDesc);
+    if (!gpu.skinningBindingLayout)
+    {
+        caustica::error(
+            "SceneGpuUpdater: failed to create the skinning binding layout; disabling GPU skinning.");
+        gpu.skinningShader = nullptr;
+        return;
+    }
 
     caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = { gpu.skinningBindingLayout };
     pipelineDesc.CS = gpu.skinningShader;
     gpu.skinningPipeline = device->createComputePipeline(pipelineDesc);
+    if (!gpu.skinningPipeline)
+    {
+        caustica::error(
+            "SceneGpuUpdater: failed to create the skinning compute pipeline; disabling GPU skinning.");
+        gpu.skinningBindingLayout = nullptr;
+        gpu.skinningShader = nullptr;
+    }
 }
 
 void SceneGpuUpdater::refresh(

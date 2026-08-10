@@ -41,9 +41,10 @@ void fillGaussianSplatShadowConstants(
     uint32_t frameIndex,
     const dm::float3& shadowDirectionToLight);
 
-bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings);
+bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings);
+bool needsTemporalGaussianSplatsBeforeAA(const PathTracerSettings& settings);
 bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings);
-bool needsGaussianSplatStochasticAccumulate(const PathTracerSettings& settings);
+bool needsGaussianSplatTemporalAccumulate(const PathTracerSettings& settings);
 bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings);
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs);

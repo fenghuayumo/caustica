@@ -87,10 +87,25 @@ void fillGaussianSplatShadowConstants(
         : dm::float4x4::identity();
 }
 
-bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings)
+bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings)
 {
     const bool stochasticSplats = settings.EnableGaussianSplats && settings.GaussianSplatSortingMode == 1;
-    return stochasticSplats && settings.RealtimeMode && settings.RealtimeAA == 1;
+    const bool stochasticSoftShadows = settings.EnableGaussianSplats
+        && resolveGaussianSplatShadowMode(settings) == GAUSSIAN_SPLAT_SHADOWS_SOFT
+        && settings.GaussianSplatShadowStrength > 0.0f
+        && settings.GaussianSplatShadowSoftRadius > 0.0f;
+    return stochasticSplats || stochasticSoftShadows;
+}
+
+bool needsTemporalGaussianSplatsBeforeAA(const PathTracerSettings& settings)
+{
+    // Stochastic opacity must be rendered before the main temporal pass. Sorted
+    // splats use alpha compositing after AA, so their soft-shadow noise is handled
+    // by the Gaussian-owned accumulation pass instead.
+    const bool stochasticSplats = settings.EnableGaussianSplats
+        && settings.GaussianSplatSortingMode == 1;
+    return stochasticSplats
+        && (!settings.RealtimeMode || settings.RealtimeAA == 1);
 }
 
 bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings)
@@ -98,16 +113,13 @@ bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings)
     if (!settings.EnableGaussianSplats)
         return false;
 
-    const bool stochasticSplats = settings.GaussianSplatSortingMode == 1;
-    const bool stochasticUsesMainTemporal = stochasticSplats
-        && (!settings.RealtimeMode || settings.RealtimeAA == 1);
-    return !stochasticUsesMainTemporal;
+    return !needsTemporalGaussianSplatsBeforeAA(settings);
 }
 
-bool needsGaussianSplatStochasticAccumulate(const PathTracerSettings& settings)
+bool needsGaussianSplatTemporalAccumulate(const PathTracerSettings& settings)
 {
-    const bool stochasticSplats = settings.EnableGaussianSplats && settings.GaussianSplatSortingMode == 1;
-    return stochasticSplats && needsGaussianSplatsCompositePass(settings);
+    return hasTemporalGaussianSplatNoise(settings)
+        && needsGaussianSplatsCompositePass(settings);
 }
 
 bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings)
@@ -125,6 +137,8 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     GaussianSplatRenderSettings renderSettings;
     renderSettings.enabled = settings.EnableGaussianSplats;
     renderSettings.depthTest = settings.GaussianSplatDepthTest;
+    renderSettings.depthBias = std::max(settings.GaussianSplatDepthBias, 0.0f);
+    renderSettings.depthEdgeDilation = settings.GaussianSplatDepthEdgeDilation;
     renderSettings.sortingMode = settings.GaussianSplatSortingMode == 1
         ? GaussianSplatSortMode::StochasticSplats
         : GaussianSplatSortMode::GpuSort;

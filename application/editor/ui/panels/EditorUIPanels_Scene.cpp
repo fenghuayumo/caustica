@@ -76,6 +76,12 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
 
         RESET_ON_CHANGE(GaussianSplatPrimaryMethodCombo(m_ui));
         RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
+        ImGui::BeginDisabled(!m_settings.GaussianSplatDepthTest);
+        RESET_ON_CHANGE(ImGui::Checkbox("Stable Mesh Edges", &m_settings.GaussianSplatDepthEdgeDilation));
+        RESET_ON_CHANGE(ImGui::DragFloat(
+            "Mesh Depth Bias", &m_settings.GaussianSplatDepthBias,
+            1.0e-5f, 0.0f, 1.0e-2f, "%.6f"));
+        ImGui::EndDisabled();
 
         RESET_ON_CHANGE(GaussianSplatShadowsModeCombo(m_ui));
 

@@ -939,6 +939,8 @@ bool GaussianSplatPass::upload(
     constants.alphaCullThreshold = settings.alphaCullThreshold;
     constants.shDegree = m_shDegree;
     constants.depthTest = settings.depthTest ? 1u : 0u;
+    constants.depthBias = std::max(settings.depthBias, 0.0f);
+    constants.depthEdgeDilation = settings.depthEdgeDilation ? 1u : 0u;
     constants.shadowsEnabled = useHybridShadows ? 1u : 0u;
     float3 shadowDir = settings.shadowDirectionToLight;
     if (length(shadowDir) < 1e-4f)

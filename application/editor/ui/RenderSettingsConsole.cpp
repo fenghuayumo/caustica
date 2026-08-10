@@ -392,6 +392,12 @@ void InitializeEntries()
 
     AddEnum("r.Gaussian.RenderingMode", "Gaussian splat primary rendering method.",
         SETTING_ACCESS(GaussianSplatPrimaryMethod), { "3dgs", "3dgut" }, reset);
+    AddScalar("r.Gaussian.DepthTest", "Depth-test Gaussian splats against mesh geometry.",
+        SETTING_ACCESS(GaussianSplatDepthTest), reset);
+    AddScalar("r.Gaussian.DepthBias", "Relative reverse-Z bias used to stabilize mesh/Gaussian intersections.",
+        SETTING_ACCESS(GaussianSplatDepthBias), reset, 0, 0.01);
+    AddScalar("r.Gaussian.DepthEdgeDilation", "Conservatively stabilize mesh silhouette depth by one pixel.",
+        SETTING_ACCESS(GaussianSplatDepthEdgeDilation), reset);
     AddEnum("r.Gaussian.Shadows", "Gaussian splat mesh-BVH shadow mode.",
         SETTING_ACCESS(GaussianSplatShadowsMode), { "off", "hard", "soft" }, reset,
         [](EditorUIData& ui)
