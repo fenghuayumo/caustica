@@ -16,6 +16,7 @@
 #include "SceneContentEditor.h"
 
 #include <cstdint>
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -194,6 +195,7 @@ public:
 #endif
 
 private:
+    void consumeCompletedMaterialPickFeedback();
     void onSceneLoadedEarly();
     void onSceneLoadedBeforeGpuPrep();
     void onSceneLoadedAfterCollectTextures();
@@ -243,6 +245,13 @@ private:
     std::unique_ptr<::GameScene> m_sampleGame;
 
     std::unique_ptr<::ZoomTool> m_zoomTool;
+
+    // Render-to-logic mailbox for material feedback. The material editor and
+    // RenderRuntimeState are logic-thread owned; the render callback only
+    // publishes POD results here.
+    std::atomic<int> m_completedMaterialPickGpuId{-1};
+    std::atomic<uint64_t> m_completedMaterialPickRequestId{0};
+    uint64_t m_consumedMaterialPickRequestId = 0;
 };
 
 } // namespace caustica::editor

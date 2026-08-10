@@ -30,6 +30,7 @@
 #include <render/PathTracingFrameContext.h>
 
 #include <chrono>
+#include <atomic>
 #include <array>
 #include <filesystem>
 #include <functional>
@@ -154,6 +155,8 @@ public:
     const DebugFeedbackStruct& getFeedbackData() const { return m_feedbackData; }
     // Picking flags from the frame snapshot that just finished rendering (not live UI state).
     [[nodiscard]] const RenderPickState& getLastRenderedPicking() const { return m_lastRenderedPicking; }
+    // Logic-thread fast path for latency-sensitive editor clicks.
+    void submitImmediateMaterialPick(const RenderPickState& picking);
     const DeltaTreeVizPathVertex* getDebugDeltaPathTree() const { return m_debugDeltaPathTree; }
 
     std::vector<DebugLineStruct>& getCpuSideDebugLines() { return m_cpuSideDebugLines; }
@@ -180,6 +183,7 @@ private:
 
     void populateRenderFrameContext(caustica::rhi::Framebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
+    void mergeImmediateMaterialPick();
     [[nodiscard]] FrameGraphContext makeFrameGraphContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
@@ -263,6 +267,9 @@ private:
     PathTracerSettings                          m_frameSettingsSnapshot;
     RenderRuntimeState                          m_frameRuntimeSnapshot;
     RenderPickState                             m_lastRenderedPicking{};
+    std::atomic<uint64_t>                       m_immediateMaterialPickPosition{0};
+    std::atomic<uint64_t>                       m_immediateMaterialPickRequestId{0};
+    std::atomic<uint64_t>                       m_completedImmediateMaterialPickRequestId{0};
     bool                                        m_frameGaussianSplatTemporalReset = false;
 
     caustica::rhi::BufferHandle                         m_feedback_Buffer_Gpu;

@@ -805,8 +805,43 @@ void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrame
     abortIfSubmitFailed(ctx, "preUpdatePathTracing");
 }
 
+void caustica::render::WorldRenderer::submitImmediateMaterialPick(const RenderPickState& picking)
+{
+    if (!picking.MaterialRequested)
+        return;
+
+    const uint64_t packedPosition = (uint64_t(picking.Position.x) << 32u)
+        | uint64_t(picking.Position.y);
+    m_immediateMaterialPickPosition.store(packedPosition, std::memory_order_relaxed);
+    m_immediateMaterialPickRequestId.store(
+        picking.MaterialRequestId,
+        std::memory_order_release);
+}
+
+void caustica::render::WorldRenderer::mergeImmediateMaterialPick()
+{
+    const uint64_t requestId = m_immediateMaterialPickRequestId.load(std::memory_order_acquire);
+    const uint64_t completedId =
+        m_completedImmediateMaterialPickRequestId.load(std::memory_order_acquire);
+    if (requestId <= completedId
+        || requestId <= m_frameRuntimeSnapshot.Picking.MaterialRequestId)
+        return;
+
+    const uint64_t packedPosition =
+        m_immediateMaterialPickPosition.load(std::memory_order_relaxed);
+    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+        uint32_t(packedPosition >> 32u),
+        uint32_t(packedPosition & 0xffffffffu)};
+    m_frameRuntimeSnapshot.Picking.MaterialRequestId = requestId;
+    m_frameRuntimeSnapshot.Picking.MaterialRequested = true;
+}
+
 void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext& ctx)
 {
+    // A click can arrive after this frame's Extract snapshot was captured. Merge
+    // it at the last safe point before constants and ray dispatch are recorded.
+    mergeImmediateMaterialPick();
+
     FrameConstants& constants = m_frameConstants;
     memset(&constants, 0, sizeof(constants));
 
@@ -870,8 +905,12 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return { x, y };
     };
 
+    const dm::uint2 pickDisplayPixel =
+        m_context->activeRuntime().Picking.hasActivePickRequest()
+        ? m_context->activeRuntime().Picking.Position
+        : m_context->activeSettings().DebugPixel;
     const dm::int2 pickPixel = pickActive
-        ? displayToRenderPixel(m_context->activeSettings().DebugPixel)
+        ? displayToRenderPixel(pickDisplayPixel)
         : dm::int2{ -1, -1 };
     const dm::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
 

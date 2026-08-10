@@ -80,16 +80,19 @@ bool gizmoCapturesInput(const SceneEditor& sceneEditor)
     return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
-void requestMaterialPick(caustica::render::RenderRuntimeState& runtime)
+void requestMaterialPick(SceneEditor& sceneEditor)
 {
     // Right-click: pick the hit geometry's material (per sub-mesh), not the whole instance.
-    runtime.Picking.MaterialRequested = true;
+    auto& picking = sceneEditor.renderAppState().runtime.Picking;
+    picking.requestMaterialPick();
+    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor))
+        worldRenderer->submitImmediateMaterialPick(picking);
 }
 
 void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
 {
     // Left-click: select the mesh instance entity for Inspector / gizmo.
-    runtime.Picking.InstanceRequested = true;
+    runtime.Picking.requestInstancePick();
 }
 
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
@@ -377,7 +380,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     }
     else if (button == ToGlfwMouse(caustica::Mouse::Right))
     {
-        // Defer material pick until release if the user only clicked (no fly look-drag).
+        // RMB is shared with fly-camera look. Decide click vs drag on release;
+        // injecting a synchronous feedback pick here would stall camera rotation.
         g_rightClickPick.tracking = true;
         g_rightClickPick.dragged = false;
         g_rightClickPick.pressX = 0.0;
@@ -405,7 +409,7 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
         if (clicked && !uiCapturesMouseForEditor(sceneEditor) && !gizmoCapturesInput(sceneEditor))
         {
             syncPickPositionFromCursor(sceneEditor);
-            requestMaterialPick(sceneEditor.renderAppState().runtime);
+            requestMaterialPick(sceneEditor);
         }
     }
 

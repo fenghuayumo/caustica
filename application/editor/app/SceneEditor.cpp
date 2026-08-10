@@ -386,6 +386,28 @@ void SceneEditor::onBeforeInitialSceneLoad()
     m_viewState.progressLoading.Set(95);
 }
 
+void SceneEditor::consumeCompletedMaterialPickFeedback()
+{
+    const uint64_t completedRequestId =
+        m_completedMaterialPickRequestId.load(std::memory_order_acquire);
+    if (completedRequestId > m_consumedMaterialPickRequestId)
+    {
+        m_consumedMaterialPickRequestId = completedRequestId;
+        auto& picking = m_renderState.Picking;
+        // SceneAfterWorldRender may already have cleared the one-shot bool.
+        // Request identity, which remains monotonic, is the authoritative match.
+        if (picking.MaterialRequestId == completedRequestId)
+        {
+            const int materialGpuId =
+                m_completedMaterialPickGpuId.load(std::memory_order_relaxed);
+            m_editor.SelectedMaterial = m_app
+                ? caustica::findMaterial(*m_app, materialGpuId)
+                : nullptr;
+            picking.completeMaterialPick(completedRequestId);
+        }
+    }
+}
+
 void SceneEditor::prepareEditorFrame()
 {
     m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
@@ -945,6 +967,9 @@ bool SceneEditor::saveSceneAsFromDialog()
 
 void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
 {
+    // Consume render feedback before EditorUIAnimate so the material panel
+    // reflects the completed click in this logic/UI frame.
+    consumeCompletedMaterialPickFeedback();
     m_captureScriptManager->preAnim(fElapsedTimeSeconds);
 
 #if CAUSTICA_WITH_PYTHON
@@ -1429,9 +1454,7 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
     if (!m_app)
         return;
 
-    if (renderedPick.MaterialRequested)
-        m_editor.SelectedMaterial = caustica::findMaterial(*m_app, int(feedback.pickedMaterialID));
-    if (renderedPick.InstanceRequested)
+    if (m_renderState.Picking.isCurrentInstanceRequest(renderedPick))
     {
         ecs::Entity picked = caustica::findEntityByInstanceIndex(*m_app, int(feedback.pickedInstanceIndex));
         bool pickedGaussian = false;
@@ -1452,13 +1475,22 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
         return;
 
     const auto& renderedPick = wr->getLastRenderedPicking();
+    if (renderedPick.MaterialRequested)
+    {
+        // Publish data before the release-store of its request identity. The
+        // logic thread consumes it in prepareEditorFrame and owns UI mutation.
+        m_completedMaterialPickGpuId.store(
+            int(wr->getFeedbackData().pickedMaterialID),
+            std::memory_order_relaxed);
+        m_completedMaterialPickRequestId.store(
+            renderedPick.MaterialRequestId,
+            std::memory_order_release);
+    }
     if (m_settings.ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
         resolvePickFeedback(wr->getFeedbackData(), renderedPick);
 
-    if (renderedPick.MaterialRequested)
-        m_renderState.Picking.MaterialRequested = false;
     if (renderedPick.InstanceRequested)
-        m_renderState.Picking.InstanceRequested = false;
+        m_renderState.Picking.completeInstancePick(renderedPick.InstanceRequestId);
 
     auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
         caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);

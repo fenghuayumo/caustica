@@ -213,9 +213,9 @@ namespace
             ? wr->getLastRenderedPicking()
             : caustica::render::RenderPickState{};
         if (renderedPick.MaterialRequested)
-            runtime->Picking.MaterialRequested = false;
+            runtime->Picking.completeMaterialPick(renderedPick.MaterialRequestId);
         if (renderedPick.InstanceRequested)
-            runtime->Picking.InstanceRequested = false;
+            runtime->Picking.completeInstancePick(renderedPick.InstanceRequestId);
     }
 
     void afterWorldRender(App& app, GpuDevice& gpuDevice)

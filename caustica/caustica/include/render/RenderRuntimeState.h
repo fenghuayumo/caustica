@@ -33,8 +33,43 @@ struct RenderPickState
     dm::uint2 Position = { 0, 0 };
     bool MaterialRequested = false;
     bool InstanceRequested = false;
+    // Monotonic request identities keep feedback from an older in-flight frame
+    // from completing or clearing a newer click of the same type.
+    uint64_t MaterialRequestId = 0;
+    uint64_t InstanceRequestId = 0;
 
-    void requestMaterialPick() { MaterialRequested = true; }
+    void requestMaterialPick()
+    {
+        ++MaterialRequestId;
+        MaterialRequested = true;
+    }
+    void requestInstancePick()
+    {
+        ++InstanceRequestId;
+        InstanceRequested = true;
+    }
+    [[nodiscard]] bool isCurrentMaterialRequest(const RenderPickState& completed) const
+    {
+        return MaterialRequested
+            && completed.MaterialRequested
+            && MaterialRequestId == completed.MaterialRequestId;
+    }
+    [[nodiscard]] bool isCurrentInstanceRequest(const RenderPickState& completed) const
+    {
+        return InstanceRequested
+            && completed.InstanceRequested
+            && InstanceRequestId == completed.InstanceRequestId;
+    }
+    void completeMaterialPick(uint64_t requestId)
+    {
+        if (MaterialRequested && MaterialRequestId == requestId)
+            MaterialRequested = false;
+    }
+    void completeInstancePick(uint64_t requestId)
+    {
+        if (InstanceRequested && InstanceRequestId == requestId)
+            InstanceRequested = false;
+    }
     bool hasActivePickRequest() const { return MaterialRequested || InstanceRequested; }
     void clearPickRequests()
     {
