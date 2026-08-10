@@ -391,7 +391,7 @@ void InitializeEntries()
         SETTING_ACCESS(PostProcessEdgeDetectionThreshold), reset, 0, 1);
 
     AddEnum("r.Gaussian.RenderingMode", "Gaussian splat primary rendering method.",
-        SETTING_ACCESS(GaussianSplatPrimaryMethod), { "3dgs", "3dgut", "3dgrt" }, reset);
+        SETTING_ACCESS(GaussianSplatPrimaryMethod), { "3dgs", "3dgut" }, reset);
     AddEnum("r.Gaussian.Shadows", "Gaussian splat mesh-BVH shadow mode.",
         SETTING_ACCESS(GaussianSplatShadowsMode), { "off", "hard", "soft" }, reset,
         [](EditorUIData& ui)
@@ -418,13 +418,13 @@ void InitializeEntries()
     AddScalar("r.Gaussian.Shadow.Samples", "Gaussian soft-shadow sample count.",
         SETTING_ACCESS(GaussianSplatShadowSoftSampleCount), reset, 1, 16);
     AddScalar("r.Gaussian.Shadow.KernelDegree", "Gaussian shadow proxy kernel degree.",
-        SETTING_ACCESS(GaussianSplatRtxKernelDegree), rebuildAS, 0, 5);
+        SETTING_ACCESS(GaussianSplatShadowKernelDegree), rebuildAS, 0, 5);
     AddScalar("r.Gaussian.Shadow.UseAABBs", "Use AABB Gaussian shadow proxies.",
         SETTING_ACCESS(GaussianSplatUseAABBs), rebuildAS);
     AddScalar("r.Gaussian.Shadow.AdaptiveClamp", "Enable adaptive Gaussian shadow clamping.",
-        SETTING_ACCESS(GaussianSplatRtxAdaptiveClamp), rebuildAS);
+        SETTING_ACCESS(GaussianSplatShadowAdaptiveClamp), rebuildAS);
     AddScalar("r.Gaussian.Shadow.RayOffset", "Gaussian shadow-ray offset.",
-        SETTING_ACCESS(GaussianSplatRtxParticleShadowOffset), reset, 0, 1);
+        SETTING_ACCESS(GaussianSplatShadowRayOffset), reset, 0, 1);
 
     AddScalar("r.AS.ForceOpaque", "Force ray-tracing instances opaque.",
         [](EditorUIData& ui) -> auto& { return ui.render.settings.AS.ForceOpaque; }, reset);

@@ -229,6 +229,7 @@ RayHitInfo TraceVisibilityRay(RaytracingAccelerationStructure accelStruct, RayDe
             g_Const.GaussianSplatShadowScale,
             g_Const.GaussianSplatShadowAlphaThreshold,
             g_Const.GaussianSplatShadowAlphaScale,
+            g_Const.GaussianSplatShadowStrength,
             g_Const.GaussianSplatShadowKernelMinResponse,
             g_Const.GaussianSplatShadowKernelDegree,
             g_Const.GaussianSplatShadowUseTLASInstances,

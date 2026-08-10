@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Animated mesh deformation test on top of render_default_scene.py.
 
-Loads Assets/default.json with Hybrid 3DGS + 3DGRT soft shadows and emitter
+Loads Assets/default.json with raster 3DGS, ray-traced soft shadows and emitter
 lighting, then animates the Antman mesh via Python vertex deformation.
 
 Usage:

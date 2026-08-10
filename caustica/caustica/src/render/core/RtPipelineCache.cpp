@@ -102,9 +102,9 @@ bool RtPipelineCache::bundleReady(const Bundle& bundle)
     return bundle.reference
         && bundle.buildStablePlanes
         && bundle.fillStablePlanes
-        && bundle.reference->hasPipeline()
-        && bundle.buildStablePlanes->hasPipeline()
-        && bundle.fillStablePlanes->hasPipeline();
+        && bundle.reference->isReady()
+        && bundle.buildStablePlanes->isReady()
+        && bundle.fillStablePlanes->isReady();
 }
 
 void RtPipelineCache::ensurePresetVariants(PtFeaturePresetId id)
@@ -244,6 +244,10 @@ bool RtPipelineCache::bind(
     std::shared_ptr<PTPipelineVariant>& outFill)
 {
     Bundle* bundle = findBundle(id);
+    // Publish the stable variant objects as soon as they exist. The frame graph
+    // captures their addresses, while PathTracePass checks the PSO/SBT readiness
+    // at execution time. Delaying publication until the whole bundle is ready
+    // leaves the first graph generation with permanent null pipeline pointers.
     if (!bundle || !bundle->reference || !bundle->buildStablePlanes || !bundle->fillStablePlanes)
         return false;
 

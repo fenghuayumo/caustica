@@ -5,10 +5,12 @@
 namespace caustica::render
 {
 
-void PathTracerScenePasses::initialize(const ScenePassDependencies& dependencies)
+void PathTracerScenePasses::initialize(
+    const SceneRayTracingResources::Dependencies& rayTracingDependencies,
+    const SceneGaussianSplatPasses::Dependencies& gaussianSplatDependencies)
 {
-    rayTracing.initialize(dependencies);
-    gaussianSplats.initialize(dependencies);
+    rayTracing.initialize(rayTracingDependencies, lighting);
+    gaussianSplats.initialize(gaussianSplatDependencies);
 
     gaussianSplats.setOnRequestFullRebuild(
         [this]() { rayTracing.requestFullRebuild(); });

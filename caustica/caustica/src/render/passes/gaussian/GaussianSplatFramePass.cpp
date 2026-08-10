@@ -124,14 +124,14 @@ void GaussianSplatFramePass::prepareScenePasses(const std::shared_ptr<ShaderDebu
     assert(m_context);
     assert(m_device);
     assert(m_scenePasses);
+    assert(m_renderTargets);
 
     GaussianSplatPrepareContext context;
     context.device = m_device;
     context.shaderFactory = m_context->shaderFactory;
-    context.renderTargets = m_renderTargets;
     context.shaderDebug = shaderDebug;
     context.gpuSort = m_gpuSort;
-    prepareGaussianSplatScenePasses(*m_scenePasses, context);
+    prepareGaussianSplatScenePasses(*m_scenePasses, context, *m_renderTargets);
     m_gpuSort = context.gpuSort;
 }
 
@@ -195,8 +195,6 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
-        pass->setRayTracingShEnabled(
-            objectSettings.primaryMethod == GaussianSplatPrimaryMethod::GRT);
 
         // A .ply dropped into a running editor is created on the logic thread,
         // after prepareScenePasses(). Finish its GPU setup here on the render
@@ -204,7 +202,8 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
         // shadow TLAS can be active while raster upload silently fails.
         if (m_gpuSort)
             pass->setGpuSort(m_gpuSort);
-        if (m_renderTargets && !pass->rasterPipelinesReady())
+        assert(m_renderTargets);
+        if (!pass->rasterPipelinesReady())
             pass->createPipeline(*m_renderTargets);
 
         pass->prepareGraphResources(objectSettings);

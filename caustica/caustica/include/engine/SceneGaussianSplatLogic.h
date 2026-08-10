@@ -4,6 +4,8 @@
 
 #include <filesystem>
 
+struct PathTracerSettings;
+
 namespace caustica::render
 {
 class SceneGaussianSplatPasses;
@@ -17,9 +19,12 @@ namespace caustica
 class SceneGaussianSplatLogic
 {
 public:
-    static void onSceneLoaded(render::SceneGaussianSplatPasses& passes);
+    static void onSceneLoaded(
+        render::SceneGaussianSplatPasses& passes,
+        PathTracerSettings& settings);
     static bool loadFromFile(
         render::SceneGaussianSplatPasses& passes,
+        PathTracerSettings& settings,
         const std::filesystem::path& fileName,
         bool convertRdfToRub = true);
     static bool removeObjectsUnderEntity(
@@ -27,9 +32,12 @@ public:
         ecs::Entity rootEntity);
 
 private:
-    static void loadFromSceneEntities(render::SceneGaussianSplatPasses& passes);
+    static void loadFromSceneEntities(
+        render::SceneGaussianSplatPasses& passes,
+        PathTracerSettings& settings);
     static bool attachToScene(
         render::SceneGaussianSplatPasses& passes,
+        PathTracerSettings& settings,
         const std::filesystem::path& fileName,
         bool convertRdfToRub);
 };

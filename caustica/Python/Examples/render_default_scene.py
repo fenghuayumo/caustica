@@ -2,8 +2,8 @@
 """Render Assets/default.json with 3DGS soft shadows and emitter lighting.
 
 The default scene places Antman (OBJ), Gingy (3DGS PLY), and a ground plane
-under directional + point lights. This script uses Hybrid 3DGS + 3DGRT mode
-(raster splats + RTX particle shadows) with soft shadows, and treats the splat
+under directional + point lights. This script uses raster 3DGS with ray-traced
+Gaussian/mesh shadows, and treats the splat
 radiance field as emissive proxy lights so mesh geometry receives illumination
 from the 3DGS object.
 
@@ -44,7 +44,7 @@ def configure_gaussian_splats(caustica, settings, args: argparse.Namespace) -> N
     settings.gaussian_splat_alpha_cull_threshold = args.alpha_cull
 
     if args.render_mode == "hybrid":
-        # UI "Hybrid 3DGS + 3DGRT": raster overlay + RTX particle shadow AS.
+        # Raster 3DGS primary color plus ray-traced Gaussian shadow acceleration structures.
         settings.gaussian_splat_shadows = True
         settings.gaussian_splat_hybrid_shadows = True
         settings.gaussian_splat_shadows_mode = int(caustica.GaussianSplatShadowMode.Soft)
@@ -53,9 +53,9 @@ def configure_gaussian_splats(caustica, settings, args: argparse.Namespace) -> N
         settings.gaussian_splat_shadow_soft_sample_count = args.shadow_soft_samples
         settings.gaussian_splat_use_tlas_instances = True
         settings.gaussian_splat_blas_compaction = True
-        settings.gaussian_splat_rtx_kernel_degree = args.rtx_kernel_degree
-        settings.gaussian_splat_rtx_adaptive_clamp = args.rtx_adaptive_clamp
-        settings.gaussian_splat_rtx_particle_shadow_offset = args.rtx_shadow_offset
+        settings.gaussian_splat_shadow_kernel_degree = args.rtx_kernel_degree
+        settings.gaussian_splat_shadow_adaptive_clamp = args.rtx_adaptive_clamp
+        settings.gaussian_splat_shadow_ray_offset = args.rtx_shadow_offset
     else:
         # UI "Raster 3DGS (VS)": splats only, no RTX shadow AS.
         settings.gaussian_splat_shadows = False
@@ -73,7 +73,7 @@ def apply_gaussian_settings_and_rebuild(renderer, caustica, settings, args: argp
     if args.render_mode == "hybrid":
         renderer.app.request_accel_rebuild()
         warmup = max(args.warmup_frames, 1)
-        print(f"[caustica] Rebuilding 3DGRT acceleration structures ({warmup} warmup frames) ...")
+        print(f"[caustica] Rebuilding Gaussian shadow acceleration structures ({warmup} warmup frames) ...")
         renderer.step_n(warmup)
 
 
@@ -108,7 +108,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--depth-test", dest="depth_test", action="store_true", default=True)
     parser.add_argument("--no-depth-test", dest="depth_test", action="store_false")
     parser.add_argument("--render-mode", choices=["hybrid", "raster"], default="hybrid",
-                        help="3DGS render mode: hybrid (3DGS + 3DGRT shadows) or raster-only.")
+                        help="3DGS render mode: hybrid (raster 3DGS + ray-traced shadows) or raster-only.")
     parser.add_argument("--warmup-frames", type=int, default=8,
                         help="Frames to run after enabling hybrid mode so RTX AS rebuild completes.")
     parser.add_argument("--splat-scale", type=float, default=1.0)
@@ -119,11 +119,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--shadow-soft-radius", type=float, default=0.08)
     parser.add_argument("--shadow-soft-samples", type=int, default=1)
     parser.add_argument("--rtx-kernel-degree", type=int, default=0,
-                        help="3DGRT particle kernel degree (0=Linear .. 5=Quintic).")
+                        help="Gaussian shadow particle kernel degree (0=Linear .. 5=Quintic).")
     parser.add_argument("--rtx-adaptive-clamp", dest="rtx_adaptive_clamp",
                         action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--rtx-shadow-offset", type=float, default=0.01,
-                        help="3DGRT particle shadow ray offset.")
+                        help="Gaussian particle shadow ray offset.")
     parser.add_argument("--emission-intensity", type=float, default=1.0,
                         help="3DGS emissive proxy intensity multiplier.")
     parser.add_argument("--emission-max-proxies", type=int, default=8192,
@@ -148,7 +148,7 @@ def main() -> int:
     mode = "headless" if args.headless else "windowed"
     print(f"[caustica] Scene : {scene}")
     print(f"[caustica] Mode  : {mode}")
-    render_label = "Hybrid 3DGS + 3DGRT" if args.render_mode == "hybrid" else "Raster 3DGS (VS)"
+    render_label = "Raster 3DGS + RT shadows" if args.render_mode == "hybrid" else "Raster 3DGS (VS)"
     print(f"[caustica] 3DGS  : {render_label}, soft shadow + emitter lighting")
 
     use_reference = args.headless or args.oidn

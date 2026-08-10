@@ -244,14 +244,25 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
 
     // AABB buffers are the AS build inputs. The explicit edge still carries MainPathTrace
     // readiness (LightingEnd / VBuffer) until TLAS/BLAS are first-class graph resources.
-    std::vector<rg::BufferHandle> aabbBuffers;
+    struct GaussianSplatAccelGraphHandles
+    {
+        rg::BufferHandle splatBuffer;
+        rg::BufferHandle aabbBuffer;
+    };
+    std::vector<GaussianSplatAccelGraphHandles> accelResources;
     for (const GaussianSplatGraphResources& resources :
         ctx.gaussian->prepareGraphResources(/*renderToOutputColor=*/true))
     {
-        if (resources.splatAabbBuffer == nullptr)
+        if (resources.splatBuffer == nullptr || resources.splatAabbBuffer == nullptr)
+        {
             continue;
-        aabbBuffers.push_back(
-            ctx.graph->importBuffer(resources.splatAabbBuffer, rg::BufferAccess::AccelStructBuildInput));
+        }
+        accelResources.push_back(GaussianSplatAccelGraphHandles{
+            .splatBuffer = ctx.graph->importBuffer(resources.splatBuffer, rg::BufferAccess::CopyDest),
+            .aabbBuffer = ctx.graph->importBuffer(
+                resources.splatAabbBuffer,
+                rg::BufferAccess::AccelStructBuildInput),
+        });
     }
 
     rg::PassOptions passOptions{};
@@ -262,9 +273,12 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
 
     return ctx.graph->addPass(
         kGaussianSplatsAccelBuildPass,
-        [aabbBuffers](rg::PassBuilder& setup) {
-            for (const rg::BufferHandle& aabb : aabbBuffers)
-                setup.write(aabb, rg::BufferAccess::AccelStructBuildInput);
+        [accelResources](rg::PassBuilder& setup) {
+            for (const GaussianSplatAccelGraphHandles& item : accelResources)
+            {
+                setup.write(item.splatBuffer, rg::BufferAccess::CopyDest);
+                setup.write(item.aabbBuffer, rg::BufferAccess::AccelStructBuildInput);
+            }
         },
         [gaussian](rg::RenderPassContext& passCtx) {
             gaussian->executeAccelBuild(passCtx.commandList());

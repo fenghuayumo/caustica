@@ -38,7 +38,8 @@ void fillGaussianSplatShadowConstants(
     FrameConstants& constants,
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
-    uint32_t frameIndex);
+    uint32_t frameIndex,
+    const dm::float3& shadowDirectionToLight);
 
 bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings);
 bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings);

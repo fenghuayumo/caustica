@@ -27,7 +27,6 @@ struct GaussianSplatPrepareContext
 {
     caustica::rhi::Device* device = nullptr;
     std::shared_ptr<caustica::ShaderFactory> shaderFactory;
-    RenderTargets* renderTargets = nullptr;
     std::shared_ptr<ShaderDebug> shaderDebug;
     std::shared_ptr<::GPUSort> gpuSort;
 };
@@ -40,13 +39,14 @@ struct GaussianSplatPrepareContext
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     const SceneGaussianSplatPasses& scenePasses);
 
-void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, GaussianSplatPrepareContext& context);
-void prepareGaussianSplatScenePass(GaussianSplatPass& pass, const GaussianSplatPrepareContext& context);
-void setGaussianSplatRayTracingShEnabled(
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+void prepareGaussianSplatScenePasses(
     SceneGaussianSplatPasses& scenePasses,
-    bool enabled);
-
+    GaussianSplatPrepareContext& context,
+    RenderTargets& renderTargets);
+void prepareGaussianSplatScenePass(
+    GaussianSplatPass& pass,
+    const GaussianSplatPrepareContext& context,
+    RenderTargets& renderTargets);
 void buildGaussianSplatEmissionProxies(
     std::vector<GaussianSplatEmissionProxy>& out,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,

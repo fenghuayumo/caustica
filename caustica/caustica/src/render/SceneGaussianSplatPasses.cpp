@@ -1,13 +1,5 @@
 #include <render/SceneGaussianSplatPasses.h>
 
-#include <render/core/RenderDevice.h>
-#include <render/PathTracerScenePasses.h>
-#include <render/core/RenderTargets.h>
-
-#include <backend/GpuDevice.h>
-#include <core/command_line.h>
-#include <core/log.h>
-#include <render/core/RenderTargets.h>
 #include <scene/scene_utils.h>
 #include <scene/SceneObjects.h>
 
@@ -17,15 +9,12 @@
 namespace caustica::render
 {
 
-void SceneGaussianSplatPasses::initialize(const ScenePassDependencies& dependencies)
+void SceneGaussianSplatPasses::initialize(const Dependencies& dependencies)
 {
     m_gpuDevice = &dependencies.gpuDevice;
-    m_settings = &dependencies.settings;
-    m_summary = &dependencies.gaussianSplatsSummary;
+    m_summary = &dependencies.summary;
     m_shaderFactory = dependencies.shaderFactory;
-    m_renderDevice = &dependencies.renderDevice;
-    m_onTemporalReset = dependencies.onGaussianSplatTemporalReset;
-    m_getRenderTargets = dependencies.getRenderTargets;
+    m_onTemporalReset = dependencies.onTemporalReset;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)
@@ -65,14 +54,6 @@ std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica:
         return sceneFolder / splatPath;
 
     return std::filesystem::absolute(splatPath);
-}
-
-void SceneGaussianSplatPasses::onPassLoaded(GaussianSplatPass& pass)
-{
-    // PLY import runs on the logic/UI thread. Shader and graphics-pipeline
-    // creation belongs to the render thread, so both scene-loaded and hot-added
-    // passes are prepared by GaussianSplatFramePass before graph publication.
-    (void)pass;
 }
 
 uint32_t SceneGaussianSplatPasses::totalSplatCount() const

@@ -404,8 +404,7 @@ struct PathTracerSettings
 
     bool                                EnableGaussianSplats = true;
     bool                                GaussianSplatDepthTest = true;
-    // 3DGRT participates in the path tracer, so primary and secondary rays share mesh/splat visibility.
-    int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT, 2 = 3DGRT
+    int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT; legacy values fall back to 3DGUT
     bool                                GaussianSplatShadows = false;
     int                                 GaussianSplatShadowsMode = 0; // 0 = off, 1 = hard, 2 = soft
     int                                 GaussianSplatSortingMode = 0; // 0 = GPU sort, 1 = stochastic splats
@@ -415,18 +414,9 @@ struct PathTracerSettings
     bool                                GaussianSplatUseAABBs = false;
     bool                                GaussianSplatUseTLASInstances = true;
     bool                                GaussianSplatBlasCompaction = true;
-    int                                 GaussianSplatRtxKernelDegree = 0;
-    bool                                GaussianSplatRtxAdaptiveClamp = true;
-    float                               GaussianSplatRtxAlphaClamp = 0.99f;
-    float                               GaussianSplatRtxMinimumTransmittance = 0.01f;
-    int                                 GaussianSplatRtxTraceStrategy = 0;
-    int                                 GaussianSplatRtxParticleSamplesPerPass = 18;
-    int                                 GaussianSplatRtxMaximumPassCount = 200;
-    float                               GaussianSplatRtxParticleShadowOffset = 0.01f;
-    float                               GaussianSplatRtxParticleShadowThreshold = 0.80f;
-    float                               GaussianSplatRtxColoredShadowStrength = 0.0f;
-    float                               GaussianSplatRtxMeshCompositeThreshold = 0.0f;
-    float                               GaussianSplatRtxDepthIsoThreshold = 0.70f;
+    int                                 GaussianSplatShadowKernelDegree = 0;
+    bool                                GaussianSplatShadowAdaptiveClamp = true;
+    float                               GaussianSplatShadowRayOffset = 0.01f;
     // Match vk_gaussian_splatting's raster default. Mip opacity compensation is
     // useful for minification, but softens this reference-quality native-res path.
     bool                                GaussianSplatMipAntialiasing = false;

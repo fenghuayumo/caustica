@@ -232,6 +232,12 @@ def global_macro_presets(preset: str) -> list[list[tuple[str, str]]]:
     if preset == "default":
         return [macro_map_to_list(base)]
 
+    for name, overrides in COVERAGE_PRESET_OVERRIDES:
+        if preset == name:
+            merged = {**base, **overrides}
+            print(f"[caustica] PT feature preset: {name}")
+            return [macro_map_to_list(merged)]
+
     if preset != "coverage":
         raise ValueError(f"Unknown global macro preset: {preset}")
 
@@ -408,6 +414,15 @@ def compile_library(
     return out_path
 
 
+def shader_dependency_mtime() -> float:
+    """Newest source timestamp for the path-tracing shader include tree."""
+    newest = 0.0
+    for pattern in ("*.hlsl", "*.hlsli", "*.h"):
+        for path in SHADER_ROOT.rglob(pattern):
+            newest = max(newest, path.stat().st_mtime)
+    return newest
+
+
 def build_jobs(global_preset: str) -> list[dict]:
     jobs: list[dict] = []
 
@@ -454,12 +469,13 @@ def build_jobs(global_preset: str) -> list[dict]:
 
 def precompile(api: str, force: bool, global_preset: str = "default") -> int:
     dxc = find_dxc(api)
+    dependency_mtime = shader_dependency_mtime()
     compiled = 0
     skipped = 0
     for job in build_jobs(global_preset):
         digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=api))
         out_path, _ = cache_paths(api, digest)
-        if out_path.exists() and not force:
+        if out_path.exists() and out_path.stat().st_mtime >= dependency_mtime and not force:
             skipped += 1
             continue
         compile_library(
@@ -506,7 +522,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--global-preset",
-        choices=["default", "coverage"],
+        choices=["default", "coverage", *(name for name, _ in COVERAGE_PRESET_OVERRIDES)],
         default="coverage",
         help=(
             "Closed feature-preset matrix to precompile. "

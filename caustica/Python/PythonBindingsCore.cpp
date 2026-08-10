@@ -81,7 +81,7 @@ namespace py_enums
     enum class GaussianSplatSortMode : int { GpuSort = 0, StochasticSplats = 1 };
     enum class GaussianSplatStorageFormat : int { Float32 = 0, Float16 = 1, Uint8 = 2 };
     enum class GaussianSplatFrustumCulling : int { Disabled = 0, AtDistanceStage = 1, AtRasterStage = 2 };
-    enum class GaussianSplatPrimaryMethod : int { GS = 0, GUT = 1, GRT = 2 };
+    enum class GaussianSplatPrimaryMethod : int { GS = 0, GUT = 1 };
     enum class GaussianSplatShadowMode : int { Disabled = 0, Hard = 1, Soft = 2 };
     enum class GaussianSplatFTBSyncMode : int { Disabled = 0, Interlock = 1 };
     enum class LightType : int {
@@ -682,7 +682,6 @@ void RegisterCoreBindings(nb::module_& m)
         nb::is_arithmetic())
         .value("GS",  py_enums::GaussianSplatPrimaryMethod::GS)
         .value("GUT", py_enums::GaussianSplatPrimaryMethod::GUT)
-        .value("GRT", py_enums::GaussianSplatPrimaryMethod::GRT)
         .export_values();
 
     nb::enum_<GaussianSplatShadowMode>(m, "GaussianSplatShadowMode",
@@ -1567,7 +1566,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("enable_gaussian_splats",        &PathTracerSettings::EnableGaussianSplats)
         .def_rw("gaussian_splat_depth_test",     &PathTracerSettings::GaussianSplatDepthTest)
         .def_rw("gaussian_splat_primary_method", &PathTracerSettings::GaussianSplatPrimaryMethod,
-                "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT, GRT=3DGRT.")
+                "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT.")
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_hybrid_shadows", &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,
@@ -1581,18 +1580,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("gaussian_splat_use_aabbs",      &PathTracerSettings::GaussianSplatUseAABBs)
         .def_rw("gaussian_splat_use_tlas_instances", &PathTracerSettings::GaussianSplatUseTLASInstances)
         .def_rw("gaussian_splat_blas_compaction", &PathTracerSettings::GaussianSplatBlasCompaction)
-        .def_rw("gaussian_splat_rtx_kernel_degree", &PathTracerSettings::GaussianSplatRtxKernelDegree)
-        .def_rw("gaussian_splat_rtx_adaptive_clamp", &PathTracerSettings::GaussianSplatRtxAdaptiveClamp)
-        .def_rw("gaussian_splat_rtx_alpha_clamp", &PathTracerSettings::GaussianSplatRtxAlphaClamp)
-        .def_rw("gaussian_splat_rtx_minimum_transmittance", &PathTracerSettings::GaussianSplatRtxMinimumTransmittance)
-        .def_rw("gaussian_splat_rtx_trace_strategy", &PathTracerSettings::GaussianSplatRtxTraceStrategy)
-        .def_rw("gaussian_splat_rtx_particle_samples_per_pass", &PathTracerSettings::GaussianSplatRtxParticleSamplesPerPass)
-        .def_rw("gaussian_splat_rtx_maximum_pass_count", &PathTracerSettings::GaussianSplatRtxMaximumPassCount)
-        .def_rw("gaussian_splat_rtx_particle_shadow_offset", &PathTracerSettings::GaussianSplatRtxParticleShadowOffset)
-        .def_rw("gaussian_splat_rtx_particle_shadow_threshold", &PathTracerSettings::GaussianSplatRtxParticleShadowThreshold)
-        .def_rw("gaussian_splat_rtx_colored_shadow_strength", &PathTracerSettings::GaussianSplatRtxColoredShadowStrength)
-        .def_rw("gaussian_splat_rtx_mesh_composite_threshold", &PathTracerSettings::GaussianSplatRtxMeshCompositeThreshold)
-        .def_rw("gaussian_splat_rtx_depth_iso_threshold", &PathTracerSettings::GaussianSplatRtxDepthIsoThreshold)
+        .def_rw("gaussian_splat_shadow_kernel_degree", &PathTracerSettings::GaussianSplatShadowKernelDegree)
+        .def_rw("gaussian_splat_shadow_adaptive_clamp", &PathTracerSettings::GaussianSplatShadowAdaptiveClamp)
+        .def_rw("gaussian_splat_shadow_ray_offset", &PathTracerSettings::GaussianSplatShadowRayOffset)
         .def_rw("gaussian_splat_projection_method", &PathTracerSettings::GaussianSplatProjectionMethod,
                 "3DGUT extent method: 0=oriented Eigen, 1=paper/reference Conic. Ignored by 3DGS.")
         .def_rw("gaussian_splat_covariance_dilation", &PathTracerSettings::GaussianSplatCovarianceDilation,

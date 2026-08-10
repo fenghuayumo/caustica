@@ -184,6 +184,9 @@ void PathTracePass::prePass(
     assert(bindingSet);
     assert(descriptorTable);
 
+    if (!pipeline->hasPipeline() || !pipeline->getShaderTable())
+        return;
+
     caustica::rhi::rt::State state;
     caustica::rhi::rt::DispatchRaysArguments args;
     args.width = viewSize.x;
@@ -241,6 +244,9 @@ void PathTracePass::mainPass(
     assert(bindingSet);
     assert(descriptorTable);
     assert(samplesPerPixel > 0);
+
+    if (!pipeline->hasPipeline() || !pipeline->getShaderTable())
+        return;
 
     caustica::rhi::rt::State state;
     caustica::rhi::rt::DispatchRaysArguments args;

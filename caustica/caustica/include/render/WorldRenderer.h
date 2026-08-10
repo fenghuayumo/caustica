@@ -8,6 +8,7 @@
 #include <render/core/AccelStructManager.h>
 #include <render/core/CameraController.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/PathTraceSceneBindings.h>
 #include <render/PathTracerScenePasses.h>
 #include <render/PathTracingContext.h>
 #include <shaders/PathTracer/Config.h>
@@ -121,7 +122,6 @@ public:
     void releaseStreamlineTemporalResources();
     void onSceneUnloading();
     void onSceneLoaded(std::shared_ptr<Scene> scene, std::filesystem::path scenePath);
-    void invalidateBindingSet() { m_bindingSet = nullptr; }
     void resetFrameIndex();
 
     bool createPTPipeline();
@@ -136,7 +136,7 @@ public:
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
-    caustica::rhi::BindingSetHandle getBindingSet() const { return m_bindingSet; }
+    [[nodiscard]] bool hasSceneBindingSet() const { return m_sceneBindings.ready(); }
 
     // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
     // Call on the render thread after the first PT update has a hit-group set.
@@ -202,6 +202,7 @@ private:
     void preUpdatePathTracing(bool resetAccum, caustica::rhi::CommandListHandle commandList);
     void postUpdatePathTracing();
 
+    PathTraceSceneBindings       m_sceneBindings;
     PathTracerScenePasses        m_scenePasses;
     CameraController             m_renderCamera;
     AccelStructManager           m_accelStructs;
@@ -220,13 +221,6 @@ private:
     std::unique_ptr<RenderTargets>              m_renderTargets;
     caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
     caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
-    caustica::rhi::BindingSetHandle                     m_bindingSet;
-    // Tracks the optional Gaussian resources represented by t7/t8. Gaussian
-    // acceleration structures are built by the render graph, so they can become
-    // available one frame after the scene binding set was first created.
-    caustica::rhi::rt::AccelStruct*                     m_boundGaussianSplatAS = nullptr;
-    caustica::rhi::Buffer*                              m_boundGaussianSplatBuffer = nullptr;
-    caustica::rhi::Buffer*                              m_boundGaussianSplatShBuffer = nullptr;
 
     std::unique_ptr<caustica::rhi::CommandListPool>     m_commandListPool;
     std::unique_ptr<caustica::rhi::FrameCommandContext> m_frameCommands;

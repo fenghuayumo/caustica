@@ -1,7 +1,6 @@
 #pragma once
 
 #include <assets/loader/ShaderMacro.h>
-#include <render/core/PathTracerSettings.h>
 #include <render/core/PtPipelineFeaturePresets.h>
 #include <render/RenderRuntimeState.h>
 #include <rhi/rhi.h>
@@ -12,6 +11,7 @@
 
 class PathTracingShaderCompiler;
 class PTPipelineVariant;
+struct PathTracerSettings;
 
 namespace caustica
 {
@@ -26,7 +26,7 @@ namespace scene { class SceneRenderData; }
 
 namespace caustica::render
 {
-class WorldRenderer;
+class PathTraceSceneBindings;
 class RtPipelineCache;
 struct RtPipelineCacheStats;
 struct RtPipelineWarmupStatus;
@@ -36,7 +36,6 @@ namespace caustica::render
 {
 
 class SceneLightingPasses;
-struct ScenePassDependencies;
 
 using AdditionalAccelStructBuilder = std::function<void(caustica::rhi::CommandList*)>;
 using AccelBuildProgress = std::function<void(
@@ -48,17 +47,30 @@ class SceneRayTracingResources
     friend struct PathTracerScenePasses;
 
 public:
+    struct Dependencies
+    {
+        caustica::GpuDevice& gpuDevice;
+        caustica::AccelStructManager& accelStructs;
+        RenderInvalidationState& invalidation;
+        caustica::BindingCache& bindingCache;
+        PathTraceSceneBindings& sceneBindings;
+    };
+
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
-    void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
+    void fillPTPipelineGlobalMacros(
+        std::vector<caustica::ShaderMacro>& macros,
+        const PathTracerSettings& settings);
     void initializePipelineRuntime(
         caustica::rhi::BindingLayoutHandle bindingLayout,
-        caustica::rhi::BindingLayoutHandle bindlessLayout);
+        caustica::rhi::BindingLayoutHandle bindlessLayout,
+        const PathTracerSettings& settings);
     [[nodiscard]] bool hasPipelineRuntime() const { return m_shaderCompiler != nullptr; }
     void updatePipelineRuntime(
         const caustica::scene::SceneRenderData* sceneData,
         uint32_t subInstanceCount,
-        bool forceShaderReload);
+        bool forceShaderReload,
+        const PathTracerSettings& settings);
     [[nodiscard]] RtPipelineWarmupStatus pipelineWarmupStatus() const;
     [[nodiscard]] RtPipelineCacheStats pipelineCacheStats() const;
     [[nodiscard]] PTPipelineVariant* pipelineReference() const { return m_pipelineReference.get(); }
@@ -74,16 +86,19 @@ public:
     [[nodiscard]] bool createAccelStructs(
         caustica::rhi::CommandList* commandList,
         caustica::Scene& scene,
+        const PathTracerSettings& settings,
         const caustica::scene::SceneRenderData* renderData = nullptr);
     [[nodiscard]] bool recreateAccelStructs(
         caustica::rhi::CommandList* commandList,
         caustica::Scene& scene,
+        const PathTracerSettings& settings,
         const caustica::scene::SceneRenderData* renderData = nullptr);
     // Exclusive load path: form BLAS submissions from backend-reported scratch
     // bytes and apply bounded in-flight fence backpressure.
     [[nodiscard]] bool recreateAccelStructsForLoad(
         caustica::Scene& scene,
         const caustica::scene::SceneRenderData& renderData,
+        const PathTracerSettings& settings,
         uint64_t targetScratchBytesPerSubmit = 256ull * 1024ull * 1024ull,
         AccelBuildProgress progress = {});
     void requestMeshAccelRebuild(const std::shared_ptr<caustica::MeshInfo>& mesh, bool resetAccumulation = true);
@@ -91,32 +106,31 @@ public:
     // Structure-only invalidation (no shader reload). Prefer this after runtime scene graph edits.
     void requestAccelerationStructureRebuild();
     void requestFullRebuild();
-    void invalidateBindingSet();
-    void recreateBindingSet(const caustica::scene::SceneRenderData* renderData = nullptr);
 
     bool consumeShaderReloadRequest();
+    bool consumeAccumulationResetRequest();
     bool& accelerationStructRebuildRequested();
 
 private:
-    void initialize(const ScenePassDependencies& dependencies);
-    [[nodiscard]] PtFeaturePresetId resolveFeaturePreset() const;
-    void createRTPipelines();
+    void initialize(const Dependencies& dependencies, SceneLightingPasses& lighting);
+    [[nodiscard]] PtFeaturePresetId resolveFeaturePreset(const PathTracerSettings& settings) const;
+    void createRTPipelines(const PathTracerSettings& settings);
     bool bindFeaturePreset(PtFeaturePresetId id);
     bool ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress = false);
     [[nodiscard]] bool createBlases(
         caustica::rhi::CommandList* commandList,
-        const caustica::scene::SceneRenderData& renderData);
+        const caustica::scene::SceneRenderData& renderData,
+        const PathTracerSettings& settings);
     [[nodiscard]] bool createTlas(
         caustica::rhi::CommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
 
     caustica::GpuDevice*                        m_gpuDevice = nullptr;
     caustica::AccelStructManager*               m_accelStructs = nullptr;
-    caustica::render::WorldRenderer* m_worldRenderer = nullptr;
-    PathTracerSettings*                         m_settings = nullptr;
     caustica::render::RenderInvalidationState*  m_invalidation = nullptr;
     SceneLightingPasses*                        m_lightingPasses = nullptr;
     caustica::BindingCache*                     m_bindingCache = nullptr;
+    PathTraceSceneBindings*                     m_sceneBindings = nullptr;
     AdditionalAccelStructBuilder                m_additionalAccelStructBuilder;
 
     // Single owner for the complete RT pipeline runtime. WorldRenderer only

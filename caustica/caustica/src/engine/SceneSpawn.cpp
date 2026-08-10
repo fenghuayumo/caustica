@@ -84,6 +84,7 @@ bool runStructureGpuBuild(
         if (!worldRendererResource->rayTracingResources().recreateAccelStructsForLoad(
             *scenePtr,
             *gpuSetupData,
+            gpuSetupData->renderSettings.settings,
             256ull * 1024ull * 1024ull,
             [](const char* stage, size_t completed, size_t total, uint64_t scratchBytes) {
                 detail::sceneSwitchTrace(
@@ -99,7 +100,10 @@ bool runStructureGpuBuild(
     {
         caustica::rhi::CommandListHandle commandList = rhiDevice->createCommandList();
         if (!worldRendererResource->rayTracingResources().recreateAccelStructs(
-            commandList, *scenePtr, gpuSetupData.get()))
+            commandList,
+            *scenePtr,
+            gpuSetupData->renderSettings.settings,
+            gpuSetupData.get()))
             return false;
     }
     detail::sceneSwitchTrace("StructureGpu: acceleration structures complete");
@@ -120,13 +124,14 @@ bool runStructureGpuBuild(
             rayTracing.updatePipelineRuntime(
                 gpuSetupData.get(),
                 static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
-                false);
+                false,
+                gpuSetupData->renderSettings.settings);
             detail::sceneSwitchTrace("StructureGpu: SBT/pipeline update complete");
         }
 
         detail::sceneSwitchTrace("StructureGpu: begin binding set");
-        worldRendererResource->rayTracingResources().recreateBindingSet(gpuSetupData.get());
-        if (!worldRendererResource->getBindingSet() || !rhiDevice->isDeviceHealthy())
+        worldRendererResource->recreateBindingSet(gpuSetupData.get());
+        if (!worldRendererResource->hasSceneBindingSet() || !rhiDevice->isDeviceHealthy())
             return false;
         detail::sceneSwitchTrace("StructureGpu: binding set complete");
     }

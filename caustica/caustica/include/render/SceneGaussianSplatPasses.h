@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ecs/Entity.h>
-#include <render/core/PathTracerSettings.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <render/RenderRuntimeState.h>
 
@@ -12,8 +11,6 @@
 #include <unordered_map>
 #include <vector>
 
-class RenderTargets;
-
 namespace caustica
 {
 struct GaussianSplat;
@@ -21,13 +18,10 @@ class GpuDevice;
 class Scene;
 class SceneGaussianSplatLogic;
 class ShaderFactory;
-namespace render { class RenderDevice; }
 } // namespace caustica
 
 namespace caustica::render
 {
-struct ScenePassDependencies;
-
 // Per-scene Gaussian splat asset ownership and ECS wiring.
 class SceneGaussianSplatPasses
 {
@@ -35,6 +29,14 @@ class SceneGaussianSplatPasses
     friend class ::caustica::SceneGaussianSplatLogic;
 
 public:
+    struct Dependencies
+    {
+        caustica::GpuDevice& gpuDevice;
+        GaussianSplatSceneSummary& summary;
+        std::shared_ptr<caustica::ShaderFactory> shaderFactory;
+        std::function<void()> onTemporalReset;
+    };
+
     // GPU pass bound to an ECS GaussianSplatComponent entity (authoring stays on ECS).
     struct SceneObject
     {
@@ -60,23 +62,19 @@ public:
     const std::string& fileNameSummary() const { return m_fileNameSummary; }
 
 private:
-    void initialize(const ScenePassDependencies& dependencies);
+    void initialize(const Dependencies& dependencies);
 
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
     void updateUIState();
-    void onPassLoaded(GaussianSplatPass& pass);
     uint32_t totalSplatCount() const;
 
     caustica::GpuDevice* m_gpuDevice = nullptr;
     caustica::Scene* m_sessionScene = nullptr; // non-owning; PathTracingContext holds shared_ptr
     std::filesystem::path m_sessionScenePath;
-    PathTracerSettings* m_settings = nullptr;
     caustica::render::GaussianSplatSceneSummary* m_summary = nullptr;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
-    caustica::render::RenderDevice* m_renderDevice = nullptr;
 
     std::function<void()> m_onTemporalReset;
-    std::function<RenderTargets*()> m_getRenderTargets;
 
     std::vector<SceneObject> m_objects;
     std::unordered_map<uint32_t, GaussianSplatPass*> m_passByEntity;

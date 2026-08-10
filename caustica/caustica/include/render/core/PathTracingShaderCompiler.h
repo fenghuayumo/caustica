@@ -60,6 +60,7 @@ public:
 
     const caustica::rhi::rt::ShaderTableHandle &    getShaderTable() const { return m_shaderTable; }
     [[nodiscard]] bool                      hasPipeline() const { return m_pipeline != nullptr; }
+    [[nodiscard]] bool                      isReady() const { return m_pipeline != nullptr && m_shaderTable != nullptr; }
 
 private:
     void                                    updateStart(std::filesystem::file_time_type lastModifiedSourceCode);

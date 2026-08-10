@@ -10,6 +10,8 @@ namespace caustica::render
 
 struct RenderInvalidationState
 {
+    // One-shot request consumed by the renderer and applied to its frame-local settings snapshot.
+    bool AccumulationResetRequested = false;
     // Full RTPSO rebuild (Ctrl+R / source hot-reload / scene load). Prefer RtPipelineCache binds.
     bool ShaderReloadRequested = false;
     bool AccelerationStructRebuildRequested = false;

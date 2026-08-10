@@ -40,19 +40,25 @@ GaussianSplatBinding getPrimaryGaussianSplatBinding(
     return binding;
 }
 
-void prepareGaussianSplatScenePass(GaussianSplatPass& pass, const GaussianSplatPrepareContext& context)
+void prepareGaussianSplatScenePass(
+    GaussianSplatPass& pass,
+    const GaussianSplatPrepareContext& context,
+    RenderTargets& renderTargets)
 {
-    if (context.renderTargets == nullptr || context.shaderDebug == nullptr || context.device == nullptr)
+    if (context.shaderDebug == nullptr || context.device == nullptr)
         return;
 
     if (context.gpuSort == nullptr)
         return;
 
     pass.setGpuSort(context.gpuSort);
-    pass.createPipeline(*context.renderTargets);
+    pass.createPipeline(renderTargets);
 }
 
-void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, GaussianSplatPrepareContext& context)
+void prepareGaussianSplatScenePasses(
+    SceneGaussianSplatPasses& scenePasses,
+    GaussianSplatPrepareContext& context,
+    RenderTargets& renderTargets)
 {
     if (context.gpuSort == nullptr
         && context.device != nullptr
@@ -66,20 +72,7 @@ void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, Gaus
     for (SceneGaussianSplatPasses::SceneObject& object : scenePasses.objects())
     {
         if (object.pass != nullptr && object.pass->hasSplats())
-            prepareGaussianSplatScenePass(*object.pass, context);
-    }
-}
-
-void setGaussianSplatRayTracingShEnabled(
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
-    SceneGaussianSplatPasses& scenePasses,
-    bool enabled)
-{
-    for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
-    {
-        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
-        if (pass != nullptr && pass->hasSplats())
-            pass->setRayTracingShEnabled(enabled && proxy.enabled);
+            prepareGaussianSplatScenePass(*object.pass, context, renderTargets);
     }
 }
 
@@ -110,8 +103,8 @@ void buildGaussianSplatEmissionProxies(
         pass->buildEmissionProxies(
             remainingProxyCount,
             settings.GaussianSplatScale,
-            uint32_t(std::clamp(settings.GaussianSplatRtxKernelDegree, 0, 5)),
-            settings.GaussianSplatRtxAdaptiveClamp,
+            uint32_t(std::clamp(settings.GaussianSplatShadowKernelDegree, 0, 5)),
+            settings.GaussianSplatShadowAdaptiveClamp,
             settings.GaussianSplatTintColor,
             settings.GaussianSplatAlphaCullThreshold);
 
@@ -201,8 +194,6 @@ void buildGaussianSplatSceneAccelStructs(
     const PathTracerSettings& settings)
 {
     const bool buildGaussianAccelStructs = needsGaussianSplatAccelBuild(settings);
-    const bool rayTracedPrimary = settings.GaussianSplatPrimaryMethod
-        == int(GaussianSplatPrimaryMethod::GRT);
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
         GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
@@ -213,12 +204,12 @@ void buildGaussianSplatSceneAccelStructs(
         {
             pass->buildAccelerationStructures(
                 commandList,
-                rayTracedPrimary || settings.GaussianSplatUseAABBs,
+                settings.GaussianSplatUseAABBs,
                 settings.GaussianSplatUseTLASInstances,
                 settings.GaussianSplatBlasCompaction,
                 settings.GaussianSplatScale,
-                uint32_t(std::clamp(settings.GaussianSplatRtxKernelDegree, 0, 5)),
-                settings.GaussianSplatRtxAdaptiveClamp);
+                uint32_t(std::clamp(settings.GaussianSplatShadowKernelDegree, 0, 5)),
+                settings.GaussianSplatShadowAdaptiveClamp);
         }
         else
         {

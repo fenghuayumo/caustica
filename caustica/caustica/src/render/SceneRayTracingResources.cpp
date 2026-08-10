@@ -1,12 +1,12 @@
 #include <render/SceneRayTracingResources.h>
 
-#include <render/PathTracerScenePasses.h>
+#include <render/PathTraceSceneBindings.h>
 #include <render/SceneLightingPasses.h>
-#include <render/WorldRenderer.h>
 
 #include <backend/GpuDevice.h>
 #include <core/log.h>
 #include <render/core/BindingCache.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/core/StreamingUploadBudget.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RtPipelineCache.h>
@@ -25,15 +25,16 @@ using caustica::scene::internal::RenderResourceAccess;
 namespace caustica::render
 {
 
-void SceneRayTracingResources::initialize(const ScenePassDependencies& dependencies)
+void SceneRayTracingResources::initialize(
+    const Dependencies& dependencies,
+    SceneLightingPasses& lighting)
 {
     m_gpuDevice = &dependencies.gpuDevice;
     m_accelStructs = &dependencies.accelStructs;
-    m_worldRenderer = &dependencies.worldRenderer;
-    m_settings = &dependencies.settings;
     m_invalidation = &dependencies.invalidation;
-    m_lightingPasses = &dependencies.lighting;
+    m_lightingPasses = &lighting;
     m_bindingCache = &dependencies.bindingCache;
+    m_sceneBindings = &dependencies.sceneBindings;
 }
 
 void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder)
@@ -41,10 +42,11 @@ void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelSt
     m_additionalAccelStructBuilder = std::move(builder);
 }
 
-PtFeaturePresetId SceneRayTracingResources::resolveFeaturePreset() const
+PtFeaturePresetId SceneRayTracingResources::resolveFeaturePreset(
+    const PathTracerSettings& settings) const
 {
     PtFeaturePresetResolveInput input;
-    input.settings = m_settings;
+    input.settings = &settings;
     const std::shared_ptr<OpacityMicromapBuilder>& opacityMaps = m_lightingPasses->opacityMaps();
     input.useOpacityMicromaps = opacityMaps != nullptr && opacityMaps->shouldUseRayTracingOpacityMicromaps();
     if (m_lightingPasses->lightSampling())
@@ -52,40 +54,44 @@ PtFeaturePresetId SceneRayTracingResources::resolveFeaturePreset() const
     return resolvePtFeaturePreset(input);
 }
 
-void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros)
+void SceneRayTracingResources::fillPTPipelineGlobalMacros(
+    std::vector<caustica::ShaderMacro>& macros,
+    const PathTracerSettings& settings)
 {
     // Always emit a cooked preset macro list so runtime hashes match offline bins / RT PSO cache.
-    fillPtFeaturePresetMacros(resolveFeaturePreset(), macros);
+    fillPtFeaturePresetMacros(resolveFeaturePreset(settings), macros);
 }
 
 void SceneRayTracingResources::initializePipelineRuntime(
     caustica::rhi::BindingLayoutHandle bindingLayout,
-    caustica::rhi::BindingLayoutHandle bindlessLayout)
+    caustica::rhi::BindingLayoutHandle bindlessLayout,
+    const PathTracerSettings& settings)
 {
     assert(!m_shaderCompiler && !m_pipelineCache);
     m_shaderCompiler = std::make_shared<PathTracingShaderCompiler>(
         m_gpuDevice->getDevice(), m_lightingPasses->materials(), bindingLayout, bindlessLayout);
     m_pipelineCache = std::make_shared<RtPipelineCache>(m_shaderCompiler);
-    createRTPipelines();
+    createRTPipelines(settings);
 }
 
 void SceneRayTracingResources::updatePipelineRuntime(
     const caustica::scene::SceneRenderData* sceneData,
     uint32_t subInstanceCount,
-    bool forceShaderReload)
+    bool forceShaderReload,
+    const PathTracerSettings& settings)
 {
     if (!m_shaderCompiler || !m_pipelineCache)
         return;
 
-    const PtFeaturePresetId desiredPreset = resolveFeaturePreset();
+    const PtFeaturePresetId desiredPreset = resolveFeaturePreset(settings);
     if (m_pipelineCache->activePreset() != desiredPreset)
-        m_settings->ResetAccumulation = true;
+        m_invalidation->AccumulationResetRequested = true;
 
     m_shaderCompiler->update(
         sceneData,
         subInstanceCount,
-        [this](std::vector<caustica::ShaderMacro>& macros) {
-            fillPTPipelineGlobalMacros(macros);
+        [this, &settings](std::vector<caustica::ShaderMacro>& macros) {
+            fillPTPipelineGlobalMacros(macros, settings);
         },
         forceShaderReload);
 
@@ -108,34 +114,35 @@ RtPipelineCacheStats SceneRayTracingResources::pipelineCacheStats() const
     return m_pipelineCache ? m_pipelineCache->stats() : RtPipelineCacheStats{};
 }
 
-void SceneRayTracingResources::createRTPipelines()
+void SceneRayTracingResources::createRTPipelines(const PathTracerSettings& settings)
 {
     assert(m_shaderCompiler);
     assert(m_pipelineCache);
 
     // UE-style startup: only the active cooked preset. Other presets stay cold until
     // first use, or explicit RtPipelineCache::precacheAll during load/cook.
-    const PtFeaturePresetId active = resolveFeaturePreset();
+    const PtFeaturePresetId active = resolveFeaturePreset(settings);
     m_pipelineCache->ensurePresetVariants(active);
 
     using SM = caustica::ShaderMacro;
     // Optional editor-only raygen variants stay on the Default macro set.
     std::vector<caustica::ShaderMacro> defaultMacros;
     fillPtFeaturePresetMacros(PtFeaturePresetId::Default, defaultMacros);
-    if (m_settings->PostProcessEdgeDetection && !m_pipelineEdgeDetection)
+    if (settings.PostProcessEdgeDetection && !m_pipelineEdgeDetection)
     {
         m_pipelineEdgeDetection = m_shaderCompiler->createVariant(
             "TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true, defaultMacros);
     }
 
-    // Bind variant pointers only. CreateStateObject must wait until
-    // PathTracingShaderCompiler::update() has built the hit-group export set
-    // (materials loaded + scene sub-instances). Calling ensureReady here
-    // CreateStateObjects with an empty hit-group map and crashes / freezes PSOs.
+    // Publish the stable variant objects before the frame graph is registered.
+    // This does not create a state object: buildPreset() still waits until
+    // PathTracingShaderCompiler::update() has produced the hit-group exports.
+    // The PSO and SBT are filled into these same objects later, matching RTXPT's
+    // persistent pipeline-handle model.
     if (!bindFeaturePreset(active))
     {
         caustica::error(
-            "RtPipelineCache: failed to bind preset '%s' after createRTPipelines",
+            "RtPipelineCache: failed to publish preset '%s' after createRTPipelines",
             ptFeaturePresetName(active).data());
     }
 }
@@ -145,7 +152,8 @@ void SceneRayTracingResources::ensureStablePlanePipelines()
     if (!m_pipelineCache)
         return;
     m_pipelineCache->ensurePresetVariants(m_pipelineCache->activePreset());
-    bindFeaturePreset(m_pipelineCache->activePreset());
+    if (m_pipelineCache->isReady(m_pipelineCache->activePreset()))
+        bindFeaturePreset(m_pipelineCache->activePreset());
 }
 
 bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
@@ -162,7 +170,7 @@ bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
     if (previous != id)
     {
         caustica::info("RtPipelineCache: bound feature preset '%s'", ptFeaturePresetName(id).data());
-        m_settings->ResetAccumulation = true;
+        m_invalidation->AccumulationResetRequested = true;
     }
     return true;
 }
@@ -192,11 +200,15 @@ uint32_t SceneRayTracingResources::precacheAllFeaturePresets(bool showProgress)
 
 bool SceneRayTracingResources::createBlases(
     caustica::rhi::CommandList* commandList,
-    const caustica::scene::SceneRenderData& renderData)
+    const caustica::scene::SceneRenderData& renderData,
+    const PathTracerSettings& settings)
 {
-    caustica::AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
+    const caustica::AccelStructBuildSettings buildSettings = {
+        .excludeTransmissive = settings.AS.ExcludeTransmissive
+    };
     m_accelStructs->bindMaterialGpuCache(m_lightingPasses->materials().get());
-    return m_accelStructs->createBlases(commandList, renderData.staticData().meshSnapshots, settings);
+    return m_accelStructs->createBlases(
+        commandList, renderData.staticData().meshSnapshots, buildSettings);
 }
 
 void SceneRayTracingResources::uploadSubInstanceData(caustica::rhi::CommandList* commandList)
@@ -214,13 +226,14 @@ bool SceneRayTracingResources::createTlas(
 bool SceneRayTracingResources::createAccelStructs(
     caustica::rhi::CommandList* commandList,
     caustica::Scene& scene,
+    const PathTracerSettings& settings,
     const caustica::scene::SceneRenderData* renderData)
 {
     (void)scene;
     assert(renderData && "createAccelStructs requires published SceneRenderData");
     const caustica::scene::SceneRenderData& data = *renderData;
     m_lightingPasses->createOpacityMicromaps(data);
-    if (!createBlases(commandList, data))
+    if (!createBlases(commandList, data, settings))
         return false;
     if (!createTlas(commandList, data))
         return false;
@@ -232,13 +245,14 @@ bool SceneRayTracingResources::createAccelStructs(
 bool SceneRayTracingResources::recreateAccelStructs(
     caustica::rhi::CommandList* commandList,
     caustica::Scene& scene,
+    const PathTracerSettings& settings,
     const caustica::scene::SceneRenderData* renderData)
 {
     if (!m_invalidation->AccelerationStructRebuildRequested)
         return true;
 
     m_invalidation->AccelerationStructRebuildRequested = false;
-    m_settings->ResetAccumulation = true;
+    m_invalidation->AccumulationResetRequested = true;
 
     assert(renderData && "recreateAccelStructs requires published SceneRenderData");
 
@@ -247,14 +261,14 @@ bool SceneRayTracingResources::recreateAccelStructs(
     // this CL builds the new generation. No device-wide waitForIdle — previous
     // frame GPU work overlaps with the AS build on the graphics queue.
     m_accelStructs->clearRetiredAccelStructs();
-    m_worldRenderer->invalidateBindingSet();
+    m_sceneBindings->invalidate();
 
     if (!commandList || !commandList->open())
     {
         m_invalidation->AccelerationStructRebuildRequested = true;
         return false;
     }
-    if (!createAccelStructs(commandList, scene, renderData))
+    if (!createAccelStructs(commandList, scene, settings, renderData))
     {
         commandList->close();
         m_invalidation->AccelerationStructRebuildRequested = true;
@@ -277,6 +291,7 @@ bool SceneRayTracingResources::recreateAccelStructs(
 bool SceneRayTracingResources::recreateAccelStructsForLoad(
     caustica::Scene& scene,
     const caustica::scene::SceneRenderData& renderData,
+    const PathTracerSettings& pathTracerSettings,
     uint64_t targetScratchBytesPerSubmit,
     AccelBuildProgress progress)
 {
@@ -289,9 +304,9 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
         return false;
 
     m_invalidation->AccelerationStructRebuildRequested = false;
-    m_settings->ResetAccumulation = true;
+    m_invalidation->AccumulationResetRequested = true;
     m_accelStructs->clearRetiredAccelStructs();
-    m_worldRenderer->invalidateBindingSet();
+    m_sceneBindings->invalidate();
     if (progress)
         progress("opacity", 0, renderData.staticData().meshSnapshots.size(), 0);
     m_lightingPasses->createOpacityMicromaps(renderData);
@@ -302,7 +317,9 @@ bool SceneRayTracingResources::recreateAccelStructsForLoad(
     constexpr uint32_t kMaxInFlightSubmits = 3;
     StreamingUploadBudget buildBudget(kMaxInFlightScratchBytes, kMaxInFlightSubmits);
     const uint64_t batchTarget = std::max<uint64_t>(targetScratchBytesPerSubmit, 1);
-    const AccelStructBuildSettings settings = { .excludeTransmissive = m_settings->AS.ExcludeTransmissive };
+    const AccelStructBuildSettings settings = {
+        .excludeTransmissive = pathTracerSettings.AS.ExcludeTransmissive
+    };
 
     for (size_t begin = 0; begin < renderData.staticData().meshSnapshots.size();)
     {
@@ -401,7 +418,7 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
         return;
 
     if (resetAccumulation)
-        m_settings->ResetAccumulation = true;
+        m_invalidation->AccumulationResetRequested = true;
 
     if (!m_accelStructs->hasTopLevelAS())
     {
@@ -415,7 +432,7 @@ void SceneRayTracingResources::requestMeshAccelRebuild(const std::shared_ptr<cau
 void SceneRayTracingResources::requestAccelerationStructureRebuild()
 {
     m_invalidation->AccelerationStructRebuildRequested = true;
-    m_settings->ResetAccumulation = true;
+    m_invalidation->AccumulationResetRequested = true;
 }
 
 void SceneRayTracingResources::requestFullRebuild()
@@ -423,21 +440,10 @@ void SceneRayTracingResources::requestFullRebuild()
     m_invalidation->AccelerationStructRebuildRequested = true;
     m_invalidation->ShaderReloadRequested = true;
     m_invalidation->ShaderAndACRefreshDelayedRequest = 0.0f;
-    m_settings->ResetAccumulation = true;
-    m_worldRenderer->invalidateBindingSet();
+    m_invalidation->AccumulationResetRequested = true;
+    m_sceneBindings->invalidate();
     if (m_bindingCache)
         m_bindingCache->clear();
-}
-
-void SceneRayTracingResources::invalidateBindingSet()
-{
-    m_worldRenderer->invalidateBindingSet();
-}
-
-void SceneRayTracingResources::recreateBindingSet(
-    const caustica::scene::SceneRenderData* renderData)
-{
-    m_worldRenderer->recreateBindingSet(renderData);
 }
 
 bool SceneRayTracingResources::consumeShaderReloadRequest()
@@ -445,6 +451,14 @@ bool SceneRayTracingResources::consumeShaderReloadRequest()
     if (!m_invalidation->ShaderReloadRequested)
         return false;
     m_invalidation->ShaderReloadRequested = false;
+    return true;
+}
+
+bool SceneRayTracingResources::consumeAccumulationResetRequest()
+{
+    if (!m_invalidation->AccumulationResetRequested)
+        return false;
+    m_invalidation->AccumulationResetRequested = false;
     return true;
 }
 

@@ -5,6 +5,7 @@
 #include <core/ThreadContext.h>
 #include <core/log.h>
 #include <render/PathTracerScenePasses.h>
+#include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 
@@ -54,18 +55,21 @@ void ApplyGaussianSplatLocalBounds(
 
 } // namespace
 
-void SceneGaussianSplatLogic::onSceneLoaded(SceneGaussianSplatPasses& passes)
+void SceneGaussianSplatLogic::onSceneLoaded(
+    SceneGaussianSplatPasses& passes,
+    PathTracerSettings& settings)
 {
     assertLogicThread();
     // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic;
     // move GaussianSplatPass factory to RT before removing this drain).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
-    loadFromSceneEntities(passes);
+    loadFromSceneEntities(passes, settings);
 }
 
 bool SceneGaussianSplatLogic::loadFromFile(
     SceneGaussianSplatPasses& passes,
+    PathTracerSettings& settings,
     const std::filesystem::path& fileName,
     bool convertRdfToRub)
 {
@@ -73,7 +77,7 @@ bool SceneGaussianSplatLogic::loadFromFile(
     // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic).
     if (passes.m_gpuDevice)
         passes.m_gpuDevice->waitForRenderThreadIdle();
-    return attachToScene(passes, fileName, convertRdfToRub);
+    return attachToScene(passes, settings, fileName, convertRdfToRub);
 }
 
 bool SceneGaussianSplatLogic::removeObjectsUnderEntity(
@@ -118,7 +122,9 @@ bool SceneGaussianSplatLogic::removeObjectsUnderEntity(
     return removedGaussianSplat;
 }
 
-void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& passes)
+void SceneGaussianSplatLogic::loadFromSceneEntities(
+    SceneGaussianSplatPasses& passes,
+    PathTracerSettings& settings)
 {
     assertLogicThread();
     passes.m_objects.clear();
@@ -159,7 +165,6 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
             {
                 splat.resolvedPath = splatPath.string();
                 splat.loadedSplatCount = pass->getSplatCount();
-                passes.onPassLoaded(*pass);
                 ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
 
                 SceneGaussianSplatPasses::SceneObject object;
@@ -182,10 +187,10 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
     // The vk reference renders raster splats at the display resolution with DLSS
     // disabled. Do the same when a scene containing splats is opened; users can
     // explicitly re-enable TAA/DLSS afterwards when they prefer performance.
-    if (!passes.m_objects.empty() && passes.m_settings && passes.m_settings->RealtimeAA != 0)
+    if (!passes.m_objects.empty() && settings.RealtimeAA != 0)
     {
         caustica::info("3D Gaussian Splats: using native-resolution rendering for reference quality.");
-        passes.m_settings->RealtimeAA = 0;
+        settings.RealtimeAA = 0;
     }
 
     // Do not requestGpuStructureSync here. Failed splats never contributed GPU
@@ -200,6 +205,7 @@ void SceneGaussianSplatLogic::loadFromSceneEntities(SceneGaussianSplatPasses& pa
 
 bool SceneGaussianSplatLogic::attachToScene(
     SceneGaussianSplatPasses& passes,
+    PathTracerSettings& settings,
     const std::filesystem::path& fileName,
     bool convertRdfToRub)
 {
@@ -261,20 +267,19 @@ bool SceneGaussianSplatLogic::attachToScene(
 
     constexpr double deg2rad = 3.14159265358979323846 / 180.0;
     entityWorld->setTranslation(entity, dm::double3(
-        double(passes.m_settings->GaussianSplatTranslation.x),
-        double(passes.m_settings->GaussianSplatTranslation.y),
-        double(passes.m_settings->GaussianSplatTranslation.z)));
+        double(settings.GaussianSplatTranslation.x),
+        double(settings.GaussianSplatTranslation.y),
+        double(settings.GaussianSplatTranslation.z)));
     entityWorld->setRotation(entity, dm::rotationQuat(dm::double3(
-        double(passes.m_settings->GaussianSplatRotationEulerDeg.x) * deg2rad,
-        double(passes.m_settings->GaussianSplatRotationEulerDeg.y) * deg2rad,
-        double(passes.m_settings->GaussianSplatRotationEulerDeg.z) * deg2rad)));
+        double(settings.GaussianSplatRotationEulerDeg.x) * deg2rad,
+        double(settings.GaussianSplatRotationEulerDeg.y) * deg2rad,
+        double(settings.GaussianSplatRotationEulerDeg.z) * deg2rad)));
     entityWorld->setScaling(entity, dm::double3(
-        double(passes.m_settings->GaussianSplatObjectScale.x),
-        double(passes.m_settings->GaussianSplatObjectScale.y),
-        double(passes.m_settings->GaussianSplatObjectScale.z)));
+        double(settings.GaussianSplatObjectScale.x),
+        double(settings.GaussianSplatObjectScale.y),
+        double(settings.GaussianSplatObjectScale.z)));
     entityWorld->setGaussianSplat(entity, splat);
 
-    passes.onPassLoaded(*pass);
     ApplyGaussianSplatLocalBounds(*entityWorld, entity, *pass);
     scene->requestGpuStructureSync();
 
@@ -283,11 +288,11 @@ bool SceneGaussianSplatLogic::attachToScene(
     object.pass = std::move(pass);
     passes.m_objects.push_back(std::move(object));
 
-    passes.m_settings->EnableGaussianSplats = true;
-    if (passes.m_settings->RealtimeAA != 0)
+    settings.EnableGaussianSplats = true;
+    if (settings.RealtimeAA != 0)
     {
         caustica::info("3D Gaussian Splats: disabling TAA/DLSS to use native-resolution reference quality.");
-        passes.m_settings->RealtimeAA = 0;
+        settings.RealtimeAA = 0;
     }
     passes.updateUIState();
     if (passes.m_onTemporalReset)

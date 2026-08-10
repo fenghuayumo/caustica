@@ -103,6 +103,8 @@ namespace
             [pipeline, displaySize, bindingSet, descriptorTable,
              threshold](rg::RenderPassContext& passCtx) {
                 assert(pipeline);
+                if (!pipeline->hasPipeline() || !pipeline->getShaderTable())
+                    return;
 
                 caustica::rhi::rt::DispatchRaysArguments args;
                 args.width = displaySize.x;

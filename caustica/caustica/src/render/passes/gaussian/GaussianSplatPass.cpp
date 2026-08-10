@@ -1,8 +1,6 @@
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <render/passes/gaussian/GaussianSplatGeometry.h>
 #include <render/passes/gaussian/GaussianSplatSorter.h>
-#include <render/passes/gaussian/GaussianSplatSorter.h>
-#include <render/passes/gaussian/GaussianSplatSorter.h>
 #include <backend/ViewRhiConversion.h>
 
 #include <render/gpuSort/GPUSort.h>
@@ -123,6 +121,34 @@ namespace
     {
         return std::max<uint64_t>(4, (size + 3u) & ~uint64_t(3u));
     }
+
+    // Keep each write comfortably below the per-command-list upload heap cap.
+    // A degree-3 SH payload is roughly 192 bytes per splat, so a single write
+    // for a million-splat asset would otherwise exceed D3D12's 256 MiB upload
+    // budget and poison the command list.
+    constexpr uint64_t kGaussianUploadChunkBytes = 16ull * 1024ull * 1024ull;
+
+    bool UploadBufferChunk(
+        caustica::rhi::CommandList* commandList,
+        caustica::rhi::Buffer* buffer,
+        const void* data,
+        uint64_t byteSize,
+        uint64_t& byteOffset)
+    {
+        if (byteOffset >= byteSize)
+            return true;
+        if (commandList == nullptr || buffer == nullptr || data == nullptr)
+            return false;
+
+        const uint64_t chunkSize = std::min(kGaussianUploadChunkBytes, byteSize - byteOffset);
+        commandList->writeBuffer(
+            buffer,
+            static_cast<const uint8_t*>(data) + byteOffset,
+            size_t(chunkSize),
+            byteOffset);
+        byteOffset += chunkSize;
+        return byteOffset == byteSize;
+    }
 }
 
 GaussianSplatPass::GaussianSplatPass(
@@ -168,12 +194,13 @@ void GaussianSplatPass::setGpuSort(std::shared_ptr<GPUSort> gpuSort)
     m_gpuSort = std::move(gpuSort);
 }
 
-void GaussianSplatPass::setRayTracingShEnabled(bool enabled)
+void GaussianSplatPass::setRayTracingRadianceResourcesEnabled(bool enabled)
 {
     if (!enabled)
     {
         m_rayTracingShBuffer = nullptr;
         m_rayTracingShUploadPending = false;
+        m_rayTracingShUploadOffset = 0;
         return;
     }
 
@@ -188,6 +215,7 @@ void GaussianSplatPass::setRayTracingShEnabled(bool enabled)
     desc.keepInitialState = true;
     m_rayTracingShBuffer = m_device->createBuffer(desc);
     m_rayTracingShUploadPending = m_rayTracingShBuffer != nullptr;
+    m_rayTracingShUploadOffset = 0;
 }
 
 caustica::render::GaussianSplatSortResources GaussianSplatPass::makeSortResources() const
@@ -244,11 +272,12 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     splatBufferDesc.keepInitialState = true;
     m_splatBuffer = m_device->createBuffer(splatBufferDesc);
 
-    // 3DGRT needs the uncompressed SH coefficients, but raster 3DGS does not.
-    // Allocate that large duplicate lazily when the render method switches to
-    // 3DGRT; million-splat assets otherwise lose hundreds of MB for no benefit.
+    // Secondary-ray Gaussian radiance is an optional Hybrid-RT feature. Keep
+    // its large uncompressed SH copy lazy, but preserve the resource path even
+    // though 3DGRT is no longer exposed as a primary rendering method.
     m_rayTracingShBuffer = nullptr;
     m_rayTracingShUploadPending = false;
+    m_rayTracingShUploadOffset = 0;
 
     m_colorBuffer = nullptr;
     m_shBuffer = nullptr;
@@ -303,6 +332,9 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     m_sourceFileName = fileName.string();
     m_splatUploadPending = true;
     m_formatUploadPending = true;
+    m_splatUploadOffset = 0;
+    m_colorUploadOffset = 0;
+    m_shUploadOffset = 0;
     m_cachedEmissionProxyMaxCount = 0;
     m_cachedEmissionProxySplatScale = 1.0f;
     m_cachedEmissionProxyKernelDegree = 0;
@@ -422,7 +454,9 @@ void GaussianSplatPass::buildAccelerationStructures(
     if (!hasSplats() || !m_splatAabbBuffer)
         return;
 
-    uploadSplatDataIfNeeded(commandList);
+    (void)uploadSplatDataIfNeeded(commandList);
+    if (m_splatUploadPending)
+        return;
 
     caustica::render::GaussianSplatAccelBuildParams params;
     params.useAABBs = useAABBs;
@@ -670,28 +704,32 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     m_hybridRenderMeshTopLevelAS = nullptr;
 }
 
-void GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList)
+bool GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList)
 {
     if (m_splats.empty())
-        return;
+        return true;
 
     if (m_splatUploadPending)
     {
-        commandList->writeBuffer(
+        m_splatUploadPending = !UploadBufferChunk(
+            commandList,
             m_splatBuffer,
             m_splats.data(),
-            m_splats.size() * sizeof(caustica::GaussianSplatData));
-        m_splatUploadPending = false;
+            uint64_t(m_splats.size()) * sizeof(caustica::GaussianSplatData),
+            m_splatUploadOffset);
     }
 
     if (m_rayTracingShUploadPending && m_rayTracingShBuffer && !m_shCoefficients.empty())
     {
-        commandList->writeBuffer(
+        m_rayTracingShUploadPending = !UploadBufferChunk(
+            commandList,
             m_rayTracingShBuffer,
             m_shCoefficients.data(),
-            m_shCoefficients.size() * sizeof(float4));
-        m_rayTracingShUploadPending = false;
+            uint64_t(m_shCoefficients.size()) * sizeof(float4),
+            m_rayTracingShUploadOffset);
     }
+
+    return !m_splatUploadPending && !m_rayTracingShUploadPending;
 }
 
 void GaussianSplatPass::ensureFormatBuffers(
@@ -709,6 +747,8 @@ void GaussianSplatPass::ensureFormatBuffers(
     m_currentShFormat = shFormat;
     m_currentRgbaFormat = rgbaFormat;
     m_formatUploadPending = true;
+    m_colorUploadOffset = 0;
+    m_shUploadOffset = 0;
 
     const uint64_t colorByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * 4u * FormatElementSize(rgbaFormat));
     caustica::rhi::BufferDesc colorDesc;
@@ -734,50 +774,58 @@ void GaussianSplatPass::ensureFormatBuffers(
     m_hybridRenderMeshTopLevelAS = nullptr;
 }
 
-void GaussianSplatPass::uploadFormatDataIfNeeded(
+bool GaussianSplatPass::uploadFormatDataIfNeeded(
     caustica::rhi::CommandList* commandList,
     GaussianSplatStorageFormat shFormat,
     GaussianSplatStorageFormat rgbaFormat)
 {
     if (!hasSplats())
-        return;
+        return true;
 
     ensureFormatBuffers(shFormat, rgbaFormat);
 
     if (!m_formatUploadPending)
-        return;
+        return true;
 
-    m_packedColorOpacity.assign(size_t(AlignRawBufferSize(uint64_t(m_splatCount) * 4u * FormatElementSize(rgbaFormat))), 0u);
-    for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
+    if (m_colorUploadOffset == 0 && m_shUploadOffset == 0)
     {
-        const float4 color = splatIndex < m_colorOpacity.size()
-            ? m_colorOpacity[splatIndex]
-            : float4(1.0f, 1.0f, 1.0f, 1.0f);
-        const uint64_t base = uint64_t(splatIndex) * 4u;
-        StoreFormattedScalar(m_packedColorOpacity, base + 0u, rgbaFormat, color.x, false);
-        StoreFormattedScalar(m_packedColorOpacity, base + 1u, rgbaFormat, color.y, false);
-        StoreFormattedScalar(m_packedColorOpacity, base + 2u, rgbaFormat, color.z, false);
-        StoreFormattedScalar(m_packedColorOpacity, base + 3u, rgbaFormat, color.w, false);
-    }
-
-    constexpr uint32_t kShScalarStride = 45;
-    m_packedShCoefficients.assign(size_t(AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat))), 0u);
-    for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
-    {
-        for (uint32_t scalarIndex = 0; scalarIndex < kShScalarStride; ++scalarIndex)
+        m_packedColorOpacity.assign(size_t(AlignRawBufferSize(uint64_t(m_splatCount) * 4u * FormatElementSize(rgbaFormat))), 0u);
+        for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
         {
-            StoreFormattedScalar(
-                m_packedShCoefficients,
-                uint64_t(splatIndex) * kShScalarStride + scalarIndex,
-                shFormat,
-                ShCoefficientAt(m_shCoefficients, splatIndex, scalarIndex),
-                true);
+            const float4 color = splatIndex < m_colorOpacity.size()
+                ? m_colorOpacity[splatIndex]
+                : float4(1.0f, 1.0f, 1.0f, 1.0f);
+            const uint64_t base = uint64_t(splatIndex) * 4u;
+            StoreFormattedScalar(m_packedColorOpacity, base + 0u, rgbaFormat, color.x, false);
+            StoreFormattedScalar(m_packedColorOpacity, base + 1u, rgbaFormat, color.y, false);
+            StoreFormattedScalar(m_packedColorOpacity, base + 2u, rgbaFormat, color.z, false);
+            StoreFormattedScalar(m_packedColorOpacity, base + 3u, rgbaFormat, color.w, false);
+        }
+
+        constexpr uint32_t kShScalarStride = 45;
+        m_packedShCoefficients.assign(size_t(AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat))), 0u);
+        for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
+        {
+            for (uint32_t scalarIndex = 0; scalarIndex < kShScalarStride; ++scalarIndex)
+            {
+                StoreFormattedScalar(
+                    m_packedShCoefficients,
+                    uint64_t(splatIndex) * kShScalarStride + scalarIndex,
+                    shFormat,
+                    ShCoefficientAt(m_shCoefficients, splatIndex, scalarIndex),
+                    true);
+            }
         }
     }
 
-    commandList->writeBuffer(m_colorBuffer, m_packedColorOpacity.data(), m_packedColorOpacity.size());
-    commandList->writeBuffer(m_shBuffer, m_packedShCoefficients.data(), m_packedShCoefficients.size());
-    m_formatUploadPending = false;
+    const bool colorComplete = UploadBufferChunk(
+        commandList, m_colorBuffer, m_packedColorOpacity.data(),
+        m_packedColorOpacity.size(), m_colorUploadOffset);
+    const bool shComplete = UploadBufferChunk(
+        commandList, m_shBuffer, m_packedShCoefficients.data(),
+        m_packedShCoefficients.size(), m_shUploadOffset);
+    m_formatUploadPending = !(colorComplete && shComplete);
+    return !m_formatUploadPending;
 }
 
 void GaussianSplatPass::prepareGraphResources(const GaussianSplatRenderSettings& settings)
@@ -844,8 +892,14 @@ bool GaussianSplatPass::upload(
 
     commandList->beginMarker("GaussianSplatsUpload");
 
-    uploadSplatDataIfNeeded(commandList);
-    uploadFormatDataIfNeeded(commandList, settings.shFormat, settings.rgbaFormat);
+    const bool splatDataReady = uploadSplatDataIfNeeded(commandList);
+    const bool formatDataReady = uploadFormatDataIfNeeded(
+        commandList, settings.shFormat, settings.rgbaFormat);
+    if (!splatDataReady || !formatDataReady)
+    {
+        commandList->endMarker();
+        return false;
+    }
 
     const bool useHybridShadows = settings.shadowsEnabled && meshTopLevelAS != nullptr && m_hybridRenderPipeline;
 

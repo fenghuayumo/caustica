@@ -77,49 +77,28 @@ RayDesc HybridGaussian_TransformRay(RayDesc ray, float4x4 transform)
     return transformedRay;
 }
 
-float3x3 HybridGaussian_LoadCovariance(GaussianSplatData splat, float splatScale)
+float3 HybridGaussian_RotateToCanonical(float3 value, float4 rotationWxyz)
 {
-    float scale2 = splatScale * splatScale;
-    return float3x3(
-        splat.covariance0.x * scale2, splat.covariance0.y * scale2, splat.covariance0.z * scale2,
-        splat.covariance0.y * scale2, splat.covariance0.w * scale2, splat.covariance1.x * scale2,
-        splat.covariance0.z * scale2, splat.covariance1.x * scale2, splat.covariance1.y * scale2);
-}
+    const float w = rotationWxyz.x;
+    const float x = rotationWxyz.y;
+    const float y = rotationWxyz.z;
+    const float z = rotationWxyz.w;
 
-bool HybridGaussian_Invert3x3(float3x3 m, out float3x3 invM)
-{
-    float a = m[0][0], b = m[0][1], c = m[0][2];
-    float d = m[1][0], e = m[1][1], f = m[1][2];
-    float g = m[2][0], h = m[2][1], i = m[2][2];
+    const float r00 = 1.0f - 2.0f * (y * y + z * z);
+    const float r01 = 2.0f * (x * y - w * z);
+    const float r02 = 2.0f * (x * z + w * y);
+    const float r10 = 2.0f * (x * y + w * z);
+    const float r11 = 1.0f - 2.0f * (x * x + z * z);
+    const float r12 = 2.0f * (y * z - w * x);
+    const float r20 = 2.0f * (x * z - w * y);
+    const float r21 = 2.0f * (y * z + w * x);
+    const float r22 = 1.0f - 2.0f * (x * x + y * y);
 
-    float A = e * i - f * h;
-    float B = c * h - b * i;
-    float C = b * f - c * e;
-    float D = f * g - d * i;
-    float E = a * i - c * g;
-    float F = c * d - a * f;
-    float G = d * h - e * g;
-    float H = b * g - a * h;
-    float I = a * e - b * d;
-
-    float det = a * A + b * D + c * G;
-    if (abs(det) < 1e-12f)
-    {
-        invM = 0.0f;
-        return false;
-    }
-
-    float invDet = 1.0f / det;
-    invM = float3x3(
-        A * invDet, B * invDet, C * invDet,
-        D * invDet, E * invDet, F * invDet,
-        G * invDet, H * invDet, I * invDet);
-    return true;
-}
-
-float HybridGaussian_QuadraticForm(float3x3 m, float3 v)
-{
-    return dot(v, mul(m, v));
+    // R^T transforms model-space vectors into the splat's canonical axes.
+    return float3(
+        r00 * value.x + r10 * value.y + r20 * value.z,
+        r01 * value.x + r11 * value.y + r21 * value.z,
+        r02 * value.x + r12 * value.y + r22 * value.z);
 }
 
 float HybridGaussian_ParticleRayMaxKernelResponse(float grayDist, uint kernelDegree)
@@ -160,17 +139,25 @@ bool HybridGaussian_IntersectSplat(
     if (splat.centerOpacity.w <= alphaThreshold)
         return false;
 
-    float3x3 invCov;
-    if (!HybridGaussian_Invert3x3(HybridGaussian_LoadCovariance(splat, max(splatScale, 1e-4f)), invCov))
-        return false;
+    // Transform the ray into the Gaussian particle's canonical unit space.
+    // particle's canonical unit space. Inverting the covariance with an
+    // absolute determinant epsilon rejects ordinary millimetre-scale splats
+    // because det(covariance) naturally falls far below 1e-12.
+    const float3 safeScale = max(
+        abs(splat.scale.xyz) * max(splatScale, 1e-4f),
+        float3(1e-8f, 1e-8f, 1e-8f));
+    const float4 normalizedRotation = normalize(splat.rotation);
+    const float3 localOrigin = HybridGaussian_RotateToCanonical(
+        ray.Origin - splat.centerOpacity.xyz,
+        normalizedRotation) / safeScale;
+    const float3 localDir = HybridGaussian_RotateToCanonical(
+        ray.Direction,
+        normalizedRotation) / safeScale;
 
-    float3 localOrigin = ray.Origin - splat.centerOpacity.xyz;
-    float3 localDir = ray.Direction;
-
-    float a = HybridGaussian_QuadraticForm(invCov, localDir);
-    float b = 2.0f * dot(localDir, mul(invCov, localOrigin));
-    float c = HybridGaussian_QuadraticForm(invCov, localOrigin);
-    if (abs(a) < 1e-12f)
+    const float a = dot(localDir, localDir);
+    const float b = 2.0f * dot(localDir, localOrigin);
+    const float c = dot(localOrigin, localOrigin);
+    if (a <= 0.0f || !isfinite(a))
         return false;
 
     float t = -0.5f * b / a;
@@ -188,6 +175,8 @@ bool HybridGaussian_IntersectSplat(
     return true;
 }
 
+// Shared Gaussian radiance tracing primitives. These are retained for Hybrid
+// secondary rays (mesh reflection/refraction) and are not a primary renderer.
 struct HybridGaussianRadianceResult
 {
     float3 radiance;
@@ -306,9 +295,6 @@ bool HybridGaussian_TraceClosestRadianceSplat(
     if (splatCount == 0 || ray.TMin >= ray.TMax)
         return false;
 
-    // Do not use ACCEPT_FIRST_HIT here: every accepted procedural candidate is
-    // committed with its Gaussian maximum-response distance, leaving the nearest
-    // one committed when traversal completes.
     RayQuery<RAY_FLAG_NONE> rayQuery;
     rayQuery.TraceRayInline(gaussianBVH, RAY_FLAG_NONE, 0xff, ray);
 
@@ -323,23 +309,15 @@ bool HybridGaussian_TraceClosestRadianceSplat(
             float alpha = 0.0f;
             if (splatIndex < splatCount
                 && HybridGaussian_IntersectSplat(
-                    ray,
-                    splats[splatIndex],
-                    splatScale,
-                    alphaThreshold,
-                    alphaScale,
-                    kernelMinResponse,
-                    kernelDegree,
-                    hitT,
-                    alpha))
+                    ray, splats[splatIndex], splatScale, alphaThreshold,
+                    alphaScale, kernelMinResponse, kernelDegree, hitT, alpha))
             {
                 rayQuery.CommitProceduralPrimitiveHit(hitT);
             }
         }
         else if (rayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
         {
-            // Compatibility fallback for the icosahedron proxy path. 3DGRT forces
-            // AABB proxies so the procedural path above provides exact ordering.
+            // Compatibility fallback for the icosahedron proxy path.
             uint primitiveDivisor = max(primitiveCountPerSplat, 1u);
             uint splatIndex = useTlasInstances != 0
                 ? rayQuery.CandidateInstanceID()
@@ -348,15 +326,8 @@ bool HybridGaussian_TraceClosestRadianceSplat(
             float alpha = 0.0f;
             if (splatIndex < splatCount
                 && HybridGaussian_IntersectSplat(
-                    ray,
-                    splats[splatIndex],
-                    splatScale,
-                    alphaThreshold,
-                    alphaScale,
-                    kernelMinResponse,
-                    kernelDegree,
-                    hitT,
-                    alpha))
+                    ray, splats[splatIndex], splatScale, alphaThreshold,
+                    alphaScale, kernelMinResponse, kernelDegree, hitT, alpha))
             {
                 rayQuery.CommitNonOpaqueTriangleHit();
             }
@@ -365,9 +336,7 @@ bool HybridGaussian_TraceClosestRadianceSplat(
 
     if (rayQuery.CommittedStatus() != COMMITTED_PROCEDURAL_PRIMITIVE_HIT
         && rayQuery.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
-    {
         return false;
-    }
 
     uint primitiveDivisor = max(primitiveCountPerSplat, 1u);
     closestSplatIndex = useTlasInstances != 0
@@ -379,15 +348,8 @@ bool HybridGaussian_TraceClosestRadianceSplat(
         return false;
 
     return HybridGaussian_IntersectSplat(
-        ray,
-        splats[closestSplatIndex],
-        splatScale,
-        alphaThreshold,
-        alphaScale,
-        kernelMinResponse,
-        kernelDegree,
-        closestHitT,
-        closestAlpha);
+        ray, splats[closestSplatIndex], splatScale, alphaThreshold,
+        alphaScale, kernelMinResponse, kernelDegree, closestHitT, closestAlpha);
 }
 
 HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
@@ -432,31 +394,16 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
         float hitT = remainingRay.TMax;
         float alpha = 0.0f;
         if (!HybridGaussian_TraceClosestRadianceSplat(
-                gaussianBVH,
-                splats,
-                splatCount,
-                remainingRay,
-                splatScale,
-                alphaThreshold,
-                alphaScale,
-                kernelMinResponse,
-                kernelDegree,
-                useTlasInstances,
-                primitiveCountPerSplat,
-                splatIndex,
-                hitT,
-                alpha))
-        {
+                gaussianBVH, splats, splatCount, remainingRay, splatScale,
+                alphaThreshold, alphaScale, kernelMinResponse, kernelDegree,
+                useTlasInstances, primitiveCountPerSplat,
+                splatIndex, hitT, alpha))
             break;
-        }
 
         GaussianSplatData splat = splats[splatIndex];
         float3 displayRadiance = splat.color.rgb * max(tintColor, 0.0f);
         displayRadiance += HybridGaussian_EvaluateViewDependentSh(
-            shCoefficients,
-            splatIndex,
-            shDegree,
-            objectViewDirection);
+            shCoefficients, splatIndex, shDegree, objectViewDirection);
         float3 particleRadiance = HybridGaussian_SrgbToLinear(max(displayRadiance, 0.0f));
         particleRadiance *= max(brightness, 0.0f);
         alpha = min(saturate(alpha), saturate(alphaClamp));
@@ -466,7 +413,6 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
         result.radiance += result.transmittance * alpha * particleRadiance;
         result.transmittance *= 1.0f - alpha;
         result.hitCount++;
-
         nextT = hitT + max(1e-4f, abs(hitT) * 1e-5f);
     }
 
@@ -490,6 +436,7 @@ bool HybridGaussian_AcceptStochasticSplat(
     float splatScale,
     float alphaThreshold,
     float alphaScale,
+    float shadowStrength,
     float kernelMinResponse,
     uint kernelDegree,
     uint seed,
@@ -510,7 +457,8 @@ bool HybridGaussian_AcceptStochasticSplat(
         return false;
     }
 
-    return HybridGaussian_StochasticOpacitySample(ray, splatIndex, hitT, seed) < alpha;
+    return HybridGaussian_StochasticOpacitySample(ray, splatIndex, hitT, seed)
+        < alpha * saturate(shadowStrength);
 }
 
 bool HybridGaussian_TraceGaussianShadow(
@@ -521,6 +469,7 @@ bool HybridGaussian_TraceGaussianShadow(
     float splatScale,
     float alphaThreshold,
     float alphaScale,
+    float shadowStrength,
     float kernelMinResponse,
     uint kernelDegree,
     uint useTlasInstances,
@@ -549,6 +498,7 @@ bool HybridGaussian_TraceGaussianShadow(
                     splatScale,
                     alphaThreshold,
                     alphaScale,
+                    shadowStrength,
                     kernelMinResponse,
                     kernelDegree,
                     seed,
@@ -572,6 +522,7 @@ bool HybridGaussian_TraceGaussianShadow(
                     splatScale,
                     alphaThreshold,
                     alphaScale,
+                    shadowStrength,
                     kernelMinResponse,
                     kernelDegree,
                     seed,
@@ -594,6 +545,7 @@ bool HybridGaussian_TraceGaussianShadowMode(
     float splatScale,
     float alphaThreshold,
     float alphaScale,
+    float shadowStrength,
     float kernelMinResponse,
     uint kernelDegree,
     uint useTlasInstances,
@@ -628,6 +580,7 @@ bool HybridGaussian_TraceGaussianShadowMode(
         splatScale,
         alphaThreshold,
         alphaScale,
+        shadowStrength,
         kernelMinResponse,
         kernelDegree,
         useTlasInstances,

@@ -135,18 +135,19 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
 
     bool GaussianSplatPrimaryMethodCombo(EditorUIData& ui)
     {
-        int primaryMethod = ui.render.settings.GaussianSplatPrimaryMethod;
+        const int storedPrimaryMethod = ui.render.settings.GaussianSplatPrimaryMethod;
+        int primaryMethod = storedPrimaryMethod == 0 ? 0 : 1;
         // Split string so "\0" is not parsed as octal \03 (would become 3DGS + ETX + DGUT).
-        if (!SettingsCombo("Rendering Mode", &primaryMethod, "3DGS\0" "3DGUT\0" "3DGRT\0\0"))
+        const bool selectionChanged = SettingsCombo("Rendering Mode", &primaryMethod, "3DGS\0" "3DGUT\0\0");
+        const bool legacyValueMigrated = primaryMethod != storedPrimaryMethod;
+        if (!selectionChanged && !legacyValueMigrated)
             return false;
 
-        primaryMethod = dm::clamp(primaryMethod, 0, 2);
+        primaryMethod = dm::clamp(primaryMethod, 0, 1);
         ui.render.settings.GaussianSplatPrimaryMethod = primaryMethod;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
-                "3DGS: EWA rasterization. 3DGUT: Unscented Transform rasterization.\n"
-                "3DGRT: ray-traced Gaussian integration for primary and secondary rays,\n"
-                "including coherent mesh occlusion, reflection and refraction.");
+                "3DGS: EWA rasterization. 3DGUT: Unscented Transform rasterization.");
 
         ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
         ui.render.settings.ResetAccumulation = true;
@@ -173,9 +174,8 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
-                "For 3DGS/3DGUT, shadows are ray-traced against the mesh BVH while the primary\n"
-                "color path stays rasterized. For 3DGRT, Gaussian occlusion is also evaluated on\n"
-                "lighting visibility rays; mesh/Gaussian primary visibility is already ray coherent.");
+                "Shadows are ray-traced between Gaussian splats and mesh geometry while the\n"
+                "primary Gaussian color path stays rasterized with 3DGS/3DGUT.");
 
         if (wasEnabled != ui.render.settings.GaussianSplatShadows)
             ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
@@ -204,22 +204,22 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         return changed;
     }
 
-    bool GaussianSplatRtxKernelDegreeCombo(EditorUIData& ui)
+    bool GaussianSplatShadowKernelDegreeCombo(EditorUIData& ui)
     {
-        const bool changed = SettingsCombo("Kernel Degree", &ui.render.settings.GaussianSplatRtxKernelDegree,
+        const bool changed = SettingsCombo("Kernel Degree", &ui.render.settings.GaussianSplatShadowKernelDegree,
             "0 (Linear)\0"
             "1 (Laplacian)\0"
             "2 (Quadratic)\0"
             "3 (Cubic)\0"
             "4 (Tesseractic)\0"
             "5 (Quintic)\0\0");
-        ui.render.settings.GaussianSplatRtxKernelDegree = dm::clamp(ui.render.settings.GaussianSplatRtxKernelDegree, 0, 5);
+        ui.render.settings.GaussianSplatShadowKernelDegree = dm::clamp(ui.render.settings.GaussianSplatShadowKernelDegree, 0, 5);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Kernel degree for the 3DGRT particle intersection shape. Changing it rebuilds Gaussian BLAS proxies.");
+            ImGui::SetTooltip("Kernel degree for Gaussian shadow-ray intersections. Changing it rebuilds Gaussian BLAS proxies.");
         return changed;
     }
 
-    bool GaussianSplatRtxParticleFormatCombo(EditorUIData& ui)
+    bool GaussianSplatShadowParticleFormatCombo(EditorUIData& ui)
     {
         int particleFormat = ui.render.settings.GaussianSplatUseAABBs ? 1 : 0;
         const bool changed = SettingsCombo(
@@ -233,7 +233,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
                 ui.render.settings.GaussianSplatUseTLASInstances = true;
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Shortcut for the 3DGS RTX acceleration proxy format. AABB + parametric forces TLAS instances.");
+            ImGui::SetTooltip("Gaussian shadow acceleration proxy format. AABB + parametric forces TLAS instances.");
         return changed;
     }
 

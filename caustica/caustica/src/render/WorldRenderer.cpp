@@ -125,25 +125,20 @@ bool caustica::render::WorldRenderer::create(const createParams& params)
     m_denoisePass = std::make_unique<DenoisePass>();
     m_gaussianFramePass = std::make_unique<GaussianSplatFramePass>();
 
-    ScenePassDependencies sceneDependencies{
+    SceneRayTracingResources::Dependencies rayTracingDependencies{
         .gpuDevice = params.gpuDevice,
         .accelStructs = m_accelStructs,
-        .worldRenderer = *this,
-        .settings = params.settings,
         .invalidation = params.runtimeState.Invalidation,
-        .gaussianSplatsSummary = params.runtimeState.GaussianSplats,
-        .lighting = m_scenePasses.lighting,
         .bindingCache = *infra.bindingCache,
+        .sceneBindings = m_sceneBindings,
+    };
+    SceneGaussianSplatPasses::Dependencies gaussianSplatDependencies{
+        .gpuDevice = params.gpuDevice,
+        .summary = params.runtimeState.GaussianSplats,
         .shaderFactory = infra.shaderFactory,
-        .renderDevice = *infra.renderDevice,
+        .onTemporalReset = [this]() { setGaussianSplatTemporalReset(true); },
     };
-    sceneDependencies.onGaussianSplatTemporalReset = [this]() {
-        setGaussianSplatTemporalReset(true);
-    };
-    sceneDependencies.getRenderTargets = [this]() {
-        return getRenderTargets();
-    };
-    m_scenePasses.initialize(sceneDependencies);
+    m_scenePasses.initialize(rayTracingDependencies, gaussianSplatDependencies);
     return true;
 }
 
@@ -154,6 +149,7 @@ void caustica::render::WorldRenderer::destroy()
     // alive past TextureLoader / AssetSystem shutdown.
     m_frameGraph.reset();
     m_rtxdiPass.reset();
+    m_sceneBindings.invalidate();
 
     m_frameCommands.reset();
     if (m_commandListPool)
@@ -202,7 +198,6 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
         caustica::rhi::BindingLayoutItem::Texture_SRV(6),
         caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(7),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(8),
-        caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(9),
         caustica::rhi::BindingLayoutItem::Texture_SRV(10),
         caustica::rhi::BindingLayoutItem::Texture_SRV(11),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(12),
@@ -460,7 +455,7 @@ void caustica::render::WorldRenderer::onSceneUnloading()
     m_context->activeSettings().DLSSLastRealtimeAA = 0;
     m_lastScheduledRealtimeAA = -1;
 
-    m_bindingSet = nullptr;
+    m_sceneBindings.invalidate();
     m_context->bindingCache.clear();
     if (m_frameCommands)
         m_frameCommands->abort();
@@ -795,10 +790,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     // to be deferred.  In particular, StructureGpu runs before the first new-scene
     // render pass and sceneUnloading() deliberately releases environment/light
     // sampling resources.
-    m_bindingSet = nullptr;
-    m_boundGaussianSplatAS = nullptr;
-    m_boundGaussianSplatBuffer = nullptr;
-    m_boundGaussianSplatShBuffer = nullptr;
+    m_sceneBindings.invalidate();
 
     const SceneGpuFrameHandles gpuHandles = m_context->resolveGpuHandles();
     if (!gpuHandles.valid())
@@ -833,13 +825,12 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     if (!m_context->accelStructs.hasTopLevelAS()
         || m_context->accelStructs.getSubInstanceBuffer() == nullptr)
     {
-        m_bindingSet = nullptr;
+        m_sceneBindings.invalidate();
         return;
     }
 
     caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
     caustica::rhi::Buffer* gaussianSplatBuffer = materialDataBuffer;
-    caustica::rhi::Buffer* gaussianSplatShBuffer = materialDataBuffer;
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
@@ -854,8 +845,6 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     {
         gaussianSplatAS = primaryGaussianSplatPass->getTopLevelAS();
         gaussianSplatBuffer = primaryGaussianSplatPass->getSplatBuffer();
-        if (primaryGaussianSplatPass->getRayTracingShBuffer() != nullptr)
-            gaussianSplatShBuffer = primaryGaussianSplatPass->getRayTracingShBuffer();
     }
 
     // Fixed resources that do not change between binding sets
@@ -873,7 +862,6 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, caustica::rhi::Format::SRGBA8_UNORM),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
-        caustica::rhi::BindingSetItem::StructuredBuffer_SRV(9, gaussianSplatShBuffer),
         caustica::rhi::BindingSetItem::Texture_SRV(10, environment->getEnvMapCube()),
         caustica::rhi::BindingSetItem::Texture_SRV(11, importanceSampling->getImportanceMapOnly()),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(12, lightSampling->getControlBuffer()),
@@ -965,22 +953,22 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
 
-        m_bindingSet = device()->createBindingSet(bindingSetDesc, m_bindingLayout);
-        if (!m_bindingSet)
+        caustica::rhi::BindingSetHandle bindingSet =
+            device()->createBindingSet(bindingSetDesc, m_bindingLayout);
+        if (!bindingSet)
             caustica::error("WorldRenderer: failed to create the scene binding set; GPU resources may be exhausted");
         else
         {
             // Store the real Gaussian resources, not the mesh fallbacks used
             // while the Gaussian render-graph build is still pending.
-            m_boundGaussianSplatAS = primaryGaussianSplatPass != nullptr
-                ? primaryGaussianSplatPass->getTopLevelAS()
-                : nullptr;
-            m_boundGaussianSplatBuffer = primaryGaussianSplatPass != nullptr
-                ? primaryGaussianSplatPass->getSplatBuffer()
-                : nullptr;
-            m_boundGaussianSplatShBuffer = primaryGaussianSplatPass != nullptr
-                ? primaryGaussianSplatPass->getRayTracingShBuffer()
-                : nullptr;
+            m_sceneBindings.publish(
+                std::move(bindingSet),
+                primaryGaussianSplatPass != nullptr
+                    ? primaryGaussianSplatPass->getTopLevelAS()
+                    : nullptr,
+                primaryGaussianSplatPass != nullptr
+                    ? primaryGaussianSplatPass->getSplatBuffer()
+                    : nullptr);
         }
     }
 }

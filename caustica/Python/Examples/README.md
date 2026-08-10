@@ -69,7 +69,7 @@ if entity:
 | `offline_render.py` | Headless reference render + screenshot |
 | `realtime_render.py` | Realtime / denoiser smoke (TAA, NRD, DLSS, OIDN) |
 | `launch_default_scene.py` | Builtin `plane_cube`, optional mesh import / FPS / OIDN |
-| `render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT |
+| `render_default_scene.py` | `Assets/default.json` raster 3DGS + ray-traced shadows |
 | `render_default_scene_animated.py` | Default scene + `SceneEntity` mesh deformation |
 | `3dgs_example.py` | 3DGS interactive / reference+OIDN / realtime+DLSS |
 | `render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics |

@@ -1216,6 +1216,7 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
             g_Const.GaussianSplatShadowScale,
             g_Const.GaussianSplatShadowAlphaThreshold,
             g_Const.GaussianSplatShadowAlphaScale,
+            g_Const.GaussianSplatShadowStrength,
             g_Const.GaussianSplatShadowKernelMinResponse,
             g_Const.GaussianSplatShadowKernelDegree,
             g_Const.GaussianSplatShadowUseTLASInstances,

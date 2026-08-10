@@ -160,7 +160,8 @@ bool GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
     if (!scene)
         return false;
 
-    SceneGaussianSplatLogic::onSceneLoaded(m_worldRenderer->gaussianSplatPasses());
+    SceneGaussianSplatLogic::onSceneLoaded(
+        m_worldRenderer->gaussianSplatPasses(), *m_settings);
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
     // Animations / prep only — AS comes from StructureGpu AccelOnly (ADR 0001 P3),
     // not the sync-frame AccelerationStructRebuildRequested path.

@@ -50,8 +50,13 @@ void setEnvMapOverrideSource(App& app, const std::string& envMapOverride)
 
 bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool convertRdfToRub)
 {
+    PathTracerSettings* cfg = settings(app);
+    WorldRenderer* renderer = worldRenderer(app);
+    if (!cfg || !renderer)
+        return false;
+
     return SceneGaussianSplatLogic::loadFromFile(
-        worldRenderer(app)->gaussianSplatPasses(), fileName, convertRdfToRub);
+        renderer->gaussianSplatPasses(), *cfg, fileName, convertRdfToRub);
 }
 
 uint32_t gaussianSplatCount(const App& app)

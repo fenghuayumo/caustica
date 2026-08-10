@@ -49,8 +49,7 @@ enum class GaussianSplatProjectionMethod : uint32_t
 enum class GaussianSplatPrimaryMethod : uint32_t
 {
     GS = 0,
-    GUT = 1,
-    GRT = 2
+    GUT = 1
 };
 
 enum class GaussianSplatRenderTarget : uint32_t
@@ -123,7 +122,9 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void setGpuSort(std::shared_ptr<GPUSort> gpuSort);
-    void setRayTracingShEnabled(bool enabled);
+    // Shared Hybrid-RT resource used by secondary-ray reflection/refraction.
+    // This is intentionally independent of the removed 3DGRT primary renderer.
+    void setRayTracingRadianceResourcesEnabled(bool enabled);
 
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
 
@@ -181,8 +182,8 @@ private:
     void createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS);
     void createStochasticFramebuffer(const RenderTargets& renderTargets);
     void ensureFormatBuffers(GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
-    void uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList);
-    void uploadFormatDataIfNeeded(caustica::rhi::CommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
+    [[nodiscard]] bool uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList);
+    [[nodiscard]] bool uploadFormatDataIfNeeded(caustica::rhi::CommandList* commandList, GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     [[nodiscard]] caustica::render::GaussianSplatSortResources makeSortResources() const;
 
     caustica::rhi::DeviceHandle m_device;
@@ -250,6 +251,10 @@ private:
     bool m_splatUploadPending = false;
     bool m_rayTracingShUploadPending = false;
     bool m_formatUploadPending = true;
+    uint64_t m_splatUploadOffset = 0;
+    uint64_t m_rayTracingShUploadOffset = 0;
+    uint64_t m_colorUploadOffset = 0;
+    uint64_t m_shUploadOffset = 0;
     uint32_t m_cachedEmissionProxyMaxCount = 0;
     float m_cachedEmissionProxySplatScale = 1.0f;
     uint32_t m_cachedEmissionProxyKernelDegree = 0;

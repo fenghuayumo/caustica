@@ -139,7 +139,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .gaussian = m_gaussianFramePass.get(),
         .environment = m_context->scenePasses.lighting.environment().get(),
         .bindingLayout = m_bindingLayout,
-        .bindingSet = m_bindingSet,
+        .bindingSet = m_sceneBindings.bindingSet(),
         .descriptorTable = descriptorTable,
         .constantBuffer = m_constantBuffer,
         .ptBuildStablePlanes = rayTracing.pipelineBuildStablePlanes(),
@@ -382,6 +382,9 @@ void caustica::render::WorldRenderer::framePassSetup(PathTracingFrameContext& ct
 
     preRender();
 
+    if (m_context->scenePasses.rayTracing.consumeAccumulationResetRequest())
+        m_context->activeSettings().ResetAccumulation = true;
+
     const bool realtimeModeChanged = (m_lastRealtimeMode != m_context->activeSettings().RealtimeMode);
     if (realtimeModeChanged)
     {
@@ -483,7 +486,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
                 std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context->textureCache, m_context->shaderFactory);
             assert(!m_context->scenePasses.rayTracing.hasPipelineRuntime());
             m_context->scenePasses.rayTracing.initializePipelineRuntime(
-                m_bindingLayout, m_bindlessLayout);
+                m_bindingLayout, m_bindlessLayout, m_context->activeSettings());
 
             std::vector<std::filesystem::path> additionalShaderPaths;
             m_context->scenePasses.lighting.computePipelines() = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
@@ -510,7 +513,10 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
     {
         m_frameCommands->ensurePrimary();
         if (!m_context->scenePasses.rayTracing.recreateAccelStructs(
-            m_frameCommands->primary(), *m_context->sessionScene, m_context->frameScene))
+            m_frameCommands->primary(),
+            *m_context->sessionScene,
+            m_context->activeSettings(),
+            m_context->frameScene))
         {
             caustica::error("WorldRenderer: acceleration-structure transaction failed");
             ctx.aborted = true;
@@ -567,7 +573,8 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         static_cast<unsigned int>(m_context->accelStructs.getSubInstanceData().size()),
         // needNewPasses covers resize/bindings and must NOT force RT PSO recreation after
         // runtime import (that recreates DXR state objects and can hang close).
-        ctx.forcePathTracingShaderReload);
+        ctx.forcePathTracingShaderReload,
+        m_context->activeSettings());
 
     m_context->diagnostics.rtPipelineWarmup = rayTracing.pipelineWarmupStatus();
     m_context->diagnostics.rtPipelineCacheStats = rayTracing.pipelineCacheStats();
@@ -645,7 +652,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             m_context->activeSettings().CameraFocalDistance, m_context->activeSettings().CameraAperture, jitter);
     }
 
-    if ((ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr) && m_shaderDebug)
+    if ((ctx.needNewPasses || ctx.needNewBindings || !m_sceneBindings.ready()) && m_shaderDebug)
         m_shaderDebug->createRenderPasses(framebuffer, m_renderTargets->depth);
 
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
@@ -672,12 +679,6 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     if (ctx.aborted)
         return;
 
-    setGaussianSplatRayTracingShEnabled(
-        m_context->frameGaussianSplats(),
-        m_context->scenePasses.gaussianSplats,
-        m_context->activeSettings().GaussianSplatPrimaryMethod
-            == int(GaussianSplatPrimaryMethod::GRT));
-
     // Gaussian BLAS/TLAS construction happens in the frame graph. The first
     // graph execution can therefore publish a new t7/t8 pair after the global
     // scene binding set has already been made. Detect that transition (and
@@ -693,12 +694,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     caustica::rhi::Buffer* const currentGaussianBuffer = currentGaussianPass != nullptr
         ? currentGaussianPass->getSplatBuffer()
         : nullptr;
-    caustica::rhi::Buffer* const currentGaussianShBuffer = currentGaussianPass != nullptr
-        ? currentGaussianPass->getRayTracingShBuffer()
-        : nullptr;
-    if (currentGaussianAS != m_boundGaussianSplatAS
-        || currentGaussianBuffer != m_boundGaussianSplatBuffer
-        || currentGaussianShBuffer != m_boundGaussianSplatShBuffer)
+    if (!m_sceneBindings.matchesGaussianResources(currentGaussianAS, currentGaussianBuffer))
     {
         ctx.needNewBindings = true;
     }
@@ -710,7 +706,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     if (m_rtxdiPass != nullptr)
     {
-        if (ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr)
+        if (ctx.needNewPasses || ctx.needNewBindings || !m_sceneBindings.ready())
             m_rtxdiPass->reset();
 
         buildGaussianSplatEmissionProxies();
@@ -755,7 +751,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             return;
     }
 
-    if (ctx.needNewPasses || ctx.needNewBindings || m_bindingSet == nullptr)
+    if (ctx.needNewPasses || ctx.needNewBindings || !m_sceneBindings.ready())
     {
         m_context->diagnostics.progressInitializingRenderer.Set(95);
         abortIfSubmitFailed(ctx, "preRecreateBindingSet");
@@ -763,7 +759,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             return;
 
         recreateBindingSet(m_context->frameScene);
-        if (!m_bindingSet)
+        if (!m_sceneBindings.ready())
         {
             caustica::error("WorldRenderer: scene binding resources are not ready; aborting frame safely");
             ctx.aborted = true;
@@ -798,6 +794,10 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
 void caustica::render::WorldRenderer::framePassPathTracePrepare(PathTracingFrameContext& ctx)
 {
+    // RT work earlier in this frame may have invalidated accumulation after frame setup.
+    if (m_context->scenePasses.rayTracing.consumeAccumulationResetRequest())
+        m_context->activeSettings().ResetAccumulation = true;
+
     if (m_toneMappingPass != nullptr)
         m_toneMappingPass->preRender(m_context->activeSettings().ToneMappingParams);
     preUpdatePathTracing(ctx.needNewPasses, m_frameCommands->primaryHandle());
@@ -835,7 +835,8 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         getPrimaryGaussianSplatBinding(
             m_context->frameGaussianSplats(),
             m_context->scenePasses.gaussianSplats),
-        uint32_t(m_frameIndex & 0xffffffffu));
+        uint32_t(m_frameIndex & 0xffffffffu),
+        resolveGaussianSplatShadowDirection(m_context->frameLights()));
 
     constants.envMapSceneParams = m_context->scenePasses.lighting.envMapSceneParams();
     constants.envMapImportanceSamplingParams = m_context->scenePasses.lighting.environment()->getImportanceSampling()->getShaderParams();
