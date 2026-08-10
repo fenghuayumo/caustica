@@ -5,13 +5,22 @@
 namespace caustica::render
 {
 
-void PathTracerScenePasses::wireSession(const ScenePassWireParams& params)
+void PathTracerScenePasses::initialize(const ScenePassDependencies& dependencies)
 {
-    rayTracing.wireSession(params);
-    gaussianSplats.wireSession(params);
+    rayTracing.initialize(dependencies);
+    gaussianSplats.initialize(dependencies);
 
     gaussianSplats.setOnRequestFullRebuild(
         [this]() { rayTracing.requestFullRebuild(); });
+}
+
+void PathTracerScenePasses::reset()
+{
+    // ShaderCompiler refers to lighting.materials(); release the complete RT
+    // runtime before destroying its lighting dependencies.
+    gaussianSplats = {};
+    rayTracing = {};
+    lighting = {};
 }
 
 } // namespace caustica::render

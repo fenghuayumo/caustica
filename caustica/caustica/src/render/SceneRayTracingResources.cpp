@@ -25,15 +25,15 @@ using caustica::scene::internal::RenderResourceAccess;
 namespace caustica::render
 {
 
-void SceneRayTracingResources::wireSession(const ScenePassWireParams& params)
+void SceneRayTracingResources::initialize(const ScenePassDependencies& dependencies)
 {
-    m_gpuDevice = &params.gpuDevice;
-    m_accelStructs = &params.accelStructs;
-    m_worldRenderer = &params.worldRenderer;
-    m_settings = &params.settings;
-    m_invalidation = &params.invalidation;
-    m_lightingPasses = &params.lighting;
-    m_bindingCache = &params.bindingCache;
+    m_gpuDevice = &dependencies.gpuDevice;
+    m_accelStructs = &dependencies.accelStructs;
+    m_worldRenderer = &dependencies.worldRenderer;
+    m_settings = &dependencies.settings;
+    m_invalidation = &dependencies.invalidation;
+    m_lightingPasses = &dependencies.lighting;
+    m_bindingCache = &dependencies.bindingCache;
 }
 
 void SceneRayTracingResources::setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder)
@@ -58,30 +58,73 @@ void SceneRayTracingResources::fillPTPipelineGlobalMacros(std::vector<caustica::
     fillPtFeaturePresetMacros(resolveFeaturePreset(), macros);
 }
 
-bool SceneRayTracingResources::createPTPipeline()
+void SceneRayTracingResources::initializePipelineRuntime(
+    caustica::rhi::BindingLayoutHandle bindingLayout,
+    caustica::rhi::BindingLayoutHandle bindlessLayout)
 {
-    return m_worldRenderer->createPTPipeline();
+    assert(!m_shaderCompiler && !m_pipelineCache);
+    m_shaderCompiler = std::make_shared<PathTracingShaderCompiler>(
+        m_gpuDevice->getDevice(), m_lightingPasses->materials(), bindingLayout, bindlessLayout);
+    m_pipelineCache = std::make_shared<RtPipelineCache>(m_shaderCompiler);
+    createRTPipelines();
+}
+
+void SceneRayTracingResources::updatePipelineRuntime(
+    const caustica::scene::SceneRenderData* sceneData,
+    uint32_t subInstanceCount,
+    bool forceShaderReload)
+{
+    if (!m_shaderCompiler || !m_pipelineCache)
+        return;
+
+    const PtFeaturePresetId desiredPreset = resolveFeaturePreset();
+    if (m_pipelineCache->activePreset() != desiredPreset)
+        m_settings->ResetAccumulation = true;
+
+    m_shaderCompiler->update(
+        sceneData,
+        subInstanceCount,
+        [this](std::vector<caustica::ShaderMacro>& macros) {
+            fillPTPipelineGlobalMacros(macros);
+        },
+        forceShaderReload);
+
+    if (m_shaderCompiler->hasUniqueHitGroups()
+        && (m_pipelineCache->activePreset() != desiredPreset
+            || !m_pipelineCache->isReady(desiredPreset)
+            || !m_pipelineReference))
+    {
+        ensureFeaturePresetReady(desiredPreset, /*showProgress=*/false);
+    }
+}
+
+RtPipelineWarmupStatus SceneRayTracingResources::pipelineWarmupStatus() const
+{
+    return m_pipelineCache ? m_pipelineCache->status() : RtPipelineWarmupStatus{};
+}
+
+RtPipelineCacheStats SceneRayTracingResources::pipelineCacheStats() const
+{
+    return m_pipelineCache ? m_pipelineCache->stats() : RtPipelineCacheStats{};
 }
 
 void SceneRayTracingResources::createRTPipelines()
 {
-    auto compiler = pathTracingShaderCompiler();
-    assert(compiler);
-    auto cache = m_worldRenderer->getRtPipelineCache();
-    assert(cache);
+    assert(m_shaderCompiler);
+    assert(m_pipelineCache);
 
     // UE-style startup: only the active cooked preset. Other presets stay cold until
     // first use, or explicit RtPipelineCache::precacheAll during load/cook.
     const PtFeaturePresetId active = resolveFeaturePreset();
-    cache->ensurePresetVariants(active);
+    m_pipelineCache->ensurePresetVariants(active);
 
     using SM = caustica::ShaderMacro;
     // Optional editor-only raygen variants stay on the Default macro set.
     std::vector<caustica::ShaderMacro> defaultMacros;
     fillPtFeaturePresetMacros(PtFeaturePresetId::Default, defaultMacros);
-    if (m_settings->PostProcessEdgeDetection && !pipelineEdgeDetection())
+    if (m_settings->PostProcessEdgeDetection && !m_pipelineEdgeDetection)
     {
-        pipelineEdgeDetection() = compiler->createVariant(
+        m_pipelineEdgeDetection = m_shaderCompiler->createVariant(
             "TestRaygenPP.hlsl", { SM("PP_EDGE_DETECTION", "1") }, "EDGY", true, defaultMacros);
     }
 
@@ -99,22 +142,21 @@ void SceneRayTracingResources::createRTPipelines()
 
 void SceneRayTracingResources::ensureStablePlanePipelines()
 {
-    auto cache = m_worldRenderer->getRtPipelineCache();
-    if (!cache)
+    if (!m_pipelineCache)
         return;
-    cache->ensurePresetVariants(cache->activePreset());
-    bindFeaturePreset(cache->activePreset());
+    m_pipelineCache->ensurePresetVariants(m_pipelineCache->activePreset());
+    bindFeaturePreset(m_pipelineCache->activePreset());
 }
 
 bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
 {
-    auto cache = m_worldRenderer->getRtPipelineCache();
-    if (!cache)
+    if (!m_pipelineCache)
         return false;
 
-    cache->ensurePresetVariants(id);
-    const PtFeaturePresetId previous = cache->activePreset();
-    if (!cache->bind(id, pipelineReference(), pipelineBuildStablePlanes(), pipelineFillStablePlanes()))
+    m_pipelineCache->ensurePresetVariants(id);
+    const PtFeaturePresetId previous = m_pipelineCache->activePreset();
+    if (!m_pipelineCache->bind(
+            id, m_pipelineReference, m_pipelineBuildStablePlanes, m_pipelineFillStablePlanes))
         return false;
 
     if (previous != id)
@@ -127,14 +169,25 @@ bool SceneRayTracingResources::bindFeaturePreset(PtFeaturePresetId id)
 
 bool SceneRayTracingResources::ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress)
 {
-    auto cache = m_worldRenderer->getRtPipelineCache();
-    if (!cache)
+    if (!m_pipelineCache)
         return false;
 
     // Single CreateStateObject owner: RtPipelineCache::ensureReady / buildPreset.
-    if (!cache->ensureReady(id, showProgress))
+    if (!m_pipelineCache->ensureReady(id, showProgress))
         return false;
     return bindFeaturePreset(id);
+}
+
+void SceneRayTracingResources::clearPipelineBindings()
+{
+    m_pipelineReference.reset();
+    m_pipelineBuildStablePlanes.reset();
+    m_pipelineFillStablePlanes.reset();
+}
+
+uint32_t SceneRayTracingResources::precacheAllFeaturePresets(bool showProgress)
+{
+    return m_pipelineCache ? m_pipelineCache->precacheAll(showProgress) : 0;
 }
 
 bool SceneRayTracingResources::createBlases(
@@ -398,31 +451,6 @@ bool SceneRayTracingResources::consumeShaderReloadRequest()
 bool& SceneRayTracingResources::accelerationStructRebuildRequested()
 {
     return m_invalidation->AccelerationStructRebuildRequested;
-}
-
-std::shared_ptr<PathTracingShaderCompiler> SceneRayTracingResources::pathTracingShaderCompiler() const
-{
-    return m_worldRenderer->getPathTracingShaderCompiler();
-}
-
-std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineReference()
-{
-    return m_worldRenderer->ptPipelineReference();
-}
-
-std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineBuildStablePlanes()
-{
-    return m_worldRenderer->ptPipelineBuildStablePlanes();
-}
-
-std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineFillStablePlanes()
-{
-    return m_worldRenderer->ptPipelineFillStablePlanes();
-}
-
-std::shared_ptr<PTPipelineVariant>& SceneRayTracingResources::pipelineEdgeDetection()
-{
-    return m_worldRenderer->ptPipelineEdgeDetection();
 }
 
 } // namespace caustica::render

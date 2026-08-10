@@ -17,15 +17,15 @@
 namespace caustica::render
 {
 
-void SceneGaussianSplatPasses::wireSession(const ScenePassWireParams& params)
+void SceneGaussianSplatPasses::initialize(const ScenePassDependencies& dependencies)
 {
-    m_gpuDevice = &params.gpuDevice;
-    m_settings = &params.settings;
-    m_summary = &params.gaussianSplatsSummary;
-    m_shaderFactory = params.shaderFactory;
-    m_renderDevice = &params.renderDevice;
-    m_onTemporalReset = params.onGaussianSplatTemporalReset;
-    m_getRenderTargets = params.getRenderTargets;
+    m_gpuDevice = &dependencies.gpuDevice;
+    m_settings = &dependencies.settings;
+    m_summary = &dependencies.gaussianSplatsSummary;
+    m_shaderFactory = dependencies.shaderFactory;
+    m_renderDevice = &dependencies.renderDevice;
+    m_onTemporalReset = dependencies.onGaussianSplatTemporalReset;
+    m_getRenderTargets = dependencies.getRenderTargets;
 }
 
 void SceneGaussianSplatPasses::setOnRequestFullRebuild(std::function<void()> callback)
@@ -69,11 +69,10 @@ std::filesystem::path SceneGaussianSplatPasses::resolveSplatPath(const caustica:
 
 void SceneGaussianSplatPasses::onPassLoaded(GaussianSplatPass& pass)
 {
-    if (!m_getRenderTargets)
-        return;
-
-    if (RenderTargets* renderTargets = m_getRenderTargets())
-        pass.createPipeline(*renderTargets);
+    // PLY import runs on the logic/UI thread. Shader and graphics-pipeline
+    // creation belongs to the render thread, so both scene-loaded and hot-added
+    // passes are prepared by GaussianSplatFramePass before graph publication.
+    (void)pass;
 }
 
 uint32_t SceneGaussianSplatPasses::totalSplatCount() const

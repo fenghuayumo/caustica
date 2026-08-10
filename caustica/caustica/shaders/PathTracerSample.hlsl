@@ -102,11 +102,67 @@ void postProcessHit(inout PathState path, const PathTracer::WorkingContext worki
 #endif
 }
 
+void compositeRayTracedGaussianSegment(inout PathState path, RayDesc worldRay)
+{
+#if PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+    if (g_Const.GaussianSplatRtxEnabled == 0
+        || g_Const.GaussianSplatShadowCount == 0
+        || worldRay.TMin >= worldRay.TMax)
+    {
+        return;
+    }
+
+    // The Gaussian TLAS is authored in the splat object's local space. Keeping
+    // the transformed direction unnormalized preserves the world-ray t parameter,
+    // so the mesh hit TMax remains a valid clipping distance after transformation.
+    RayDesc splatRay = HybridGaussian_TransformRay(
+        worldRay,
+        g_Const.GaussianSplatShadowWorldToObject);
+    HybridGaussianRadianceResult gaussian = HybridGaussian_TraceRadiance(
+        GaussianSplatBVH,
+        t_GaussianShadowSplats,
+        t_GaussianRayTracingSH,
+        g_Const.GaussianSplatShadowCount,
+        g_Const.GaussianSplatShDegree,
+        splatRay,
+        g_Const.GaussianSplatShadowScale,
+        g_Const.GaussianSplatShadowAlphaThreshold,
+        g_Const.GaussianSplatShadowAlphaScale,
+        g_Const.GaussianSplatShadowKernelMinResponse,
+        g_Const.GaussianSplatShadowKernelDegree,
+        g_Const.GaussianSplatShadowUseTLASInstances,
+        g_Const.GaussianSplatShadowPrimitiveCountPerSplat,
+        g_Const.GaussianSplatRtxMaximumPassCount,
+        g_Const.GaussianSplatRtxMinimumTransmittance,
+        g_Const.GaussianSplatRtxAlphaClamp,
+        g_Const.GaussianSplatBrightness,
+        g_Const.GaussianSplatTintColor);
+
+    if (gaussian.hitCount == 0u)
+        return;
+
+    const float3 segmentThroughput = path.GetThp();
+    path.SetL(path.GetL() + float4(segmentThroughput * gaussian.radiance, 0.0f));
+    path.SetThp(segmentThroughput * gaussian.transmittance);
+    if (gaussian.transmittance <= g_Const.GaussianSplatRtxMinimumTransmittance)
+        path.terminate();
+#endif
+}
+
 void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::WorkingContext workingContext)
 {
 #if defined(SER_HIT_OBJECT) || defined(__INTELLISENSE__)
     CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     Bridge::traceScatterRay(path, rayQuery, tMinMax, workingContext.Debug);   // this outputs ray and rayQuery; if there was a hit, ray.TMax is rayQuery.ComittedRayT
+
+    RayDesc gaussianSegment = path.getScatterRay().toRayDesc();
+    gaussianSegment.TMin = tMinMax.x;
+    gaussianSegment.TMax = rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT
+        ? rayQuery.CommittedRayT()
+        : tMinMax.y;
+    compositeRayTracedGaussianSegment(path, gaussianSegment);
+    if (!path.isActive())
+        return;
 
     SER_HIT_OBJECT hit;
     if (rayQuery.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
@@ -141,10 +197,25 @@ void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::Worki
     SER_INVOKE_HIT(hit, payload);
     path = PathPayload::unpack(payload);
 #else
-    // refactor...
     RayDesc ray = path.getScatterRay().toRayDesc();
     ray.TMin = tMinMax.x;
     ray.TMax = tMinMax.y;
+
+    // The non-SER path needs an inline visibility query to obtain the mesh segment
+    // limit before TraceRay shades the surface. This duplicates mesh traversal only
+    // for the explicitly selected 3DGRT method.
+    if (g_Const.GaussianSplatRtxEnabled != 0)
+    {
+        CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) meshQuery;
+        Bridge::traceScatterRay(path, meshQuery, tMinMax, workingContext.Debug);
+        RayDesc gaussianSegment = ray;
+        if (meshQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+            gaussianSegment.TMax = meshQuery.CommittedRayT();
+        compositeRayTracedGaussianSegment(path, gaussianSegment);
+        if (!path.isActive())
+            return;
+    }
+
     PathPayload payload = PathPayload::pack(path);
     TraceRay( SceneBVH, RAY_FLAG_NONE, 0xff, 0, 1, 0, ray, payload );
     path = PathPayload::unpack(payload);

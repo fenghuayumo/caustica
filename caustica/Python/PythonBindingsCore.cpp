@@ -81,7 +81,7 @@ namespace py_enums
     enum class GaussianSplatSortMode : int { GpuSort = 0, StochasticSplats = 1 };
     enum class GaussianSplatStorageFormat : int { Float32 = 0, Float16 = 1, Uint8 = 2 };
     enum class GaussianSplatFrustumCulling : int { Disabled = 0, AtDistanceStage = 1, AtRasterStage = 2 };
-    enum class GaussianSplatPrimaryMethod : int { GS = 0, GUT = 1 };
+    enum class GaussianSplatPrimaryMethod : int { GS = 0, GUT = 1, GRT = 2 };
     enum class GaussianSplatShadowMode : int { Disabled = 0, Hard = 1, Soft = 2 };
     enum class GaussianSplatFTBSyncMode : int { Disabled = 0, Interlock = 1 };
     enum class LightType : int {
@@ -682,6 +682,7 @@ void RegisterCoreBindings(nb::module_& m)
         nb::is_arithmetic())
         .value("GS",  py_enums::GaussianSplatPrimaryMethod::GS)
         .value("GUT", py_enums::GaussianSplatPrimaryMethod::GUT)
+        .value("GRT", py_enums::GaussianSplatPrimaryMethod::GRT)
         .export_values();
 
     nb::enum_<GaussianSplatShadowMode>(m, "GaussianSplatShadowMode",
@@ -1566,7 +1567,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("enable_gaussian_splats",        &PathTracerSettings::EnableGaussianSplats)
         .def_rw("gaussian_splat_depth_test",     &PathTracerSettings::GaussianSplatDepthTest)
         .def_rw("gaussian_splat_primary_method", &PathTracerSettings::GaussianSplatPrimaryMethod,
-                "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT.")
+                "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT, GRT=3DGRT.")
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_hybrid_shadows", &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,

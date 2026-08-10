@@ -24,19 +24,20 @@ rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassH
 
     const rg::BufferHandle constants =
         ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
+    const caustica::rhi::BufferHandle constantBuffer = ctx.constantBuffer;
+    const FrameConstants frameConstants = *ctx.frameConstants;
 
     return ctx.graph->addPass(
         kUploadFrameConstantsPass,
         [constants](rg::PassBuilder& setup) {
             setup.write(constants, rg::BufferAccess::CopyDest);
         },
-        [ctx](rg::RenderPassContext& passCtx) {
-            if (passCtx.commandList() == nullptr || ctx.frameConstants == nullptr
-                || ctx.constantBuffer == nullptr)
+        [constantBuffer, frameConstants](rg::RenderPassContext& passCtx) {
+            if (passCtx.commandList() == nullptr || constantBuffer == nullptr)
                 return;
             passCtx.commandList()->writeBuffer(
-                ctx.constantBuffer,
-                ctx.frameConstants,
+                constantBuffer,
+                &frameConstants,
                 sizeof(FrameConstants));
         },
         rg::PassOptions{
@@ -75,6 +76,8 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                         ctx.graph->importTexture(map, rg::TextureAccess::UnorderedAccess);
             }
         }
+        PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
+        const uint64_t frameIndex = ctx.frameIndex;
 
         previous = ctx.graph->addPass(
             kEnvMapUpdatePass,
@@ -84,10 +87,10 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                 if (radianceImportance.isValid())
                     setup.write(radianceImportance, rg::TextureAccess::UnorderedAccess);
             },
-            [ctx](rg::RenderPassContext& passCtx) {
-                if (passCtx.commandList() == nullptr || ctx.pathTracingContext == nullptr)
+            [pathTracingContext, frameIndex](rg::RenderPassContext& passCtx) {
+                if (passCtx.commandList() == nullptr || pathTracingContext == nullptr)
                     return;
-                updateEnvMapFrame(*ctx.pathTracingContext, passCtx.commandList(), ctx.frameIndex);
+                updateEnvMapFrame(*pathTracingContext, passCtx.commandList(), frameIndex);
             },
             passOptions);
     }
@@ -116,6 +119,11 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
             if (auto buffer = ctx.lightSampling->getLightSamplingProxies())
                 lightProxies = ctx.graph->importBuffer(buffer, rg::BufferAccess::UnorderedAccess);
         }
+        PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
+        LightSamplingCache* const lightSampling = ctx.lightSampling;
+        const uint64_t frameIndex = ctx.frameIndex;
+        const std::vector<GaussianSplatEmissionProxy>* const gaussianEmissionProxies =
+            ctx.gaussianSplatEmissionProxies;
 
         previous = ctx.graph->addPass(
             kLightSamplingUpdateBeginPass,
@@ -127,15 +135,16 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                 if (lightProxies.isValid())
                     setup.write(lightProxies, rg::BufferAccess::UnorderedAccess);
             },
-            [ctx](rg::RenderPassContext& passCtx) {
-                if (passCtx.commandList() == nullptr || ctx.pathTracingContext == nullptr
-                    || ctx.lightSampling == nullptr)
+            [pathTracingContext, lightSampling, frameIndex,
+             gaussianEmissionProxies](rg::RenderPassContext& passCtx) {
+                if (passCtx.commandList() == nullptr || pathTracingContext == nullptr
+                    || lightSampling == nullptr)
                     return;
                 updateLightSamplingBeginFrame(
-                    *ctx.pathTracingContext,
+                    *pathTracingContext,
                     passCtx.commandList(),
-                    ctx.frameIndex,
-                    ctx.gaussianSplatEmissionProxies);
+                    frameIndex,
+                    gaussianEmissionProxies);
             },
             passOptions);
     }
@@ -152,6 +161,10 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                 ctx.graph->importBuffer(ctx.subInstanceDataBuffer, rg::BufferAccess::CopyDest);
         if (ctx.constantBuffer)
             constants = ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
+        PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
+        FrameConstants* const frameConstants = ctx.frameConstants;
+        const caustica::rhi::BufferHandle constantBuffer = ctx.constantBuffer;
+        EnvMapProcessor* const environment = ctx.environment;
 
         previous = ctx.graph->addPass(
             kUploadSubInstanceDataPass,
@@ -161,21 +174,22 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                 if (constants.isValid())
                     setup.write(constants, rg::BufferAccess::CopyDest);
             },
-            [ctx](rg::RenderPassContext& passCtx) {
+            [pathTracingContext, frameConstants, constantBuffer,
+             environment](rg::RenderPassContext& passCtx) {
                 caustica::rhi::CommandList* commandList = passCtx.commandList();
-                if (commandList == nullptr || ctx.pathTracingContext == nullptr)
+                if (commandList == nullptr || pathTracingContext == nullptr)
                     return;
 
-                ctx.pathTracingContext->scenePasses.rayTracing.uploadSubInstanceData(commandList);
+                pathTracingContext->scenePasses.rayTracing.uploadSubInstanceData(commandList);
 
-                if (ctx.frameConstants != nullptr && ctx.constantBuffer != nullptr
-                    && ctx.environment != nullptr)
+                if (frameConstants != nullptr && constantBuffer != nullptr
+                    && environment != nullptr)
                 {
-                    ctx.frameConstants->envMapImportanceSamplingParams =
-                        ctx.environment->getImportanceSampling()->getShaderParams();
+                    frameConstants->envMapImportanceSamplingParams =
+                        environment->getImportanceSampling()->getShaderParams();
                     commandList->writeBuffer(
-                        ctx.constantBuffer,
-                        ctx.frameConstants,
+                        constantBuffer,
+                        frameConstants,
                         sizeof(FrameConstants));
                 }
             },

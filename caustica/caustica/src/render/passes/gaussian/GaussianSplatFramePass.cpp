@@ -195,6 +195,18 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
 
         GaussianSplatRenderSettings objectSettings = settings;
         objectSettings.objectToWorld = gaussianSplatObjectToWorld(proxy);
+        pass->setRayTracingShEnabled(
+            objectSettings.primaryMethod == GaussianSplatPrimaryMethod::GRT);
+
+        // A .ply dropped into a running editor is created on the logic thread,
+        // after prepareScenePasses(). Finish its GPU setup here on the render
+        // thread before publishing resources to the frame graph. Otherwise its
+        // shadow TLAS can be active while raster upload silently fails.
+        if (m_gpuSort)
+            pass->setGpuSort(m_gpuSort);
+        if (m_renderTargets && !pass->rasterPipelinesReady())
+            pass->createPipeline(*m_renderTargets);
+
         pass->prepareGraphResources(objectSettings);
         resources.push_back(pass->graphResources(objectSettings));
     }

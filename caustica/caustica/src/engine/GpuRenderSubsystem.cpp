@@ -167,8 +167,8 @@ bool GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
     bool unusedAccelFlag = false;
     SceneManager::onSceneLoadedGpuPrep(*scene, unusedAccelFlag);
     m_worldRenderer->accelStructs().resetSubInstanceCount();
-    // onSceneUnloading clears m_ptPipeline*; without this the RT cache stays
-    // "ready" and never rebinds, so MainPathTrace dispatches a null pipeline.
+    // onSceneUnloading clears the live RT pipeline bindings; the retained cache
+    // must rebind them before MainPathTrace can dispatch the new scene.
     m_runtimeState->Invalidation.ShaderReloadRequested = true;
     m_settings->MaterialVariantIndex = 0;
     scene->requestGpuStructureSync(StructureGpuUploadMode::AccelOnly);

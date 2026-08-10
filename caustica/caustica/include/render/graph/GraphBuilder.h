@@ -153,6 +153,7 @@ public:
     void compile();
     // Primary must already be open. Parallel waves fork deferred lists and submit
     // them before continuing; serial waves / serialOnPrimary record on primary.
+    // Single-shot: execute callbacks are released before this function returns.
     void execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params = {});
 
     // Timestamp queries are allocated/reset on the render thread, then written
@@ -176,8 +177,8 @@ public:
 
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
     [[nodiscard]] const std::vector<std::string>& passNames() const { return m_passNames; }
-    [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const { return m_compiledPassOrder; }
-    [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaves() const { return m_compiledWaves; }
+    [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const;
+    [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaves() const;
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
     [[nodiscard]] bool lastCompileCacheHit() const { return m_lastCompileCacheHit; }
     [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
@@ -220,15 +221,22 @@ private:
     struct Pass
     {
         std::string name;
-        SetupFn setup;
         ExecuteFn execute;
         PassOptions options;
         bool active = false;
+        double measuredRecordingCost = 0.0;
         std::vector<std::pair<TextureHandle, TextureAccess>> textureReads;
         std::vector<std::pair<TextureHandle, TextureAccess>> textureWrites;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferReads;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferWrites;
         caustica::rhi::TimerQuery* gpuTimer = nullptr;
+    };
+
+    struct RecordingBatch
+    {
+        std::vector<uint32_t> passes;
+        double cost = 0.0;
+        caustica::rhi::CommandListHandle commandList;
     };
 
     struct TextureAliasingBarrier
@@ -359,7 +367,15 @@ private:
     TransientResourceStats m_transientStats;
     VolatileConstantBinder m_volatileConstants;
     std::unordered_map<uint64_t, CompiledPlan> m_compiledPlanCache;
-    std::unordered_map<std::string, double> m_recordingCostHistory;
+    // Cache-hit plans are immutable until the next compile/reset. Borrow their
+    // topology instead of deep-copying pass order and waves every stable frame.
+    const CompiledPlan* m_activeCachedPlan = nullptr;
+    // Per-wave scratch retains capacity across frames. Each worker owns one
+    // state pair, so recording remains lock-free without per-job allocations.
+    std::vector<uint32_t> m_activePassScratch;
+    std::vector<RecordingBatch> m_recordingBatchScratch;
+    std::vector<std::vector<caustica::rhi::ResourceStates>> m_parallelTextureStateScratch;
+    std::vector<std::vector<caustica::rhi::ResourceStates>> m_parallelBufferStateScratch;
     std::array<GpuTimingSlot, kGpuTimingSlotCount> m_gpuTimingSlots{};
     int32_t m_activeGpuTimingSlot = -1;
     bool m_lastCompileCacheHit = false;

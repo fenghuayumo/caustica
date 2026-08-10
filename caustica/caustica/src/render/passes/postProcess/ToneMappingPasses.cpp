@@ -363,7 +363,7 @@ void ToneMappingPass::registerGraphPass(
     caustica::rg::GraphBuilder& graph,
     caustica::rg::TextureHandle sourceColor,
     caustica::rg::TextureHandle outputLdrColor,
-    const caustica::ICompositeView& compositeView,
+    caustica::PlanarView compositeView,
     bool enabled,
     bool* outCommandListWasClosed)
 {
@@ -374,12 +374,13 @@ void ToneMappingPass::registerGraphPass(
 
     graph.addPass(
         "ToneMapping",
-        [&, constantsBuffer](caustica::rg::PassBuilder& setup) {
+        [sourceColor, outputLdrColor, constantsBuffer](caustica::rg::PassBuilder& setup) {
             setup.read(sourceColor, caustica::rg::TextureAccess::ShaderResource);
             setup.write(constantsBuffer, caustica::rg::BufferAccess::ConstantBuffer);
             setup.write(outputLdrColor, caustica::rg::TextureAccess::RenderTarget);
         },
-        [this, sourceColor, constantsBuffer, &compositeView, enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
+        [this, sourceColor, constantsBuffer, compositeView = std::move(compositeView),
+         enabled, outCommandListWasClosed](caustica::rg::RenderPassContext& ctx) {
             const bool closed = render(
                 ctx.commandList(),
                 compositeView,

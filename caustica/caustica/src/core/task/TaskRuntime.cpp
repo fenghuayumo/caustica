@@ -87,6 +87,7 @@ struct Runtime
     std::mutex queueMutex;
     std::condition_variable wakeCv;
     std::deque<std::shared_ptr<TaskState>> queues[kPriorityCount];
+    std::atomic<uint32_t> anyPending{0};
 
     DomainQueue render;
     DomainQueue logic;
@@ -176,6 +177,7 @@ void enqueueAny(std::shared_ptr<TaskState> task)
     {
         std::lock_guard<std::mutex> lock(rt.queueMutex);
         rt.queues[prio].push_back(std::move(task));
+        rt.anyPending.fetch_add(1, std::memory_order_release);
     }
     rt.wakeCv.notify_one();
 }
@@ -197,6 +199,61 @@ void dispatchByAffinity(std::shared_ptr<TaskState> task)
     default:
         enqueueAny(std::move(task));
         break;
+    }
+}
+
+void enqueueBatch(
+    Affinity affinity,
+    Priority priority,
+    std::vector<std::shared_ptr<TaskState>>& tasks)
+{
+    if (tasks.empty())
+        return;
+
+    auto& rt = runtime();
+    const size_t prio = std::min(static_cast<size_t>(priority), kPriorityCount - 1);
+    const uint32_t count = static_cast<uint32_t>(tasks.size());
+    switch (affinity)
+    {
+    case Affinity::Render:
+    case Affinity::Logic:
+    {
+        DomainQueue& domain = affinity == Affinity::Render ? rt.render : rt.logic;
+        std::function<void()> wake;
+        {
+            std::lock_guard<std::mutex> lock(domain.mutex);
+            for (auto& task : tasks)
+                domain.queues[prio].push_back(std::move(task));
+            domain.pending.fetch_add(count, std::memory_order_release);
+            wake = domain.wake;
+        }
+        if (wake)
+            wake();
+        break;
+    }
+    case Affinity::IO:
+    {
+        {
+            std::lock_guard<std::mutex> lock(rt.ioMutex);
+            for (auto& task : tasks)
+                rt.ioQueues[prio].push_back(std::move(task));
+            rt.ioPending.fetch_add(count, std::memory_order_release);
+        }
+        rt.ioWakeCv.notify_all();
+        break;
+    }
+    case Affinity::Any:
+    default:
+    {
+        {
+            std::lock_guard<std::mutex> lock(rt.queueMutex);
+            for (auto& task : tasks)
+                rt.queues[prio].push_back(std::move(task));
+            rt.anyPending.fetch_add(count, std::memory_order_release);
+        }
+        rt.wakeCv.notify_all();
+        break;
+    }
     }
 }
 
@@ -242,8 +299,8 @@ void completeTask(const std::shared_ptr<TaskState>& task)
 
     if (task->group)
     {
-        task->group->pending.fetch_sub(1, std::memory_order_acq_rel);
-        task->group->pending.notify_all();
+        if (task->group->pending.fetch_sub(1, std::memory_order_acq_rel) == 1)
+            task->group->pending.notify_all();
     }
 }
 
@@ -259,6 +316,7 @@ bool helpOnceInternal()
                 continue;
             task = std::move(rt.queues[p].front());
             rt.queues[p].pop_front();
+            rt.anyPending.fetch_sub(1, std::memory_order_release);
             break;
         }
     }
@@ -294,14 +352,6 @@ void pumpDomain(DomainQueue& domain)
     }
 }
 
-uint32_t countQueued(const std::deque<std::shared_ptr<TaskState>>* queues, size_t n)
-{
-    uint32_t total = 0;
-    for (size_t i = 0; i < n; ++i)
-        total += static_cast<uint32_t>(queues[i].size());
-    return total;
-}
-
 void workerMain()
 {
     auto& rt = runtime();
@@ -313,12 +363,7 @@ void workerMain()
             rt.wakeCv.wait(lock, [&] {
                 if (!rt.running.load(std::memory_order_acquire))
                     return true;
-                for (size_t p = 0; p < kPriorityCount; ++p)
-                {
-                    if (!rt.queues[p].empty())
-                        return true;
-                }
-                return false;
+                return rt.anyPending.load(std::memory_order_acquire) != 0;
             });
 
             if (!rt.running.load(std::memory_order_acquire))
@@ -330,6 +375,7 @@ void workerMain()
                     continue;
                 task = std::move(rt.queues[p].front());
                 rt.queues[p].pop_front();
+                rt.anyPending.fetch_sub(1, std::memory_order_release);
                 break;
             }
         }
@@ -481,6 +527,7 @@ void shutdown()
         std::lock_guard<std::mutex> lock(rt.queueMutex);
         for (auto& q : rt.queues)
             q.clear();
+        rt.anyPending.store(0, std::memory_order_release);
     }
     {
         std::lock_guard<std::mutex> lock(rt.render.mutex);
@@ -688,10 +735,7 @@ RuntimeStats snapshotStats()
     stats.renderQueued = rt.render.pending.load(std::memory_order_acquire);
     stats.logicQueued = rt.logic.pending.load(std::memory_order_acquire);
     stats.ioQueued = rt.ioPending.load(std::memory_order_acquire);
-    {
-        std::lock_guard<std::mutex> lock(rt.queueMutex);
-        stats.anyQueued = detail::countQueued(rt.queues, detail::kPriorityCount);
-    }
+    stats.anyQueued = rt.anyPending.load(std::memory_order_acquire);
     return stats;
 }
 
@@ -775,20 +819,23 @@ void parallelFor(Group& group,
     }
 
     const uint32_t groups = (count + groupSize - 1) / groupSize;
+    group.pending.fetch_add(groups, std::memory_order_release);
+    auto sharedFn = std::make_shared<std::function<void(uint32_t)>>(std::move(fn));
+    std::vector<std::shared_ptr<detail::TaskState>> tasks;
+    tasks.reserve(groups);
     for (uint32_t g = 0; g < groups; ++g)
     {
         const uint32_t begin = g * groupSize;
         const uint32_t end = std::min(begin + groupSize, count);
-        TaskDesc desc;
-        desc.name = "parallelFor";
-        desc.priority = priority;
-        desc.affinity = affinity;
-        desc.body = [fn, begin, end]() {
+        auto state = std::make_shared<detail::TaskState>();
+        state->group = &group;
+        state->body = [sharedFn, begin, end]() {
             for (uint32_t i = begin; i < end; ++i)
-                fn(i);
+                (*sharedFn)(i);
         };
-        launch(group, std::move(desc));
+        tasks.push_back(std::move(state));
     }
+    detail::enqueueBatch(affinity, priority, tasks);
 }
 
 } // namespace caustica::task

@@ -74,11 +74,18 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
     {
         RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
-        RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
         RESET_ON_CHANGE(GaussianSplatPrimaryMethodCombo(m_ui));
+        const bool rayTracedPrimary = m_settings.GaussianSplatPrimaryMethod == 2;
+
+        ImGui::BeginDisabled(rayTracedPrimary);
+        RESET_ON_CHANGE(ImGui::Checkbox("Mesh Depth Test", &m_settings.GaussianSplatDepthTest));
+        ImGui::EndDisabled();
+        if (rayTracedPrimary && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("3DGRT resolves mesh/Gaussian visibility in the same ray segment, so a raster depth-test toggle is not needed.");
+
         RESET_ON_CHANGE(GaussianSplatShadowsModeCombo(m_ui));
 
-        if (ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
+        if (!rayTracedPrimary && ImGui::CollapsingHeader("Rasterization", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
@@ -100,11 +107,52 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             ImGui::EndDisabled();
         }
 
+        if (rayTracedPrimary && ImGui::CollapsingHeader("Ray Traced Integration", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
+            ImGui::TextWrapped(
+                "Gaussian radiance is integrated front-to-back along every path segment before the nearest mesh hit. "
+                "This includes camera, reflection and refraction rays.");
+
+            bool asChanged = false;
+            asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);
+            asChanged |= ImGui::Checkbox("Adaptive clamp", &m_settings.GaussianSplatRtxAdaptiveClamp);
+            if (asChanged)
+            {
+                m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
+            }
+
+            RESET_ON_CHANGE(ImGui::DragFloat(
+                "Alpha clamp", &m_settings.GaussianSplatRtxAlphaClamp,
+                0.005f, 0.0f, 1.0f, "%.3f"));
+            m_settings.GaussianSplatRtxAlphaClamp = dm::clamp(
+                m_settings.GaussianSplatRtxAlphaClamp, 0.0f, 1.0f);
+
+            RESET_ON_CHANGE(ImGui::DragFloat(
+                "Min transmittance", &m_settings.GaussianSplatRtxMinimumTransmittance,
+                0.001f, 0.0001f, 1.0f, "%.4f"));
+            m_settings.GaussianSplatRtxMinimumTransmittance = dm::clamp(
+                m_settings.GaussianSplatRtxMinimumTransmittance, 0.0001f, 1.0f);
+
+            RESET_ON_CHANGE(ImGui::InputInt(
+                "Maximum layers", &m_settings.GaussianSplatRtxMaximumPassCount, 1, 16));
+            m_settings.GaussianSplatRtxMaximumPassCount = dm::clamp(
+                m_settings.GaussianSplatRtxMaximumPassCount, 1, 256);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Correctness-first nearest-hit passes per ray segment. Lower values are faster but can truncate dense splat layers.");
+
+            ImGui::TextDisabled("3DGRT uses analytic AABB procedural intersections.");
+        }
+
         if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED
             && ImGui::CollapsingHeader("Mesh Shadow RT", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-            ImGui::TextDisabled("Shadows use mesh BVH rays; primary stays 3DGS/3DGUT.");
+            ImGui::TextDisabled(rayTracedPrimary
+                ? "Gaussian occlusion is also evaluated on lighting visibility rays."
+                : "Shadows use mesh BVH rays; primary stays 3DGS/3DGUT.");
 
             bool asChanged = false;
             asChanged |= GaussianSplatRtxKernelDegreeCombo(m_ui);

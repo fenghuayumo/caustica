@@ -404,8 +404,8 @@ struct PathTracerSettings
 
     bool                                EnableGaussianSplats = true;
     bool                                GaussianSplatDepthTest = true;
-    // Primary color path only. Shadows (when not off) add mesh BVH ray tracing on top of either primary.
-    int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT
+    // 3DGRT participates in the path tracer, so primary and secondary rays share mesh/splat visibility.
+    int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT, 2 = 3DGRT
     bool                                GaussianSplatShadows = false;
     int                                 GaussianSplatShadowsMode = 0; // 0 = off, 1 = hard, 2 = soft
     int                                 GaussianSplatSortingMode = 0; // 0 = GPU sort, 1 = stochastic splats

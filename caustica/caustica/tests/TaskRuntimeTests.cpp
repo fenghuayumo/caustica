@@ -67,6 +67,26 @@ int main()
     wait(liveGroup);
     passed &= expect(liveExecutions.load(std::memory_order_relaxed) == 1, "Live Group task did not execute once");
 
+    std::atomic<uint32_t> parallelExecutions{0};
+    std::atomic<uint32_t> parallelSum{0};
+    Group parallelGroup;
+    parallelFor(
+        parallelGroup,
+        64,
+        Priority::High,
+        Affinity::Any,
+        [&](uint32_t index) {
+            parallelExecutions.fetch_add(1, std::memory_order_relaxed);
+            parallelSum.fetch_add(index, std::memory_order_relaxed);
+        },
+        4);
+    wait(parallelGroup);
+    passed &= expect(parallelExecutions.load(std::memory_order_relaxed) == 64,
+        "Batched parallelFor did not execute every index once");
+    passed &= expect(parallelSum.load(std::memory_order_relaxed) == (63u * 64u) / 2u,
+        "Batched parallelFor produced an invalid index range");
+    passed &= expect(!isBusy(parallelGroup), "Batched parallelFor did not complete its Group");
+
     std::atomic<bool> ioCompleted{false};
     TaskDesc io;
     io.name = "IO.AtomicWait";

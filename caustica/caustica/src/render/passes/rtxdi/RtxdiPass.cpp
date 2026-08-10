@@ -777,6 +777,8 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 		return after;
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
+	const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+	rg::GraphBuilder* const graph = ctx.graph;
 	rg::PassHandle previousPass = after;
 
 	rg::BufferHandle rtxdiConstants{};
@@ -786,13 +788,14 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			rtxdiConstants = ctx.graph->importBuffer(buffer, rg::BufferAccess::CopyDest);
 	}
 
-	auto addRtxdiBeginStage = [&](const char* name, auto declareAccess, auto execute)
+	auto addRtxdiBeginStage = [graph, &previousPass](
+		const char* name, auto declareAccess, auto execute)
 	{
 		rg::PassOptions passOptions{};
 		passOptions.sideEffect = true;
 		passOptions.after = previousPass;
 
-		previousPass = ctx.graph->addPass(
+		previousPass = graph->addPass(
 			name,
 			std::move(declareAccess),
 			std::move(execute),
@@ -840,9 +843,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->presampleLights(passCtx.commandList(), ctx.bindingSet);
+					rtxdiPass->presampleLights(passCtx.commandList(), bindingSet);
 			});
 
 		addRtxdiBeginStage(
@@ -850,9 +853,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->presampleEnvMap(passCtx.commandList(), ctx.bindingSet);
+					rtxdiPass->presampleEnvMap(passCtx.commandList(), bindingSet);
 			});
 
 		addRtxdiBeginStage(
@@ -860,9 +863,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->presampleReGIR(passCtx.commandList(), ctx.bindingSet);
+					rtxdiPass->presampleReGIR(passCtx.commandList(), bindingSet);
 			});
 	}
 
@@ -885,33 +888,35 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		return after;
 
 	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
-	const PathTracerSettings settings = *ctx.settings;
 
-	const bool useDI = settings.actualUseReSTIRDI();
-	const bool useGI = settings.actualUseReSTIRGI();
-	const bool usePT = settings.actualUseReSTIRPT();
+	const bool useDI = ctx.settings->actualUseReSTIRDI();
+	const bool useGI = ctx.settings->actualUseReSTIRGI();
+	const bool usePT = ctx.settings->actualUseReSTIRPT();
 	// Keep parity with RtxdiPass::executeFrame (fused DI+GI final shading).
 	static constexpr bool enableFusedDIGIFinal = true;
 	const bool useFusedDIGIFinal = useDI && useGI && enableFusedDIGIFinal;
+	const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+	rg::GraphBuilder* const graph = ctx.graph;
 
 	rg::PassHandle previousPass = after;
 
-	auto addRtxdiExecuteStage = [&](const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
+	auto addRtxdiExecuteStage = [graph, &previousPass](
+		const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
 	{
 		rg::PassOptions passOptions{};
 		passOptions.sideEffect = true;
 		passOptions.after = previousPass;
 
-		previousPass = ctx.graph->addPass(
+		previousPass = graph->addPass(
 			name,
 			std::move(declareAccess),
 			std::move(execute),
 			passOptions);
 	};
 
-	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, settings]() {
-		return [rtxdiResources, pathTraceTargets, settings](rg::PassBuilder& setup) {
-			declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, settings);
+	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, useGI, usePT]() {
+		return [rtxdiResources, pathTraceTargets, useGI, usePT](rg::PassBuilder& setup) {
+			declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, useGI, usePT);
 		};
 	};
 
@@ -920,9 +925,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiDIPass,
 			makeExecuteAccess(),
-			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->execute(passCtx.commandList(), ctx.bindingSet, useFusedDIGIFinal);
+					rtxdiPass->execute(passCtx.commandList(), bindingSet, useFusedDIGIFinal);
 			});
 	}
 
@@ -931,9 +936,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiGIPass,
 			makeExecuteAccess(),
-			[ctx, rtxdiPass, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->executeGI(passCtx.commandList(), ctx.bindingSet, useFusedDIGIFinal);
+					rtxdiPass->executeGI(passCtx.commandList(), bindingSet, useFusedDIGIFinal);
 			});
 	}
 
@@ -942,9 +947,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiFusedDIGIFinalPass,
 			makeExecuteAccess(),
-			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->executeFusedDIGIFinal(passCtx.commandList(), ctx.bindingSet);
+					rtxdiPass->executeFusedDIGIFinal(passCtx.commandList(), bindingSet);
 			});
 	}
 
@@ -953,9 +958,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiPTPass,
 			makeExecuteAccess(),
-			[ctx, rtxdiPass](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
 				if (rtxdiPass)
-					rtxdiPass->executePT(passCtx.commandList(), ctx.bindingSet);
+					rtxdiPass->executePT(passCtx.commandList(), bindingSet);
 			});
 	}
 

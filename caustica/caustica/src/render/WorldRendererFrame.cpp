@@ -18,9 +18,6 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/core/LightingUpdate.h>
 #include <render/core/AccelStructManager.h>
 #include <render/core/CameraController.h>
-#include <render/core/PathTracingShaderCompiler.h>
-#include <render/core/RtPipelineCache.h>
-#include <render/core/PtPipelineFeaturePresets.h>
 #include <render/core/ComputePipelineRegistry.h>
 #include <render/passes/lighting/LightingFrame.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -122,6 +119,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
     const bool copyDebugFeedback =
         m_context->activeSettings().ContinuousDebugFeedback
         || m_context->activeRuntime().Picking.hasActivePickRequest();
+    const SceneRayTracingResources& rayTracing = m_context->scenePasses.rayTracing;
 
     FrameGraphContext featureCtx{
         .graph = ctx.graph,
@@ -144,10 +142,10 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .bindingSet = m_bindingSet,
         .descriptorTable = descriptorTable,
         .constantBuffer = m_constantBuffer,
-        .ptBuildStablePlanes = m_ptPipelineBuildStablePlanes.get(),
-        .ptFillStablePlanes = m_ptPipelineFillStablePlanes.get(),
-        .ptReference = m_ptPipelineReference.get(),
-        .ptEdgeDetection = m_ptPipelineEdgeDetection.get(),
+        .ptBuildStablePlanes = rayTracing.pipelineBuildStablePlanes(),
+        .ptFillStablePlanes = rayTracing.pipelineFillStablePlanes(),
+        .ptReference = rayTracing.pipelineReference(),
+        .ptEdgeDetection = rayTracing.pipelineEdgeDetection(),
         .exportVBufferPSO = m_pathTracePass ? m_pathTracePass->exportVBufferPSO() : nullptr,
         .toneMapping = m_toneMappingPass.get(),
         .bloom = m_bloomPass.get(),
@@ -483,16 +481,13 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         {
             m_context->scenePasses.lighting.materials() = std::make_shared<MaterialGpuCache>(
                 std::string("PathTracerMaterialSpecializations.hlsl"), device(), m_context->textureCache, m_context->shaderFactory);
-            assert(m_pathTracingShaderCompiler == nullptr);
-
-            m_pathTracingShaderCompiler = std::make_shared<PathTracingShaderCompiler>(
-                device(), m_context->scenePasses.lighting.materials(), m_bindingLayout, m_bindlessLayout);
-            m_rtPipelineCache = std::make_shared<RtPipelineCache>(m_pathTracingShaderCompiler);
+            assert(!m_context->scenePasses.rayTracing.hasPipelineRuntime());
+            m_context->scenePasses.rayTracing.initializePipelineRuntime(
+                m_bindingLayout, m_bindlessLayout);
 
             std::vector<std::filesystem::path> additionalShaderPaths;
             m_context->scenePasses.lighting.computePipelines() = std::make_shared<ComputePipelineRegistry>(device(), additionalShaderPaths);
 
-            m_context->scenePasses.rayTracing.createRTPipelines();
             caustica::info("WorldRenderer: coldInit pipelines created");
         }
 
@@ -559,50 +554,23 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
 
 void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameContext& ctx)
 {
-    if (ctx.aborted || m_pathTracingShaderCompiler == nullptr)
+    SceneRayTracingResources& rayTracing = m_context->scenePasses.rayTracing;
+    if (ctx.aborted || !rayTracing.hasPipelineRuntime())
         return;
 
     if (m_context->gpuDevice.isShuttingDown())
         return;
 
     // Hit-group rebuild uses mesh proxies from the frame snapshot (indices assigned at Extract).
-    const scene::SceneRenderData* sceneData = m_context->frameScene;
-
-    // UE-style: feature toggles snap to a cooked preset and bind prebuilt RT PSOs.
-    // forcePathTracingShaderReload remains for source hot-reload / Ctrl+R / scene load only.
-    const PtFeaturePresetId desiredPreset = m_context->scenePasses.rayTracing.resolveFeaturePreset();
-
-    if (m_rtPipelineCache && m_rtPipelineCache->activePreset() != desiredPreset)
-        m_context->activeSettings().ResetAccumulation = true;
-
-    m_pathTracingShaderCompiler->update(
-        sceneData,
+    rayTracing.updatePipelineRuntime(
+        m_context->frameScene,
         static_cast<unsigned int>(m_context->accelStructs.getSubInstanceData().size()),
-        [this](std::vector<caustica::ShaderMacro>& macros) { m_context->scenePasses.rayTracing.fillPTPipelineGlobalMacros(macros); },
         // needNewPasses covers resize/bindings and must NOT force RT PSO recreation after
         // runtime import (that recreates DXR state objects and can hang close).
         ctx.forcePathTracingShaderReload);
 
-    if (m_rtPipelineCache)
-    {
-        // After update() has primed hit-group exports: bind cooked preset.
-        // CreateStateObject only on cold miss / switch (never during createRTPipelines).
-        // No per-frame background warmup — that belongs in cook/load precacheAll.
-        // Also rebind when live pointers were cleared (scene unload) while the
-        // cooked preset remains ready — otherwise MainPathTrace gets null PSOs.
-        if (m_pathTracingShaderCompiler->hasUniqueHitGroups()
-            && (m_rtPipelineCache->activePreset() != desiredPreset
-                || !m_rtPipelineCache->isReady(desiredPreset)
-                || !m_ptPipelineReference))
-        {
-            m_context->scenePasses.rayTracing.ensureFeaturePresetReady(
-                desiredPreset,
-                /*showProgress=*/false);
-        }
-
-        m_context->diagnostics.rtPipelineWarmup = m_rtPipelineCache->status();
-        m_context->diagnostics.rtPipelineCacheStats = m_rtPipelineCache->stats();
-    }
+    m_context->diagnostics.rtPipelineWarmup = rayTracing.pipelineWarmupStatus();
+    m_context->diagnostics.rtPipelineCacheStats = rayTracing.pipelineCacheStats();
 
     if (m_context->scenePasses.lighting.computePipelines())
         m_context->scenePasses.lighting.computePipelines()->update(ctx.needNewPasses);
@@ -639,8 +607,8 @@ void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrame
             m_activeGpuFrameTimer = int(frameIndex % m_gpuFrameTimers.size());
         }
     }
-    ctx.submitInitializationStage = [this, &ctx](const char* stage) -> bool {
-        if (!ctx.needNewPasses)
+    ctx.submitInitializationStage = [this, frame = &ctx](const char* stage) -> bool {
+        if (!frame->needNewPasses)
             return true;
 
         // Flush init work, then wait the graphics fence (not device-wide idle).
@@ -703,6 +671,12 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     abortIfSubmitFailed(ctx, "updateSceneGeometry");
     if (ctx.aborted)
         return;
+
+    setGaussianSplatRayTracingShEnabled(
+        m_context->frameGaussianSplats(),
+        m_context->scenePasses.gaussianSplats,
+        m_context->activeSettings().GaussianSplatPrimaryMethod
+            == int(GaussianSplatPrimaryMethod::GRT));
 
     // Gaussian BLAS/TLAS construction happens in the frame graph. The first
     // graph execution can therefore publish a new t7/t8 pair after the global
@@ -1048,6 +1022,7 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
     const rg::TextureHandle combinedHistoryClampRelax = ctx.graph->importTexture(
         ctx.renderTargets->combinedHistoryClampRelax,
         rg::TextureAccess::UnorderedAccess);
+    RenderTargets* const renderTargets = ctx.renderTargets;
 
     const rg::PassHandle clearFrameTargets = ctx.graph->addPass(
         "ClearFrameTargets",
@@ -1055,8 +1030,8 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
             setup.write(depth, rg::TextureAccess::UnorderedAccess);
             setup.write(combinedHistoryClampRelax, rg::TextureAccess::UnorderedAccess);
         },
-        [ctx](rg::RenderPassContext& passCtx) {
-            ctx.renderTargets->clear(passCtx.commandList());
+        [renderTargets](rg::RenderPassContext& passCtx) {
+            renderTargets->clear(passCtx.commandList());
         },
         rg::PassOptions{ .sideEffect = true });
 

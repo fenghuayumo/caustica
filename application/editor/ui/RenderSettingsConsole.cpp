@@ -391,7 +391,7 @@ void InitializeEntries()
         SETTING_ACCESS(PostProcessEdgeDetectionThreshold), reset, 0, 1);
 
     AddEnum("r.Gaussian.RenderingMode", "Gaussian splat primary rendering method.",
-        SETTING_ACCESS(GaussianSplatPrimaryMethod), { "3dgs", "3dgut" }, reset);
+        SETTING_ACCESS(GaussianSplatPrimaryMethod), { "3dgs", "3dgut", "3dgrt" }, reset);
     AddEnum("r.Gaussian.Shadows", "Gaussian splat mesh-BVH shadow mode.",
         SETTING_ACCESS(GaussianSplatShadowsMode), { "off", "hard", "soft" }, reset,
         [](EditorUIData& ui)

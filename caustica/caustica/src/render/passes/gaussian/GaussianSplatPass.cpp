@@ -168,6 +168,28 @@ void GaussianSplatPass::setGpuSort(std::shared_ptr<GPUSort> gpuSort)
     m_gpuSort = std::move(gpuSort);
 }
 
+void GaussianSplatPass::setRayTracingShEnabled(bool enabled)
+{
+    if (!enabled)
+    {
+        m_rayTracingShBuffer = nullptr;
+        m_rayTracingShUploadPending = false;
+        return;
+    }
+
+    if (m_rayTracingShBuffer || m_shCoefficients.empty())
+        return;
+
+    caustica::rhi::BufferDesc desc;
+    desc.byteSize = uint64_t(m_shCoefficients.size()) * sizeof(float4);
+    desc.structStride = sizeof(float4);
+    desc.debugName = "GaussianSplatRayTracingSHBuffer";
+    desc.initialState = caustica::rhi::ResourceStates::ShaderResource;
+    desc.keepInitialState = true;
+    m_rayTracingShBuffer = m_device->createBuffer(desc);
+    m_rayTracingShUploadPending = m_rayTracingShBuffer != nullptr;
+}
+
 caustica::render::GaussianSplatSortResources GaussianSplatPass::makeSortResources() const
 {
     caustica::render::GaussianSplatSortResources resources;
@@ -221,6 +243,12 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     splatBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     splatBufferDesc.keepInitialState = true;
     m_splatBuffer = m_device->createBuffer(splatBufferDesc);
+
+    // 3DGRT needs the uncompressed SH coefficients, but raster 3DGS does not.
+    // Allocate that large duplicate lazily when the render method switches to
+    // 3DGRT; million-splat assets otherwise lose hundreds of MB for no benefit.
+    m_rayTracingShBuffer = nullptr;
+    m_rayTracingShUploadPending = false;
 
     m_colorBuffer = nullptr;
     m_shBuffer = nullptr;
@@ -644,11 +672,26 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
 
 void GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList)
 {
-    if (!m_splatUploadPending || m_splats.empty())
+    if (m_splats.empty())
         return;
 
-    commandList->writeBuffer(m_splatBuffer, m_splats.data(), m_splats.size() * sizeof(caustica::GaussianSplatData));
-    m_splatUploadPending = false;
+    if (m_splatUploadPending)
+    {
+        commandList->writeBuffer(
+            m_splatBuffer,
+            m_splats.data(),
+            m_splats.size() * sizeof(caustica::GaussianSplatData));
+        m_splatUploadPending = false;
+    }
+
+    if (m_rayTracingShUploadPending && m_rayTracingShBuffer && !m_shCoefficients.empty())
+    {
+        commandList->writeBuffer(
+            m_rayTracingShBuffer,
+            m_shCoefficients.data(),
+            m_shCoefficients.size() * sizeof(float4));
+        m_rayTracingShUploadPending = false;
+    }
 }
 
 void GaussianSplatPass::ensureFormatBuffers(

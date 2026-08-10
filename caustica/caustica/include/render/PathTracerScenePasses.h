@@ -34,7 +34,9 @@ class PathTracerSettings;
 namespace caustica::render
 {
 
-struct ScenePassWireParams
+// Non-owning services shared by scene-scoped render subsystems.
+// The caller owns every referenced service for the lifetime of PathTracerScenePasses.
+struct ScenePassDependencies
 {
     caustica::GpuDevice& gpuDevice;
     caustica::AccelStructManager& accelStructs;
@@ -50,14 +52,16 @@ struct ScenePassWireParams
     std::function<RenderTargets*()> getRenderTargets;
 };
 
-// Scene-scoped render pass bundles owned by WorldRenderer (not Application hosts).
+// Renderer-session subsystems owned as one unit by WorldRenderer. Scene assets
+// may reset independently while the RT pipeline runtime stays warm.
 struct PathTracerScenePasses
 {
     SceneLightingPasses lighting;
     SceneRayTracingResources rayTracing;
     SceneGaussianSplatPasses gaussianSplats;
 
-    void wireSession(const ScenePassWireParams& params);
+    void initialize(const ScenePassDependencies& dependencies);
+    void reset();
 };
 
 } // namespace caustica::render

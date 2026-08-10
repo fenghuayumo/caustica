@@ -113,15 +113,13 @@ bool runStructureGpuBuild(
     {
         // SBT: rebuildShaderTableOnly allocates a new table; old tables stay
         // referenced by in-flight DispatchRays (no waitForIdle required).
-        if (auto compiler = worldRendererResource->rayTracingResources().pathTracingShaderCompiler())
+        auto& rayTracing = worldRendererResource->rayTracingResources();
+        if (rayTracing.hasPipelineRuntime())
         {
             detail::sceneSwitchTrace("StructureGpu: begin SBT/pipeline update");
-            compiler->update(
+            rayTracing.updatePipelineRuntime(
                 gpuSetupData.get(),
                 static_cast<unsigned int>(worldRendererResource->accelStructs().getSubInstanceData().size()),
-                [worldRendererResource](std::vector<caustica::ShaderMacro>& macros) {
-                    worldRendererResource->rayTracingResources().fillPTPipelineGlobalMacros(macros);
-                },
                 false);
             detail::sceneSwitchTrace("StructureGpu: SBT/pipeline update complete");
         }

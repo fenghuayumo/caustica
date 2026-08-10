@@ -3,7 +3,6 @@
 #include <render/graph/GraphBuilder.h>
 
 class RtxdiPass;
-struct PathTracerSettings;
 
 namespace caustica::render
 {
@@ -47,6 +46,7 @@ void declareRtxdiExecuteAccess(
     rg::PassBuilder& setup,
     const RtxdiGraphResources& rtxdiResources,
     const PathTraceGraphTargets& pathTraceTargets,
-    const PathTracerSettings& settings);
+    bool useGI,
+    bool usePT);
 
 } // namespace caustica::render

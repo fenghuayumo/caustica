@@ -137,16 +137,18 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
     {
         int primaryMethod = ui.render.settings.GaussianSplatPrimaryMethod;
         // Split string so "\0" is not parsed as octal \03 (would become 3DGS + ETX + DGUT).
-        if (!SettingsCombo("Rendering Mode", &primaryMethod, "3DGS\0" "3DGUT\0\0"))
+        if (!SettingsCombo("Rendering Mode", &primaryMethod, "3DGS\0" "3DGUT\0" "3DGRT\0\0"))
             return false;
 
-        primaryMethod = dm::clamp(primaryMethod, 0, 1);
+        primaryMethod = dm::clamp(primaryMethod, 0, 2);
         ui.render.settings.GaussianSplatPrimaryMethod = primaryMethod;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
-                "Color path: 3DGS (EWA / VS raster) or 3DGUT (Unscented Transform + 3D kernel).\n"
-                "Shadows are separate (Off/Hard/Soft) and work with either mode.");
+                "3DGS: EWA rasterization. 3DGUT: Unscented Transform rasterization.\n"
+                "3DGRT: ray-traced Gaussian integration for primary and secondary rays,\n"
+                "including coherent mesh occlusion, reflection and refraction.");
 
+        ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
         ui.render.settings.ResetAccumulation = true;
         ui.render.settings.ResetRealtimeCaches = true;
         return true;
@@ -171,8 +173,9 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
-                "When not Off, shadows are ray-traced against the mesh BVH on top of the\n"
-                "selected primary (3DGS or 3DGUT). Primary color path is unchanged.");
+                "For 3DGS/3DGUT, shadows are ray-traced against the mesh BVH while the primary\n"
+                "color path stays rasterized. For 3DGRT, Gaussian occlusion is also evaluated on\n"
+                "lighting visibility rays; mesh/Gaussian primary visibility is already ray coherent.");
 
         if (wasEnabled != ui.render.settings.GaussianSplatShadows)
             ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;

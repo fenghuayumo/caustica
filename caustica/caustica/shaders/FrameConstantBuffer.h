@@ -69,6 +69,17 @@ struct FrameConstants
     uint GaussianSplatShadowKernelDegree;
     uint GaussianSplatShadowAdaptiveClamp;
 
+    uint GaussianSplatRtxEnabled;
+    uint GaussianSplatRtxMaximumPassCount;
+    float GaussianSplatRtxMinimumTransmittance;
+    float GaussianSplatRtxAlphaClamp;
+
+    float GaussianSplatBrightness;
+    float3 GaussianSplatTintColor;
+
+    uint GaussianSplatShDegree;
+    uint3 GaussianSplatRtxPadding;
+
     float4x4 GaussianSplatShadowWorldToObject;
 };
 

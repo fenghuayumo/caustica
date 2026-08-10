@@ -23,7 +23,6 @@ class ShaderFactory;
 namespace caustica::render
 {
 
-class GPUSort;
 class PathTracingContext;
 class SceneGaussianSplatPasses;
 struct FrameGraphContext;
@@ -72,8 +71,8 @@ public:
     [[nodiscard]] caustica::rhi::Texture* currentColor() const { return m_currentColor.Get(); }
     [[nodiscard]] caustica::rhi::Texture* accumulatedColor() const { return m_accumulatedColor.Get(); }
 
-    [[nodiscard]] std::shared_ptr<GPUSort>& gpuSort() { return m_gpuSort; }
-    [[nodiscard]] const std::shared_ptr<GPUSort>& gpuSort() const { return m_gpuSort; }
+    [[nodiscard]] std::shared_ptr<::GPUSort>& gpuSort() { return m_gpuSort; }
+    [[nodiscard]] const std::shared_ptr<::GPUSort>& gpuSort() const { return m_gpuSort; }
 
 private:
     PathTracingContext* m_context = nullptr;
@@ -95,7 +94,7 @@ private:
     caustica::rhi::ShaderHandle m_colorSpaceShader;
     caustica::rhi::ComputePipelineHandle m_colorSpacePipeline;
     std::unique_ptr<AccumulationPass> m_accumulationPass;
-    std::shared_ptr<GPUSort> m_gpuSort;
+    std::shared_ptr<::GPUSort> m_gpuSort;
     bool m_compositeRendered = false;
 };
 

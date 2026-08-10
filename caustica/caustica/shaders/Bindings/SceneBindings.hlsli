@@ -17,6 +17,7 @@ StructuredBuffer<GeometryDebugData> t_GeometryDebugData     : register(t4);
 StructuredBuffer<StandardMaterialData> t_StandardMaterialData : register(t5);
 RaytracingAccelerationStructure GaussianSplatBVH            : register(t7);
 StructuredBuffer<GaussianSplatData> t_GaussianShadowSplats  : register(t8);
+StructuredBuffer<float4> t_GaussianRayTracingSH             : register(t9);
 
 // Bindless
 VK_BINDING(0, 1) ByteAddressBuffer t_BindlessBuffers[]      : register(t0, space1);

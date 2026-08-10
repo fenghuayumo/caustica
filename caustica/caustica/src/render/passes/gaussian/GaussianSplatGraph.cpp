@@ -51,14 +51,19 @@ void fillGaussianSplatShadowConstants(
     uint32_t frameIndex)
 {
     const uint32_t gaussianSplatShadowMode = resolveGaussianSplatShadowMode(settings);
+    const bool gaussianSplatRtxEnabled = settings.EnableGaussianSplats
+        && settings.GaussianSplatPrimaryMethod == int(GaussianSplatPrimaryMethod::GRT);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryBinding.splatPass;
     constants.GaussianSplatShadowCount = (settings.EnableGaussianSplats
-            && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
+            && (gaussianSplatRtxEnabled || gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
             && primaryGaussianSplatPass != nullptr
             && primaryGaussianSplatPass->getTopLevelAS() != nullptr)
         ? primaryGaussianSplatPass->getSplatCount()
         : 0;
-    constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0 ? 1u : 0u;
+    constants.GaussianSplatShadowsEnabled = constants.GaussianSplatShadowCount > 0
+            && gaussianSplatShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
+        ? 1u
+        : 0u;
     constants.GaussianSplatShadowScale = settings.GaussianSplatScale;
     constants.GaussianSplatShadowAlphaThreshold = settings.GaussianSplatAlphaCullThreshold;
     constants.GaussianSplatShadowUseTLASInstances =
@@ -76,6 +81,21 @@ void fillGaussianSplatShadowConstants(
     constants.GaussianSplatShadowKernelMinResponse = kGaussianSplatShadowKernelMinResponse;
     constants.GaussianSplatShadowKernelDegree = uint32_t(std::clamp(settings.GaussianSplatRtxKernelDegree, 0, 5));
     constants.GaussianSplatShadowAdaptiveClamp = settings.GaussianSplatRtxAdaptiveClamp ? 1u : 0u;
+    constants.GaussianSplatRtxEnabled = gaussianSplatRtxEnabled
+            && constants.GaussianSplatShadowCount > 0
+        ? 1u
+        : 0u;
+    constants.GaussianSplatRtxMaximumPassCount = uint32_t(std::clamp(
+        settings.GaussianSplatRtxMaximumPassCount, 1, 256));
+    constants.GaussianSplatRtxMinimumTransmittance = std::clamp(
+        settings.GaussianSplatRtxMinimumTransmittance, 1e-4f, 1.0f);
+    constants.GaussianSplatRtxAlphaClamp = std::clamp(
+        settings.GaussianSplatRtxAlphaClamp, 0.0f, 0.9999f);
+    constants.GaussianSplatBrightness = std::max(settings.GaussianSplatBrightness, 0.0f);
+    constants.GaussianSplatTintColor = dm::max(settings.GaussianSplatTintColor, dm::float3(0.0f));
+    constants.GaussianSplatShDegree = primaryGaussianSplatPass != nullptr
+        ? std::min(primaryGaussianSplatPass->getShDegree(), 3u)
+        : 0u;
     constants.GaussianSplatShadowWorldToObject = primaryBinding.splatPass != nullptr
         ? inverse(primaryBinding.objectToWorld)
         : dm::float4x4::identity();
@@ -83,6 +103,9 @@ void fillGaussianSplatShadowConstants(
 
 bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings)
 {
+    if (settings.GaussianSplatPrimaryMethod == int(GaussianSplatPrimaryMethod::GRT))
+        return false;
+
     const bool stochasticSplats = settings.EnableGaussianSplats && settings.GaussianSplatSortingMode == 1;
     return stochasticSplats && settings.RealtimeMode && settings.RealtimeAA == 1;
 }
@@ -90,6 +113,8 @@ bool needsStochasticGaussianSplatsBeforeAA(const PathTracerSettings& settings)
 bool needsGaussianSplatsCompositePass(const PathTracerSettings& settings)
 {
     if (!settings.EnableGaussianSplats)
+        return false;
+    if (settings.GaussianSplatPrimaryMethod == int(GaussianSplatPrimaryMethod::GRT))
         return false;
 
     const bool stochasticSplats = settings.GaussianSplatSortingMode == 1;
@@ -107,7 +132,8 @@ bool needsGaussianSplatStochasticAccumulate(const PathTracerSettings& settings)
 bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings)
 {
     return settings.EnableGaussianSplats
-        && resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+        && (settings.GaussianSplatPrimaryMethod == int(GaussianSplatPrimaryMethod::GRT)
+            || resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED);
 }
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs)
@@ -128,7 +154,7 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     renderSettings.frustumCulling = static_cast<GaussianSplatFrustumCulling>(
         std::clamp(settings.GaussianSplatFrustumCulling, 0, 2));
     renderSettings.primaryMethod = static_cast<GaussianSplatPrimaryMethod>(
-        std::clamp(settings.GaussianSplatPrimaryMethod, 0, 1));
+        std::clamp(settings.GaussianSplatPrimaryMethod, 0, 2));
     renderSettings.projectionMethod = static_cast<GaussianSplatProjectionMethod>(
         std::clamp(settings.GaussianSplatProjectionMethod, 0, 1));
     renderSettings.shFormat = static_cast<GaussianSplatStorageFormat>(std::clamp(settings.GaussianSplatSHFormat, 0, 2));

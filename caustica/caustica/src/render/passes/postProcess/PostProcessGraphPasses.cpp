@@ -32,6 +32,11 @@ namespace
         const rg::TextureHandle depth = ctx.graph->importTexture(
             ctx.renderTargets->depth,
             rg::TextureAccess::ShaderResource);
+        const dm::uint2 displaySize = ctx.extractedView->displaySize;
+        const caustica::PlanarView postProcessView = ctx.extractedView->postProcessView;
+        const auto tintColor = ctx.settings->EnvironmentMapParams.TintColor;
+        const float intensity = ctx.settings->EnvironmentMapParams.Intensity;
+        const auto rotation = ctx.settings->EnvironmentMapParams.RotationXYZ;
 
         ctx.graph->addPass(
             "SkyAerialPerspective",
@@ -40,18 +45,18 @@ namespace
                 setup.read(depth, rg::TextureAccess::ShaderResource);
                 setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
             },
-            [processedOutputColor, depth, sky, ctx](rg::RenderPassContext& passCtx) {
-                const dm::uint2 size = ctx.extractedView->displaySize;
+            [processedOutputColor, depth, sky, displaySize, postProcessView,
+             tintColor, intensity, rotation](rg::RenderPassContext& passCtx) {
                 sky->applyAerialPerspective(
                     passCtx.commandList(),
                     passCtx.texture(processedOutputColor),
                     passCtx.texture(depth),
-                    ctx.extractedView->postProcessView,
-                    size.x,
-                    size.y,
-                    ctx.settings->EnvironmentMapParams.TintColor,
-                    ctx.settings->EnvironmentMapParams.Intensity,
-                    ctx.settings->EnvironmentMapParams.RotationXYZ);
+                    postProcessView,
+                    displaySize.x,
+                    displaySize.y,
+                    tintColor,
+                    intensity,
+                    rotation);
             });
     }
 
@@ -69,6 +74,11 @@ namespace
         bool enabled)
     {
         assert(ctx.graph);
+        PTPipelineVariant* const pipeline = ctx.ptEdgeDetection;
+        const dm::uint2 displaySize = ctx.extractedView->displaySize;
+        const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+        caustica::rhi::DescriptorTable* const descriptorTable = ctx.descriptorTable;
+        const float threshold = ctx.settings->PostProcessEdgeDetectionThreshold;
 
         ctx.graph->addPass(
             "PPEdgeDetectionCopy",
@@ -90,23 +100,21 @@ namespace
             [ldrColor](rg::PassBuilder& setup) {
                 setup.write(ldrColor, rg::TextureAccess::UnorderedAccess);
             },
-            [ctx](rg::RenderPassContext& passCtx) {
-                assert(ctx.extractedView);
-                assert(ctx.settings);
-                PTPipelineVariant* pipeline = ctx.ptEdgeDetection;
+            [pipeline, displaySize, bindingSet, descriptorTable,
+             threshold](rg::RenderPassContext& passCtx) {
                 assert(pipeline);
 
                 caustica::rhi::rt::DispatchRaysArguments args;
-                args.width = ctx.extractedView->displaySize.x;
-                args.height = ctx.extractedView->displaySize.y;
+                args.width = displaySize.x;
+                args.height = displaySize.y;
 
                 caustica::rhi::rt::State state;
                 state.shaderTable = pipeline->getShaderTable();
-                state.bindings = { ctx.bindingSet, ctx.descriptorTable };
+                state.bindings = { bindingSet, descriptorTable };
                 passCtx.commandList()->setRayTracingState(state);
 
                 FrameMiniConstants miniConstants = {
-                    uint4(*reinterpret_cast<uint*>(&ctx.settings->PostProcessEdgeDetectionThreshold), 0, 0, 0)
+                    uint4(*reinterpret_cast<const uint*>(&threshold), 0, 0, 0)
                 };
                 passCtx.commandList()->setPushConstants(&miniConstants, sizeof(miniConstants));
                 passCtx.commandList()->dispatchRays(args);
@@ -187,6 +195,8 @@ rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
 
     const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(targetColor, rg::TextureAccess::RenderTarget);
     ctx.graph->extractTexture(targetColorHandle, rg::TextureAccess::RenderTarget);
+    FullscreenBlitPass* const blitPass = ctx.blitPass;
+    caustica::rhi::Framebuffer* const targetFramebuffer = ctx.targetFramebuffer;
 
     return ctx.graph->addPass(
         "Blit",
@@ -194,11 +204,11 @@ rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
             setup.read(ldrColor, rg::TextureAccess::ShaderResource);
             setup.write(targetColorHandle, rg::TextureAccess::RenderTarget);
         },
-        [ctx, ldrColor](rg::RenderPassContext& passCtx) {
+        [blitPass, targetFramebuffer, ldrColor](rg::RenderPassContext& passCtx) {
             BlitParameters blitParams{};
-            blitParams.targetFramebuffer = ctx.targetFramebuffer;
+            blitParams.targetFramebuffer = targetFramebuffer;
             blitParams.sourceTexture = passCtx.texture(ldrColor);
-            ctx.blitPass->blitTexture(passCtx.commandList(), blitParams, nullptr);
+            blitPass->blitTexture(passCtx.commandList(), blitParams, nullptr);
         },
         rg::PassOptions{ .sideEffect = true });
 }

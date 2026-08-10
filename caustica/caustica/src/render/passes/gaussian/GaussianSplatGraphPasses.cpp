@@ -97,6 +97,7 @@ namespace
             importGaussianSplatGraphResources(ctx, renderToOutputColor);
         if (resources.empty())
             return {};
+        GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
         const rg::PassHandle uploadPass = ctx.graph->addPass(
             uploadPassName,
@@ -109,9 +110,8 @@ namespace
                     setup.write(item.shBuffer, rg::BufferAccess::CopyDest);
                 }
             },
-            [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
-                if (gaussianSplatsEnabled(ctx))
-                    ctx.gaussian->executeUpload(passCtx.commandList(), renderToOutputColor);
+            [gaussian, renderToOutputColor](rg::RenderPassContext& passCtx) {
+                gaussian->executeUpload(passCtx.commandList(), renderToOutputColor);
             },
             rg::PassOptions{ .sideEffect = true });
 
@@ -136,9 +136,8 @@ namespace
                     }
                 }
             },
-            [ctx](rg::RenderPassContext& passCtx) {
-                if (gaussianSplatsEnabled(ctx))
-                    ctx.gaussian->executeSort(passCtx.commandList());
+            [gaussian](rg::RenderPassContext& passCtx) {
+                gaussian->executeSort(passCtx.commandList());
             },
             rg::PassOptions{ .sideEffect = true, .after = uploadPass });
 
@@ -155,9 +154,8 @@ namespace
                     setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
                     setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
                 },
-                [ctx](rg::RenderPassContext& passCtx) {
-                    if (gaussianSplatsEnabled(ctx))
-                        ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), false);
+                [gaussian](rg::RenderPassContext& passCtx) {
+                    gaussian->executeColorSpaceConversion(passCtx.commandList(), false);
                 },
                 rg::PassOptions{ .sideEffect = true, .after = sortPass });
         }
@@ -180,9 +178,8 @@ namespace
                         setup.write(item.stochasticDepth, rg::TextureAccess::DepthWrite);
                 }
             },
-            [ctx, renderToOutputColor](rg::RenderPassContext& passCtx) {
-                if (gaussianSplatsEnabled(ctx))
-                    ctx.gaussian->executeRaster(passCtx.commandList(), renderToOutputColor);
+            [gaussian, renderToOutputColor](rg::RenderPassContext& passCtx) {
+                gaussian->executeRaster(passCtx.commandList(), renderToOutputColor);
             },
             rg::PassOptions{ .sideEffect = true, .after = rasterPredecessor });
 
@@ -195,9 +192,8 @@ namespace
                     setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
                     setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
                 },
-                [ctx](rg::RenderPassContext& passCtx) {
-                    if (gaussianSplatsEnabled(ctx))
-                        ctx.gaussian->executeColorSpaceConversion(passCtx.commandList(), true);
+                [gaussian](rg::RenderPassContext& passCtx) {
+                    gaussian->executeColorSpaceConversion(passCtx.commandList(), true);
                 },
                 rg::PassOptions{ .sideEffect = true, .after = rasterPass });
         }
@@ -262,6 +258,7 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
     // AS handles are not graph resources yet; sideEffect keeps the build alive for PT bindings.
     passOptions.sideEffect = true;
     passOptions.after = after;
+    GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
     return ctx.graph->addPass(
         kGaussianSplatsAccelBuildPass,
@@ -269,10 +266,8 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
             for (const rg::BufferHandle& aabb : aabbBuffers)
                 setup.write(aabb, rg::BufferAccess::AccelStructBuildInput);
         },
-        [ctx](rg::RenderPassContext& passCtx) {
-            if (!gaussianSplatsEnabled(ctx))
-                return;
-            ctx.gaussian->executeAccelBuild(passCtx.commandList());
+        [gaussian](rg::RenderPassContext& passCtx) {
+            gaussian->executeAccelBuild(passCtx.commandList());
         },
         passOptions);
 }
@@ -323,6 +318,7 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
     const rg::TextureHandle accumulatedColor = ctx.graph->importTexture(
         accumulatedColorTexture,
         rg::TextureAccess::UnorderedAccess);
+    GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
     const rg::PassHandle copyCurrentPass = ctx.graph->addPass(
         "GaussianSplatsCopyCurrent",
@@ -330,9 +326,7 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
             setup.read(processedOutputColor, rg::TextureAccess::CopySource);
             setup.write(currentColor, rg::TextureAccess::CopyDest);
         },
-        [ctx, processedOutputColor, currentColor](rg::RenderPassContext& passCtx) {
-            if (!gaussianSplatsEnabled(ctx))
-                return;
+        [processedOutputColor, currentColor](rg::RenderPassContext& passCtx) {
             passCtx.commandList()->copyTexture(
                 passCtx.texture(currentColor), caustica::rhi::TextureSlice(),
                 passCtx.texture(processedOutputColor), caustica::rhi::TextureSlice());
@@ -350,10 +344,8 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
             setup.write(accumulatedColor, rg::TextureAccess::UnorderedAccess);
             setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
         },
-        [ctx](rg::RenderPassContext& passCtx) {
-            if (!gaussianSplatsEnabled(ctx))
-                return;
-            ctx.gaussian->executeAccumulate(passCtx.commandList());
+        [gaussian](rg::RenderPassContext& passCtx) {
+            gaussian->executeAccumulate(passCtx.commandList());
         },
         rg::PassOptions{
             .sideEffect = true,

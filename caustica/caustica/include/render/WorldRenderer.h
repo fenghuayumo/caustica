@@ -44,12 +44,9 @@
 #endif
 
 class ComputePipelineRegistry;
-class PathTracingShaderCompiler;
-class PTPipelineVariant;
 class ToneMappingPass;
 struct PathTracerCameraData;
 
-namespace caustica::render { class RtPipelineCache; }
 struct PathTracerConstants;
 
 namespace caustica
@@ -141,17 +138,9 @@ public:
 
     caustica::rhi::BindingSetHandle getBindingSet() const { return m_bindingSet; }
 
-    std::shared_ptr<PathTracingShaderCompiler> getPathTracingShaderCompiler() const { return m_pathTracingShaderCompiler; }
-    std::shared_ptr<RtPipelineCache> getRtPipelineCache() const { return m_rtPipelineCache; }
-
     // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
     // Call on the render thread after the first PT update has a hit-group set.
     uint32_t precacheAllRtFeaturePresets(bool showProgress = true);
-
-    std::shared_ptr<PTPipelineVariant>& ptPipelineReference() { return m_ptPipelineReference; }
-    std::shared_ptr<PTPipelineVariant>& ptPipelineBuildStablePlanes() { return m_ptPipelineBuildStablePlanes; }
-    std::shared_ptr<PTPipelineVariant>& ptPipelineFillStablePlanes() { return m_ptPipelineFillStablePlanes; }
-    std::shared_ptr<PTPipelineVariant>& ptPipelineEdgeDetection() { return m_ptPipelineEdgeDetection; }
 
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
 
@@ -232,13 +221,12 @@ private:
     caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
     caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
     caustica::rhi::BindingSetHandle                     m_bindingSet;
-
-    std::shared_ptr<PTPipelineVariant>          m_ptPipelineReference;
-    std::shared_ptr<PTPipelineVariant>          m_ptPipelineBuildStablePlanes;
-    std::shared_ptr<PTPipelineVariant>          m_ptPipelineFillStablePlanes;
-    std::shared_ptr<PTPipelineVariant>          m_ptPipelineEdgeDetection;
-    std::shared_ptr<PathTracingShaderCompiler>            m_pathTracingShaderCompiler;
-    std::shared_ptr<RtPipelineCache>                      m_rtPipelineCache;
+    // Tracks the optional Gaussian resources represented by t7/t8. Gaussian
+    // acceleration structures are built by the render graph, so they can become
+    // available one frame after the scene binding set was first created.
+    caustica::rhi::rt::AccelStruct*                     m_boundGaussianSplatAS = nullptr;
+    caustica::rhi::Buffer*                              m_boundGaussianSplatBuffer = nullptr;
+    caustica::rhi::Buffer*                              m_boundGaussianSplatShBuffer = nullptr;
 
     std::unique_ptr<caustica::rhi::CommandListPool>     m_commandListPool;
     std::unique_ptr<caustica::rhi::FrameCommandContext> m_frameCommands;

@@ -69,7 +69,8 @@ void declareRtxdiExecuteAccess(
     rg::PassBuilder& setup,
     const RtxdiGraphResources& rtxdiResources,
     const PathTraceGraphTargets& pathTraceTargets,
-    const PathTracerSettings& settings)
+    bool useGI,
+    bool usePT)
 {
     declarePathTraceOutputWrites(setup, pathTraceTargets);
     setup.write(pathTraceTargets.secondarySurfacePositionNormal, rg::TextureAccess::UnorderedAccess);
@@ -79,10 +80,10 @@ void declareRtxdiExecuteAccess(
     setup.read(rtxdiResources.lightDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(rtxdiResources.lightReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 
-    if (settings.actualUseReSTIRGI())
+    if (useGI)
         setup.write(rtxdiResources.giReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 
-    if (settings.actualUseReSTIRPT())
+    if (usePT)
         setup.write(rtxdiResources.ptReservoirBuffer, rg::BufferAccess::UnorderedAccess);
 }
 

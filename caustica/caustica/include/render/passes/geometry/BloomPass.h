@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include <render/core/RenderDevice.h>
+#include <scene/View.h>
 
 namespace caustica
 {
@@ -71,7 +72,7 @@ namespace caustica::render
             caustica::rg::GraphBuilder& graph,
             caustica::rg::TextureHandle processedOutputColor,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-            const caustica::ICompositeView& compositeView,
+            caustica::PlanarView compositeView,
             float sigmaInPixels,
             float blendFactor,
             bool enabled);

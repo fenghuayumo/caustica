@@ -49,7 +49,8 @@ enum class GaussianSplatProjectionMethod : uint32_t
 enum class GaussianSplatPrimaryMethod : uint32_t
 {
     GS = 0,
-    GUT = 1
+    GUT = 1,
+    GRT = 2
 };
 
 enum class GaussianSplatRenderTarget : uint32_t
@@ -122,6 +123,7 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void setGpuSort(std::shared_ptr<GPUSort> gpuSort);
+    void setRayTracingShEnabled(bool enabled);
 
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
 
@@ -161,8 +163,16 @@ public:
     [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }
     [[nodiscard]] caustica::math::box3 getLocalBounds() const { return m_localBounds; }
     [[nodiscard]] const std::string& getSourceFileName() const { return m_sourceFileName; }
+    [[nodiscard]] bool rasterPipelinesReady() const
+    {
+        return m_rasterRenderPipeline != nullptr
+            && m_gutRasterRenderPipeline != nullptr
+            && m_sortKeyPipeline != nullptr;
+    }
     [[nodiscard]] caustica::rhi::rt::AccelStruct* getTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
     [[nodiscard]] caustica::rhi::Buffer* getSplatBuffer() const { return m_splatBuffer.Get(); }
+    [[nodiscard]] caustica::rhi::Buffer* getRayTracingShBuffer() const { return m_rayTracingShBuffer.Get(); }
+    [[nodiscard]] uint32_t getShDegree() const { return m_shDegree; }
     [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
     [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& getEmissionProxies() const { return m_emissionProxies; }
@@ -181,6 +191,7 @@ private:
 
     caustica::rhi::BufferHandle m_constantBuffer;
     caustica::rhi::BufferHandle m_splatBuffer;
+    caustica::rhi::BufferHandle m_rayTracingShBuffer;
     caustica::rhi::BufferHandle m_colorBuffer;
     caustica::rhi::BufferHandle m_shBuffer;
     caustica::rhi::BufferHandle m_indexBuffer;
@@ -237,6 +248,7 @@ private:
     uint32_t m_splatCount = 0;
     uint32_t m_shDegree = 0;
     bool m_splatUploadPending = false;
+    bool m_rayTracingShUploadPending = false;
     bool m_formatUploadPending = true;
     uint32_t m_cachedEmissionProxyMaxCount = 0;
     float m_cachedEmissionProxySplatScale = 1.0f;

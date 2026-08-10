@@ -26,7 +26,7 @@ namespace render { class RenderDevice; }
 
 namespace caustica::render
 {
-struct ScenePassWireParams;
+struct ScenePassDependencies;
 
 // Per-scene Gaussian splat asset ownership and ECS wiring.
 class SceneGaussianSplatPasses
@@ -60,7 +60,7 @@ public:
     const std::string& fileNameSummary() const { return m_fileNameSummary; }
 
 private:
-    void wireSession(const ScenePassWireParams& params);
+    void initialize(const ScenePassDependencies& dependencies);
 
     std::filesystem::path resolveSplatPath(const caustica::GaussianSplat& splat) const;
     void updateUIState();

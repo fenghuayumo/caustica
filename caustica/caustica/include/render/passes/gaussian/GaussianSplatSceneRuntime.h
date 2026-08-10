@@ -29,7 +29,7 @@ struct GaussianSplatPrepareContext
     std::shared_ptr<caustica::ShaderFactory> shaderFactory;
     RenderTargets* renderTargets = nullptr;
     std::shared_ptr<ShaderDebug> shaderDebug;
-    std::shared_ptr<GPUSort> gpuSort;
+    std::shared_ptr<::GPUSort> gpuSort;
 };
 
 [[nodiscard]] dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
@@ -42,6 +42,10 @@ struct GaussianSplatPrepareContext
 
 void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, GaussianSplatPrepareContext& context);
 void prepareGaussianSplatScenePass(GaussianSplatPass& pass, const GaussianSplatPrepareContext& context);
+void setGaussianSplatRayTracingShEnabled(
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
+    bool enabled);
 
 void buildGaussianSplatEmissionProxies(
     std::vector<GaussianSplatEmissionProxy>& out,

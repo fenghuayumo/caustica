@@ -27,13 +27,16 @@ namespace scene { class SceneRenderData; }
 namespace caustica::render
 {
 class WorldRenderer;
+class RtPipelineCache;
+struct RtPipelineCacheStats;
+struct RtPipelineWarmupStatus;
 }
 
 namespace caustica::render
 {
 
 class SceneLightingPasses;
-struct ScenePassWireParams;
+struct ScenePassDependencies;
 
 using AdditionalAccelStructBuilder = std::function<void(caustica::rhi::CommandList*)>;
 using AccelBuildProgress = std::function<void(
@@ -48,14 +51,23 @@ public:
     void setAdditionalAccelStructBuilder(AdditionalAccelStructBuilder builder);
 
     void fillPTPipelineGlobalMacros(std::vector<caustica::ShaderMacro>& macros);
-    [[nodiscard]] PtFeaturePresetId resolveFeaturePreset() const;
-    bool createPTPipeline();
-    void createRTPipelines();
+    void initializePipelineRuntime(
+        caustica::rhi::BindingLayoutHandle bindingLayout,
+        caustica::rhi::BindingLayoutHandle bindlessLayout);
+    [[nodiscard]] bool hasPipelineRuntime() const { return m_shaderCompiler != nullptr; }
+    void updatePipelineRuntime(
+        const caustica::scene::SceneRenderData* sceneData,
+        uint32_t subInstanceCount,
+        bool forceShaderReload);
+    [[nodiscard]] RtPipelineWarmupStatus pipelineWarmupStatus() const;
+    [[nodiscard]] RtPipelineCacheStats pipelineCacheStats() const;
+    [[nodiscard]] PTPipelineVariant* pipelineReference() const { return m_pipelineReference.get(); }
+    [[nodiscard]] PTPipelineVariant* pipelineBuildStablePlanes() const { return m_pipelineBuildStablePlanes.get(); }
+    [[nodiscard]] PTPipelineVariant* pipelineFillStablePlanes() const { return m_pipelineFillStablePlanes.get(); }
+    [[nodiscard]] PTPipelineVariant* pipelineEdgeDetection() const { return m_pipelineEdgeDetection.get(); }
+    void clearPipelineBindings();
+    uint32_t precacheAllFeaturePresets(bool showProgress = true);
     void ensureStablePlanePipelines();
-    // Bind cooked preset pipelines (lightweight). Variants must already exist.
-    bool bindFeaturePreset(PtFeaturePresetId id);
-    // Ensure CreateStateObject for a preset (blocking for that preset only), then bind.
-    bool ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress = false);
 
     void uploadSubInstanceData(caustica::rhi::CommandList* commandList);
     // Session Scene is owned by PathTracingContext; pass it in for mesh/AS mutation.
@@ -85,14 +97,12 @@ public:
     bool consumeShaderReloadRequest();
     bool& accelerationStructRebuildRequested();
 
-    std::shared_ptr<PathTracingShaderCompiler> pathTracingShaderCompiler() const;
-    std::shared_ptr<PTPipelineVariant>& pipelineReference();
-    std::shared_ptr<PTPipelineVariant>& pipelineBuildStablePlanes();
-    std::shared_ptr<PTPipelineVariant>& pipelineFillStablePlanes();
-    std::shared_ptr<PTPipelineVariant>& pipelineEdgeDetection();
-
 private:
-    void wireSession(const ScenePassWireParams& params);
+    void initialize(const ScenePassDependencies& dependencies);
+    [[nodiscard]] PtFeaturePresetId resolveFeaturePreset() const;
+    void createRTPipelines();
+    bool bindFeaturePreset(PtFeaturePresetId id);
+    bool ensureFeaturePresetReady(PtFeaturePresetId id, bool showProgress = false);
     [[nodiscard]] bool createBlases(
         caustica::rhi::CommandList* commandList,
         const caustica::scene::SceneRenderData& renderData);
@@ -108,6 +118,15 @@ private:
     SceneLightingPasses*                        m_lightingPasses = nullptr;
     caustica::BindingCache*                     m_bindingCache = nullptr;
     AdditionalAccelStructBuilder                m_additionalAccelStructBuilder;
+
+    // Single owner for the complete RT pipeline runtime. WorldRenderer only
+    // consumes raw per-frame views exposed above.
+    std::shared_ptr<PathTracingShaderCompiler>  m_shaderCompiler;
+    std::shared_ptr<RtPipelineCache>             m_pipelineCache;
+    std::shared_ptr<PTPipelineVariant>           m_pipelineReference;
+    std::shared_ptr<PTPipelineVariant>           m_pipelineBuildStablePlanes;
+    std::shared_ptr<PTPipelineVariant>           m_pipelineFillStablePlanes;
+    std::shared_ptr<PTPipelineVariant>           m_pipelineEdgeDetection;
 };
 
 } // namespace caustica::render

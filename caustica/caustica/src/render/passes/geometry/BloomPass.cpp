@@ -316,7 +316,7 @@ void BloomPass::registerGraphPass(
     caustica::rg::GraphBuilder& graph,
     caustica::rg::TextureHandle processedOutputColor,
     const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-    const caustica::ICompositeView& compositeView,
+    caustica::PlanarView compositeView,
     float sigmaInPixels,
     float blendFactor,
     bool enabled)
@@ -328,20 +328,22 @@ void BloomPass::registerGraphPass(
         rg::TextureHandle downscale2{};
         rg::TextureHandle pass1Blur{};
         rg::TextureHandle pass2Blur{};
+        caustica::PlanarView view;
     };
 
     auto passData = std::make_shared<BloomGraphPassData>();
     passData->outputColor = processedOutputColor;
+    passData->view = std::move(compositeView);
 
     graph.addPass(
         "Bloom",
-        [passData, framebufferFactory, &compositeView](caustica::rg::PassBuilder& setup) {
-            const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
+        [passData, framebufferFactory](caustica::rg::PassBuilder& setup) {
+            const IView* view = passData->view.getChildView(ViewType::PLANAR, 0);
             uint32_t mip1W = 0;
             uint32_t mip1H = 0;
             uint32_t mip2W = 0;
             uint32_t mip2H = 0;
-            const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+            const rg::Format colorFormat = bloomColorFormat(framebufferFactory, passData->view);
             computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
             passData->downscale1 = setup.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));
@@ -360,11 +362,11 @@ void BloomPass::registerGraphPass(
             setup.read(passData->pass2Blur, caustica::rg::TextureAccess::ShaderResource);
             setup.write(passData->outputColor, caustica::rg::TextureAccess::RenderTarget);
         },
-        [this, passData, framebufferFactory, &compositeView, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
+        [this, passData, framebufferFactory, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
             renderInternal(
                 ctx.commandList(),
                 framebufferFactory,
-                compositeView,
+                passData->view,
                 ctx.texture(passData->outputColor),
                 ctx.texture(passData->downscale1),
                 ctx.texture(passData->downscale2),

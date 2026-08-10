@@ -18,6 +18,7 @@ namespace caustica
     class ShaderFactory;
     class FramebufferFactory;
     class ICompositeView;
+    class PlanarView;
 }
 
 #ifndef TONEMAPPING_AUTOEXPOSURE_CPU
@@ -148,7 +149,7 @@ public:
         caustica::rg::GraphBuilder& graph,
         caustica::rg::TextureHandle sourceColor,
         caustica::rg::TextureHandle outputLdrColor,
-        const caustica::ICompositeView& compositeView,
+        caustica::PlanarView compositeView,
         bool enabled,
         bool* outCommandListWasClosed = nullptr);
 

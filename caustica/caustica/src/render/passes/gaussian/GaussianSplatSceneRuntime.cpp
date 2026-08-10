@@ -70,6 +70,19 @@ void prepareGaussianSplatScenePasses(SceneGaussianSplatPasses& scenePasses, Gaus
     }
 }
 
+void setGaussianSplatRayTracingShEnabled(
+    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
+    SceneGaussianSplatPasses& scenePasses,
+    bool enabled)
+{
+    for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
+    {
+        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
+        if (pass != nullptr && pass->hasSplats())
+            pass->setRayTracingShEnabled(enabled && proxy.enabled);
+    }
+}
+
 void buildGaussianSplatEmissionProxies(
     std::vector<GaussianSplatEmissionProxy>& out,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
@@ -187,18 +200,20 @@ void buildGaussianSplatSceneAccelStructs(
     SceneGaussianSplatPasses& scenePasses,
     const PathTracerSettings& settings)
 {
-    const bool buildShadowAccelStructs = resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+    const bool buildGaussianAccelStructs = needsGaussianSplatAccelBuild(settings);
+    const bool rayTracedPrimary = settings.GaussianSplatPrimaryMethod
+        == int(GaussianSplatPrimaryMethod::GRT);
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
     {
         GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
         if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
             continue;
 
-        if (buildShadowAccelStructs)
+        if (buildGaussianAccelStructs)
         {
             pass->buildAccelerationStructures(
                 commandList,
-                settings.GaussianSplatUseAABBs,
+                rayTracedPrimary || settings.GaussianSplatUseAABBs,
                 settings.GaussianSplatUseTLASInstances,
                 settings.GaussianSplatBlasCompaction,
                 settings.GaussianSplatScale,
