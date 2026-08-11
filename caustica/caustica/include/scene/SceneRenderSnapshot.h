@@ -36,6 +36,23 @@ namespace caustica::scene
             return m_buffers[slotForFrame(frameIndex)];
         }
 
+        [[nodiscard]] const SceneRenderData& readBufferForFrameOrLatest(uint32_t frameIndex) const
+        {
+            const uint32_t slot = slotForFrame(frameIndex);
+            if (m_extractedFrameIndex[slot].load(std::memory_order_acquire) == frameIndex)
+                return m_buffers[slot];
+
+            // A skipped Extract leaves unrelated data in this frame's ring slot.
+            // Reuse the most recently published packet instead of replaying a
+            // three-frame-old camera/settings packet (including one-shot resets).
+            const uint32_t latest = m_latestExtractedFrameIndex.load(std::memory_order_acquire);
+            if (latest != UINT32_MAX)
+                return m_buffers[slotForFrame(latest)];
+
+            // Before the first publish all buffers are default-initialized.
+            return m_buffers[slot];
+        }
+
         [[nodiscard]] SceneRenderData& writeBufferForFrame(uint32_t frameIndex)
         {
             return m_buffers[slotForFrame(frameIndex)];

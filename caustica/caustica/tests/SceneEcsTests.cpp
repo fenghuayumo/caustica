@@ -1,4 +1,5 @@
 #include <scene/SceneEcs.h>
+#include <scene/SceneRenderSnapshot.h>
 
 #include <cstdio>
 
@@ -41,6 +42,18 @@ int main()
     entityWorld.endChangeDetectionFrame();
     passed &= expect(!entityWorld.hasPendingLightChanges(),
         "published light deletion remained dirty in the following frame");
+
+    {
+        caustica::scene::SceneRenderSnapshot snapshot;
+        snapshot.bufferForFrame(1).renderSettings.settings.ResetRealtimeCaches = true;
+        snapshot.publish(1);
+        snapshot.bufferForFrame(2).renderSettings.settings.ResetRealtimeCaches = false;
+        snapshot.publish(2);
+
+        passed &= expect(
+            !snapshot.readBufferForFrameOrLatest(4).renderSettings.settings.ResetRealtimeCaches,
+            "skipped frame replayed a stale ring-slot temporal reset");
+    }
 
     return passed ? 0 : 1;
 }

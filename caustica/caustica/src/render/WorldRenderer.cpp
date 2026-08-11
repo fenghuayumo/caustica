@@ -674,6 +674,8 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
     if (scene)
     {
         scene->beginGpuReadFrame(renderPhaseFrameIndex);
+        const bool hasCurrentExtract =
+            scene->wasRenderSnapshotExtractedOnLogicThread(renderPhaseFrameIndex);
         const scene::SceneRenderData& sessionData = scene->getRenderData();
         const bool structureBuildInFlight = scene->structureGpuBuildInFlight();
         committedSceneHold = structureBuildInFlight ? scene->committedRenderData() : nullptr;
@@ -694,6 +696,18 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
         m_frameRuntimeSnapshot.GaussianSplats = m_context->runtimeState.GaussianSplats;
         m_frameGaussianSplatTemporalReset = sessionData.renderSettings.gaussianSplatTemporalReset;
         m_context->sceneTime = sessionData.renderSettings.sceneTime;
+
+        if (!hasCurrentExtract)
+        {
+            // The fallback packet may already have driven an earlier render frame.
+            // Never replay its one-shot invalidations: doing so periodically resets
+            // ReSTIR/NRD/TAA history when a ring slot is missing after a scene switch.
+            m_frameSettingsSnapshot.ResetAccumulation = false;
+            m_frameSettingsSnapshot.ResetRealtimeCaches = false;
+            m_frameSettingsSnapshot.NRDModeChanged = false;
+            m_frameRuntimeSnapshot.Invalidation = {};
+            m_frameGaussianSplatTemporalReset = false;
+        }
 
         m_context->frameSettings = &m_frameSettingsSnapshot;
         m_context->frameRuntime = &m_frameRuntimeSnapshot;
@@ -719,12 +733,13 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
             !structureBuildInFlight && scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
         const bool frameSceneLightsChanged =
             scene->hasSceneLightsChanged(renderPhaseFrameIndex);
-        if (frameSceneLightsChanged)
+        if (frameSceneLightsChanged && !m_frameSettingsSnapshot.RealtimeMode)
         {
-            // Light-set/property changes invalidate accumulated radiance, ReSTIR
-            // reservoirs and denoiser history even when no mesh structure changed.
+            // Dynamic lights are updated every frame in realtime scenes. RTXPT keeps
+            // NRD/TAA history alive and lets disocclusion/history clamping adapt to
+            // the lighting change; treating a light-proxy refresh as a cache reset
+            // makes animated-light scenes restart temporal filtering every frame.
             m_frameSettingsSnapshot.ResetAccumulation = true;
-            m_frameSettingsSnapshot.ResetRealtimeCaches = true;
         }
 
         // Apply extracted camera pose before view update (RT owns view matrices).

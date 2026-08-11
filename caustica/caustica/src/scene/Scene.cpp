@@ -483,7 +483,7 @@ const scene::SceneRenderData& Scene::getRenderSnapshotForRead() const
     const uint32_t gpuFrameIndex = m_gpuReadFrameIndex.load(std::memory_order_acquire);
     assert(gpuFrameIndex != UINT32_MAX &&
         "Scene::getRenderData requires beginGpuReadFrame, or use getRenderDataForFrame");
-    return m_RenderSnapshot.readBufferForFrame(gpuFrameIndex);
+    return m_RenderSnapshot.readBufferForFrameOrLatest(gpuFrameIndex);
 }
 
 void Scene::beginGpuReadFrame(uint32_t frameIndex)
