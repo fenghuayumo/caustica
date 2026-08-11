@@ -13,10 +13,6 @@
 #include <shaders/PathTracer/DebugViewType.hlsli>
 #include <render/passes/denoisers/NrdConfig.h>
 
-#if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-#include <Rtxtf/STFDefinitions.h>
-#endif
-
 #if CAUSTICA_WITH_STREAMLINE
 #include <backend/StreamlineInterface.h>
 using SI = caustica::StreamlineInterface;

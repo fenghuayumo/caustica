@@ -1,53 +1,46 @@
 #pragma once
 
-#include <rtxdi/ImportanceSamplingContext.h>
 #include <render/passes/rtxdi/RtxdiApplicationSettings.h>
-
-// Lightweight settings POD for PathTracerSettings / SceneRenderData.
-// Kept out of RtxdiPass.h so settings headers do not pull Scene.h (include cycle).
 
 struct RtxdiUserSettings
 {
-    rtxdi::CheckerboardMode checkerboardMode = rtxdi::CheckerboardMode::Off;
+    caustica::rtxdi_config::CheckerboardMode checkerboardMode = caustica::rtxdi_config::CheckerboardMode::Off;
 
     struct
     {
-        rtxdi::ReSTIRDI_ResamplingMode resamplingMode = getReSTIRDI_ResamplingMode();
-        ReSTIRDI_InitialSamplingParameters initialSamplingParams = getReSTIRDIInitialSamplingParams();
-        ReSTIRDI_TemporalResamplingParameters temporalResamplingParams = getReSTIRDITemporalResamplingParams();
-        ReSTIRDI_SpatialResamplingParameters spatialResamplingParams = getReSTIRDISpatialResamplingParams();
-        ReSTIRDI_ShadingParameters shadingParams = getReSTIRDIShadingParams();
+        caustica::rtxdi_config::DIResamplingMode resamplingMode = caustica::rtxdi_config::DIResamplingMode::TemporalAndSpatial;
+        caustica::rtxdi_config::DIInitialSamplingParameters initialSamplingParams = caustica::rtxdi_config::defaultDIInitialSampling();
+        caustica::rtxdi_config::DITemporalResamplingParameters temporalResamplingParams = caustica::rtxdi_config::defaultDITemporalResampling();
+        caustica::rtxdi_config::DISpatialResamplingParameters spatialResamplingParams = caustica::rtxdi_config::defaultDISpatialResampling();
+        caustica::rtxdi_config::DIShadingParameters shadingParams = caustica::rtxdi_config::defaultDIShading();
     } restirDI;
 
     struct
     {
-        rtxdi::ReSTIRGI_ResamplingMode resamplingMode = getReSTIRGI_ResamplingMode();
-        ReSTIRGI_TemporalResamplingParameters temporalResamplingParams = getReSTIRGITemporalResamplingParams();
-        ReSTIRGI_SpatialResamplingParameters spatialResamplingParams = getReSTIRGISpatialResamplingParams();
-        ReSTIRGI_FinalShadingParameters finalShadingParams = getReSTIRGIFinalShadingParams();
+        caustica::rtxdi_config::GIResamplingMode resamplingMode = caustica::rtxdi_config::GIResamplingMode::TemporalAndSpatial;
+        caustica::rtxdi_config::GITemporalResamplingParameters temporalResamplingParams = caustica::rtxdi_config::defaultGITemporalResampling();
+        caustica::rtxdi_config::GISpatialResamplingParameters spatialResamplingParams = caustica::rtxdi_config::defaultGISpatialResampling();
+        caustica::rtxdi_config::GIFinalShadingParameters finalShadingParams = caustica::rtxdi_config::defaultGIFinalShading();
     } restirGI;
 
     struct
     {
-        rtxdi::ReSTIRPT_ResamplingMode resamplingMode = getReSTIRPT_ResamplingMode();
-        RTXDI_PTInitialSamplingParameters initialSamplingParams = getReSTIRPTInitialSamplingParams();
-        RTXDI_PTTemporalResamplingParameters temporalResamplingParams = getReSTIRPTTemporalResamplingParams();
-        RTXDI_PTReconnectionParameters reconnectionParams = getReSTIRPTReconnectionParams();
-        RTXDI_PTHybridShiftPerFrameParameters hybridShiftParams = getReSTIRPTHybridShiftParams();
-        RTXDI_BoilingFilterParameters boilingFilterParams = getReSTIRPTBoilingFilterParams();
-        RTXDI_PTSpatialResamplingParameters spatialResamplingParams = getReSTIRPTSpatialResamplingParams();
+        caustica::rtxdi_config::PTResamplingMode resamplingMode = caustica::rtxdi_config::PTResamplingMode::TemporalAndSpatial;
+        caustica::rtxdi_config::PTInitialSamplingParameters initialSamplingParams = caustica::rtxdi_config::defaultPTInitialSampling();
+        caustica::rtxdi_config::PTTemporalResamplingParameters temporalResamplingParams = caustica::rtxdi_config::defaultPTTemporalResampling();
+        caustica::rtxdi_config::PTReconnectionParameters reconnectionParams = caustica::rtxdi_config::defaultPTReconnection();
+        caustica::rtxdi_config::PTHybridShiftParameters hybridShiftParams = caustica::rtxdi_config::defaultPTHybridShift();
+        caustica::rtxdi_config::BoilingFilterParameters boilingFilterParams = caustica::rtxdi_config::defaultPTBoilingFilter();
+        caustica::rtxdi_config::PTSpatialResamplingParameters spatialResamplingParams = caustica::rtxdi_config::defaultPTSpatialResampling();
     } restirPT;
 
     struct
     {
-        rtxdi::ReGIRStaticParameters regirStaticParams = {};
-        rtxdi::ReGIRDynamicParameters regirDynamicParameters = getReGIRDynamicParams();
+        caustica::rtxdi_config::ReGIRStaticParameters regirStaticParams{};
+        caustica::rtxdi_config::ReGIRDynamicParameters regirDynamicParameters{};
     } regir;
 
-    struct
-    {
-        int numIndirectSamples = 6;
-    } regirIndirect;
+    struct { int numIndirectSamples = 6; } regirIndirect;
 
     float rayEpsilon = 1.0e-4f;
     bool reStirGIEnableTemporalResampling = true;

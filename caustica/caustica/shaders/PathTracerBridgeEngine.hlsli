@@ -620,7 +620,7 @@ ActiveTextureSampler Bridge::createTextureSampler(
     bool isTriangleHit,
     float texLODBias
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-    ,STF_SamplerState stfSamplerState
+    ,CausticaStochasticTextureSampler stfSamplerState
 #endif
 )
 {
@@ -677,7 +677,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     float coneTexLODValue = computeRayConeTriangleLODValue( bridgeGS.vertexPositions, bridgeGS.vertexTexcoords, transpose((float3x3)bridgeGS.instance.transform) );
       
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-    STF_SamplerState stfSamplerState;
+    CausticaStochasticTextureSampler stfSamplerState;
     float4 u;
     #if 0
     if (g_Const.ptConsts.STFUseBlueNoise)
@@ -691,7 +691,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
         SampleGenerator sampleGenerator = SampleGenerator::make(sampleGeneratorVertexBase); 
         u = sampleNext4D(sampleGenerator);
     }
-    stfSamplerState = STF_SamplerState::Create(u);
+    stfSamplerState = CausticaStochasticTextureSampler::Create(u);
     stfSamplerState.SetFrameIndex(Bridge::getSampleIndex());
     stfSamplerState.SetFilterType(g_Const.ptConsts.STFFilterMode);
     stfSamplerState.SetMagMethod(g_Const.ptConsts.STFMagnificationMethod);

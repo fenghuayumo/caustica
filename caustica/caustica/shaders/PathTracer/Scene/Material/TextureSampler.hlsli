@@ -2,7 +2,7 @@
 #define __TEXTURE_SAMPLER_HLSLI__
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-#include <Rtxtf/STFSamplerState.hlsli>
+#include <shaders/PathTracer/StochasticTextureSampler.hlsli>
 #endif
 
 #if 0 // no interfaces in HLSL
@@ -45,14 +45,14 @@ struct ExplicitLodTextureSampler //: ITextureSampler
 {
     float lod; ///< The explicit level of detail to use
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-    STF_SamplerState stfSamplerState;  
+    CausticaStochasticTextureSampler stfSamplerState;
 
-    void __init(float lod, STF_SamplerState stfSamplerState)
+    void __init(float lod, CausticaStochasticTextureSampler stfSamplerState)
     {
         this.lod = lod;
         this.stfSamplerState = stfSamplerState;
     }
-    static ExplicitLodTextureSampler make(float lod, STF_SamplerState stfSamplerState) 
+    static ExplicitLodTextureSampler make(float lod, CausticaStochasticTextureSampler stfSamplerState)
     {
         ExplicitLodTextureSampler ret; ret.__init(lod, stfSamplerState); return ret; 
     }
@@ -84,14 +84,14 @@ struct ExplicitRayConesLodTextureSampler //: ITextureSampler
 {
     float rayconesLODWithoutTexDims;    ///< this is \Delta_t, which is texture independent, plus the rest of the terms, except the texture size, which is added below
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-    STF_SamplerState stfSamplerState;  
+    CausticaStochasticTextureSampler stfSamplerState;
 
-    void __init(float rayconesLODWithoutTexDims, STF_SamplerState stfSamplerState)
+    void __init(float rayconesLODWithoutTexDims, CausticaStochasticTextureSampler stfSamplerState)
     {
         this.rayconesLODWithoutTexDims = rayconesLODWithoutTexDims;
         this.stfSamplerState = stfSamplerState;
     }
-    static ExplicitRayConesLodTextureSampler make(float rayconesLODWithoutTexDims, STF_SamplerState stfSamplerState) 
+    static ExplicitRayConesLodTextureSampler make(float rayconesLODWithoutTexDims, CausticaStochasticTextureSampler stfSamplerState)
     { 
         ExplicitRayConesLodTextureSampler ret; ret.__init(rayconesLODWithoutTexDims, stfSamplerState); return ret; 
     }

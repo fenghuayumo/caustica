@@ -173,8 +173,8 @@ OmmBuildQueue::OmmBuildQueue(
         return m_shaderFactory->createShader(shaderNameStr.c_str(), shaderEntryName, &defines, type);
     };
 
-    caustica::omm::GpuBakeRhi::MessageCallback messageCb = [](::omm::MessageSeverity severity, const char* message) {
-        caustica::info("[OMM SDK]: %d %s", severity, message);
+    caustica::omm::GpuBakeRhi::MessageCallback messageCb = [](caustica::omm::MessageSeverity severity, const char* message) {
+        caustica::info("[OMM]: %d %s", static_cast<int>(severity), message);
     };
 
     // Intialize the the internal baker, which records some buffer updates into a command list

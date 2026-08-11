@@ -91,7 +91,7 @@ void InitializeRenderAppStateFromCommandLine(RenderAppState& state, const Comman
     settings.TemporalAntiAliasingParams.useHistoryClampRelax = true;
     settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
 
-    settings.RTXDI.regir.regirStaticParams.Mode = rtxdi::ReGIRMode::Grid;
+    settings.RTXDI.regir.regirStaticParams.Mode = caustica::rtxdi_config::ReGIRMode::Grid;
 
     settings.UseNEE = cmdLine.UseNEE != 0;
     settings.NEEType = cmdLine.NEEType;

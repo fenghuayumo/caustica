@@ -33,8 +33,8 @@ public:
 			caustica::rhi::rt::OpacityMicromapFormat format = caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State;
 			caustica::rhi::rt::OpacityMicromapBuildFlags flags = caustica::rhi::rt::OpacityMicromapBuildFlags::FastTrace;
 			uint32_t maxOmmArrayDataSizeInMB; // Limit OMM memory footprint to this value.
-			omm::OpacityState alphaCutoffGT = omm::OpacityState::Opaque;
-			omm::OpacityState alphaCutoffLE = omm::OpacityState::Transparent;
+			caustica::omm::OpacityState alphaCutoffGT = caustica::omm::OpacityState::Opaque;
+			caustica::omm::OpacityState alphaCutoffLE = caustica::omm::OpacityState::Transparent;
 
 			// Debug settings
 			bool computeOnly = false;

@@ -31,7 +31,6 @@ using namespace caustica::math;
 #include <core/command_line.h>
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-#include <Rtxtf/STFDefinitions.h>
 #endif
 
 namespace caustica::editor

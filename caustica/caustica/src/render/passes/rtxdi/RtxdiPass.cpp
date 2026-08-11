@@ -1,4 +1,5 @@
 #include <render/passes/rtxdi/RtxdiPass.h>
+#include "RtxdiSdkAdapter.h"
 #include <rtxdi/ImportanceSamplingContext.h>
 #include <rtxdi/PT/ReSTIRPT.h>
 
@@ -30,6 +31,7 @@
 using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
+namespace rtxdi_sdk = caustica::render::rtxdi_sdk;
 
 RtxdiPass::RtxdiPass(
 	caustica::rhi::Device* device,
@@ -84,11 +86,11 @@ void RtxdiPass::checkContextStaticParameters()
         if (reSTIRDIContext.GetStaticParameters().RenderWidth != m_BridgeParameters.frameDims.x ||
             reSTIRDIContext.GetStaticParameters().RenderHeight != m_BridgeParameters.frameDims.y)
             needsReset = true;
-        if (reSTIRDIContext.GetStaticParameters().CheckerboardSamplingMode != m_BridgeParameters.userSettings.checkerboardMode)
+        if (reSTIRDIContext.GetStaticParameters().CheckerboardSamplingMode != rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode))
             needsReset = true;
-        if (m_ReSTIRPTContext && m_ReSTIRPTContext->GetStaticParams().CheckerboardSamplingMode != m_BridgeParameters.userSettings.checkerboardMode)
+        if (m_ReSTIRPTContext && m_ReSTIRPTContext->GetStaticParams().CheckerboardSamplingMode != rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode))
             needsReset = true;
-		if (reGIRContext.GetReGIRStaticParameters().Mode != m_BridgeParameters.userSettings.regir.regirStaticParams.Mode)
+		if (reGIRContext.GetReGIRStaticParameters().Mode != static_cast<::rtxdi::ReGIRMode>(m_BridgeParameters.userSettings.regir.regirStaticParams.Mode))
 			needsReset = true;
 		if (reGIRContext.GetReGIRStaticParameters().LightsPerCell != m_BridgeParameters.userSettings.regir.regirStaticParams.LightsPerCell)
 			needsReset = true;
@@ -102,31 +104,31 @@ void RtxdiPass::updateContextDynamicParameters()
 {
 	// ReSTIR DI
 	m_ImportanceSamplingContext->GetReSTIRDIContext().SetFrameIndex(m_BridgeParameters.frameIndex);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetInitialSamplingParameters(m_BridgeParameters.userSettings.restirDI.initialSamplingParams);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetResamplingMode(m_BridgeParameters.userSettings.restirDI.resamplingMode);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetTemporalResamplingParameters(m_BridgeParameters.userSettings.restirDI.temporalResamplingParams);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetSpatialResamplingParameters(m_BridgeParameters.userSettings.restirDI.spatialResamplingParams);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetShadingParameters(m_BridgeParameters.userSettings.restirDI.shadingParams);
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetInitialSamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.initialSamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.resamplingMode));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.temporalResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.spatialResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetShadingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.shadingParams));
 
 	// ReSTIR GI
 	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFrameIndex(m_BridgeParameters.frameIndex);
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetResamplingMode(m_BridgeParameters.userSettings.restirGI.resamplingMode);
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetTemporalResamplingParameters(m_BridgeParameters.userSettings.restirGI.temporalResamplingParams);
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetSpatialResamplingParameters(m_BridgeParameters.userSettings.restirGI.spatialResamplingParams);
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFinalShadingParameters(m_BridgeParameters.userSettings.restirGI.finalShadingParams);
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.resamplingMode));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.temporalResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.spatialResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFinalShadingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.finalShadingParams));
 
     // ReSTIR PT
     m_ReSTIRPTContext->SetFrameIndex(m_BridgeParameters.frameIndex);
-    m_ReSTIRPTContext->SetResamplingMode(m_BridgeParameters.userSettings.restirPT.resamplingMode);
-    m_ReSTIRPTContext->SetInitialSamplingParameters(m_BridgeParameters.userSettings.restirPT.initialSamplingParams);
-    m_ReSTIRPTContext->SetTemporalResamplingParameters(m_BridgeParameters.userSettings.restirPT.temporalResamplingParams);
-    m_ReSTIRPTContext->SetReconnectionParameters(m_BridgeParameters.userSettings.restirPT.reconnectionParams);
-    m_ReSTIRPTContext->SetHybridShiftParameters(m_BridgeParameters.userSettings.restirPT.hybridShiftParams);
-    m_ReSTIRPTContext->SetBoilingFilterParameters(m_BridgeParameters.userSettings.restirPT.boilingFilterParams);
-    m_ReSTIRPTContext->SetSpatialResamplingParameters(m_BridgeParameters.userSettings.restirPT.spatialResamplingParams);
+    m_ReSTIRPTContext->SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.resamplingMode));
+    m_ReSTIRPTContext->SetInitialSamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.initialSamplingParams));
+    m_ReSTIRPTContext->SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.temporalResamplingParams));
+    m_ReSTIRPTContext->SetReconnectionParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.reconnectionParams));
+    m_ReSTIRPTContext->SetHybridShiftParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.hybridShiftParams));
+    m_ReSTIRPTContext->SetBoilingFilterParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.boilingFilterParams));
+    m_ReSTIRPTContext->SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.spatialResamplingParams));
 
 	// ReGIR
-	auto regirParams = m_BridgeParameters.userSettings.regir.regirDynamicParameters;
+	auto regirParams = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.regir.regirDynamicParameters);
 	regirParams.center = { m_BridgeParameters.cameraPosition.x, m_BridgeParameters.cameraPosition.y,m_BridgeParameters.cameraPosition.z };
 	m_ImportanceSamplingContext->GetReGIRContext().SetDynamicParameters(regirParams);
 }
@@ -292,15 +294,15 @@ void RtxdiPass::prepareResources(
         rtxdi::ImportanceSamplingContext_StaticParameters staticParameters = {};
         staticParameters.renderWidth = m_BridgeParameters.frameDims.x;
         staticParameters.renderHeight = m_BridgeParameters.frameDims.y;
-        staticParameters.CheckerboardSamplingMode = m_BridgeParameters.userSettings.checkerboardMode;
-        staticParameters.regirStaticParams = m_BridgeParameters.userSettings.regir.regirStaticParams;
+        staticParameters.CheckerboardSamplingMode = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode);
+        staticParameters.regirStaticParams = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.regir.regirStaticParams);
 
         m_ImportanceSamplingContext = std::make_unique<rtxdi::ImportanceSamplingContext>(staticParameters);
 
         rtxdi::ReSTIRPTStaticParameters ptStaticParameters = {};
         ptStaticParameters.RenderWidth = m_BridgeParameters.frameDims.x;
         ptStaticParameters.RenderHeight = m_BridgeParameters.frameDims.y;
-        ptStaticParameters.CheckerboardSamplingMode = m_BridgeParameters.userSettings.checkerboardMode;
+        ptStaticParameters.CheckerboardSamplingMode = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode);
         m_ReSTIRPTContext = std::make_unique<rtxdi::ReSTIRPTContext>(ptStaticParameters);
 
         // RTXDI context settings affect the shader permutations

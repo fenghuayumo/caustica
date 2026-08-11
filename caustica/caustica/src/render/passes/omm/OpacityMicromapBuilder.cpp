@@ -189,8 +189,8 @@ void OpacityMicromapBuilder::createOpacityMicromaps(
             geom.dynamicSubdivisionScale = m_uiData.ActiveState->EnableDynamicSubdivision ? m_uiData.ActiveState->DynamicSubdivisionScale : 0.f;
             geom.format = m_uiData.ActiveState->Format;
             geom.flags = m_uiData.ActiveState->Flag;
-            geom.alphaCutoffGT = (::omm::OpacityState)m_uiData.ActiveState->AlphaCutoffGT;
-            geom.alphaCutoffLE = (::omm::OpacityState)m_uiData.ActiveState->AlphaCutoffLE;
+            geom.alphaCutoffGT = static_cast<caustica::omm::OpacityState>(m_uiData.ActiveState->AlphaCutoffGT);
+            geom.alphaCutoffLE = static_cast<caustica::omm::OpacityState>(m_uiData.ActiveState->AlphaCutoffLE);
             geom.maxOmmArrayDataSizeInMB = m_uiData.ActiveState->MaxOmmArrayDataSizeInMB;
             geom.computeOnly = m_uiData.ActiveState->ComputeOnly;
             geom.enableLevelLineIntersection = m_uiData.ActiveState->LevelLineIntersection;
@@ -485,18 +485,18 @@ bool OpacityMicromapBuilder::debugGUI(
         }
 
         {
-            auto StateToString = [ ](::omm::OpacityState state) {
+            auto StateToString = [ ](caustica::omm::OpacityState state) {
                 const char* strings[] = { "Transparent", "Opaque", "UnknownTransparent", "UnknownOpaque" };
                 assert((int)state >= 0 && (int)state < IM_ARRAYSIZE(strings));
                 return strings[(int)state];
             };
-            const std::array<::omm::OpacityState, 4> states = { ::omm::OpacityState::Transparent, ::omm::OpacityState::Opaque, ::omm::OpacityState::UnknownTransparent, ::omm::OpacityState::UnknownOpaque };
+            const std::array<caustica::omm::OpacityState, 4> states = { caustica::omm::OpacityState::Transparent, caustica::omm::OpacityState::Opaque, caustica::omm::OpacityState::UnknownTransparent, caustica::omm::OpacityState::UnknownOpaque };
 
-            if (ImGui::BeginCombo("AlphaCutoffGT", StateToString((::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT)))
+            if (ImGui::BeginCombo("AlphaCutoffGT", StateToString(static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffGT))))
             {
                 for (uint i = 0; i < states.size(); i++)
                 {
-                    bool is_selected = states[i] == (::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffGT;
+                    bool is_selected = states[i] == static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffGT);
                     if (ImGui::Selectable(StateToString(states[i]), is_selected))
                         m_uiData.DesiredState.AlphaCutoffGT = (int)states[i];
                     if (is_selected)
@@ -505,11 +505,11 @@ bool OpacityMicromapBuilder::debugGUI(
                 ImGui::EndCombo();
             }
 
-            if (ImGui::BeginCombo("AlphaCutoffLE", StateToString((::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE)))
+            if (ImGui::BeginCombo("AlphaCutoffLE", StateToString(static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffLE))))
             {
                 for (uint i = 0; i < states.size(); i++)
                 {
-                    bool is_selected = states[i] == (::omm::OpacityState)m_uiData.DesiredState.AlphaCutoffLE;
+                    bool is_selected = states[i] == static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffLE);
                     if (ImGui::Selectable(StateToString(states[i]), is_selected))
                         m_uiData.DesiredState.AlphaCutoffLE = (int)states[i];
                     if (is_selected)

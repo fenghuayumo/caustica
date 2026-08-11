@@ -23,10 +23,26 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <memory>
 #include <optional>
 
-#include <omm.hpp>
-
 namespace caustica::omm
 {
+	// Public OMM bake configuration belongs to Caustica. The NVIDIA OMM SDK
+	// remains an implementation detail of GpuBakeRhi.cpp.
+	enum class OpacityState : uint32_t
+	{
+		Transparent = 0,
+		Opaque = 1,
+		UnknownTransparent = 2,
+		UnknownOpaque = 3
+	};
+
+	enum class MessageSeverity : uint32_t
+	{
+		Info = 0,
+		Warning = 1,
+		PerformanceWarning = 2,
+		Error = 3
+	};
+
 	class GpuBakeRhiImpl;
 
 	class GpuBakeRhi
@@ -40,7 +56,7 @@ namespace caustica::omm
 			std::function<caustica::rhi::ShaderHandle(caustica::rhi::ShaderType type, const char* shaderName, const char* shaderEntryName)> shaders;
 		};
 
-		using MessageCallback = std::function<void(::omm::MessageSeverity severity, const char* message)>;
+		using MessageCallback = std::function<void(MessageSeverity severity, const char* message)>;
 
 		enum class Operation
 		{
@@ -56,16 +72,8 @@ namespace caustica::omm
 			caustica::rhi::TextureHandle				alphaTexture;
 			uint32_t							alphaTextureChannel = 3;
 			float								alphaCutoff = 0.5f;
-			union {
-				OMM_DEPRECATED_MSG("alphaCutoffGT is deprectated, please use alphaCutoffGreater")
-				::omm::OpacityState					alphaCutoffGT;
-				::omm::OpacityState					alphaCutoffGreater = ::omm::OpacityState::Opaque;
-			};
-			union {
-				OMM_DEPRECATED_MSG("alphaCutoffLT is deprectated, please use alphaCutoffLessEqual")
-				::omm::OpacityState					alphaCutoffLT;
-				::omm::OpacityState					alphaCutoffLessEqual = ::omm::OpacityState::Transparent;
-			};
+			OpacityState					alphaCutoffGreater = OpacityState::Opaque;
+			OpacityState					alphaCutoffLessEqual = OpacityState::Transparent;
 			bool								bilinearFilter = true;
 			bool								enableLevelLineIntersection = true;
 			caustica::rhi::SamplerAddressMode			sampleMode = caustica::rhi::SamplerAddressMode::Clamp;
@@ -180,8 +188,6 @@ namespace caustica::omm
 			const uint32_t width,
 			const uint32_t height
 		);
-
-		Stats GetStats(const ::omm::Cpu::BakeResultDesc& desc);
 
 	private:
 		std::unique_ptr< GpuBakeRhiImpl> m_impl;

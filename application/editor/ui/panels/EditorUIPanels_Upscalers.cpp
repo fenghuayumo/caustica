@@ -224,7 +224,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
 		            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("Local Light Sampling Mode", (int*)&m_settings.RTXDI.restirDI.initialSamplingParams.localLightSamplingMode,
 			            "Uniform\0Power RIS\0ReGIR RIS\0\0"));
 
-                    if (m_settings.RTXDI.restirDI.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode::ReGIR_RIS)
+                    if (m_settings.RTXDI.restirDI.initialSamplingParams.localLightSamplingMode == caustica::rtxdi_config::LocalLightSamplingMode::ReGIRRIS)
                     {
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::Combo("ReGIR Mode", (int*)&m_settings.RTXDI.regir.regirStaticParams.Mode,
                             "Disabled\0Grid\0Onion\0\0"));
@@ -329,7 +329,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
                     int reconnectionMode = int(m_settings.RTXDI.restirPT.reconnectionParams.reconnectionMode);
                     bool reconnectionChanged = ImGui::Combo("Reconnection Mode ##PT", &reconnectionMode, "Fixed Threshold\0Footprint\0\0");
                     if (reconnectionChanged)
-                        m_settings.RTXDI.restirPT.reconnectionParams.reconnectionMode = RTXDI_PTReconnectionMode(reconnectionMode);
+                        m_settings.RTXDI.restirPT.reconnectionParams.reconnectionMode = caustica::rtxdi_config::PTReconnectionMode(reconnectionMode);
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(reconnectionChanged);
 
                     RTXDI_RESTIR_PT_RESET_ON_CHANGE(ImGui::SliderFloat("Min Connection Footprint ##PT", &m_settings.RTXDI.restirPT.reconnectionParams.minConnectionFootprint, 0.0f, 0.1f));

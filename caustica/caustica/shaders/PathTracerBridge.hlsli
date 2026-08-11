@@ -54,7 +54,7 @@ namespace Bridge
         bool isTriangleHit,
         float texLODBias
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-        ,STF_SamplerState stfSamplerState
+        ,CausticaStochasticTextureSampler stfSamplerState
 #endif
     );
 

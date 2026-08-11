@@ -60,34 +60,8 @@ void PathTracePass::fillConstants(
     assert(params.context);
 
 #if CAUSTICA_STOCHASTIC_TEXTURE_FILTERING_ENABLE
-    auto GetStfMagnificationMethod = [](StfMagnificationMethod method)->int {
-        switch (method)
-        {
-        case StfMagnificationMethod::Default:   return STF_MAGNIFICATION_METHOD_NONE;
-        case StfMagnificationMethod::Quad2x2:   return STF_MAGNIFICATION_METHOD_2x2_QUAD;
-        case StfMagnificationMethod::Fine2x2:   return STF_MAGNIFICATION_METHOD_2x2_FINE;
-        case StfMagnificationMethod::FineTemporal2x2: return STF_MAGNIFICATION_METHOD_2x2_FINE_TEMPORAL;
-        case StfMagnificationMethod::FineAlu3x3: return STF_MAGNIFICATION_METHOD_3x3_FINE_ALU;
-        case StfMagnificationMethod::FineLut3x3: return STF_MAGNIFICATION_METHOD_3x3_FINE_LUT;
-        case StfMagnificationMethod::Fine4x4:    return STF_MAGNIFICATION_METHOD_4x4_FINE;
-        default:
-            assert(!"Not Implemented");
-            return 0;
-        }
-    };
-
-    auto GetStfFilterMode = [](StfFilterMode mode)->int {
-        switch (mode)
-        {
-        case StfFilterMode::Point:      return STF_FILTER_TYPE_POINT;
-        case StfFilterMode::Linear:     return STF_FILTER_TYPE_LINEAR;
-        case StfFilterMode::Cubic:      return STF_FILTER_TYPE_CUBIC;
-        case StfFilterMode::Gaussian:   return STF_FILTER_TYPE_GAUSSIAN;
-        default:
-            assert(!"Not Implemented");
-            return 0;
-        }
-    };
+    auto GetStfMagnificationMethod = [](StfMagnificationMethod method) { return static_cast<int>(method); };
+    auto GetStfFilterMode = [](StfFilterMode mode) { return static_cast<int>(mode); };
 #endif
 
     const PathTracerSettings& settings = params.context->activeSettings();

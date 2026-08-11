@@ -100,6 +100,30 @@ namespace
 		}
 	}
 
+	static ::omm::OpacityState GetSdkOpacityState(caustica::omm::OpacityState state)
+	{
+		switch (state)
+		{
+		case caustica::omm::OpacityState::Transparent: return ::omm::OpacityState::Transparent;
+		case caustica::omm::OpacityState::Opaque: return ::omm::OpacityState::Opaque;
+		case caustica::omm::OpacityState::UnknownTransparent: return ::omm::OpacityState::UnknownTransparent;
+		case caustica::omm::OpacityState::UnknownOpaque: return ::omm::OpacityState::UnknownOpaque;
+		default: assert(false); return ::omm::OpacityState::Opaque;
+		}
+	}
+
+	static caustica::omm::MessageSeverity GetMessageSeverity(::omm::MessageSeverity severity)
+	{
+		switch (severity)
+		{
+		case ::omm::MessageSeverity::Info: return caustica::omm::MessageSeverity::Info;
+		case ::omm::MessageSeverity::Warning: return caustica::omm::MessageSeverity::Warning;
+		case ::omm::MessageSeverity::PerfWarning: return caustica::omm::MessageSeverity::PerformanceWarning;
+		case ::omm::MessageSeverity::Fatal: return caustica::omm::MessageSeverity::Error;
+		default: assert(false); return caustica::omm::MessageSeverity::Error;
+		}
+	}
+
 	/// -- BINDING CACHE FROM DONUT -- 
 
 	/*
@@ -237,8 +261,6 @@ public:
 		const uint32_t width,
 		const uint32_t height
 	);
-
-	GpuBakeRhi::Stats GetStats(const ::omm::Cpu::BakeResultDesc& desc);
 
 private:
 
@@ -394,7 +416,7 @@ void GpuBakeRhiImpl::InitBaker(GpuBakeRhi::ShaderProvider* shaderProvider)
 			desc.messageInterface.userArg = this;
 			desc.messageInterface.messageCallback = [](::omm::MessageSeverity severity, const char* message, void* userArg) {
 				GpuBakeRhiImpl* _this = (GpuBakeRhiImpl*)userArg;
-				_this->m_messageCallback.value()(severity, message);
+				_this->m_messageCallback.value()(GetMessageSeverity(severity), message);
 			};
 		}
 
@@ -696,8 +718,8 @@ void GpuBakeRhiImpl::SetupPipelines(
 	config.alphaTextureChannel					= params.alphaTextureChannel;
 	config.alphaMode							= AlphaMode::Test;
 	config.alphaCutoff							= params.alphaCutoff;
-	config.alphaCutoffGreater					= params.alphaCutoffGreater;
-	config.alphaCutoffLessEqual					= params.alphaCutoffLessEqual;
+	config.alphaCutoffGreater					= GetSdkOpacityState(params.alphaCutoffGreater);
+	config.alphaCutoffLessEqual					= GetSdkOpacityState(params.alphaCutoffLessEqual);
 	config.texCoordFormat						= GetTexCoordFormat(params.texCoordFormat);
 	config.texCoordOffsetInBytes				= params.texCoordBufferOffsetInBytes;
 	config.texCoordStrideInBytes				= params.texCoordStrideInBytes;
@@ -1245,25 +1267,6 @@ void GpuBakeRhiImpl::DumpDebug(
 	assert(res == ::omm::Result::SUCCESS);
 }
 
-GpuBakeRhi::Stats GpuBakeRhiImpl::GetStats(const ::omm::Cpu::BakeResultDesc& desc)
-{
-	::omm::Debug::Stats stats;
-	::omm::Result statsRes = ::omm::Debug::GetStats(m_baker, &desc, &stats);
-	assert(statsRes == ::omm::Result::SUCCESS);
-
-	GpuBakeRhi::Stats s;
-	s.totalOpaque = stats.totalOpaque;
-	s.totalTransparent = stats.totalTransparent;
-	s.totalUnknownTransparent = stats.totalUnknownTransparent;
-	s.totalUnknownOpaque = stats.totalUnknownOpaque;
-	s.totalFullyOpaque = stats.totalFullyOpaque;
-	s.totalFullyTransparent = stats.totalFullyTransparent;
-	s.totalFullyUnknownOpaque = stats.totalFullyUnknownOpaque;
-	s.totalFullyUnknownTransparent = stats.totalFullyUnknownTransparent;
-	return s;
-}
-
-
 GpuBakeRhi::GpuBakeRhi(caustica::rhi::DeviceHandle device, caustica::rhi::CommandListHandle commandList, bool enableDebug, ShaderProvider* shaderProvider, std::optional<MessageCallback> callback)
 	:m_impl(std::make_unique<GpuBakeRhiImpl>(device, commandList, enableDebug, shaderProvider, callback))
 {
@@ -1343,11 +1346,6 @@ void GpuBakeRhi::DumpDebug(
 		width,
 		height
 	);
-}
-
-GpuBakeRhi::Stats GpuBakeRhi::GetStats(const ::omm::Cpu::BakeResultDesc& desc)
-{
-	return m_impl->GetStats(desc);
 }
 
 } // namespace caustica::omm
