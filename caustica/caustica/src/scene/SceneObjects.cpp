@@ -19,10 +19,10 @@ void GaussianSplat::load(const Json::Value& node)
 }
 
 // =============================================================================
-// SampleSettings
+// SceneSettings
 // =============================================================================
 
-void SampleSettings::load(const Json::Value& node)
+void SceneSettings::load(const Json::Value& node)
 {
     node["realtimeMode"]          >> realtimeMode;
     node["enableAnimations"]      >> enableAnimations;
@@ -52,8 +52,9 @@ std::shared_ptr<void> SceneTypeFactory::createLeaf(const std::string& type)
 {
     if (type == "GaussianSplat" || type == "GaussianSplats" || type == "3DGaussianSplat")
         return std::make_shared<GaussianSplat>();
-    if (type == "SampleSettings")
-        return std::make_shared<SampleSettings>();
+    // Accept the legacy name so scenes authored before the engine rename still load.
+    if (type == "SceneSettings" || type == "SampleSettings")
+        return std::make_shared<SceneSettings>();
     if (type == "GameSettings")
         return std::make_shared<GameSettings>();
     return nullptr;

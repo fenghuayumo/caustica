@@ -87,6 +87,15 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     auto* dirLightComp = caustica::scene::tryGetDirectionalLight(ew->world(), entity);
     auto* spotLightComp = caustica::scene::tryGetSpotLight(ew->world(), entity);
     auto* pointLightComp = caustica::scene::tryGetPointLight(ew->world(), entity);
+    const bool isLight = envLightComp || dirLightComp || spotLightComp || pointLightComp;
+    auto markLightingEdited = [&](bool changed) {
+        if (changed)
+        {
+            m_settings.ResetAccumulation = true;
+            m_settings.ResetRealtimeCaches = true;
+        }
+        return changed;
+    };
     caustica::GaussianSplat* gaussianSplat = splatComp ? &splatComp->splat : nullptr;
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.f, 6.f));
@@ -193,6 +202,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
+            if (isLight)
+                m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(posEdit);
         endTransformEdit(posEdit);
@@ -225,6 +236,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
+            if (isLight)
+                m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(rotEdit);
         endTransformEdit(rotEdit);
@@ -239,6 +252,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
+            if (isLight)
+                m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(sclEdit);
         endTransformEdit(sclEdit);
@@ -368,10 +383,18 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 ImGui::TextWrapped("Source: `%s`", caustica::envMapLocalPath(*m_sceneEditor.app()).c_str());
             ImGui::PopStyleColor();
 
-            // Live controls bind to the session EnvironmentMapParams (same path the
-            // renderer consumes). Scene JSON EnvironmentLight fields seed load-time state.
-            RESET_ON_CHANGE(InspectorCheckbox("Enabled", &m_settings.EnvironmentMapParams.enabled));
-            RESET_ON_CHANGE(InspectorCheckbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
+            // The entity component is the authoritative enabled state. Mirror it to
+            // the session setting consumed by the environment processor so Inspector,
+            // Hierarchy and render extraction cannot disagree.
+            bool environmentEnabled = envLightComp->enabled;
+            if (InspectorCheckbox("Enabled", &environmentEnabled))
+            {
+                envLightComp->enabled = environmentEnabled;
+                m_settings.EnvironmentMapParams.enabled = environmentEnabled;
+                ew->world().notifyComponentChanged<caustica::scene::EnvironmentLightComponent>(entity);
+                markLightingEdited(true);
+            }
+            markLightingEdited(InspectorCheckbox("Visible to Camera", &m_settings.EnvironmentMapParams.VisibleToCamera));
 
             std::string overrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
             const std::vector<std::filesystem::path>& envMapMediaList = caustica::envMapMediaList(*m_sceneEditor.app());
@@ -416,13 +439,13 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                     "'sky (manual)' = free elevation/azimuth control in Sky Atmosphere.");
             if (caustica::envMapOverrideSource(*m_sceneEditor.app()) != overrideSource)
             {
-                m_settings.ResetAccumulation = true;
+                markLightingEdited(true);
                 caustica::setEnvMapOverrideSource(*m_sceneEditor.app(), overrideSource);
             }
 
-            RESET_ON_CHANGE(InspectorColorEdit3("Tint Color", &m_settings.EnvironmentMapParams.TintColor.x));
-            RESET_ON_CHANGE(InspectorDragFloat("Intensity", &m_settings.EnvironmentMapParams.Intensity, 0.01f, 0.f, 100.f, "%.3f"));
-            RESET_ON_CHANGE(InspectorDragFloat3(
+            markLightingEdited(InspectorColorEdit3("Tint Color", &m_settings.EnvironmentMapParams.TintColor.x));
+            markLightingEdited(InspectorDragFloat("Intensity", &m_settings.EnvironmentMapParams.Intensity, 0.01f, 0.f, 100.f, "%.3f"));
+            markLightingEdited(InspectorDragFloat3(
                 "Rotation XYZ", &m_settings.EnvironmentMapParams.RotationXYZ.x, 0.5f, -360.f, 360.f, "%.1f"));
 
             if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment();
@@ -432,7 +455,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::TextColored(categoryColor, "Sky Atmosphere");
-                m_settings.ResetAccumulation |= envMapProcessor->getProceduralSky()->debugGUI(layout.indent);
+                markLightingEdited(envMapProcessor->getProceduralSky()->debugGUI(layout.indent));
             }
         }
     }
@@ -445,25 +468,34 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ImGui::Spacing();
             if (dirLightComp)
             {
-                RESET_ON_CHANGE(InspectorColorEdit3("Color", &dirLightComp->color.x));
-                RESET_ON_CHANGE(InspectorDragFloat("Irradiance", &dirLightComp->irradiance, 0.01f, 0.f, 1000.f, "%.3f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Angular Size", &dirLightComp->angularSize, 0.01f, 0.f, 90.f, "%.2f"));
+                bool changed = false;
+                changed |= InspectorColorEdit3("Color", &dirLightComp->color.x);
+                changed |= InspectorDragFloat("Irradiance", &dirLightComp->irradiance, 0.01f, 0.f, 1000.f, "%.3f");
+                changed |= InspectorDragFloat("Angular Size", &dirLightComp->angularSize, 0.01f, 0.f, 90.f, "%.2f");
+                if (markLightingEdited(changed))
+                    ew->world().notifyComponentChanged<caustica::scene::DirectionalLightComponent>(entity);
             }
             else if (spotLightComp)
             {
-                RESET_ON_CHANGE(InspectorColorEdit3("Color", &spotLightComp->color.x));
-                RESET_ON_CHANGE(InspectorDragFloat("Intensity", &spotLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Radius", &spotLightComp->radius, 0.01f, 0.f, 100.f, "%.3f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Range", &spotLightComp->range, 0.1f, 0.f, 1e6f, "%.2f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Inner Angle", &spotLightComp->innerAngle, 0.5f, 0.f, 180.f, "%.1f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Outer Angle", &spotLightComp->outerAngle, 0.5f, 0.f, 180.f, "%.1f"));
+                bool changed = false;
+                changed |= InspectorColorEdit3("Color", &spotLightComp->color.x);
+                changed |= InspectorDragFloat("Intensity", &spotLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f");
+                changed |= InspectorDragFloat("Radius", &spotLightComp->radius, 0.01f, 0.f, 100.f, "%.3f");
+                changed |= InspectorDragFloat("Range", &spotLightComp->range, 0.1f, 0.f, 1e6f, "%.2f");
+                changed |= InspectorDragFloat("Inner Angle", &spotLightComp->innerAngle, 0.5f, 0.f, 180.f, "%.1f");
+                changed |= InspectorDragFloat("Outer Angle", &spotLightComp->outerAngle, 0.5f, 0.f, 180.f, "%.1f");
+                if (markLightingEdited(changed))
+                    ew->world().notifyComponentChanged<caustica::scene::SpotLightComponent>(entity);
             }
             else if (pointLightComp)
             {
-                RESET_ON_CHANGE(InspectorColorEdit3("Color", &pointLightComp->color.x));
-                RESET_ON_CHANGE(InspectorDragFloat("Intensity", &pointLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Radius", &pointLightComp->radius, 0.01f, 0.f, 100.f, "%.3f"));
-                RESET_ON_CHANGE(InspectorDragFloat("Range", &pointLightComp->range, 0.1f, 0.f, 1e6f, "%.2f"));
+                bool changed = false;
+                changed |= InspectorColorEdit3("Color", &pointLightComp->color.x);
+                changed |= InspectorDragFloat("Intensity", &pointLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f");
+                changed |= InspectorDragFloat("Radius", &pointLightComp->radius, 0.01f, 0.f, 100.f, "%.3f");
+                changed |= InspectorDragFloat("Range", &pointLightComp->range, 0.1f, 0.f, 1e6f, "%.2f");
+                if (markLightingEdited(changed))
+                    ew->world().notifyComponentChanged<caustica::scene::PointLightComponent>(entity);
             }
         }
     }
@@ -560,4 +592,3 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
 
 } // namespace caustica::editor
-

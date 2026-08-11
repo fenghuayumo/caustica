@@ -305,21 +305,25 @@ void ExtractLightsFull(ecs::World& world, SceneRenderData& out)
     world.each<DirectionalLightComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const DirectionalLightComponent& light, const GlobalTransformComponent& global)
         {
+            if (!light.enabled) return;
             extractLight(entity, light.color, {}, toLightData(light), global);
         });
     world.each<SpotLightComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const SpotLightComponent& light, const GlobalTransformComponent& global)
         {
+            if (!light.enabled) return;
             extractLight(entity, light.color, light.proxies, toLightData(light), global);
         });
     world.each<PointLightComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const PointLightComponent& light, const GlobalTransformComponent& global)
         {
+            if (!light.enabled) return;
             extractLight(entity, light.color, light.proxies, toLightData(light), global);
         });
     world.each<EnvironmentLightComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const EnvironmentLightComponent& light, const GlobalTransformComponent& global)
         {
+            if (!light.enabled) return;
             extractLight(entity, light.color, {}, toLightData(light), global);
         });
 }
@@ -677,7 +681,6 @@ void extractSceneRenderData(
     {
         if (!ExtractMeshInstancesTransforms(world, inout))
             ExtractMeshInstancesFull(world, inout);
-        ExtractLightsTransforms(world, inout);
     }
     else
     {
@@ -688,6 +691,9 @@ void extractSceneRenderData(
                 proxy.enabled = meshComp->enabled;
         }
     }
+
+    if (flags.transformsChanged || flags.lightsChanged)
+        ExtractLightsTransforms(world, inout);
 
     // Skinned joints track animation every frame even when hierarchy is idle.
     ExtractSkinnedMeshes(world, inout, frameIndex);

@@ -122,19 +122,19 @@ void RtPipelineCache::ensurePresetVariants(PtFeaturePresetId id)
 
     using SM = caustica::ShaderMacro;
     bundle.reference = m_compiler->createVariant(
-        "PathTracerSample.hlsl",
+        "PathTracerEntryPoint.hlsl",
         { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE") },
         "REF",
         false,
         globalMacros);
     bundle.buildStablePlanes = m_compiler->createVariant(
-        "PathTracerSample.hlsl",
+        "PathTracerEntryPoint.hlsl",
         { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES") },
         "BUILD",
         false,
         globalMacros);
     bundle.fillStablePlanes = m_compiler->createVariant(
-        "PathTracerSample.hlsl",
+        "PathTracerEntryPoint.hlsl",
         { SM("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES") },
         "FILL",
         false,

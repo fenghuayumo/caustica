@@ -158,7 +158,7 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
 | TaskRuntime + Logic→RT enqueue | Landed — `caustica::task`, sole `EnqueueRenderCommand*` → `Affinity::Render`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
 | LoadSession amortized streaming | P3 landed — `LoadSession` / `tickLoadSession`; present during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
-| SampleSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
+| SceneSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Apps use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |

@@ -291,7 +291,7 @@ void onSceneUnloading(App& app)
 namespace
 {
 
-void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
+void applySceneSettingsFromScene(App& app, ::SceneManager& manager)
 {
     PathTracerSettings* cfg = settings(app);
     CameraController* cam = cameraController(app);
@@ -302,21 +302,21 @@ void applySampleSettingsFromScene(App& app, ::SceneManager& manager)
     if (!scene)
         return;
 
-    if (const SampleSettings* sampleSettings = scene->getSampleSettings())
+    if (const SceneSettings* sceneSettings = scene->getSceneSettings())
     {
-        cfg->RealtimeMode = sampleSettings->realtimeMode.value_or(cfg->RealtimeMode);
-        cfg->EnableAnimations = sampleSettings->enableAnimations.value_or(cfg->EnableAnimations);
-        cfg->EnableKeyframes = sampleSettings->enableKeyframes.value_or(cfg->EnableKeyframes);
-        if (sampleSettings->startingCamera.has_value())
-            cam->setSelectedCameraIndex(sampleSettings->startingCamera.value() + 1);
-        if (sampleSettings->realtimeFireflyFilter.has_value())
+        cfg->RealtimeMode = sceneSettings->realtimeMode.value_or(cfg->RealtimeMode);
+        cfg->EnableAnimations = sceneSettings->enableAnimations.value_or(cfg->EnableAnimations);
+        cfg->EnableKeyframes = sceneSettings->enableKeyframes.value_or(cfg->EnableKeyframes);
+        if (sceneSettings->startingCamera.has_value())
+            cam->setSelectedCameraIndex(sceneSettings->startingCamera.value() + 1);
+        if (sceneSettings->realtimeFireflyFilter.has_value())
         {
-            cfg->RealtimeFireflyFilterThreshold = sampleSettings->realtimeFireflyFilter.value();
+            cfg->RealtimeFireflyFilterThreshold = sceneSettings->realtimeFireflyFilter.value();
             cfg->RealtimeFireflyFilterEnabled = true;
         }
-        cfg->BounceCount = sampleSettings->maxBounces.value_or(cfg->BounceCount);
-        cfg->DiffuseBounceCount = sampleSettings->maxDiffuseBounces.value_or(cfg->DiffuseBounceCount);
-        cfg->TexLODBias = sampleSettings->textureMIPBias.value_or(cfg->TexLODBias);
+        cfg->BounceCount = sceneSettings->maxBounces.value_or(cfg->BounceCount);
+        cfg->DiffuseBounceCount = sceneSettings->maxDiffuseBounces.value_or(cfg->DiffuseBounceCount);
+        cfg->TexLODBias = sceneSettings->textureMIPBias.value_or(cfg->TexLODBias);
     }
 }
 
@@ -333,7 +333,7 @@ void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const Com
     cfg->EnableKeyframes = false;
     cfg->RealtimeMode = false;
 
-    applySampleSettingsFromScene(app, manager);
+    applySceneSettingsFromScene(app, manager);
 
     if (cmd.stopAnimations)
     {

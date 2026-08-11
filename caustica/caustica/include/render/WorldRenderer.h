@@ -264,6 +264,10 @@ private:
     bool                                        m_gaussianSplatTemporalReset = true;
 
     // Per-frame copies from SceneRenderData (filled at render() begin).
+    // During an asynchronous structure rebuild this packet combines the committed,
+    // TLAS-compatible geometry with the latest light proxies. Keeping the whole
+    // committed packet would otherwise leave deleted/edited lights active.
+    scene::SceneRenderData                      m_frameSceneSnapshot;
     PathTracerSettings                          m_frameSettingsSnapshot;
     RenderRuntimeState                          m_frameRuntimeSnapshot;
     RenderPickState                             m_lastRenderedPicking{};

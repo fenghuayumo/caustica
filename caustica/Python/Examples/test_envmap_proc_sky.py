@@ -163,8 +163,8 @@ def build_env_test_scene_json(
                 ],
             },
             {
-                "name": "SampleSettings",
-                "type": "SampleSettings",
+                "name": "SceneSettings",
+                "type": "SceneSettings",
                 "realtimeMode": True,
                 "enableAnimations": False,
                 "startingCamera": -1,

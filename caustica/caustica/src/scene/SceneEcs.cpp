@@ -247,8 +247,8 @@ void CopyEntityComponents(
         dstWorld.emplace<GeometrySequenceComponent>(dstEntity, *geomSeq);
     if (const auto* splat = srcWorld.get<GaussianSplatComponent>(srcEntity))
         dstWorld.emplace<GaussianSplatComponent>(dstEntity, *splat);
-    if (const auto* sample = srcWorld.get<SampleSettingsComponent>(srcEntity))
-        dstWorld.emplace<SampleSettingsComponent>(dstEntity, *sample);
+    if (const auto* sceneSettings = srcWorld.get<SceneSettingsComponent>(srcEntity))
+        dstWorld.emplace<SceneSettingsComponent>(dstEntity, *sceneSettings);
     if (const auto* game = srcWorld.get<GameSettingsComponent>(srcEntity))
         dstWorld.emplace<GameSettingsComponent>(dstEntity, *game);
 }
@@ -301,6 +301,8 @@ void SceneEntityWorld::clear()
     m_GeometryInstancesCount = 0;
     m_structureDirty = true;
     m_transformDirty = true;
+    m_lightDirty = true;
+    m_frameLightDirty = false;
     m_previousTransformDirty = false;
     ensureChangeDetection();
 }
@@ -323,10 +325,6 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
         || changeDetection->anyOfChangedThisFrame<
             MeshInstanceComponent,
             SkinnedMeshComponent,
-            DirectionalLightComponent,
-            SpotLightComponent,
-            PointLightComponent,
-            EnvironmentLightComponent,
             CameraComponent,
             AnimationComponent,
             GaussianSplatComponent,
@@ -347,12 +345,37 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
     {
         m_structureDirty = true;
         m_transformDirty = true;
+        m_lightDirty = true;
     }
 
-    if (changeDetection->anyOfChangedThisFrame<LocalTransformComponent, ParentComponent>(registry)
-        || changeDetection->anyOfAddedThisFrame<LocalTransformComponent, ParentComponent>(registry))
+    if (changeDetection->anyOfChangedThisFrame<
+            DirectionalLightComponent,
+            SpotLightComponent,
+            PointLightComponent,
+            EnvironmentLightComponent>(registry))
+    {
+        m_lightDirty = true;
+    }
+
+    // A transform on a light-only subtree must not masquerade as a mesh transform
+    // change. The old global flag rewrote every mesh instance buffer while dragging
+    // a light, disturbing temporal rendering even though no geometry moved.
+    m_world.each<LocalTransformComponent, SceneContentComponent, ecs::Changed<LocalTransformComponent>>(
+        [&](ecs::Entity, LocalTransformComponent&, SceneContentComponent& content) {
+            const SceneContentFlags subtree = content.subgraphContent;
+            const bool containsLights = (subtree & SceneContentFlags::Lights) != 0;
+            const bool containsAnythingElse = (subtree & ~SceneContentFlags::Lights) != 0;
+            if (containsLights)
+                m_lightDirty = true;
+            if (!containsLights || containsAnythingElse)
+                m_transformDirty = true;
+        });
+
+    if (changeDetection->anyOfChangedThisFrame<ParentComponent>(registry)
+        || changeDetection->anyOfAddedThisFrame<ParentComponent>(registry))
     {
         m_transformDirty = true;
+        m_lightDirty = true;
     }
 }
 
@@ -543,6 +566,15 @@ bool SceneEntityWorld::hasPendingTransformChanges()
     return m_transformDirty || m_previousTransformDirty;
 }
 
+bool SceneEntityWorld::hasPendingLightChanges()
+{
+    syncDirtyFlagsFromChangeDetection();
+    // Component edits remain visible through Changed<T> until Extract, but a
+    // deleted light has no component left to carry that signal. Preserve the
+    // refresh-time snapshot until publishRenderSnapshot ends the ECS frame.
+    return m_lightDirty || m_frameLightDirty;
+}
+
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
     updateHierarchy(m_world, previousPolicy);
@@ -579,6 +611,7 @@ void SceneEntityWorld::beginRefreshFrame()
 
     m_frameStructureDirty = m_structureDirty;
     m_frameTransformDirty = m_transformDirty;
+    m_frameLightDirty |= m_lightDirty;
 }
 
 void SceneEntityWorld::markDirtySkinnedMeshes(uint32_t frameIndex)
@@ -665,11 +698,13 @@ void SceneEntityWorld::finalizeRefreshFrame()
     m_previousTransformDirty = m_frameStructureDirty || m_frameTransformDirty;
     m_structureDirty = false;
     m_transformDirty = false;
+    m_lightDirty = false;
 }
 
 void SceneEntityWorld::endChangeDetectionFrame()
 {
     m_world.endChangeFrame();
+    m_frameLightDirty = false;
     if (auto* changeDetection = m_world.getResource<ecs::ChangeDetection>())
         changeDetection->clearWorldStructureChange();
     if (auto* transformEvents = m_world.getResource<ecs::Events<TransformChangedEvent>>())
@@ -781,8 +816,25 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
     if (!m_world.isAlive(entity))
         return;
 
-    m_structureDirty = true;
-    m_transformDirty = true;
+    const auto* content = m_world.get<SceneContentComponent>(entity);
+    const SceneContentFlags subtree = content ? content->subgraphContent : SceneContentFlags::None;
+    const bool containsLights = (subtree & SceneContentFlags::Lights) != 0;
+    const bool lightOnly = containsLights && (subtree & ~SceneContentFlags::Lights) == 0;
+
+    if (lightOnly)
+    {
+        // Analytic/environment lights are render proxies, not GPU scene structure.
+        // Rebuilding mesh uploads, BLAS/TLAS and SBT for their removal is both
+        // unnecessary and can overlap the next presented frame.
+        m_lightDirty = true;
+    }
+    else
+    {
+        m_structureDirty = true;
+        m_transformDirty = true;
+        if (containsLights)
+            m_lightDirty = true;
+    }
 
     if (auto* children = m_world.get<ChildrenComponent>(entity))
     {
@@ -806,7 +858,9 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
             root->root = ecs::NullEntity;
     }
 
-    m_world.despawn(entity);
+    // ChangeDetection's generic structure bit implies a full mesh/AS rebuild.
+    // Light-only deletion is tracked by m_lightDirty instead.
+    m_world.despawn(entity, !lightOnly);
 }
 
 bool SceneEntityWorld::setParent(ecs::Entity entity, ecs::Entity parent)
@@ -1115,9 +1169,9 @@ void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const GaussianSplat&
     m_world.emplace<GaussianSplatComponent>(entity, GaussianSplatComponent{ splat });
 }
 
-void SceneEntityWorld::setSampleSettings(ecs::Entity entity, const SampleSettings& settings)
+void SceneEntityWorld::setSceneSettings(ecs::Entity entity, const SceneSettings& settings)
 {
-    m_world.emplace<SampleSettingsComponent>(entity, SampleSettingsComponent{ settings });
+    m_world.emplace<SceneSettingsComponent>(entity, SceneSettingsComponent{ settings });
 }
 
 void SceneEntityWorld::setGameSettings(ecs::Entity entity, const GameSettings& settings)

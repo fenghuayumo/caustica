@@ -501,6 +501,11 @@ bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
     return m_RenderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
 }
 
+bool Scene::hasSceneLightsChanged(uint32_t frameIndex) const
+{
+    return m_RenderSnapshot.publishedStateForFrame(frameIndex).lightsChanged;
+}
+
 bool Scene::hasSceneStructureChanged(uint32_t frameIndex) const
 {
     const scene::SceneRenderPublishState& state = m_RenderSnapshot.publishedStateForFrame(frameIndex);
@@ -853,11 +858,11 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
         splat->load(src);
         m_EntityWorld->setGaussianSplat(entity, *splat);
     }
-    else if (type == "SampleSettings")
+    else if (type == "SceneSettings" || type == "SampleSettings")
     {
-        auto settings = std::static_pointer_cast<SampleSettings>(leaf);
+        auto settings = std::static_pointer_cast<SceneSettings>(leaf);
         settings->load(src);
-        m_EntityWorld->setSampleSettings(entity, *settings);
+        m_EntityWorld->setSceneSettings(entity, *settings);
     }
     else if (type == "GameSettings")
     {
@@ -1202,12 +1207,15 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
     if (!m_EntityWorld)
         return;
 
-    if (!m_EntityWorld->hasPendingStructureChanges() && !m_EntityWorld->hasPendingTransformChanges())
+    if (!m_EntityWorld->hasPendingStructureChanges()
+        && !m_EntityWorld->hasPendingTransformChanges()
+        && !m_EntityWorld->hasPendingLightChanges())
         return;
 
     scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
     pending.structureChanged = m_EntityWorld->hasPendingStructureChanges();
     pending.transformsChanged = m_EntityWorld->hasPendingTransformChanges();
+    pending.lightsChanged = m_EntityWorld->hasPendingLightChanges();
     pending.frameIndex = frameIndex;
     if (pending.structureChanged)
         pending.structureGeneration = m_structureGpu.bumpPublishedGeneration();
@@ -1234,11 +1242,14 @@ void Scene::extractLogicRenderCache(uint32_t frameIndex)
 
     scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
     const bool hasPendingChanges =
-        m_EntityWorld->hasPendingStructureChanges() || m_EntityWorld->hasPendingTransformChanges();
+        m_EntityWorld->hasPendingStructureChanges()
+        || m_EntityWorld->hasPendingTransformChanges()
+        || m_EntityWorld->hasPendingLightChanges();
 
     scene::SceneRenderExtractFlags flags{
         .structureChanged = !m_LogicExtractCacheValid,
         .transformsChanged = !m_LogicExtractCacheValid,
+        .lightsChanged = !m_LogicExtractCacheValid,
     };
 
     if (hasPendingChanges)
@@ -1246,6 +1257,7 @@ void Scene::extractLogicRenderCache(uint32_t frameIndex)
         refreshEntityWorldForFrame(frameIndex);
         flags.structureChanged = pending.structureChanged || !m_LogicExtractCacheValid;
         flags.transformsChanged = pending.transformsChanged || !m_LogicExtractCacheValid;
+        flags.lightsChanged = pending.lightsChanged || !m_LogicExtractCacheValid;
     }
     else if (pending.frameIndex != frameIndex)
     {
@@ -1254,6 +1266,7 @@ void Scene::extractLogicRenderCache(uint32_t frameIndex)
         pending.structureGeneration = m_structureGpu.publishedGeneration();
         pending.structureChanged = pending.structureGeneration > m_structureGpu.consumedGeneration();
         pending.transformsChanged = false;
+        pending.lightsChanged = false;
         pending.frameIndex = frameIndex;
     }
 
@@ -1323,7 +1336,7 @@ void Scene::processNodesRecursive()
 
     auto& world = m_EntityWorld->world();
 
-    world.each<scene::SampleSettingsComponent>([this](ecs::Entity, scene::SampleSettingsComponent& component)
+    world.each<scene::SceneSettingsComponent>([this](ecs::Entity, scene::SceneSettingsComponent& component)
     {
         m_loadedSettings = component.settings;
     });

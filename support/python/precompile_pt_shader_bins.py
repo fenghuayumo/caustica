@@ -17,19 +17,19 @@ EXTERNAL_ROOT = ROOT / "External"
 # Stable pipeline variants used at runtime (see SceneRayTracingResources.cpp).
 PIPELINE_VARIANTS = [
     {
-        "source": "PathTracerSample.hlsl",
+        "source": "PathTracerEntryPoint.hlsl",
         "pipeline_id": "REF",
         "macros": [("PATH_TRACER_MODE", "PATH_TRACER_MODE_REFERENCE")],
         "material_source": "PathTracerMaterialSpecializations.hlsl",
     },
     {
-        "source": "PathTracerSample.hlsl",
+        "source": "PathTracerEntryPoint.hlsl",
         "pipeline_id": "BUILD",
         "macros": [("PATH_TRACER_MODE", "PATH_TRACER_MODE_BUILD_STABLE_PLANES")],
         "material_source": "PathTracerMaterialSpecializations.hlsl",
     },
     {
-        "source": "PathTracerSample.hlsl",
+        "source": "PathTracerEntryPoint.hlsl",
         "pipeline_id": "FILL",
         "macros": [("PATH_TRACER_MODE", "PATH_TRACER_MODE_FILL_STABLE_PLANES")],
         "material_source": "PathTracerMaterialSpecializations.hlsl",

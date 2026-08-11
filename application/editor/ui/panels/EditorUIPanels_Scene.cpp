@@ -16,6 +16,7 @@
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -35,6 +36,22 @@ using namespace caustica::editor;
 
 namespace caustica::editor
 {
+
+namespace
+{
+bool WouldRemoveLastEnvironmentLight(caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity subtree)
+{
+    size_t environmentLightCount = 0;
+    size_t removedEnvironmentLightCount = 0;
+    entityWorld.world().each<caustica::scene::EnvironmentLightComponent>(
+        [&](ecs::Entity light, caustica::scene::EnvironmentLightComponent&) {
+            ++environmentLightCount;
+            if (entityWorld.entitySubtreeContains(subtree, light))
+                ++removedEnvironmentLightCount;
+        });
+    return environmentLightCount > 0 && removedEnvironmentLightCount == environmentLightCount;
+}
+} // namespace
 
 void EditorUI::BuildScenePanel(const PanelLayout& layout)
 {
@@ -248,22 +265,17 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
             }
             ImGui::PopID();
 
-            const bool hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
             const ecs::Entity selected = m_editorUI.SelectedEntity;
             const bool selectedAlive = selected != ecs::NullEntity && ew->world().isAlive(selected);
-            const auto* parentComp = selectedAlive
-                ? ew->world().tryGet<caustica::scene::ParentComponent>(selected)
-                : nullptr;
             const bool canDeleteSelected = selectedAlive
-                && parentComp != nullptr
-                && parentComp->parent != ecs::NullEntity
+                && selected != ew->root()
+                && !WouldRemoveLastEnvironmentLight(*ew, selected)
                 && m_editorUI.PendingDeleteEntity == ecs::NullEntity;
             // Allow Delete after viewport pick too (not only when Hierarchy is focused).
             // Disable key-repeat so holding Delete cannot queue overlapping deletes.
             const bool deleteKeyPressed = !ImGui::GetIO().WantTextInput
                 && ImGui::IsKeyPressed(ImGuiKey_Delete, /*repeat=*/false);
-            if (canDeleteSelected && deleteKeyPressed
-                && (hierarchyFocused || !ImGui::GetIO().WantCaptureKeyboard))
+            if (canDeleteSelected && deleteKeyPressed)
                 deleteSelectedEntity = true;
 
             if (deleteSelectedEntity)

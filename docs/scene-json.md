@@ -74,8 +74,8 @@
       ]
     },
     {
-      "name": "SampleSettings",
-      "type": "SampleSettings",
+      "name": "SceneSettings",
+      "type": "SceneSettings",
       "realtimeMode": true,
       "enableAnimations": false,
       "enableKeyframes": false,
@@ -181,7 +181,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `GaussianSplat` | 3D Gaussian Splat PLY 节点。 |
 | `GaussianSplats` | `GaussianSplat` 的别名。 |
 | `3DGaussianSplat` | `GaussianSplat` 的别名。 |
-| `SampleSettings` | 初始渲染设置节点。 |
+| `SceneSettings` | 初始渲染设置节点。 |
 | `GameSettings` | SampleGame 使用的设置节点，会保存原始 JSON。 |
 
 `MaterialPatch` 是旧格式，当前已经不再支持，不要在新 scene 中使用。
@@ -371,14 +371,16 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 - 节点 Transform 控制对象整体位置、旋转、缩放。
 - 当前 RTX/path-tracing splat shadow 资源槽仍以第一个启用的 3DGS 对象为主要 shadow source。
 
-## `SampleSettings`
+## `SceneSettings`
 
-`SampleSettings` 用来初始化 Caustica UI/渲染状态。
+`SceneSettings` 用来初始化 Caustica UI/渲染状态。
+
+旧场景中的 `SampleSettings` 类型仍可读取，但已弃用；新场景应使用 `SceneSettings`。
 
 ```json
 {
-  "name": "SampleSettings",
-  "type": "SampleSettings",
+  "name": "SceneSettings",
+  "type": "SceneSettings",
       "realtimeMode": true,
       "enableAnimations": false,
       "enableKeyframes": false,

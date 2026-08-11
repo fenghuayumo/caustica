@@ -27,6 +27,20 @@ namespace
             .postMaterialLoad = [](caustica::Material& material) { LocalConfig::postMaterialLoad(material); },
         };
     }
+
+    bool WouldRemoveLastEnvironmentLight(
+        caustica::scene::SceneEntityWorld& entityWorld, caustica::ecs::Entity subtree)
+    {
+        size_t environmentLightCount = 0;
+        size_t removedEnvironmentLightCount = 0;
+        entityWorld.world().each<caustica::scene::EnvironmentLightComponent>(
+            [&](caustica::ecs::Entity light, caustica::scene::EnvironmentLightComponent&) {
+                ++environmentLightCount;
+                if (entityWorld.entitySubtreeContains(subtree, light))
+                    ++removedEnvironmentLightCount;
+            });
+        return environmentLightCount > 0 && removedEnvironmentLightCount == environmentLightCount;
+    }
 }
 
 SceneContentEditor::SceneContentEditor(SceneEditor& sceneEditor)
@@ -111,10 +125,13 @@ bool SceneContentEditor::deleteEntity(caustica::ecs::Entity entity)
     if (!app)
         return false;
 
+    auto* ew = caustica::entityWorld(*app);
+    if (!ew || WouldRemoveLastEnvironmentLight(*ew, entity))
+        return false;
+
     if (!caustica::despawn(*app, entity))
         return false;
 
-    auto* ew = caustica::entityWorld(*app);
     auto& editor = m_sceneEditor.editorUIState();
     if (ew && editor.TogglableNodes != nullptr)
     {

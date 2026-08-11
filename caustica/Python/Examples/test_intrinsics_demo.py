@@ -43,8 +43,8 @@ def build_test_scene(caustica) -> str:
                 ],
             },
             {
-                "name": "SampleSettings",
-                "type": "SampleSettings",
+                "name": "SceneSettings",
+                "type": "SceneSettings",
                 "realtimeMode": False,
                 "startingCamera": -1,
             },

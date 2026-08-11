@@ -11,6 +11,7 @@ namespace caustica::scene
     {
         bool structureChanged = false;
         bool transformsChanged = false;
+        bool lightsChanged = false;
         uint32_t frameIndex = 0;
         uint64_t structureGeneration = 0;
     };

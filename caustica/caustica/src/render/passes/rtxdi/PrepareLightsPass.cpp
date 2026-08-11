@@ -490,7 +490,12 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandLis
     uint32_t numFinitePrimLights = 0;
     uint32_t numInfinitePrimLights = 0;
 
-    bool enableImportanceSampledEnvironmentLight = m_EnvironmentMap ? true : false;
+    const bool hasEnvironmentLightProxy = std::any_of(
+        renderData.lights.begin(), renderData.lights.end(),
+        [](const scene::LightRenderProxy& light) {
+            return scene::tryGetEnvironmentLightData(light.data) != nullptr;
+        });
+    bool enableImportanceSampledEnvironmentLight = m_EnvironmentMap != nullptr && hasEnvironmentLightProxy;
 
     if (m_GaussianSplatEmissionProxies != nullptr && m_GaussianSplatEmissionIntensity > 0.0f)
     {
@@ -547,7 +552,10 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandLis
 	lightBufferParams.localLightBufferRegion.numLights += numFinitePrimLights;
 	lightBufferParams.infiniteLightBufferRegion.firstLightIndex = lightBufferParams.localLightBufferRegion.numLights;
     // Note we do not include the environment map in numInfiniteLights
-	lightBufferParams.infiniteLightBufferRegion.numLights = numInfinitePrimLights - enableImportanceSampledEnvironmentLight;;
+	lightBufferParams.infiniteLightBufferRegion.numLights =
+        numInfinitePrimLights >= uint32_t(enableImportanceSampledEnvironmentLight)
+        ? numInfinitePrimLights - uint32_t(enableImportanceSampledEnvironmentLight)
+        : 0u;
 	lightBufferParams.environmentLightParams.lightIndex = lightBufferParams.infiniteLightBufferRegion.firstLightIndex + lightBufferParams.infiniteLightBufferRegion.numLights;
 	lightBufferParams.environmentLightParams.lightPresent = enableImportanceSampledEnvironmentLight ? 1u : 0u;
     

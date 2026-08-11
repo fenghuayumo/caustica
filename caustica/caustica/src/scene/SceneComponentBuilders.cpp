@@ -39,6 +39,7 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
     if (type == "DirectionalLight")
     {
         DirectionalLightComponent component;
+        if (src.isMember("enabled")) src["enabled"] >> component.enabled;
         src["color"] >> component.color;
         src["irradiance"] >> component.irradiance;
         src["angularSize"] >> component.angularSize;
@@ -48,6 +49,7 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
     if (type == "PointLight")
     {
         PointLightComponent component;
+        if (src.isMember("enabled")) src["enabled"] >> component.enabled;
         src["color"] >> component.color;
         src["intensity"] >> component.intensity;
         src["radius"] >> component.radius;
@@ -59,6 +61,7 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
     if (type == "SpotLight")
     {
         SpotLightComponent component;
+        if (src.isMember("enabled")) src["enabled"] >> component.enabled;
         src["color"] >> component.color;
         src["intensity"] >> component.intensity;
         src["innerAngle"] >> component.innerAngle;
@@ -72,6 +75,7 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
     if (type == "EnvironmentLight")
     {
         EnvironmentLightComponent component;
+        if (src.isMember("enabled")) src["enabled"] >> component.enabled;
         src["radianceScale"] >> component.radianceScale;
         src["textureIndex"] >> component.textureIndex;
         src["rotation"] >> component.rotation;

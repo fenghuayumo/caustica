@@ -282,6 +282,14 @@ bool GetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
         return mesh->enabled;
     if (auto* splat = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity))
         return splat->splat.enabled;
+    if (auto* light = caustica::scene::tryGetDirectionalLight(ew.world(), entity))
+        return light->enabled;
+    if (auto* light = caustica::scene::tryGetSpotLight(ew.world(), entity))
+        return light->enabled;
+    if (auto* light = caustica::scene::tryGetPointLight(ew.world(), entity))
+        return light->enabled;
+    if (auto* light = caustica::scene::tryGetEnvironmentLight(ew.world(), entity))
+        return light->enabled;
     return true;
 }
 
@@ -291,6 +299,26 @@ void SetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity,
         mesh->enabled = enabled;
     if (auto* splat = ew.world().tryGet<caustica::scene::GaussianSplatComponent>(entity))
         splat->splat.enabled = enabled;
+    if (auto* light = caustica::scene::tryGetDirectionalLight(ew.world(), entity))
+    {
+        light->enabled = enabled;
+        ew.world().notifyComponentChanged<caustica::scene::DirectionalLightComponent>(entity);
+    }
+    if (auto* light = caustica::scene::tryGetSpotLight(ew.world(), entity))
+    {
+        light->enabled = enabled;
+        ew.world().notifyComponentChanged<caustica::scene::SpotLightComponent>(entity);
+    }
+    if (auto* light = caustica::scene::tryGetPointLight(ew.world(), entity))
+    {
+        light->enabled = enabled;
+        ew.world().notifyComponentChanged<caustica::scene::PointLightComponent>(entity);
+    }
+    if (auto* light = caustica::scene::tryGetEnvironmentLight(ew.world(), entity))
+    {
+        light->enabled = enabled;
+        ew.world().notifyComponentChanged<caustica::scene::EnvironmentLightComponent>(entity);
+    }
 }
 
 } // namespace
@@ -305,8 +333,10 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
 
     const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
     const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
+    const bool isLightEntity = IsLightEntity(*ew, entity);
+    const bool isEnvironmentLightEntity = IsEnvironmentLightEntity(*ew, entity);
     const bool isSelectable = IsHierarchyLeafEntity(*ew, entity);
-    const bool showVisibilityToggle = isMeshEntity || isGaussianSplatEntity;
+    const bool showVisibilityToggle = isMeshEntity || isGaussianSplatEntity || isLightEntity;
     const auto& children = ew->getEntityChildren(entity);
 
     bool hasVisibleChildren = false;
@@ -394,7 +424,11 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         if (eyeClicked)
         {
             SetEntityEnabled(*ew, entity, !enabled);
+            if (isEnvironmentLightEntity)
+                ui.render.settings.EnvironmentMapParams.enabled = !enabled;
             ui.render.settings.ResetAccumulation = true;
+            if (isLightEntity)
+                ui.render.settings.ResetRealtimeCaches = true;
             if (isGaussianSplatEntity)
                 ui.render.runtime.Invalidation.AccelerationStructRebuildRequested = true;
         }

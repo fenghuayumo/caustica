@@ -37,13 +37,16 @@ public:
         return entity;
     }
 
-    void despawn(Entity entity)
+    void despawn(Entity entity, bool noteStructureChange = true)
     {
         if (!isAlive(entity))
             return;
 
-        if (auto* changeDetection = getResource<ChangeDetection>())
-            changeDetection->noteStructureChange();
+        if (noteStructureChange)
+        {
+            if (auto* changeDetection = getResource<ChangeDetection>())
+                changeDetection->noteStructureChange();
+        }
 
         m_registry.destroy(entity);
     }

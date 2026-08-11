@@ -697,13 +697,35 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
 
         m_context->frameSettings = &m_frameSettingsSnapshot;
         m_context->frameRuntime = &m_frameRuntimeSnapshot;
-        m_context->frameScene = structureData;
+        if (structureBuildInFlight && structureData)
+        {
+            // Geometry must remain compatible with the committed TLAS/SBT while the
+            // replacement structure is built, but lights are independent render
+            // proxies and must track the latest Extract snapshot immediately.
+            m_frameSceneSnapshot = *structureData;
+            m_frameSceneSnapshot.lights = sessionData.lights;
+            m_frameSceneSnapshot.lightEntities = sessionData.lightEntities;
+            m_context->frameScene = &m_frameSceneSnapshot;
+        }
+        else
+        {
+            m_context->frameScene = structureData;
+        }
         m_context->frameGpu = m_context->sceneGpuResources.frameHandles();
         // Suppress structure/transform GPU paths until async AS commit finishes.
         m_context->frameSceneStructureChanged =
             !structureBuildInFlight && scene->hasSceneStructureChanged(renderPhaseFrameIndex);
         m_context->frameSceneTransformsChanged =
             !structureBuildInFlight && scene->hasSceneTransformsChanged(renderPhaseFrameIndex);
+        const bool frameSceneLightsChanged =
+            scene->hasSceneLightsChanged(renderPhaseFrameIndex);
+        if (frameSceneLightsChanged)
+        {
+            // Light-set/property changes invalidate accumulated radiance, ReSTIR
+            // reservoirs and denoiser history even when no mesh structure changed.
+            m_frameSettingsSnapshot.ResetAccumulation = true;
+            m_frameSettingsSnapshot.ResetRealtimeCaches = true;
+        }
 
         // Apply extracted camera pose before view update (RT owns view matrices).
         // Skip when snapshot has no active camera (structure-only republish / scene-load extract).

@@ -82,14 +82,7 @@ void EditorPlugin::configureLateSchedules(App& app)
             ctx.app.requestRenderUnfocused();
         });
 
-    app.addSystemAfter<system_label::EditorSceneProcessPendingMutations, caustica::system_label::BeforeAnimate>(
-        AppSchedule::preUpdate,
-        [this](SystemContext& ctx) {
-            (void)ctx;
-            m_sceneEditor.processPendingSceneDeletes();
-        });
-
-    app.addSystemAfter<system_label::EditorSceneAnimateBegin, system_label::EditorSceneProcessPendingMutations>(
+    app.addSystemAfter<system_label::EditorSceneAnimateBegin, caustica::system_label::BeforeAnimate>(
         AppSchedule::preUpdate,
         [this](SystemContext& ctx) {
             if (!ctx.windowFocused)
@@ -155,12 +148,15 @@ void EditorPlugin::configureLateSchedules(App& app)
 
     app.addSystemAfter<system_label::EditorUIAnimate, system_label::EditorSceneAnimateEnd>(
         AppSchedule::update,
-        [](SystemContext& ctx) {
+        [this](SystemContext& ctx) {
             auto* uiSubsystem = ctx.tryRes<EditorUISubsystem>();
             if (!uiSubsystem)
                 return;
 
             uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
+            // Hierarchy queues Delete while building. Apply it after all panels
+            // finish, but before Extract publishes the frame snapshot.
+            m_sceneEditor.processPendingSceneDeletes();
         });
 
     // Undo/Redo must run after gizmo/inspector commit so same-frame Ctrl+Z undoes

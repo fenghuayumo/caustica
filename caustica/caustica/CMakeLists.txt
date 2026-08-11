@@ -432,6 +432,15 @@ endif()
 # Render passes, world renderer, GPU utilities, path tracer, post-processing,
 # denoising (denoisers/nrd + OIDN), RTXDI, Gaussian splatting, GPU sort, debugging.
 
+if (BUILD_TESTING)
+    add_executable(causSceneEcsTests tests/SceneEcsTests.cpp)
+    target_link_libraries(causSceneEcsTests PRIVATE causScene causEngine)
+    if (MSVC)
+        target_compile_options(causSceneEcsTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causSceneEcsTests COMMAND causSceneEcsTests)
+endif()
+
 file(GLOB_RECURSE caus_render_headers include/render/*.h)
 file(GLOB_RECURSE caus_render_sources src/render/*.cpp src/render/*.c src/render/graph/*.cpp)
 

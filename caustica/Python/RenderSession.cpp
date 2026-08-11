@@ -194,8 +194,8 @@ namespace
         root["graph"].append(cameras);
 
         Json::Value settings(Json::objectValue);
-        settings["name"] = "SampleSettings";
-        settings["type"] = "SampleSettings";
+        settings["name"] = "SceneSettings";
+        settings["type"] = "SceneSettings";
         settings["realtimeMode"] = true;
         settings["startingCamera"] = -1;
         root["graph"].append(settings);

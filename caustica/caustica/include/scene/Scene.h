@@ -100,7 +100,7 @@ namespace caustica
         
         virtual bool loadCustomData(Json::Value& rootNode, bool asyncTextures);
 
-        std::optional<SampleSettings> m_loadedSettings;
+        std::optional<SceneSettings> m_loadedSettings;
         std::optional<GameSettings>   m_loadedGameSettings;
 
         void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
@@ -175,6 +175,7 @@ namespace caustica
         }
 
         [[nodiscard]] bool hasSceneTransformsChanged(uint32_t frameIndex) const;
+        [[nodiscard]] bool hasSceneLightsChanged(uint32_t frameIndex) const;
         [[nodiscard]] bool hasSceneStructureChanged(uint32_t frameIndex) const;
 
         // Model import is always serial. asyncTextures selects Async vs Deferred texture loads
@@ -217,7 +218,7 @@ namespace caustica
         void attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
         void processNodesRecursive();
 
-        [[nodiscard]] const SampleSettings* getSampleSettings() const
+        [[nodiscard]] const SceneSettings* getSceneSettings() const
         {
             return m_loadedSettings ? &*m_loadedSettings : nullptr;
         }

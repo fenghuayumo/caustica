@@ -368,7 +368,7 @@ void animate(App& app, float fElapsedTimeSeconds)
                     });
 
                 // Imported/skeletal playback and editor keyframes have independent
-                // clocks. SampleSettings.enableAnimations must never move Timeline.
+                // clocks. SceneSettings.enableAnimations must never move Timeline.
                 const bool advanceImportedClock =
                     enableSkeletal && (hasImportedAnim || hasGeometrySequence);
                 const bool advanceKeyframeClock = enableKeyframes && hasEditorKeyframes;

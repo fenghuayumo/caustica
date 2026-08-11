@@ -12,7 +12,6 @@ struct EditorUIShutdown { static constexpr const char* name = "EditorUI.shutdown
 
 struct EditorSceneBeginFrame { static constexpr const char* name = "EditorScene.beginFrame"; };
 struct EditorSceneRequestUnfocusedRender { static constexpr const char* name = "EditorScene.RequestUnfocusedRender"; };
-struct EditorSceneProcessPendingMutations { static constexpr const char* name = "EditorScene.ProcessPendingMutations"; };
 struct EditorSceneAnimateBegin { static constexpr const char* name = "EditorScene.AnimateBegin"; };
 struct EditorSceneSyncLoadedScene { static constexpr const char* name = "EditorScene.SyncLoadedScene"; };
 struct EditorSceneAnimateEnd { static constexpr const char* name = "EditorScene.AnimateEnd"; };

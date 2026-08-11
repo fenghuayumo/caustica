@@ -19,12 +19,14 @@ namespace caustica::scene
 
     // What changed since the last extract into the logic-side cache.
     // Structure → rebuild proxy lists + mesh/material snapshots;
-    // transforms → Changed<> patch of mesh/light proxies;
+    // transforms → Changed<> patch of mesh proxies;
+    // lights → refresh light values/transforms without rewriting mesh instances;
     // neither → skinned / camera / splat refresh only.
     struct SceneRenderExtractFlags
     {
         bool structureChanged = true;
         bool transformsChanged = true;
+        bool lightsChanged = true;
     };
 
     // Logic-thread only. Updates `inout` in place (UE SceneProxy sync / Bevy Extract).

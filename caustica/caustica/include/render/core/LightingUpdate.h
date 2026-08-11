@@ -80,7 +80,8 @@ struct UpdateLightingEndParams
 void syncEnvMapSceneParams(
     const PathTracerSettings& settings,
     EnvMapSceneParams& params,
-    float envMapRadianceScale);
+    float envMapRadianceScale,
+    bool environmentLightPresent = true);
 
 void preUpdateLighting(PreUpdateLightingParams& params);
 

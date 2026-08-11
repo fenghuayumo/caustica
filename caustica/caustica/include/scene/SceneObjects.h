@@ -23,7 +23,7 @@ namespace caustica
     };
 
     // =========================================================================
-    // GaussianSplat / SampleSettings / GameSettings — value payloads on ECS
+    // GaussianSplat / SceneSettings / GameSettings — value payloads on ECS
     // =========================================================================
 
     struct GaussianSplat
@@ -39,7 +39,7 @@ namespace caustica
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
     };
 
-    struct SampleSettings
+    struct SceneSettings
     {
         std::string name;
         std::optional<bool>  realtimeMode;

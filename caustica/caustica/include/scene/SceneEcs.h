@@ -22,7 +22,7 @@
 namespace caustica
 {
 struct GaussianSplat;
-struct SampleSettings;
+struct SceneSettings;
 struct GameSettings;
 class SceneTypeFactory;
 struct SkinnedMeshJoint;
@@ -177,6 +177,7 @@ using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightDa
 // UE-style typed light components (mutually exclusive on an entity).
 struct DirectionalLightComponent
 {
+    bool enabled = true;
     dm::float3 color = dm::colors::white;
     float irradiance = 1.f;
     float angularSize = 0.f;
@@ -184,6 +185,7 @@ struct DirectionalLightComponent
 
 struct SpotLightComponent
 {
+    bool enabled = true;
     dm::float3 color = dm::colors::white;
     std::vector<std::string> proxies;
     float intensity = 1.f;
@@ -195,6 +197,7 @@ struct SpotLightComponent
 
 struct PointLightComponent
 {
+    bool enabled = true;
     dm::float3 color = dm::colors::white;
     std::vector<std::string> proxies;
     float intensity = 1.f;
@@ -204,6 +207,7 @@ struct PointLightComponent
 
 struct EnvironmentLightComponent
 {
+    bool enabled = true;
     dm::float3 color = dm::colors::white;
     dm::float3 radianceScale = dm::float3(1.f);
     int textureIndex = -1;
@@ -283,9 +287,9 @@ struct GaussianSplatComponent
     GaussianSplat splat;
 };
 
-struct SampleSettingsComponent
+struct SceneSettingsComponent
 {
-    SampleSettings settings;
+    SceneSettings settings;
 };
 
 struct GameSettingsComponent
@@ -364,7 +368,7 @@ public:
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
     void setGaussianSplat(ecs::Entity entity, const GaussianSplat& splat);
-    void setSampleSettings(ecs::Entity entity, const SampleSettings& settings);
+    void setSceneSettings(ecs::Entity entity, const SceneSettings& settings);
     void setGameSettings(ecs::Entity entity, const GameSettings& settings);
 
     // Deep-copies a subtree from another world into this one under `parent`.
@@ -402,6 +406,7 @@ public:
 
     [[nodiscard]] bool hasPendingStructureChanges();
     [[nodiscard]] bool hasPendingTransformChanges();
+    [[nodiscard]] bool hasPendingLightChanges();
 
     // Reconcile ResourceTracker / camera list / leaf bounds from Added<>/Changed<>.
     // Called from beginRefreshFrame; also via ensureSceneResourcesSynced() before mesh reads.
@@ -454,6 +459,7 @@ private:
     ecs::World m_world;
     bool m_frameStructureDirty = false;   // per-frame snapshot of m_structureDirty for systems
     bool m_frameTransformDirty = false;   // per-frame snapshot of m_transformDirty for systems
+    bool m_frameLightDirty = false;       // survives refresh until Extract publishes the light list
     ecs::Entity m_root = ecs::NullEntity;
     std::vector<ecs::Entity> m_CameraEntities;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
@@ -461,6 +467,7 @@ private:
     std::unordered_map<ecs::Entity, std::shared_ptr<MeshInfo>> m_registeredMeshByEntity;
     bool m_structureDirty = true;         // refresh/Extract cache (from ChangeDetection)
     bool m_transformDirty = true;         // refresh/Extract cache (from ChangeDetection)
+    bool m_lightDirty = true;             // refresh only analytic/environment light proxies
     bool m_previousTransformDirty = false;
     static inline const std::vector<ecs::Entity> s_emptyChildren{};
 };

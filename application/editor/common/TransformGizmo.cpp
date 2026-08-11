@@ -14,6 +14,7 @@
 #include <math/affine.h>
 #include <math/quat.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/View.h>
 
 #include <algorithm>
@@ -484,6 +485,8 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         // PT must drop history while the pose changes. CaptureCurrent keeps motion
         // vectors on the per-frame delta so temporal denoise does not thrash.
         ctx.settings.ResetAccumulation = true;
+        if (caustica::scene::hasAnyLightComponent(entityWorld->world(), entity))
+            ctx.settings.ResetRealtimeCaches = true;
     }
 
     if (!usingGizmo && wasTracking && !g_drag.suppressUntilRelease)

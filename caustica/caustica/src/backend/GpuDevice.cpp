@@ -217,6 +217,23 @@ void GpuDevice::waitForRenderThreadIdle()
 
 void GpuDevice::backBufferResized()
 {
+    const uint32_t backBufferCount = getBackBufferCount();
+    std::vector<caustica::rhi::Texture*> backBuffers;
+    backBuffers.reserve(backBufferCount);
+    for (uint32_t index = 0; index < backBufferCount; ++index)
+    {
+        caustica::rhi::Texture* backBuffer = getBackBuffer(index);
+        if (backBuffer == nullptr)
+        {
+            caustica::error("Back buffer resize produced a null buffer at index %u", index);
+            m_CanPresentSwapChain = false;
+            m_SwapChain.framebuffers.clear();
+            m_SwapChain.framebuffersWithDepth.clear();
+            return;
+        }
+        backBuffers.push_back(backBuffer);
+    }
+
     createDepthBuffer();
 
     if (m_frameDriver)
@@ -225,13 +242,12 @@ void GpuDevice::backBufferResized()
             m_DeviceParams.backBufferHeight,
             m_DeviceParams.swapChainSampleCount);
 
-    uint32_t backBufferCount = getBackBufferCount();
     m_SwapChain.framebuffers.resize(backBufferCount);
     m_SwapChain.framebuffersWithDepth.resize(backBufferCount);
     for (uint32_t index = 0; index < backBufferCount; index++)
     {
         caustica::rhi::FramebufferDesc framebufferDesc = caustica::rhi::FramebufferDesc()
-            .addColorAttachment(getBackBuffer(index));
+            .addColorAttachment(backBuffers[index]);
         
         m_SwapChain.framebuffers[index] = getDevice()->createFramebuffer(framebufferDesc);
 

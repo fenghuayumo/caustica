@@ -42,6 +42,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <shaders/FrameConstantBuffer.h>
 #include <shaders/view_cb.h>
 
+#include <algorithm>
 #include <cstring>
 #include <functional>
 #include <utility>
@@ -450,7 +451,17 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         return;
     }
 
-    caustica::syncEnvMapSceneParams(m_context->activeSettings(), m_context->scenePasses.lighting.envMapSceneParams(), c_envMapRadianceScale);
+    const bool environmentLightPresent = std::any_of(
+        m_context->frameLights().begin(),
+        m_context->frameLights().end(),
+        [](const scene::LightRenderProxy& light) {
+            return scene::tryGetEnvironmentLightData(light.data) != nullptr;
+        });
+    caustica::syncEnvMapSceneParams(
+        m_context->activeSettings(),
+        m_context->scenePasses.lighting.envMapSceneParams(),
+        c_envMapRadianceScale,
+        environmentLightPresent);
 
     if (m_context->scenePasses.rayTracing.consumeShaderReloadRequest())
     {
@@ -711,7 +722,8 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
         buildGaussianSplatEmissionProxies();
 
-        const bool envMapPresent = m_context->activeSettings().EnvironmentMapParams.enabled;
+        const bool envMapPresent =
+            m_context->scenePasses.lighting.envMapSceneParams().Enabled != 0.f;
         RtxdiPass::SetupParams rtxdiParams{};
         rtxdiParams.commandList = m_frameCommands->primaryHandle();
         rtxdiParams.renderTargets = m_renderTargets.get();

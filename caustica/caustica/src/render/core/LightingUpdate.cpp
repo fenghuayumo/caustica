@@ -173,9 +173,10 @@ void updateLightSamplingBegin(
 void syncEnvMapSceneParams(
     const PathTracerSettings& settings,
     EnvMapSceneParams& params,
-    float envMapRadianceScale)
+    float envMapRadianceScale,
+    bool environmentLightPresent)
 {
-    if (settings.EnvironmentMapParams.enabled)
+    if (settings.EnvironmentMapParams.enabled && environmentLightPresent)
     {
         const float intensity = settings.EnvironmentMapParams.Intensity / envMapRadianceScale;
         params.ColorMultiplier = settings.EnvironmentMapParams.TintColor * intensity;
