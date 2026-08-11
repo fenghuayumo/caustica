@@ -18,6 +18,5 @@ option(OMM_BUILD_VIEWER "" OFF)
 set(OMM_STATIC_LIBRARY ON CACHE BOOL "" FORCE)
 set(OMM_LIB_INSTALL OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(external)
 add_subdirectory(libraries/omm-lib)
 # GPU bake: caustica::omm::GpuBakeRhi in causRender (not built from this tree).

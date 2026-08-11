@@ -51,6 +51,34 @@ if (NOT TARGET stb)
     target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
 endif()
 
+# Shared dependencies used by the OMM runtime. Keep these as repository-level
+# submodules so the engine does not carry duplicate vendored copies under OMM.
+if (NOT TARGET glm)
+    add_subdirectory(glm)
+    set_target_properties(glm PROPERTIES FOLDER ${third_party_folder})
+endif()
+
+if (NOT TARGET lz4_static)
+    set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+    set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
+    add_subdirectory(lz4/build/cmake)
+    set_target_properties(lz4_static PROPERTIES FOLDER ${third_party_folder})
+endif()
+
+if (TARGET lz4_static AND NOT TARGET lz4)
+    add_library(lz4 ALIAS lz4_static)
+endif()
+
+if (NOT TARGET xxhash)
+    set(XXHASH_BUILD_XXHSUM OFF CACHE BOOL "" FORCE)
+    add_subdirectory(xxHash/build/cmake)
+    set_target_properties(xxhash PROPERTIES FOLDER ${third_party_folder})
+endif()
+
+if (TARGET stb AND NOT TARGET stb_lib)
+    add_library(stb_lib ALIAS stb)
+endif()
+
 if (NOT TARGET cgltf)
     add_library(cgltf INTERFACE)
     target_include_directories(cgltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cgltf)
