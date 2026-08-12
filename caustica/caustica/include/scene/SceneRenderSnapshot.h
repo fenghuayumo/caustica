@@ -65,7 +65,15 @@ namespace caustica::scene
 
         [[nodiscard]] const SceneRenderPublishState& publishedStateForFrame(uint32_t frameIndex) const
         {
-            return m_publishedStates[slotForFrame(frameIndex)];
+            const uint32_t slot = slotForFrame(frameIndex);
+            if (m_extractedFrameIndex[slot].load(std::memory_order_acquire) != frameIndex)
+            {
+                // A skipped Extract must not inherit change flags from the older
+                // frame that happens to share this ring-buffer slot.
+                static const SceneRenderPublishState emptyState{};
+                return emptyState;
+            }
+            return m_publishedStates[slot];
         }
 
         void publish(uint32_t frameIndex)

@@ -321,7 +321,8 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 
     const auto& registry = m_world.registry();
 
-    if (changeDetection->worldStructureChanged()
+    const bool worldStructureChanged = changeDetection->worldStructureChanged();
+    const bool renderStructureChanged = worldStructureChanged
         || changeDetection->anyOfChangedThisFrame<
             MeshInstanceComponent,
             SkinnedMeshComponent,
@@ -333,26 +334,30 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
         || changeDetection->anyOfAddedThisFrame<
             MeshInstanceComponent,
             SkinnedMeshComponent,
-            DirectionalLightComponent,
-            SpotLightComponent,
-            PointLightComponent,
-            EnvironmentLightComponent,
             CameraComponent,
             AnimationComponent,
             GaussianSplatComponent,
             ParentComponent,
-            ChildrenComponent>(registry))
+            ChildrenComponent>(registry);
+
+    if (renderStructureChanged)
     {
         m_structureDirty = true;
         m_transformDirty = true;
-        m_lightDirty = true;
     }
 
-    if (changeDetection->anyOfChangedThisFrame<
+    const bool lightComponentsChanged =
+        changeDetection->anyOfChangedThisFrame<
             DirectionalLightComponent,
             SpotLightComponent,
             PointLightComponent,
-            EnvironmentLightComponent>(registry))
+            EnvironmentLightComponent>(registry)
+        || changeDetection->anyOfAddedThisFrame<
+            DirectionalLightComponent,
+            SpotLightComponent,
+            PointLightComponent,
+            EnvironmentLightComponent>(registry);
+    if (worldStructureChanged || lightComponentsChanged)
     {
         m_lightDirty = true;
     }
