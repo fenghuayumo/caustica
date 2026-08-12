@@ -98,11 +98,11 @@ namespace
     std::filesystem::path ResolveRuntimeDirectory()
     {
         std::filesystem::path moduleDirectory = GetCurrentModuleDirectory();
-        if (std::filesystem::exists(moduleDirectory / "ShaderPrecompiled"))
+        if (std::filesystem::exists(moduleDirectory / "ShaderBin"))
             return moduleDirectory;
 
         std::filesystem::path executableDirectory = caustica::getDirectoryWithExecutable();
-        if (std::filesystem::exists(executableDirectory / "ShaderPrecompiled"))
+        if (std::filesystem::exists(executableDirectory / "ShaderBin"))
             return executableDirectory;
 
         return moduleDirectory;

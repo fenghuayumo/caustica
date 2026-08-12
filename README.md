@@ -294,7 +294,7 @@ python -m pip install dist/caustica-*.whl
 
 UE-style two-layer model:
 
-1. **Offline cook (shader libraries)** — closed feature-preset matrix (`coverage`: single-axis + curated combos like `ReSTIR_DI_OMM`). DXC writes `ShaderDynamic/Bin/{dxil|spirv}/` and optionally `caustica.shaders.<api>.pack`. Runtime must **not DXC** on UI toggles.
+1. **Offline cook (shader libraries)** — closed feature-preset matrix (`coverage`: single-axis + curated combos like `ReSTIR_DI_OMM`). DXC writes hash-addressed objects to `ShaderBin/{dxil|spirv}/` and optionally `caustica.shaders.<api>.pack`. Runtime must **not DXC** on UI toggles.
 2. **Runtime RT PSOs** — `CreateStateObject` is device-local and hit-group dependent; it is **not** a `.bin` cook artifact. The app CreateStateObjects only the **active** preset on first use / switch, then binds. Interactive frames never background-warm the other ~25 presets.
 
 ```

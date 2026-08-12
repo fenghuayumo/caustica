@@ -25,13 +25,13 @@ public:
     struct Config
     {
         std::shared_ptr<IFileSystem> fileSystem;
-        std::filesystem::path precompiledBasePath = "/ShaderPrecompiled";
+        std::filesystem::path shaderBinBasePath = "/ShaderBin";
     };
 
     explicit ShaderCompilerService(Config config);
 
     [[nodiscard]] std::shared_ptr<IBlob> loadPrecompiledBytecode(const char* fileName, const char* entryName);
-    [[nodiscard]] std::shared_ptr<IBlob> loadBytecodeForKey(const ShaderKey& key, std::string_view dynamicPackRoot = "/ShaderDynamic/Bin");
+    [[nodiscard]] std::shared_ptr<IBlob> loadBytecodeForKey(const ShaderKey& key, std::string_view shaderBinRoot = "/ShaderBin");
 
     void clearBytecodeCache();
 
@@ -40,10 +40,13 @@ public:
     [[nodiscard]] const Config& config() const { return m_config; }
 
 private:
-    [[nodiscard]] std::filesystem::path resolvePrecompiledPath(const char* fileName, const char* entryName) const;
+    [[nodiscard]] std::string resolveLogicalShaderId(const char* fileName, const char* entryName) const;
+    bool ensureManifestLoaded();
 
     Config m_config;
     std::unordered_map<std::string, std::shared_ptr<IBlob>> m_bytecodeCache;
+    std::unordered_map<std::string, std::string> m_manifest;
+    bool m_manifestLoaded = false;
 };
 
 } // namespace caustica::shader

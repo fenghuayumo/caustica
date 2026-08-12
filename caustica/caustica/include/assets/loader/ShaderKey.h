@@ -37,7 +37,7 @@ struct ShaderKey
     [[nodiscard]] static std::string        formatCacheFileNameNoExt(std::string_view hashHex);
     [[nodiscard]] std::string               cacheFileNameNoExt() const;
     [[nodiscard]] std::filesystem::path       cacheFilePath(const std::filesystem::path& binariesRoot) const;
-    [[nodiscard]] std::string               packVfsPath(std::string_view packRoot = "/ShaderDynamic/Bin") const;
+    [[nodiscard]] std::string               packVfsPath(std::string_view packRoot = "/ShaderBin") const;
 
     [[nodiscard]] bool operator==(const ShaderKey& other) const;
 };

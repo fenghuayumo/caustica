@@ -168,14 +168,14 @@ actual DXR 1.2 and Shader Model 6.9 support still depends on the GPU and driver.
 `EngineApp` discovers runtime data in this order:
 
 1. A supplied `EngineAppDesc::runtimeDirectory`, otherwise the module or
-   executable directory containing `ShaderPrecompiled`.
+   executable directory containing `ShaderBin`.
 2. A supplied `EngineAppDesc::resourceRoot`, otherwise the runtime directory
    containing `Assets`, then its parent.
 
 For a copied binary distribution, keep the generated shader directories and
 runtime libraries with the executable, and put `Assets/` either beside the
 executable or one directory above it. A distribution build may use
-`caustica.shaders.<api>.pack` beside the executable instead of loose dynamic
+`caustica.shaders.<api>.pack` beside the executable instead of loose
 shader bins.
 
 ## Command line

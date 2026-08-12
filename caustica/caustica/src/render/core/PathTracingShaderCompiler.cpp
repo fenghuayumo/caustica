@@ -43,7 +43,7 @@ using namespace caustica;
 using namespace caustica::math;
 using namespace caustica;
 
-static const std::string c_PTShaderBinariesRoot = "ShaderDynamic/Bin";
+static const std::string c_PTShaderBinariesRoot = "ShaderBin";
 static const std::string c_PTShaderPackMount = "/" + c_PTShaderBinariesRoot;
 
 #if PIPELINE_BAKER_USE_OPTIMIZATIONS
@@ -531,11 +531,11 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::Device* devi
     const char* shaderTypeName = caustica::getShaderTypeName(device->getGraphicsAPI());
     const std::filesystem::path shaderPackPath = getRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
-    const bool shaderPackHasDynamicBins = shaderPackFS->hasDynamicBinLayout(m_compilerConfig.ShaderBinariesPath);
+    const bool shaderPackHasDynamicBins = shaderPackFS->hasShaderBinLayout();
     if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
     {
         caustica::warning(
-            "Shader pack '%s' does not include ShaderDynamic bins; falling back to '%s'.",
+            "Shader pack '%s' does not include ShaderBin; falling back to '%s'.",
             shaderPackPath.string().c_str(),
             m_compilerConfig.ShaderBinariesPath.string().c_str());
     }

@@ -338,7 +338,7 @@ def cache_paths(compile_api: str, digest: str) -> tuple[Path, str]:
     folder = runtime_bin_folder(compile_api)
     file_stem = digest[2:] if len(digest) >= 2 else digest
     rel = f"{digest[:2]}/{file_stem}.bin"
-    out_dir = BIN_DIR / "ShaderDynamic" / "Bin" / folder / digest[:2]
+    out_dir = BIN_DIR / "ShaderBin" / folder / digest[:2]
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir / f"{file_stem}.bin", rel
 
@@ -346,12 +346,12 @@ def cache_paths(compile_api: str, digest: str) -> tuple[Path, str]:
 def find_dxc(api: str) -> Path:
     if api == "d3d12":
         candidates = [
-            BIN_DIR / "ShaderDynamic" / "Tools" / "d3d12" / "x64" / "dxc.exe",
+            BIN_DIR / "ShaderDev" / "Tools" / "d3d12" / "x64" / "dxc.exe",
             os.environ.get("SHADERMAKE_DXC_PATH", ""),
         ]
     else:
         candidates = [
-            BIN_DIR / "ShaderDynamic" / "Tools" / "vk" / "x64" / "dxc.exe",
+            BIN_DIR / "ShaderDev" / "Tools" / "vk" / "x64" / "dxc.exe",
             os.environ.get("SHADERMAKE_DXC_VK_PATH", ""),
             os.environ.get("DXC_SPIRV_PATH", ""),
         ]
@@ -513,7 +513,7 @@ def run_pt_shader_precompile(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Precompile path-tracing shader libraries to ShaderDynamic/Bin using DXC (hash-compatible with runtime)."
+        description="Precompile path-tracing shader libraries to ShaderBin using DXC (hash-compatible with runtime)."
     )
     parser.add_argument(
         "--shader-api",

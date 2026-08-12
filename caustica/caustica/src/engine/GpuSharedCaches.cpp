@@ -30,37 +30,29 @@ std::shared_ptr<ShaderFactory> CreateShaderFactory(GpuDevice& gpuDevice)
 {
     const char* shaderTypeName = getShaderTypeName(gpuDevice.getGraphicsAPI());
     const std::filesystem::path appDirectory = getRuntimeDirectory();
-    const std::filesystem::path engineShaderPath = appDirectory / "ShaderPrecompiled/engine" / shaderTypeName;
-    const std::filesystem::path appShaderPath = appDirectory / "ShaderPrecompiled/caustica" / shaderTypeName;
-    const std::filesystem::path nrdShaderPath = appDirectory / "ShaderPrecompiled/nrd" / shaderTypeName;
-    const std::filesystem::path ommShaderPath = appDirectory / "ShaderPrecompiled/omm" / shaderTypeName;
+    const std::filesystem::path shaderBinPath = appDirectory / "ShaderBin" / shaderTypeName;
 
     std::shared_ptr<RootFileSystem> rootFS = std::make_shared<RootFileSystem>();
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
-    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderPrecompiled");
-    const bool shaderPackHasCurrentLayout = shaderPackFS->isOpen()
-        && shaderPackFS->fileExists("caustica/caustica/shaders/render/misc/DebugLines_main_vs.bin")
-        && shaderPackFS->fileExists("engine/fullscreen_vs.bin");
+    auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderBin");
+    const bool shaderPackHasCurrentLayout = shaderPackFS->hasShaderBinLayout();
 
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
-        warning("Shader pack '%s' does not match the current shader layout; falling back to ShaderPrecompiled directories",
+        warning("Shader pack '%s' does not match the current ShaderBin layout; falling back to loose binaries",
             shaderPackPath.string().c_str());
     }
 
     if (shaderPackHasCurrentLayout)
     {
-        rootFS->mount("/ShaderPrecompiled", shaderPackFS);
+        rootFS->mount("/ShaderBin", shaderPackFS);
     }
     else
     {
-        rootFS->mount("/ShaderPrecompiled/engine", engineShaderPath);
-        rootFS->mount("/ShaderPrecompiled/caustica", appShaderPath);
-        rootFS->mount("/ShaderPrecompiled/nrd", nrdShaderPath);
-        rootFS->mount("/ShaderPrecompiled/omm", ommShaderPath);
+        rootFS->mount("/ShaderBin", shaderBinPath);
     }
 
-    return std::make_shared<ShaderFactory>(gpuDevice.getDevice(), rootFS, "/ShaderPrecompiled");
+    return std::make_shared<ShaderFactory>(gpuDevice.getDevice(), rootFS, "/ShaderBin");
 }
 
 } // namespace

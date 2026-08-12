@@ -166,26 +166,12 @@ def add_shader_pack_tree(
 
 def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[str, Path]:
     entries: dict[str, Path] = {}
-    static_roots = {
-        "engine": "ShaderPrecompiled/engine",
-        "caustica": "ShaderPrecompiled/caustica",
-        "nrd": "ShaderPrecompiled/nrd",
-        "omm": "ShaderPrecompiled/omm",
-    }
-    for source_name, logical_root in static_roots.items():
-        add_shader_pack_tree(
-            entries,
-            BIN_DIR / "ShaderPrecompiled" / source_name / shader_type,
-            logical_root,
-        )
-
-    if dynamic_shaders in {"bin", "full"}:
-        add_shader_pack_tree(
-            entries,
-            BIN_DIR / "ShaderDynamic" / "Bin" / shader_type,
-            "ShaderDynamic/Bin",
-            normalize_dynamic_names=True,
-        )
+    shader_bin_root = BIN_DIR / "ShaderBin" / shader_type
+    if shader_bin_root.exists():
+        for item in shader_bin_root.rglob("*.bin"):
+            if item.is_file():
+                logical_path = f"ShaderBin/{item.relative_to(shader_bin_root).as_posix()}"
+                entries.setdefault(logical_path, item)
 
     return entries
 
@@ -277,29 +263,22 @@ def copy_runtime_files(
             write_shader_pack(shader_type, dynamic_shaders, package_dir)
     else:
         copy_tree(
-            BIN_DIR / "ShaderPrecompiled",
-            package_dir / "ShaderPrecompiled",
-            path_filter=shader_filter,
-        )
-
-    if not shader_pack and dynamic_shaders in {"bin", "full"} and (BIN_DIR / "ShaderDynamic" / "Bin").exists():
-        copy_tree(
-            BIN_DIR / "ShaderDynamic" / "Bin",
-            package_dir / "ShaderDynamic" / "Bin",
+            BIN_DIR / "ShaderBin",
+            package_dir / "ShaderBin",
             suffixes={".bin"},
             path_filter=shader_filter,
         )
 
     if dynamic_shaders == "full":
-        if (BIN_DIR / "ShaderDynamic" / "Source").exists():
+        if (BIN_DIR / "ShaderDev" / "Source").exists():
             copy_tree(
-                BIN_DIR / "ShaderDynamic" / "Source",
-                package_dir / "ShaderDynamic" / "Source",
+                BIN_DIR / "ShaderDev" / "Source",
+                package_dir / "ShaderDev" / "Source",
             )
-        if (BIN_DIR / "ShaderDynamic" / "Tools").exists():
+        if (BIN_DIR / "ShaderDev" / "Tools").exists():
             copy_tree(
-                BIN_DIR / "ShaderDynamic" / "Tools",
-                package_dir / "ShaderDynamic" / "Tools",
+                BIN_DIR / "ShaderDev" / "Tools",
+                package_dir / "ShaderDev" / "Tools",
                 suffixes={"", ".exe", ".json", ".marker", ".dll", ".so"},
                 path_filter=tool_filter,
             )
@@ -436,9 +415,9 @@ def parse_args() -> argparse.Namespace:
         choices=["full", "bin", "none"],
         default="bin",
         help=(
-            "ShaderDynamic payload. 'bin' includes compiled runtime variants only; "
+            "Shader development payload. 'bin' includes ShaderBin only; "
             "'full' also includes Source and Tools for runtime compilation; "
-            "'none' omits ShaderDynamic."
+            "'none' omits optional shader development assets."
         ),
     )
     parser.add_argument(
@@ -470,7 +449,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Before staging the wheel, launch the local caustica extension headlessly to "
-            "generate ShaderDynamic/Bin entries for selected scenes."
+            "generate ShaderBin entries for selected scenes."
         ),
     )
     parser.add_argument(
@@ -514,7 +493,7 @@ def parse_args() -> argparse.Namespace:
         dest="precompile_pt_shaders",
         action="store_true",
         default=True,
-        help="Precompile path-tracing shader libraries into ShaderDynamic/Bin before staging.",
+        help="Precompile path-tracing shader libraries into ShaderBin before staging.",
     )
     parser.add_argument(
         "--no-precompile-pt-shaders",
@@ -549,6 +528,13 @@ def main() -> int:
         raise FileNotFoundError(f"{BIN_DIR} does not exist. Build caustica first.")
     if not PYTHON_PACKAGE_DIR.exists():
         raise FileNotFoundError(f"{PYTHON_PACKAGE_DIR} does not exist.")
+    shader_types = ["dxil"] if args.shader_api == "d3d12" else ["spirv"] if args.shader_api == "vulkan" else ["dxil", "spirv"]
+    for shader_type in shader_types:
+        manifest = BIN_DIR / "ShaderBin" / shader_type / "manifest.bin"
+        if not manifest.exists():
+            raise FileNotFoundError(
+                f"{manifest} does not exist. Build target ShaderBinManifest before packaging."
+            )
 
     if STAGING_DIR.exists():
         shutil.rmtree(STAGING_DIR)

@@ -49,11 +49,11 @@ std::filesystem::path GetCurrentModuleDirectory()
 std::filesystem::path ResolveDefaultRuntimeDirectory()
 {
     const std::filesystem::path moduleDirectory = GetCurrentModuleDirectory();
-    if (std::filesystem::exists(moduleDirectory / "ShaderPrecompiled"))
+    if (std::filesystem::exists(moduleDirectory / "ShaderBin"))
         return moduleDirectory;
 
     const std::filesystem::path executableDirectory = getDirectoryWithExecutable();
-    if (std::filesystem::exists(executableDirectory / "ShaderPrecompiled"))
+    if (std::filesystem::exists(executableDirectory / "ShaderBin"))
         return executableDirectory;
 
     return moduleDirectory;

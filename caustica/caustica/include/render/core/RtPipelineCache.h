@@ -35,7 +35,7 @@ struct RtPipelineCacheStats
 // UE-style RT pipeline cache (two layers):
 //
 //  1) Offline cook (cook_shaders.py): DXC shader *libraries* for the closed
-//     feature-preset matrix → ShaderDynamic/Bin (+ optional .pack).
+//     feature-preset matrix -> ShaderBin (+ optional .pack).
 //  2) Runtime: CreateStateObject is owned *only* by this cache, and only when a
 //     preset is actually needed (active bind) or explicitly precached at
 //     load/cook time. Interactive frames never background-warm other presets.

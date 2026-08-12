@@ -44,7 +44,7 @@ struct EngineAppDesc
     std::string scene = "default.json";
     std::string windowTitle = "caustica";
 
-    // Empty = auto-discover next to the executable / module (ShaderPrecompiled, Assets).
+    // Empty = auto-discover next to the executable / module (ShaderBin, Assets).
     std::filesystem::path runtimeDirectory;
     std::filesystem::path resourceRoot;
 

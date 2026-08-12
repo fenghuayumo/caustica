@@ -18,7 +18,7 @@ ShaderFactory::ShaderFactory(caustica::rhi::DeviceHandle rendererInterface,
 	: m_Device(rendererInterface)
 	, m_compilerService(std::make_shared<shader::ShaderCompilerService>(shader::ShaderCompilerService::Config{
 		.fileSystem = fs,
-		.precompiledBasePath = basePath,
+		.shaderBinBasePath = basePath,
 	}))
 	, m_fs(fs)
 	, m_basePath(basePath)

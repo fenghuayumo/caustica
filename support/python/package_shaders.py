@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
         "--dynamic-shaders",
         choices=["bin", "none"],
         default="bin",
-        help="Include ShaderDynamic/Bin entries in the pack when available.",
+        help="Compatibility option; ShaderBin always contains all runtime shaders.",
     )
     parser.add_argument(
         "--output-dir",
@@ -88,6 +88,11 @@ def main() -> int:
         else ["dxil", "spirv"]
     )
     for shader_type in shader_types:
+        manifest = BIN_DIR / "ShaderBin" / shader_type / "manifest.bin"
+        if not manifest.exists():
+            raise FileNotFoundError(
+                f"{manifest} does not exist. Build target ShaderBinManifest before packaging."
+            )
         write_shader_pack(shader_type, args.dynamic_shaders, args.output_dir)
     return 0
 

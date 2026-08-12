@@ -21,10 +21,7 @@ public:
 
     [[nodiscard]] bool isOpen() const { return m_packFile != nullptr; }
 
-    // Returns true when the pack should be mounted for ShaderDynamic/Bin lookups.
-    // If loose bins exist on disk, at least one must also exist in the pack; otherwise
-    // we assume a pack-only distribution layout.
-    [[nodiscard]] bool hasDynamicBinLayout(const std::filesystem::path& diskBinApiRoot);
+    [[nodiscard]] bool hasShaderBinLayout();
 
     bool folderExists(const std::filesystem::path& name) override;
     bool fileExists(const std::filesystem::path& name) override;

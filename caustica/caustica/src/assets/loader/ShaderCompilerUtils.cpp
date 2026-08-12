@@ -59,13 +59,13 @@ namespace ShaderCompilerUtils
         std::filesystem::path shaderSourcePathDevelopment =
             sourceRootDirectory / "caustica/caustica/shaders";
         std::filesystem::path shaderSourcePathRuntime =
-            runtimeDirectory / "ShaderDynamic/Source/caustica/caustica/shaders";
+            runtimeDirectory / "ShaderDev/Source/caustica/caustica/shaders";
 
         ShaderBinariesPath = runtimeDirectory / binarySubfolder / 
             caustica::getShaderTypeName(device->getGraphicsAPI());
 
         ShaderCompilerPath = std::filesystem::absolute(
-            runtimeDirectory / "ShaderDynamic/Tools" / graphicsAPIName / platformName / dxcExecutableName);
+            runtimeDirectory / "ShaderDev/Tools" / graphicsAPIName / platformName / dxcExecutableName);
         
         if (!std::filesystem::exists(shaderSourcePathDevelopment))
         {
@@ -78,14 +78,14 @@ namespace ShaderCompilerUtils
                 caustica::info("Shader source folder '%s' not found; runtime shader compilation is disabled.",
                     shaderSourcePathRuntime.string().c_str());
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/caustica";
-                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDev/Source/caustica/caustica";
+                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDev/Source/External";
             }
             else
             {
                 ShadersPath = shaderSourcePathRuntime;
-                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDynamic/Source/caustica/caustica";
-                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDynamic/Source/External";
+                ShadersPathExternalIncludes1 = runtimeDirectory / "ShaderDev/Source/caustica/caustica";
+                ShadersPathExternalIncludes2 = runtimeDirectory / "ShaderDev/Source/External";
             }
         }
         else

@@ -601,11 +601,11 @@ set(omm_shader_compile_args
     CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/omm.cfg
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/render/omm/internal
     FOLDER "caustica/render"
-    SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/spirv
+    SPIRV_DXC ${CAUSTICA_SHADER_STAGING_DIR}/omm/spirv
 )
 if (WIN32)
     list(APPEND omm_shader_compile_args
-        DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/dxil
+        DXIL ${CAUSTICA_SHADER_STAGING_DIR}/omm/dxil
     )
 endif()
 caustica_compile_shaders(${omm_shader_compile_args})

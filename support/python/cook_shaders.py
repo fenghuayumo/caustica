@@ -6,7 +6,7 @@ Official Caustica PT cook entry point (UE-style offline specialization).
 Two layers (do not confuse them):
 
   A) Shader libraries (this script, required for release):
-     DXC-precompile the closed feature-preset matrix → ShaderDynamic/Bin
+     DXC-precompile the closed feature-preset matrix -> ShaderBin
      → verify → package caustica.shaders.<api>.pack
 
   B) DXR state objects (CreateStateObject):
@@ -159,7 +159,7 @@ def main() -> int:
                 return rc
 
     print("[caustica] Cook complete.")
-    print("  Layer A (libraries): load-only uses ShaderDynamic/Bin or caustica.shaders.<api>.pack")
+    print("  Shader storage: load-only uses ShaderBin or caustica.shaders.<api>.pack")
     print("  Layer B (RT PSOs): runtime CreateStateObject for active preset only;")
     print("                     use Renderer.precache_rt_feature_presets() at load if desired.")
     return 0

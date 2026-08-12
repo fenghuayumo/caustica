@@ -161,6 +161,7 @@ function(caustica_compile_shaders)
             message(FATAL_ERROR "caustica_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_PATH to the full path to the DXC binary")
         endif()
         
+        file(MAKE_DIRECTORY "${params_DXIL}")
         set(compilerCommand ${SHADERMAKE_PATH}
            --config ${params_CONFIG}
            --out ${params_DXIL}
@@ -193,6 +194,7 @@ function(caustica_compile_shaders)
             message(FATAL_ERROR "caustica_compile_shaders: Slang not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
         endif()
         
+        file(MAKE_DIRECTORY "${params_DXIL_SLANG}")
         set(compilerCommand ${SHADERMAKE_PATH}
            --config ${params_CONFIG}
            --out ${params_DXIL_SLANG}
@@ -226,6 +228,7 @@ function(caustica_compile_shaders)
             message(FATAL_ERROR "caustica_compile_shaders: FXC not found -- please set SHADERMAKE_FXC_PATH to the full path to the FXC binary")
         endif()
         
+        file(MAKE_DIRECTORY "${params_DXBC}")
         set(compilerCommand ${SHADERMAKE_PATH}
            --config ${params_CONFIG}
            --out ${params_DXBC}
@@ -257,6 +260,7 @@ function(caustica_compile_shaders)
             message(FATAL_ERROR "caustica_compile_shaders: DXC not found -- please set SHADERMAKE_DXC_VK_PATH to the full path to the DXC binary")
         endif()
         
+        file(MAKE_DIRECTORY "${params_SPIRV_DXC}")
         set(compilerCommand ${SHADERMAKE_PATH}
            --config ${params_CONFIG}
            --out ${params_SPIRV_DXC}
@@ -292,6 +296,7 @@ function(caustica_compile_shaders)
             message(FATAL_ERROR "caustica_compile_shaders: Slang compiler not found --- please set SHADERMAKE_SLANG_PATH to the full path to the Slang executable")
         endif()
         
+        file(MAKE_DIRECTORY "${params_SPIRV_SLANG}")
         set(compilerCommand ${SHADERMAKE_PATH}
            --config ${params_CONFIG}
            --out ${params_SPIRV_SLANG}

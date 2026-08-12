@@ -23,7 +23,7 @@ def verify(compile_api: str, global_preset: str = "coverage") -> tuple[int, list
         out_path, rel = cache_paths(compile_api, digest)
         checked += 1
         if not out_path.exists():
-            missing.append(f"{job['label']}: ShaderDynamic/Bin/{folder}/{rel}")
+            missing.append(f"{job['label']}: ShaderBin/{folder}/{rel}")
     return checked, missing
 
 
@@ -64,7 +64,7 @@ def verify_apis(shader_api: str, global_preset: str = "coverage") -> int:
         return 1
 
     print(
-        f"[caustica] PT shader verify OK ({total_checked} bins under {BIN_DIR / 'ShaderDynamic' / 'Bin'})"
+        f"[caustica] PT shader verify OK ({total_checked} bins under {BIN_DIR / 'ShaderBin'})"
     )
     return 0
 

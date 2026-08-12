@@ -25,9 +25,9 @@ def configure_import_path() -> None:
 
 def shader_bin_dir(shader_api: str) -> Path:
     if shader_api == "d3d12":
-        return BIN_DIR / "ShaderDynamic" / "Bin" / "dxil"
+        return BIN_DIR / "ShaderBin" / "dxil"
     if shader_api == "vulkan":
-        return BIN_DIR / "ShaderDynamic" / "Bin" / "spirv"
+        return BIN_DIR / "ShaderBin" / "spirv"
     raise ValueError(f"Unsupported shader API: {shader_api}")
 
 

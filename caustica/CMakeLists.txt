@@ -74,25 +74,25 @@ set(caustica_shader_compile_common
 if (WIN32)
     caustica_compile_shaders(${caustica_shader_compile_common}
         CONFIG ${caustica_shader_config_dxil}
-        DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/dxil
+        DXIL ${CAUSTICA_SHADER_STAGING_DIR}/${project}/dxil
         SHADERMAKE_OPTIONS_DXIL ${SHADERMAKE_OPTIONS_DXIL}
     )
     caustica_compile_shaders(${caustica_shader_compile_common}
         CONFIG ${caustica_shader_config_vk}
-        SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
+        SPIRV_DXC ${CAUSTICA_SHADER_STAGING_DIR}/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
     )
 else()
     caustica_compile_shaders(${caustica_shader_compile_common}
         CONFIG ${caustica_shader_config_vk}
-        SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/${project}/spirv
+        SPIRV_DXC ${CAUSTICA_SHADER_STAGING_DIR}/${project}/spirv
         SHADERMAKE_OPTIONS_SPIRV ${SHADERMAKE_OPTIONS_SPIRV}
     )
 endif()
 
 
 ##########################################################################
-# Path-tracing libraries (lib_6_6) -> ShaderDynamic/Bin via DXC precompile.
+# Path-tracing libraries (lib_6_6) -> unified ShaderBin via DXC precompile.
 # ShaderMake cannot compile lib_* profiles; Python script matches runtime DXC hash layout.
 # PathTracerShaders.cfg documents tier permutations (not consumed by ShaderMake).
 set(caustica_pt_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/caustica/shaders")
@@ -102,9 +102,9 @@ file(GLOB_RECURSE caustica_pt_shader_sources
 )
 set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
 
-# Formal PT cook: coverage matrix → ShaderDynamic/Bin (required for UE-style runtime PSO switch).
+# Formal PT cook: coverage matrix -> ShaderBin (required for UE-style runtime PSO switch).
 # Official release entry point is also: python support/python/cook_shaders.py
-option(CAUSTICA_PRECOMPILE_PT_SHADERS "Precompile path-tracing DXC shader bins into ShaderDynamic/Bin" ON)
+option(CAUSTICA_PRECOMPILE_PT_SHADERS "Precompile path-tracing DXC shader bins into ShaderBin" ON)
 option(CAUSTICA_VERIFY_PT_SHADERS "Verify cooked PT bins cover the coverage feature-preset matrix" ON)
 option(CAUSTICA_PACKAGE_SHADER_PACK
     "Build caustica.shaders.<api>.pack after PT cook (default ON for distribution builds)"
@@ -128,7 +128,7 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
             list(APPEND caustica_pt_precompile_env "SHADERMAKE_DXC_VK_PATH=${DXC_SPIRV_PATH}")
         endif()
         set(caustica_pt_precompile_cmds
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderBin"
             COMMAND ${caustica_pt_precompile_env}
                 ${Python3_EXECUTABLE}
                 "${CMAKE_SOURCE_DIR}/support/python/precompile_pt_shader_bins.py"
@@ -146,7 +146,7 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
         add_custom_target(causticaPathTracerShaders
             ${caustica_pt_precompile_cmds}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            DEPENDS ShaderDynamicAssets_CopyAlways
+            DEPENDS ShaderRuntimeAssets_CopyAlways
             COMMENT "Cooking path-tracing shaders (coverage preset + verify)"
             SOURCES ${caustica_pt_shader_sources}
         )
@@ -164,7 +164,7 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
         )
     else()
         add_custom_target(causticaPathTracerShaders
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderBin"
             COMMENT "Path-tracing shader precompile skipped (Python3 not found)"
             SOURCES ${caustica_pt_shader_sources}
         )
@@ -174,7 +174,7 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
     endif()
 else()
     add_custom_target(causticaPathTracerShaders
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderBin"
         COMMENT "Path-tracing shader precompile disabled"
         SOURCES ${caustica_pt_shader_sources}
     )
@@ -188,20 +188,19 @@ set_target_properties(causticaShaderPack PROPERTIES FOLDER ${folder})
 
 ##########################################################################
 ################ dynamic shader runtime assets ###########################
-# Default (load-only): ship only ShaderDynamic/Bin precompiled libraries.
+# Default (load-only): ship only the unified ShaderBin object store.
 # Optional dev mode copies DXC + HLSL sources for runtime recompilation.
 if (CAUSTICA_DISTRIBUTION_BUILD OR NOT CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION)
-add_custom_target(ShaderDynamicAssets_CopyAlways
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Bin"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools"
-    COMMENT "Load-only shader layout: keep ShaderDynamic/Bin, prune sources and DXC tools"
+add_custom_target(ShaderRuntimeAssets_CopyAlways
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderBin"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev"
+    COMMENT "Load-only shader layout: keep ShaderBin, prune shader development assets"
 )
-add_custom_target(ShaderDynamicAssets ALL)
+add_custom_target(ShaderRuntimeAssets ALL)
 else()
-set(DYNSH_COPY1_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/copyVK.marker")
-set(DYNSH_COPY2_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/copyDX.marker")
-set(DYNSH_COPY3_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/copy.marker")
+set(DYNSH_COPY1_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Tools/copyVK.marker")
+set(DYNSH_COPY2_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Tools/copyDX.marker")
+set(DYNSH_COPY3_MARKER "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Source/copy.marker")
 
 # vulkan SDK / SPIR-V dxc (optional)
 if (DXC_SPIRV_PATH)
@@ -213,12 +212,12 @@ else()
     get_filename_component(DXC_SPIRV_ROOT_DIR ${DXC_SPIRV_PATH_MINUS_EXE} DIRECTORY)
     file(GLOB FILES_TO_COPY_2_LIB "${DXC_SPIRV_ROOT_DIR}/lib/*.so" "${DXC_SPIRV_ROOT_DIR}/lib/*.so.*")
 endif()
-set(DEST_DIR_2 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/vk/x64")
-set(DEST_LIB_DIR_2 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/vk/lib")
+set(DEST_DIR_2 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Tools/vk/x64")
+set(DEST_LIB_DIR_2 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Tools/vk/lib")
 if (WIN32)
 add_custom_command(
     OUTPUT "${DYNSH_COPY1_MARKER}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_2}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FILES_TO_COPY_2} ${DEST_DIR_2}
     COMMAND ${CMAKE_COMMAND} -E touch "${DYNSH_COPY1_MARKER}"
@@ -227,7 +226,7 @@ add_custom_command(
 else()
 add_custom_command(
     OUTPUT "${DYNSH_COPY1_MARKER}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_2}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_LIB_DIR_2}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FILES_TO_COPY_2} ${DEST_DIR_2}
@@ -241,10 +240,10 @@ endif()
 # d3d12 dxc (Windows only)
 if (WIN32)
 set(SOURCE_DIR_1 "${DXC_CUSTOM_PATH}")
-set(DEST_DIR_1 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Tools/d3d12/x64")
+set(DEST_DIR_1 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Tools/d3d12/x64")
 add_custom_command(
     OUTPUT "${DYNSH_COPY2_MARKER}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_1}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_1} ${DEST_DIR_1}
     COMMAND ${CMAKE_COMMAND} -E touch "${DYNSH_COPY2_MARKER}"
@@ -260,13 +259,13 @@ endif()
 
 # shader files - main caustica and localized framework shader dependencies
 set(SOURCE_DIR_CAUSTICA_SHADERS "${PROJECT_SOURCE_DIR}/caustica/caustica/shaders")
-set(DEST_DIR_CAUSTICA_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/caustica/caustica/shaders")
+set(DEST_DIR_CAUSTICA_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Source/caustica/caustica/shaders")
 # shader files - NVAPI shader dependencies
 set(SOURCE_DIR_NVAPI_SHADERS "${PROJECT_SOURCE_DIR}/External/NVAPI")
-set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic/Source/External/NVAPI")
+set(DEST_DIR_NVAPI_SHADERS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDev/Source/External/NVAPI")
 file(GLOB SOURCE_DIR_NVAPI_SHADERS_FILES "${SOURCE_DIR_NVAPI_SHADERS}/nvHLSL*.h" "${SOURCE_DIR_NVAPI_SHADERS}/nvShader*.h")
 #message("SourceDir=${SOURCE_DIR_CAUSTICA_SHADERS}, DestDir=${DEST_DIR_CAUSTICA_SHADERS}")
-add_custom_target(ShaderDynamicAssets_CopyAlways
+add_custom_target(ShaderRuntimeAssets_CopyAlways
 #    OUTPUT "${DYNSH_COPY3_MARKER}" <- let this run every build; it will only update changed
     COMMAND ${CMAKE_COMMAND} -E make_directory ${DEST_DIR_CAUSTICA_SHADERS}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${SOURCE_DIR_CAUSTICA_SHADERS} ${DEST_DIR_CAUSTICA_SHADERS}
@@ -283,7 +282,7 @@ elseif (DXC_SPIRV_PATH)
 else()
     set(shader_dynamic_copy_deps "")
 endif()
-add_custom_target(ShaderDynamicAssets ALL DEPENDS ${shader_dynamic_copy_deps})
+add_custom_target(ShaderRuntimeAssets ALL DEPENDS ${shader_dynamic_copy_deps})
 endif()
 
 ##########################################################################
@@ -291,7 +290,7 @@ endif()
 # Engine runtime (caustica.lib) + editor application sources
 add_subdirectory(caustica)       # builds engine modules; NRD lives in denoisers/
 
-# Compile engine NRD compute shaders into ShaderPrecompiled/nrd (NrdIntegration).
+# Compile NRD compute shaders into staging; ShaderBinManifest content-addresses them.
 if (DEFINED CAUSTICA_NRD_SHADER_ROOT)
     get_target_property(_caustica_mathlib_dir MathLib SOURCE_DIR)
     set(_nrd_shader_cfg "${CAUSTICA_NRD_SHADER_ROOT}/nrd_shaders.cfg")
@@ -315,17 +314,42 @@ if (DEFINED CAUSTICA_NRD_SHADER_ROOT)
         CONFIG ${_nrd_shader_cfg}
         SOURCES ${CAUSTICA_NRD_SHADER_INCLUDE_DIR} ${CAUSTICA_NRD_SHADER_SOURCE_DIR} ${CAUSTICA_NRD_SHADER_RESOURCE_DIR}
         FOLDER "caustica/shaders"
-        SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/spirv
+        SPIRV_DXC ${CAUSTICA_SHADER_STAGING_DIR}/nrd/spirv
         CFLAGS "-WX -O3 -enable-16bit-types -all_resources_bound"
         INCLUDES ${_caustica_mathlib_dir} ${CAUSTICA_NRD_SHADER_INCLUDE_DIR} ${CAUSTICA_NRD_SHADER_RESOURCE_DIR}
     )
     if (WIN32)
         list(APPEND nrd_shader_compile_args
-            DXIL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/nrd/dxil
+            DXIL ${CAUSTICA_SHADER_STAGING_DIR}/nrd/dxil
         )
     endif()
     caustica_compile_shaders(${nrd_shader_compile_args})
     add_dependencies(causRender nrd_shaders)
+endif()
+
+if (NOT Python3_FOUND)
+    find_package(Python3 COMPONENTS Interpreter)
+endif()
+if (Python3_FOUND)
+    if (WIN32)
+        set(caustica_shader_bin_api both)
+    else()
+        set(caustica_shader_bin_api spirv)
+    endif()
+    add_custom_target(ShaderBinManifest
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_SOURCE_DIR}/support/python/build_shader_bin.py"
+            --shader-api ${caustica_shader_bin_api}
+            --staging-dir "${CAUSTICA_SHADER_STAGING_DIR}"
+            --bin-dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled"
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderDynamic"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        DEPENDS caustica_shaders nrd_shaders omm_shaders causticaEngineShaders
+        COMMENT "Building unified hash-addressed ShaderBin manifest"
+    )
+    set_target_properties(ShaderBinManifest PROPERTIES FOLDER ${folder})
+    add_dependencies(causticaShaderPack ShaderBinManifest)
 endif()
 
 add_subdirectory(../application/editor application/editor)  # sets CAUSTICA_EDITOR_SOURCES and CAUSTICA_EDITOR_ENTRY_SOURCE
@@ -403,7 +427,10 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
     endif()
 endif()
 
-add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+add_dependencies(causticaApp caustica_shaders nrd_shaders omm_shaders causticaPathTracerShaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
+if (TARGET ShaderBinManifest)
+    add_dependencies(causticaApp ShaderBinManifest)
+endif()
 if (CAUSTICA_PACKAGE_SHADER_PACK)
     add_dependencies(causticaApp causticaShaderPack)
 endif()
@@ -452,7 +479,7 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
         target_compile_options(${TARGET_NAME} PRIVATE /utf-8)
     endif()
     target_link_libraries(${TARGET_NAME} PRIVATE causticaApp caustica_rhi)
-    add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+    add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
     if (CAUSTICA_PACKAGE_SHADER_PACK)
         add_dependencies(${TARGET_NAME} causticaShaderPack)
     endif()
@@ -526,7 +553,7 @@ else()
     message(STATUS "Python3 not found — skipping check_public_api include allowlist")
 endif()
 target_link_libraries(caustica_thin_client PRIVATE causEngine caustica_rhi)
-add_dependencies(caustica_thin_client caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+add_dependencies(caustica_thin_client caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
 if (CAUSTICA_PACKAGE_SHADER_PACK)
     add_dependencies(caustica_thin_client causticaShaderPack)
 endif()
@@ -580,7 +607,7 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
     )
     # Note: nanobind defaults the python module name to the target name; we
     # pin it to `caustica` so users can write `import caustica`.
-    # Drop the .pyd next to caustica.exe / the runtime DLLs / ShaderPrecompiled
+    # Drop the .pyd next to caustica.exe / the runtime DLLs / ShaderBin
     # so the extension can find shaders and AgilitySDK redistributables.
     set_target_properties(caustica_py PROPERTIES
         OUTPUT_NAME "caustica"
@@ -603,7 +630,7 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
         target_compile_options(caustica_py PRIVATE /utf-8)
     endif()
 
-    add_dependencies(caustica_py caustica_shaders nrd_shaders omm_shaders ShaderDynamicAssets ShaderDynamicAssets_CopyAlways)
+    add_dependencies(caustica_py caustica_shaders nrd_shaders omm_shaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
 
     if (CAUSTICA_WITH_OIDN)
         add_custom_command(
