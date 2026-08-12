@@ -1,4 +1,4 @@
-// Hillaire 2020 LUT compute shaders — Transmittance / Multi-Scattering / Sky-View
+// Hillaire 2020 LUT compute shaders: Transmittance / Multi-Scattering / Sky-View
 
 #include "SkyAtmosphereIntegrate.hlsli"
 

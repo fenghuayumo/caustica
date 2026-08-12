@@ -20,7 +20,10 @@ bool ComputePass::init(
 {
 	m_computeShader = shaderFactory.createShader(fileName, entry, &macros, caustica::rhi::ShaderType::Compute);
 	if (!m_computeShader)
+	{
+		caustica::error("Failed to create compute shader %s:%s", fileName, entry);
 		return false;
+	}
 
 	caustica::rhi::ComputePipelineDesc pipelineDesc;
 	if(extraBindingLayout)
@@ -33,7 +36,10 @@ bool ComputePass::init(
 	m_computePipeline = device->createComputePipeline(pipelineDesc);
 
 	if (!m_computePipeline)
+	{
+		caustica::error("Failed to create compute pipeline %s:%s", fileName, entry);
 		return false;
+	}
 
 	return true;
 }
@@ -48,7 +54,10 @@ bool ComputePass::init(
 {
     m_computeShader = shaderFactory.createShader(fileName, entry, &macros, caustica::rhi::ShaderType::Compute);
     if (!m_computeShader)
+    {
+        caustica::error("Failed to create compute shader %s:%s", fileName, entry);
         return false;
+    }
 
     caustica::rhi::ComputePipelineDesc pipelineDesc;
     pipelineDesc.bindingLayouts = bindingLayouts;
@@ -56,7 +65,10 @@ bool ComputePass::init(
     m_computePipeline = device->createComputePipeline(pipelineDesc);
 
     if (!m_computePipeline)
+    {
+        caustica::error("Failed to create compute pipeline %s:%s", fileName, entry);
         return false;
+    }
 
     return true;
 }
@@ -73,6 +85,9 @@ void ComputePass::execute(
 	const void* pushConstants /*= nullptr*/, 
 	size_t pushConstantSize /*= 0*/)
 {
+	if (!m_computePipeline)
+		return;
+
 	caustica::rhi::ComputeState state;
 	state.bindings;
     if (extraBindingSet)
@@ -97,6 +112,9 @@ void ComputePass::execute(
     int depth,
     const caustica::rhi::BindingSetVector & bindings)
 {
+    if (!m_computePipeline)
+        return;
+
     caustica::rhi::ComputeState state;
     state.bindings = bindings;
     state.pipeline = m_computePipeline;

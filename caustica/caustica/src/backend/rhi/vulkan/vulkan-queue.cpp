@@ -98,7 +98,7 @@ namespace caustica::rhi::vulkan
         m_SignalSemaphoreValues.push_back(value);
     }
 
-    uint64_t Queue::submit(CommandList* const* ppCmd, size_t numCmd)
+    uint64_t Queue::submit(rhi::CommandList* const* ppCmd, size_t numCmd)
     {
         // Serialize with getOrCreateCommandBuffer / retire / wait-signal staging.
         std::lock_guard lockGuard(m_Mutex);
@@ -167,7 +167,7 @@ namespace caustica::rhi::vulkan
         return m_LastSubmittedID;
     }
 
-    void Queue::updateTextureTileMappings(Texture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings)
+    void Queue::updateTextureTileMappings(rhi::Texture* _texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings)
     {
         Texture* texture = checked_cast<Texture*>(_texture);
 

@@ -129,8 +129,8 @@ protected:
     void installDebugCallback();
     bool pickPhysicalDevice();
     bool findQueueFamilies(vk::PhysicalDevice physicalDevice);
-    bool createDevice();
-    bool createSwapChain();
+    bool createVulkanDevice();
+    bool createVulkanSwapChain();
     void destroySwapChain();
 
     struct VulkanExtensionSet

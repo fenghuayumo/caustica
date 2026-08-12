@@ -221,9 +221,9 @@ namespace caustica::rhi::vulkan
         void addSignalSemaphore(vk::Semaphore semaphore, uint64_t value);
 
         // submits a command buffer to this queue, returns submissionID
-        uint64_t submit(CommandList* const* ppCmd, size_t numCmd);
+        uint64_t submit(rhi::CommandList* const* ppCmd, size_t numCmd);
 
-        void updateTextureTileMappings(Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings);
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings);
 
         // retire any command buffers that have finished execution from the pending execution list
         void retireCommandBuffers();
@@ -748,7 +748,7 @@ namespace caustica::rhi::vulkan
 
         ~BindingSet() override;
         const BindingSetDesc* getDesc() const override { return &desc; }
-        BindingLayout* getLayout() const override { return layout; }
+        BindingLayout* getLayout() const override { return static_cast<BindingLayout*>(layout.Get()); }
         Object getNativeObject(ObjectType objectType) override;
 
     private:
@@ -770,7 +770,7 @@ namespace caustica::rhi::vulkan
 
         ~DescriptorTable() override;
         const BindingSetDesc* getDesc() const override { return nullptr; }
-        BindingLayout* getLayout() const override { return layout; }
+        BindingLayout* getLayout() const override { return static_cast<BindingLayout*>(layout.Get()); }
         uint32_t getCapacity() const override { return capacity; }
 
         // Vulkan doesn't have a concept of the first descriptor in the heap
@@ -1309,7 +1309,7 @@ namespace caustica::rhi::vulkan
         std::unique_ptr<UploadManager> m_UploadManager;
         std::unique_ptr<UploadManager> m_ScratchManager;
         
-        void clearTexture(Texture* texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue);
+        void clearTexture(rhi::Texture* texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue);
 
         void bindBindingSets(vk::PipelineBindPoint bindPoint, vk::PipelineLayout pipelineLayout, const BindingSetVector& bindings, BindingVector<uint32_t> const& descriptorSetIdxToBindingIdx);
 
@@ -1331,8 +1331,8 @@ namespace caustica::rhi::vulkan
         void updateMeshletVolatileBuffers();
         void updateRayTracingVolatileBuffers();
 
-        void requireTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
-        void requireBufferState(Buffer* buffer, ResourceStates state);
+        void requireTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
+        void requireBufferState(rhi::Buffer* buffer, ResourceStates state);
         bool anyBarriers() const;
 
         void buildTopLevelAccelStructInternal(AccelStruct* as, VkDeviceAddress instanceData, size_t numInstances, rt::AccelStructBuildFlags buildFlags, uint64_t currentVersion);

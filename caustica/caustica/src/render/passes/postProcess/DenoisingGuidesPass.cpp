@@ -50,8 +50,8 @@ DenoisingGuidesPass::DenoisingGuidesPass( caustica::rhi::Device* device, std::sh
 
     // These need to know about the scene
     pipelineDesc.bindingLayouts = { m_bindingLayout };
-    m_csDenoiseSpecHitT.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "denoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
-    m_csComputeAvgLayerRadiance.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "computeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csDenoiseSpecHitT.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "DenoiseSpecHitT", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
+    m_csComputeAvgLayerRadiance.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "ComputeAvgLayerRadiance", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
     m_csDebugViz.init(m_device, *shaderFactory, "caustica/shaders/render/processingPasses/DenoisingGuidesPass.hlsl", "DebugViz", std::vector<caustica::ShaderMacro>(), pipelineDesc.bindingLayouts);
 
     //m_constantBuffer = m_device->createBuffer(caustica::rhi::utils::CreateVolatileConstantBufferDesc(sizeof(DenoisingGuidesPassConstants), "DenoisingGuidesPassConstants", caustica::c_MaxRenderPassConstantBufferVersions));

@@ -506,7 +506,7 @@ bool GpuDevice_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
     return true;
 }
 
-bool GpuDevice_VK::createDevice()
+bool GpuDevice_VK::createVulkanDevice()
 {
     // figure out which optional extensions are supported
     auto deviceExtensions = m_VulkanPhysicalDevice.enumerateDeviceExtensionProperties();
@@ -782,7 +782,7 @@ void GpuDevice_VK::destroySwapChain()
     m_SwapChainImages.clear();
 }
 
-bool GpuDevice_VK::createSwapChain()
+bool GpuDevice_VK::createVulkanSwapChain()
 {
     destroySwapChain();
 
@@ -988,7 +988,7 @@ bool GpuDevice_VK::createDevice()
     }
     CHECK(pickPhysicalDevice())
     CHECK(findQueueFamilies(m_VulkanPhysicalDevice))
-    CHECK(createDevice())
+    CHECK(createVulkanDevice())
 
     auto vecInstanceExt = stringSetToVector(enabledExtensions.instance);
     auto vecLayers = stringSetToVector(enabledExtensions.layers);
@@ -1022,12 +1022,14 @@ bool GpuDevice_VK::createDevice()
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
 
-    m_RhiDevice = m_RhiDevice = caustica::rhi::vulkan::createDevice(deviceDesc);
+    m_RhiDevice = caustica::rhi::vulkan::createDevice(deviceDesc);
 
+#if CAUSTICA_RHI_WITH_VALIDATION
     if (m_DeviceParams.enableRhiValidationLayer)
     {
         m_ValidationLayer = caustica::rhi::validation::createValidationLayer(m_RhiDevice);
     }
+#endif
 
 #if CAUSTICA_WITH_STREAMLINE
     if (!m_DeviceParams.headlessDevice)
@@ -1050,7 +1052,7 @@ bool GpuDevice_VK::createDevice()
 
 bool GpuDevice_VK::createSwapChain()
 {
-    CHECK(createSwapChain())
+    CHECK(createVulkanSwapChain())
 
     size_t const numPresentSemaphores = m_SwapChainImages.size();
     m_PresentSemaphores.reserve(numPresentSemaphores);
@@ -1162,7 +1164,7 @@ bool GpuDevice_VK::beginFrame()
     if (res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR) // Suboptimal is considered a success
     {
         // Schedule the wait. The actual wait operation will be submitted when the app executes any command list.
-        m_RhiDevice->queueWaitForSemaphore(caustica::rhi::CommandQueue::Graphics, semaphore, 0);
+        caustica::rhi::vulkan::queueWaitForSemaphore(m_RhiDevice, caustica::rhi::CommandQueue::Graphics, semaphore, 0);
         return true;
     }
 
@@ -1176,7 +1178,7 @@ bool GpuDevice_VK::present()
 
     const auto& semaphore = m_PresentSemaphores[m_SwapChainIndex];
 
-    m_RhiDevice->queueSignalSemaphore(caustica::rhi::CommandQueue::Graphics, semaphore, 0);
+    caustica::rhi::vulkan::queueSignalSemaphore(m_RhiDevice, caustica::rhi::CommandQueue::Graphics, semaphore, 0);
 
     // Caustica RHI buffers the semaphores and signals them when something is submitted to a queue.
     // Call 'executeCommandLists' with no command lists to actually signal the semaphore.

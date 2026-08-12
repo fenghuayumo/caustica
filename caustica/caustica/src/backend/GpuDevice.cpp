@@ -154,7 +154,7 @@ bool GpuDevice::initializeGraphicsDevice(const DeviceCreationParameters& params)
     return true;
 }
 
-bool GpuDevice::initializeWindowSwapChain(Window* window)
+bool GpuDevice::bindWindow(Window* window)
 {
     if (!window || !window->hasInitialised())
     {
@@ -186,6 +186,14 @@ bool GpuDevice::initializeWindowSwapChain(Window* window)
     m_DPIScaleFactorY = window->getDPIScaleY();
 
     window->setRenderDuringMove(m_EnableRenderDuringWindowMovement);
+
+    return true;
+}
+
+bool GpuDevice::initializeWindowSwapChain(Window* window)
+{
+    if (!bindWindow(window))
+        return false;
 
     if (!createSwapChain())
         return false;

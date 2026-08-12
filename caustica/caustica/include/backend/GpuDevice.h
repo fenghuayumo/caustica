@@ -333,6 +333,7 @@ namespace caustica
         GpuDevice();
 
         static GpuDevice* create(caustica::rhi::GraphicsAPI api);
+        bool bindWindow(class Window* window);
         bool initializeGraphicsDevice(const DeviceCreationParameters& params);
         bool initializeWindowSwapChain(class Window* window);
         bool initializeHeadlessGraphics(const DeviceCreationParameters& params);

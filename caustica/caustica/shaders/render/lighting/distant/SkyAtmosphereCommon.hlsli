@@ -1,4 +1,4 @@
-// Hillaire 2020 — A Scalable and Production Ready Sky and Atmosphere Rendering Technique
+// Hillaire 2020: A Scalable and Production Ready Sky and Atmosphere Rendering Technique
 // Ported from https://github.com/sebh/UnrealEngineSkyAtmosphere (MIT)
 
 #ifndef __SKY_ATMOSPHERE_COMMON_HLSLI__

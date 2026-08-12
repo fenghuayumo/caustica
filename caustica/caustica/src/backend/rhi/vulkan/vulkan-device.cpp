@@ -12,6 +12,16 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace caustica::rhi::vulkan
 {
+    void queueWaitForSemaphore(rhi::Device* device, CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value)
+    {
+        checked_cast<Device*>(device)->queueWaitForSemaphore(waitQueue, semaphore, value);
+    }
+
+    void queueSignalSemaphore(rhi::Device* device, CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value)
+    {
+        checked_cast<Device*>(device)->queueSignalSemaphore(executionQueue, semaphore, value);
+    }
+
     DeviceHandle createDevice(const DeviceDesc& desc)
     {
 #if defined(CAUSTICA_RHI_SHARED_LIBRARY_BUILD)
@@ -541,16 +551,6 @@ namespace caustica::rhi::vulkan
             return nullptr;
 
         return Object(m_Queues[uint32_t(queue)]->getVkQueue());
-    }
-
-    bool Device::isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const
-    {
-        if (queue >= CommandQueue::Count)
-            return true;
-        const auto& q = m_Queues[uint32_t(queue)];
-        if (!q)
-            return true;
-        return q->pollCommandList(submissionID);
     }
 
     bool Device::isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const

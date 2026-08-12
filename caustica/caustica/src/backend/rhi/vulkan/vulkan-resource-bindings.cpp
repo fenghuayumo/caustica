@@ -887,14 +887,22 @@ namespace caustica::rhi::vulkan
         static_vector<uint32_t, c_MaxVolatileConstantBuffers> dynamicOffsets;
         for (uint32_t i = 0; i < numDescriptorSets; ++i)
         {
-            BindingSet* bindingSetHandle = nullptr;
+            rhi::BindingSet* bindingSetHandle = nullptr;
             if (descriptorSetIdxToBindingIdx.empty())
             {
                 bindingSetHandle = bindings[i];
             }
             else if(descriptorSetIdxToBindingIdx[i] != 0xffffffff)
             {
-                bindingSetHandle = bindings[descriptorSetIdxToBindingIdx[i]];
+                const uint32_t bindingIndex = descriptorSetIdxToBindingIdx[i];
+                if (bindingIndex >= bindings.size())
+                {
+                    m_Context.error("Vulkan descriptor-set layout references a missing binding set");
+                }
+                else
+                {
+                    bindingSetHandle = bindings[bindingIndex];
+                }
             }
 
             if (bindingSetHandle == nullptr)

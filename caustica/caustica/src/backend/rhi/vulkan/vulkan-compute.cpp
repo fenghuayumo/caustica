@@ -54,6 +54,8 @@ namespace caustica::rhi::vulkan
                                                     m_Context.allocationCallbacks,
                                                     &pso->pipeline);
 
+        if (res != vk::Result::eSuccess)
+            m_Context.error(std::string("Failed to create Vulkan compute pipeline: ") + resultToString(VkResult(res)));
         CHECK_VK_FAIL(res)
 
         return ComputePipelineHandle::Create(pso);

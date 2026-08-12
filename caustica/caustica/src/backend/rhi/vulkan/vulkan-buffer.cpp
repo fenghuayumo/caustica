@@ -246,7 +246,7 @@ namespace caustica::rhi::vulkan
         return 0;
     }
 
-    void CommandList::writeVolatileBuffer(rhi::Buffer* buffer, const void* data, size_t dataSize)
+    void CommandList::writeVolatileBuffer(Buffer* buffer, const void* data, size_t dataSize)
     {
         VolatileBufferState& state = m_VolatileBufferStates[buffer];
 
@@ -589,7 +589,7 @@ namespace caustica::rhi::vulkan
 
     void *Device::mapBuffer(Buffer* _buffer, CpuAccessMode flags, uint64_t offset, size_t size) const
     {
-        Buffer* buffer = checked_cast<Buffer*>(_buffer);
+        Buffer* buffer = _buffer;
 
         assert(flags != CpuAccessMode::None);
 
@@ -628,7 +628,7 @@ namespace caustica::rhi::vulkan
         return ptr;
     }
 
-    void *Device::mapBuffer(Buffer* _buffer, CpuAccessMode flags)
+    void *Device::mapBuffer(rhi::Buffer* _buffer, CpuAccessMode flags)
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 

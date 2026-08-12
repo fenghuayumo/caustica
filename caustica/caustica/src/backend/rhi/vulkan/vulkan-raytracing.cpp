@@ -4,7 +4,7 @@
 
 namespace caustica::rhi::vulkan
 {
-    static vk::DeviceOrHostAddressConstKHR getBufferAddress(Buffer* _buffer, uint64_t offset)
+    static vk::DeviceOrHostAddressConstKHR getBufferAddress(rhi::Buffer* _buffer, uint64_t offset)
     {
         if (!_buffer)
             return vk::DeviceOrHostAddressConstKHR();
@@ -14,7 +14,7 @@ namespace caustica::rhi::vulkan
         return vk::DeviceOrHostAddressConstKHR().setDeviceAddress(buffer->deviceAddress + size_t(offset));
     }
 
-    static vk::DeviceOrHostAddressKHR getMutableBufferAddress(Buffer* _buffer, uint64_t offset)
+    static vk::DeviceOrHostAddressKHR getMutableBufferAddress(rhi::Buffer* _buffer, uint64_t offset)
     {
         if (!_buffer)
             return vk::DeviceOrHostAddressKHR();
@@ -1435,7 +1435,7 @@ namespace caustica::rhi::vulkan
     }
 
     static void registerShaderModule(
-        Shader* _shader,
+        rhi::Shader* _shader,
         std::unordered_map<Shader*, uint32_t>& shaderStageIndices,
         size_t& numShaders,
         size_t& numShadersWithSpecializations,
@@ -1713,7 +1713,7 @@ namespace caustica::rhi::vulkan
         return false;
     }
 
-    void ShaderTable::setRayGenerationShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
+    void ShaderTable::setRayGenerationShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1727,7 +1727,7 @@ namespace caustica::rhi::vulkan
         }
     }
 
-    int ShaderTable::addMissShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addMissShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1745,7 +1745,7 @@ namespace caustica::rhi::vulkan
         return -1;
     }
 
-    int ShaderTable::addHitGroup(const char* exportName, BindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addHitGroup(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();
@@ -1763,7 +1763,7 @@ namespace caustica::rhi::vulkan
         return -1;
     }
 
-    int ShaderTable::addCallableShader(const char* exportName, BindingSet* bindings /*= nullptr*/)
+    int ShaderTable::addCallableShader(const char* exportName, rhi::BindingSet* bindings /*= nullptr*/)
     {
         if (bindings != nullptr)
             utils::NotSupported();

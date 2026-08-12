@@ -161,6 +161,12 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
     if (windowDesc.Maximized)
         window->maximise();
 
+    if (!gpuDevice->bindWindow(window.get()))
+    {
+        caustica::error("GpuDevice::createInitialized: failed to bind platform window");
+        return result;
+    }
+
     if (!gpuDevice->initializeGraphicsDevice(deviceParams))
     {
         caustica::error("GpuDevice::createInitialized: failed to create graphics device");
