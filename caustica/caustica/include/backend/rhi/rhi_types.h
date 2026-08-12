@@ -3400,13 +3400,14 @@ namespace caustica::rhi
         // - DX12: Maps to BuildRaytracingAccelerationStructure, or NvAPI_D3D12_BuildRaytracingAccelerationStructureEx
         //   if Opacity Micromaps or Line-Swept Sphere geometries are supported by the device.
         // - Vulkan: Maps to vkCmdBuildAccelerationStructuresKHR.
-        // If Caustica RHI is built with RTXMU enabled, all BLAS builds, updates and compactions are handled by RTXMU.
-        // Note that RTXMU currently doesn't support OMM or LSS.
+        // If Caustica RHI is built with its internal acceleration-structure manager enabled,
+        // all BLAS builds, updates and compactions are handled by that manager.
+        // The internal manager currently doesn't support OMM or LSS.
         virtual void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries,
             size_t numGeometries, rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) = 0;
         
         // Compacts all bottom-level ray tracing acceleration structures (BLASes) that are currently available
-        // for compaction. This process is handled by the RTXMU library. If Caustica RHI is built without RTXMU,
+        // for compaction. This process is handled by the internal manager. If it is disabled,
         // this function has no effect.
         virtual void compactBottomLevelAccelStructs() = 0;
 

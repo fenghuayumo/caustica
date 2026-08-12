@@ -3,6 +3,10 @@ set(RHI_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend/rhi")
 
 include(CMakeDependentOption)
 
+option(CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+    "Use Caustica's internal acceleration-structure memory manager"
+    OFF)
+
 if (CAUSTICA_RHI_WITH_DX12)
     option(CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP "Use D3D12 native Opacity Micromaps from DXR 1.2" OFF)
 endif()
@@ -23,22 +27,6 @@ endif()
 if (CAUSTICA_RHI_WITH_DX12 AND NOT TARGET DirectX-Headers AND NOT TARGET Microsoft::DirectX-Headers)
     add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/DirectX-Headers
                      ${CMAKE_BINARY_DIR}/thirdparty/DirectX-Headers)
-endif()
-
-if (CAUSTICA_RHI_WITH_RTXMU)
-    if (TARGET Vulkan-Headers)
-        get_target_property(RTXMU_VULKAN_INCLUDE_DIR Vulkan-Headers INTERFACE_INCLUDE_DIRECTORIES)
-    elseif (TARGET Vulkan::Headers)
-        get_target_property(RTXMU_VULKAN_INCLUDE_DIR Vulkan::Headers INTERFACE_INCLUDE_DIRECTORIES)
-    endif()
-
-    option(RTXMU_WITH_VULKAN "" ${CAUSTICA_RHI_WITH_VULKAN})
-    option(RTXMU_WITH_D3D12 "" ${CAUSTICA_RHI_WITH_DX12})
-
-    if (NOT TARGET rtxmu)
-        add_subdirectory(${CMAKE_SOURCE_DIR}/rtxmu
-                         ${CMAKE_BINARY_DIR}/rtxmu)
-    endif()
 endif()
 
 if (CAUSTICA_RHI_WITH_NVAPI AND NOT TARGET nvapi)
@@ -79,6 +67,24 @@ set(src_common
     common/utils.cpp
     common/command_list_pool.cpp
     common/aftermath.cpp)
+
+set(accel_struct_manager_dir ${CMAKE_CURRENT_SOURCE_DIR}/internal/accel_struct)
+set(accel_struct_manager_common
+    ${accel_struct_manager_dir}/AccelStructManager.h
+    ${accel_struct_manager_dir}/Logger.h
+    ${accel_struct_manager_dir}/Logger.cpp
+    ${accel_struct_manager_dir}/Suballocator.h
+    ${accel_struct_manager_dir}/LICENSE.txt)
+set(accel_struct_manager_d3d12
+    ${accel_struct_manager_dir}/D3D12AccelStructManager.h
+    ${accel_struct_manager_dir}/D3D12AccelStructManager.cpp
+    ${accel_struct_manager_dir}/D3D12Suballocator.h
+    ${accel_struct_manager_dir}/D3D12Suballocator.cpp)
+set(accel_struct_manager_vulkan
+    ${accel_struct_manager_dir}/VkAccelStructManager.h
+    ${accel_struct_manager_dir}/VkAccelStructManager.cpp
+    ${accel_struct_manager_dir}/VulkanSuballocator.h
+    ${accel_struct_manager_dir}/VulkanSuballocator.cpp)
 
 # ------------------------------------------------------------------
 # Validation layer
@@ -246,9 +252,12 @@ if (CAUSTICA_RHI_WITH_DX12)
         target_include_directories(${caustica_rhi_d3d12_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
     endif()
 
-    if (CAUSTICA_RHI_WITH_RTXMU)
-        target_compile_definitions(${caustica_rhi_d3d12_target} PUBLIC CAUSTICA_RHI_WITH_RTXMU=1)
-        target_link_libraries(${caustica_rhi_d3d12_target} PUBLIC rtxmu)
+    if (CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER)
+        target_sources(${caustica_rhi_d3d12_target} PRIVATE
+            ${accel_struct_manager_common}
+            ${accel_struct_manager_d3d12})
+        target_include_directories(${caustica_rhi_d3d12_target} PRIVATE ${accel_struct_manager_dir})
+        target_compile_definitions(${caustica_rhi_d3d12_target} PRIVATE CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER=1)
     endif()
 
     target_compile_definitions(${caustica_rhi_d3d12_target} PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
@@ -289,9 +298,13 @@ if (CAUSTICA_RHI_WITH_VULKAN)
         target_compile_definitions(${caustica_rhi_vk_target} PRIVATE NOMINMAX)
     endif()
 
-    if (CAUSTICA_RHI_WITH_RTXMU)
-        target_compile_definitions(${caustica_rhi_vk_target} PUBLIC CAUSTICA_RHI_WITH_RTXMU=1)
-        target_link_libraries(${caustica_rhi_vk_target} PUBLIC rtxmu)
+    if (CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER)
+        target_sources(${caustica_rhi_vk_target} PRIVATE ${accel_struct_manager_vulkan})
+        if (NOT CAUSTICA_RHI_BUILD_SHARED OR NOT CAUSTICA_RHI_WITH_DX12)
+            target_sources(${caustica_rhi_vk_target} PRIVATE ${accel_struct_manager_common})
+        endif()
+        target_include_directories(${caustica_rhi_vk_target} PRIVATE ${accel_struct_manager_dir})
+        target_compile_definitions(${caustica_rhi_vk_target} PRIVATE CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER=1)
     endif()
 
     if (TARGET Vulkan-Headers)

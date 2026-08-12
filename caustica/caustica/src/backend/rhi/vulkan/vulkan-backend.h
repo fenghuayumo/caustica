@@ -12,8 +12,8 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-#include <rtxmu/VkAccelStructManager.h>
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+#include "../internal/accel_struct/VkAccelStructManager.h"
 #endif
 
 #if (VK_HEADER_VERSION < 318)
@@ -88,8 +88,8 @@ namespace caustica::rhi::vulkan
         std::vector<vk::SpecializationMapEntry>& specMapEntries,
         std::vector<uint32_t>& specData);
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-    struct RtxMuResources
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+    struct AccelStructResources
     {
         std::vector<uint64_t> asBuildsCompleted;
         std::mutex asListMutex;
@@ -154,9 +154,9 @@ namespace caustica::rhi::vulkan
         vk::PhysicalDeviceSubgroupProperties subgroupProperties;
         MessageCallback* messageCallback = nullptr;
         bool logBufferLifetime = false;
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        std::unique_ptr<rtxmu::VkAccelStructManager> rtxMemUtil;
-        std::unique_ptr<RtxMuResources> rtxMuResources;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::unique_ptr<caustica::rhi::internal::VkAccelStructManager> accelStructManager;
+        std::unique_ptr<AccelStructResources> accelStructResources;
 #endif
         vk::DescriptorSetLayout emptyDescriptorSetLayout;
 
@@ -186,9 +186,9 @@ namespace caustica::rhi::vulkan
         uint64_t recordingID = 0;
         uint64_t submissionID = 0;
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        std::vector<uint64_t> rtxmuBuildIds;
-        std::vector<uint64_t> rtxmuCompactionIds;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::vector<uint64_t> accelStructBuildIds;
+        std::vector<uint64_t> accelStructCompactionIds;
 #endif
 
         explicit TrackedCommandBuffer(const VulkanContext& context)
@@ -997,8 +997,7 @@ namespace caustica::rhi::vulkan
         rt::AccelStructDesc desc;
         bool allowUpdate = false;
         bool compacted = false;
-        size_t rtxmuId = ~0ull;
-        vk::Buffer rtxmuBuffer;
+        size_t managedId = ~0ull;
 
 
         explicit AccelStruct(const VulkanContext& context)

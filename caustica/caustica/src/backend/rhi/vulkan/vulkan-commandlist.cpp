@@ -61,10 +61,10 @@ namespace caustica::rhi::vulkan
         m_StateTracker.keepTextureInitialStates();
         commitBarriers();
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        if (!m_CurrentCmdBuf->rtxmuBuildIds.empty())
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        if (!m_CurrentCmdBuf->accelStructBuildIds.empty())
         {
-            m_Context.rtxMemUtil->PopulateCompactionSizeCopiesCommandList(m_CurrentCmdBuf->cmdBuf, m_CurrentCmdBuf->rtxmuBuildIds);
+            m_Context.accelStructManager->PopulateCompactionSizeCopiesCommandList(m_CurrentCmdBuf->cmdBuf, m_CurrentCmdBuf->accelStructBuildIds);
         }
 #endif
 

@@ -247,13 +247,13 @@ namespace caustica::rhi::d3d12
             m_OpacityMicromapSupported = m_Options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_2;
 #endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
             if (m_RayTracingSupported)
             {
-                m_Context.rtxMemUtil = std::make_unique<rtxmu::DxAccelStructManager>(m_Context.device5);
+                m_Context.accelStructManager = std::make_unique<caustica::rhi::internal::DxAccelStructManager>(m_Context.device5);
 
                 // Initialize suballocator blocks to 8 MB
-                m_Context.rtxMemUtil->Initialize(8388608);
+                m_Context.accelStructManager->Initialize(8388608);
             }
 #endif
         }
@@ -343,13 +343,13 @@ namespace caustica::rhi::d3d12
             }
         }
 #if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
-    #ifdef CAUSTICA_RHI_WITH_RTXMU
-        m_OpacityMicromapSupported = false; // RTXMU does not support OMMs
+    #ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        m_OpacityMicromapSupported = false; // the internal acceleration-structure manager does not support OMMs
     #endif
 #endif // CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
 #if CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        m_OpacityMicromapSupported = false; // RTXMU does not support OMMs
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        m_OpacityMicromapSupported = false; // the internal acceleration-structure manager does not support OMMs
 #else
         if (m_NvapiIsInitialized)
         {
@@ -745,20 +745,20 @@ namespace caustica::rhi::d3d12
                 
                 if (pQueue->lastCompletedInstance >= instance->submittedInstance)
                 {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-                    if (!instance->rtxmuBuildIds.empty())
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+                    if (!instance->accelStructBuildIds.empty())
                     {
                         std::lock_guard asLockGuard(m_Resources.asListMutex);
 
                         m_Resources.asBuildsCompleted.insert(m_Resources.asBuildsCompleted.end(),
-                            instance->rtxmuBuildIds.begin(), instance->rtxmuBuildIds.end());
+                            instance->accelStructBuildIds.begin(), instance->accelStructBuildIds.end());
 
-                        instance->rtxmuBuildIds.clear();
+                        instance->accelStructBuildIds.clear();
                     }
-                    if (!instance->rtxmuCompactionIds.empty())
+                    if (!instance->accelStructCompactionIds.empty())
                     {
-                        m_Context.rtxMemUtil->GarbageCollection(instance->rtxmuCompactionIds);
-                        instance->rtxmuCompactionIds.clear();
+                        m_Context.accelStructManager->GarbageCollection(instance->accelStructCompactionIds);
+                        instance->accelStructCompactionIds.clear();
                     }
 #endif
                     pQueue->commandListsInFlight.pop_back();

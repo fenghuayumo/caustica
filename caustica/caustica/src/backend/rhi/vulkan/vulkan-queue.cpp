@@ -291,20 +291,20 @@ namespace caustica::rhi::vulkan
                 cmd->submissionID = 0;
                 m_CommandBuffersPool.push_back(cmd);
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-                if (!cmd->rtxmuBuildIds.empty())
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+                if (!cmd->accelStructBuildIds.empty())
                 {
-                    std::lock_guard lockGuard(m_Context.rtxMuResources->asListMutex);
+                    std::lock_guard lockGuard(m_Context.accelStructResources->asListMutex);
                     
-                    m_Context.rtxMuResources->asBuildsCompleted.insert(m_Context.rtxMuResources->asBuildsCompleted.end(),
-                        cmd->rtxmuBuildIds.begin(), cmd->rtxmuBuildIds.end());
+                    m_Context.accelStructResources->asBuildsCompleted.insert(m_Context.accelStructResources->asBuildsCompleted.end(),
+                        cmd->accelStructBuildIds.begin(), cmd->accelStructBuildIds.end());
 
-                    cmd->rtxmuBuildIds.clear();
+                    cmd->accelStructBuildIds.clear();
                 }
-                if (!cmd->rtxmuCompactionIds.empty())
+                if (!cmd->accelStructCompactionIds.empty())
                 {
-                    m_Context.rtxMemUtil->GarbageCollection(cmd->rtxmuCompactionIds);
-                    cmd->rtxmuCompactionIds.clear();
+                    m_Context.accelStructManager->GarbageCollection(cmd->accelStructCompactionIds);
+                    cmd->accelStructCompactionIds.clear();
                 }
 #endif
             }

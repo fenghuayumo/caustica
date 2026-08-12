@@ -204,20 +204,20 @@ namespace caustica::rhi::vulkan
             deviceFeatures2.setPNext(&m_Context.linearSweptSpheresFeatures);
             m_Context.physicalDevice.getFeatures2(&deviceFeatures2);
         }
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         if (m_Context.extensions.KHR_acceleration_structure)
         {
-            m_Context.rtxMemUtil = std::make_unique<rtxmu::VkAccelStructManager>(desc.instance, desc.device, desc.physicalDevice);
+            m_Context.accelStructManager = std::make_unique<caustica::rhi::internal::VkAccelStructManager>(desc.instance, desc.device, desc.physicalDevice);
 
             // Initialize suballocator blocks to 8 MB
-            m_Context.rtxMemUtil->Initialize(8388608);
+            m_Context.accelStructManager->Initialize(8388608);
 
-            m_Context.rtxMuResources = std::make_unique<RtxMuResources>();
+            m_Context.accelStructResources = std::make_unique<AccelStructResources>();
         }
 
         if (m_Context.extensions.EXT_opacity_micromap)
         {
-            m_Context.warning("Opacity micro-maps are not currently supported by RTXMU.");
+            m_Context.warning("Opacity micro-maps are not currently supported by the internal acceleration-structure manager.");
         }
 #endif
         auto pipelineInfo = vk::PipelineCacheCreateInfo();
@@ -334,8 +334,8 @@ namespace caustica::rhi::vulkan
         case Feature::RayTracingPipeline:
             return m_Context.extensions.KHR_ray_tracing_pipeline;
         case Feature::RayTracingOpacityMicromap:
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-            return false; // RTXMU does not support OMMs
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+            return false; // the internal acceleration-structure manager does not support OMMs
 #else
             return m_Context.extensions.EXT_opacity_micromap;
 #endif

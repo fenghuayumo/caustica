@@ -420,15 +420,15 @@ namespace caustica::rhi::d3d12
 
     AccelStruct::~AccelStruct()
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         bool isManaged = desc.isTopLevel;
-        if (!isManaged && rtxmuId != ~0ull)
+        if (!isManaged && managedId != ~0ull)
         {
-            std::vector<uint64_t> delAccel = { rtxmuId };
-            m_Context.rtxMemUtil->RemoveAccelerationStructures(delAccel);
-            rtxmuId = ~0ull;
+            std::vector<uint64_t> delAccel = { managedId };
+            m_Context.accelStructManager->RemoveAccelerationStructures(delAccel);
+            managedId = ~0ull;
         }
-#endif // CAUSTICA_RHI_WITH_RTXMU
+#endif // CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
     }
 
     Object OpacityMicromap::getNativeObject(ObjectType objectType)
@@ -454,9 +454,9 @@ namespace caustica::rhi::d3d12
 
     uint64_t AccelStruct::getDeviceAddress() const
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         if (!desc.isTopLevel)
-            return m_Context.rtxMemUtil->GetAccelStructGPUVA(rtxmuId);
+            return m_Context.accelStructManager->GetAccelStructGPUVA(managedId);
 #endif
         return dataBuffer->gpuVA;
     }
@@ -869,7 +869,7 @@ namespace caustica::rhi::d3d12
 
         assert(ASPreBuildInfo.ResultDataMaxSizeInBytes <= ~0u);
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         bool needBuffer = desc.isTopLevel;
 #else
         bool needBuffer = true;
@@ -2064,30 +2064,28 @@ namespace caustica::rhi::d3d12
         }
 #endif
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         std::vector<uint64_t> accelStructsToBuild;
         std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS> buildInputs;
         buildInputs.push_back(inputs.GetAs<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS>());
 
-        if(as->rtxmuId == ~0ull)
+        if(as->managedId == ~0ull)
         {
-            m_Context.rtxMemUtil->PopulateBuildCommandList(m_ActiveCommandList->commandList4.Get(),
+            m_Context.accelStructManager->PopulateBuildCommandList(m_ActiveCommandList->commandList4.Get(),
                                                            buildInputs.data(),
                                                            buildInputs.size(),
                                                            accelStructsToBuild);
 
-            as->rtxmuId = accelStructsToBuild[0];
+            as->managedId = accelStructsToBuild[0];
 
-            as->rtxmuGpuVA = m_Context.rtxMemUtil->GetAccelStructGPUVA(as->rtxmuId);
-
-            m_Instance->rtxmuBuildIds.push_back(as->rtxmuId);
+            m_Instance->accelStructBuildIds.push_back(as->managedId);
 
         }
         else
         {
-            std::vector<uint64_t> buildsToUpdate(1, as->rtxmuId);
+            std::vector<uint64_t> buildsToUpdate(1, as->managedId);
 
-            m_Context.rtxMemUtil->PopulateUpdateCommandList(m_ActiveCommandList->commandList4.Get(),
+            m_Context.accelStructManager->PopulateUpdateCommandList(m_ActiveCommandList->commandList4.Get(),
                                                             buildInputs.data(),
                                                             uint32_t(buildInputs.size()),
                                                             buildsToUpdate);
@@ -2163,7 +2161,7 @@ namespace caustica::rhi::d3d12
             buildDesc.SourceAccelerationStructureData = performUpdate ? as->dataBuffer->gpuVA : 0;
             m_ActiveCommandList->commandList4->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
         }
-#endif // CAUSTICA_RHI_WITH_RTXMU
+#endif // CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
 
         if (as->desc.trackLiveness)
             m_Instance->referencedResources.push_back(as);
@@ -2171,7 +2169,7 @@ namespace caustica::rhi::d3d12
 
     void CommandList::compactBottomLevelAccelStructs()
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
 
         if (!m_Resources.asBuildsCompleted.empty())
         {
@@ -2179,9 +2177,9 @@ namespace caustica::rhi::d3d12
 
             if (!m_Resources.asBuildsCompleted.empty())
             {
-                m_Context.rtxMemUtil->PopulateCompactionCommandList(m_ActiveCommandList->commandList4.Get(), m_Resources.asBuildsCompleted);
+                m_Context.accelStructManager->PopulateCompactionCommandList(m_ActiveCommandList->commandList4.Get(), m_Resources.asBuildsCompleted);
 
-                m_Instance->rtxmuCompactionIds.insert(m_Instance->rtxmuCompactionIds.end(), m_Resources.asBuildsCompleted.begin(), m_Resources.asBuildsCompleted.end());
+                m_Instance->accelStructCompactionIds.insert(m_Instance->accelStructCompactionIds.end(), m_Resources.asBuildsCompleted.begin(), m_Resources.asBuildsCompleted.end());
 
                 m_Resources.asBuildsCompleted.clear();
             }
@@ -2282,8 +2280,8 @@ namespace caustica::rhi::d3d12
                 if (blas->desc.trackLiveness)
                     as->bottomLevelASes.push_back(blas);
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-                dxrInstance.AccelerationStructure = m_Context.rtxMemUtil->GetAccelStructGPUVA(blas->rtxmuId);
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+                dxrInstance.AccelerationStructure = m_Context.accelStructManager->GetAccelStructGPUVA(blas->managedId);
 #else
                 dxrInstance.AccelerationStructure = blas->dataBuffer->gpuVA;
 
@@ -2300,8 +2298,8 @@ namespace caustica::rhi::d3d12
             }
         }
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        m_Context.rtxMemUtil->PopulateUAVBarriersCommandList(m_ActiveCommandList->commandList4, m_Instance->rtxmuBuildIds);
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        m_Context.accelStructManager->PopulateUAVBarriersCommandList(m_ActiveCommandList->commandList4, m_Instance->accelStructBuildIds);
 #endif
 
         // Copy the instance array to the GPU

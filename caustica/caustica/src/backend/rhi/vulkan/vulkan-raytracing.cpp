@@ -305,7 +305,7 @@ namespace caustica::rhi::vulkan
         as->desc = desc;
         as->allowUpdate = (desc.buildFlags & rt::AccelStructBuildFlags::AllowUpdate) != 0;
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         bool isManaged = desc.isTopLevel;
 #else
         bool isManaged = true;
@@ -731,17 +731,17 @@ namespace caustica::rhi::vulkan
         if (performUpdate)
             buildInfo.setSrcAccelerationStructure(as->accelStruct);
         
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         commitBarriers();
 
         std::array<vk::AccelerationStructureBuildGeometryInfoKHR, 1> buildInfos = { buildInfo };
         std::array<const vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeArrays = { buildRanges.data() };
         std::array<const uint32_t*, 1> maxPrimArrays = { maxPrimitiveCounts.data() };
 
-        if(as->rtxmuId == ~0ull)
+        if(as->managedId == ~0ull)
         {
             std::vector<uint64_t> accelStructsToBuild;
-            m_Context.rtxMemUtil->PopulateBuildCommandList(m_CurrentCmdBuf->cmdBuf,
+            m_Context.accelStructManager->PopulateBuildCommandList(m_CurrentCmdBuf->cmdBuf,
                                                            buildInfos.data(),
                                                            buildRangeArrays.data(),
                                                            maxPrimArrays.data(),
@@ -749,19 +749,18 @@ namespace caustica::rhi::vulkan
                                                            accelStructsToBuild);
 
 
-            as->rtxmuId = accelStructsToBuild[0];
+            as->managedId = accelStructsToBuild[0];
             
-            as->rtxmuBuffer = m_Context.rtxMemUtil->GetBuffer(as->rtxmuId);
-            as->accelStruct = m_Context.rtxMemUtil->GetAccelerationStruct(as->rtxmuId);
-            as->accelStructDeviceAddress = m_Context.rtxMemUtil->GetDeviceAddress(as->rtxmuId);
+            as->accelStruct = m_Context.accelStructManager->GetAccelerationStruct(as->managedId);
+            as->accelStructDeviceAddress = m_Context.accelStructManager->GetDeviceAddress(as->managedId);
 
-            m_CurrentCmdBuf->rtxmuBuildIds.push_back(as->rtxmuId);
+            m_CurrentCmdBuf->accelStructBuildIds.push_back(as->managedId);
         }
         else
         {
-            std::vector<uint64_t> buildsToUpdate(1, as->rtxmuId);
+            std::vector<uint64_t> buildsToUpdate(1, as->managedId);
 
-            m_Context.rtxMemUtil->PopulateUpdateCommandList(m_CurrentCmdBuf->cmdBuf,
+            m_Context.accelStructManager->PopulateUpdateCommandList(m_CurrentCmdBuf->cmdBuf,
                                                             buildInfos.data(),
                                                             buildRangeArrays.data(),
                                                             maxPrimArrays.data(),
@@ -824,19 +823,19 @@ namespace caustica::rhi::vulkan
 
     void CommandList::compactBottomLevelAccelStructs()
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
 
-        if (!m_Context.rtxMuResources->asBuildsCompleted.empty())
+        if (!m_Context.accelStructResources->asBuildsCompleted.empty())
         {
-            std::lock_guard lockGuard(m_Context.rtxMuResources->asListMutex);
+            std::lock_guard lockGuard(m_Context.accelStructResources->asListMutex);
 
-            if (!m_Context.rtxMuResources->asBuildsCompleted.empty())
+            if (!m_Context.accelStructResources->asBuildsCompleted.empty())
             {
-                m_Context.rtxMemUtil->PopulateCompactionCommandList(m_CurrentCmdBuf->cmdBuf, m_Context.rtxMuResources->asBuildsCompleted);
+                m_Context.accelStructManager->PopulateCompactionCommandList(m_CurrentCmdBuf->cmdBuf, m_Context.accelStructResources->asBuildsCompleted);
 
-                m_CurrentCmdBuf->rtxmuCompactionIds.insert(m_CurrentCmdBuf->rtxmuCompactionIds.end(), m_Context.rtxMuResources->asBuildsCompleted.begin(), m_Context.rtxMuResources->asBuildsCompleted.end());
+                m_CurrentCmdBuf->accelStructCompactionIds.insert(m_CurrentCmdBuf->accelStructCompactionIds.end(), m_Context.accelStructResources->asBuildsCompleted.begin(), m_Context.accelStructResources->asBuildsCompleted.end());
 
-                m_Context.rtxMuResources->asBuildsCompleted.clear();
+                m_Context.accelStructResources->asBuildsCompleted.clear();
             }
         }
 #endif
@@ -936,10 +935,9 @@ namespace caustica::rhi::vulkan
             if (src.bottomLevelAS)
             {
                 AccelStruct* blas = checked_cast<AccelStruct*>(src.bottomLevelAS);
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-                blas->rtxmuBuffer = m_Context.rtxMemUtil->GetBuffer(blas->rtxmuId);
-                blas->accelStruct = m_Context.rtxMemUtil->GetAccelerationStruct(blas->rtxmuId);
-                blas->accelStructDeviceAddress = m_Context.rtxMemUtil->GetDeviceAddress(blas->rtxmuId);
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+                blas->accelStruct = m_Context.accelStructManager->GetAccelerationStruct(blas->managedId);
+                blas->accelStructDeviceAddress = m_Context.accelStructManager->GetDeviceAddress(blas->managedId);
                 dst.setAccelerationStructureReference(blas->accelStructDeviceAddress);
 #else
                 dst.setAccelerationStructureReference(blas->accelStructDeviceAddress);
@@ -962,8 +960,8 @@ namespace caustica::rhi::vulkan
             memcpy(dst.transform.matrix.data(), src.transform, sizeof(float) * 12);
         }
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        m_Context.rtxMemUtil->PopulateUAVBarriersCommandList(m_CurrentCmdBuf->cmdBuf, m_CurrentCmdBuf->rtxmuBuildIds);
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        m_Context.accelStructManager->PopulateUAVBarriersCommandList(m_CurrentCmdBuf->cmdBuf, m_CurrentCmdBuf->accelStructBuildIds);
 #endif
 
         uint64_t currentVersion = MakeVersion(m_CurrentCmdBuf->recordingID, m_CommandListParameters.queueType, false);
@@ -1127,13 +1125,13 @@ namespace caustica::rhi::vulkan
 
     AccelStruct::~AccelStruct()
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         bool isManaged = desc.isTopLevel;
-        if (!isManaged && rtxmuId != ~0ull)
+        if (!isManaged && managedId != ~0ull)
         {
-            std::vector<uint64_t> delAccel = { rtxmuId };
-            m_Context.rtxMemUtil->RemoveAccelerationStructures(delAccel);
-            rtxmuId = ~0ull;
+            std::vector<uint64_t> delAccel = { managedId };
+            m_Context.accelStructManager->RemoveAccelerationStructures(delAccel);
+            managedId = ~0ull;
         }
 #else
         bool isManaged = true;
@@ -1164,9 +1162,9 @@ namespace caustica::rhi::vulkan
 
     uint64_t AccelStruct::getDeviceAddress() const
     {
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         if (!desc.isTopLevel)
-            return m_Context.rtxMemUtil->GetDeviceAddress(rtxmuId);
+            return m_Context.accelStructManager->GetDeviceAddress(managedId);
 #endif
         return getBufferAddress(dataBuffer, 0).deviceAddress;
     }

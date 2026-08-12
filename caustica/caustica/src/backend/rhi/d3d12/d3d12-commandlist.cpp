@@ -344,10 +344,10 @@ namespace caustica::rhi::d3d12
         m_StateTracker.keepTextureInitialStates();
         commitBarriers();
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        if (!m_Instance->rtxmuBuildIds.empty())
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        if (!m_Instance->accelStructBuildIds.empty())
         {
-            m_Context.rtxMemUtil->PopulateCompactionSizeCopiesCommandList(m_ActiveCommandList->commandList4, m_Instance->rtxmuBuildIds);
+            m_Context.accelStructManager->PopulateCompactionSizeCopiesCommandList(m_ActiveCommandList->commandList4, m_Instance->accelStructBuildIds);
         }
 #endif
 

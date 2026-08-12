@@ -9,7 +9,7 @@ Common requirements:
 
 - A C++20 compiler and CMake 3.18 or newer.
 - A ray-tracing-capable GPU and a recent vendor driver.
-- All Git submodules, including `Assets`, `rtxmu`, the RHI headers, and the
+- All Git submodules, including `Assets`, the RHI headers, and the
   libraries under `External/`.
 - Python 3.8 or newer, including development headers, when
   `CAUSTICA_WITH_PYTHON=ON` (the default).

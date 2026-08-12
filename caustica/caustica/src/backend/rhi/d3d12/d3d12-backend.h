@@ -70,8 +70,8 @@
 #include "../common/dxgi-format.h"
 #include "../common/versioning.h"
 
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-#include <rtxmu/D3D12AccelStructManager.h>
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+#include "../internal/accel_struct/D3D12AccelStructManager.h"
 #endif
 
 namespace caustica::rhi::d3d12
@@ -120,8 +120,8 @@ namespace caustica::rhi::d3d12
 #if CAUSTICA_RHI_D3D12_WITH_COOPVEC
         RefCountPtr<ID3D12DevicePreview> devicePreview;
 #endif
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        std::unique_ptr<rtxmu::DxAccelStructManager> rtxMemUtil;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::unique_ptr<caustica::rhi::internal::DxAccelStructManager> accelStructManager;
 #endif
 
         RefCountPtr<ID3D12CommandSignature> drawIndirectSignature;
@@ -181,7 +181,7 @@ namespace caustica::rhi::d3d12
         StaticDescriptorHeap shaderResourceViewHeap;
         StaticDescriptorHeap samplerHeap;
         utils::BitSetAllocator timerQueries;
-#ifdef CAUSTICA_RHI_WITH_RTXMU
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
         std::mutex asListMutex;
         std::vector<uint64_t> asBuildsCompleted;
 #endif
@@ -760,10 +760,7 @@ namespace caustica::rhi::d3d12
         rt::AccelStructDesc desc;
         bool allowUpdate = false;
         bool compacted = false;
-        size_t rtxmuId = ~0ull;
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        D3D12_GPU_VIRTUAL_ADDRESS rtxmuGpuVA = 0;
-#endif
+        size_t managedId = ~0ull;
 
         AccelStruct(const Context& context)
             : m_Context(context)
@@ -928,9 +925,9 @@ namespace caustica::rhi::d3d12
         std::vector<RefCountPtr<TimerQuery>> referencedTimerQueries;
         std::vector<std::shared_ptr<BufferChunk>> referencedUploadChunks;
         std::vector<std::shared_ptr<BufferChunk>> referencedScratchChunks;
-#ifdef CAUSTICA_RHI_WITH_RTXMU
-        std::vector<uint64_t> rtxmuBuildIds;
-        std::vector<uint64_t> rtxmuCompactionIds;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::vector<uint64_t> accelStructBuildIds;
+        std::vector<uint64_t> accelStructCompactionIds;
 #endif
     };
 
