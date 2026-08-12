@@ -41,6 +41,7 @@ struct EngineAppDesc
     int adapterIndex = -1;
     bool useVulkan = false;
     bool fullscreen = false;
+    bool maximized = false;
     std::string scene = "default.json";
     std::string windowTitle = "caustica";
 

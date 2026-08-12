@@ -156,6 +156,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     desc.adapterIndex = editor.cmdLine().adapterIndex;
     desc.useVulkan = editor.cmdLine().useVulkan;
     desc.fullscreen = editor.cmdLine().fullscreen;
+    desc.maximized = createDesc.startMaximized;
     desc.scene = preferredScene;
     desc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
     desc.viewState = &editor.viewState();

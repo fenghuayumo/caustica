@@ -12,8 +12,8 @@ namespace caustica::editor
 
 namespace
 {
-    // Size the restore/client rect for the primary monitor. The editor starts
-    // maximized, so this mainly affects the un-maximize restore size.
+    // Keep enough room for the native frame so the title bar and window
+    // controls remain visible on the primary monitor.
     void ApplyDefaultWindowSizeForLargeDisplays(CommandLineOptions& cmdLine)
     {
         if (cmdLine.fullscreen)
@@ -39,8 +39,10 @@ namespace
         if (workW <= 0 || workH <= 0)
             return;
 
-        const uint32_t maxW = static_cast<uint32_t>(workW);
-        const uint32_t maxH = static_cast<uint32_t>(workH);
+        constexpr int kChromeX = 48;
+        constexpr int kChromeY = 96;
+        const uint32_t maxW = static_cast<uint32_t>(std::max(1280, workW - kChromeX));
+        const uint32_t maxH = static_cast<uint32_t>(std::max(720, workH - kChromeY));
 
         if (workW > 2560 && workH > 1440)
         {

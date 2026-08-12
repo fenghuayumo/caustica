@@ -158,9 +158,6 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
         return result;
     }
 
-    if (windowDesc.Maximized)
-        window->maximise();
-
     if (!gpuDevice->bindWindow(window.get()))
     {
         caustica::error("GpuDevice::createInitialized: failed to bind platform window");
@@ -178,6 +175,12 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
         caustica::error("GpuDevice::createInitialized: failed to create swap chain");
         return result;
     }
+
+    // Maximize only after backend/device/swap-chain initialization. Vulkan
+    // integration may touch the native window while initializing and otherwise
+    // restore a window that DX12 leaves maximized.
+    if (windowDesc.Maximized)
+        window->maximise();
 
     helpersRegisterActiveWindow(window->getNativeHandle());
     result.gpuDevice = std::move(gpuDevice);

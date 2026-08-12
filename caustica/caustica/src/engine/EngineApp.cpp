@@ -155,6 +155,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.adapterIndex = m_desc.adapterIndex;
         createDesc.enableDebug = m_desc.debugDevice;
         createDesc.startFullscreen = m_desc.fullscreen;
+        createDesc.startMaximized = m_desc.maximized && !m_desc.fullscreen;
         if (m_desc.headless)
             createDesc.vsyncEnabled = false;
 #if CAUSTICA_WITH_DX12

@@ -76,11 +76,9 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    if (desc.Borderless)
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-
-    if (desc.Maximized && !desc.Fullscreen)
-        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+    // Be explicit: stale platform/window-manager state must not turn a normal
+    // editor window into a borderless one.
+    glfwWindowHint(GLFW_DECORATED, desc.Borderless ? GLFW_FALSE : GLFW_TRUE);
 
     glfwWindowHint(GLFW_SAMPLES, 1);
 
