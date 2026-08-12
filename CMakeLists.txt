@@ -61,12 +61,9 @@ else()
 endif()
 option(CAUSTICA_WITH_DX12 "Enable the DX12 version of the framework runtime code" ${CAUSTICA_DEFAULT_WITH_DX12})
 
-# Vulkan is required for Linux/WSL builds because the D3D backends are Windows-only.
-if (WIN32)
-    set(CAUSTICA_DEFAULT_WITH_VULKAN OFF)
-else()
-    set(CAUSTICA_DEFAULT_WITH_VULKAN ON)
-endif()
+# Ship one Windows executable with both runtime-selectable backends. Vulkan is
+# also the only supported backend on Linux/WSL.
+set(CAUSTICA_DEFAULT_WITH_VULKAN ON)
 option(CAUSTICA_WITH_VULKAN "Enable the Vulkan version of the framework runtime code" ${CAUSTICA_DEFAULT_WITH_VULKAN})
 
 option(CAUSTICA_WITH_RHI "Enable Caustica RHI and related projects" ON)

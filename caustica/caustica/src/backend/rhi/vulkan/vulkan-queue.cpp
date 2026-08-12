@@ -294,7 +294,7 @@ namespace caustica::rhi::vulkan
 #ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
                 if (!cmd->accelStructBuildIds.empty())
                 {
-                    std::lock_guard lockGuard(m_Context.accelStructResources->asListMutex);
+                    std::lock_guard accelStructLockGuard(m_Context.accelStructResources->asListMutex);
                     
                     m_Context.accelStructResources->asBuildsCompleted.insert(m_Context.accelStructResources->asBuildsCompleted.end(),
                         cmd->accelStructBuildIds.begin(), cmd->accelStructBuildIds.end());
