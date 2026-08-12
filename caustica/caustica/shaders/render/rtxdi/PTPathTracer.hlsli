@@ -3,10 +3,10 @@
 
 #include "../rtxdi/RtxdiApplicationBridge.hlsli"
 
-#include <Rtxdi/PT/PathReconnectibility.hlsli>
-#include <Rtxdi/PT/PathTracerRandomContext.hlsli>
-#include <Rtxdi/PT/PathTracerContext.hlsli>
-#include <Rtxdi/PT/Reservoir.hlsli>
+#include <render/rtxdi/internal/PT/PathReconnectibility.hlsli>
+#include <render/rtxdi/internal/PT/PathTracerRandomContext.hlsli>
+#include <render/rtxdi/internal/PT/PathTracerContext.hlsli>
+#include <render/rtxdi/internal/PT/Reservoir.hlsli>
 
 void RAB_ReconnectionDenoiserCallback(RTXDI_PTReservoir neighborSample, RAB_Surface surface, inout RAB_PathTracerUserData userData)
 {
@@ -138,9 +138,9 @@ void RAB_PathTrace(inout RTXDI_PathTracerContext ctx, inout RTXDI_PathTracerRand
 }
 
 #if defined(RTXDI_RESTIR_PT_INITIAL_SAMPLING)
-#include <Rtxdi/PT/InitialSampling.hlsli>
+#include <render/rtxdi/internal/PT/InitialSampling.hlsli>
 #elif defined(RTXDI_RESTIR_PT_HYBRID_SHIFT)
-#include <Rtxdi/PT/HybridShift.hlsli>
+#include <render/rtxdi/internal/PT/HybridShift.hlsli>
 #endif
 
 #endif // CAUSTICA_RESTIR_PT_PATH_TRACER_HLSLI

@@ -7,10 +7,10 @@
 #endif
 
 #include "RtxdiApplicationBridge.hlsli"
-#include <Rtxdi/Di/BoilingFilter.hlsli>
-#include <Rtxdi/Di/SpatialResampling.hlsli>
-#include <Rtxdi/Di/SpatioTemporalResampling.hlsli>
-#include <Rtxdi/Di/TemporalResampling.hlsli>
+#include <render/rtxdi/internal/Di/BoilingFilter.hlsli>
+#include <render/rtxdi/internal/Di/SpatialResampling.hlsli>
+#include <render/rtxdi/internal/Di/SpatioTemporalResampling.hlsli>
+#include <render/rtxdi/internal/Di/TemporalResampling.hlsli>
 
 #if USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)] 

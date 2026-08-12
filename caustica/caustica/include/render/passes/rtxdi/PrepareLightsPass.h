@@ -3,7 +3,7 @@
 #include <ecs/Entity.h>
 #include <math/math.h>
 #include <rhi/rhi.h>
-#include <rtxdi/DI/ReSTIRDI.h>
+#include <render/rtxdi/internal/DI/ReSTIRDI.h>
 #include <memory>
 #include <unordered_map>
 #include <vector>

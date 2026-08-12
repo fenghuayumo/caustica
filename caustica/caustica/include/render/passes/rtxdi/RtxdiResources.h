@@ -2,7 +2,7 @@
 
 #include <rhi/rhi.h>
 
-namespace rtxdi
+namespace caustica::rtxdi_internal
 {
     class ReSTIRDIContext;
     class ReSTIRPTContext;
@@ -34,9 +34,9 @@ public:
 
     RtxdiResources(
         caustica::rhi::Device* device, 
-        const rtxdi::ReSTIRDIContext& context,
-        const rtxdi::ReSTIRPTContext& ptContext,
-        const rtxdi::RISBufferSegmentAllocator& risBufferSegmentAllocator,
+        const caustica::rtxdi_internal::ReSTIRDIContext& context,
+        const caustica::rtxdi_internal::ReSTIRPTContext& ptContext,
+        const caustica::rtxdi_internal::RISBufferSegmentAllocator& risBufferSegmentAllocator,
         uint32_t maxEmissiveMeshes,
         uint32_t maxEmissiveTriangles,
         uint32_t maxPrimitiveLights,

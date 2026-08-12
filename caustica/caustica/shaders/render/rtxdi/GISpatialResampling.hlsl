@@ -3,10 +3,10 @@
 #define NON_PATH_TRACING_PASS 1
 
 #include "../rtxdi/RtxdiApplicationBridge.hlsli"
-#include <Rtxdi/GI/Reservoir.hlsli>
-#include <Rtxdi/GI/TemporalResampling.hlsli>
-#include <Rtxdi/GI/SpatioTemporalResampling.hlsli>
-#include <Rtxdi/GI/SpatialResampling.hlsli>
+#include <render/rtxdi/internal/GI/Reservoir.hlsli>
+#include <render/rtxdi/internal/GI/TemporalResampling.hlsli>
+#include <render/rtxdi/internal/GI/SpatioTemporalResampling.hlsli>
+#include <render/rtxdi/internal/GI/SpatialResampling.hlsli>
 
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
 void main(uint2 GlobalIndex : SV_DispatchThreadID, uint2 LocalIndex : SV_GroupThreadID, uint2 GroupIdx : SV_GroupID)

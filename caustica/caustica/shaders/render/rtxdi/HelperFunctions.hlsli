@@ -1,7 +1,7 @@
 #ifndef HELPER_FUNCTIONS_HLSLI
 #define HELPER_FUNCTIONS_HLSLI
 
-#include <Rtxdi/Utils/Math.hlsli>
+#include <render/rtxdi/internal/Utils/Math.hlsli>
 #include <shaders/PathTracer/Utils/Geometry.hlsli>
 
 static const float c_pi = 3.1415926535;

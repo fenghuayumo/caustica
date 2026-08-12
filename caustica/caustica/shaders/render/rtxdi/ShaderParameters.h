@@ -8,10 +8,10 @@
 #include <shaders/sky_cb.h>
 
 
-#include <Rtxdi/DI/ReSTIRDIParameters.h>
-#include <Rtxdi/ReGIR/ReGIRParameters.h>
-#include <Rtxdi/GI/ReSTIRGIParameters.h>
-#include <Rtxdi/PT/ReSTIRPTParameters.h>
+#include <render/rtxdi/internal/DI/ReSTIRDIParameters.h>
+#include <render/rtxdi/internal/ReGIR/ReGIRParameters.h>
+#include <render/rtxdi/internal/GI/ReSTIRGIParameters.h>
+#include <render/rtxdi/internal/PT/ReSTIRPTParameters.h>
 #include <shaders/PathTracer/PathTracerShared.h>
 #include <shaders/PathTracer/Lighting/PolymorphicLight.h>
 #include <shaders/Bindings/BindingDataTypes.hlsli>

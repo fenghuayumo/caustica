@@ -1,7 +1,7 @@
 #include <render/passes/rtxdi/RtxdiPass.h>
-#include "RtxdiSdkAdapter.h"
-#include <rtxdi/ImportanceSamplingContext.h>
-#include <rtxdi/PT/ReSTIRPT.h>
+#include "RtxdiRuntimeAdapter.h"
+#include <render/rtxdi/internal/ImportanceSamplingContext.h>
+#include <render/rtxdi/internal/PT/ReSTIRPT.h>
 
 #include <render/FrameGraphPasses.h>
 #include <render/FrameGraphContext.h>
@@ -31,7 +31,7 @@
 using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
-namespace rtxdi_sdk = caustica::render::rtxdi_sdk;
+namespace rtxdi_runtime = caustica::render::rtxdi_runtime;
 
 RtxdiPass::RtxdiPass(
 	caustica::rhi::Device* device,
@@ -86,11 +86,11 @@ void RtxdiPass::checkContextStaticParameters()
         if (reSTIRDIContext.GetStaticParameters().RenderWidth != m_BridgeParameters.frameDims.x ||
             reSTIRDIContext.GetStaticParameters().RenderHeight != m_BridgeParameters.frameDims.y)
             needsReset = true;
-        if (reSTIRDIContext.GetStaticParameters().CheckerboardSamplingMode != rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode))
+        if (reSTIRDIContext.GetStaticParameters().CheckerboardSamplingMode != rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.checkerboardMode))
             needsReset = true;
-        if (m_ReSTIRPTContext && m_ReSTIRPTContext->GetStaticParams().CheckerboardSamplingMode != rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode))
+        if (m_ReSTIRPTContext && m_ReSTIRPTContext->GetStaticParams().CheckerboardSamplingMode != rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.checkerboardMode))
             needsReset = true;
-		if (reGIRContext.GetReGIRStaticParameters().Mode != static_cast<::rtxdi::ReGIRMode>(m_BridgeParameters.userSettings.regir.regirStaticParams.Mode))
+		if (reGIRContext.GetReGIRStaticParameters().Mode != static_cast<::caustica::rtxdi_internal::ReGIRMode>(m_BridgeParameters.userSettings.regir.regirStaticParams.Mode))
 			needsReset = true;
 		if (reGIRContext.GetReGIRStaticParameters().LightsPerCell != m_BridgeParameters.userSettings.regir.regirStaticParams.LightsPerCell)
 			needsReset = true;
@@ -104,31 +104,31 @@ void RtxdiPass::updateContextDynamicParameters()
 {
 	// ReSTIR DI
 	m_ImportanceSamplingContext->GetReSTIRDIContext().SetFrameIndex(m_BridgeParameters.frameIndex);
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetInitialSamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.initialSamplingParams));
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.resamplingMode));
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.temporalResamplingParams));
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.spatialResamplingParams));
-	m_ImportanceSamplingContext->GetReSTIRDIContext().SetShadingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirDI.shadingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetInitialSamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirDI.initialSamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetResamplingMode(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirDI.resamplingMode));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetTemporalResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirDI.temporalResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetSpatialResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirDI.spatialResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRDIContext().SetShadingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirDI.shadingParams));
 
 	// ReSTIR GI
 	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFrameIndex(m_BridgeParameters.frameIndex);
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.resamplingMode));
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.temporalResamplingParams));
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.spatialResamplingParams));
-	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFinalShadingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirGI.finalShadingParams));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetResamplingMode(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirGI.resamplingMode));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetTemporalResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirGI.temporalResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetSpatialResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirGI.spatialResamplingParams));
+	m_ImportanceSamplingContext->GetReSTIRGIContext().SetFinalShadingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirGI.finalShadingParams));
 
     // ReSTIR PT
     m_ReSTIRPTContext->SetFrameIndex(m_BridgeParameters.frameIndex);
-    m_ReSTIRPTContext->SetResamplingMode(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.resamplingMode));
-    m_ReSTIRPTContext->SetInitialSamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.initialSamplingParams));
-    m_ReSTIRPTContext->SetTemporalResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.temporalResamplingParams));
-    m_ReSTIRPTContext->SetReconnectionParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.reconnectionParams));
-    m_ReSTIRPTContext->SetHybridShiftParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.hybridShiftParams));
-    m_ReSTIRPTContext->SetBoilingFilterParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.boilingFilterParams));
-    m_ReSTIRPTContext->SetSpatialResamplingParameters(rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.restirPT.spatialResamplingParams));
+    m_ReSTIRPTContext->SetResamplingMode(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.resamplingMode));
+    m_ReSTIRPTContext->SetInitialSamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.initialSamplingParams));
+    m_ReSTIRPTContext->SetTemporalResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.temporalResamplingParams));
+    m_ReSTIRPTContext->SetReconnectionParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.reconnectionParams));
+    m_ReSTIRPTContext->SetHybridShiftParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.hybridShiftParams));
+    m_ReSTIRPTContext->SetBoilingFilterParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.boilingFilterParams));
+    m_ReSTIRPTContext->SetSpatialResamplingParameters(rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.restirPT.spatialResamplingParams));
 
 	// ReGIR
-	auto regirParams = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.regir.regirDynamicParameters);
+	auto regirParams = rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.regir.regirDynamicParameters);
 	regirParams.center = { m_BridgeParameters.cameraPosition.x, m_BridgeParameters.cameraPosition.y,m_BridgeParameters.cameraPosition.z };
 	m_ImportanceSamplingContext->GetReGIRContext().SetDynamicParameters(regirParams);
 }
@@ -141,7 +141,7 @@ void RtxdiPass::createPipelines(caustica::rhi::BindingLayoutHandle extraBindingL
 
 	m_PresampleLightsPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/rtxdi/PresampleLights.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	m_PresampleEnvMapPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/rtxdi/PresampleEnvironmentMap.hlsl", "main", {}, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
-	if (reGIRParams.Mode != rtxdi::ReGIRMode::Disabled)
+	if (reGIRParams.Mode != caustica::rtxdi_internal::ReGIRMode::Disabled)
 	{
 		m_PresampleReGIRPass.init(m_device, *m_shaderFactory, "caustica/shaders/render/rtxdi/PresampleReGIR.hlsl", "main", regirMacros, m_bindingLayout, extraBindingLayout, m_bindlessLayout);
 	}
@@ -291,19 +291,19 @@ void RtxdiPass::prepareResources(
     if (!m_ImportanceSamplingContext)
     {
         // Set static parameters for ReSTIR DI, ReSTIR GI and ReGIR
-        rtxdi::ImportanceSamplingContext_StaticParameters staticParameters = {};
+        caustica::rtxdi_internal::ImportanceSamplingContext_StaticParameters staticParameters = {};
         staticParameters.renderWidth = m_BridgeParameters.frameDims.x;
         staticParameters.renderHeight = m_BridgeParameters.frameDims.y;
-        staticParameters.CheckerboardSamplingMode = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode);
-        staticParameters.regirStaticParams = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.regir.regirStaticParams);
+        staticParameters.CheckerboardSamplingMode = rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.checkerboardMode);
+        staticParameters.regirStaticParams = rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.regir.regirStaticParams);
 
-        m_ImportanceSamplingContext = std::make_unique<rtxdi::ImportanceSamplingContext>(staticParameters);
+        m_ImportanceSamplingContext = std::make_unique<caustica::rtxdi_internal::ImportanceSamplingContext>(staticParameters);
 
-        rtxdi::ReSTIRPTStaticParameters ptStaticParameters = {};
+        caustica::rtxdi_internal::ReSTIRPTStaticParameters ptStaticParameters = {};
         ptStaticParameters.RenderWidth = m_BridgeParameters.frameDims.x;
         ptStaticParameters.RenderHeight = m_BridgeParameters.frameDims.y;
-        ptStaticParameters.CheckerboardSamplingMode = rtxdi_sdk::toSdk(m_BridgeParameters.userSettings.checkerboardMode);
-        m_ReSTIRPTContext = std::make_unique<rtxdi::ReSTIRPTContext>(ptStaticParameters);
+        ptStaticParameters.CheckerboardSamplingMode = rtxdi_runtime::toInternal(m_BridgeParameters.userSettings.checkerboardMode);
+        m_ReSTIRPTContext = std::make_unique<caustica::rtxdi_internal::ReSTIRPTContext>(ptStaticParameters);
 
         // RTXDI context settings affect the shader permutations
         createPipelines(extraBindingLayout, true);
@@ -461,7 +461,7 @@ void RtxdiPass::presampleReGIR(caustica::rhi::CommandListHandle commandList, cau
 	const auto& reGIRContext = m_ImportanceSamplingContext->GetReGIRContext();
 	if (!m_ImportanceSamplingContext->IsReGIREnabled()
 		|| !m_BridgeParameters.usingReGIR
-		|| reGIRContext.GetReGIRStaticParameters().Mode == rtxdi::ReGIRMode::Disabled)
+		|| reGIRContext.GetReGIRStaticParameters().Mode == caustica::rtxdi_internal::ReGIRMode::Disabled)
 		return;
 
 	dm::int3 worldGridDispatchSize = {
@@ -503,7 +503,7 @@ void RtxdiPass::execute(
 	dm::int2 dispatchSize = { (int) reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
 	
 	// Not implemented
-	//if (reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::FusedSpatiotemporal)
+	//if (reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::FusedSpatiotemporal)
 	//{
 	//	// TODO: combine initial, temporal, spatial and final sampling in one pass
 	//       // In case this is implemented, probably no point in doing fused ReSTIR-DI and ReSTIR-GI sampling, so 
@@ -514,15 +514,15 @@ void RtxdiPass::execute(
 		//Generate sample, pick re-sampling method, final sampling
 		executeRayTracingPass(commandList, m_GenerateInitialSamplesPass, "Generate Initial Samples", dispatchSize, extraBindingSet);
 
-		if (reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::Temporal ||
-			reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
+		if (reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::Temporal ||
+			reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
 		{
 			caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
 			executeRayTracingPass(commandList, m_TemporalResamplingPass, "Temporal Re-sampling", dispatchSize, extraBindingSet);
 		}
 		
-		if (reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::Spatial ||
-			reSTIRDI.GetResamplingMode() == rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
+		if (reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::Spatial ||
+			reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::TemporalAndSpatial)
 		{
 			caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->LightReservoirBuffer);
 			executeRayTracingPass(commandList, m_SpatialResamplingPass, "Spatial Re-sampling", dispatchSize, extraBindingSet);
@@ -575,7 +575,7 @@ void RtxdiPass::fillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants
 	bridgeConstants.reStirGIVaryAgeThreshold = m_BridgeParameters.userSettings.reStirGIVaryAgeThreshold;
 
 	const auto& giSampleMode = m_ImportanceSamplingContext->GetReSTIRGIContext().GetResamplingMode();
-	bridgeConstants.reStirGIEnableTemporalResampling = ((giSampleMode == rtxdi::ReSTIRGI_ResamplingMode::Temporal) || (giSampleMode == rtxdi::ReSTIRGI_ResamplingMode::TemporalAndSpatial)) ? 1 : 0;
+	bridgeConstants.reStirGIEnableTemporalResampling = ((giSampleMode == caustica::rtxdi_internal::ReSTIRGI_ResamplingMode::Temporal) || (giSampleMode == caustica::rtxdi_internal::ReSTIRGI_ResamplingMode::TemporalAndSpatial)) ? 1 : 0;
 }
 
 void RtxdiPass::fillDIConstants(ReSTIRDI_Parameters& diParams)
@@ -638,7 +638,7 @@ void RtxdiPass::fillReGIRConstant(ReGIR_Parameters& regirParams)
 	regirParams.commonParams.centerX = dynamicParams.center.x;
 	regirParams.commonParams.centerY = dynamicParams.center.y;
 	regirParams.commonParams.centerZ = dynamicParams.center.z;
-	regirParams.commonParams.cellSize = (staticParams.Mode == rtxdi::ReGIRMode::Onion)
+	regirParams.commonParams.cellSize = (staticParams.Mode == caustica::rtxdi_internal::ReGIRMode::Onion)
 		? dynamicParams.regirCellSize * 0.5f // Onion operates with radii, while "size" feels more like diameter
 		: dynamicParams.regirCellSize;
 	regirParams.commonParams.localLightSamplingFallbackMode = static_cast<uint32_t>(dynamicParams.fallbackSamplingMode);
@@ -681,7 +681,7 @@ void RtxdiPass::executeGI(caustica::rhi::CommandListHandle commandList, caustica
 
 	executeRayTracingPass(commandList, m_GITemporalResamplingPass, "Temporal Resampling", dispatchSize, extraBindingSet);
 
-	if (reSTIRGI.GetResamplingMode() == rtxdi::ReSTIRGI_ResamplingMode::Spatial || reSTIRGI.GetResamplingMode() == rtxdi::ReSTIRGI_ResamplingMode::TemporalAndSpatial)
+	if (reSTIRGI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRGI_ResamplingMode::Spatial || reSTIRGI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRGI_ResamplingMode::TemporalAndSpatial)
 	{
 		caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->GIReservoirBuffer);
 
@@ -713,15 +713,15 @@ void RtxdiPass::executePT(caustica::rhi::CommandListHandle commandList, caustica
 
     executeRayTracingPass(commandList, m_PTGenerateInitialSamplesPass, "Generate Initial PT Samples", dispatchSize, extraBindingSet);
 
-    if (reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::Temporal ||
-        reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
+    if (reSTIRPT.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRPT_ResamplingMode::Temporal ||
+        reSTIRPT.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
     {
         caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
         executeRayTracingPass(commandList, m_PTTemporalResamplingPass, "PT Temporal Resampling", dispatchSize, extraBindingSet);
     }
 
-    if (reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::Spatial ||
-        reSTIRPT.GetResamplingMode() == rtxdi::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
+    if (reSTIRPT.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRPT_ResamplingMode::Spatial ||
+        reSTIRPT.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRPT_ResamplingMode::TemporalAndSpatial)
     {
         caustica::rhi::utils::BufferUavBarrier(commandList, m_rtxdiResources->PTReservoirBuffer);
         executeRayTracingPass(commandList, m_PTSpatialResamplingPass, "PT Spatial Resampling", dispatchSize, extraBindingSet);
@@ -1004,19 +1004,19 @@ void RtxdiPass::executeRayTracingPass(
 	commandList->endMarker();
 }
 
-caustica::ShaderMacro RtxdiPass::getReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters)
+caustica::ShaderMacro RtxdiPass::getReGirMacro(const caustica::rtxdi_internal::ReGIRStaticParameters& regirParameters)
 {
 	std::string regirMode;
 
 	switch (regirParameters.Mode)
 	{
-	case rtxdi::ReGIRMode::Disabled :
+	case caustica::rtxdi_internal::ReGIRMode::Disabled :
 		regirMode = "RTXDI_REGIR_DISABLED";
 		break;
-	case rtxdi::ReGIRMode::Grid :
+	case caustica::rtxdi_internal::ReGIRMode::Grid :
 		regirMode = "RTXDI_REGIR_GRID";
 		break;
-	case rtxdi::ReGIRMode::Onion :
+	case caustica::rtxdi_internal::ReGIRMode::Onion :
 		regirMode = "RTXDI_REGIR_ONION";
 		break;
 	}

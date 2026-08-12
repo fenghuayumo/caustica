@@ -1,6 +1,6 @@
 #include "ShaderParameters.h"
 #include <shaders/binding_helpers.hlsli>
-#include <Rtxdi/Utils/Math.hlsli>
+#include <render/rtxdi/internal/Utils/Math.hlsli>
 #include <shaders/PathTracer/Utils/Math/MathHelpers.hlsli>
 #include <shaders/PathTracer/Utils/Utils.hlsli>
 

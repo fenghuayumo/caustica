@@ -1,9 +1,9 @@
 #define RTXDI_WITH_RESTIR_GI
 
 #include <render/passes/rtxdi/RtxdiResources.h>
-#include <rtxdi/DI/ReSTIRDI.h>
-#include <rtxdi/PT/ReSTIRPT.h>
-#include <rtxdi/LightSampling/RISBufferSegmentAllocator.h>
+#include <render/rtxdi/internal/DI/ReSTIRDI.h>
+#include <render/rtxdi/internal/PT/ReSTIRPT.h>
+#include <render/rtxdi/internal/LightSampling/RISBufferSegmentAllocator.h>
 
 #include <math/math.h>
 
@@ -25,9 +25,9 @@ uint32_t getNextPowerOf2(uint32_t a)
 
 RtxdiResources::RtxdiResources(
     caustica::rhi::Device* device, 
-    const rtxdi::ReSTIRDIContext& context,
-    const rtxdi::ReSTIRPTContext& ptContext,
-    const rtxdi::RISBufferSegmentAllocator& risBufferSegmentAllocator,
+    const caustica::rtxdi_internal::ReSTIRDIContext& context,
+    const caustica::rtxdi_internal::ReSTIRPTContext& ptContext,
+    const caustica::rtxdi_internal::RISBufferSegmentAllocator& risBufferSegmentAllocator,
     uint32_t maxEmissiveMeshes,
     uint32_t maxEmissiveTriangles,
     uint32_t maxPrimitiveLights,
@@ -116,7 +116,7 @@ RtxdiResources::RtxdiResources(
 
 
     caustica::rhi::BufferDesc lightReservoirBufferDesc;
-    lightReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
+    lightReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * caustica::rtxdi_internal::c_NumReSTIRDIReservoirBuffers;
     lightReservoirBufferDesc.structStride = sizeof(RTXDI_PackedDIReservoir);
     lightReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     lightReservoirBufferDesc.keepInitialState = true;
@@ -126,7 +126,7 @@ RtxdiResources::RtxdiResources(
 
 
     caustica::rhi::BufferDesc giReservoirBufferDesc;
-    giReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedGIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
+    giReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedGIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * caustica::rtxdi_internal::c_NumReSTIRDIReservoirBuffers;
     giReservoirBufferDesc.structStride = sizeof(RTXDI_PackedGIReservoir);
     giReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     giReservoirBufferDesc.keepInitialState = true;
@@ -136,7 +136,7 @@ RtxdiResources::RtxdiResources(
 
 
     caustica::rhi::BufferDesc ptReservoirBufferDesc;
-    ptReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedPTReservoir) * ptContext.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRPTReservoirBuffers;
+    ptReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedPTReservoir) * ptContext.GetReservoirBufferParameters().reservoirArrayPitch * caustica::rtxdi_internal::c_NumReSTIRPTReservoirBuffers;
     ptReservoirBufferDesc.structStride = sizeof(RTXDI_PackedPTReservoir);
     ptReservoirBufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
     ptReservoirBufferDesc.keepInitialState = true;
@@ -145,7 +145,7 @@ RtxdiResources::RtxdiResources(
     PTReservoirBuffer = device->createBuffer(ptReservoirBufferDesc);
 
     caustica::rhi::TextureDesc localLightPdfDesc;
-    rtxdi::ComputePdfTextureSize(maxLocalLights, localLightPdfDesc.width, localLightPdfDesc.height, localLightPdfDesc.mipLevels);
+    caustica::rtxdi_internal::ComputePdfTextureSize(maxLocalLights, localLightPdfDesc.width, localLightPdfDesc.height, localLightPdfDesc.mipLevels);
     assert(localLightPdfDesc.width * localLightPdfDesc.height >= maxLocalLights);
     localLightPdfDesc.isUAV = true;
     localLightPdfDesc.debugName = "LocalLightPdf";
@@ -163,7 +163,7 @@ void RtxdiResources::initializeNeighborOffsets(caustica::rhi::CommandList* comma
     std::vector<uint8_t> offsets;
     offsets.resize(neighborOffsetCount * 2); 
 
-    rtxdi::FillNeighborOffsetBuffer(offsets.data(), neighborOffsetCount);
+    caustica::rtxdi_internal::FillNeighborOffsetBuffer(offsets.data(), neighborOffsetCount);
 
     commandList->writeBuffer(NeighborOffsetsBuffer, offsets.data(), offsets.size());
 

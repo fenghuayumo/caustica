@@ -1,9 +1,9 @@
 #pragma pack_matrix(row_major)
 
 #include "RtxdiApplicationBridge.hlsli"
-#include <Rtxdi/DI/TemporalResampling.hlsli>
-#include <Rtxdi/DI/SpatioTemporalResampling.hlsli>
-#include <Rtxdi/DI/SpatialResampling.hlsli>
+#include <render/rtxdi/internal/DI/TemporalResampling.hlsli>
+#include <render/rtxdi/internal/DI/SpatioTemporalResampling.hlsli>
+#include <render/rtxdi/internal/DI/SpatialResampling.hlsli>
 
 #if USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]

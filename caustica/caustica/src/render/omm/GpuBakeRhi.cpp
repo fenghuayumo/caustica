@@ -13,7 +13,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 #include <rhi/common/misc.h>
 #include <rhi/utils.h>
 
-#include <omm.hpp>
+#include <render/omm/internal/omm.hpp>
 
 #include <vector>
 #include <stdint.h>

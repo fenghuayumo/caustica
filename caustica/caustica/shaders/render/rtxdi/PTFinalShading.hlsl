@@ -3,7 +3,7 @@
 #define NON_PATH_TRACING_PASS 1
 
 #include "../rtxdi/RtxdiApplicationBridge.hlsli"
-#include <Rtxdi/PT/Reservoir.hlsli>
+#include <render/rtxdi/internal/PT/Reservoir.hlsli>
 
 float3 CAUSTICA_RtxdiPT_SanitizeRadiance(float3 radiance)
 {

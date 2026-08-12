@@ -4,8 +4,8 @@
 #define RTXDI_RESTIR_PT_HYBRID_SHIFT
 
 #include "../rtxdi/PTPathTracer.hlsli"
-#include <Rtxdi/Utils/RandomSamplerPerPassSeeds.hlsli>
-#include <Rtxdi/PT/SpatialResampling.hlsli>
+#include <render/rtxdi/internal/Utils/RandomSamplerPerPassSeeds.hlsli>
+#include <render/rtxdi/internal/PT/SpatialResampling.hlsli>
 
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
 void main(uint2 globalIndex : SV_DispatchThreadID)

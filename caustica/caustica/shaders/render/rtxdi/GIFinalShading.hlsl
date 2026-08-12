@@ -6,7 +6,7 @@
 
 #include "../rtxdi/RtxdiApplicationBridge.hlsli"
 
-#include <Rtxdi/GI/Reservoir.hlsli>
+#include <render/rtxdi/internal/GI/Reservoir.hlsli>
 
 static const float kMaxBrdfValue = 1e4;
 static const float kMISRoughness = 0.2;

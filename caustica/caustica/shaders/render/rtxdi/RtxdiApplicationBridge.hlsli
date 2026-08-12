@@ -84,8 +84,8 @@ SamplerState s_EnvironmentSampler                           : register(s4 VK_DES
 #if !defined(CAUSTICA_RTXDI_RESOURCES_ONLY)
 
 #include "PolymorphicLightRTXDI.hlsli"
-#include <Rtxdi/Utils/BrdfRaySample.hlsli>
-#include <Rtxdi/Utils/RandomSamplerState.hlsli>
+#include <render/rtxdi/internal/Utils/BrdfRaySample.hlsli>
+#include <render/rtxdi/internal/Utils/RandomSamplerState.hlsli>
 
 static const bool kSpecularOnly = false;
 static const float kMinRoughness = 0.05f;

@@ -9,7 +9,7 @@
 #define RTXDI_BOILING_FILTER_GROUP_SIZE RTXDI_SCREEN_SPACE_GROUP_SIZE
 #endif
 
-#include <Rtxdi/DI/SpatioTemporalResampling.hlsli>
+#include <render/rtxdi/internal/DI/SpatioTemporalResampling.hlsli>
 
 #if USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]

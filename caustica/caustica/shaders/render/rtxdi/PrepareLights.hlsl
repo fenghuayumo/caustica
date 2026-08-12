@@ -2,7 +2,7 @@
 
 #include <shaders/bindless.h>
 #include <shaders/binding_helpers.hlsli>
-#include <Rtxdi/Utils/Math.hlsli>
+#include <render/rtxdi/internal/Utils/Math.hlsli>
 #include "ShaderParameters.h"
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
 #include <shaders/PathTracer/Utils/Utils.hlsli>

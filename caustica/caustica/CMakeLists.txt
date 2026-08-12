@@ -83,9 +83,6 @@ set(CAUSTICA_COMMON_INCLUDE_PUBLIC
 
 set(CAUSTICA_COMMON_INCLUDE_PRIVATE
     "${CAUSTICA_NRD_INCLUDE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtxdi/Include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include"
 )
 
 set(CAUSTICA_COMMON_COMPILE_DEFS
@@ -130,8 +127,6 @@ endfunction()
 # ═══════════════════════════════════════════════════════════════════════════
 # Third-party render libraries (RTXDI, OMM — vendored in-engine)
 # ═══════════════════════════════════════════════════════════════════════════
-
-add_subdirectory(third_party)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # FOUNDATION LAYER — no dependencies on other caustica modules
@@ -448,9 +443,24 @@ add_library(causRender STATIC ${caus_render_headers} ${caus_render_sources})
 caus_configure_static(causRender)
 target_link_libraries(causRender
     PUBLIC causScene causBackend causImgui causAssets causEcs
-    PUBLIC jsoncpp_static Rtxdi omm-lib
-    PRIVATE MathLib
+    PUBLIC jsoncpp_static
+    PRIVATE MathLib glm stb_lib xxHash::xxhash lz4
 )
+target_include_directories(causRender PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/render/omm/internal"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/render/omm/internal"
+    "${CMAKE_CURRENT_SOURCE_DIR}/shaders/render/omm/internal"
+)
+target_compile_definitions(causRender PRIVATE
+    OMM_VK_S_SHIFT=100
+    OMM_VK_T_SHIFT=200
+    OMM_VK_B_SHIFT=300
+    OMM_VK_U_SHIFT=400
+)
+find_package(OpenMP QUIET)
+if (OpenMP_CXX_FOUND)
+    target_link_libraries(causRender PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # NRD CPU implementation is compiled into causRender (not a separate lib).
 set(_nrd_compile_defs
@@ -578,18 +588,18 @@ if (CAUSTICA_WITH_STATIC_SHADERS)
     target_include_directories(causRender PRIVATE "${CAUSTICA_ENGINE_STATIC_SHADERS_DIR}")
 endif()
 
-# OMM runtime shader compilation (shaders live under third_party/omm)
+# OMM runtime shader compilation (caustica internal implementation)
 util_generate_shader_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/omm.cfg"
-    "third_party/omm/libraries/omm-lib/shaders"
+    "shaders/render/omm/internal"
     "-D COMPILER_DXC=1"
 )
 
 set(omm_shader_compile_args
     TARGET omm_shaders
     CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/omm.cfg
-    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/omm/libraries/omm-lib/include
-    FOLDER "caustica/third_party"
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/include/render/omm/internal
+    FOLDER "caustica/render"
     SPIRV_DXC ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ShaderPrecompiled/omm/spirv
 )
 if (WIN32)

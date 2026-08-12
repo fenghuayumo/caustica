@@ -5,7 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include <rtxdi/ImportanceSamplingContext.h>
+#include <render/rtxdi/internal/ImportanceSamplingContext.h>
 #include <render/core/ComputePass.h>
 #include "RayTracingPass.h"
 #include "RtxdiResources.h"
@@ -153,8 +153,8 @@ private:
 	void createPipelines(caustica::rhi::BindingLayoutHandle extraBindingLayout = nullptr, bool useRayQuery = true);
 	void createBindingSet(const RenderTargets& renderTargets);
 
-	std::unique_ptr<rtxdi::ImportanceSamplingContext> m_ImportanceSamplingContext;
-    std::unique_ptr<rtxdi::ReSTIRPTContext> m_ReSTIRPTContext;
+	std::unique_ptr<caustica::rtxdi_internal::ImportanceSamplingContext> m_ImportanceSamplingContext;
+    std::unique_ptr<caustica::rtxdi_internal::ReSTIRPTContext> m_ReSTIRPTContext;
 	std::shared_ptr<RtxdiResources> m_rtxdiResources;
 	std::unique_ptr<PrepareLightsPass> m_PrepareLightsPass;
 	std::unique_ptr<GenerateMipsPass> m_LocalLightPdfMipmapPass;
@@ -202,7 +202,7 @@ private:
 		caustica::rhi::BindingSet* extraBindingSet = nullptr
 	);
 
-	caustica::ShaderMacro getReGirMacro(const rtxdi::ReGIRStaticParameters& regirParameters);
+	caustica::ShaderMacro getReGirMacro(const caustica::rtxdi_internal::ReGIRStaticParameters& regirParameters);
 
 	void fillConstants(caustica::rhi::CommandListHandle commandList);
 	void fillSharedConstants(struct RtxdiBridgeConstants& bridgeConstants) const;

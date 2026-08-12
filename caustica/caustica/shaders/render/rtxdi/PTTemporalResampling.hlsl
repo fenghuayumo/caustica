@@ -9,9 +9,9 @@
 #endif
 
 #include "../rtxdi/PTPathTracer.hlsli"
-#include <Rtxdi/Utils/RandomSamplerPerPassSeeds.hlsli>
-#include <Rtxdi/PT/BoilingFilter.hlsli>
-#include <Rtxdi/PT/TemporalResampling.hlsli>
+#include <render/rtxdi/internal/Utils/RandomSamplerPerPassSeeds.hlsli>
+#include <render/rtxdi/internal/PT/BoilingFilter.hlsli>
+#include <render/rtxdi/internal/PT/TemporalResampling.hlsli>
 
 float3 CAUSTICA_RtxdiPT_LoadMotionVector(uint2 pixelPosition)
 {
