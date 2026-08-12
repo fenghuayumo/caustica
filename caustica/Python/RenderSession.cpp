@@ -3,8 +3,13 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include <engine/EngineApp.h>
+#include <engine/EntryPoint.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
+#include <engine/SceneViewState.h>
+#include <engine/RenderFrameApi.h>
+#include <engine/internal/SceneApiInternal.h>
+#include <scene/SceneManager.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/RenderDevice.h>
 #include <core/file_utils.h>
@@ -18,9 +23,13 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cctype>
 #include <cstring>
+#include <cmath>
 #include <filesystem>
+#include <thread>
+#include <mutex>
 #include <vector>
 
 #if CAUSTICA_WITH_DX12
@@ -40,6 +49,22 @@
 namespace
 {
     constexpr double c_HeadlessFrameTimeSeconds = 1.0 / 60.0;
+    std::mutex g_platformMutex;
+    uint32_t g_platformUsers = 0;
+
+    void AcquireAppPlatform()
+    {
+        std::lock_guard lock(g_platformMutex);
+        if (g_platformUsers++ == 0)
+            caustica::initializeAppPlatform();
+    }
+
+    void ReleaseAppPlatform()
+    {
+        std::lock_guard lock(g_platformMutex);
+        if (g_platformUsers > 0 && --g_platformUsers == 0)
+            caustica::shutdownAppPlatform();
+    }
 
     void AppendUnique(std::vector<std::string>& values, const std::string& value)
     {
@@ -320,6 +345,8 @@ namespace caustica_py
 RenderSession::RenderSession(const Config& cfg)
     : m_config(cfg)
 {
+    AcquireAppPlatform();
+    m_platformInitialized = true;
     m_config.scene = PrepareSceneArgument(cfg.scene);
 
     if (cfg.nonInteractive)
@@ -371,8 +398,11 @@ RenderSession::RenderSession(const Config& cfg)
 
     m_initialized = true;
 
-    if (!m_config.scene.empty())
-        WaitUntilReady();
+    if (!m_config.scene.empty() && !WaitUntilReady())
+    {
+        caustica::error("RenderSession: scene did not become ready");
+        shutdown();
+    }
 }
 
 RenderSession::~RenderSession()
@@ -386,9 +416,15 @@ void RenderSession::shutdown()
         m_engine->shutdown();
     m_engine.reset();
     m_initialized = false;
+    if (m_platformInitialized)
+    {
+        ReleaseAppPlatform();
+        m_platformInitialized = false;
+    }
 }
 
-bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
+bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady,
+                              double timeoutSeconds, int warmupFrames)
 {
     if (!m_initialized || !m_engine)
         return false;
@@ -396,24 +432,60 @@ bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady)
     m_engine->setScene(PrepareSceneArgument(sceneName), /*forceReload=*/true);
 
     if (waitUntilReady)
-        return WaitUntilReady();
+        return WaitUntilReady(timeoutSeconds, warmupFrames);
     return true;
 }
 
-bool RenderSession::WaitUntilReady(int maxFrames)
+bool RenderSession::IsSceneReady() const
+{
+    if (!m_initialized || !m_engine || !m_engine->isSceneLoaded())
+        return false;
+
+    const auto* viewState = m_engine->app().tryResource<caustica::SceneViewState>();
+    if (!viewState)
+        return !m_engine->isSceneLoading();
+
+    // Secondary opacity/OMM streaming may continue after the scene is already
+    // published and renderable. Prewarm only needs the primary load transaction
+    // to finish and rendering suspension to be released.
+    return !viewState->loadSession.isActive()
+        && !viewState->sceneGpuSuspended.load(std::memory_order_acquire);
+}
+
+bool RenderSession::WaitUntilReady(double timeoutSeconds, int warmupFrames)
 {
     if (!m_initialized || !m_engine)
         return false;
 
-    // Loading + first-frame setup may take quite a few frames - keep
-    // pumping until the scene reports loaded.
-    for (int i = 0; i < maxFrames; ++i)
+    const auto start = std::chrono::steady_clock::now();
+    const auto timeout = std::chrono::duration<double>(std::max(0.0, timeoutSeconds));
+    while (timeoutSeconds <= 0.0 || std::chrono::steady_clock::now() - start < timeout)
     {
-        Step(0.0f);
-        if (m_engine->isSceneLoaded() && !m_engine->isSceneLoading())
+        if (!Step(0.0f))
+            return false;
+        if (IsSceneReady())
+        {
+            if (warmupFrames > 0 && !StepN(warmupFrames))
+                return false;
+            m_engine->renderAppState().settings.ResetAccumulation = true;
             return true;
+        }
+        // Scene import and GPU streaming run on worker/render domains. A headless
+        // loop can otherwise consume the frame budget in a fraction of a second
+        // before those domains get enough wall-clock time to finish.
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    caustica::warning("RenderSession: scene did not finish loading within %d frames", maxFrames);
+    const auto* viewState = m_engine->app().tryResource<caustica::SceneViewState>();
+    const auto* manager = caustica::detail::sessionManager(m_engine->app());
+    caustica::warning(
+        "RenderSession: scene did not become ready within %.1f seconds "
+        "(phase=%s managerLoaded=%d managerLoading=%d gpuSuspended=%d secondaryStreaming=%d)",
+        timeoutSeconds,
+        viewState ? caustica::loadSessionPhaseName(viewState->loadSession.phase) : "Unavailable",
+        manager && manager->isSceneLoaded() ? 1 : 0,
+        manager && manager->isSceneLoading() ? 1 : 0,
+        viewState && viewState->sceneGpuSuspended.load(std::memory_order_acquire) ? 1 : 0,
+        viewState && viewState->loadSession.secondaryStreaming.load(std::memory_order_acquire) ? 1 : 0);
     return false;
 }
 
@@ -475,12 +547,78 @@ int RenderSession::StepUntilAccumulated(int maxFrames)
     int frames = 0;
     while (frames < target)
     {
-        if (!Step()) break;
+        // All samples of one reference output frame must observe the same
+        // simulation/animation time. Sequence callers advance the pose once,
+        // then this loop freezes time while accumulating samples.
+        if (!Step(0.0f)) break;
         ++frames;
         if (m_engine->accumulationCompleted())
             break;
     }
     return frames;
+}
+
+bool RenderSession::PrepareAnimationFrame(
+    double sceneTime,
+    bool importedAnimations,
+    bool keyframes)
+{
+    if (!m_initialized || !m_engine || !std::isfinite(sceneTime))
+        return false;
+
+    caustica::App& app = m_engine->app();
+    auto& settings = m_engine->renderAppState().settings;
+    const bool previousRealtime = settings.RealtimeMode;
+    const bool previousAnimations = settings.EnableAnimations;
+    const bool previousKeyframes = settings.EnableKeyframes;
+
+    // Animation evaluation currently belongs to the realtime update path.
+    // Evaluate exactly once at the requested clock, then restore the caller's
+    // mode so reference accumulation can sample a frozen pose.
+    caustica::setSceneTime(app, sceneTime);
+    if (auto* viewState = app.tryResource<caustica::SceneViewState>())
+        viewState->keyframeTime = sceneTime;
+    settings.RealtimeMode = true;
+    settings.EnableAnimations = importedAnimations;
+    settings.EnableKeyframes = keyframes;
+    settings.ResetRealtimeCaches = true;
+    const bool ok = Step(0.0f);
+
+    settings.RealtimeMode = previousRealtime;
+    settings.EnableAnimations = previousAnimations;
+    settings.EnableKeyframes = previousKeyframes;
+    settings.ResetAccumulation = true;
+    return ok;
+}
+
+int RenderSession::RenderReferenceFrame(int spp, bool oidn, int maxFrames)
+{
+    if (!m_initialized || !m_engine || spp <= 0)
+        return 0;
+
+    auto& settings = m_engine->renderAppState().settings;
+    settings.RealtimeMode = false;
+    settings.AccumulationTarget = spp;
+    settings.AccumulationPreWarmRealtimeCaches = false;
+    settings.ReferenceOIDNDenoiser = oidn;
+    settings.ReferenceOIDNDenoiserChanged = true;
+    return StepUntilAccumulated(maxFrames);
+}
+
+bool RenderSession::RenderRealtimeFrame(float dt)
+{
+    if (!m_initialized || !m_engine || !std::isfinite(dt) || dt < 0.0f)
+        return false;
+
+    auto& settings = m_engine->renderAppState().settings;
+    if (!settings.RealtimeMode)
+    {
+        settings.RealtimeMode = true;
+        settings.ResetAccumulation = true;
+        settings.ResetRealtimeCaches = true;
+    }
+    settings.AccumulationTarget = 1;
+    return Step(dt);
 }
 
 bool RenderSession::SaveScreenshot(const std::string& outputPath)

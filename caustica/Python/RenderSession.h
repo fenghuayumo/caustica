@@ -52,11 +52,17 @@ public:
     RenderSession(const RenderSession&) = delete;
     RenderSession& operator=(const RenderSession&) = delete;
 
-    bool LoadScene(const std::string& sceneName, bool waitUntilReady = true);
-    bool WaitUntilReady(int maxFrames = 256);
+    bool LoadScene(const std::string& sceneName, bool waitUntilReady = true,
+                   double timeoutSeconds = 600.0, int warmupFrames = 4);
+    bool WaitUntilReady(double timeoutSeconds = 600.0, int warmupFrames = 4);
+    [[nodiscard]] bool IsSceneReady() const;
     bool Step(float dt = -1.0f);
     bool StepN(int frames);
     int  StepUntilAccumulated(int maxFrames = 0);
+    bool PrepareAnimationFrame(double sceneTime, bool importedAnimations = true,
+                               bool keyframes = true);
+    int  RenderReferenceFrame(int spp = 64, bool oidn = true, int maxFrames = 0);
+    bool RenderRealtimeFrame(float dt = 1.0f / 60.0f);
     bool SaveScreenshot(const std::string& outputPath);
 
     // CPU readback of the current LDR final color (same source as save_screenshot).
@@ -97,6 +103,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
 #endif
     bool                                            m_initialized = false;
+    bool                                            m_platformInitialized = false;
     double                                          m_lastTimeSeconds = 0.0;
     uint32_t                                        m_lastRenderedBackBufferIndex = UINT32_MAX;
 };

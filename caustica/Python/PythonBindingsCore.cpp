@@ -20,6 +20,7 @@
 #include <engine/MeshDeformApi.h>
 #include <engine/SceneSpawn.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/RenderFrameApi.h>
 #include <backend/GpuDevice.h>
 #include <render/RenderAppState.h>
 #include <render/WorldRenderer.h>
@@ -1488,7 +1489,7 @@ void RegisterCoreBindings(nb::module_& m)
             [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
             [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
 
-    nb::class_<PathTracerSettings>(m, "settings",
+    nb::class_<PathTracerSettings>(m, "Settings",
         "Live renderer session state (path tracer settings and runtime flags).\n"
         "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
         .def_rw("enable_animations",             &PathTracerSettings::EnableAnimations)
@@ -1707,9 +1708,6 @@ void RegisterCoreBindings(nb::module_& m)
                 nb::rv_policy::reference_internal,
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
-
-    // Docs / examples historically used `caustica.Settings`; keep both names.
-    m.attr("Settings") = nb::type<PathTracerSettings>();
 
     nb::class_<EditorUIData>(m, "EditorSettings",
         "Desktop-editor settings that extend `settings` with ImGui view state.")
@@ -2022,6 +2020,15 @@ void RegisterCoreBindings(nb::module_& m)
             [](App& self) { return caustica::accumulationCompleted(self); })
         .def_prop_ro("accumulation_sample_index",
             [](App& self) { return caustica::accumulationSampleIndex(self); })
+        .def_prop_rw("scene_time",
+            [](App& self) { return caustica::sceneTime(self); },
+            [](App& self, double value) {
+                if (!std::isfinite(value))
+                    throw std::runtime_error("scene_time must be finite");
+                caustica::setSceneTime(self, value);
+            },
+            "Imported-animation clock in seconds. Setting it changes the clock; use\n"
+            "Renderer.prepare_animation_frame() to evaluate and freeze a reference pose.")
         .def_prop_ro("fps_info",
             [](App& self) { return caustica::fpsInfo(self); })
         .def_prop_ro("resolution_info",

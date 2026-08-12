@@ -895,6 +895,15 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     }
     else
     {
+        // A suspended scene skips the normal render phase while its exclusive
+        // GPU load transaction is active. In sync-render/headless mode that
+        // phase is also the usual Render-domain pump, so keep pumping here or
+        // LoadSession.StreamStep can never execute and the scene stays suspended.
+        if (!m_useDedicatedRenderThread || !m_renderThread.isRunning())
+        {
+            const ThreadDomainScope renderDomain(ThreadDomain::Render);
+            task::pumpRender();
+        }
         m_renderSkippedSinceLastSubmission = true;
     }
 

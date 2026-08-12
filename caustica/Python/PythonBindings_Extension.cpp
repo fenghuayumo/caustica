@@ -123,9 +123,15 @@ public:
         }
     }
 
-    bool LoadScene(const std::string& sceneName, bool wait) {
-        return m_session ? m_session->LoadScene(sceneName, wait) : false;
+    bool LoadScene(const std::string& sceneName, bool wait, double timeoutSeconds, int warmupFrames) {
+        return m_session ? m_session->LoadScene(sceneName, wait, timeoutSeconds, warmupFrames) : false;
     }
+
+    bool WaitUntilReady(double timeoutSeconds, int warmupFrames) {
+        return m_session ? m_session->WaitUntilReady(timeoutSeconds, warmupFrames) : false;
+    }
+
+    bool IsSceneReady() const { return m_session && m_session->IsSceneReady(); }
 
     bool LoadGaussianSplats(const std::string& fileName, bool convertRdfToRub) {
         return m_session && m_session->GetApp()
@@ -143,6 +149,20 @@ public:
 
     int StepUntilAccumulated(int maxFrames) {
         return m_session ? m_session->StepUntilAccumulated(maxFrames) : 0;
+    }
+
+    bool PrepareAnimationFrame(double sceneTime, bool importedAnimations, bool keyframes) {
+        return m_session
+            ? m_session->PrepareAnimationFrame(sceneTime, importedAnimations, keyframes)
+            : false;
+    }
+
+    int RenderReferenceFrame(int spp, bool oidn, int maxFrames) {
+        return m_session ? m_session->RenderReferenceFrame(spp, oidn, maxFrames) : 0;
+    }
+
+    bool RenderRealtimeFrame(float dt) {
+        return m_session ? m_session->RenderRealtimeFrame(dt) : false;
     }
 
     bool SaveScreenshot(const std::string& path) {
@@ -254,9 +274,19 @@ NB_MODULE(caustica, m)
              "the Python process exits.")
 
         .def("load_scene",
-             [](PyRenderer& self, const std::string& name, bool wait) { return self.LoadScene(name, wait); },
+             [](PyRenderer& self, const std::string& name, bool wait, double timeoutSeconds, int warmupFrames) {
+                 return self.LoadScene(name, wait, timeoutSeconds, warmupFrames);
+             },
              nb::arg("scene_name"), nb::arg("wait_until_ready") = true,
+             nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4,
              "load a scene by name, builtin primitive reference, or inline scene JSON string.")
+
+        .def("wait_until_ready", &PyRenderer::WaitUntilReady,
+             nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4,
+             "Wait for scene import and GPU publication, then render warm-up frames.")
+
+        .def_prop_ro("scene_ready", &PyRenderer::IsSceneReady,
+             "True after scene import and GPU publication complete.")
 
         .def("load_gaussian_splats",
              [](PyRenderer& self, const std::string& fileName, bool convertRdfToRub) {
@@ -287,6 +317,25 @@ NB_MODULE(caustica, m)
              nb::arg("max_frames") = 0,
              "reset accumulation and keep stepping until the SPP target is reached\n"
              "(or `max_frames` frames have been produced if positive).")
+
+        .def("prepare_animation_frame", &PyRenderer::PrepareAnimationFrame,
+             nb::arg("time_seconds"),
+             nb::arg("imported_animations") = true,
+             nb::arg("keyframes") = true,
+             "Evaluate animation once at an exact timeline time, reset temporal history,\n"
+             "and leave the resulting pose frozen for reference accumulation.")
+
+        .def("render_reference_frame", &PyRenderer::RenderReferenceFrame,
+             nb::arg("spp") = 64,
+             nb::arg("oidn") = true,
+             nb::arg("max_frames") = 0,
+             "Render one frozen-time reference output frame. Accumulates `spp` samples\n"
+             "with dt=0, optionally runs OIDN synchronously, and returns engine frame count.")
+
+        .def("render_realtime_frame", &PyRenderer::RenderRealtimeFrame,
+             nb::arg("dt") = 1.0f / 60.0f,
+             "Render one realtime output frame and advance animation by `dt`. Keeps NRD,\n"
+             "TAA, or DLSS-RR temporal history according to the current settings.")
 
         .def("save_screenshot", &PyRenderer::SaveScreenshot,
              nb::arg("output_path"),
