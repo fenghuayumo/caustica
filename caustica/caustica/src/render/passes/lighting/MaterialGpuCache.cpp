@@ -342,6 +342,12 @@ bool StandardMaterial::read(
     const bool hasMaterialModelField = input.isMember("materialModel") || input.isMember("MaterialModel");
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
+    const bool hasExplicitBaseDiffuseRoughness =
+        input.isMember("baseDiffuseRoughness")
+        || input.isMember("BaseDiffuseRoughness")
+        || input.isMember("base_diffuse_roughness")
+        || (hasOpenPBRBlock && input["OpenPBR"].isObject()
+            && input["OpenPBR"].isMember("base_diffuse_roughness"));
 
     // OpenPBR stores the coat normal in its material block. Mirror it into the
     // legacy texture field so both schemas use the same loading path.
@@ -576,18 +582,21 @@ bool StandardMaterial::read(
     else if (!hasMaterialModelField && !useSpecularGlossModel)
     {
         materialModel = "OpenPBR";
-        specularColor = dm::float3(1.f);
     }
     else if (!hasMaterialModelField && useSpecularGlossModel)
         materialModel = "RTXPT";
 
-    // Legacy RTXPT JSON often stores SpecularColor as 0 (unused in metal-rough).
-    // OpenPBR uses it as dielectric specular tint — keep 0 and F0 collapses to black.
-    if (IsOpenPBRMaterialModel(materialModel) && !useSpecularGlossModel
-        && specularColor.x == 0.f && specularColor.y == 0.f && specularColor.z == 0.f)
-    {
-        specularColor = dm::float3(1.f);
-    }
+    // readOpenPBR supplies the standard neutral tint when explicit OpenPBR
+    // authoring omits specular_color. Legacy engine/RTXPT material files are
+    // not explicit OpenPBR and retain their stored value instead.
+    const bool explicitlyAuthoredOpenPBR = hasOpenPBRBlock || hasTopLevelOpenPBRFields
+        || (hasMaterialModelField && IsOpenPBRMaterialModel(materialModel));
+
+    // RTXPT used specular roughness for Frostbite diffuse as well. Only new,
+    // explicitly authored OpenPBR materials should default the independent
+    // base_diffuse_roughness to zero.
+    if (!hasExplicitBaseDiffuseRoughness && !explicitlyAuthoredOpenPBR)
+        baseDiffuseRoughness = roughness;
 
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
     baseDiffuseRoughness = std::clamp(baseDiffuseRoughness, 0.0f, 1.0f);
@@ -1412,18 +1421,15 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
     standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    // Engine Material defaults specularColor to 0 (metal-rough unused). OpenPBR uses it as
-    // dielectric specular tint — leave 0 and EvaluateStandardMaterial zeros specular F0.
-    const bool zeroSpecular =
-        material.specularColor.x == 0.f && material.specularColor.y == 0.f && material.specularColor.z == 0.f;
-    standardMaterial->specularColor = (!material.useSpecularGlossModel && zeroSpecular)
-        ? dm::float3(1.f)
-        : material.specularColor;
+    // Keep engine-imported values compatible with RTXPT. Explicit OpenPBR
+    // materials loaded from JSON/Python still default specular_color to white.
+    standardMaterial->specularColor = material.specularColor;
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
     standardMaterial->metalness = material.metalness;
     standardMaterial->roughness = material.roughness;
+    standardMaterial->baseDiffuseRoughness = material.roughness;
     standardMaterial->opacity = material.opacity;
     standardMaterial->alphaCutoff = material.alphaCutoff;
     standardMaterial->transmissionFactor = material.transmissionFactor;

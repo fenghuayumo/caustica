@@ -107,6 +107,25 @@ def configure_common_material(material: object) -> None:
     material.enable_transmission_weight_texture = False
 
 
+def verify_legacy_material_migration(material: object) -> None:
+    """Guard the RTXPT-compatible defaults before authoring the furnace case."""
+    specular_color = tuple(float(channel) for channel in material.specular_color)
+    if any(abs(channel) > 1.0e-6 for channel in specular_color):
+        raise RuntimeError(
+            "legacy builtin material gained a dielectric specular tint: "
+            f"specular_color={specular_color}"
+        )
+
+    specular_roughness = float(material.specular_roughness)
+    diffuse_roughness = float(material.base_diffuse_roughness)
+    if abs(diffuse_roughness - specular_roughness) > 1.0e-6:
+        raise RuntimeError(
+            "legacy builtin material did not migrate roughness to "
+            "base_diffuse_roughness: "
+            f"specular={specular_roughness}, diffuse={diffuse_roughness}"
+        )
+
+
 CASES = (
     ("coat_smooth", {"coat_weight": 1.0, "coat_roughness": 0.08}),
     ("coat_rough", {"coat_weight": 1.0, "coat_roughness": 0.45}),
@@ -246,6 +265,7 @@ def main() -> int:
             material = renderer.app.find_material_by_id(0)
             if material is None:
                 raise RuntimeError("Mat_BuiltinSphere was not available as material ID 0")
+            verify_legacy_material_migration(material)
             configure_common_material(material)
 
             apply_case(material, {})
