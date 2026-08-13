@@ -214,6 +214,11 @@ namespace caustica::scene
         GeometryRenderResourceId id;
         MaterialRenderResourceId materialId;
         uint32_t materialIndex = ~0u;
+        // BLAS creation can run before MaterialGpuCache is initialized during
+        // transactional scene loading. Keep the authoring domain with the
+        // geometry so alpha-tested/transmissive primitives are never
+        // accidentally baked as opaque in that window.
+        MaterialDomain materialDomain = MaterialDomain::Opaque;
         dm::box3 objectSpaceBounds = dm::box3::empty();
         uint32_t indexOffsetInMesh = 0;
         uint32_t vertexOffsetInMesh = 0;

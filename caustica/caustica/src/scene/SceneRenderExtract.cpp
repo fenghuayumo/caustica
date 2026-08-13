@@ -608,6 +608,9 @@ void ExtractMeshSnapshots(const SceneEntityWorld& entityWorld, SceneStaticPacket
             geometry.materialIndex = sourceGeometry->material
                 ? sourceGeometry->material->materialID
                 : ~0u;
+            geometry.materialDomain = sourceGeometry->material
+                ? sourceGeometry->material->domain
+                : MaterialDomain::Opaque;
             geometry.objectSpaceBounds = sourceGeometry->objectSpaceBounds;
             geometry.indexOffsetInMesh = sourceGeometry->indexOffsetInMesh;
             geometry.vertexOffsetInMesh = sourceGeometry->vertexOffsetInMesh;

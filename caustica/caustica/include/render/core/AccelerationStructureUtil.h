@@ -143,9 +143,30 @@ namespace bvh
             triangles.vertexStride = sizeof(dm::float3);
             triangles.vertexCount = geometry->numVertices;
 
-            const MaterialGpuCache::RayTracingState materialState = materialGpuCache
-                ? materialGpuCache->resolveRayTracingState(geometry->materialId)
-                : MaterialGpuCache::RayTracingState{};
+            MaterialGpuCache::RayTracingState materialState = {};
+            const std::shared_ptr<StandardMaterial> runtimeMaterial = materialGpuCache
+                ? materialGpuCache->findByResourceId(geometry->materialId)
+                : nullptr;
+            if (runtimeMaterial)
+            {
+                materialState = materialGpuCache->resolveRayTracingState(geometry->materialId);
+            }
+            else
+            {
+                // The initial StructureGpu BLAS build intentionally precedes
+                // WorldRenderer/MaterialGpuCache initialization. Falling back
+                // to an all-opaque state here permanently suppresses AnyHit for
+                // alpha-masked geometry. The immutable render snapshot already
+                // carries the source material domain, so use it until the
+                // runtime material override exists.
+                materialState.alphaTest =
+                    geometry->materialDomain == caustica::MaterialDomain::AlphaTested
+                    || geometry->materialDomain == caustica::MaterialDomain::TransmissiveAlphaTested;
+                materialState.transmission =
+                    geometry->materialDomain == caustica::MaterialDomain::Transmissive
+                    || geometry->materialDomain == caustica::MaterialDomain::TransmissiveAlphaTested
+                    || geometry->materialDomain == caustica::MaterialDomain::TransmissiveAlphaBlended;
+            }
 
             if ((cfg.excludeTransmissive && materialState.transmission) || materialState.skipRender)
             {

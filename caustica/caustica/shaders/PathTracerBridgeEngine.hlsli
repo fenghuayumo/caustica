@@ -836,8 +836,13 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // "This microfacet lobe is exactly the same as the specular lobe except sampled along the line of sight through the surface."
     lpfloat     bsdfDataSpecularTransmission = bridgeMaterial.transmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
     lpfloat     bsdfDataDiffuseTransmission = bridgeMaterial.diffuseTransmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
-    // OpenPBR transmission_color is independent of base_color.
+    // OpenPBR specular transmission_color is independent of base_color, but
+    // diffuse transmission is the light passing through the diffuse layer and
+    // must retain its textured base color.  Prefer the base color whenever a
+    // diffuse-transmission lobe is present (notably alpha-tested foliage).
     lpfloat3    bsdfDataTransmission = bridgeMaterial.transmissionColor;
+    if (bridgeMaterial.diffuseTransmission > lpfloat(0.0))
+        bsdfDataTransmission = bridgeMaterial.baseColor;
 #else
     lpfloat     bsdfDataDiffuseTransmission  = 0;
     lpfloat     bsdfDataSpecularTransmission = 0;    

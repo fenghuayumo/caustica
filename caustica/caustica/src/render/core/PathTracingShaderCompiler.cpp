@@ -753,8 +753,18 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
 
         for (HitGroupInfo& hitGroup : m_perSubInstanceHitGroup)
         {
-            if (m_uniqueHitGroups.find(hitGroup.getShaderPermutationIndex()) != m_uniqueHitGroups.end())
-                continue;
+            const auto existing = m_uniqueHitGroups.find(hitGroup.getShaderPermutationIndex());
+            if (existing != m_uniqueHitGroups.end())
+            {
+                // A hit-group export is shared by every material using the same
+                // shader permutation. It is only safe for an alpha-tested
+                // sub-instance when that frozen export was created with Any Hit.
+                // Opaque sub-instances may use an Any-Hit export because
+                // AlphaTestImpl() immediately accepts them based on
+                // SubInstanceData::Flags_AlphaTested.
+                if (!hitGroup.hasAnyHitShader || existing->second.hasAnyHitShader)
+                    continue;
+            }
             hitGroup = fallback;
         }
     };
@@ -841,7 +851,16 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             HitGroupInfo hitGroup = m_perSubInstanceHitGroup[i];
             if (hitGroup.getShaderPermutationIndex() < 0)
                 hitGroup.hasAnyHitShader = true;
-            m_uniqueHitGroups[hitGroup.getShaderPermutationIndex()] = hitGroup;
+
+            // Multiple materials commonly share one shader permutation, while
+            // only some of them use alpha testing. There can be only one RT
+            // hit-group export per permutation, so preserve the strongest
+            // requirement instead of letting the last material overwrite it.
+            // The shared export must contain Any Hit if any user needs it.
+            const int permutationIndex = hitGroup.getShaderPermutationIndex();
+            auto [existing, inserted] = m_uniqueHitGroups.try_emplace(permutationIndex, hitGroup);
+            if (!inserted)
+                existing->second.hasAnyHitShader |= hitGroup.hasAnyHitShader;
         }
         m_materialStateRevision = materialStateRevision;
         m_resourceBindingRevision = resourceBindingRevision;
