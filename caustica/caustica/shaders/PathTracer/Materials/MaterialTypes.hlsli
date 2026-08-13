@@ -7,6 +7,7 @@
 struct MaterialProperties
 {
     float3 shadingNormal;
+    float3 coatShadingNormal;
     float3 geometryNormal;
     lpfloat3 diffuseAlbedo; // BRDF input Cdiff
     lpfloat3 specularF0; // BRDF input F0
@@ -64,6 +65,7 @@ struct MaterialProperties
     {
         MaterialProperties result;
         result.shadingNormal = 0;
+        result.coatShadingNormal = 0;
         result.geometryNormal = 0;
         result.diffuseAlbedo = 0;
         result.specularF0 = 0;

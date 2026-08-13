@@ -17,6 +17,7 @@ struct MaterialTextureSample
     float4 baseOrDiffuse;
     float4 metalRoughOrSpecular;
     float4 normal;
+    float4 coatNormal;
     float4 emissive;
     float4 occlusion;
     float4 transmission;
@@ -30,6 +31,7 @@ MaterialTextureSample DefaultMaterialTextures()
     values.metalRoughOrSpecular = 1.0;
     values.emissive = 1.0;
     values.normal = float4(0.5, 0.5, 1.0, 0.0);
+    values.coatNormal = float4(0.5, 0.5, 1.0, 0.0);
     values.occlusion = 1.0;
     values.transmission = 1.0;
     values.opacity = 1.0;

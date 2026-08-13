@@ -254,8 +254,9 @@ enum MaterialAttributes
     MatAttr_Normal       = 0x04,
     MatAttr_MetalRough   = 0x08,
     MatAttr_Transmission = 0x10,
+    MatAttr_CoatNormal   = 0x20,
 
-    MatAttr_All          = 0x1F
+    MatAttr_All          = 0x3F
 };
 
 float4 sampleTexture(uint textureIndexAndInfo, SamplerState materialSampler, const ActiveTextureSampler textureSampler, float2 uv)
@@ -269,14 +270,14 @@ float4 sampleTexture(uint textureIndexAndInfo, SamplerState materialSampler, con
     return textureSampler.sampleTexture(tex2D, materialSampler, uv, baseLOD, mipLevels);
 }
 
-void ApplyStandardMaterialNormalMap(inout MaterialProperties result, float4 tangent, float4 normalsTextureValue, float normalTextureScale)
+float3 EvaluateStandardMaterialNormalMap(float3 geometryNormal, float4 tangent, float4 normalsTextureValue, float normalTextureScale)
 {
     float squareTangentLength = dot(tangent.xyz, tangent.xyz);
     if (squareTangentLength == 0)
-        return;
+        return geometryNormal;
     
     if (tangent.w == 0)
-        return;
+        return geometryNormal;
 
     normalsTextureValue.xy = normalsTextureValue.xy * 2.0 - 1.0;
     normalsTextureValue.xy *= normalTextureScale;
@@ -289,15 +290,15 @@ void ApplyStandardMaterialNormalMap(inout MaterialProperties result, float4 tang
     float squareNormalMapLength = dot(normalsTextureValue.xyz, normalsTextureValue.xyz);
 
     if (squareNormalMapLength == 0)
-        return;
+        return geometryNormal;
         
     float normalMapLen = sqrt(squareNormalMapLength);
     float3 localNormal = normalsTextureValue.xyz / normalMapLen;
 
     tangent.xyz *= rsqrt(squareTangentLength);
-    float3 bitangent = cross(result.geometryNormal, tangent.xyz) * tangent.w;
+    float3 bitangent = cross(geometryNormal, tangent.xyz) * tangent.w;
 
-    result.shadingNormal = normalize(tangent.xyz * localNormal.x + bitangent.xyz * localNormal.y + result.geometryNormal.xyz * localNormal.z);
+    return normalize(tangent.xyz * localNormal.x + bitangent.xyz * localNormal.y + geometryNormal.xyz * localNormal.z);
 }
 
 MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, StandardMaterialData material, MaterialTextureSample textures)
@@ -305,6 +306,7 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     MaterialProperties result = MaterialProperties::make();
     result.geometryNormal   = normalize(normal);
     result.shadingNormal    = result.geometryNormal;
+    result.coatShadingNormal = result.geometryNormal;
     result.flags = material.Flags;
     result.baseWeight = lpfloat(saturate(material.BaseWeight));
     result.baseDiffuseRoughness = lpfloat(saturate(material.BaseDiffuseRoughness));
@@ -417,12 +419,15 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     
     #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
         #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
-            ApplyStandardMaterialNormalMap(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
+            result.shadingNormal = EvaluateStandardMaterialNormalMap(result.geometryNormal, tangent, textures.normal, material.NormalTextureScale);
         #endif
     #else
         if ((material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
-            ApplyStandardMaterialNormalMap(result, tangent, textures.normal, material.NormalTextureScale);  // there's an incorrect "error X3508: 'ApplyNormalMap': output parameter 'result' not completely initialized" if this line happens before result is fully initialized
+            result.shadingNormal = EvaluateStandardMaterialNormalMap(result.geometryNormal, tangent, textures.normal, material.NormalTextureScale);
     #endif
+
+    if ((material.Flags & StandardMaterialFlags_UseCoatNormalTexture) != 0)
+        result.coatShadingNormal = EvaluateStandardMaterialNormalMap(result.geometryNormal, tangent, textures.coatNormal, material.CoatNormalTextureScale);
 
     return result;
 }
@@ -455,6 +460,9 @@ MaterialProperties sampleGeometryStandardMaterial(const BridgeGeometrySample gs,
             if ((attributes & MatAttr_Normal) && (material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
                 textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
         #endif
+
+        if ((attributes & MatAttr_CoatNormal) && (material.Flags & StandardMaterialFlags_UseCoatNormalTexture) != 0)
+            textures.coatNormal = sampleTexture(material.CoatNormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
 
         if ((attributes & MatAttr_MetalRough) && (material.Flags & StandardMaterialFlags_UseMetalRoughOrSpecularTexture) != 0)
             textures.metalRoughOrSpecular = sampleTexture(material.MetalRoughOrSpecularTextureIndex, materialSampler, textureSampler, gs.texcoord);
@@ -780,6 +788,33 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     adjustShadingNormal( ptShadingData, bridgeGS.tangent, true, ignoreTangent );
     // ^^ this should be part of material processing code
 
+    // The common case has no coat normal map. Reuse the base frame verbatim so
+    // scenes without this feature do not pay for a second shading-frame setup.
+    float3 coatNormalLocal = float3(0.f, 0.f, 1.f);
+    float3 coatTangentLocal = float3(1.f, 0.f, 0.f);
+    float coatBitangentSign = 1.f;
+    const bool hasCoatNormal = bridgeMaterial.coatWeight > 0.f
+        && (bridgeMaterial.flags & StandardMaterialFlags_UseCoatNormalTexture) != 0;
+    if (hasCoatNormal)
+    {
+        ShadingData coatShadingData = ptShadingData;
+        coatShadingData.N = bridgeGS.frontFacing ? bridgeMaterial.coatShadingNormal : -bridgeMaterial.coatShadingNormal;
+        adjustShadingNormal(coatShadingData, bridgeGS.tangent, true, ignoreTangent);
+        coatNormalLocal = normalize(float3(
+            dot(coatShadingData.N, ptShadingData.T),
+            dot(coatShadingData.N, ptShadingData.B),
+            dot(coatShadingData.N, ptShadingData.N)));
+        coatTangentLocal = normalize(float3(
+            dot(coatShadingData.T, ptShadingData.T),
+            dot(coatShadingData.T, ptShadingData.B),
+            dot(coatShadingData.T, ptShadingData.N)));
+        float3 coatBitangentLocal = normalize(float3(
+            dot(coatShadingData.B, ptShadingData.T),
+            dot(coatShadingData.B, ptShadingData.B),
+            dot(coatShadingData.B, ptShadingData.N)));
+        coatBitangentSign = dot(cross(coatNormalLocal, coatTangentLocal), coatBitangentLocal) < 0.f ? -1.f : 1.f;
+    }
+
     // ptShadingData.opacity = bridgeMaterial.opacity;
 
     ptShadingData.shadowNoLFadeout = bridgeMaterial.shadowNoLFadeout;
@@ -897,6 +932,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
             bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
             bridgeMaterial.anisotropy, bridgeMaterial.fuzzWeight, bridgeMaterial.fuzzColor, bridgeMaterial.fuzzRoughness,
             bridgeMaterial.coatWeight, bridgeMaterial.coatColor, bridgeMaterial.coatRoughness, bridgeMaterial.coatAnisotropy, bridgeMaterial.coatIor, bridgeMaterial.coatDarkening,
+            (lpfloat3)coatNormalLocal, (lpfloat3)coatTangentLocal, (lpfloat)coatBitangentSign,
             bridgeMaterial.subsurfaceWeight, bridgeMaterial.subsurfaceColor,
             bridgeMaterial.thinFilmWeight, bridgeMaterial.thinFilmThickness, bridgeMaterial.thinFilmIor,
             bridgeMaterial.transmissionDispersionScale, bridgeMaterial.transmissionDispersionAbbeNumber ) );

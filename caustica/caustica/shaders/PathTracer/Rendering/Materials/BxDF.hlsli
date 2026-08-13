@@ -806,6 +806,9 @@ struct StandardBSDFData
     lpfloat     _coatAnisotropy;
     lpfloat     _coatIor;
     lpfloat     _coatDarkening;
+    lpfloat3    _coatNormal;              ///< Coat normal in the base shading frame.
+    lpfloat3    _coatTangent;             ///< Coat tangent in the base shading frame.
+    lpfloat     _coatBitangentSign;       ///< Handedness needed to reconstruct the coat bitangent.
 
     lpfloat     _subsurfaceWeight;
     lpfloat3    _subsurfaceColor;
@@ -822,6 +825,7 @@ struct StandardBSDFData
         lpfloat roughness, lpfloat metallic, lpfloat eta, lpfloat3 transmission, lpfloat diffuseTransmission, lpfloat specularTransmission,
         lpfloat anisotropy, lpfloat fuzzWeight, lpfloat3 fuzzColor, lpfloat fuzzRoughness,
         lpfloat coatWeight, lpfloat3 coatColor, lpfloat coatRoughness, lpfloat coatAnisotropy, lpfloat coatIor, lpfloat coatDarkening,
+        lpfloat3 coatNormal, lpfloat3 coatTangent, lpfloat coatBitangentSign,
         lpfloat subsurfaceWeight, lpfloat3 subsurfaceColor,
         lpfloat thinFilmWeight, lpfloat thinFilmThickness, lpfloat thinFilmIor,
         lpfloat dispersionScale, lpfloat dispersionAbbeNumber )
@@ -861,6 +865,9 @@ struct StandardBSDFData
         d._coatAnisotropy = coatAnisotropy;
         d._coatIor = coatIor;
         d._coatDarkening = coatDarkening;
+        d._coatNormal = coatNormal;
+        d._coatTangent = coatTangent;
+        d._coatBitangentSign = coatBitangentSign;
         d._subsurfaceWeight = subsurfaceWeight;
         d._subsurfaceColor = subsurfaceColor;
         d._thinFilmWeight = thinFilmWeight;
@@ -925,6 +932,9 @@ struct StandardBSDFData
     lpfloat     CoatAnisotropy      ()  { return _coatAnisotropy;       }
     lpfloat     CoatIor             ()  { return _coatIor;              }
     lpfloat     CoatDarkening       ()  { return _coatDarkening;        }
+    lpfloat3    CoatNormal          ()  { return _coatNormal;           }
+    lpfloat3    CoatTangent         ()  { return _coatTangent;          }
+    lpfloat     CoatBitangentSign   ()  { return _coatBitangentSign;    }
     lpfloat     SubsurfaceWeight    ()  { return _subsurfaceWeight;     }
     lpfloat3    SubsurfaceColor     ()  { return _subsurfaceColor;      }
     lpfloat     ThinFilmWeight      ()  { return _thinFilmWeight;       }
@@ -966,6 +976,10 @@ struct FalcorBSDF // : IBxDF
     float pSpecularReflectionTransmission;  ///< Probability for sampling the specular BSDF.
     float pCoatReflection;                  ///< Probability for sampling the OpenPBR coat BRDF.
 
+    float3 coatT;                           ///< Coat frame expressed in the base local frame.
+    float3 coatB;
+    float3 coatN;
+
     bool psdExclude; // disable PSD
 
     /** Initialize a new instance.
@@ -974,8 +988,7 @@ struct FalcorBSDF // : IBxDF
     */
     void __init(
         const MaterialHeader mtl,
-        float3 N,
-        float3 V,
+        float3 wiLocal,
         const StandardBSDFData data)
     {
         // TODO: Currently specular reflection and transmission lobes are not properly separated.
@@ -989,18 +1002,41 @@ struct FalcorBSDF // : IBxDF
         float3 transmissionAlbedo = isThinSurface ? dataTransmission : sqrt(dataTransmission);
 
         float dataRoughness = data.Roughness();
-        float NdotV = saturate(dot(V, N));
+        float NdotV = saturate(wiLocal.z);
+
+        coatWeight = saturate(data.CoatWeight());
+        coatT = float3(1.f, 0.f, 0.f);
+        coatB = float3(0.f, 1.f, 0.f);
+        coatN = float3(0.f, 0.f, 1.f);
+        if (coatWeight > 0.f)
+        {
+            coatN = normalize((float3)data.CoatNormal());
+            float3 projectedT = (float3)data.CoatTangent();
+            projectedT -= coatN * dot(projectedT, coatN);
+            if (dot(projectedT, projectedT) < 1e-8f)
+            {
+                projectedT = float3(1.f, 0.f, 0.f) - coatN * coatN.x;
+                if (dot(projectedT, projectedT) < 1e-8f)
+                    projectedT = float3(0.f, 1.f, 0.f) - coatN * coatN.y;
+            }
+            coatT = normalize(projectedT);
+            float coatBitangentSign = data.CoatBitangentSign() < 0.f ? -1.f : 1.f;
+            coatB = cross(coatN, coatT) * coatBitangentSign;
+        }
+        float coatNdotV = saturate(dot(wiLocal, coatN));
 
         // OpenPBR coat attenuation of the coated base substrate.
-        coatWeight = saturate(data.CoatWeight());
         float3 coatBaseAtten = OpenPBRCoatBaseAttenuation(
-            coatWeight, data.CoatColor(), data.CoatDarkening(), data.CoatIor(), NdotV);
+            coatWeight, data.CoatColor(), data.CoatDarkening(), data.CoatIor(), coatNdotV);
 
         fuzzReflection.color = data.FuzzColor();
         fuzzReflection.weight = data.FuzzWeight();
         fuzzReflection.roughness = data.FuzzRoughness();
-        float3 fuzzBaseAtten = 1.0f - saturate(fuzzReflection.weight)
+        float3 fuzzBaseAttenBase = 1.0f - saturate(fuzzReflection.weight)
             * saturate(fuzzReflection.color) * fuzzReflection.directionalAlbedo(NdotV);
+        float3 fuzzBaseAttenCoat = 1.0f - saturate(fuzzReflection.weight)
+            * saturate(fuzzReflection.color) * fuzzReflection.directionalAlbedo(coatNdotV);
+        float3 fuzzBaseAtten = lerp(fuzzBaseAttenBase, fuzzBaseAttenCoat, coatWeight);
 
         // Subsurface mixes opaque base diffuse toward subsurface_color (OpenPBR opaque-base mix).
         float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
@@ -1070,8 +1106,8 @@ struct FalcorBSDF // : IBxDF
         coatReflection.edgeTint = 1.f;
         coatReflection.metallic = 0.f;
         coatReflection.specularWeight = 1.f;
-        coatReflection.albedo *= fuzzBaseAtten;
-        coatReflection.dielectricF0 *= fuzzBaseAtten;
+        coatReflection.albedo *= fuzzBaseAttenCoat;
+        coatReflection.dielectricF0 *= fuzzBaseAttenCoat;
         coatReflection.alpha = coatAlpha;
         coatReflection.anisotropy = data.CoatAnisotropy();
         coatReflection.activeLobes = activeLobes | (uint)LobeType::ClearcoatDeltaReflection;
@@ -1100,7 +1136,7 @@ struct FalcorBSDF // : IBxDF
         float diffuseWeight = Luminance(diffuseReflection.albedo);
         float fuzzWeight = Luminance(fuzzReflection.color) * fuzzReflection.weight;
         float specularWeight = Luminance(specularReflection.evalOpenPBRFresnel(NdotV));
-        float coatSampleWeight = coatWeight * Luminance(evalFresnelSchlick(coatReflection.albedo, 1.f, NdotV));
+        float coatSampleWeight = coatWeight * Luminance(evalFresnelSchlick(coatReflection.albedo, 1.f, coatNdotV));
 
         pDiffuseReflection = (activeLobes & (uint)LobeType::DiffuseReflection) ? diffuseWeight * dielectricBSDF * (1.f - diffTrans) : 0.f;
         pDiffuseTransmission = (activeLobes & (uint)LobeType::DiffuseTransmission) ? diffuseWeight * dielectricBSDF * diffTrans : 0.f;
@@ -1130,20 +1166,74 @@ struct FalcorBSDF // : IBxDF
 */
     void __init(const ShadingData shadingData, const StandardBSDFData data)
     {
-        __init(shadingData.mtl, shadingData.V, shadingData.N, data);
+        __init(shadingData.mtl, shadingData.toLocal(shadingData.V), data);
     }
 
     static FalcorBSDF make( const ShadingData shadingData, const StandardBSDFData data )     { FalcorBSDF ret; ret.__init(shadingData, data); return ret; }
 
     static FalcorBSDF make(
         const MaterialHeader mtl,
-        float3 N,
-        float3 V, 
+        float3 wiLocal,
         const StandardBSDFData data) 
     { 
         FalcorBSDF ret;
-        ret.__init(mtl, N, V, data); 
+        ret.__init(mtl, wiLocal, data);
         return ret;
+    }
+
+    float3 toCoatLocal(const float3 v) { return float3(dot(v, coatT), dot(v, coatB), dot(v, coatN)); }
+    float3 fromCoatLocal(const float3 v) { return coatT * v.x + coatB * v.y + coatN * v.z; }
+    float coatEvalPdf(const float3 wi, const float3 wo) { return coatReflection.evalPdf(toCoatLocal(wi), toCoatLocal(wo)); }
+
+    float3 fuzzEval(const float3 wi, const float3 wo)
+    {
+        float3 baseFuzz = fuzzReflection.eval(wi, wo);
+        if (coatWeight <= 0.f)
+            return baseFuzz;
+        float3 coatFuzz = fuzzReflection.eval(toCoatLocal(wi), toCoatLocal(wo));
+        return lerp(baseFuzz, coatFuzz, coatWeight);
+    }
+
+    float fuzzEvalPdf(const float3 wi, const float3 wo)
+    {
+        float basePdf = fuzzReflection.evalPdf(wi, wo);
+        if (coatWeight <= 0.f)
+            return basePdf;
+        float coatPdf = fuzzReflection.evalPdf(toCoatLocal(wi), toCoatLocal(wo));
+        return lerp(basePdf, coatPdf, coatWeight);
+    }
+
+    bool sampleFuzz(const float3 wi, out float3 wo, out float pdf, out float3 weight, out uint lobe, out float lobeP, float3 preGeneratedSample)
+    {
+        if (coatWeight <= 0.f)
+            return fuzzReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample);
+
+        const bool sampleCoatFrame = preGeneratedSample.z < coatWeight;
+        const float frameProbability = sampleCoatFrame ? coatWeight : (1.f - coatWeight);
+        float3 sampledWo = 0.f;
+        bool valid;
+        if (sampleCoatFrame)
+        {
+            valid = fuzzReflection.sample(toCoatLocal(wi), sampledWo, pdf, weight, lobe, lobeP, preGeneratedSample);
+            wo = fromCoatLocal(sampledWo);
+        }
+        else
+        {
+            valid = fuzzReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample);
+        }
+
+        if (!valid || frameProbability <= 0.f)
+            return false;
+
+        pdf = fuzzEvalPdf(wi, wo);
+        if (pdf <= 0.f)
+            return false;
+
+        weight = fuzzEval(wi, wo) / pdf;
+        // lobeP is used by the firefly filter and includes conditional splits
+        // inside a lobe, just like reflection/refraction selection.
+        lobeP *= frameProbability;
+        return true;
     }
 
     /** Returns the set of BSDF lobes.
@@ -1185,10 +1275,10 @@ struct FalcorBSDF // : IBxDF
         float3 diffuse = 0.f; float3 specular = 0.f;
         if (pDiffuseReflection > 0.f) diffuse += (1.f - specTrans) * (1.f - diffTrans) * diffuseReflection.eval(wi, wo);    // <- this isn't correct; diffuse has a specular component that should be considered
         if (pDiffuseTransmission > 0.f) diffuse += (1.f - specTrans) * diffTrans * diffuseTransmission.eval(wi, wo);
-        if (pFuzzReflection > 0.f) diffuse += fuzzReflection.eval(wi, wo);
+        if (pFuzzReflection > 0.f) diffuse += fuzzEval(wi, wo);
         if (pSpecularReflection > 0.f) specular += (1.f - specTrans) * specularReflection.eval(wi, wo);
         if (pSpecularReflectionTransmission > 0.f) specular += specTrans * (specularReflectionTransmission.eval(wi, wo));   // <- do we want to consider transmission as specular? this depends entirely on denoiser - should ask RR folks
-        if (pCoatReflection > 0.f) specular += coatWeight * coatReflection.eval(wi, wo);
+        if (pCoatReflection > 0.f) specular += coatWeight * coatReflection.eval(toCoatLocal(wi), toCoatLocal(wo));
 
         return float4(diffuse+specular, Average(specular)); // use average instead of sum to avoid hitting fp16 ceiling early
     }
@@ -1228,10 +1318,10 @@ struct FalcorBSDF // : IBxDF
             pdf *= pDiffuseReflection;
             lobeP *= pDiffuseReflection;
             // if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
-            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
-            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission)
         {
@@ -1241,10 +1331,10 @@ struct FalcorBSDF // : IBxDF
             pdf *= pDiffuseTransmission;
             lobeP *= pDiffuseTransmission;
             // if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);     // <- why is this not included?
-            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
             // if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
-            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection)
         {
@@ -1252,14 +1342,14 @@ struct FalcorBSDF // : IBxDF
             preGeneratedSample.z = clamp((uSelect - (pDiffuseReflection + pDiffuseTransmission))/pFuzzReflection, 0, cOneMinusEpsilon);
 #endif
 
-            valid = fuzzReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
+            valid = sampleFuzz(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
             weight /= pFuzzReflection;
             pdf *= pFuzzReflection;
             lobeP *= pFuzzReflection;
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
-            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection)
         {
@@ -1273,10 +1363,10 @@ struct FalcorBSDF // : IBxDF
             pdf *= pSpecularReflection;
             lobeP *= pSpecularReflection;
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
-            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
             // if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
-            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         }
         else if (uSelect < pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission)
         {
@@ -1291,22 +1381,24 @@ struct FalcorBSDF // : IBxDF
             lobeP *= pSpecularReflectionTransmission;
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
             if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
-            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
-            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+            if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         }
         else if (pCoatReflection > 0.f)
         {
 #if RecycleSelectSamples
             preGeneratedSample.z = clamp((uSelect - (pDiffuseReflection + pDiffuseTransmission + pFuzzReflection + pSpecularReflection + pSpecularReflectionTransmission))/pCoatReflection, 0, cOneMinusEpsilon);
 #endif
-            valid = coatReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
+            float3 coatWo = 0.f;
+            valid = coatReflection.sample(toCoatLocal(wi), coatWo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
+            wo = fromCoatLocal(coatWo);
             weight /= pCoatReflection;
             weight *= coatWeight;
             pdf *= pCoatReflection;
             lobeP *= pCoatReflection;
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
-            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+            if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
             if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
             if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
         }
@@ -1334,10 +1426,10 @@ struct FalcorBSDF // : IBxDF
         float pdf = 0.f;
         if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
         if (pDiffuseTransmission > 0.f) pdf += pDiffuseTransmission * diffuseTransmission.evalPdf(wi, wo);
-        if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzReflection.evalPdf(wi, wo);
+        if (pFuzzReflection > 0.f) pdf += pFuzzReflection * fuzzEvalPdf(wi, wo);
         if (pSpecularReflection > 0.f) pdf += pSpecularReflection * specularReflection.evalPdf(wi, wo);
         if (pSpecularReflectionTransmission > 0.f) pdf += pSpecularReflectionTransmission * specularReflectionTransmission.evalPdf(wi, wo);
-        if (pCoatReflection > 0.f) pdf += pCoatReflection * coatReflection.evalPdf(wi, wo);
+        if (pCoatReflection > 0.f) pdf += pCoatReflection * coatEvalPdf(wi, wo);
         return pdf;
     }
 
@@ -1371,7 +1463,8 @@ struct FalcorBSDF // : IBxDF
         deltaCoat.transmission          = false;
 
         deltaReflection.dir  = float3(-wi.x, -wi.y, wi.z);
-        deltaCoat.dir = deltaReflection.dir;
+        float3 coatWi = toCoatLocal(wi);
+        deltaCoat.dir = fromCoatLocal(float3(-coatWi.x, -coatWi.y, coatWi.z));
 
         if (specularReflection.alpha == 0 && specularReflection.hasLobe(LobeType::DeltaReflection))
         {
@@ -1425,7 +1518,7 @@ struct FalcorBSDF // : IBxDF
         if (coatReflection.alpha == 0.f && pCoatReflection > 0.f)
         {
             deltaCoat.probability = pCoatReflection;
-            deltaCoat.thp = coatWeight * evalFresnelSchlick(coatReflection.albedo, 1.f, wi.z);
+            deltaCoat.thp = coatWeight * evalFresnelSchlick(coatReflection.albedo, 1.f, coatWi.z);
         }
 
         // Lobes are by convention in this order, and the index must match BSDFSample::getDeltaLobeIndex() as well as the UI.

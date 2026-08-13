@@ -707,6 +707,7 @@ void RegisterCoreBindings(nb::module_& m)
         .value("ORM", StandardMaterialTextureSlot::OcclusionRoughnessMetallic)
         .value("OcclusionRoughnessMetallic", StandardMaterialTextureSlot::OcclusionRoughnessMetallic)
         .value("Normal", StandardMaterialTextureSlot::Normal)
+        .value("CoatNormal", StandardMaterialTextureSlot::CoatNormal)
         .value("Emissive", StandardMaterialTextureSlot::Emissive)
         .value("Transmission", StandardMaterialTextureSlot::Transmission)
         .export_values();
@@ -898,6 +899,9 @@ void RegisterCoreBindings(nb::module_& m)
             [](StandardMaterial& self) { return self.normalTextureScale; },
             [](StandardMaterial& self, float v) { self.normalTextureScale = v; self.gpuDataDirty = true; },
             "OpenPBR alias for normal_texture_scale.")
+        .def_prop_rw("coat_normal_scale",
+            [](StandardMaterial& self) { return self.coatNormalTextureScale; },
+            [](StandardMaterial& self, float v) { self.coatNormalTextureScale = v; self.gpuDataDirty = true; })
         .def_prop_rw("ior",
             [](StandardMaterial& self) { return self.IoR; },
             [](StandardMaterial& self, float v) { self.IoR = v; self.gpuDataDirty = true; })
@@ -983,6 +987,9 @@ void RegisterCoreBindings(nb::module_& m)
             [](StandardMaterial& self) { return self.enableNormalTexture; },
             [](StandardMaterial& self, bool v) { self.enableNormalTexture = v; self.gpuDataDirty = true; },
             "OpenPBR alias for enable_normal_texture.")
+        .def_prop_rw("enable_coat_normal_texture",
+            [](StandardMaterial& self) { return self.enableCoatNormalTexture; },
+            [](StandardMaterial& self, bool v) { self.enableCoatNormalTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_emissive_texture",
             [](StandardMaterial& self) { return self.enableEmissiveTexture; },
             [](StandardMaterial& self, bool v) { self.enableEmissiveTexture = v; self.gpuDataDirty = true; })
@@ -1004,6 +1011,8 @@ void RegisterCoreBindings(nb::module_& m)
             [](StandardMaterial& self) { return MaterialTexturePath(self, StandardMaterialTextureSlot::OcclusionRoughnessMetallic); })
         .def_prop_ro("normal_texture_path",
             [](StandardMaterial& self) { return MaterialTexturePath(self, StandardMaterialTextureSlot::Normal); })
+        .def_prop_ro("coat_normal_texture_path",
+            [](StandardMaterial& self) { return MaterialTexturePath(self, StandardMaterialTextureSlot::CoatNormal); })
         .def_prop_ro("emissive_texture_path",
             [](StandardMaterial& self) { return MaterialTexturePath(self, StandardMaterialTextureSlot::Emissive); })
         .def_prop_ro("transmission_texture_path",
@@ -1030,6 +1039,11 @@ void RegisterCoreBindings(nb::module_& m)
                 return SetMaterialTextureFromPython(self, StandardMaterialTextureSlot::Normal, path, false, true);
             },
             nb::arg("path"))
+        .def("set_coat_normal_texture",
+            [](StandardMaterial& self, const std::string& path) {
+                return SetMaterialTextureFromPython(self, StandardMaterialTextureSlot::CoatNormal, path, false, true);
+            },
+            nb::arg("path"))
         .def("set_emissive_texture",
             [](StandardMaterial& self, const std::string& path, std::optional<bool> sRGB) {
                 return SetMaterialTextureFromPython(self, StandardMaterialTextureSlot::Emissive, path, sRGB, false);
@@ -1050,6 +1064,8 @@ void RegisterCoreBindings(nb::module_& m)
             [](StandardMaterial& self) { ClearMaterialTextureFromPython(self, StandardMaterialTextureSlot::OcclusionRoughnessMetallic); })
         .def("clear_normal_texture",
             [](StandardMaterial& self) { ClearMaterialTextureFromPython(self, StandardMaterialTextureSlot::Normal); })
+        .def("clear_coat_normal_texture",
+            [](StandardMaterial& self) { ClearMaterialTextureFromPython(self, StandardMaterialTextureSlot::CoatNormal); })
         .def("clear_emissive_texture",
             [](StandardMaterial& self) { ClearMaterialTextureFromPython(self, StandardMaterialTextureSlot::Emissive); })
         .def("clear_transmission_texture",

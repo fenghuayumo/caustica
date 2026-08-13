@@ -28,6 +28,7 @@ static const int StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB0     = (1 << 13
 static const int StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB1     = (1 << 14);
 static const int StandardMaterialFlags_UseOpenPBRMaterialModel        = (1 << 15);
 static const int StandardMaterialFlags_UnlitReceiveShadows            = (1 << 16);
+static const int StandardMaterialFlags_UseCoatNormalTexture           = (1 << 17);
 static const int StandardMaterialFlags_NestedPriorityMask             = 0xF0000000;
 static const int StandardMaterialFlags_NestedPriorityShift            = 28;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F000000;
@@ -106,7 +107,9 @@ struct StandardMaterialData
     StandardVolumeConstants Volume;
 
     float       BaseDiffuseRoughness;
-    float3      _padOpenPBR;
+    float       CoatNormalTextureScale;
+    uint        CoatNormalTextureIndex;
+    float       _padOpenPBR;
 };
 
 #if defined(__cplusplus)

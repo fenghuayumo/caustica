@@ -19,6 +19,8 @@ struct PackedPathTracerSurfaceData
     uint _roughnessMetallicEta;				// R11G11B10_FLOAT
     uint _transmission;						// R11G11B10_FLOAT
     uint _diffuseSpecularTransmission;		// fp16 | fp16
+    uint _coatNormal;                       // octFp16, in the base shading frame
+    uint _coatTangentAndSign;               // octFp16 coat tangent; high bit stores coat-frame handedness
 
 };
 

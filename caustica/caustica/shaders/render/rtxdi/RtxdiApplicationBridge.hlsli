@@ -654,7 +654,7 @@ bool RAB_SurfaceImportanceSampleBsdf(RAB_Surface surface, inout RTXDI_RandomSamp
     uint lobe = 0;
     float lobeP = 0.0f;
 
-    FalcorBSDF bsdf = FalcorBSDF::make(surface._mtl, surface.GetNormal(), surface.GetView(), surface._data);
+    FalcorBSDF bsdf = FalcorBSDF::make(surface._mtl, wiLocal, surface._data);
 
 #if RecycleSelectSamples
     const float3 u = float3(RTXDI_GetNextRandom(rng), RTXDI_GetNextRandom(rng), RTXDI_GetNextRandom(rng));

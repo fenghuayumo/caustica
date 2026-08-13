@@ -332,6 +332,7 @@ with caustica.Renderer(scene="bistro-programmer-art.scene.json", headless=True) 
     mat.enable_normal_texture = True
     mat.set_base_texture(r"D:/assets/replacement_albedo.png")
     mat.set_normal_texture(r"D:/assets/replacement_normal.png")
+    mat.set_coat_normal_texture(r"D:/assets/replacement_coat_normal.png")
 
     # In reference accumulation mode, reset after any visible edit so old
     # accumulated samples do not remain mixed into the image.
@@ -397,6 +398,7 @@ Default color-space handling:
 | `TextureSlot.Base` | `set_base_texture(path, srgb=None)` | sRGB |
 | `TextureSlot.ORM` | `set_orm_texture(path, srgb=None)` | Linear in metal-rough mode, sRGB in spec-gloss mode |
 | `TextureSlot.Normal` | `set_normal_texture(path)` | Linear normal map |
+| `TextureSlot.CoatNormal` | `set_coat_normal_texture(path)` | Linear coat normal map |
 | `TextureSlot.Emissive` | `set_emissive_texture(path, srgb=None)` | sRGB |
 | `TextureSlot.Transmission` | `set_transmission_texture(path, srgb=None)` | Linear |
 
@@ -964,6 +966,7 @@ Editable properties automatically mark GPU data dirty:
 | `transmission_diffuse_weight` | `float` |
 | `normal_texture_scale` | `float` |
 | `geometry_normal_scale` | `float` |
+| `coat_normal_scale` | `float` |
 | `ior` | `float` |
 | `specular_ior` | `float` |
 | `alpha_cutoff` | `float` |
@@ -987,6 +990,7 @@ Editable properties automatically mark GPU data dirty:
 | `enable_base_metalness_specular_roughness_texture` | `bool` |
 | `enable_normal_texture` | `bool` |
 | `enable_geometry_normal_texture` | `bool` |
+| `enable_coat_normal_texture` | `bool` |
 | `enable_emissive_texture` | `bool` |
 | `enable_emission_color_texture` | `bool` |
 | `enable_transmission_texture` | `bool` |
@@ -999,6 +1003,7 @@ Editable properties automatically mark GPU data dirty:
 | `base_texture_path` | `str | None` |
 | `orm_texture_path` | `str | None` |
 | `normal_texture_path` | `str | None` |
+| `coat_normal_texture_path` | `str | None` |
 | `emissive_texture_path` | `str | None` |
 | `transmission_texture_path` | `str | None` |
 
@@ -1011,10 +1016,11 @@ Editable properties automatically mark GPU data dirty:
 | `set_base_texture(path, srgb=None)` | Replace base/diffuse texture. Defaults to sRGB. |
 | `set_orm_texture(path, srgb=None)` | Replace ORM/spec-gloss texture. Defaults to linear for metal-rough and sRGB for spec-gloss. |
 | `set_normal_texture(path)` | Replace normal texture. |
+| `set_coat_normal_texture(path)` | Replace the independent OpenPBR coat normal texture. |
 | `set_emissive_texture(path, srgb=None)` | Replace emissive texture. Defaults to sRGB. |
 | `set_transmission_texture(path, srgb=None)` | Replace transmission texture. Defaults to linear. |
 | `clear_texture(slot)` | Disconnect and disable a texture slot. |
-| `clear_base_texture()`, `clear_orm_texture()`, `clear_normal_texture()`, `clear_emissive_texture()`, `clear_transmission_texture()` | Slot-specific clear helpers. |
+| `clear_base_texture()`, `clear_orm_texture()`, `clear_normal_texture()`, `clear_coat_normal_texture()`, `clear_emissive_texture()`, `clear_transmission_texture()` | Slot-specific clear helpers. |
 
 #### Runtime Update Rules
 

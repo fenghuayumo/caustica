@@ -86,7 +86,7 @@ struct PathTracerCollectedSurfaceData
 		float3 wiLocal = _ToLocal(_V);
 		float3 woLocal = _ToLocal(wo);
 
-		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, _N, _V, _data);
+		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, wiLocal, _data);
 
 		return bsdf.eval(wiLocal, woLocal);
 	}
@@ -99,7 +99,7 @@ struct PathTracerCollectedSurfaceData
 		float3 wiLocal = _ToLocal(_V);
 		float3 woLocal = _ToLocal(wo);
 
-		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, _N, _V, roughBsdf);
+		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, wiLocal, roughBsdf);
 
 		return bsdf.eval(wiLocal, woLocal);
 	}
@@ -132,7 +132,7 @@ struct PathTracerCollectedSurfaceData
 		float3 wiLocal = _ToLocal(_V);
 		float3 woLocal = _ToLocal(wo);
 
-		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, _N, _V, _data);
+		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, wiLocal, _data);
 
 		return bsdf.evalPdf(wiLocal, woLocal);
 	}
@@ -160,7 +160,7 @@ struct PathTracerCollectedSurfaceData
 			if (min(wiLocal.z, woLocal.z) < kMinCosTheta || result.pdf == 0.f) return false;
 		}
 
-		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, _N, _V, _data);
+		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, wiLocal, _data);
 
 		result.wo = _FromLocal(woLocal);
         result.weight = bsdf.eval(wiLocal, woLocal).rgb / result.pdf;
@@ -176,7 +176,7 @@ struct PathTracerCollectedSurfaceData
 		float3 wiLocal = _ToLocal(_V);
 		float3 woLocal = float3(0, 0, 0);
 
-		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, _N, _V, _data);
+		FalcorBSDF bsdf = FalcorBSDF::make(_mtl, wiLocal, _data);
 #if RecycleSelectSamples
         bool valid = bsdf.sample(wiLocal, woLocal, result.pdf, result.weight, result.lobe, result.lobeP, sampleNext3D(sampleGenerator));
 #else
@@ -311,6 +311,10 @@ PackedPathTracerSurfaceData RunCompress(PathTracerCollectedSurfaceData d)
 	c._roughnessMetallicEta = Encode_R11G11B10_FLOAT(float3(d._data.Roughness(), d._data.Metallic(), d._data.Eta()));
 	c._transmission = Encode_R11G11B10_FLOAT(d._data.Transmission());
 	c._diffuseSpecularTransmission = Fp32ToFp16(float2(d._data.DiffuseTransmission(), d._data.SpecularTransmission()));
+	c._coatNormal = Fp32ToFp16(Encode_Oct((float3)d._data.CoatNormal()));
+	c._coatTangentAndSign = Fp32ToFp16(Encode_Oct((float3)d._data.CoatTangent()));
+	if (d._data.CoatBitangentSign() < 0.f)
+		c._coatTangentAndSign |= 0x80000000u;
 
 	return c;
 }
@@ -378,6 +382,9 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	lpfloat coatAnisotropy = 0;
 	lpfloat coatIor = (lpfloat)1.6;
 	lpfloat coatDarkening = 1;
+	lpfloat3 coatNormal = (lpfloat3)Decode_Oct(Fp16ToFp32(c._coatNormal));
+	lpfloat3 coatTangent = (lpfloat3)Decode_Oct(Fp16ToFp32(c._coatTangentAndSign & 0x7fffffffu));
+	lpfloat coatBitangentSign = (c._coatTangentAndSign & 0x80000000u) != 0 ? (lpfloat)-1.f : (lpfloat)1.f;
 
 	lpfloat thinFilmWeight = 0;
 	lpfloat thinFilmThickness = (lpfloat)0.5;
@@ -432,6 +439,7 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
         bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
         anisotropy, fuzzWeight, fuzzColor, fuzzRoughness,
         coatWeight, coatColor, coatRoughness, coatAnisotropy, coatIor, coatDarkening,
+        coatNormal, coatTangent, coatBitangentSign,
         subsurfaceWeight, subsurfaceColor,
         thinFilmWeight, thinFilmThickness, thinFilmIor,
         dispersionScale, dispersionAbbeNumber );

@@ -50,6 +50,7 @@ enum class StandardMaterialTextureSlot
     Base,
     OcclusionRoughnessMetallic,
     Normal,
+    CoatNormal,
     Emissive,
     Transmission
 };
@@ -148,6 +149,7 @@ struct StandardMaterial : public StandardMaterialBase
     StandardMaterialTexture baseTexture;                        // .rgb base color; .a = opacity (both modes)
     StandardMaterialTexture occlusionRoughnessMetallicTexture;  // .rgb ORM; (spec-gloss fallback: specular color, .a = glossiness)
     StandardMaterialTexture normalTexture;
+    StandardMaterialTexture coatNormalTexture;
     StandardMaterialTexture emissiveTexture;
     StandardMaterialTexture transmissionTexture;                // see KHR_materials_transmission; undefined on specular-gloss materials
 
@@ -199,6 +201,7 @@ struct StandardMaterial : public StandardMaterialBase
     float                   transmissionFactor                  = 0.f; // see KHR_materials_transmission; undefined on specular-gloss materials
     float                   diffuseTransmissionFactor           = 0.f; // like specularTransmissionFactor, except using diffuse transmission lobe (roughness ignored)
     float                   normalTextureScale                  = 1.f;
+    float                   coatNormalTextureScale              = 1.f;
     float                   IoR                                 = 1.5f; // index of refraction, see KHR_materials_ior
 
     // Toggle between two PBR models: metal-rough and specular-gloss.
@@ -209,6 +212,7 @@ struct StandardMaterial : public StandardMaterialBase
     bool                    enableBaseTexture                   = true;
     bool                    enableOcclusionRoughnessMetallicTexture   = true;
     bool                    enableNormalTexture                 = true;
+    bool                    enableCoatNormalTexture             = true;
     bool                    enableEmissiveTexture               = true;
     bool                    enableTransmissionTexture           = true;
 

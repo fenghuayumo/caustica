@@ -189,6 +189,7 @@ void StandardMaterial::write(Json::Value& output)
     saveTexture(output, baseTexture, "baseTexture");
     saveTexture(output, occlusionRoughnessMetallicTexture, "occlusionRoughnessMetallicTexture");
     saveTexture(output, normalTexture, "normalTexture");
+    saveTexture(output, coatNormalTexture, "coatNormalTexture");
     saveTexture(output, emissiveTexture, "emissiveTexture");
     saveTexture(output, transmissionTexture, "transmissionTexture");
 
@@ -238,12 +239,14 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(transmissionFactor);
     STORE_FIELD(diffuseTransmissionFactor);
     STORE_FIELD(normalTextureScale);
+    STORE_FIELD(coatNormalTextureScale);
     STORE_FIELD(IoR);
 
     STORE_FIELD(useSpecularGlossModel);
     STORE_FIELD(enableBaseTexture);
     STORE_FIELD(enableOcclusionRoughnessMetallicTexture);
     STORE_FIELD(enableNormalTexture);
+    STORE_FIELD(enableCoatNormalTexture);
     STORE_FIELD(enableEmissiveTexture);
     STORE_FIELD(enableTransmissionTexture);
     STORE_FIELD(enableAlphaTesting);
@@ -300,6 +303,9 @@ void StandardMaterial::write(Json::Value& output)
         openPBR["coat_roughness_anisotropy"] << coatAnisotropy;
         openPBR["coat_ior"] << coatIor;
         openPBR["coat_darkening"] << coatDarkening;
+        openPBR["coat_normal_scale"] << coatNormalTextureScale;
+        if (output.isMember("coatNormalTexture"))
+            openPBR["coat_normal"] = output["coatNormalTexture"];
 
         openPBR["subsurface_weight"] << subsurfaceWeight;
         openPBR["subsurface_color"] << subsurfaceColor;
@@ -337,6 +343,14 @@ bool StandardMaterial::read(
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
 
+    // OpenPBR stores the coat normal in its material block. Mirror it into the
+    // legacy texture field so both schemas use the same loading path.
+    if (!input.isMember("coatNormalTexture") && input.isMember("OpenPBR")
+        && input["OpenPBR"].isObject() && input["OpenPBR"].isMember("coat_normal"))
+    {
+        input["coatNormalTexture"] = input["OpenPBR"]["coat_normal"];
+    }
+
     auto loadTexture = [&](const char* camelName, const char* pascalName, StandardMaterialTexture& output)
     {
         output = StandardMaterialTexture();
@@ -372,6 +386,7 @@ bool StandardMaterial::read(
     loadTexture("baseTexture", "BaseTexture", this->baseTexture);
     loadTexture("occlusionRoughnessMetallicTexture", "OcclusionRoughnessMetallicTexture", this->occlusionRoughnessMetallicTexture);
     loadTexture("normalTexture", "NormalTexture", this->normalTexture);
+    loadTexture("coatNormalTexture", "CoatNormalTexture", this->coatNormalTexture);
     loadTexture("emissiveTexture", "EmissiveTexture", this->emissiveTexture);
     loadTexture("transmissionTexture", "TransmissionTexture", this->transmissionTexture);
 
@@ -436,12 +451,14 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(transmissionFactor, "TransmissionFactor");
     LOAD_FIELD_EITHER(diffuseTransmissionFactor, "DiffuseTransmissionFactor");
     LOAD_FIELD_EITHER(normalTextureScale, "NormalTextureScale");
+    LOAD_FIELD_EITHER(coatNormalTextureScale, "CoatNormalTextureScale");
     LOAD_FIELD_EITHER(IoR, "IoR");
 
     LOAD_FIELD_EITHER(useSpecularGlossModel, "UseSpecularGlossModel");
     LOAD_FIELD_EITHER(enableBaseTexture, "EnableBaseTexture");
     LOAD_FIELD_EITHER(enableOcclusionRoughnessMetallicTexture, "EnableOcclusionRoughnessMetallicTexture");
     LOAD_FIELD_EITHER(enableNormalTexture, "EnableNormalTexture");
+    LOAD_FIELD_EITHER(enableCoatNormalTexture, "EnableCoatNormalTexture");
     LOAD_FIELD_EITHER(enableEmissiveTexture, "EnableEmissiveTexture");
     LOAD_FIELD_EITHER(enableTransmissionTexture, "EnableTransmissionTexture");
     LOAD_FIELD_EITHER(enableAlphaTesting, "EnableAlphaTesting");
@@ -517,6 +534,7 @@ bool StandardMaterial::read(
         ReadJsonMember(openPBR, "coat_roughness_anisotropy", coatAnisotropy);
         ReadJsonMember(openPBR, "coat_ior", coatIor);
         ReadJsonMember(openPBR, "coat_darkening", coatDarkening);
+        ReadJsonMember(openPBR, "coat_normal_scale", coatNormalTextureScale);
 
         ReadJsonMember(openPBR, "subsurface_weight", subsurfaceWeight);
         ReadJsonMember(openPBR, "subsurface_color", subsurfaceColor);
@@ -624,6 +642,8 @@ StandardMaterialTexture& StandardMaterial::getTexture(StandardMaterialTextureSlo
         return occlusionRoughnessMetallicTexture;
     case StandardMaterialTextureSlot::Normal:
         return normalTexture;
+    case StandardMaterialTextureSlot::CoatNormal:
+        return coatNormalTexture;
     case StandardMaterialTextureSlot::Emissive:
         return emissiveTexture;
     case StandardMaterialTextureSlot::Transmission:
@@ -649,6 +669,8 @@ bool StandardMaterial::isTextureEnabled(StandardMaterialTextureSlot slot) const
         return enableOcclusionRoughnessMetallicTexture;
     case StandardMaterialTextureSlot::Normal:
         return enableNormalTexture;
+    case StandardMaterialTextureSlot::CoatNormal:
+        return enableCoatNormalTexture;
     case StandardMaterialTextureSlot::Emissive:
         return enableEmissiveTexture;
     case StandardMaterialTextureSlot::Transmission:
@@ -671,6 +693,9 @@ void StandardMaterial::setTextureEnabled(StandardMaterialTextureSlot slot, bool 
         break;
     case StandardMaterialTextureSlot::Normal:
         enableNormalTexture = enabled;
+        break;
+    case StandardMaterialTextureSlot::CoatNormal:
+        enableCoatNormalTexture = enabled;
         break;
     case StandardMaterialTextureSlot::Emissive:
         enableEmissiveTexture = enabled;
@@ -902,6 +927,22 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
         ImGui::Text("geometry_normal_scale");
     }
 
+    drawTextureToggle("Use coat_normal texture", coatNormalTexture, enableCoatNormalTexture);
+    if (enableCoatNormalTexture)
+    {
+        ImGui::SetNextItemWidth(itemWidth - 31.f);
+        update |= ImGui::SliderFloat("###coatnormtexscale", &coatNormalTextureScale, -2.f, 2.f);
+        ImGui::SameLine(0.f, 5.f);
+        ImGui::SetNextItemWidth(26.f);
+        if (ImGui::Button("1.0##coat_normal"))
+        {
+            coatNormalTextureScale = 1.f;
+            update = true;
+        }
+        ImGui::SameLine();
+        ImGui::Text("coat_normal_scale");
+    }
+
     drawTextureToggle("Use emission_color texture", emissiveTexture, enableEmissiveTexture);
 
     update |= ImGui::ColorEdit3("emission_color", emissiveColor.data(), ImGuiColorEditFlags_Float);
@@ -1024,6 +1065,8 @@ void StandardMaterial::fillData(StandardMaterialData & data)
 
     if (normalTexture.loaded && enableNormalTexture)
         data.Flags |= StandardMaterialFlags_UseNormalTexture;
+    if (coatNormalTexture.loaded && enableCoatNormalTexture)
+        data.Flags |= StandardMaterialFlags_UseCoatNormalTexture;
 
     if (transmissionTexture.loaded && enableTransmissionTexture && enableTransmission)
         data.Flags |= StandardMaterialFlags_UseTransmissionTexture;
@@ -1070,6 +1113,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.FuzzColor = fuzzColor;
     data.FuzzRoughness = std::clamp(fuzzRoughness, 0.0f, 1.0f);
     data.NormalTextureScale = normalTextureScale;
+    data.CoatNormalTextureScale = coatNormalTextureScale;
     data.TransmissionFactor = (enableTransmission)?(transmissionFactor):(0);
     data.DiffuseTransmissionFactor = (enableTransmission)?(diffuseTransmissionFactor):(0);
     data.Opacity = opacity;
@@ -1104,7 +1148,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.TransmissionDispersionScale = std::clamp(transmissionDispersionScale, 0.0f, 1.0f);
     data.TransmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
     data.UnlitShadowStrength = std::clamp(unlitShadowStrength, 0.0f, 1.0f);
-    data._padOpenPBR = dm::float3(0.f);
+    data._padOpenPBR = 0.f;
 
     // bindless textures
 
@@ -1112,6 +1156,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     GetBindlessTextureIndex(occlusionRoughnessMetallicTexture.loaded, data.MetalRoughOrSpecularTextureIndex, data.Flags, StandardMaterialFlags_UseMetalRoughOrSpecularTexture);
     GetBindlessTextureIndex(emissiveTexture.loaded, data.EmissiveTextureIndex, data.Flags, StandardMaterialFlags_UseEmissiveTexture);
     GetBindlessTextureIndex(normalTexture.loaded, data.NormalTextureIndex, data.Flags, StandardMaterialFlags_UseNormalTexture);
+    GetBindlessTextureIndex(coatNormalTexture.loaded, data.CoatNormalTextureIndex, data.Flags, StandardMaterialFlags_UseCoatNormalTexture);
     GetBindlessTextureIndex(transmissionTexture.loaded, data.TransmissionTextureIndex, data.Flags, StandardMaterialFlags_UseTransmissionTexture);
 
     data.Flags |= (uint)(min(nestedPriority, kMaterialMaxNestedPriority)) << StandardMaterialFlags_NestedPriorityShift;
@@ -1151,6 +1196,7 @@ static bool DefaultTextureSRGB(const StandardMaterial& material, StandardMateria
     case StandardMaterialTextureSlot::OcclusionRoughnessMetallic:
         return material.useSpecularGlossModel;
     case StandardMaterialTextureSlot::Normal:
+    case StandardMaterialTextureSlot::CoatNormal:
     case StandardMaterialTextureSlot::Transmission:
         return false;
     default:
@@ -1161,7 +1207,7 @@ static bool DefaultTextureSRGB(const StandardMaterial& material, StandardMateria
 
 static bool DefaultTextureNormalMap(StandardMaterialTextureSlot slot)
 {
-    return slot == StandardMaterialTextureSlot::Normal;
+    return slot == StandardMaterialTextureSlot::Normal || slot == StandardMaterialTextureSlot::CoatNormal;
 }
 
 void MaterialGpuCache::recordTexture(const StandardMaterialTexture& texture)
@@ -1551,6 +1597,7 @@ void MaterialGpuCache::rebuildActiveTextureIndex()
         recordTexture(material->baseTexture);
         recordTexture(material->occlusionRoughnessMetallicTexture);
         recordTexture(material->normalTexture);
+        recordTexture(material->coatNormalTexture);
         recordTexture(material->emissiveTexture);
         recordTexture(material->transmissionTexture);
     }
@@ -1636,6 +1683,7 @@ int MaterialGpuCache::ensureMaterialsFromScene(
         recordTexture(standardMaterial->baseTexture);
         recordTexture(standardMaterial->occlusionRoughnessMetallicTexture);
         recordTexture(standardMaterial->normalTexture);
+        recordTexture(standardMaterial->coatNormalTexture);
         recordTexture(standardMaterial->emissiveTexture);
         recordTexture(standardMaterial->transmissionTexture);
         initializeUniqueDeterministicName(standardMaterial);
@@ -1888,6 +1936,7 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
         recordTexture(standardMaterial->baseTexture);
         recordTexture(standardMaterial->occlusionRoughnessMetallicTexture);
         recordTexture(standardMaterial->normalTexture);
+        recordTexture(standardMaterial->coatNormalTexture);
         recordTexture(standardMaterial->emissiveTexture);
         recordTexture(standardMaterial->transmissionTexture);
 
