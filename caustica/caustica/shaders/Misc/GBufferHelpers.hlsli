@@ -384,6 +384,11 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	lpfloat thinFilmIor = (lpfloat)1.4;
 	lpfloat dispersionScale = 0;
 	lpfloat dispersionAbbeNumber = 20;
+	lpfloat baseDiffuseRoughness = 0;
+	lpfloat3 dielectricSpecular = bsdfDataSpecular;
+	lpfloat3 metalSpecular = bsdfDataSpecular;
+	lpfloat3 specularColor = (lpfloat3)1;
+	lpfloat specularWeight = 1;
 
 	// These parameters are currently uniform per material. Reconstructing them
 	// by material ID preserves the complete OpenPBR BSDF without enlarging the
@@ -412,9 +417,19 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 		thinFilmIor = (lpfloat)material.ThinFilmIor;
 		dispersionScale = (lpfloat)material.TransmissionDispersionScale;
 		dispersionAbbeNumber = (lpfloat)material.TransmissionDispersionAbbeNumber;
+		baseDiffuseRoughness = (lpfloat)material.BaseDiffuseRoughness;
+		specularColor = (lpfloat3)material.SpecularColor;
+		specularWeight = (lpfloat)material.SpecularWeight;
+		float relativeIor = bsdfDataEta < 1.0f ? rcp(max((float)bsdfDataEta, 1e-4f)) : (float)bsdfDataEta;
+		dielectricSpecular = (lpfloat3)(OpenPBRDielectricF0(relativeIor) * material.SpecularColor);
+		if (bsdfDataMetallic > 1e-4f && specularWeight > 1e-4f)
+			metalSpecular = (lpfloat3)((bsdfDataSpecular - dielectricSpecular * (1.0f - bsdfDataMetallic))
+				/ max(bsdfDataMetallic * specularWeight, (lpfloat)1e-4f));
 	}
 
-    d._data = StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
+    d._data = StandardBSDFData::make(bsdfDataDiffuse, bsdfDataSpecular, dielectricSpecular, metalSpecular,
+        specularColor, specularWeight, baseDiffuseRoughness,
+        bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
         anisotropy, fuzzWeight, fuzzColor, fuzzRoughness,
         coatWeight, coatColor, coatRoughness, coatAnisotropy, coatIor, coatDarkening,
         subsurfaceWeight, subsurfaceColor,

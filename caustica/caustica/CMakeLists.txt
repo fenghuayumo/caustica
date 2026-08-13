@@ -177,6 +177,12 @@ if (BUILD_TESTING)
         target_compile_options(causTaskRuntimeTests PRIVATE /utf-8)
     endif()
     add_test(NAME causTaskRuntimeTests COMMAND causTaskRuntimeTests)
+
+    add_executable(causOpenPBRMaterialTests tests/OpenPBRMaterialTests.cpp)
+    if (MSVC)
+        target_compile_options(causOpenPBRMaterialTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causOpenPBRMaterialTests COMMAND causOpenPBRMaterialTests)
 endif()
 
 # ── causEvents ────────────────────────────────────────────────────────────

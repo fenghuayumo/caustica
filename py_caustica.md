@@ -945,12 +945,17 @@ Editable properties automatically mark GPU data dirty:
 | `specular_roughness` | `float` |
 | `material_model` | `str` |
 | `base_weight` | `float` |
+| `base_diffuse_roughness` | `float` |
 | `specular_weight` | `float` |
 | `anisotropy` | `float` |
 | `specular_roughness_anisotropy` | `float` |
 | `fuzz_weight` | `float` |
 | `fuzz_color` | `(r, g, b)` |
 | `fuzz_roughness` | `float` |
+| `subsurface_radius_scale` | `(r, g, b)` |
+| `subsurface_scale` | `float` (legacy broadcast alias) |
+| `subsurface_scatter_anisotropy` | `float` |
+| `subsurface_anisotropy` | `float` (legacy alias) |
 | `opacity` | `float` |
 | `geometry_opacity` | `float` |
 | `transmission_factor` | `float` |

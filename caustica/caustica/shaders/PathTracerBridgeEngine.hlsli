@@ -307,7 +307,9 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     result.shadingNormal    = result.geometryNormal;
     result.flags = material.Flags;
     result.baseWeight = lpfloat(saturate(material.BaseWeight));
+    result.baseDiffuseRoughness = lpfloat(saturate(material.BaseDiffuseRoughness));
     result.specularWeight = lpfloat(max(material.SpecularWeight, 0.0));
+    result.specularColor = lpfloat3(saturate(material.SpecularColor));
     result.anisotropy = lpfloat(clamp(material.Anisotropy, -1.0, 1.0));
     result.fuzzWeight = lpfloat(saturate(material.FuzzWeight));
     result.fuzzColor = lpfloat3(saturate(material.FuzzColor));
@@ -328,6 +330,8 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
         // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_pbrSpecularGlossiness/README.md#specular---glossiness
         result.diffuseAlbedo = lpfloat3(diffuseColor * (1.0 - max(specularColor.r, max(specularColor.g, specularColor.b))));
         result.specularF0 = lpfloat3(specularColor);
+        result.dielectricSpecularF0 = result.specularF0;
+        result.metalSpecularF0 = result.specularF0;
     }
     else
     {
@@ -341,11 +345,16 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
 
         // Compute the BRDF inputs for the metal-rough model
         // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#metal-brdf-and-dielectric-brdf
-        float3 specularTint = (material.Flags & StandardMaterialFlags_UseOpenPBRMaterialModel) != 0 ? material.SpecularColor.rgb : float3(1, 1, 1);
-        float f = (material.IoR - 1.f) / (material.IoR + 1.f);
-        float dielectricF0 = f * f;
+        bool useOpenPBR = (material.Flags & StandardMaterialFlags_UseOpenPBRMaterialModel) != 0;
+        float3 specularTint = useOpenPBR ? material.SpecularColor.rgb : float3(1, 1, 1);
+        float relativeBaseIor = lerp(max(material.IoR, 1e-4f), max(material.IoR, 1e-4f) / max(material.CoatIor, 1e-4f), saturate(material.CoatWeight));
+        float effectiveIor = useOpenPBR ? OpenPBRModulatedIor(relativeBaseIor, max(material.SpecularWeight, 0.0f)) : material.IoR;
+        float dielectricF0 = OpenPBRDielectricF0(effectiveIor);
         result.diffuseAlbedo = result.baseColor * result.baseWeight * (1.0 - result.metalness); // Don't compensate for specular energy here. Energy compensation is built into Frostbite's diffuse, so this would be double dipping.
-        result.specularF0 = lpfloat3( lerp(dielectricF0 * result.specularWeight * specularTint, result.baseColor.rgb, result.metalness) );
+        result.dielectricSpecularF0 = lpfloat3(dielectricF0 * specularTint);
+        result.metalSpecularF0 = result.baseColor * result.baseWeight;
+        result.specularF0 = lpfloat3(lerp(result.dielectricSpecularF0, result.metalSpecularF0 * result.specularWeight, result.metalness));
+        result.ior = lpfloat(effectiveIor);
     }
 
 #if 0    
@@ -376,7 +385,8 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     if ((material.Flags & StandardMaterialFlags_UseEmissiveTexture) != 0)
         result.emissiveColor *= lpfloat3( textures.emissive.rgb );
 
-    result.ior = lpfloat( material.IoR );
+    if ((material.Flags & StandardMaterialFlags_UseSpecularGlossModel) != 0)
+        result.ior = lpfloat(material.IoR);
     
     result.shadowNoLFadeout = lpfloat( material.ShadowNoLFadeout );
     result.unlitShadowStrength = lpfloat(saturate(material.UnlitShadowStrength));
@@ -391,7 +401,7 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
     result.subsurfaceWeight = lpfloat(saturate(material.SubsurfaceWeight));
     result.subsurfaceColor = lpfloat3(saturate(material.SubsurfaceColor));
     result.subsurfaceRadius = lpfloat(max(material.SubsurfaceRadius, 0.0));
-    result.subsurfaceScale = lpfloat(max(material.SubsurfaceScale, 0.0));
+    result.subsurfaceRadiusScale = lpfloat3(max(float3(material.SubsurfaceRadiusScaleX, material.SubsurfaceRadiusScaleY, material.SubsurfaceRadiusScaleZ), 0.0));
     result.subsurfaceAnisotropy = lpfloat(clamp(material.SubsurfaceAnisotropy, -1.0, 1.0));
 
     result.thinFilmWeight = lpfloat(saturate(material.ThinFilmWeight));
@@ -791,8 +801,8 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // "This microfacet lobe is exactly the same as the specular lobe except sampled along the line of sight through the surface."
     lpfloat     bsdfDataSpecularTransmission = bridgeMaterial.transmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
     lpfloat     bsdfDataDiffuseTransmission = bridgeMaterial.diffuseTransmission * (1 - bridgeMaterial.metalness);    // (1 - bridgeMaterial.metalness) is from https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md#transparent-metals
-    // OpenPBR transmission_color; fall back to base_color when unset/white path matches legacy behaviour.
-    lpfloat3    bsdfDataTransmission = bridgeMaterial.transmissionColor * bridgeMaterial.baseColor;
+    // OpenPBR transmission_color is independent of base_color.
+    lpfloat3    bsdfDataTransmission = bridgeMaterial.transmissionColor;
 #else
     lpfloat     bsdfDataDiffuseTransmission  = 0;
     lpfloat     bsdfDataSpecularTransmission = 0;    
@@ -882,7 +892,9 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 #endif
 
     StandardBSDF bsdf = StandardBSDF::make(
-        StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
+        StandardBSDFData::make( bsdfDataDiffuse, bsdfDataSpecular, bridgeMaterial.dielectricSpecularF0, bridgeMaterial.metalSpecularF0,
+            bridgeMaterial.specularColor, bridgeMaterial.specularWeight, bridgeMaterial.baseDiffuseRoughness,
+            bsdfDataRoughness, bsdfDataMetallic, bsdfDataEta, bsdfDataTransmission, bsdfDataDiffuseTransmission, bsdfDataSpecularTransmission,
             bridgeMaterial.anisotropy, bridgeMaterial.fuzzWeight, bridgeMaterial.fuzzColor, bridgeMaterial.fuzzRoughness,
             bridgeMaterial.coatWeight, bridgeMaterial.coatColor, bridgeMaterial.coatRoughness, bridgeMaterial.coatAnisotropy, bridgeMaterial.coatIor, bridgeMaterial.coatDarkening,
             bridgeMaterial.subsurfaceWeight, bridgeMaterial.subsurfaceColor,
@@ -945,13 +957,22 @@ HomogeneousVolumeData Bridge::loadHomogeneousVolumeData(const uint materialDataI
     float attenDistance = volumeInfo.AttenuationDistance;
     if (material.TransmissionDepth > 0.0f)
         attenDistance = min(attenDistance, material.TransmissionDepth);
-    ptVolume.sigmaA = -log( clamp( volumeInfo.AttenuationColor * saturate(material.TransmissionColor), 1e-7, 1 ) ) / max( 1e-30, attenDistance.xxx );
+    float3 sigmaT = -log(clamp(volumeInfo.AttenuationColor * saturate(material.TransmissionColor), 1e-7, 1))
+        / max(1e-30, attenDistance.xxx);
 
-    // OpenPBR scattering: transmission_scatter and/or subsurface (dense medium approx).
+    // OpenPBR defines transmission_scatter as part of total extinction, not an
+    // additional extinction term. Shift negative absorption by gray as required
+    // by the specification when artist parameters request sigmaS > sigmaT.
     float3 sigmaS = OpenPBRTransmissionSigmaS(material.TransmissionScatter, max(material.TransmissionDepth, attenDistance));
+    float3 sigmaA = sigmaT - sigmaS;
+    float minSigmaA = min(sigmaA.x, min(sigmaA.y, sigmaA.z));
+    if (minSigmaA < 0.0f)
+        sigmaA -= minSigmaA.xxx;
     if (material.SubsurfaceWeight > 0.0f)
-        sigmaS += material.SubsurfaceWeight * OpenPBRSubsurfaceSigmaS(material.SubsurfaceColor, material.SubsurfaceRadius, material.SubsurfaceScale);
+        sigmaS += material.SubsurfaceWeight * OpenPBRSubsurfaceSigmaS(material.SubsurfaceColor, material.SubsurfaceRadius,
+            float3(material.SubsurfaceRadiusScaleX, material.SubsurfaceRadiusScaleY, material.SubsurfaceRadiusScaleZ));
     ptVolume.sigmaS = max(sigmaS, float3(0, 0, 0));
+    ptVolume.sigmaA = max(sigmaA, float3(0, 0, 0));
     ptVolume.g = clamp(material.TransmissionScatterAnisotropy != 0.0f ? material.TransmissionScatterAnisotropy : material.SubsurfaceAnisotropy, -0.999f, 0.999f);
     return ptVolume;
 }

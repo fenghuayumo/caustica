@@ -10,10 +10,14 @@ struct MaterialProperties
     float3 geometryNormal;
     lpfloat3 diffuseAlbedo; // BRDF input Cdiff
     lpfloat3 specularF0; // BRDF input F0
+    lpfloat3 dielectricSpecularF0;
+    lpfloat3 metalSpecularF0;
+    lpfloat3 specularColor;
     lpfloat3 emissiveColor;
     lpfloat opacity;
     //lpfloat occlusion;
     lpfloat roughness;
+    lpfloat baseDiffuseRoughness;
     lpfloat baseWeight;
     lpfloat specularWeight;
     lpfloat anisotropy;
@@ -42,7 +46,7 @@ struct MaterialProperties
     lpfloat subsurfaceWeight;
     lpfloat3 subsurfaceColor;
     lpfloat subsurfaceRadius;
-    lpfloat subsurfaceScale;
+    lpfloat3 subsurfaceRadiusScale;
     lpfloat subsurfaceAnisotropy;
 
     lpfloat thinFilmWeight;
@@ -63,10 +67,14 @@ struct MaterialProperties
         result.geometryNormal = 0;
         result.diffuseAlbedo = 0;
         result.specularF0 = 0;
+        result.dielectricSpecularF0 = 0;
+        result.metalSpecularF0 = 0;
+        result.specularColor = 1;
         result.emissiveColor = 0;
         result.opacity = 1;
         //result.occlusion = 1;
         result.roughness = 0;
+        result.baseDiffuseRoughness = 0;
         result.baseWeight = 1;
         result.specularWeight = 1;
         result.anisotropy = 0;
@@ -94,7 +102,7 @@ struct MaterialProperties
         result.subsurfaceWeight = 0;
         result.subsurfaceColor = 1;
         result.subsurfaceRadius = 1;
-        result.subsurfaceScale = 1;
+        result.subsurfaceRadiusScale = lpfloat3(1, 0.5, 0.25);
         result.subsurfaceAnisotropy = 0;
 
         result.thinFilmWeight = 0;

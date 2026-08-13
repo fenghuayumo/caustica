@@ -5,6 +5,7 @@ import hashlib
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
@@ -68,7 +69,7 @@ def configure_import_path() -> None:
 
 # Keep in sync with sizeof(StandardMaterialData) in
 # caustica/shaders/PathTracer/Materials/StandardMaterial.h (17 x 16 bytes).
-STANDARD_MATERIAL_DATA_BYTES = "272"
+STANDARD_MATERIAL_DATA_BYTES = "288"
 
 
 def tier_macros(tier: int) -> list[tuple[str, str]]:
@@ -376,8 +377,6 @@ def compile_library(
 ) -> Path | None:
     digest = hash_hex(build_hash_command(logical_source, macros, api=api, profile=profile))
     out_path, _ = cache_paths(api, digest)
-    if out_path.exists() and not force:
-        return out_path
 
     cmd = [str(dxc), str(source), "-Zi", "-Zsb", "-O3", "-enable-16bit-types", "-WX", "-all_resources_bound", "-T", profile]
     if profile.startswith("lib_6_6"):
@@ -417,9 +416,26 @@ def compile_library(
 def shader_dependency_mtime() -> float:
     """Newest source timestamp for the path-tracing shader include tree."""
     newest = 0.0
-    for pattern in ("*.hlsl", "*.hlsli", "*.h"):
-        for path in SHADER_ROOT.rglob(pattern):
+    # NRD and the other render-pass shaders are built by separate targets and
+    # are not included by PathTracerEntryPoint/MaterialSpecializations. Scanning
+    # the entire shader tree made those targets spuriously invalidate all 1456
+    # path-tracer variants during an otherwise incremental build.
+    dependency_roots = (
+        SHADER_ROOT / "PathTracer",
+        SHADER_ROOT / "Misc",
+    )
+    dependency_files = (
+        SHADER_ROOT / "PathTracerEntryPoint.hlsl",
+        SHADER_ROOT / "PathTracerMaterialSpecializations.hlsl",
+        SHADER_ROOT / "PathTracerBridgeEngine.hlsli",
+    )
+    for path in dependency_files:
+        if path.exists():
             newest = max(newest, path.stat().st_mtime)
+    for dependency_root in dependency_roots:
+        for pattern in ("*.hlsl", "*.hlsli", "*.h"):
+            for path in dependency_root.rglob(pattern):
+                newest = max(newest, path.stat().st_mtime)
     return newest
 
 
@@ -470,7 +486,7 @@ def build_jobs(global_preset: str) -> list[dict]:
 def precompile(api: str, force: bool, global_preset: str = "default") -> int:
     dxc = find_dxc(api)
     dependency_mtime = shader_dependency_mtime()
-    compiled = 0
+    pending: list[dict] = []
     skipped = 0
     for job in build_jobs(global_preset):
         digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=api))
@@ -478,15 +494,26 @@ def precompile(api: str, force: bool, global_preset: str = "default") -> int:
         if out_path.exists() and out_path.stat().st_mtime >= dependency_mtime and not force:
             skipped += 1
             continue
-        compile_library(
-            dxc,
-            source=job["source"],
-            logical_source=job["logical"],
-            macros=job["macros"],
-            api=api,
-            force=force,
-        )
-        compiled += 1
+        pending.append(job)
+
+    worker_count = max(1, min(int(os.environ.get("CAUSTICA_PT_SHADER_JOBS", "4")), len(pending) or 1))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(
+                compile_library,
+                dxc,
+                source=job["source"],
+                logical_source=job["logical"],
+                macros=job["macros"],
+                api=api,
+                force=force,
+            )
+            for job in pending
+        ]
+        for future in as_completed(futures):
+            future.result()
+
+    compiled = len(pending)
     print(
         f"[caustica] PT shader precompile ({api}, preset={global_preset}): "
         f"compiled={compiled}, skipped={skipped}"

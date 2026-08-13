@@ -651,4 +651,20 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
         target_compile_definitions(caustica_py PRIVATE CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP=$<BOOL:${CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP}>)
         target_include_directories(caustica_py PRIVATE ${CAUSTICA_D3D_AGILITY_SDK_PATH}/build/native/include)
     endif()
+
+    if (BUILD_TESTING AND Python3_EXECUTABLE)
+        add_test(
+            NAME causOpenPBRWhiteFurnaceRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/openpbr_white_furnace_render_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/openpbr-white-furnace"
+        )
+        set_tests_properties(causOpenPBRWhiteFurnaceRenderTests PROPERTIES
+            LABELS "gpu;render;openpbr"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
+    endif()
 endif()

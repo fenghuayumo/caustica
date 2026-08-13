@@ -34,7 +34,7 @@ static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F0000
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Shift    = 24;
 
 /// Data with the packed layout in GPU memory.
-/// sizeof must stay 272 (17 x 16). Update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in
+/// sizeof must stay 288 (18 x 16). Update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in
 /// PtPipelineFeaturePresets.cpp / MaterialFeatureMask.cpp / precompile_pt_shader_bins.py
 /// when this layout changes so cooked PT libs invalidate correctly.
 struct StandardMaterialData
@@ -82,7 +82,7 @@ struct StandardMaterialData
     float       CoatAnisotropy;
     float       SubsurfaceWeight;
     float       SubsurfaceRadius;
-    float       SubsurfaceScale;
+    float       SubsurfaceRadiusScaleX;
 
     float3      SubsurfaceColor;
     float       SubsurfaceAnisotropy;
@@ -100,10 +100,13 @@ struct StandardMaterialData
 
     float       TransmissionScatterAnisotropy;
     float       UnlitShadowStrength;
-    float       _padOpenPBR1;
-    float       _padOpenPBR2;
+    float       SubsurfaceRadiusScaleY;
+    float       SubsurfaceRadiusScaleZ;
 
     StandardVolumeConstants Volume;
+
+    float       BaseDiffuseRoughness;
+    float3      _padOpenPBR;
 };
 
 #if defined(__cplusplus)

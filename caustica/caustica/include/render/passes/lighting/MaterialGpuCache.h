@@ -157,6 +157,7 @@ struct StandardMaterial : public StandardMaterialBase
     
     std::string             materialModel                       = "OpenPBR"; // Built-in material model. "RTXPT" keeps legacy naming only.
     float                   baseWeight                          = 1.f;
+    float                   baseDiffuseRoughness                = 0.f;
     float                   specularWeight                      = 1.f;
     float                   anisotropy                          = 0.f; // OpenPBR specular_roughness_anisotropy, range [-1, 1].
     float                   fuzzWeight                          = 0.f;
@@ -175,7 +176,7 @@ struct StandardMaterial : public StandardMaterialBase
     float                   subsurfaceWeight                    = 0.f;
     dm::float3              subsurfaceColor                     = 1.f;
     float                   subsurfaceRadius                    = 1.f;
-    float                   subsurfaceScale                     = 1.f;
+    dm::float3              subsurfaceRadiusScale               = dm::float3(1.f, 0.5f, 0.25f);
     float                   subsurfaceAnisotropy                = 0.f;
 
     // OpenPBR thin-film

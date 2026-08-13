@@ -1,8 +1,9 @@
 # OpenPBR materials
 
 Caustica uses OpenPBR as the built-in material model (`MaterialModel`: `"OpenPBR"`).
-Parameters map onto the path-tracer BSDF (diffuse, GGX specular, transmission,
-anisotropy, fuzz, coat, subsurface approximation, thin-film, and dispersion).
+Parameters map onto the path-tracer BSDF (rough diffuse, GGX specular,
+transmission, anisotropy, fuzz, coat, subsurface approximation, thin-film, and
+RGB hero-wavelength dispersion).
 Existing `.material.json` files remain valid.
 
 When `MaterialModel` is `"OpenPBR"`, the inspector shows OpenPBR parameter names and
@@ -28,16 +29,16 @@ Material override discovery and texture path rules are documented in
 
 | OpenPBR group | Status |
 | --- | --- |
-| Base / specular / metalness | Implemented |
+| Base / specular / metalness | Implemented (effective-IOR dielectric + F82-tint metal) |
 | Transmission (+ color, depth, scatter) | Implemented |
-| Fuzz | Implemented (sheen approximation) |
-| Coat (+ darkening) | Implemented (GGX coat lobe + base attenuation) |
+| Fuzz | Implemented (energy-layered sheen approximation) |
+| Coat (+ darkening) | Implemented (GGX coat lobe + energy-layered base attenuation) |
 | Thin-film | Implemented (RGB Airy iridescence approx) |
-| Dispersion | Implemented (Abbe-number RGB η scale) |
+| Dispersion | Implemented (Cauchy/Abbe RGB hero-wavelength sampling) |
 | Subsurface | Implemented as lobe mix + homogeneous `sigmaS` (not full BSSRDF random walk) |
 | Volume absorption | Implemented (`volume_attenuation_*` / transmission depth) |
 | Coat / base separate normals | Not yet (shared shading normal) |
-| Full OpenPBR energy white-furnace model | Approximate (Turquin MS + coat attenuation) |
+| Full OpenPBR energy white-furnace model | Approximate; white coat/fuzz layer identities have regression tests |
 
 ## Existing material parameters
 
@@ -75,11 +76,12 @@ OpenPBR fields:
 | --- | --- |
 | `MaterialModel` | `"OpenPBR"` enables OpenPBR authoring and specular tinting. |
 | `BaseWeight` | Multiplies the diffuse/base contribution. |
-| `SpecularWeight` | Multiplies dielectric specular. |
+| `BaseDiffuseRoughness` | Roughness of the diffuse lobe, independent of specular roughness. |
+| `SpecularWeight` | Modulates the dielectric effective IOR/Fresnel response and scales the metal Fresnel response. |
 | `Anisotropy` | Directional GGX highlight amount, range `[-1, 1]`. |
 | `FuzzWeight` / `FuzzColor` / `FuzzRoughness` | Cloth/velvet/dust fuzz lobe. |
 | `CoatWeight` / `CoatColor` / `CoatRoughness` / `CoatAnisotropy` / `CoatIor` / `CoatDarkening` | Clearcoat layer. |
-| `SubsurfaceWeight` / `SubsurfaceColor` / `SubsurfaceRadius` / `SubsurfaceScale` / `SubsurfaceAnisotropy` | Dense scattering approx. |
+| `SubsurfaceWeight` / `SubsurfaceColor` / `SubsurfaceRadius` / `SubsurfaceRadiusScale` / `SubsurfaceAnisotropy` | Dense scattering approx. `SubsurfaceRadiusScale` is RGB. |
 | `ThinFilmWeight` / `ThinFilmThickness` / `ThinFilmIor` | Iridescent thin film (thickness in µm). |
 | `TransmissionColor` / `TransmissionDepth` / `TransmissionScatter` / `TransmissionScatterAnisotropy` | Transmission medium. |
 | `TransmissionDispersionScale` / `TransmissionDispersionAbbeNumber` | Chromatic dispersion. |
@@ -93,6 +95,7 @@ OpenPBR fields:
     "base_weight": 1.0,
     "base_color": [0.55, 0.48, 0.40],
     "base_metalness": 0.0,
+    "base_diffuse_roughness": 0.0,
     "specular_weight": 0.45,
     "specular_color": [1.0, 0.95, 0.9],
     "specular_roughness": 0.35,
@@ -109,6 +112,8 @@ OpenPBR fields:
     "subsurface_weight": 0.0,
     "subsurface_color": [0.8, 0.2, 0.15],
     "subsurface_radius": 0.5,
+    "subsurface_radius_scale": [1.0, 0.5, 0.25],
+    "subsurface_scatter_anisotropy": 0.0,
     "transmission_weight": 0.0,
     "transmission_color": [1.0, 1.0, 1.0],
     "transmission_depth": 0.0,
@@ -128,6 +133,7 @@ OpenPBR fields:
 | `base_weight` | `BaseWeight` |
 | `base_color` | `BaseOrDiffuseColor` |
 | `base_metalness` | `Metalness` |
+| `base_diffuse_roughness` | `BaseDiffuseRoughness` |
 | `specular_weight` | `SpecularWeight` |
 | `specular_color` | `SpecularColor` |
 | `specular_roughness` | `Roughness` |
@@ -142,8 +148,8 @@ OpenPBR fields:
 | `subsurface_weight` | `SubsurfaceWeight` |
 | `subsurface_color` | `SubsurfaceColor` |
 | `subsurface_radius` | `SubsurfaceRadius` |
-| `subsurface_scale` | `SubsurfaceScale` |
-| `subsurface_anisotropy` | `SubsurfaceAnisotropy` |
+| `subsurface_radius_scale` | `SubsurfaceRadiusScale` (RGB) |
+| `subsurface_scatter_anisotropy` | `SubsurfaceAnisotropy` |
 | `thin_film_weight` | `ThinFilmWeight` |
 | `thin_film_thickness` | `ThinFilmThickness` |
 | `thin_film_ior` | `ThinFilmIor` |
@@ -167,4 +173,6 @@ OpenPBR fields:
 
 - **Subsurface**: opaque-base mix toward `subsurface_color`, plus homogeneous volume scattering from radius/scale. Thin-walled subsurface also raises diffuse transmission. Full path-traced BSSRDF random walk is future work.
 - **Coat PSD**: path-space decomposition dominant bounce index `2` is coat reflection.
-- **Dispersion**: RGB Abbe approximation on relative η; not a full spectral solver.
+- **Compatibility aliases**: legacy scalar `subsurface_scale` is accepted and broadcast to RGB; `subsurface_anisotropy` remains accepted as an alias for `subsurface_scatter_anisotropy`.
+- **Dispersion**: one RGB hero wavelength is selected per transmissive BSDF sample, with its IOR derived from the Cauchy equation and OpenPBR effective Abbe number. This produces real angular color separation but is not a full spectral solver.
+- **White furnace**: `causOpenPBRMaterialTests` covers effective-IOR, F82, dispersion ordering, and the non-absorbing coat/fuzz layer identities. The GPU-labelled `causOpenPBRWhiteFurnaceRenderTests` test additionally renders an OpenPBR sphere in a constant linear-white HDR environment and compares coat/fuzz images against an unlayered paired golden over the sphere interior. Captures and amplified difference images are written under `build/test-output/openpbr-white-furnace`.

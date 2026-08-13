@@ -10,6 +10,57 @@ float OpenPBRDielectricF0(float ior)
     return f * f;
 }
 
+/** Apply OpenPBR specular_weight by modulating the relative dielectric IOR.
+    This keeps reflection, transmission, and refraction consistent instead of
+    scaling F0 alone. */
+float OpenPBRModulatedIor(float relativeIor, float specularWeight)
+{
+    relativeIor = max(relativeIor, 1e-4f);
+    float f0 = OpenPBRDielectricF0(relativeIor);
+    float epsilon = sign(relativeIor - 1.0f) * sqrt(saturate(specularWeight * f0));
+    epsilon = clamp(epsilon, -0.9999f, 0.9999f);
+    return (1.0f + epsilon) / max(1.0f - epsilon, 1e-4f);
+}
+
+/** OpenPBR conductor Fresnel using the F82-tint parametrization. */
+float3 OpenPBRF82Tint(float3 f0, float3 edgeTint, float cosTheta)
+{
+    cosTheta = saturate(cosTheta);
+    f0 = saturate(f0);
+    edgeTint = saturate(edgeTint);
+    float3 schlick = f0 + (1.0f - f0) * pow(1.0f - cosTheta, 5.0f);
+    const float muBar = 1.0f / 7.0f;
+    float3 schlickBar = f0 + (1.0f - f0) * pow(1.0f - muBar, 5.0f);
+    float denom = muBar * pow(1.0f - muBar, 6.0f);
+    float correction = cosTheta * pow(1.0f - cosTheta, 6.0f) / max(denom, 1e-6f);
+    return saturate(schlick - correction * (schlickBar - edgeTint * schlickBar));
+}
+
+/** RGB relative IORs from the OpenPBR Abbe/Cauchy parametrization.
+    The input eta is incident/transmitted IOR. The green channel is the
+    Fraunhofer d-line reference and therefore remains equal to eta. */
+float3 OpenPBRDispersionRelativeEta(float eta, float abbeNumber, float dispersionScale)
+{
+    dispersionScale = saturate(dispersionScale);
+    if (dispersionScale <= 0.0f || abbeNumber <= 1e-4f || abs(eta - 1.0f) <= 1e-5f)
+        return eta.xxx;
+
+    float nD = eta < 1.0f ? rcp(max(eta, 1e-4f)) : eta;
+    float vd = abbeNumber / dispersionScale;
+    const float lambdaC = 656.3f;
+    const float lambdaD = 587.6f;
+    const float lambdaF = 486.1f;
+    float invC2 = rcp(lambdaC * lambdaC);
+    float invD2 = rcp(lambdaD * lambdaD);
+    float invF2 = rcp(lambdaF * lambdaF);
+    float B = (nD - 1.0f) / max(vd * (invF2 - invC2), 1e-8f);
+    float A = nD - B * invD2;
+    float3 wavelengths = float3(650.0f, lambdaD, lambdaF);
+    float3 nRgb = A + B / (wavelengths * wavelengths);
+    float3 scale = nRgb / max(nD, 1e-4f);
+    return eta < 1.0f ? eta / scale : eta * scale;
+}
+
 /** OpenPBR coat darkening / absorption attenuation of the coated base.
     Approximates layering: base is attenuated by coat Fresnel coverage and coat_color absorption.
 */
@@ -23,9 +74,13 @@ float3 OpenPBRCoatBaseAttenuation(float coatWeight, float3 coatColor, float coat
     float F = F0 + (1.0f - F0) * pow(saturate(1.0f - NdotV), 5.0f);
     float coverage = coatWeight * F;
 
-    // Physical darkening from multiple internal reflections; coat_darkening=0 undoes it artistically.
-    float darken = lerp(1.0f, saturate(1.0f - 0.2f * F0), saturate(coatDarkening));
-    float3 absorption = lerp(float3(1, 1, 1), saturate(coatColor) * darken, coatWeight);
+    // Multiple-reflection darkening is absorption-driven. A white coat over a
+    // white substrate must remain white in a furnace; coat_darkening therefore
+    // cannot introduce gray energy loss by itself.
+    float3 coatAbsorption = saturate(coatColor);
+    float3 extraDarkening = lerp(1.0f.xxx, coatAbsorption,
+        saturate(coatDarkening) * saturate(F0 * 4.0f));
+    float3 absorption = lerp(1.0f.xxx, coatAbsorption * extraDarkening, coatWeight);
     return absorption * (1.0f - coverage);
 }
 
@@ -64,25 +119,10 @@ float3 OpenPBRApplyThinFilmToF0(float3 specularF0, float thinFilmWeight, float t
     return lerp(specularF0, saturate(specularF0 * irid + (1.0f - specularF0) * irid * 0.35f), thinFilmWeight);
 }
 
-/** Abbe-number dispersion: returns per-channel relative eta scale for RGB.
-    OpenPBR: transmission_dispersion_abbe_number (Vd), transmission_dispersion_scale.
-*/
-float3 OpenPBRDispersionEtaScale(float abbeNumber, float dispersionScale)
-{
-    dispersionScale = saturate(dispersionScale);
-    if (dispersionScale <= 0.0f || abbeNumber <= 1e-3f)
-        return float3(1, 1, 1);
-
-    // nF - nC = (n_d - 1) / Vd; distribute across R/G/B around the medium IOR.
-    float delta = dispersionScale / max(abbeNumber, 1e-3f);
-    // R (long) lower IOR, B (short) higher IOR.
-    return float3(1.0f - 0.5f * delta, 1.0f, 1.0f + 0.5f * delta);
-}
-
 /** Map OpenPBR subsurface radius/color into a homogeneous scattering coefficient. */
-float3 OpenPBRSubsurfaceSigmaS(float3 subsurfaceColor, float radius, float scale)
+float3 OpenPBRSubsurfaceSigmaS(float3 subsurfaceColor, float radius, float3 radiusScale)
 {
-    float meanFreePath = max(radius * max(scale, 0.0f), 1e-4f);
+    float3 meanFreePath = max(radius * max(radiusScale, 0.0f), 1e-4f);
     float3 albedo = saturate(subsurfaceColor);
     // Higher albedo -> more scattering relative to absorption.
     return albedo / meanFreePath;

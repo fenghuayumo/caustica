@@ -94,6 +94,7 @@ static bool HasOpenPBRFields(const Json::Value& input)
         && (input.isMember("base_weight")
             || input.isMember("base_color")
             || input.isMember("base_metalness")
+            || input.isMember("base_diffuse_roughness")
             || input.isMember("specular_weight")
             || input.isMember("specular_roughness")
             || input.isMember("specular_roughness_anisotropy")
@@ -199,6 +200,7 @@ void StandardMaterial::write(Json::Value& output)
 
     STORE_FIELD(materialModel);
     STORE_FIELD(baseWeight);
+    STORE_FIELD(baseDiffuseRoughness);
     STORE_FIELD(specularWeight);
     STORE_FIELD(anisotropy);
     STORE_FIELD(fuzzWeight);
@@ -215,7 +217,7 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(subsurfaceWeight);
     STORE_FIELD(subsurfaceColor);
     STORE_FIELD(subsurfaceRadius);
-    STORE_FIELD(subsurfaceScale);
+    STORE_FIELD(subsurfaceRadiusScale);
     STORE_FIELD(subsurfaceAnisotropy);
 
     STORE_FIELD(thinFilmWeight);
@@ -276,6 +278,7 @@ void StandardMaterial::write(Json::Value& output)
         openPBR["base_weight"] << baseWeight;
         openPBR["base_color"] << baseOrDiffuseColor;
         openPBR["base_metalness"] << metalness;
+        openPBR["base_diffuse_roughness"] << baseDiffuseRoughness;
         openPBR["specular_weight"] << specularWeight;
         openPBR["specular_color"] << specularColor;
         openPBR["specular_roughness"] << roughness;
@@ -301,8 +304,8 @@ void StandardMaterial::write(Json::Value& output)
         openPBR["subsurface_weight"] << subsurfaceWeight;
         openPBR["subsurface_color"] << subsurfaceColor;
         openPBR["subsurface_radius"] << subsurfaceRadius;
-        openPBR["subsurface_scale"] << subsurfaceScale;
-        openPBR["subsurface_anisotropy"] << subsurfaceAnisotropy;
+        openPBR["subsurface_radius_scale"] << subsurfaceRadiusScale;
+        openPBR["subsurface_scatter_anisotropy"] << subsurfaceAnisotropy;
 
         openPBR["thin_film_weight"] << thinFilmWeight;
         openPBR["thin_film_thickness"] << thinFilmThickness;
@@ -386,6 +389,7 @@ bool StandardMaterial::read(
 
     LOAD_FIELD_EITHER(materialModel, "MaterialModel");
     LOAD_FIELD_EITHER(baseWeight, "BaseWeight");
+    LOAD_FIELD_EITHER(baseDiffuseRoughness, "BaseDiffuseRoughness");
     LOAD_FIELD_EITHER(specularWeight, "SpecularWeight");
     LOAD_FIELD_EITHER(anisotropy, "Anisotropy");
     LOAD_FIELD_EITHER(fuzzWeight, "FuzzWeight");
@@ -402,7 +406,16 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(subsurfaceWeight, "SubsurfaceWeight");
     LOAD_FIELD_EITHER(subsurfaceColor, "SubsurfaceColor");
     LOAD_FIELD_EITHER(subsurfaceRadius, "SubsurfaceRadius");
-    LOAD_FIELD_EITHER(subsurfaceScale, "SubsurfaceScale");
+    if (input.isMember("subsurfaceRadiusScale"))
+        input["subsurfaceRadiusScale"] >> subsurfaceRadiusScale;
+    else if (input.isMember("SubsurfaceRadiusScale"))
+        input["SubsurfaceRadiusScale"] >> subsurfaceRadiusScale;
+    else if (input.isMember("subsurfaceScale") || input.isMember("SubsurfaceScale"))
+    {
+        float legacyScale = 1.0f;
+        JsonMemberEither(input, "subsurfaceScale", "SubsurfaceScale") >> legacyScale;
+        subsurfaceRadiusScale = dm::float3(legacyScale);
+    }
     LOAD_FIELD_EITHER(subsurfaceAnisotropy, "SubsurfaceAnisotropy");
 
     LOAD_FIELD_EITHER(thinFilmWeight, "ThinFilmWeight");
@@ -476,6 +489,7 @@ bool StandardMaterial::read(
         ReadJsonMember(openPBR, "base_weight", baseWeight);
         ReadJsonMember(openPBR, "base_color", baseOrDiffuseColor);
         ReadJsonMember(openPBR, "base_metalness", metalness);
+        ReadJsonMember(openPBR, "base_diffuse_roughness", baseDiffuseRoughness);
 
         ReadJsonMember(openPBR, "specular_weight", specularWeight);
         ReadJsonMember(openPBR, "specular_color", specularColor);
@@ -507,8 +521,21 @@ bool StandardMaterial::read(
         ReadJsonMember(openPBR, "subsurface_weight", subsurfaceWeight);
         ReadJsonMember(openPBR, "subsurface_color", subsurfaceColor);
         ReadJsonMember(openPBR, "subsurface_radius", subsurfaceRadius);
-        ReadJsonMember(openPBR, "subsurface_scale", subsurfaceScale);
-        ReadJsonMember(openPBR, "subsurface_anisotropy", subsurfaceAnisotropy);
+        if (!ReadJsonMember(openPBR, "subsurface_radius_scale", subsurfaceRadiusScale)
+            && openPBR.isMember("subsurface_scale"))
+        {
+            const Json::Value& legacyScale = openPBR["subsurface_scale"];
+            if (legacyScale.isArray())
+                legacyScale >> subsurfaceRadiusScale;
+            else
+            {
+                float scale = 1.0f;
+                legacyScale >> scale;
+                subsurfaceRadiusScale = dm::float3(scale);
+            }
+        }
+        if (!ReadJsonMember(openPBR, "subsurface_scatter_anisotropy", subsurfaceAnisotropy))
+            ReadJsonMember(openPBR, "subsurface_anisotropy", subsurfaceAnisotropy);
 
         ReadJsonMember(openPBR, "thin_film_weight", thinFilmWeight);
         ReadJsonMember(openPBR, "thin_film_thickness", thinFilmThickness);
@@ -545,6 +572,7 @@ bool StandardMaterial::read(
     }
 
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
+    baseDiffuseRoughness = std::clamp(baseDiffuseRoughness, 0.0f, 1.0f);
     specularWeight = std::max(specularWeight, 0.0f);
     anisotropy = std::clamp(anisotropy, -1.0f, 1.0f);
     fuzzWeight = std::clamp(fuzzWeight, 0.0f, 1.0f);
@@ -556,7 +584,7 @@ bool StandardMaterial::read(
     coatDarkening = std::clamp(coatDarkening, 0.0f, 1.0f);
     subsurfaceWeight = std::clamp(subsurfaceWeight, 0.0f, 1.0f);
     subsurfaceRadius = std::max(subsurfaceRadius, 0.0f);
-    subsurfaceScale = std::max(subsurfaceScale, 0.0f);
+    subsurfaceRadiusScale = dm::max(subsurfaceRadiusScale, dm::float3(0.0f));
     subsurfaceAnisotropy = std::clamp(subsurfaceAnisotropy, -1.0f, 1.0f);
     thinFilmWeight = std::clamp(thinFilmWeight, 0.0f, 1.0f);
     thinFilmThickness = std::max(thinFilmThickness, 0.0f);
@@ -768,6 +796,7 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
 
     update |= ImGui::ColorEdit3(enableBaseTexture ? "base_color factor" : "base_color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
     update |= ImGui::SliderFloat("base_weight", &baseWeight, 0.f, 1.f);
+    update |= ImGui::SliderFloat("base_diffuse_roughness", &baseDiffuseRoughness, 0.f, 1.f);
 
     drawTextureToggle("Use base_metalness/specular_roughness texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
 
@@ -800,9 +829,9 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
         update |= ImGui::ColorEdit3("subsurface_color", subsurfaceColor.data(), ImGuiColorEditFlags_Float);
         update |= ImGui::InputFloat("subsurface_radius", &subsurfaceRadius);
         if (subsurfaceRadius < 0.0f) { subsurfaceRadius = 0.0f; update = true; }
-        update |= ImGui::InputFloat("subsurface_scale", &subsurfaceScale);
-        if (subsurfaceScale < 0.0f) { subsurfaceScale = 0.0f; update = true; }
-        update |= ImGui::SliderFloat("subsurface_anisotropy", &subsurfaceAnisotropy, -1.f, 1.f);
+        update |= ImGui::InputFloat3("subsurface_radius_scale", subsurfaceRadiusScale.data());
+        subsurfaceRadiusScale = dm::max(subsurfaceRadiusScale, dm::float3(0.0f));
+        update |= ImGui::SliderFloat("subsurface_scatter_anisotropy", &subsurfaceAnisotropy, -1.f, 1.f);
     }
 
     if (ImGui::CollapsingHeader("Thin Film"))
@@ -1034,6 +1063,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.Roughness = roughness;
     data.Metalness = metalness;
     data.BaseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
+    data.BaseDiffuseRoughness = std::clamp(baseDiffuseRoughness, 0.0f, 1.0f);
     data.SpecularWeight = std::max(specularWeight, 0.0f);
     data.Anisotropy = std::clamp(anisotropy, -1.0f, 1.0f);
     data.FuzzWeight = std::clamp(fuzzWeight, 0.0f, 1.0f);
@@ -1058,7 +1088,9 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.SubsurfaceWeight = std::clamp(subsurfaceWeight, 0.0f, 1.0f);
     data.SubsurfaceColor = subsurfaceColor;
     data.SubsurfaceRadius = std::max(subsurfaceRadius, 0.0f);
-    data.SubsurfaceScale = std::max(subsurfaceScale, 0.0f);
+    data.SubsurfaceRadiusScaleX = std::max(subsurfaceRadiusScale.x, 0.0f);
+    data.SubsurfaceRadiusScaleY = std::max(subsurfaceRadiusScale.y, 0.0f);
+    data.SubsurfaceRadiusScaleZ = std::max(subsurfaceRadiusScale.z, 0.0f);
     data.SubsurfaceAnisotropy = std::clamp(subsurfaceAnisotropy, -1.0f, 1.0f);
 
     data.ThinFilmWeight = std::clamp(thinFilmWeight, 0.0f, 1.0f);
@@ -1072,7 +1104,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.TransmissionDispersionScale = std::clamp(transmissionDispersionScale, 0.0f, 1.0f);
     data.TransmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
     data.UnlitShadowStrength = std::clamp(unlitShadowStrength, 0.0f, 1.0f);
-    data._padOpenPBR1 = data._padOpenPBR2 = 0.f;
+    data._padOpenPBR = dm::float3(0.f);
 
     // bindless textures
 
@@ -1806,7 +1838,7 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
     assert(!mediaPath.empty());
     m_renderDevice = &renderDevice;
 
-    static_assert(sizeof(StandardMaterialData) == 272,
+    static_assert(sizeof(StandardMaterialData) == 288,
         "StandardMaterialData size changed — update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in "
         "PtPipelineFeaturePresets.cpp, MaterialFeatureMask.cpp, and precompile_pt_shader_bins.py");
 

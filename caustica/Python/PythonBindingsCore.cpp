@@ -781,6 +781,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("base_weight",
             [](StandardMaterial& self) { return self.baseWeight; },
             [](StandardMaterial& self, float v) { self.baseWeight = v; self.gpuDataDirty = true; })
+        .def_prop_rw("base_diffuse_roughness",
+            [](StandardMaterial& self) { return self.baseDiffuseRoughness; },
+            [](StandardMaterial& self, float v) { self.baseDiffuseRoughness = v; self.gpuDataDirty = true; })
         .def_prop_rw("specular_weight",
             [](StandardMaterial& self) { return self.specularWeight; },
             [](StandardMaterial& self, float v) { self.specularWeight = v; self.gpuDataDirty = true; })
@@ -828,9 +831,16 @@ void RegisterCoreBindings(nb::module_& m)
             [](StandardMaterial& self) { return self.subsurfaceRadius; },
             [](StandardMaterial& self, float v) { self.subsurfaceRadius = v; self.gpuDataDirty = true; })
         .def_prop_rw("subsurface_scale",
-            [](StandardMaterial& self) { return self.subsurfaceScale; },
-            [](StandardMaterial& self, float v) { self.subsurfaceScale = v; self.gpuDataDirty = true; })
+            [](StandardMaterial& self) { return self.subsurfaceRadiusScale.x; },
+            [](StandardMaterial& self, float v) { self.subsurfaceRadiusScale = dm::float3(v); self.gpuDataDirty = true; },
+            "Legacy scalar alias; setting it applies the same scale to RGB.")
+        .def_prop_rw("subsurface_radius_scale",
+            [](StandardMaterial& self) { return Float3ToTuple(self.subsurfaceRadiusScale); },
+            [](StandardMaterial& self, nb::object v) { self.subsurfaceRadiusScale = ToFloat3(v); self.gpuDataDirty = true; })
         .def_prop_rw("subsurface_anisotropy",
+            [](StandardMaterial& self) { return self.subsurfaceAnisotropy; },
+            [](StandardMaterial& self, float v) { self.subsurfaceAnisotropy = v; self.gpuDataDirty = true; })
+        .def_prop_rw("subsurface_scatter_anisotropy",
             [](StandardMaterial& self) { return self.subsurfaceAnisotropy; },
             [](StandardMaterial& self, float v) { self.subsurfaceAnisotropy = v; self.gpuDataDirty = true; })
         .def_prop_rw("thin_film_weight",
