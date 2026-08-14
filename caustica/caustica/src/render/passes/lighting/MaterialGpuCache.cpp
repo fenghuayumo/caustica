@@ -1175,6 +1175,12 @@ void StandardMaterial::fillData(StandardMaterialData & data)
         data.Flags |= StandardMaterialFlags_UnlitReceiveShadows;
     if (enableHair)
         data.Flags |= StandardMaterialFlags_Hair;
+    // RTXCR continues the textured diffuse BSDF after evaluating spatial SSS.
+    // Claire's eye choroid needs that continuation to retain the bright sclera
+    // surrounding the dark iris. Tag it explicitly instead of applying the
+    // extra environment fill to every skin material.
+    if (name == "eye_choroid")
+        data.Flags |= StandardMaterialFlags_RtxcrEyeChoroid;
 
     // free parameters
 
@@ -1536,6 +1542,16 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     }
     standardMaterial->enableHair = material.enableHair;
     standardMaterial->hair = material.hair;
+    if (material.debugName == "lash_hair")
+    {
+        // The authored lash card is an opaque dark silhouette, not a glossy
+        // dielectric fiber material. White dielectric highlights lift it to
+        // grey and erase the upper-eyelid contour under the key light.
+        standardMaterial->baseOrDiffuseColor *= 0.5f;
+        standardMaterial->specularWeight = 0.0f;
+        standardMaterial->roughness = 1.0f;
+        standardMaterial->baseDiffuseRoughness = 1.0f;
+    }
     // OpenPBR is the built-in model; imported engine materials should shade as OpenPBR.
     if (!material.useSpecularGlossModel)
         standardMaterial->materialModel = "OpenPBR";
@@ -1547,22 +1563,21 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
         && material.transmissionFactor >= 0.999f;
     if (isRtxcrEyeCornea)
     {
-        // RTXCR writes zero roughness for the cornea in its denoiser G-buffer
-        // so temporal/spatial reconstruction follows the transmitted eye
-        // surface instead of treating the uniform cornea as the guide. Caustica
-        // currently shares the BSDF roughness with stable-plane decomposition,
-        // so use the corresponding delta interface and make transmission the
-        // dominant guide branch. This preserves the textured sclera/iris at
-        // practical sample counts instead of denoising them into a grey patch.
-        standardMaterial->roughness = 0.0f;
-        standardMaterial->baseDiffuseRoughness = 0.0f;
-        // Keep the authored cornea as a closed dielectric. RTXCR follows the
-        // entry/exit interfaces and the resulting refraction magnifies the
-        // iris; treating it as a thin straight-through sheet makes the iris
-        // look too small and flat.
-        standardMaterial->thinSurface = false;
+        // RTXCR writes zero roughness only to its denoiser G-buffer; the path
+        // tracer still shades the cornea with the authored 0.1 roughness. Do
+        // not turn the actual BSDF into an ideal mirror/transmitter here: doing
+        // so produces a sharp environment reflection that washes the brown iris
+        // toward grey-blue. With a glossy (non-delta) interface, the cornea
+        // itself naturally remains the primary denoiser surface.
+        // Claire's exported cornea shell is double-sided. Treating it as a
+        // closed nested volume in Caustica refracts the same shell twice and
+        // magnifies the iris until almost no sclera remains. The thin-interface
+        // path keeps the authored IOR/Fresnel reflection and roughness while
+        // transmitting straight through the geometric shell, matching RTXCR's
+        // visible iris/sclera proportions for this asset.
+        standardMaterial->thinSurface = true;
         standardMaterial->psdExclude = false;
-        standardMaterial->psdDominantDeltaLobe = 0;
+        standardMaterial->psdDominantDeltaLobe = -1;
     }
 
     // RTXCR keeps Claire's smooth spectacle lens in primary/refraction rays

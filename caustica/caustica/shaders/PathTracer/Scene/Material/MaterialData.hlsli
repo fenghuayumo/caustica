@@ -28,8 +28,9 @@ struct MaterialHeader
     static const uint kUnlitReceiveShadowsFlagOffset = kPSDDominantDeltaLobeP1Offset + kPSDDominantDeltaLobeP1Bits;
     static const uint kUnlitShadowStrengthBits = 8;
     static const uint kUnlitShadowStrengthOffset = kUnlitReceiveShadowsFlagOffset + 1;
+    static const uint kRtxcrEyeChoroidFlagOffset = kUnlitShadowStrengthOffset + kUnlitShadowStrengthBits;
 
-    static const uint kTotalHeaderBitsX = kUnlitShadowStrengthOffset + kUnlitShadowStrengthBits;
+    static const uint kTotalHeaderBitsX = kRtxcrEyeChoroidFlagOffset + 1;
 
     /** Set the nested priority used for nested dielectrics.
     */
@@ -80,6 +81,9 @@ struct MaterialHeader
 
     void setUnlitShadowStrength(float strength) { packedData.x = PACK_BITS(kUnlitShadowStrengthBits, kUnlitShadowStrengthOffset, packedData.x, (uint)(saturate(strength) * 255.0 + 0.5)); }
     float getUnlitShadowStrength() { return EXTRACT_BITS(kUnlitShadowStrengthBits, kUnlitShadowStrengthOffset, packedData.x) / 255.0; }
+
+    void setRtxcrEyeChoroid(bool enabled) { packedData.x = PACK_BITS(1, kRtxcrEyeChoroidFlagOffset, packedData.x, enabled ? 1 : 0); }
+    bool isRtxcrEyeChoroid() { return packedData.x & (1u << kRtxcrEyeChoroidFlagOffset); }
 
     static MaterialHeader make( ) { MaterialHeader header; header.packedData = 0; return header; }
 };

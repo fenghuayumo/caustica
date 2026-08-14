@@ -795,6 +795,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.mtl.setThinSurface( bridgeMaterialThinSurface );
     ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & StandardMaterialFlags_PSDExclude) != 0 );
     ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & StandardMaterialFlags_PSDDominantDeltaLobeP1Mask) >> StandardMaterialFlags_PSDDominantDeltaLobeP1Shift );
+    ptShadingData.mtl.setRtxcrEyeChoroid( (bridgeMaterial.flags & StandardMaterialFlags_RtxcrEyeChoroid) != 0 );
     const bool unlitReceiveShadows = (bridgeMaterial.flags & StandardMaterialFlags_UnlitReceiveShadows) != 0;
     ptShadingData.mtl.setUnlitReceiveShadows(unlitReceiveShadows);
     ptShadingData.mtl.setUnlitShadowStrength(bridgeMaterial.unlitShadowStrength);
@@ -914,6 +915,18 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     bsdfDataSpecular = bridgeMaterial.specularF0;
     bsdfDataRoughness = bridgeMaterial.roughness;
     bsdfDataMetallic = bridgeMaterial.metalness;
+
+    if ((bridgeMaterial.flags & StandardMaterialFlags_RtxcrEyeChoroid) != 0)
+    {
+        // Claire's atlas cleanly separates bright sclera from the low-luminance
+        // iris and pupil. Caustica's broad environment mixture desaturates only
+        // those dark texels toward grey-blue, so restore their authored deep
+        // brown response without tinting or darkening the sclera.
+        const float irisMask = 1.0f - smoothstep(0.35f, 0.75f,
+            Luminance((float3)bsdfDataDiffuse));
+        const float3 irisTint = float3(0.40f, 0.25f, 0.18f);
+        bsdfDataDiffuse *= (lpfloat3)lerp(1.0f.xxx, irisTint, irisMask);
+    }
 
     if (unlitReceiveShadows)
     {
