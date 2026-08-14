@@ -35,14 +35,14 @@ inline void CausticaMakeSubsurfaceMaterial(
 
 inline float CausticaSubsurfaceMaxRadius(
     const RTXCR_SubsurfaceMaterialData material,
-    const bool isRtxcrEyePath, const float roughness)
+    const bool transmissionEncountered, const float roughness)
 {
     // Match RTXCR's character integrator. Once a path has crossed a
     // transmissive material, keep facial skin samples local and make the
     // rough eye-choroid/sclera material almost local. Without this branch the
     // one-unit skin radius smears the iris over the sclera and over-darkens
     // skin beneath the glasses.
-    if (isRtxcrEyePath)
+    if (transmissionEncountered)
         return roughness >= 1.0f ? 1e-2f : 0.4f;
 
     const float fittedRadius = 8.0f * SSS_METERS_UNIT
@@ -341,7 +341,7 @@ inline float3 HandleSubsurfaceNEE(
     if (!any(material.transmissionColor > 1e-4f))
         return 0.0f;
     const float maxRadius = CausticaSubsurfaceMaxRadius(material,
-        path.hasFlag(PathFlags::rtxcrEyePath), (float)bsdf.data.Roughness());
+        path.hasFlag(PathFlags::transmissionEncountered), (float)bsdf.data.Roughness());
     float3 radiance = CausticaEvaluateBurleyDiffusion(path, shadingData, bsdf,
         instanceIndex, geometryIndex, material, maxRadius,
         sampleGenerator, workingContext);

@@ -1096,7 +1096,7 @@ struct FalcorBSDF // : IBxDF
         subsurfaceSpecularScale = isThinSurface ? 1.f : lerp(1.f, 0.5f, sssW);
         float3 baseDiffuse = isThinSurface
             ? lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW)
-            : data.Diffuse() * (mtl.isRtxcrEyeChoroid() ? 1.f : (1.f - sssW));
+            : data.Diffuse() * (mtl.isEyeChoroid() ? 1.f : (1.f - sssW));
         // Non-reciprocal albedo scaling for the dielectric interface. This is
         // the OpenPBR/Standard-Surface mixture approximation and is essential
         // for white-furnace energy conservation of glossy diffuse materials.

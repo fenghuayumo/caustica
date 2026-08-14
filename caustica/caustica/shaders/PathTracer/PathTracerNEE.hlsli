@@ -184,7 +184,7 @@ namespace PathTracer
     // This will ray cast and, if light visible, accumulate radiance properly, including doing weighted sum for 
     void ProcessLightSample(inout NEEResult accum, LightSample lightSample, uint candidateSampleCount, uint fullSamples,
                                 const ShadingData shadingData, const ActiveBSDF bsdf, const PathState preScatterPath,
-                                const bool rtxcrSssSpecularOnly, LightSampler lightSampler,
+                                const bool subsurfaceSpecularOnly, LightSampler lightSampler,
                                 inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
     {
         float3 visibility = float3(0, 0, 0);
@@ -260,7 +260,7 @@ namespace PathTracer
 
             // compute BSDF throughput!
             float4 bsdfThp;
-            if (rtxcrSssSpecularOnly)
+            if (subsurfaceSpecularOnly)
             {
                 const float3 specular = 0.5f
                     * bsdf.evalSpecularOnly(shadingData, lightSample.Direction);
@@ -310,7 +310,7 @@ namespace PathTracer
     
     inline NEEResult HandleNEE_MultipleSamples(const PathState preScatterPath, const ShadingData shadingData, const ActiveBSDF bsdf, 
                                             const LightSampler lightSampler, const uint fullSamples,
-                                            const bool rtxcrSssSpecularOnly,
+                                            const bool subsurfaceSpecularOnly,
                                             inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
     {
         #ifdef CAUSTICA_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT
@@ -331,7 +331,7 @@ namespace PathTracer
 
             // this computes the BSDF throughput and (if throughput>0) then casts shadow ray and handles radiance summing up & weighted averaging for 'sample distance' used by denoiser
             ProcessLightSample(result, lightSample, candidateSampleCount, fullSamples,
-                shadingData, bsdf, preScatterPath, rtxcrSssSpecularOnly,
+                shadingData, bsdf, preScatterPath, subsurfaceSpecularOnly,
                 lightSampler, sampleGenerator, workingContext);
         }
         
@@ -340,7 +340,7 @@ namespace PathTracer
     
     inline NEEResult HandleNEE(const PathState preScatterPath,
                                     const ShadingData shadingData, const ActiveBSDF bsdf,
-                                    const bool rtxcrSssSpecularOnly,
+                                    const bool subsurfaceSpecularOnly,
                                     inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
     {
         LightSampler lightSampler = Bridge::CreateLightSampler( preScatterPath.GetPixelPos(), preScatterPath.rayCone.getWidth(), preScatterPath.GetSceneLength() );
@@ -390,7 +390,7 @@ namespace PathTracer
         // sampleGeneratorLightSampler = SampleGenerator::make( sgBase, SampleGeneratorEffectSeed::NextEventEstimationLightSamplerG, useLowDiscrepancyGen, globalNEESamples * workingContext.PtConsts.NEECandidateSamples );
 
         return HandleNEE_MultipleSamples(preScatterPath, shadingData, bsdf,
-            lightSampler, fullSamples, rtxcrSssSpecularOnly,
+            lightSampler, fullSamples, subsurfaceSpecularOnly,
             sampleGenerator, workingContext);
     }
 
@@ -398,7 +398,7 @@ namespace PathTracer
 
 inline NEEResult HandleNEE(const PathState preScatterPath, 
                                 const ShadingData shadingData, const ActiveBSDF bsdf,
-                                const bool rtxcrSssSpecularOnly,
+                                const bool subsurfaceSpecularOnly,
                                 const SampleGeneratorVertexBase sgBase, const WorkingContext workingContext)
 {
     NEEResult result = NEEResult::empty();

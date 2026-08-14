@@ -1787,10 +1787,10 @@ bool GltfImporter::load(
                 // Match the default radius used by the RTXCR sample. This is
                 // important for dense grooms: the authored radius otherwise
                 // over-covers pixels and loses the translucent strand detail.
-                constexpr float kRtxcrDefaultHairRadiusScale = 0.618f;
-                segment.vertices[0].radius = kRtxcrDefaultHairRadiusScale
+                constexpr float kDefaultHairRadiusScale = 0.618f;
+                segment.vertices[0].radius = kDefaultHairRadiusScale
                     * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex0]);
-                segment.vertices[1].radius = kRtxcrDefaultHairRadiusScale
+                segment.vertices[1].radius = kDefaultHairRadiusScale
                     * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex1]);
                 segment.vertices[0].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex0];
                 segment.vertices[1].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex1];

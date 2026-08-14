@@ -795,7 +795,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.mtl.setThinSurface( bridgeMaterialThinSurface );
     ptShadingData.mtl.setPSDExclude( (bridgeMaterial.flags & StandardMaterialFlags_PSDExclude) != 0 );
     ptShadingData.mtl.setPSDDominantDeltaLobeP1( (bridgeMaterial.flags & StandardMaterialFlags_PSDDominantDeltaLobeP1Mask) >> StandardMaterialFlags_PSDDominantDeltaLobeP1Shift );
-    ptShadingData.mtl.setRtxcrEyeChoroid( (bridgeMaterial.flags & StandardMaterialFlags_RtxcrEyeChoroid) != 0 );
+    ptShadingData.mtl.setEyeChoroid( (bridgeMaterial.flags & StandardMaterialFlags_EyeChoroid) != 0 );
     const bool unlitReceiveShadows = (bridgeMaterial.flags & StandardMaterialFlags_UnlitReceiveShadows) != 0;
     ptShadingData.mtl.setUnlitReceiveShadows(unlitReceiveShadows);
     ptShadingData.mtl.setUnlitShadowStrength(bridgeMaterial.unlitShadowStrength);
@@ -916,7 +916,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     bsdfDataRoughness = bridgeMaterial.roughness;
     bsdfDataMetallic = bridgeMaterial.metalness;
 
-    if ((bridgeMaterial.flags & StandardMaterialFlags_RtxcrEyeChoroid) != 0)
+    if ((bridgeMaterial.flags & StandardMaterialFlags_EyeChoroid) != 0)
     {
         // Claire's atlas cleanly separates bright sclera from the low-luminance
         // iris and pupil. Caustica's broad environment mixture desaturates only

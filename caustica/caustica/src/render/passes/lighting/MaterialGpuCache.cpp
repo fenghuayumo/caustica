@@ -1180,7 +1180,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     // surrounding the dark iris. Tag it explicitly instead of applying the
     // extra environment fill to every skin material.
     if (name == "eye_choroid")
-        data.Flags |= StandardMaterialFlags_RtxcrEyeChoroid;
+        data.Flags |= StandardMaterialFlags_EyeChoroid;
 
     // free parameters
 
@@ -1558,10 +1558,10 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
 
     standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
     standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
-    const bool isRtxcrEyeCornea = material.debugName == "eye_cornea"
+    const bool isEyeCornea = material.debugName == "eye_cornea"
         && standardMaterial->enableTransmission
         && material.transmissionFactor >= 0.999f;
-    if (isRtxcrEyeCornea)
+    if (isEyeCornea)
     {
         // RTXCR writes zero roughness only to its denoiser G-buffer; the path
         // tracer still shades the cornea with the authored 0.1 roughness. Do
@@ -1583,14 +1583,14 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     // RTXCR keeps Claire's smooth spectacle lens in primary/refraction rays
     // but excludes it from shadow rays. Model the double-sided lens mesh as an
     // ideal thin interface so it does not become a stack of nested volumes.
-    const bool isRtxcrCharacterLens = standardMaterial->modelName == "glass_lens"
+    const bool isCharacterLens = standardMaterial->modelName == "glass_lens"
         || material.debugName == "glass_lens_mtl";
-    const bool rtxcrIdealLens = isRtxcrCharacterLens
+    const bool useIdealLensSampling = isCharacterLens
         && standardMaterial->enableTransmission
         && material.transmissionFactor >= 0.999f
         && material.roughness <= 1e-4f;
-    standardMaterial->excludeFromNEE = rtxcrIdealLens;
-    if (rtxcrIdealLens)
+    standardMaterial->excludeFromNEE = useIdealLensSampling;
+    if (useIdealLensSampling)
     {
         standardMaterial->roughness = 0.0f;
         standardMaterial->baseDiffuseRoughness = 0.0f;

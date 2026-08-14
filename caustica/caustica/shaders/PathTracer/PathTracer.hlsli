@@ -570,7 +570,7 @@ namespace PathTracer
         // This is important for both the actual cornea/choroid pair and skin
         // viewed through Claire's glasses.
         if (bsdf.data.SpecularTransmission() > 0.0f)
-            path.setFlag(PathFlags::rtxcrEyePath);
+            path.setFlag(PathFlags::transmissionEncountered);
 
 #if ENABLE_DEBUG_VIZUALISATIONS && ENABLE_DEBUG_LINES_VIZ && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
         if (debugPath)
@@ -719,9 +719,9 @@ namespace PathTracer
 
         // Compute NextEventEstimation a.k.a. direct light sampling!
 #if !NON_PATH_TRACING_PASS && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
-        const bool rtxcrSssSurface = CausticaIsSubsurfaceSurface(shadingData, bsdf);
-        const bool rtxcrSssAlreadyEvaluated =
-            preScatterPath.getCounter(PackedCounters::RTXCRSubsurfaceEvents) != 0;
+        const bool isSubsurfaceSurface = CausticaIsSubsurfaceSurface(shadingData, bsdf);
+        const bool subsurfaceAlreadyEvaluated =
+            preScatterPath.getCounter(PackedCounters::SubsurfaceEvents) != 0;
 #endif
 #if NON_PATH_TRACING_PASS || PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES || !PT_NEE_ENABLED
         NEEResult neeResult = NEEResult::empty();
@@ -730,9 +730,9 @@ namespace PathTracer
         // direct lighting contains only the normalized microfacet half; the
         // spatial diffusion half is accumulated immediately below.
         NEEResult neeResult = NEEResult::empty();
-        if (!rtxcrSssAlreadyEvaluated)
+        if (!subsurfaceAlreadyEvaluated)
         {
-            neeResult = HandleNEE(preScatterPath, shadingData, bsdf, rtxcrSssSurface,
+            neeResult = HandleNEE(preScatterPath, shadingData, bsdf, isSubsurfaceSurface,
                 uniformSG, workingContext);
         }
 #endif
@@ -740,12 +740,12 @@ namespace PathTracer
         // RTXCR performs spatial SSS at most once on a path. Repeating it on
         // subsequent hits disproportionately darkens/noises short multi-hit
         // regions such as the eyelids and eye socket.
-        if (!rtxcrSssAlreadyEvaluated && rtxcrSssSurface)
+        if (!subsurfaceAlreadyEvaluated && isSubsurfaceSurface)
         {
             neeResult.AccumulateRadiance(HandleSubsurfaceNEE(
                 preScatterPath, shadingData, bsdf, InstanceIndex(), GeometryIndex(),
                 uniformSG, workingContext), 0.0f);
-            path.setCounter(PackedCounters::RTXCRSubsurfaceEvents, 1);
+            path.setCounter(PackedCounters::SubsurfaceEvents, 1);
         }
 #endif
 
