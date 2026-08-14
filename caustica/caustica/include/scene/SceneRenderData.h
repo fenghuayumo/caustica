@@ -104,6 +104,7 @@ namespace caustica::scene
         float verticalFovRadians = 1.f;
         std::optional<float> aspectRatio;
         std::optional<bool> enableAutoExposure;
+        std::optional<std::string> toneMapOperator;
         std::optional<float> exposureCompensation;
         std::optional<float> exposureValue;
         std::optional<float> exposureValueMin;

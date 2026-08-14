@@ -1016,6 +1016,7 @@ struct FalcorBSDF // : IBxDF
     float diffTrans;                        ///< Mix between diffuse BRDF and diffuse BTDF.
     float specTrans;                        ///< Mix between dielectric BRDF and specular BSDF.
     float coatWeight;                       ///< OpenPBR coat_weight used for base attenuation.
+    float subsurfaceSpecularScale;          ///< RTXCR diffusion/microfacet energy split.
 
     float pDiffuseReflection;               ///< Probability for sampling the diffuse BRDF.
     float pDiffuseTransmission;             ///< Probability for sampling the diffuse BTDF.
@@ -1090,6 +1091,10 @@ struct FalcorBSDF // : IBxDF
         // BSSRDF path. Keep the local diffuse lobe only for the unscattered
         // fraction. Thin surfaces retain the OpenPBR diffuse approximation.
         float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
+        // RTXCR's character preset normalizes diffusion and base microfacet
+        // reflection to equal weights. Interpolate that split by the authored
+        // OpenPBR subsurface weight, and leave thin-surface approximation alone.
+        subsurfaceSpecularScale = isThinSurface ? 1.f : lerp(1.f, 0.5f, sssW);
         float3 baseDiffuse = isThinSurface
             ? lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW)
             : data.Diffuse() * (1.f - sssW);
@@ -1187,7 +1192,8 @@ struct FalcorBSDF // : IBxDF
 
         float diffuseWeight = Luminance(diffuseReflection.albedo);
         float fuzzWeight = Luminance(fuzzReflection.color) * fuzzReflection.weight;
-        float specularWeight = Luminance(specularReflection.evalOpenPBRFresnel(NdotV));
+        float specularWeight = subsurfaceSpecularScale
+            * Luminance(specularReflection.evalOpenPBRFresnel(NdotV));
         float coatSampleWeight = coatWeight * Luminance(evalFresnelSchlick(coatReflection.albedo, 1.f, coatNdotV));
 
         pDiffuseReflection = (activeLobes & (uint)LobeType::DiffuseReflection) ? diffuseWeight * dielectricBSDF * (1.f - diffTrans) : 0.f;
@@ -1328,7 +1334,8 @@ struct FalcorBSDF // : IBxDF
         if (pDiffuseReflection > 0.f) diffuse += (1.f - specTrans) * (1.f - diffTrans) * diffuseReflection.eval(wi, wo);    // <- this isn't correct; diffuse has a specular component that should be considered
         if (pDiffuseTransmission > 0.f) diffuse += (1.f - specTrans) * diffTrans * diffuseTransmission.eval(wi, wo);
         if (pFuzzReflection > 0.f) diffuse += fuzzEval(wi, wo);
-        if (pSpecularReflection > 0.f) specular += (1.f - specTrans) * specularReflection.eval(wi, wo);
+        if (pSpecularReflection > 0.f) specular += (1.f - specTrans)
+            * subsurfaceSpecularScale * specularReflection.eval(wi, wo);
         if (pSpecularReflectionTransmission > 0.f) specular += specTrans * (specularReflectionTransmission.eval(wi, wo));   // <- do we want to consider transmission as specular? this depends entirely on denoiser - should ask RR folks
         if (pCoatReflection > 0.f) specular += coatWeight * coatReflection.eval(toCoatLocal(wi), toCoatLocal(wo));
 
@@ -1411,7 +1418,7 @@ struct FalcorBSDF // : IBxDF
 
             valid = specularReflection.sample(wi, wo, pdf, weight, lobe, lobeP, preGeneratedSample.xyz);
             weight /= pSpecularReflection;
-            weight *= (1.f - specTrans);
+            weight *= (1.f - specTrans) * subsurfaceSpecularScale;
             pdf *= pSpecularReflection;
             lobeP *= pSpecularReflection;
             if (pDiffuseReflection > 0.f) pdf += pDiffuseReflection * diffuseReflection.evalPdf(wi, wo);
@@ -1523,7 +1530,8 @@ struct FalcorBSDF // : IBxDF
             deltaReflection.probability = pSpecularReflection;
 
             // re-compute correct thp for all channels (using float3 version of evalFresnelSchlick!) but then take out the portion that is handled by specularReflectionTransmission below!
-            deltaReflection.thp = (1-pSpecularReflectionTransmission)*specularReflection.evalOpenPBRFresnel(wi.z);
+            deltaReflection.thp = (1-pSpecularReflectionTransmission)
+                * subsurfaceSpecularScale * specularReflection.evalOpenPBRFresnel(wi.z);
         }
 
         // Handle delta reflection/transmission.

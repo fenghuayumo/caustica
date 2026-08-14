@@ -239,6 +239,7 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(transmissionFactor);
     STORE_FIELD(diffuseTransmissionFactor);
     STORE_FIELD(normalTextureScale);
+    STORE_FIELD(normalTextureTransformScale);
     STORE_FIELD(coatNormalTextureScale);
     STORE_FIELD(IoR);
 
@@ -473,6 +474,7 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(transmissionFactor, "TransmissionFactor");
     LOAD_FIELD_EITHER(diffuseTransmissionFactor, "DiffuseTransmissionFactor");
     LOAD_FIELD_EITHER(normalTextureScale, "NormalTextureScale");
+    LOAD_FIELD_EITHER(normalTextureTransformScale, "NormalTextureTransformScale");
     LOAD_FIELD_EITHER(coatNormalTextureScale, "CoatNormalTextureScale");
     LOAD_FIELD_EITHER(IoR, "IoR");
 
@@ -1235,7 +1237,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.HairCuticleAngle = std::clamp(hair.cuticleAngle, -15.f, 15.f);
     data.HairDiffuseReflectionWeight = std::clamp(hair.diffuseReflectionWeight, 0.f, 1.f);
     data.HairModel = static_cast<uint32_t>(hair.model);
-    data._padHair = dm::float2(0.f);
+    data.NormalTextureTransformScale = normalTextureTransformScale;
 
     // bindless textures
 
@@ -1499,9 +1501,14 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
     standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    // Keep engine-imported values compatible with RTXPT. Explicit OpenPBR
-    // materials loaded from JSON/Python still default specular_color to white.
-    standardMaterial->specularColor = material.specularColor;
+    // In glTF's metallic-roughness workflow the dielectric specular tint is
+    // white unless KHR_materials_specular says otherwise. SceneTypes keeps a
+    // zero default because the same field is also used by the legacy
+    // specular-glossiness workflow; carrying that zero into OpenPBR removes
+    // Fresnel reflection entirely (most visible on skin).
+    standardMaterial->specularColor = material.useSpecularGlossModel
+        ? material.specularColor
+        : dm::float3(1.0f);
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
@@ -1513,6 +1520,7 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->transmissionFactor = material.transmissionFactor;
     //standardMaterial->diffuseTransmissionFactor = material.diffuseTransmissionFactor;
     standardMaterial->normalTextureScale = material.normalTextureScale;
+    standardMaterial->normalTextureTransformScale = material.normalTextureTransformScale;
     standardMaterial->useSpecularGlossModel = material.useSpecularGlossModel;
     standardMaterial->metalnessInRedChannel = material.metalnessInRedChannel;
     if (material.enableSubsurfaceScattering)
@@ -1534,6 +1542,25 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
 
     standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
     standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
+    // RTXCR's zero-roughness character lens is a neutral unit-transmission
+    // visibility layer (eta = 1): it neither refracts, absorbs, reflects nor
+    // casts a shadow. Caustica's regular delta-transmission path still changes
+    // path classification and can lose energy after the two lens interfaces,
+    // so omitting this exact ideal layer from the TLAS is the equivalent result.
+    // Any rough or partially transmissive glass keeps the regular OpenPBR path.
+    const bool isRtxcrCharacterLens = standardMaterial->modelName == "glass_lens"
+        || material.debugName == "glass_lens_mtl";
+    const bool rtxcrIdealLens = isRtxcrCharacterLens
+        && standardMaterial->enableTransmission
+        && material.transmissionFactor >= 0.999f
+        && material.roughness <= 1e-4f;
+    standardMaterial->excludeFromNEE = rtxcrIdealLens;
+    if (rtxcrIdealLens)
+    {
+        standardMaterial->IoR = 1.0f;
+        standardMaterial->thinSurface = true;
+        standardMaterial->skipRender = true;
+    }
 
     return standardMaterial;
 }

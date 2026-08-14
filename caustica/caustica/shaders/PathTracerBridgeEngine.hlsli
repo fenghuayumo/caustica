@@ -480,11 +480,13 @@ MaterialProperties sampleGeometryStandardMaterial(const BridgeGeometrySample gs,
         #if defined(CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE)
             #if CAUSTICA_MATERIAL_USE_NORMAL_TEXTURE
                 if (attributes & MatAttr_Normal)
-                    textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
+                    textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler,
+                        gs.texcoord * material.NormalTextureTransformScale);
             #endif
         #else
             if ((attributes & MatAttr_Normal) && (material.Flags & StandardMaterialFlags_UseNormalTexture) != 0)
-                textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler, gs.texcoord);
+                textures.normal = sampleTexture(material.NormalTextureIndex, materialSampler, textureSampler,
+                    gs.texcoord * material.NormalTextureTransformScale);
         #endif
 
         if ((attributes & MatAttr_CoatNormal) && (material.Flags & StandardMaterialFlags_UseCoatNormalTexture) != 0)

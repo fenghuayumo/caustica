@@ -125,7 +125,7 @@ struct StandardMaterialData
 
     float       HairDiffuseReflectionWeight;
     uint        HairModel;
-    float2      _padHair;
+    float2      NormalTextureTransformScale;
 };
 
 #if defined(__cplusplus)

@@ -201,6 +201,7 @@ struct StandardMaterial : public StandardMaterialBase
     float                   transmissionFactor                  = 0.f; // see KHR_materials_transmission; undefined on specular-gloss materials
     float                   diffuseTransmissionFactor           = 0.f; // like specularTransmissionFactor, except using diffuse transmission lobe (roughness ignored)
     float                   normalTextureScale                  = 1.f;
+    dm::float2              normalTextureTransformScale         = 1.f;
     float                   coatNormalTextureScale              = 1.f;
     float                   IoR                                 = 1.5f; // index of refraction, see KHR_materials_ior
 

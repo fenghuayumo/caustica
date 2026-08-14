@@ -35,10 +35,11 @@ inline void CausticaMakeSubsurfaceMaterial(
 
 inline float CausticaSubsurfaceMaxRadius(const RTXCR_SubsurfaceMaterialData material)
 {
-    // Eight scattering radii retain the useful Burley profile while bounding
-    // projection and transmission rays to the local character geometry.
-    return max(1e-4f,
-        8.0f * SSS_METERS_UNIT * material.scale * CausticaMax3(material.scatteringColor));
+    const float fittedRadius = 8.0f * SSS_METERS_UNIT
+        * material.scale * CausticaMax3(material.scatteringColor);
+    // Match the RTXCR character demo's one-world-unit projection bound so
+    // large imported scale values do not smear across facial features.
+    return clamp(fittedRadius, 1e-4f, 1.0f);
 }
 
 inline float CausticaSubsurfaceMaxInteriorDistance(const float maxRadius)
@@ -163,21 +164,36 @@ inline float3 CausticaEvaluateBurleyDiffusion(
     const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
     const WorkingContext workingContext)
 {
-    const RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
+    RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
         shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
 
+    // RTXCR alternates between a surface-aligned disk and a camera-aligned
+    // disk. The latter prevents the surface frame from stretching samples over
+    // steeply curved facial features (nose, lips and eyelids).
+    if (sampleNext1D(sampleGenerator) <= 0.5f)
+    {
+        const float3 cameraUp = normalize(g_Const.ptConsts.camera.CameraV);
+        const float3 cameraDirection = normalize(g_Const.ptConsts.camera.DirectionW);
+        interaction.normal = -cameraDirection;
+        interaction.tangent = cameraUp;
+        interaction.biTangent = normalize(cross(cameraUp, interaction.normal));
+    }
+
     RTXCR_SubsurfaceSample subsurfaceSample;
-    RTXCR_EvalBurleyDiffusionProfile(material, interaction, maxRadius, true,
+    // RTXCR leaves single-scattering diffusion-profile correction disabled in
+    // the Claire preset; enabling it shifts both the energy and the skin tint.
+    RTXCR_EvalBurleyDiffusionProfile(material, interaction, maxRadius, false,
         sampleNext2D(sampleGenerator), subsurfaceSample);
 
     const float3 sampleOffset = subsurfaceSample.samplePosition - shadingData.posW;
-    const float3 radialOffset = sampleOffset - shadingData.N * dot(sampleOffset, shadingData.N);
+    const float3 radialOffset = sampleOffset
+        - interaction.normal * dot(sampleOffset, interaction.normal);
     if (length(radialOffset) >= maxRadius)
         return 0.0f;
 
     RayDesc projectionRay;
     projectionRay.Origin = subsurfaceSample.samplePosition;
-    projectionRay.Direction = -shadingData.N;
+    projectionRay.Direction = -interaction.normal;
     projectionRay.TMin = 0.0f;
     projectionRay.TMax = 2.0f * maxRadius;
 
@@ -311,7 +327,10 @@ inline float3 HandleSubsurfaceNEE(
         instanceIndex, material, maxRadius, sampleGenerator, workingContext);
     radiance += CausticaEvaluateSingleScatteringTransmission(path, shadingData, bsdf,
         instanceIndex, material, maxRadius, sampleGenerator, workingContext);
-    return path.GetThp() * max(radiance, 0.0f) * weight;
+    // RTXCR's character preset normalizes the diffusion and microfacet UI
+    // weights to 0.5/0.5. The matching microfacet factor is applied while the
+    // BSDF is assembled; keep the spatial component on the other half here.
+    return path.GetThp() * max(radiance, 0.0f) * (0.5f * weight);
 }
 
 #endif

@@ -98,6 +98,7 @@ std::optional<CameraComponent> makeCameraComponentFromJson(const std::string& ty
         src["zNear"] >> data.zNear;
         src["zFar"] >> data.zFar;
         src["enableAutoExposure"] >> data.enableAutoExposure;
+        src["toneMapOperator"] >> data.toneMapOperator;
         src["exposureCompensation"] >> data.exposureCompensation;
         src["exposureValue"] >> data.exposureValue;
         src["exposureValueMin"] >> data.exposureValueMin;

@@ -47,9 +47,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--animated", action="store_true")
     parser.add_argument("--environment-map", type=Path, default=DEFAULT_ENVIRONMENT)
-    parser.add_argument("--environment-intensity", type=float, default=0.02)
-    parser.add_argument("--directional-light-scale", type=float, default=2.0)
-    parser.add_argument("--exposure-compensation", type=float, default=2.5)
+    parser.add_argument("--environment-intensity", type=float, default=0.33)
+    parser.add_argument("--directional-light-scale", type=float, default=1.0)
+    parser.add_argument("--exposure-compensation", type=float, default=0.0)
+    parser.add_argument(
+        "--tone-map-operator",
+        choices=("Linear", "Reinhard", "ReinhardModified", "HejiHableAlu", "HableUc2", "Aces"),
+        default="Reinhard",
+    )
     args = parser.parse_args()
 
     assets = args.rtxcr_assets.resolve()
@@ -106,6 +111,7 @@ def main() -> int:
     for node in walk_nodes(graph):
         if node.get("type") in ("PerspectiveCamera", "PerspectiveCameraEx"):
             node["enableAutoExposure"] = False
+            node["toneMapOperator"] = args.tone_map_operator
             node["exposureCompensation"] = args.exposure_compensation
         elif node.get("type") == "DirectionalLight" and isinstance(node.get("irradiance"), (int, float)):
             node["irradiance"] *= args.directional_light_scale

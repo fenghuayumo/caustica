@@ -390,6 +390,17 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
     ToneMappingParameters defaults;
     settings.ToneMappingParams.autoExposure =
         proxy.enableAutoExposure.value_or(defaults.autoExposure);
+    settings.ToneMappingParams.toneMapOperator = defaults.toneMapOperator;
+    if (proxy.toneMapOperator)
+    {
+        const std::string& op = *proxy.toneMapOperator;
+        if (op == "Linear") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Linear;
+        else if (op == "Reinhard") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Reinhard;
+        else if (op == "ReinhardModified") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::ReinhardModified;
+        else if (op == "HejiHableAlu") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HejiHableAlu;
+        else if (op == "HableUc2") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
+        else if (op == "Aces") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Aces;
+    }
     settings.ToneMappingParams.exposureCompensation =
         proxy.exposureCompensation.value_or(defaults.exposureCompensation);
     settings.ToneMappingParams.exposureValue =
@@ -450,6 +461,7 @@ CameraRenderProxy makeCameraRenderProxy(
         proxy.verticalFovRadians = pers->verticalFov;
         proxy.aspectRatio = pers->aspectRatio;
         proxy.enableAutoExposure = pers->enableAutoExposure;
+        proxy.toneMapOperator = pers->toneMapOperator;
         proxy.exposureCompensation = pers->exposureCompensation;
         proxy.exposureValue = pers->exposureValue;
         proxy.exposureValueMin = pers->exposureValueMin;
