@@ -1145,7 +1145,10 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     if (metalnessInRedChannel)
         data.Flags |= StandardMaterialFlags_MetalnessInRedChannel;
 
-    if (thinSurface || !enableTransmission) // materials with no transmission are automatically considered thin surface - simplifies a lot of things
+    // A positive subsurface weight makes the material volumetric even when it
+    // has no specular-transmission lobe. Explicit thin-walled materials retain
+    // the local OpenPBR approximation instead of entering the RTXCR BSSRDF.
+    if (thinSurface || (!enableTransmission && subsurfaceWeight <= 0.0f))
         data.Flags |= StandardMaterialFlags_ThinSurface;
 
     if (psdExclude)

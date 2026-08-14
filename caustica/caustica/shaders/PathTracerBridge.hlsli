@@ -96,6 +96,11 @@ namespace Bridge
     // Consider simplifying alpha testing - perhaps splitting it up from the main geometry path, load it with fewer indirections or something like that.
     static float3 traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug);
 
+    // Opaque closest-hit query used by RTXCR subsurface projection and
+    // transmission rays. The caller decides whether back faces are culled.
+    static bool traceSubsurfaceRay(RayDesc ray, const bool cullBackFaces,
+        out TriangleHit triangleHit, out float hitT);
+
     static void traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug);
 
 #if PT_USE_RESTIR_GI

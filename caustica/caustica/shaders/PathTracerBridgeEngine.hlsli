@@ -975,6 +975,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
             bridgeMaterial.coatWeight, bridgeMaterial.coatColor, bridgeMaterial.coatRoughness, bridgeMaterial.coatAnisotropy, bridgeMaterial.coatIor, bridgeMaterial.coatDarkening,
             (lpfloat3)coatNormalLocal, (lpfloat3)coatTangentLocal, (lpfloat)coatBitangentSign,
             bridgeMaterial.subsurfaceWeight, bridgeMaterial.subsurfaceColor,
+            bridgeMaterial.subsurfaceRadius, bridgeMaterial.subsurfaceRadiusScale, bridgeMaterial.subsurfaceAnisotropy,
             bridgeMaterial.thinFilmWeight, bridgeMaterial.thinFilmThickness, bridgeMaterial.thinFilmIor,
             bridgeMaterial.transmissionDispersionScale, bridgeMaterial.transmissionDispersionAbbeNumber ) );
 
@@ -1341,6 +1342,30 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
     }
 
     return transmittance;
+}
+
+bool Bridge::traceSubsurfaceRay(RayDesc ray, const bool cullBackFaces,
+    out TriangleHit triangleHit, out float hitT)
+{
+    CAUSTICA_RayQuery(RAY_FLAG_FORCE_OPAQUE, 0) rayQuery;
+    const uint rayFlags = cullBackFaces ? RAY_FLAG_CULL_BACK_FACING_TRIANGLES : RAY_FLAG_NONE;
+    rayQuery.TraceRayInline(SceneBVH, rayFlags, 0xff, ray);
+    while (rayQuery.Proceed()) {}
+
+    hitT = 0.0f;
+    triangleHit.instanceID = GeometryInstanceID::make(0, 0);
+    triangleHit.primitiveIndex = 0;
+    triangleHit.barycentrics = 0.0f;
+
+    if (rayQuery.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
+        return false;
+
+    triangleHit.instanceID = GeometryInstanceID::make(
+        rayQuery.CommittedInstanceIndex(), rayQuery.CommittedGeometryIndex());
+    triangleHit.primitiveIndex = rayQuery.CommittedPrimitiveIndex();
+    triangleHit.barycentrics = rayQuery.CommittedTriangleBarycentrics();
+    hitT = rayQuery.CommittedRayT();
+    return true;
 }
 
 void Bridge::traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug)

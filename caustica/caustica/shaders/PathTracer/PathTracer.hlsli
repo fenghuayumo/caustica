@@ -716,6 +716,10 @@ namespace PathTracer
 #else
         NEEResult neeResult = HandleNEE(preScatterPath, shadingData, bsdf, uniformSG, workingContext); 
 #endif
+#if !NON_PATH_TRACING_PASS && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+        neeResult.AccumulateRadiance(HandleSubsurfaceNEE(
+            preScatterPath, shadingData, bsdf, InstanceIndex(), uniformSG, workingContext), 0.0f);
+#endif
 
 #if PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES        
         path.SetPackedMISInfo_ThpRuRuCorrection( neeResult.BSDFMISInfo.Pack16bit(), path.GetThpRuRuCorrection() );

@@ -1,0 +1,314 @@
+#ifndef __PATH_TRACER_SUBSURFACE_HLSLI__
+#define __PATH_TRACER_SUBSURFACE_HLSLI__
+
+// RTXCR uses the diffuse mean-free-path fit for the Burley profile.
+#define USE_DIFFUSE_MEAN_FREE_PATH 1
+#include "../ThirdParty/RTXCR/SubsurfaceScattering.hlsli"
+#include "../ThirdParty/RTXCR/Transmission.hlsli"
+
+inline float CausticaMax3(const float3 v)
+{
+    return max(v.x, max(v.y, v.z));
+}
+
+inline float CausticaSubsurfaceWeight(const ActiveBSDF bsdf)
+{
+    return saturate(bsdf.data.SubsurfaceWeight())
+        * (1.0f - saturate(bsdf.data.Metallic()))
+        * (1.0f - saturate(bsdf.data.SpecularTransmission()));
+}
+
+inline void CausticaMakeSubsurfaceMaterial(
+    const ActiveBSDF bsdf, out RTXCR_SubsurfaceMaterialData material)
+{
+    material = RTXCR_CreateDefaultSubsurfaceMaterialData();
+    // OpenPBR's subsurface_color is the volume's diffuse transmission tint.
+    // The base layer weight is applied separately by CausticaSubsurfaceWeight.
+    material.transmissionColor = saturate((float3)bsdf.data.SubsurfaceColor());
+    material.scatteringColor = max((float3)bsdf.data.SubsurfaceRadiusScale(), 1e-4f);
+    material.scale = max((float)bsdf.data.SubsurfaceRadius(), 1e-4f);
+    material.g = clamp((float)bsdf.data.SubsurfaceAnisotropy(), -0.99f, 0.99f);
+}
+
+inline float CausticaSubsurfaceMaxRadius(const RTXCR_SubsurfaceMaterialData material)
+{
+    // Eight scattering radii retain the useful Burley profile while bounding
+    // projection and transmission rays to the local character geometry.
+    return max(1e-4f,
+        8.0f * SSS_METERS_UNIT * material.scale * CausticaMax3(material.scatteringColor));
+}
+
+inline float CausticaSubsurfaceMaxInteriorDistance(const float maxRadius)
+{
+    // Projection uses an eight-radius disk; transmission needs more room to
+    // cross a closed head/limb mesh from oblique incident directions.
+    return 8.0f * maxRadius;
+}
+
+inline bool CausticaSampleGlobalLight(
+    const float3 position, const PathState path,
+    inout UniformSampleSequenceGenerator sampleGenerator,
+    out LightSample result)
+{
+    LightSampler lightSampler = Bridge::CreateLightSampler(
+        path.GetPixelPos(), path.rayCone.getWidth(), path.GetSceneLength());
+
+    const bool hasEnvironment = Bridge::HasEnvMap();
+    const bool hasSceneLights = !lightSampler.IsEmpty();
+    const float environmentBranchProbability = hasSceneLights ? 0.5f : 1.0f;
+
+    // Baked environments are represented by many quad proxies in the global
+    // light sampler. Picking only one proxy gives a correct but extremely
+    // high-variance BSSRDF estimate. Sample the complete environment directly
+    // and reserve the other branch for non-environment scene lights. Rejecting
+    // environment proxies on that branch avoids double counting; retaining the
+    // branch probability in the PDF keeps the mixture unbiased.
+    if (hasEnvironment && (!hasSceneLights
+        || sampleNext1D(sampleGenerator) < environmentBranchProbability))
+    {
+        const DistantLightSample envSample =
+            Bridge::CreateEnvMapImportanceSampler().MIPDescentSample(
+                sampleNext2D(sampleGenerator));
+        if (envSample.Pdf <= 0.0f || !any(envSample.Le > 0.0f))
+            return false;
+
+        const float pdf = envSample.Pdf * environmentBranchProbability;
+        result.Direction = envSample.Dir;
+        result.Distance = kMaxSceneDistance;
+        result.Li = envSample.Le / pdf;
+        result.SolidAnglePdf = envSample.Pdf;
+        result.LightIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+        result.SelectionPdf = environmentBranchProbability;
+        result.LightSampleableByBSDF = true;
+        result.FromLocalDistribution = false;
+        return true;
+    }
+
+    if (!hasSceneLights)
+        return false;
+
+    float selectionPdf = 0.0f;
+    const uint lightIndex = lightSampler.SampleGlobal(
+        sampleNext1D(sampleGenerator), selectionPdf);
+    if (selectionPdf <= 0.0f)
+        return false;
+
+    const PolymorphicLightInfoFull packedLight = lightSampler.LoadLight(lightIndex);
+    const PolymorphicLightType lightType = PolymorphicLight::DecodeType(packedLight);
+    if (hasEnvironment && (lightType == PolymorphicLightType::kEnvironment
+        || lightType == PolymorphicLightType::kEnvironmentQuad))
+        return false;
+
+    const PolymorphicLightSample sampledLight = PolymorphicLight::CalcSample(
+        packedLight, sampleNext2D(sampleGenerator), position);
+    const float sceneLightBranchProbability = hasEnvironment
+        ? (1.0f - environmentBranchProbability) : 1.0f;
+    const float mixtureSelectionPdf = selectionPdf * sceneLightBranchProbability;
+    const float pdf = sampledLight.SolidAnglePdf * mixtureSelectionPdf;
+    if (pdf <= 0.0f || !any(sampledLight.Radiance > 0.0f))
+        return false;
+
+    const float3 toLight = sampledLight.Position - position;
+    result.Distance = length(toLight);
+    if (result.Distance <= 1e-7f)
+        return false;
+
+    result.Direction = toLight / result.Distance;
+    result.Li = sampledLight.Radiance / pdf;
+    result.SolidAnglePdf = sampledLight.SolidAnglePdf;
+    result.LightIndex = lightIndex;
+    result.SelectionPdf = mixtureSelectionPdf;
+    result.LightSampleableByBSDF = sampledLight.LightSampleableByBSDF;
+    result.FromLocalDistribution = false;
+    return true;
+}
+
+inline float3 CausticaSubsurfaceVisibility(
+    const float3 position, const float3 outwardFaceNormal,
+    const LightSample lightSample, const PathState path,
+    const WorkingContext workingContext)
+{
+    RayDesc ray;
+    ray.Origin = ComputeRayOrigin(position, outwardFaceNormal);
+    ray.Direction = lightSample.Direction;
+    ray.TMin = 0.0f;
+    ray.TMax = lightSample.Distance * 0.9985f;
+    return Bridge::traceVisibilityRay(
+        ray, path.rayCone, path.getVertexIndex(), workingContext.Debug);
+}
+
+inline bool CausticaLoadSubsurfaceHit(
+    const RayDesc ray, const bool cullBackFaces,
+    const uint initialInstanceIndex, const uint initialMaterialID,
+    const PathState path, const WorkingContext workingContext,
+    out SurfaceData surface, out float hitT)
+{
+    TriangleHit triangleHit;
+    if (!Bridge::traceSubsurfaceRay(ray, cullBackFaces, triangleHit, hitT))
+        return false;
+    if (triangleHit.instanceID.getInstanceIndex() != initialInstanceIndex)
+        return false;
+
+    surface = Bridge::loadSurface(triangleHit, ray.Direction, path.rayCone,
+        path.getVertexIndex(), path.GetPixelPos(), workingContext.Debug);
+    return surface.shadingData.materialID == initialMaterialID;
+}
+
+inline float3 CausticaEvaluateBurleyDiffusion(
+    const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
+    const uint instanceIndex, const RTXCR_SubsurfaceMaterialData material,
+    const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
+    const WorkingContext workingContext)
+{
+    const RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
+        shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
+
+    RTXCR_SubsurfaceSample subsurfaceSample;
+    RTXCR_EvalBurleyDiffusionProfile(material, interaction, maxRadius, true,
+        sampleNext2D(sampleGenerator), subsurfaceSample);
+
+    const float3 sampleOffset = subsurfaceSample.samplePosition - shadingData.posW;
+    const float3 radialOffset = sampleOffset - shadingData.N * dot(sampleOffset, shadingData.N);
+    if (length(radialOffset) >= maxRadius)
+        return 0.0f;
+
+    RayDesc projectionRay;
+    projectionRay.Origin = subsurfaceSample.samplePosition;
+    projectionRay.Direction = -shadingData.N;
+    projectionRay.TMin = 0.0f;
+    projectionRay.TMax = 2.0f * maxRadius;
+
+    SurfaceData sampleSurface;
+    float projectionT;
+    // Imported meshes are not guaranteed to share DXR's front-face winding.
+    // The closest hit is selected from outside the surface, then constrained to
+    // the originating instance and material, so face culling is unnecessary.
+    if (!CausticaLoadSubsurfaceHit(projectionRay, false, instanceIndex,
+        shadingData.materialID, path, workingContext, sampleSurface, projectionT))
+        return 0.0f;
+
+    LightSample lightSample;
+    if (!CausticaSampleGlobalLight(sampleSurface.shadingData.posW,
+        path, sampleGenerator, lightSample))
+        return 0.0f;
+
+    const float NoL = dot(sampleSurface.shadingData.N, lightSample.Direction);
+    if (NoL <= 0.0f)
+        return 0.0f;
+
+    const float3 visibility = CausticaSubsurfaceVisibility(
+        sampleSurface.shadingData.posW, sampleSurface.shadingData.faceNCorrected,
+        lightSample, path, workingContext);
+    return RTXCR_EvalBssrdf(subsurfaceSample,
+        lightSample.Li * visibility, NoL);
+}
+
+inline float3 CausticaEvaluateSingleScatteringTransmission(
+    const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
+    const uint instanceIndex, const RTXCR_SubsurfaceMaterialData material,
+    const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
+    const WorkingContext workingContext)
+{
+    const RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
+        shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
+    const RTXCR_SubsurfaceMaterialCoefficients coefficients =
+        RTXCR_ComputeSubsurfaceMaterialCoefficients(material);
+    const float maxInteriorDistance = CausticaSubsurfaceMaxInteriorDistance(maxRadius);
+    const float3 refractedDirection = RTXCR_CalculateRefractionRay(
+        interaction, sampleNext2D(sampleGenerator));
+
+    RayDesc transmissionRay;
+    transmissionRay.Origin = shadingData.computeNewRayOrigin(false);
+    transmissionRay.Direction = refractedDirection;
+    transmissionRay.TMin = 0.0f;
+    transmissionRay.TMax = maxInteriorDistance;
+
+    SurfaceData exitSurface;
+    float thickness;
+    if (!CausticaLoadSubsurfaceHit(transmissionRay, false, instanceIndex,
+        shadingData.materialID, path, workingContext, exitSurface, thickness))
+        return 0.0f;
+
+    const float3 exitOutwardNormal = -exitSurface.shadingData.N;
+    const float3 exitOutwardFaceNormal = -exitSurface.shadingData.faceNCorrected;
+    float3 radiance = 0.0f;
+
+    LightSample boundaryLight;
+    if (CausticaSampleGlobalLight(exitSurface.shadingData.posW,
+        path, sampleGenerator, boundaryLight)
+        && dot(exitOutwardNormal, boundaryLight.Direction) > 0.0f)
+    {
+        const float3 visibility = CausticaSubsurfaceVisibility(
+            exitSurface.shadingData.posW, exitOutwardFaceNormal,
+            boundaryLight, path, workingContext);
+        const float3 boundary = RTXCR_EvaluateBoundaryTerm(
+            shadingData.N, boundaryLight.Direction, refractedDirection,
+            exitOutwardNormal, thickness, coefficients);
+        // Entry direction is cosine sampled, cancelling its cosine/pdf term.
+        radiance += boundaryLight.Li * visibility * boundary * RTXCR_PI;
+    }
+
+    // One uniform distance sample along the transmitted segment. The HG phase
+    // function is importance sampled, so its phase/pdf ratio cancels.
+    const float distanceSample = thickness * clamp(
+        sampleNext1D(sampleGenerator), 1e-4f, 1.0f - 1e-4f);
+    const float3 scatteringPosition = transmissionRay.Origin
+        + refractedDirection * distanceSample;
+    const float3 scatteringDirection = RTXCR_SampleDirectionHenyeyGreenstein(
+        sampleNext2D(sampleGenerator), material.g, refractedDirection);
+
+    RayDesc scatteringRay;
+    scatteringRay.Origin = scatteringPosition;
+    scatteringRay.Direction = scatteringDirection;
+    scatteringRay.TMin = 1e-5f;
+    scatteringRay.TMax = maxInteriorDistance;
+
+    SurfaceData scatteringExitSurface;
+    float scatteringExitT;
+    if (CausticaLoadSubsurfaceHit(scatteringRay, false, instanceIndex,
+        shadingData.materialID, path, workingContext,
+        scatteringExitSurface, scatteringExitT))
+    {
+        const float3 scatteringExitNormal = -scatteringExitSurface.shadingData.N;
+        const float3 scatteringExitFaceNormal = -scatteringExitSurface.shadingData.faceNCorrected;
+        LightSample scatteringLight;
+        if (CausticaSampleGlobalLight(scatteringExitSurface.shadingData.posW,
+            path, sampleGenerator, scatteringLight)
+            && dot(scatteringExitNormal, scatteringLight.Direction) > 0.0f)
+        {
+            const float3 visibility = CausticaSubsurfaceVisibility(
+                scatteringExitSurface.shadingData.posW, scatteringExitFaceNormal,
+                scatteringLight, path, workingContext);
+            const float3 singleScattering = RTXCR_EvaluateSingleScattering(
+                scatteringLight.Direction, scatteringExitNormal,
+                distanceSample + scatteringExitT, coefficients);
+            radiance += scatteringLight.Li * visibility
+                * singleScattering * thickness;
+        }
+    }
+
+    return radiance;
+}
+
+inline float3 HandleSubsurfaceNEE(
+    const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
+    const uint instanceIndex, inout UniformSampleSequenceGenerator sampleGenerator,
+    const WorkingContext workingContext)
+{
+    const float weight = CausticaSubsurfaceWeight(bsdf);
+    if (weight <= 0.0f || shadingData.mtl.isThinSurface() || bsdf.data.IsHair())
+        return 0.0f;
+
+    RTXCR_SubsurfaceMaterialData material;
+    CausticaMakeSubsurfaceMaterial(bsdf, material);
+    if (!any(material.transmissionColor > 1e-4f))
+        return 0.0f;
+    const float maxRadius = CausticaSubsurfaceMaxRadius(material);
+    float3 radiance = CausticaEvaluateBurleyDiffusion(path, shadingData, bsdf,
+        instanceIndex, material, maxRadius, sampleGenerator, workingContext);
+    radiance += CausticaEvaluateSingleScatteringTransmission(path, shadingData, bsdf,
+        instanceIndex, material, maxRadius, sampleGenerator, workingContext);
+    return path.GetThp() * max(radiance, 0.0f) * weight;
+}
+
+#endif

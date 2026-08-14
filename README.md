@@ -63,6 +63,7 @@ Recommended starting points:
 * C++ embedding with `EngineApp`: [docs/embedding-cpp.md](docs/embedding-cpp.md)
 * Scene authoring: [docs/scene-json.md](docs/scene-json.md)
 * Materials for sim-to-real variation: [docs/openpbr.md](docs/openpbr.md)
+* RTXCR skin transport: [docs/rtxcr-skin.md](docs/rtxcr-skin.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * RHI / render-thread contract: [docs/architecture-rhi-threading.md](docs/architecture-rhi-threading.md)
 * Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
@@ -162,10 +163,10 @@ Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shad
 Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
 
 * **Authoring** — write parameters in OpenPBR snake_case (`base_color`, `coat_weight`, `subsurface_radius`, …) or inside an `OpenPBR` JSON block; existing PascalCase fields still load and bake to the same GPU layout
-* **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, **fuzz**, **coat** (with darkening), **thin-film** iridescence, **dispersion**, and **subsurface** (lobe mix + homogeneous scatter)
+* **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, **fuzz**, **coat** (with darkening), **thin-film** iridescence, **dispersion**, and RTXCR **subsurface** (Burley BSSRDF + ray-traced single scattering/transmission)
 * **Editor UI** — material inspector shows OpenPBR parameter names and maps them to `StandardMaterial` / GPU constants
 
-Approximate vs full spec: subsurface uses homogeneous volume scattering rather than a full BSSRDF random walk; coat/base share one shading normal; energy balance is approximate (Turquin MS + coat attenuation).
+Approximate vs full spec: subsurface uses RTXCR's real-time Burley diffusion profile plus one-sample ray-traced transmission/single scattering rather than a full random walk; coat/base share one shading normal; energy balance is approximate (Turquin MS + coat attenuation).
 
 Example:
 
@@ -375,6 +376,7 @@ Rendering overrides and capture-sequence options are listed in [the command-line
 * [C++ embedding](docs/embedding-cpp.md)
 * [Scene JSON format](docs/scene-json.md)
 * [OpenPBR materials](docs/openpbr.md)
+* [RTXCR skin integration](docs/rtxcr-skin.md)
 * [ECS + render proxies](docs/architecture-render-proxy.md)
 * [RHI threading contract](docs/architecture-rhi-threading.md)
 * [Python API reference](py_caustica.md)

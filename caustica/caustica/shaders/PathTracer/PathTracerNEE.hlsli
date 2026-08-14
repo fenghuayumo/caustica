@@ -374,7 +374,7 @@ namespace PathTracer
 
         return HandleNEE_MultipleSamples(preScatterPath, shadingData, bsdf, lightSampler, fullSamples, sampleGenerator, workingContext);
     }
-    
+
 #else // disabled NEE!
 
 inline NEEResult HandleNEE(const PathState preScatterPath, 
@@ -386,6 +386,10 @@ inline NEEResult HandleNEE(const PathState preScatterPath,
     return result;
 }
 #endif
+
+// Spatial subsurface transport owns its light samples and must remain
+// available even when the regular surface NEE strategy is disabled.
+#include "PathTracerSubsurface.hlsli"
  
 }
 

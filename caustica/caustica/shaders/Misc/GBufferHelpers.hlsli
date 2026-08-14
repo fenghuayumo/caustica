@@ -375,6 +375,9 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 	lpfloat fuzzRoughness = (lpfloat)0.6;
 	lpfloat subsurfaceWeight = 0;
 	lpfloat3 subsurfaceColor = (lpfloat3)1;
+	lpfloat subsurfaceRadius = (lpfloat)1;
+	lpfloat3 subsurfaceRadiusScale = (lpfloat3)float3(1, 0.5, 0.25);
+	lpfloat subsurfaceAnisotropy = 0;
 
 	lpfloat coatWeight = 0;
 	lpfloat3 coatColor = (lpfloat3)1;
@@ -411,6 +414,12 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
 		fuzzRoughness = (lpfloat)material.FuzzRoughness;
 		subsurfaceWeight = (lpfloat)material.SubsurfaceWeight;
 		subsurfaceColor = (lpfloat3)material.SubsurfaceColor;
+		subsurfaceRadius = (lpfloat)material.SubsurfaceRadius;
+		subsurfaceRadiusScale = (lpfloat3)float3(
+			material.SubsurfaceRadiusScaleX,
+			material.SubsurfaceRadiusScaleY,
+			material.SubsurfaceRadiusScaleZ);
+		subsurfaceAnisotropy = (lpfloat)material.SubsurfaceAnisotropy;
 
 		coatWeight = (lpfloat)material.CoatWeight;
 		coatColor = (lpfloat3)material.CoatColor;
@@ -441,6 +450,7 @@ PathTracerCollectedSurfaceData RunDecompress(PackedPathTracerSurfaceData c)
         coatWeight, coatColor, coatRoughness, coatAnisotropy, coatIor, coatDarkening,
         coatNormal, coatTangent, coatBitangentSign,
         subsurfaceWeight, subsurfaceColor,
+        subsurfaceRadius, subsurfaceRadiusScale, subsurfaceAnisotropy,
         thinFilmWeight, thinFilmThickness, thinFilmIor,
         dispersionScale, dispersionAbbeNumber );
 

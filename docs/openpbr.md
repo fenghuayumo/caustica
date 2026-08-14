@@ -35,7 +35,7 @@ Material override discovery and texture path rules are documented in
 | Coat (+ darkening) | Implemented (GGX coat lobe + energy-layered base attenuation) |
 | Thin-film | Implemented (RGB Airy iridescence approx) |
 | Dispersion | Implemented (Cauchy/Abbe RGB hero-wavelength sampling) |
-| Subsurface | Implemented as lobe mix + homogeneous `sigmaS` (not full BSSRDF random walk) |
+| Subsurface | RTXCR Burley diffusion BSSRDF + ray-traced boundary transmission and single scattering |
 | Volume absorption | Implemented (`volume_attenuation_*` / transmission depth) |
 | Coat / base separate normals | Not yet (shared shading normal) |
 | Full OpenPBR energy white-furnace model | Approximate; white coat/fuzz layer identities have regression tests |
@@ -81,7 +81,7 @@ OpenPBR fields:
 | `Anisotropy` | Directional GGX highlight amount, range `[-1, 1]`. |
 | `FuzzWeight` / `FuzzColor` / `FuzzRoughness` | Cloth/velvet/dust fuzz lobe. |
 | `CoatWeight` / `CoatColor` / `CoatRoughness` / `CoatAnisotropy` / `CoatIor` / `CoatDarkening` | Clearcoat layer. |
-| `SubsurfaceWeight` / `SubsurfaceColor` / `SubsurfaceRadius` / `SubsurfaceRadiusScale` / `SubsurfaceAnisotropy` | Dense scattering approx. `SubsurfaceRadiusScale` is RGB. |
+| `SubsurfaceWeight` / `SubsurfaceColor` / `SubsurfaceRadius` / `SubsurfaceRadiusScale` / `SubsurfaceAnisotropy` | RTXCR skin scattering. Radius is in centimeters; `SubsurfaceRadiusScale` is RGB. |
 | `ThinFilmWeight` / `ThinFilmThickness` / `ThinFilmIor` | Iridescent thin film (thickness in µm). |
 | `TransmissionColor` / `TransmissionDepth` / `TransmissionScatter` / `TransmissionScatterAnisotropy` | Transmission medium. |
 | `TransmissionDispersionScale` / `TransmissionDispersionAbbeNumber` | Chromatic dispersion. |
@@ -171,7 +171,7 @@ OpenPBR fields:
 
 ## Notes
 
-- **Subsurface**: opaque-base mix toward `subsurface_color`, plus homogeneous volume scattering from radius/scale. Thin-walled subsurface also raises diffuse transmission. Full path-traced BSSRDF random walk is future work.
+- **Subsurface**: thick surfaces use RTXCR's Burley diffusion profile, a ray-traced back-boundary transmission term, and one HG-importance-sampled single-scattering event per path vertex. `subsurface_radius` is interpreted in centimeters and multiplied per channel by `subsurface_radius_scale`. Thin-walled materials retain the diffuse-transmission approximation because they have no closed interior to trace. This is a real-time combined BSSRDF, not a full random walk.
 - **Coat PSD**: path-space decomposition dominant bounce index `2` is coat reflection.
 - **Compatibility aliases**: legacy scalar `subsurface_scale` is accepted and broadcast to RGB; `subsurface_anisotropy` remains accepted as an alias for `subsurface_scatter_anisotropy`.
 - **Dispersion**: one RGB hero wavelength is selected per transmissive BSDF sample, with its IOR derived from the Cauchy equation and OpenPBR effective Abbe number. This produces real angular color separation but is not a full spectral solver.

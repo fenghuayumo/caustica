@@ -668,5 +668,19 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
             RESOURCE_LOCK caustica_gpu
             TIMEOUT 300
         )
+
+        add_test(
+            NAME causRtxcrSkinRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/rtxcr_skin_render_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/rtxcr-skin"
+        )
+        set_tests_properties(causRtxcrSkinRenderTests PROPERTIES
+            LABELS "gpu;render;openpbr;rtxcr"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
     endif()
 endif()

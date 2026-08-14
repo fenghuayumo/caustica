@@ -812,6 +812,9 @@ struct StandardBSDFData
 
     lpfloat     _subsurfaceWeight;
     lpfloat3    _subsurfaceColor;
+    lpfloat     _subsurfaceRadius;
+    lpfloat3    _subsurfaceRadiusScale;
+    lpfloat     _subsurfaceAnisotropy;
 
     lpfloat     _thinFilmWeight;
     lpfloat     _thinFilmThickness;
@@ -827,6 +830,7 @@ struct StandardBSDFData
         lpfloat coatWeight, lpfloat3 coatColor, lpfloat coatRoughness, lpfloat coatAnisotropy, lpfloat coatIor, lpfloat coatDarkening,
         lpfloat3 coatNormal, lpfloat3 coatTangent, lpfloat coatBitangentSign,
         lpfloat subsurfaceWeight, lpfloat3 subsurfaceColor,
+        lpfloat subsurfaceRadius, lpfloat3 subsurfaceRadiusScale, lpfloat subsurfaceAnisotropy,
         lpfloat thinFilmWeight, lpfloat thinFilmThickness, lpfloat thinFilmIor,
         lpfloat dispersionScale, lpfloat dispersionAbbeNumber )
     {
@@ -870,6 +874,9 @@ struct StandardBSDFData
         d._coatBitangentSign = coatBitangentSign;
         d._subsurfaceWeight = subsurfaceWeight;
         d._subsurfaceColor = subsurfaceColor;
+        d._subsurfaceRadius = subsurfaceRadius;
+        d._subsurfaceRadiusScale = subsurfaceRadiusScale;
+        d._subsurfaceAnisotropy = subsurfaceAnisotropy;
         d._thinFilmWeight = thinFilmWeight;
         d._thinFilmThickness = thinFilmThickness;
         d._thinFilmIor = thinFilmIor;
@@ -975,6 +982,9 @@ struct StandardBSDFData
     lpfloat     CoatBitangentSign   ()  { return _coatBitangentSign;    }
     lpfloat     SubsurfaceWeight    ()  { return _subsurfaceWeight;     }
     lpfloat3    SubsurfaceColor     ()  { return _subsurfaceColor;      }
+    lpfloat     SubsurfaceRadius    ()  { return _subsurfaceRadius;     }
+    lpfloat3    SubsurfaceRadiusScale() { return _subsurfaceRadiusScale; }
+    lpfloat     SubsurfaceAnisotropy()  { return _subsurfaceAnisotropy; }
     lpfloat     ThinFilmWeight      ()  { return _thinFilmWeight;       }
     lpfloat     ThinFilmThickness   ()  { return _thinFilmThickness;    }
     lpfloat     ThinFilmIor         ()  { return _thinFilmIor;          }
@@ -1076,9 +1086,13 @@ struct FalcorBSDF // : IBxDF
             * saturate(fuzzReflection.color) * fuzzReflection.directionalAlbedo(coatNdotV);
         float3 fuzzBaseAtten = lerp(fuzzBaseAttenBase, fuzzBaseAttenCoat, coatWeight);
 
-        // Subsurface mixes opaque base diffuse toward subsurface_color (OpenPBR opaque-base mix).
+        // Thick-surface subsurface energy is evaluated spatially by the RTXCR
+        // BSSRDF path. Keep the local diffuse lobe only for the unscattered
+        // fraction. Thin surfaces retain the OpenPBR diffuse approximation.
         float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
-        float3 baseDiffuse = lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW);
+        float3 baseDiffuse = isThinSurface
+            ? lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW)
+            : data.Diffuse() * (1.f - sssW);
         // Non-reciprocal albedo scaling for the dielectric interface. This is
         // the OpenPBR/Standard-Surface mixture approximation and is essential
         // for white-furnace energy conservation of glossy diffuse materials.
