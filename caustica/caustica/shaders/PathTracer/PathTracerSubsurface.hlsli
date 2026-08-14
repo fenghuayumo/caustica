@@ -22,9 +22,12 @@ inline void CausticaMakeSubsurfaceMaterial(
     const ActiveBSDF bsdf, out RTXCR_SubsurfaceMaterialData material)
 {
     material = RTXCR_CreateDefaultSubsurfaceMaterialData();
-    // OpenPBR's subsurface_color is the volume's diffuse transmission tint.
-    // The base layer weight is applied separately by CausticaSubsurfaceWeight.
-    material.transmissionColor = saturate((float3)bsdf.data.SubsurfaceColor());
+    // RTXCR's character preset uses the textured diffuse albedo as the SSS
+    // transmission color. Keep OpenPBR's subsurface_color as an additional
+    // volume tint; using it alone turns white-tinted character skin into wax
+    // and discards authored details such as lips and freckles.
+    material.transmissionColor = saturate(
+        (float3)bsdf.data.Diffuse() * (float3)bsdf.data.SubsurfaceColor());
     material.scatteringColor = max((float3)bsdf.data.SubsurfaceRadiusScale(), 1e-4f);
     material.scale = max((float)bsdf.data.SubsurfaceRadius(), 1e-4f);
     material.g = clamp((float)bsdf.data.SubsurfaceAnisotropy(), -0.99f, 0.99f);

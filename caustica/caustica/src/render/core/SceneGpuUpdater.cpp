@@ -118,6 +118,20 @@ size_t MeshUploadBytes(const scene::MeshUploadBlob& upload)
     return bytes;
 }
 
+size_t MeshUploadAllocationCount(const scene::MeshUploadBlob& upload)
+{
+    size_t count = upload.indexData.empty() ? 0 : 1;
+    count += upload.positionData.empty() ? 0 : 2; // current + previous position
+    count += upload.normalData.empty() ? 0 : 1;
+    count += upload.tangentData.empty() ? 0 : 1;
+    count += upload.texcoord1Data.empty() ? 0 : 1;
+    count += upload.texcoord2Data.empty() ? 0 : 1;
+    count += upload.weightData.empty() ? 0 : 1;
+    count += upload.jointData.empty() ? 0 : 1;
+    count += upload.radiusData.empty() ? 0 : 1;
+    return count;
+}
+
 bool IsMeshGpuRecordReady(
     const MeshGpuRecord& record,
     const std::shared_ptr<const scene::MeshUploadBlob>& upload)
@@ -141,6 +155,7 @@ struct MeshUploadPlan
 {
     size_t end = 0;
     size_t bytes = 0;
+    size_t allocationCount = 0;
 };
 
 MeshUploadPlan PlanMeshUpload(
@@ -150,7 +165,7 @@ MeshUploadPlan PlanMeshUpload(
     size_t targetUploadBytes)
 {
     const size_t meshCount = renderData.staticData().meshSnapshots.size();
-    MeshUploadPlan plan{ std::min(meshBegin, meshCount), 0 };
+    MeshUploadPlan plan{ std::min(meshBegin, meshCount), 0, 0 };
     if (meshBegin >= meshCount)
         return plan;
 
@@ -177,6 +192,8 @@ MeshUploadPlan PlanMeshUpload(
             && !gpuReadyUploads.contains(upload.get()))
         {
             addedBytes = MeshUploadBytes(*upload);
+            plan.allocationCount = SaturatingAdd(
+                plan.allocationCount, MeshUploadAllocationCount(*upload));
         }
 
         // A single immutable BufferGroup may be larger than the target. It still
@@ -1187,12 +1204,16 @@ size_t SceneGpuUpdater::uploadMeshesAfterLoad(
         return meshBegin;
 
     caustica::rhi::CommandListParameters uploadParams;
-    uploadParams.uploadChunkSize = 4 * 1024 * 1024;
+    constexpr size_t kUploadChunkSize = 4 * 1024 * 1024;
+    uploadParams.uploadChunkSize = kUploadChunkSize;
     // The byte planner and process-wide StreamingUploadBudget are the memory
     // authority. Keep the per-command-list pool large enough for one planned
     // batch (including chunk rounding), otherwise UploadManager tries to reuse
     // a chunk that belongs to the command list currently being recorded.
-    constexpr size_t kUploadHeadroom = 16 * 1024 * 1024;
+    const size_t kUploadHeadroom = plan.allocationCount
+        > std::numeric_limits<size_t>::max() / kUploadChunkSize
+        ? std::numeric_limits<size_t>::max()
+        : plan.allocationCount * kUploadChunkSize;
     uploadParams.uploadMaxMemory = std::max(
         size_t(128) * 1024 * 1024,
         SaturatingAdd(plan.bytes, kUploadHeadroom));

@@ -842,8 +842,17 @@ bool GltfImporter::load(
 
                 if (m_fs->fileExists(filePathDDS) || std::filesystem::exists(filePathDDS))
                     filePath = filePathDDS;
-                else
-                    filePath = resolveTexturePath((gltfDirectory / uriPath).replace_extension(".dds"));
+                else if (!sceneDirectory.empty() && !uriPath.is_absolute())
+                {
+                    std::filesystem::path sceneDds = sceneDirectory / uriPath;
+                    sceneDds.replace_extension(".dds");
+                    if (m_fs->fileExists(sceneDds) || std::filesystem::exists(sceneDds))
+                        filePath = std::filesystem::absolute(sceneDds);
+                }
+                // If neither DDS candidate exists, retain the authored PNG/JPEG
+                // path. RTXCR-Assets ships source textures and relies on its
+                // sample build to create DDS files; Caustica must still be able
+                // to load the original glTF directly.
             }
 
             result.path = filePath.generic_string();
@@ -1733,6 +1742,24 @@ bool GltfImporter::load(
 
         for (const std::shared_ptr<MeshGeometry>& geometry : mesh->geometries)
         {
+            // Curve topology is an unambiguous hair signal even when an asset
+            // predates NV_materials_hair. RTXCR's Claire groom is authored as
+            // line primitives, so falling back to a regular surface material
+            // here would turn the strands into opaque ribbons. Keep explicit
+            // extension values, otherwise use the RTXCR sample defaults.
+            if (geometry->material && !geometry->material->enableHair)
+            {
+                geometry->material->enableHair = true;
+                geometry->material->hair.model = Material::HairParams::Model::FarField;
+                geometry->material->hair.baseColor = dm::float3(0.227f, 0.130f, 0.035f);
+                geometry->material->hair.melanin = 0.805f;
+                geometry->material->hair.melaninRedness = 0.05f;
+                geometry->material->hair.longitudinalRoughness = 0.25f;
+                geometry->material->hair.azimuthalRoughness = 0.6f;
+                geometry->material->hair.ior = 1.55f;
+                geometry->material->hair.cuticleAngle = 3.0f;
+            }
+
             const uint32_t indexStep = geometry->type == MeshGeometryPrimitiveType::Lines ? 2u : 1u;
             std::vector<hair::StrandSegment> segments;
             segments.reserve(geometry->numIndices / indexStep);
@@ -1748,8 +1775,14 @@ bool GltfImporter::load(
                 hair::StrandSegment segment;
                 segment.vertices[0].position = source->positionData[vertex0];
                 segment.vertices[1].position = source->positionData[vertex1];
-                segment.vertices[0].radius = source->radiusData.empty() ? 0.001f : source->radiusData[vertex0];
-                segment.vertices[1].radius = source->radiusData.empty() ? 0.001f : source->radiusData[vertex1];
+                // Match the default radius used by the RTXCR sample. This is
+                // important for dense grooms: the authored radius otherwise
+                // over-covers pixels and loses the translucent strand detail.
+                constexpr float kRtxcrDefaultHairRadiusScale = 0.618f;
+                segment.vertices[0].radius = kRtxcrDefaultHairRadiusScale
+                    * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex0]);
+                segment.vertices[1].radius = kRtxcrDefaultHairRadiusScale
+                    * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex1]);
                 segment.vertices[0].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex0];
                 segment.vertices[1].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex1];
                 segments.push_back(segment);

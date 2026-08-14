@@ -190,6 +190,8 @@ namespace caustica::scene
         bool enableOpacityTexture = true;
         bool doubleSided = false;
         bool metalnessInRedChannel = false;
+        bool enableSubsurfaceScattering = false;
+        Material::SubsurfaceParams subsurface;
         bool enableHair = false;
         Material::HairParams hair;
         MaterialConstants constants = {};

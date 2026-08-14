@@ -535,6 +535,8 @@ void ExtractMaterialSnapshots(
         snapshot.enableOpacityTexture = material->enableOpacityTexture;
         snapshot.doubleSided = material->doubleSided;
         snapshot.metalnessInRedChannel = material->metalnessInRedChannel;
+        snapshot.enableSubsurfaceScattering = material->enableSubsurfaceScattering;
+        snapshot.subsurface = material->subsurface;
         snapshot.enableHair = material->enableHair;
         snapshot.hair = material->hair;
         material->fillConstantBuffer(snapshot.constants, false);

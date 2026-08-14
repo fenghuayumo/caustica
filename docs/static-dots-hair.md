@@ -30,6 +30,11 @@ Hair shading is enabled through the material's `NV_materials_hair` extension:
 }
 ```
 
+Line and line-strip curve primitives automatically use the RTXCR Far-Field
+hair defaults when the extension is absent. Explicit `NV_materials_hair`
+values always take precedence. Imported strand radii use RTXCR's default
+`0.618` scale so dense production grooms retain their intended coverage.
+
 `model` accepts `"FarField"` (the default) or `"Chiang"`. Far-Field supports
 the additional diffuse reflection weight and tint; Chiang uses the longitudinal
 and azimuthal roughness parameters directly. The same settings are available

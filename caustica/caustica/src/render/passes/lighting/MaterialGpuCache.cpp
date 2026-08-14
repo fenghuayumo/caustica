@@ -1515,6 +1515,17 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->normalTextureScale = material.normalTextureScale;
     standardMaterial->useSpecularGlossModel = material.useSpecularGlossModel;
     standardMaterial->metalnessInRedChannel = material.metalnessInRedChannel;
+    if (material.enableSubsurfaceScattering)
+    {
+        // NV_materials_subsurface uses the same semantic mapping as the
+        // RTXCR/OpenPBR bridge. Preserve it when the authoring material is
+        // converted into the path tracer's StandardMaterial representation.
+        standardMaterial->subsurfaceWeight = 1.0f;
+        standardMaterial->subsurfaceColor = material.subsurface.transmissionColor;
+        standardMaterial->subsurfaceRadius = material.subsurface.scale;
+        standardMaterial->subsurfaceRadiusScale = material.subsurface.scatteringColor;
+        standardMaterial->subsurfaceAnisotropy = material.subsurface.anisotropy;
+    }
     standardMaterial->enableHair = material.enableHair;
     standardMaterial->hair = material.hair;
     // OpenPBR is the built-in model; imported engine materials should shade as OpenPBR.
