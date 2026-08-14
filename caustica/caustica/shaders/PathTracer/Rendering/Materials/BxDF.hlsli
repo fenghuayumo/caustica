@@ -1087,14 +1087,17 @@ struct FalcorBSDF // : IBxDF
             * saturate(fuzzReflection.color) * fuzzReflection.directionalAlbedo(coatNdotV);
         float3 fuzzBaseAtten = lerp(fuzzBaseAttenBase, fuzzBaseAttenCoat, coatWeight);
 
-        // RTXCR replaces direct diffuse lighting with its spatial BSSRDF, but
-        // keeps the textured diffuse lobe for subsequent indirect sampling.
-        // The normalized direct-light split is applied by the NEE path.
+        // Thick-surface subsurface energy is evaluated spatially by the RTXCR
+        // BSSRDF path. Keeping a full local diffuse lobe as well double counts
+        // the broad environment fill, which is especially visible on sclera
+        // and the lower eyelid behind Claire's glasses. Keep only the authored
+        // unscattered fraction for indirect continuation; thin surfaces retain
+        // the local OpenPBR approximation.
         float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
-        subsurfaceSpecularScale = 1.f;
+        subsurfaceSpecularScale = isThinSurface ? 1.f : lerp(1.f, 0.5f, sssW);
         float3 baseDiffuse = isThinSurface
             ? lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW)
-            : data.Diffuse();
+            : data.Diffuse() * (1.f - sssW);
         // Non-reciprocal albedo scaling for the dielectric interface. This is
         // the OpenPBR/Standard-Surface mixture approximation and is essential
         // for white-furnace energy conservation of glossy diffuse materials.
