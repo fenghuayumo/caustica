@@ -29,13 +29,14 @@ static const int StandardMaterialFlags_PSDBlockMVsAtSurfaceTypeB1     = (1 << 14
 static const int StandardMaterialFlags_UseOpenPBRMaterialModel        = (1 << 15);
 static const int StandardMaterialFlags_UnlitReceiveShadows            = (1 << 16);
 static const int StandardMaterialFlags_UseCoatNormalTexture           = (1 << 17);
+static const int StandardMaterialFlags_Hair                           = (1 << 18);
 static const int StandardMaterialFlags_NestedPriorityMask             = 0xF0000000;
 static const int StandardMaterialFlags_NestedPriorityShift            = 28;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F000000;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Shift    = 24;
 
 /// Data with the packed layout in GPU memory.
-/// sizeof must stay 288 (18 x 16). Update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in
+/// Packed size is 352 bytes (22 x 16). Update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in
 /// PtPipelineFeaturePresets.cpp / MaterialFeatureMask.cpp / precompile_pt_shader_bins.py
 /// when this layout changes so cooked PT libs invalidate correctly.
 struct StandardMaterialData
@@ -110,6 +111,21 @@ struct StandardMaterialData
     float       CoatNormalTextureScale;
     uint        CoatNormalTextureIndex;
     float       _padOpenPBR;
+
+    float3      HairBaseColor;
+    float       HairMelanin;
+
+    float3      HairDiffuseReflectionTint;
+    float       HairMelaninRedness;
+
+    float       HairLongitudinalRoughness;
+    float       HairAzimuthalRoughness;
+    float       HairIor;
+    float       HairCuticleAngle;
+
+    float       HairDiffuseReflectionWeight;
+    uint        HairModel;
+    float2      _padHair;
 };
 
 #if defined(__cplusplus)

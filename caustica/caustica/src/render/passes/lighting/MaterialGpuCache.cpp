@@ -242,6 +242,22 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(coatNormalTextureScale);
     STORE_FIELD(IoR);
 
+    STORE_FIELD(enableHair);
+    if (enableHair)
+    {
+        Json::Value& hairJ = output["Hair"];
+        hairJ["model"] = hair.model == caustica::Material::HairParams::Model::Chiang ? "Chiang" : "FarField";
+        hairJ["base_color"] << hair.baseColor;
+        hairJ["melanin"] << hair.melanin;
+        hairJ["melanin_redness"] << hair.melaninRedness;
+        hairJ["longitudinal_roughness"] << hair.longitudinalRoughness;
+        hairJ["azimuthal_roughness"] << hair.azimuthalRoughness;
+        hairJ["ior"] << hair.ior;
+        hairJ["cuticle_angle"] << hair.cuticleAngle;
+        hairJ["diffuse_reflection_weight"] << hair.diffuseReflectionWeight;
+        hairJ["diffuse_reflection_tint"] << hair.diffuseReflectionTint;
+    }
+
     STORE_FIELD(useSpecularGlossModel);
     STORE_FIELD(enableBaseTexture);
     STORE_FIELD(enableOcclusionRoughnessMetallicTexture);
@@ -459,6 +475,27 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(normalTextureScale, "NormalTextureScale");
     LOAD_FIELD_EITHER(coatNormalTextureScale, "CoatNormalTextureScale");
     LOAD_FIELD_EITHER(IoR, "IoR");
+
+    LOAD_FIELD_EITHER(enableHair, "EnableHair");
+    if (input.isMember("Hair") && input["Hair"].isObject())
+    {
+        const Json::Value& hairJ = input["Hair"];
+        enableHair = true;
+        std::string model = "FarField";
+        ReadJsonMember(hairJ, "model", model);
+        hair.model = LowerCopy(model) == "chiang"
+            ? caustica::Material::HairParams::Model::Chiang
+            : caustica::Material::HairParams::Model::FarField;
+        ReadJsonMember(hairJ, "base_color", hair.baseColor);
+        ReadJsonMember(hairJ, "melanin", hair.melanin);
+        ReadJsonMember(hairJ, "melanin_redness", hair.melaninRedness);
+        ReadJsonMember(hairJ, "longitudinal_roughness", hair.longitudinalRoughness);
+        ReadJsonMember(hairJ, "azimuthal_roughness", hair.azimuthalRoughness);
+        ReadJsonMember(hairJ, "ior", hair.ior);
+        ReadJsonMember(hairJ, "cuticle_angle", hair.cuticleAngle);
+        ReadJsonMember(hairJ, "diffuse_reflection_weight", hair.diffuseReflectionWeight);
+        ReadJsonMember(hairJ, "diffuse_reflection_tint", hair.diffuseReflectionTint);
+    }
 
     LOAD_FIELD_EITHER(useSpecularGlossModel, "UseSpecularGlossModel");
     LOAD_FIELD_EITHER(enableBaseTexture, "EnableBaseTexture");
@@ -868,6 +905,31 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
         update |= ImGui::SliderFloat("subsurface_scatter_anisotropy", &subsurfaceAnisotropy, -1.f, 1.f);
     }
 
+    if (ImGui::CollapsingHeader("Hair"))
+    {
+        update |= ImGui::Checkbox("Enable hair BCSDF", &enableHair);
+        UI_SCOPED_DISABLE(!enableHair);
+
+        int hairModel = static_cast<int>(hair.model);
+        if (ImGui::Combo("Hair model", &hairModel, "Far-Field BCSDF\0Chiang BCSDF\0\0"))
+        {
+            hair.model = static_cast<caustica::Material::HairParams::Model>(hairModel);
+            update = true;
+        }
+        update |= ImGui::ColorEdit3("Hair base color", hair.baseColor.data(), ImGuiColorEditFlags_Float);
+        update |= ImGui::SliderFloat("Hair melanin", &hair.melanin, 0.f, 1.f);
+        update |= ImGui::SliderFloat("Hair melanin redness", &hair.melaninRedness, 0.f, 1.f);
+        update |= ImGui::SliderFloat("Hair longitudinal roughness", &hair.longitudinalRoughness, 0.001f, 1.f);
+        update |= ImGui::SliderFloat("Hair azimuthal roughness", &hair.azimuthalRoughness, 0.001f, 1.f);
+        update |= ImGui::SliderFloat("Hair IOR", &hair.ior, 1.001f, 2.f);
+        update |= ImGui::SliderFloat("Hair cuticle angle", &hair.cuticleAngle, -15.f, 15.f);
+
+        const bool farField = hair.model == caustica::Material::HairParams::Model::FarField;
+        UI_SCOPED_DISABLE(!farField);
+        update |= ImGui::SliderFloat("Hair diffuse weight", &hair.diffuseReflectionWeight, 0.f, 1.f);
+        update |= ImGui::ColorEdit3("Hair diffuse tint", hair.diffuseReflectionTint.data(), ImGuiColorEditFlags_Float);
+    }
+
     if (ImGui::CollapsingHeader("Thin Film"))
     {
         update |= ImGui::SliderFloat("thin_film_weight", &thinFilmWeight, 0.f, 1.f);
@@ -1106,6 +1168,8 @@ void StandardMaterial::fillData(StandardMaterialData & data)
 
     if (unlitReceiveShadows)
         data.Flags |= StandardMaterialFlags_UnlitReceiveShadows;
+    if (enableHair)
+        data.Flags |= StandardMaterialFlags_Hair;
 
     // free parameters
 
@@ -1158,6 +1222,17 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     data.TransmissionDispersionAbbeNumber = std::max(transmissionDispersionAbbeNumber, 0.0f);
     data.UnlitShadowStrength = std::clamp(unlitShadowStrength, 0.0f, 1.0f);
     data._padOpenPBR = 0.f;
+    data.HairBaseColor = hair.baseColor;
+    data.HairMelanin = std::clamp(hair.melanin, 0.f, 1.f);
+    data.HairDiffuseReflectionTint = hair.diffuseReflectionTint;
+    data.HairMelaninRedness = std::clamp(hair.melaninRedness, 0.f, 1.f);
+    data.HairLongitudinalRoughness = std::clamp(hair.longitudinalRoughness, 0.001f, 1.f);
+    data.HairAzimuthalRoughness = std::clamp(hair.azimuthalRoughness, 0.001f, 1.f);
+    data.HairIor = std::max(hair.ior, 1.001f);
+    data.HairCuticleAngle = std::clamp(hair.cuticleAngle, -15.f, 15.f);
+    data.HairDiffuseReflectionWeight = std::clamp(hair.diffuseReflectionWeight, 0.f, 1.f);
+    data.HairModel = static_cast<uint32_t>(hair.model);
+    data._padHair = dm::float2(0.f);
 
     // bindless textures
 
@@ -1437,6 +1512,8 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->normalTextureScale = material.normalTextureScale;
     standardMaterial->useSpecularGlossModel = material.useSpecularGlossModel;
     standardMaterial->metalnessInRedChannel = material.metalnessInRedChannel;
+    standardMaterial->enableHair = material.enableHair;
+    standardMaterial->hair = material.hair;
     // OpenPBR is the built-in model; imported engine materials should shade as OpenPBR.
     if (!material.useSpecularGlossModel)
         standardMaterial->materialModel = "OpenPBR";
@@ -1892,7 +1969,7 @@ void MaterialGpuCache::createRenderPassesAndLoadMaterials(caustica::rhi::Binding
     assert(!mediaPath.empty());
     m_renderDevice = &renderDevice;
 
-    static_assert(sizeof(StandardMaterialData) == 288,
+    static_assert(sizeof(StandardMaterialData) == 352,
         "StandardMaterialData size changed — update CAUSTICA_STANDARD_MATERIAL_DATA_BYTES in "
         "PtPipelineFeaturePresets.cpp, MaterialFeatureMask.cpp, and precompile_pt_shader_bins.py");
 

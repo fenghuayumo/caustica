@@ -204,6 +204,9 @@ struct StandardMaterial : public StandardMaterialBase
     float                   coatNormalTextureScale              = 1.f;
     float                   IoR                                 = 1.5f; // index of refraction, see KHR_materials_ior
 
+    bool                    enableHair                          = false;
+    caustica::Material::HairParams hair;
+
     // Toggle between two PBR models: metal-rough and specular-gloss.
     // See the comments on the other fields here.
     bool                    useSpecularGlossModel = false;

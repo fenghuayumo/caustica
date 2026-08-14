@@ -440,6 +440,13 @@ if (BUILD_TESTING)
         target_compile_options(causSceneEcsTests PRIVATE /utf-8)
     endif()
     add_test(NAME causSceneEcsTests COMMAND causSceneEcsTests)
+
+    add_executable(causHairDotsTests tests/HairDotsTests.cpp)
+    target_link_libraries(causHairDotsTests PRIVATE causScene)
+    if (MSVC)
+        target_compile_options(causHairDotsTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causHairDotsTests COMMAND causHairDotsTests)
 endif()
 
 file(GLOB_RECURSE caus_render_headers include/render/*.h)

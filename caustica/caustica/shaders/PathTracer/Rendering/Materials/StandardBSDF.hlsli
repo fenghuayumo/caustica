@@ -8,6 +8,133 @@
 
 #include "IBSDF.hlsli"
 #include "BxDF.hlsli"
+#include "../../../ThirdParty/RTXCR/HairChiangBSDF.hlsli"
+#include "../../../ThirdParty/RTXCR/HairFarFieldBCSDF.hlsli"
+
+static const uint CausticaHairModel_FarField = 0;
+static const uint CausticaHairModel_Chiang = 1;
+
+RTXCR_HairMaterialData CausticaMakeHairMaterialData(const StandardBSDFData data)
+{
+    RTXCR_HairMaterialData material;
+    material.baseColor = data.HairBaseColor();
+    material.longitudinalRoughness = max((float)data.HairLongitudinalRoughness(), 0.001f);
+    material.azimuthalRoughness = max((float)data.HairAzimuthalRoughness(), 0.001f);
+    material.ior = max((float)data.HairIor(), 1.001f);
+    material.eta = 1.0f / material.ior;
+    material.fresnelApproximation = 1;
+    material.absorptionModel = RTXCR_HairAbsorptionModel_Physics;
+    material.melanin = saturate((float)data.HairMelanin());
+    material.melaninRedness = saturate((float)data.HairMelaninRedness());
+    material.cuticleAngleInDegrees = (float)data.HairCuticleAngle();
+    return material;
+}
+
+RTXCR_HairInteractionSurface CausticaMakeHairInteraction(const ShadingData shadingData)
+{
+    RTXCR_HairInteractionSurface surface;
+    // RTXCR's local hair convention is X=strand tangent, Z=fiber normal.
+    surface.incidentRayDirection = float3(
+        dot(shadingData.V, shadingData.T),
+        dot(shadingData.V, shadingData.B),
+        dot(shadingData.V, shadingData.N));
+    surface.shadingNormal = float3(0.f, 0.f, 1.f);
+    surface.tangent = float3(1.f, 0.f, 0.f);
+    return surface;
+}
+
+float3 CausticaHairToLocal(const ShadingData shadingData, float3 direction)
+{
+    return float3(dot(direction, shadingData.T), dot(direction, shadingData.B), dot(direction, shadingData.N));
+}
+
+float3 CausticaHairFromLocal(const ShadingData shadingData, float3 direction)
+{
+    return shadingData.T * direction.x + shadingData.B * direction.y + shadingData.N * direction.z;
+}
+
+// Evaluate the same directional mixture PDF used by RTXCR_SampleChiangBsdf().
+// Keeping this separate from the BCSDF value is required for unbiased NEE/MIS.
+float CausticaHairChiangPdf(
+    const RTXCR_HairMaterialInteraction interaction, const float3 wi, const float3 wo)
+{
+    const float sinThetaO = wo.x;
+    const float cosThetaO = RTXCR_Sqrt01(1.f - sinThetaO * sinThetaO);
+    const float phiO = RTXCR_Atan2safe(wo.z, wo.y);
+    const float sinThetaI = wi.x;
+    const float cosThetaI = RTXCR_Sqrt01(1.f - sinThetaI * sinThetaI);
+    const float phiI = RTXCR_Atan2safe(wi.z, wi.y);
+    const float dphi = phiI - phiO;
+
+    float apPdf[RTXCR_Hair_Max_Scattering_Events + 1];
+    RTXCR_ComputeApPdf(interaction, cosThetaO, apPdf);
+
+    const float etap = RTXCR_Sqrt0(interaction.ior * interaction.ior - sinThetaO * sinThetaO) /
+        max(cosThetaO, 1e-6f);
+    const float sinGammaT = interaction.h / max(etap, 1e-6f);
+    const float gammaT = asin(clamp(sinGammaT, -1.f, 1.f));
+
+    float pdf = 0.f;
+    [unroll]
+    for (uint p = 0; p < RTXCR_Hair_Max_Scattering_Events; ++p)
+    {
+        float sinThetaIp;
+        float cosThetaIp;
+        if (p == 0)
+        {
+            sinThetaIp = sinThetaI * interaction.cos2kAlpha[1] - cosThetaI * interaction.sin2kAlpha[1];
+            cosThetaIp = cosThetaI * interaction.cos2kAlpha[1] + sinThetaI * interaction.sin2kAlpha[1];
+        }
+        else if (p == 1)
+        {
+            sinThetaIp = sinThetaI * interaction.cos2kAlpha[0] + cosThetaI * interaction.sin2kAlpha[0];
+            cosThetaIp = cosThetaI * interaction.cos2kAlpha[0] - sinThetaI * interaction.sin2kAlpha[0];
+        }
+        else
+        {
+            sinThetaIp = sinThetaI * interaction.cos2kAlpha[2] + cosThetaI * interaction.sin2kAlpha[2];
+            cosThetaIp = cosThetaI * interaction.cos2kAlpha[2] - sinThetaI * interaction.sin2kAlpha[2];
+        }
+
+        pdf += RTXCR_MP(abs(cosThetaIp), cosThetaO, sinThetaIp, sinThetaO, interaction.v[p]) *
+            apPdf[p] * RTXCR_NP(dphi, p, interaction.logisticDistributionScalar, interaction.gammaI, gammaT);
+    }
+
+    pdf += RTXCR_MP(cosThetaI, cosThetaO, sinThetaI, sinThetaO,
+        interaction.v[RTXCR_Hair_Max_Scattering_Events]) *
+        apPdf[RTXCR_Hair_Max_Scattering_Events] * RTXCR_ONE_OVER_TWO_PI;
+    return max(pdf, 0.f);
+}
+
+void CausticaEvalHair(
+    const StandardBSDFData data, const ShadingData shadingData, const float3 wo,
+    out float3 value, out float pdf, out float diffuseWeight)
+{
+    const RTXCR_HairMaterialData material = CausticaMakeHairMaterialData(data);
+    const RTXCR_HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
+    const float3 wiLocal = surface.incidentRayDirection;
+    const float3 woLocal = CausticaHairToLocal(shadingData, wo);
+    diffuseWeight = 0.f;
+
+    if (data.HairModel() == CausticaHairModel_Chiang)
+    {
+        const RTXCR_HairMaterialInteraction interaction = RTXCR_CreateHairMaterialInteraction(material, surface);
+        value = RTXCR_HairChiangBsdfEval(interaction, woLocal, wiLocal);
+        pdf = CausticaHairChiangPdf(interaction, woLocal, wiLocal);
+    }
+    else
+    {
+        const RTXCR_HairMaterialInteractionBcsdf interaction =
+            RTXCR_CreateHairMaterialInteractionBcsdf(
+                material, data.HairDiffuseReflectionTint(),
+                data.HairDiffuseReflectionWeight(), material.longitudinalRoughness);
+        float3 specular;
+        float3 diffuse;
+        RTXCR_HairFarFieldBcsdfEval(surface, interaction, woLocal, wiLocal, specular, diffuse, pdf);
+        value = specular + diffuse;
+        diffuseWeight = saturate((float)data.HairDiffuseReflectionWeight());
+    }
+}
 
 /** Implementation of Falcor's standard surface BSDF.
 
@@ -42,6 +169,15 @@ struct StandardBSDF // : IBSDF
 
     float4 eval(const ShadingData shadingData, const float3 wo)
     {
+        if (data.IsHair())
+        {
+            float3 value;
+            float pdf;
+            float diffuseWeight;
+            CausticaEvalHair(data, shadingData, wo, value, pdf, diffuseWeight);
+            return float4(value, Average(value) * (1.f - diffuseWeight));
+        }
+
         float3 wiLocal = shadingData.toLocal(shadingData.V);
         float3 woLocal = shadingData.toLocal(wo);
 
@@ -52,6 +188,52 @@ struct StandardBSDF // : IBSDF
 
     bool sample(const ShadingData shadingData, const float4 preGeneratedSamples, out BSDFSample result, bool useImportanceSampling)
     {
+        if (data.IsHair())
+        {
+            const RTXCR_HairMaterialData material = CausticaMakeHairMaterialData(data);
+            const RTXCR_HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
+            const float3 wiLocal = surface.incidentRayDirection;
+            float3 woLocal = 0.f;
+            float3 value = 0.f;
+            float pdf = 0.f;
+            bool valid = false;
+            if (data.HairModel() == CausticaHairModel_Chiang)
+            {
+                float2 u[2] = {
+                    preGeneratedSamples.xy,
+                    float2(preGeneratedSamples.z, frac(preGeneratedSamples.x + preGeneratedSamples.y * 0.61803398875f))
+                };
+                RTXCR_HairLobeType hairLobe;
+                const RTXCR_HairMaterialInteraction interaction = RTXCR_CreateHairMaterialInteraction(material, surface);
+                valid = RTXCR_SampleChiangBsdf(interaction, wiLocal, u, woLocal, pdf, value, hairLobe);
+            }
+            else
+            {
+                const RTXCR_HairMaterialInteractionBcsdf interaction =
+                    RTXCR_CreateHairMaterialInteractionBcsdf(
+                        material, data.HairDiffuseReflectionTint(),
+                        data.HairDiffuseReflectionWeight(), material.longitudinalRoughness);
+                float2 u[2] = {
+                    preGeneratedSamples.xy,
+                    float2(frac(preGeneratedSamples.y + preGeneratedSamples.z * 0.754877666f),
+                           frac(preGeneratedSamples.x * 0.569840296f + preGeneratedSamples.z))
+                };
+                float3 specular;
+                float3 diffuse;
+                const float h = 2.f * preGeneratedSamples.z - 1.f;
+                valid = RTXCR_SampleFarFieldBcsdf(surface, interaction, wiLocal, h,
+                    frac(preGeneratedSamples.x + preGeneratedSamples.y + preGeneratedSamples.z),
+                    u, woLocal, specular, diffuse, pdf);
+                value = specular + diffuse;
+            }
+            result.wo = CausticaHairFromLocal(shadingData, woLocal);
+            result.pdf = pdf;
+            result.weight = pdf > 0.f ? value / pdf : 0.f;
+            result.lobe = (uint)LobeType::SpecularReflection;
+            result.lobeP = 1.f;
+            return valid && pdf > 0.f && all(isfinite(result.weight));
+        }
+
         if (!useImportanceSampling) return sampleReference(shadingData, preGeneratedSamples, result);
 
         float3 wiLocal = shadingData.toLocal(shadingData.V);
@@ -70,6 +252,15 @@ struct StandardBSDF // : IBSDF
 
     float evalPdf(const ShadingData shadingData, const float3 wo, bool useImportanceSampling)
     {
+        if (data.IsHair())
+        {
+            float3 value;
+            float pdf;
+            float diffuseWeight;
+            CausticaEvalHair(data, shadingData, wo, value, pdf, diffuseWeight);
+            return max(pdf, 0.f);
+        }
+
         if (!useImportanceSampling) return evalPdfReference(shadingData, wo);
 
         float3 wiLocal = shadingData.toLocal(shadingData.V);
@@ -82,6 +273,13 @@ struct StandardBSDF // : IBSDF
 
     void estimateSpecDiffBSDF( out float3 outDiffEstimate, out float3 outSpecEstimate, const float3 normal, const float3 viewVector )
     {
+        if (data.IsHair())
+        {
+            const float diffuseWeight = saturate((float)data.HairDiffuseReflectionWeight());
+            outDiffEstimate = data.HairDiffuseReflectionTint() * diffuseWeight;
+            outSpecEstimate = data.HairBaseColor() * (1.f - diffuseWeight);
+            return;
+        }
     #if 1
         lpfloat dataRoughness = data.Roughness();
         float alpha = dataRoughness * dataRoughness;
@@ -147,6 +345,9 @@ struct StandardBSDF // : IBSDF
 
     uint getLobes(const ShadingData shadingData)
     {
+        if (data.IsHair())
+            return (uint)LobeType::SpecularReflection
+                | (data.HairDiffuseReflectionWeight() > 0.f ? (uint)LobeType::DiffuseReflection : 0u);
         return FalcorBSDF::getLobes(data);
     }
 
@@ -216,6 +417,13 @@ struct StandardBSDF // : IBSDF
 
     void evalDeltaLobes(const ShadingData shadingData, out DeltaLobe deltaLobes[cMaxDeltaLobes], out int deltaLobeCount, out float nonDeltaPart)
     {
+        if (data.IsHair())
+        {
+            [unroll] for (uint i = 0; i < cMaxDeltaLobes; ++i) deltaLobes[i] = DeltaLobe::make();
+            deltaLobeCount = 0;
+            nonDeltaPart = 1.f;
+            return;
+        }
         float3 wiLocal = shadingData.toLocal(shadingData.V);
         
         FalcorBSDF bsdf = FalcorBSDF::make(shadingData, data); 

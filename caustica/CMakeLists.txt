@@ -99,6 +99,8 @@ set(caustica_pt_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/caustica/shaders")
 file(GLOB_RECURSE caustica_pt_shader_sources
     "${caustica_pt_shader_dir}/PathTracer*.hlsl"
     "${caustica_pt_shader_dir}/PathTracer*.hlsli"
+    "${caustica_pt_shader_dir}/HairGeometry.hlsli"
+    "${caustica_pt_shader_dir}/ThirdParty/RTXCR/*.hlsli"
 )
 set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
 

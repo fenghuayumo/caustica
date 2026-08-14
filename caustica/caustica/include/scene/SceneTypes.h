@@ -125,6 +125,12 @@ namespace caustica
         bool enableHair = false;
         struct HairParams
         {
+            enum class Model : uint32_t
+            {
+                FarField = 0,
+                Chiang = 1,
+            };
+
             dm::float3 baseColor = 1.0f;
             float melanin = 0.5f;
             float melaninRedness = 0.5f;
@@ -134,6 +140,7 @@ namespace caustica
             dm::float3 diffuseReflectionTint = 0.0f;
             float ior = 1.55f;
             float cuticleAngle = 3.0f;
+            Model model = Model::FarField;
         } hair;
 
         // Toggles for the textures. Only effective if the corresponding texture is non-null.

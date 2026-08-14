@@ -23,12 +23,14 @@
 
 #include "Libraries/MicroRng.hlsli"
 #include "HybridGaussianShadow.hlsli"
+#include "HairGeometry.hlsli"
 
 
 #if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // build
 #if PT_USE_RESTIR_GI || PT_USE_RESTIR_DI || PT_USE_RESTIR_PT
 #define EXPORT_GBUFFER 1
 #endif
+
 #endif
 
 #if EXPORT_GBUFFER
@@ -204,6 +206,10 @@ BridgeGeometrySample getGeometryFromHit(
 
     float3 objectSpaceFlatNormal = SafeNormalize(cross(vBA, vCA));
 
+    float3 objectVertexNormals[3] = {
+        objectSpaceFlatNormal, objectSpaceFlatNormal, objectSpaceFlatNormal
+    };
+
 
     if ((attributes & GeomAttr_Normal) && gs.geometry.normalOffset != ~0u)
     {
@@ -211,6 +217,7 @@ BridgeGeometrySample getGeometryFromHit(
         normals[0] = normalize(Unpack_RGB8_SNORM(vertexBuffer.Load(gs.geometry.normalOffset + indices[0] * c_SizeOfNormal)));
         normals[1] = normalize(Unpack_RGB8_SNORM(vertexBuffer.Load(gs.geometry.normalOffset + indices[1] * c_SizeOfNormal)));
         normals[2] = normalize(Unpack_RGB8_SNORM(vertexBuffer.Load(gs.geometry.normalOffset + indices[2] * c_SizeOfNormal)));
+        objectVertexNormals = normals;
 
 		// we want the geometry normal to be on the same hemisphere as the triangle normal (should be guaranteed on tools side, but isn't always)
         normals[0] = FlipIfOpposite(normals[0], objectSpaceFlatNormal);
@@ -241,6 +248,25 @@ BridgeGeometrySample getGeometryFromHit(
     }
 
     gs.flatNormal   = SafeNormalize(mul(gs.instance.transform, float4(objectSpaceFlatNormal, 0.0)).xyz);
+
+    if (gs.instance.IsCurveDOTS() && gs.geometry.curveRadiusOffset != ~0u)
+    {
+        const float radius0 = asfloat(vertexBuffer.Load(gs.geometry.curveRadiusOffset + indices[0] * c_SizeOfCurveRadius));
+        const float radius1 = asfloat(vertexBuffer.Load(gs.geometry.curveRadiusOffset + indices[2] * c_SizeOfCurveRadius));
+        const float3 center0 = gs.vertexPositions[0] - radius0 * objectVertexNormals[0];
+        const float3 center1 = gs.vertexPositions[2] - radius1 * objectVertexNormals[2];
+        const float3 center0W = mul(gs.instance.transform, float4(center0, 1.f)).xyz;
+        const float3 center1W = mul(gs.instance.transform, float4(center1, 1.f)).xyz;
+        const float radius0W = length(mul(gs.instance.transform, float4(objectVertexNormals[0] * radius0, 0.f)).xyz);
+        const float radius1W = length(mul(gs.instance.transform, float4(objectVertexNormals[2] * radius1, 0.f)).xyz);
+        const float3 hitPositionW = mul(gs.instance.transform, float4(gs.objectSpacePosition, 1.f)).xyz;
+        const float rayBackstep = max(max(radius0W, radius1W) * 4.f, 1e-3f);
+        const float3 curveNormal = CausticaAdjustDotsNormal(
+            hitPositionW - rayDirection * rayBackstep, rayDirection,
+            center0W, center1W, radius0W, radius1W, gs.flatNormal);
+        gs.geometryNormal = curveNormal;
+        gs.flatNormal = curveNormal;
+    }
 
     gs.frontFacing  = dot( -rayDirection, gs.flatNormal ) >= 0.0;
 
@@ -739,6 +765,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     MaterialProperties bridgeMaterial = sampleGeometryStandardMaterial(bridgeGS, materialIndex, MatAttr_All, s_MaterialSampler, textureSampler);
 
     bool ignoreTangent = (bridgeMaterial.flags & StandardMaterialFlags_IgnoreMeshTangentSpace) != 0;
+    const bool isHairMaterial = (bridgeMaterial.flags & StandardMaterialFlags_Hair) != 0;
 
     // after this point we have valid tangent space in ptShadingData.N/.T/.B using geometry (interpolated) normal, but without normalmap yet
     computeTangentSpace(ptShadingData, bridgeGS.tangent, ignoreTangent);
@@ -749,6 +776,14 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.frontFacing = bridgeGS.frontFacing;
 
     ptShadingData.N = (bridgeGS.frontFacing)?(bridgeMaterial.shadingNormal):(-bridgeMaterial.shadingNormal);
+    if (isHairMaterial)
+    {
+        // Hair BCSDF uses T as the strand axis. Build the fiber frame after the
+        // two-sided normal has been selected so front/back hits agree.
+        ptShadingData.T = normalize(bridgeGS.tangent.xyz
+            - ptShadingData.N * dot(bridgeGS.tangent.xyz, ptShadingData.N));
+        ptShadingData.B = normalize(cross(ptShadingData.N, ptShadingData.T));
+    }
 
     // Engine -> RTXPT
     const bool bridgeMaterialThinSurface = (bridgeMaterial.flags & StandardMaterialFlags_ThinSurface) != 0;
@@ -785,7 +820,8 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
 
     // Helper function to adjust the shading normal to reduce black pixels due to back-facing view direction. Note: This breaks the reciprocity of the BSDF!
     // This also reorthonormalizes the frame based on the normal map, which is necessary (see `ptShadingData.N = bridgeMaterial.shadingNormal;` line above)
-    adjustShadingNormal( ptShadingData, bridgeGS.tangent, true, ignoreTangent );
+    if (!isHairMaterial)
+        adjustShadingNormal( ptShadingData, bridgeGS.tangent, true, ignoreTangent );
     // ^^ this should be part of material processing code
 
     // The common case has no coat normal map. Reuse the base frame verbatim so
@@ -941,6 +977,17 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
             bridgeMaterial.subsurfaceWeight, bridgeMaterial.subsurfaceColor,
             bridgeMaterial.thinFilmWeight, bridgeMaterial.thinFilmThickness, bridgeMaterial.thinFilmIor,
             bridgeMaterial.transmissionDispersionScale, bridgeMaterial.transmissionDispersionAbbeNumber ) );
+
+    if ((bridgeMaterial.flags & StandardMaterialFlags_Hair) != 0)
+    {
+        const StandardMaterialData hairMaterial = t_StandardMaterialData[materialIndex];
+        bsdf.data.SetHair(
+            hairMaterial.HairModel, (lpfloat3)hairMaterial.HairBaseColor, (lpfloat3)hairMaterial.HairDiffuseReflectionTint,
+            (lpfloat)hairMaterial.HairMelanin, (lpfloat)hairMaterial.HairMelaninRedness,
+            (lpfloat)hairMaterial.HairLongitudinalRoughness, (lpfloat)hairMaterial.HairAzimuthalRoughness,
+            (lpfloat)hairMaterial.HairIor, (lpfloat)hairMaterial.HairCuticleAngle,
+            (lpfloat)hairMaterial.HairDiffuseReflectionWeight);
+    }
 
     // if you think tangent space is broken, test with this (won't make it correctly oriented)
     //ConstructONB( ptShadingData.N, ptShadingData.T, ptShadingData.B );

@@ -68,8 +68,8 @@ def configure_import_path() -> None:
 
 
 # Keep in sync with sizeof(StandardMaterialData) in
-# caustica/shaders/PathTracer/Materials/StandardMaterial.h (17 x 16 bytes).
-STANDARD_MATERIAL_DATA_BYTES = "288"
+# caustica/shaders/PathTracer/Materials/StandardMaterial.h (22 x 16 bytes).
+STANDARD_MATERIAL_DATA_BYTES = "352"
 
 
 def tier_macros(tier: int) -> list[tuple[str, str]]:

@@ -878,6 +878,44 @@ struct StandardBSDFData
         return d;
     }
 
+    void SetHair(
+        uint model, lpfloat3 baseColor, lpfloat3 diffuseReflectionTint,
+        lpfloat melanin, lpfloat melaninRedness, lpfloat longitudinalRoughness,
+        lpfloat azimuthalRoughness, lpfloat ior, lpfloat cuticleAngle,
+        lpfloat diffuseReflectionWeight)
+    {
+        // Thin-film weight is non-negative on regular materials. A negative
+        // value is therefore a compact hair tag carrying model + 1.
+        _thinFilmWeight = -(lpfloat(model) + lpfloat(1.f));
+#if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
+        _diffuse_roughness = Fp32ToFp16(float4(baseColor, longitudinalRoughness));
+        _specular_metallic = Fp32ToFp16(float4(diffuseReflectionTint, melanin));
+        _transmission_eta = Fp32ToFp16(float4(0.f, 0.f, 0.f, ior));
+#else
+        _diffuse = baseColor;
+        _specular = diffuseReflectionTint;
+        _metallic = melanin;
+        _roughness = longitudinalRoughness;
+        _eta = ior;
+#endif
+        _anisotropy = melaninRedness;
+        _baseDiffuseRoughness = azimuthalRoughness;
+        _coatDarkening = cuticleAngle;
+        _specularWeight = diffuseReflectionWeight;
+    }
+
+    bool        IsHair                  ()  { return _thinFilmWeight < lpfloat(0.f); }
+    uint        HairModel               ()  { return uint(-_thinFilmWeight - lpfloat(1.f)); }
+    lpfloat3    HairBaseColor           ()  { return Diffuse(); }
+    lpfloat3    HairDiffuseReflectionTint() { return Specular(); }
+    lpfloat     HairMelanin             ()  { return Metallic(); }
+    lpfloat     HairMelaninRedness      ()  { return _anisotropy; }
+    lpfloat     HairLongitudinalRoughness() { return Roughness(); }
+    lpfloat     HairAzimuthalRoughness  ()  { return _baseDiffuseRoughness; }
+    lpfloat     HairIor                 ()  { return Eta(); }
+    lpfloat     HairCuticleAngle        ()  { return _coatDarkening; }
+    lpfloat     HairDiffuseReflectionWeight() { return _specularWeight; }
+
 #if CAUSTICA_STANDARD_BSDF_DATA_MANUAL_PACK
     lpfloat3    Diffuse             ()  { float4 val = Fp16ToFp32(_diffuse_roughness); return (lpfloat3)val.xyz; }
     lpfloat     Roughness           ()  { float4 val = Fp16ToFp32(_diffuse_roughness); return (lpfloat)val.w; }

@@ -6,6 +6,7 @@
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneAnimationAccess.h>
+#include <scene/HairDots.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -500,6 +501,31 @@ static int cgltf_parse_json_hair(cgltf_options* options, jsmntok_t const* tokens
     return i;
 }
 
+static caustica::Material::HairParams::Model cgltf_parse_json_hair_model(
+    jsmntok_t const* tokens, int i, const uint8_t* json_chunk)
+{
+    if (tokens[i].type != JSMN_OBJECT)
+        return caustica::Material::HairParams::Model::FarField;
+    const int size = tokens[i].size;
+    ++i;
+    for (int j = 0; j < size; ++j)
+    {
+        if (cgltf_json_strcmp(tokens + i, json_chunk, "model") == 0)
+        {
+            const jsmntok_t& value = tokens[i + 1];
+            const size_t length = size_t(value.end - value.start);
+            const std::string model(reinterpret_cast<const char*>(json_chunk + value.start), length);
+            return model == "Chiang" || model == "chiang"
+                ? caustica::Material::HairParams::Model::Chiang
+                : caustica::Material::HairParams::Model::FarField;
+        }
+        i = cgltf_skip_json(tokens, i + 1);
+        if (i < 0)
+            break;
+    }
+    return caustica::Material::HairParams::Model::FarField;
+}
+
 // Add support for subsurface scattering and hair in glTF
 // Note: SSS and Hair can't be set at the same time on the same material
 static const void ParseMaterialExtensions(cgltf_options* options, const cgltf_material* material, Material* matInfo)
@@ -565,8 +591,24 @@ static const void ParseMaterialExtensions(cgltf_options* options, const cgltf_ma
         else if (strcmp(ext.name, "NV_materials_hair") == 0)
         {
             matInfo->enableHair = true;
+            // Seed the extension parser with engine defaults so omitted optional
+            // properties do not silently become zero-valued invalid parameters.
             cgltf_hair gltf_hair = {};
+            gltf_hair.base_color[0] = matInfo->hair.baseColor.x;
+            gltf_hair.base_color[1] = matInfo->hair.baseColor.y;
+            gltf_hair.base_color[2] = matInfo->hair.baseColor.z;
+            gltf_hair.melanin = matInfo->hair.melanin;
+            gltf_hair.melaninRedness = matInfo->hair.melaninRedness;
+            gltf_hair.longitudinalRoughness = matInfo->hair.longitudinalRoughness;
+            gltf_hair.azimuthalRoughness = matInfo->hair.azimuthalRoughness;
+            gltf_hair.ior = matInfo->hair.ior;
+            gltf_hair.cuticleAngle = matInfo->hair.cuticleAngle;
+            gltf_hair.diffuseReflectionWeight = matInfo->hair.diffuseReflectionWeight;
+            gltf_hair.diffuse_reflection_tint[0] = matInfo->hair.diffuseReflectionTint.x;
+            gltf_hair.diffuse_reflection_tint[1] = matInfo->hair.diffuseReflectionTint.y;
+            gltf_hair.diffuse_reflection_tint[2] = matInfo->hair.diffuseReflectionTint.z;
             cgltf_parse_json_hair(options, tokens, k, json_chunk, &gltf_hair);
+            matInfo->hair.model = cgltf_parse_json_hair_model(tokens, k, json_chunk);
 
             matInfo->hair.baseColor = { gltf_hair.base_color[0], gltf_hair.base_color[1], gltf_hair.base_color[2] };
             matInfo->hair.melanin = gltf_hair.melanin;
@@ -1664,6 +1706,76 @@ bool GltfImporter::load(
                 }
             }
         }
+    }
+
+    // Static hair path: glTF line primitives with a _RADIUS attribute are
+    // expanded once on import into RTXCR DOTS triangles. The resulting mesh
+    // uses the regular triangle BLAS/SBT path while retaining strand tangent
+    // and radius for cylindrical hit shading.
+    for (const std::shared_ptr<MeshInfo>& mesh : meshes)
+    {
+        if (!mesh || mesh->type != MeshType::CurvePolytubes || !mesh->buffers)
+            continue;
+
+        bool hasOnlyCurves = !mesh->geometries.empty();
+        for (const auto& geometry : mesh->geometries)
+            hasOnlyCurves &= geometry && geometry->type != MeshGeometryPrimitiveType::Triangles;
+        if (!hasOnlyCurves)
+        {
+            caustica::warning("Mesh '%s' mixes curve and triangle primitives; static DOTS conversion was skipped.", mesh->name.c_str());
+            continue;
+        }
+
+        const std::shared_ptr<BufferGroup> source = mesh->buffers;
+        auto dots = std::make_shared<BufferGroup>();
+        dm::box3 meshBounds = dm::box3::empty();
+        uint32_t outputOffset = 0;
+
+        for (const std::shared_ptr<MeshGeometry>& geometry : mesh->geometries)
+        {
+            const uint32_t indexStep = geometry->type == MeshGeometryPrimitiveType::Lines ? 2u : 1u;
+            std::vector<hair::StrandSegment> segments;
+            segments.reserve(geometry->numIndices / indexStep);
+            const uint32_t sourceIndexBase = mesh->indexOffset + geometry->indexOffsetInMesh;
+            const uint32_t sourceVertexBase = mesh->vertexOffset + geometry->vertexOffsetInMesh;
+
+            for (uint32_t i = 0; i + 1 < geometry->numIndices; i += indexStep)
+            {
+                const uint32_t local0 = source->indexData[sourceIndexBase + i];
+                const uint32_t local1 = source->indexData[sourceIndexBase + i + 1];
+                const uint32_t vertex0 = sourceVertexBase + local0;
+                const uint32_t vertex1 = sourceVertexBase + local1;
+                hair::StrandSegment segment;
+                segment.vertices[0].position = source->positionData[vertex0];
+                segment.vertices[1].position = source->positionData[vertex1];
+                segment.vertices[0].radius = source->radiusData.empty() ? 0.001f : source->radiusData[vertex0];
+                segment.vertices[1].radius = source->radiusData.empty() ? 0.001f : source->radiusData[vertex1];
+                segment.vertices[0].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex0];
+                segment.vertices[1].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex1];
+                segments.push_back(segment);
+            }
+
+            const uint32_t geometryVertexCount = uint32_t(segments.size()) * 12u;
+            hair::appendStaticDots(segments, *dots, outputOffset);
+            geometry->indexOffsetInMesh = outputOffset;
+            geometry->vertexOffsetInMesh = outputOffset;
+            geometry->numIndices = geometryVertexCount;
+            geometry->numVertices = geometryVertexCount;
+            geometry->type = MeshGeometryPrimitiveType::Triangles;
+            geometry->objectSpaceBounds = dm::box3::empty();
+            for (uint32_t vertex = outputOffset; vertex < outputOffset + geometryVertexCount; ++vertex)
+                geometry->objectSpaceBounds |= dots->positionData[vertex];
+            meshBounds |= geometry->objectSpaceBounds;
+            outputOffset += geometryVertexCount;
+        }
+
+        mesh->buffers = std::move(dots);
+        mesh->type = MeshType::CurveDisjointOrthogonalTriangleStrips;
+        mesh->indexOffset = 0;
+        mesh->vertexOffset = 0;
+        mesh->totalIndices = outputOffset;
+        mesh->totalVertices = outputOffset;
+        mesh->objectSpaceBounds = meshBounds;
     }
 
     std::unordered_map<const cgltf_camera*, scene::CameraComponent> cameraMap;

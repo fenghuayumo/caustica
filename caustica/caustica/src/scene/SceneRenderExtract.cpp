@@ -535,6 +535,8 @@ void ExtractMaterialSnapshots(
         snapshot.enableOpacityTexture = material->enableOpacityTexture;
         snapshot.doubleSided = material->doubleSided;
         snapshot.metalnessInRedChannel = material->metalnessInRedChannel;
+        snapshot.enableHair = material->enableHair;
+        snapshot.hair = material->hair;
         material->fillConstantBuffer(snapshot.constants, false);
         material->fillConstantBuffer(snapshot.bindlessConstants, true);
         out.materialSnapshotIndex.emplace(
