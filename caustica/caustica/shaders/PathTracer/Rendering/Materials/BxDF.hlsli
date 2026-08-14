@@ -1087,17 +1087,14 @@ struct FalcorBSDF // : IBxDF
             * saturate(fuzzReflection.color) * fuzzReflection.directionalAlbedo(coatNdotV);
         float3 fuzzBaseAtten = lerp(fuzzBaseAttenBase, fuzzBaseAttenCoat, coatWeight);
 
-        // Thick-surface subsurface energy is evaluated spatially by the RTXCR
-        // BSSRDF path. Keep the local diffuse lobe only for the unscattered
-        // fraction. Thin surfaces retain the OpenPBR diffuse approximation.
+        // RTXCR replaces direct diffuse lighting with its spatial BSSRDF, but
+        // keeps the textured diffuse lobe for subsequent indirect sampling.
+        // The normalized direct-light split is applied by the NEE path.
         float sssW = saturate(data.SubsurfaceWeight()) * (1.f - data.Metallic()) * (1.f - data.SpecularTransmission());
-        // RTXCR's character preset normalizes diffusion and base microfacet
-        // reflection to equal weights. Interpolate that split by the authored
-        // OpenPBR subsurface weight, and leave thin-surface approximation alone.
-        subsurfaceSpecularScale = isThinSurface ? 1.f : lerp(1.f, 0.5f, sssW);
+        subsurfaceSpecularScale = 1.f;
         float3 baseDiffuse = isThinSurface
             ? lerp(data.Diffuse(), data.Diffuse() * data.SubsurfaceColor(), sssW)
-            : data.Diffuse() * (1.f - sssW);
+            : data.Diffuse();
         // Non-reciprocal albedo scaling for the dielectric interface. This is
         // the OpenPBR/Standard-Surface mixture approximation and is essential
         // for white-furnace energy conservation of glossy diffuse materials.
@@ -1340,6 +1337,18 @@ struct FalcorBSDF // : IBxDF
         if (pCoatReflection > 0.f) specular += coatWeight * coatReflection.eval(toCoatLocal(wi), toCoatLocal(wo));
 
         return float4(diffuse+specular, Average(specular)); // use average instead of sum to avoid hitting fp16 ceiling early
+    }
+
+    float3 evalSpecularOnly(const float3 wi, const float3 wo)
+    {
+        float3 specular = 0.f;
+        if (pSpecularReflection > 0.f) specular += (1.f - specTrans)
+            * specularReflection.eval(wi, wo);
+        if (pSpecularReflectionTransmission > 0.f) specular += specTrans
+            * specularReflectionTransmission.eval(wi, wo);
+        if (pCoatReflection > 0.f) specular += coatWeight
+            * coatReflection.eval(toCoatLocal(wi), toCoatLocal(wo));
+        return specular;
     }
 
     bool sample(const float3 wi, out float3 wo, out float pdf, out float3 weight, out uint lobe, out float lobeP, 

@@ -1542,12 +1542,32 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
 
     standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
     standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);
-    // RTXCR's zero-roughness character lens is a neutral unit-transmission
-    // visibility layer (eta = 1): it neither refracts, absorbs, reflects nor
-    // casts a shadow. Caustica's regular delta-transmission path still changes
-    // path classification and can lose energy after the two lens interfaces,
-    // so omitting this exact ideal layer from the TLAS is the equivalent result.
-    // Any rough or partially transmissive glass keeps the regular OpenPBR path.
+    const bool isRtxcrEyeCornea = material.debugName == "eye_cornea"
+        && standardMaterial->enableTransmission
+        && material.transmissionFactor >= 0.999f;
+    if (isRtxcrEyeCornea)
+    {
+        // RTXCR writes zero roughness for the cornea in its denoiser G-buffer
+        // so temporal/spatial reconstruction follows the transmitted eye
+        // surface instead of treating the uniform cornea as the guide. Caustica
+        // currently shares the BSDF roughness with stable-plane decomposition,
+        // so use the corresponding delta interface and make transmission the
+        // dominant guide branch. This preserves the textured sclera/iris at
+        // practical sample counts instead of denoising them into a grey patch.
+        standardMaterial->roughness = 0.0f;
+        standardMaterial->baseDiffuseRoughness = 0.0f;
+        // Keep the authored cornea as a closed dielectric. RTXCR follows the
+        // entry/exit interfaces and the resulting refraction magnifies the
+        // iris; treating it as a thin straight-through sheet makes the iris
+        // look too small and flat.
+        standardMaterial->thinSurface = false;
+        standardMaterial->psdExclude = false;
+        standardMaterial->psdDominantDeltaLobe = 0;
+    }
+
+    // RTXCR keeps Claire's smooth spectacle lens in primary/refraction rays
+    // but excludes it from shadow rays. Model the double-sided lens mesh as an
+    // ideal thin interface so it does not become a stack of nested volumes.
     const bool isRtxcrCharacterLens = standardMaterial->modelName == "glass_lens"
         || material.debugName == "glass_lens_mtl";
     const bool rtxcrIdealLens = isRtxcrCharacterLens
@@ -1557,9 +1577,12 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->excludeFromNEE = rtxcrIdealLens;
     if (rtxcrIdealLens)
     {
-        standardMaterial->IoR = 1.0f;
+        standardMaterial->roughness = 0.0f;
+        standardMaterial->baseDiffuseRoughness = 0.0f;
         standardMaterial->thinSurface = true;
-        standardMaterial->skipRender = true;
+        standardMaterial->psdExclude = false;
+        standardMaterial->psdDominantDeltaLobe = 0;
+        standardMaterial->skipRender = false;
     }
 
     return standardMaterial;

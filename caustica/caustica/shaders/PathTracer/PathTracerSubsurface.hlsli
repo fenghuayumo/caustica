@@ -33,20 +33,23 @@ inline void CausticaMakeSubsurfaceMaterial(
     material.g = clamp((float)bsdf.data.SubsurfaceAnisotropy(), -0.99f, 0.99f);
 }
 
-inline float CausticaSubsurfaceMaxRadius(const RTXCR_SubsurfaceMaterialData material)
+inline float CausticaSubsurfaceMaxRadius(
+    const RTXCR_SubsurfaceMaterialData material,
+    const bool isRtxcrEyePath, const float roughness)
 {
+    // Match RTXCR's character integrator. Once a path has crossed a
+    // transmissive material, keep facial skin samples local and make the
+    // rough eye-choroid/sclera material almost local. Without this branch the
+    // one-unit skin radius smears the iris over the sclera and over-darkens
+    // skin beneath the glasses.
+    if (isRtxcrEyePath)
+        return roughness >= 1.0f ? 1e-2f : 0.4f;
+
     const float fittedRadius = 8.0f * SSS_METERS_UNIT
         * material.scale * CausticaMax3(material.scatteringColor);
     // Match the RTXCR character demo's one-world-unit projection bound so
     // large imported scale values do not smear across facial features.
     return clamp(fittedRadius, 1e-4f, 1.0f);
-}
-
-inline float CausticaSubsurfaceMaxInteriorDistance(const float maxRadius)
-{
-    // Projection uses an eight-radius disk; transmission needs more room to
-    // cross a closed head/limb mesh from oblique incident directions.
-    return 8.0f * maxRadius;
 }
 
 inline bool CausticaSampleGlobalLight(
@@ -143,7 +146,8 @@ inline float3 CausticaSubsurfaceVisibility(
 
 inline bool CausticaLoadSubsurfaceHit(
     const RayDesc ray, const bool cullBackFaces,
-    const uint initialInstanceIndex, const uint initialMaterialID,
+    const uint initialInstanceIndex, const uint initialGeometryIndex,
+    const bool requireSameGeometry, const uint initialMaterialID,
     const PathState path, const WorkingContext workingContext,
     out SurfaceData surface, out float hitT)
 {
@@ -151,6 +155,9 @@ inline bool CausticaLoadSubsurfaceHit(
     if (!Bridge::traceSubsurfaceRay(ray, cullBackFaces, triangleHit, hitT))
         return false;
     if (triangleHit.instanceID.getInstanceIndex() != initialInstanceIndex)
+        return false;
+    if (requireSameGeometry
+        && triangleHit.instanceID.getGeometryIndex() != initialGeometryIndex)
         return false;
 
     surface = Bridge::loadSurface(triangleHit, ray.Direction, path.rayCone,
@@ -160,7 +167,8 @@ inline bool CausticaLoadSubsurfaceHit(
 
 inline float3 CausticaEvaluateBurleyDiffusion(
     const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
-    const uint instanceIndex, const RTXCR_SubsurfaceMaterialData material,
+    const uint instanceIndex, const uint geometryIndex,
+    const RTXCR_SubsurfaceMaterialData material,
     const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
     const WorkingContext workingContext)
 {
@@ -195,15 +203,21 @@ inline float3 CausticaEvaluateBurleyDiffusion(
     projectionRay.Origin = subsurfaceSample.samplePosition;
     projectionRay.Direction = -interaction.normal;
     projectionRay.TMin = 0.0f;
-    projectionRay.TMax = 2.0f * maxRadius;
+    // The diffusion radius bounds the tangent-plane sample, not the distance
+    // needed to project that sample back onto a curved surface. RTXCR traces
+    // this ray without a radius-derived limit. In particular, its 0.01 eye
+    // radius would otherwise leave only a 0.02 projection ray, causing most
+    // sclera samples to miss the eyeball and return black.
+    projectionRay.TMax = kMaxSceneDistance;
 
     SurfaceData sampleSurface;
     float projectionT;
-    // Imported meshes are not guaranteed to share DXR's front-face winding.
-    // The closest hit is selected from outside the surface, then constrained to
-    // the originating instance and material, so face culling is unnecessary.
-    if (!CausticaLoadSubsurfaceHit(projectionRay, false, instanceIndex,
-        shadingData.materialID, path, workingContext, sampleSurface, projectionT))
+    // RTXCR only accepts the front face of the exact geometry from which the
+    // diffusion sample originated. Comparing just the material lets adjacent
+    // eyelid/socket primitives sharing one skin material leak into each other.
+    if (!CausticaLoadSubsurfaceHit(projectionRay, true, instanceIndex,
+        geometryIndex, true, shadingData.materialID, path, workingContext,
+        sampleSurface, projectionT))
         return 0.0f;
 
     LightSample lightSample;
@@ -225,14 +239,12 @@ inline float3 CausticaEvaluateBurleyDiffusion(
 inline float3 CausticaEvaluateSingleScatteringTransmission(
     const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
     const uint instanceIndex, const RTXCR_SubsurfaceMaterialData material,
-    const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
-    const WorkingContext workingContext)
+    inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
 {
     const RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
         shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
     const RTXCR_SubsurfaceMaterialCoefficients coefficients =
         RTXCR_ComputeSubsurfaceMaterialCoefficients(material);
-    const float maxInteriorDistance = CausticaSubsurfaceMaxInteriorDistance(maxRadius);
     const float3 refractedDirection = RTXCR_CalculateRefractionRay(
         interaction, sampleNext2D(sampleGenerator));
 
@@ -240,12 +252,17 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
     transmissionRay.Origin = shadingData.computeNewRayOrigin(false);
     transmissionRay.Direction = refractedDirection;
     transmissionRay.TMin = 0.0f;
-    transmissionRay.TMax = maxInteriorDistance;
+    // RTXCR traces through the complete closed object. The surface diffusion
+    // radius is unrelated to its thickness: coupling the two reduced the
+    // 0.01-radius sclera path to a 0.08 interior ray, so it almost never found
+    // the back of the eyeball and lost all transmission energy.
+    transmissionRay.TMax = kMaxSceneDistance;
 
     SurfaceData exitSurface;
     float thickness;
     if (!CausticaLoadSubsurfaceHit(transmissionRay, false, instanceIndex,
-        shadingData.materialID, path, workingContext, exitSurface, thickness))
+        0u, false, shadingData.materialID, path, workingContext,
+        exitSurface, thickness))
         return 0.0f;
 
     const float3 exitOutwardNormal = -exitSurface.shadingData.N;
@@ -267,10 +284,10 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
         radiance += boundaryLight.Li * visibility * boundary * RTXCR_PI;
     }
 
-    // One uniform distance sample along the transmitted segment. The HG phase
-    // function is importance sampled, so its phase/pdf ratio cancels.
-    const float distanceSample = thickness * clamp(
-        sampleNext1D(sampleGenerator), 1e-4f, 1.0f - 1e-4f);
+    // RTXCR's default is one evenly spaced interior sample, i.e. the midpoint
+    // for a single sample. The HG phase function is importance sampled, so its
+    // phase/pdf ratio cancels.
+    const float distanceSample = 0.5f * thickness;
     const float3 scatteringPosition = transmissionRay.Origin
         + refractedDirection * distanceSample;
     const float3 scatteringDirection = RTXCR_SampleDirectionHenyeyGreenstein(
@@ -280,12 +297,12 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
     scatteringRay.Origin = scatteringPosition;
     scatteringRay.Direction = scatteringDirection;
     scatteringRay.TMin = 1e-5f;
-    scatteringRay.TMax = maxInteriorDistance;
+    scatteringRay.TMax = kMaxSceneDistance;
 
     SurfaceData scatteringExitSurface;
     float scatteringExitT;
     if (CausticaLoadSubsurfaceHit(scatteringRay, false, instanceIndex,
-        shadingData.materialID, path, workingContext,
+        0u, false, shadingData.materialID, path, workingContext,
         scatteringExitSurface, scatteringExitT))
     {
         const float3 scatteringExitNormal = -scatteringExitSurface.shadingData.N;
@@ -311,7 +328,8 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
 
 inline float3 HandleSubsurfaceNEE(
     const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
-    const uint instanceIndex, inout UniformSampleSequenceGenerator sampleGenerator,
+    const uint instanceIndex, const uint geometryIndex,
+    inout UniformSampleSequenceGenerator sampleGenerator,
     const WorkingContext workingContext)
 {
     const float weight = CausticaSubsurfaceWeight(bsdf);
@@ -322,15 +340,25 @@ inline float3 HandleSubsurfaceNEE(
     CausticaMakeSubsurfaceMaterial(bsdf, material);
     if (!any(material.transmissionColor > 1e-4f))
         return 0.0f;
-    const float maxRadius = CausticaSubsurfaceMaxRadius(material);
+    const float maxRadius = CausticaSubsurfaceMaxRadius(material,
+        path.hasFlag(PathFlags::rtxcrEyePath), (float)bsdf.data.Roughness());
     float3 radiance = CausticaEvaluateBurleyDiffusion(path, shadingData, bsdf,
-        instanceIndex, material, maxRadius, sampleGenerator, workingContext);
+        instanceIndex, geometryIndex, material, maxRadius,
+        sampleGenerator, workingContext);
     radiance += CausticaEvaluateSingleScatteringTransmission(path, shadingData, bsdf,
-        instanceIndex, material, maxRadius, sampleGenerator, workingContext);
+        instanceIndex, material, sampleGenerator, workingContext);
     // RTXCR's character preset normalizes the diffusion and microfacet UI
     // weights to 0.5/0.5. The matching microfacet factor is applied while the
     // BSDF is assembled; keep the spatial component on the other half here.
     return path.GetThp() * max(radiance, 0.0f) * (0.5f * weight);
+}
+
+inline bool CausticaIsSubsurfaceSurface(
+    const ShadingData shadingData, const ActiveBSDF bsdf)
+{
+    return CausticaSubsurfaceWeight(bsdf) > 0.0f
+        && !shadingData.mtl.isThinSurface()
+        && !bsdf.data.IsHair();
 }
 
 #endif

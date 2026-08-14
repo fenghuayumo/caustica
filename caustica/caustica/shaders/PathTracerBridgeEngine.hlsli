@@ -1236,7 +1236,11 @@ bool Bridge::AlphaTestVisibilityRay(uint instanceID, uint instanceIndex, uint ge
 float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug)
 {
     CAUSTICA_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, 0xff, ray);
+    // Match RTXCR's default character path: shadow rays only test front faces.
+    // Closed thin geometry such as spectacle rims otherwise contributes both
+    // sides to visibility and produces the unnaturally dense bands visible on
+    // the cheeks and lower eyelids.
+    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xff, ray);
 
     float3 transmittance = float3(1, 1, 1);
     uint insideTransparentMaterialID = 0xFFFFFFFFu;
@@ -1266,6 +1270,13 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
 
                     if (IsTransparentShadowMaterial(material))
                     {
+                        // RTXCR assigns perfectly smooth transmissive meshes
+                        // (Claire's spectacle lenses) to an instance mask that
+                        // shadow rays do not trace. Preserve that behavior here
+                        // instead of darkening the face once per lens boundary.
+                        if (material.Roughness <= 1e-4f)
+                            continue;
+
                         const float candidateRayT = rayQuery.CandidateTriangleRayT();
                         transmittance *= ComputeTransparentShadowSurfaceTransmittance(subInstanceData, material, candidatePrimitiveIndex, candidateBarycentrics);
 
@@ -1375,7 +1386,13 @@ void Bridge::traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_F
     RayDesc ray = path.getScatterRay().toRayDesc();
     ray.TMin = tMinMax.x;
     ray.TMax = tMinMax.y;
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, 0xff, ray);
+    // RTXCR culls back faces while the path is outside a dielectric, then
+    // disables culling for an internal ray so it can find the exit boundary.
+    // This is particularly visible on Claire's thin eyelash/eyelid geometry:
+    // accepting both sides makes it look like a thick black strip.
+    const uint rayFlags = path.isInsideDielectricVolume()
+        ? RAY_FLAG_NONE : RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    rayQuery.TraceRayInline(SceneBVH, rayFlags, 0xff, ray);
 
     while (rayQuery.Proceed())
     {

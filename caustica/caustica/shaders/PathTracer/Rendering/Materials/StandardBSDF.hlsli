@@ -186,6 +186,14 @@ struct StandardBSDF // : IBSDF
         return bsdf.eval(wiLocal, woLocal);
     }
 
+    float3 evalSpecularOnly(const ShadingData shadingData, const float3 wo)
+    {
+        float3 wiLocal = shadingData.toLocal(shadingData.V);
+        float3 woLocal = shadingData.toLocal(wo);
+        FalcorBSDF bsdf = FalcorBSDF::make(shadingData, data);
+        return bsdf.evalSpecularOnly(wiLocal, woLocal);
+    }
+
     bool sample(const ShadingData shadingData, const float4 preGeneratedSamples, out BSDFSample result, bool useImportanceSampling)
     {
         if (data.IsHair())

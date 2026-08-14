@@ -14,6 +14,7 @@
 
 #include <type_traits>
 #include <variant>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 
@@ -813,6 +814,14 @@ bool GltfImporter::load(
             // Decode %-encoded characters in the URI, because cgltf doesn't do that for some reason.
             std::string uri = image->uri;
             cgltf_decode_uri(uri.data());
+            // cgltf decodes in place and may shorten the string. Some RTXCR
+            // Claire assets also contain a trailing newline in an image URI.
+            // Normalize both cases before constructing a filesystem path;
+            // otherwise the valid texture beside the glTF is missed and the
+            // scene-directory fallback resolves to the wrong parent folder.
+            uri.resize(std::strlen(uri.c_str()));
+            while (!uri.empty() && std::isspace(static_cast<unsigned char>(uri.back())))
+                uri.pop_back();
 
             // No inline data - read a file.
             const std::filesystem::path gltfDirectory = fileName.parent_path();

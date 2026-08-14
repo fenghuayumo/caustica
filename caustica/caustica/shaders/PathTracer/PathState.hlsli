@@ -53,8 +53,8 @@ enum class PathFlags
     stablePlaneBaseScatterDiff      = (1<<18),  ///< When stepping off the last stable plane & branch, we had a diffuse scatter event (this determines if the radiance is diffuse or specular for denoising purposes)
     exportSpecHitTQueued            = (1<<19),  ///< Export specular hitT distance on first next non-specular scatter (or sky) and clear the flag.
     stablePlaneOnDominantBranch     = (1<<20),  ///< Are we on the dominant stable plane or one of its branches (landing on a new stable branch will re-set this flag accordingly)
+    rtxcrEyePath                    = (1<<21),  ///< Path has encountered a transmissive material. RTXCR uses this to constrain character SSS behind lenses/cornea.
 
-    // Bits to kPathFlagsBitCount are still unused.
     // ^no more flag space! consider moving vertexIndex counter to PackedCounters
 };
 
@@ -65,7 +65,7 @@ enum class PackedCounters // each packed to 8 bits, 4 max fits in 32bit uint
     DiffuseBounces              = 0,    ///< Diffuse reflection.
     RejectedHits                = 1,    ///< Number of false intersections rejected along the path. This is used as a safeguard to avoid deadlock in pathological cases.
     BouncesFromStablePlane      = 2,    ///< Number of bounces after the last stable plane the path was on (path.vertexIndex - currentStablePlaneVertexIndex)
-    //SubSampleIndex              = 3     ///< Used when doing multiple (sub)samples per pixels: when the path gets terminated, this counter is incremented, and if still < 
+    RTXCRSubsurfaceEvents       = 3,    ///< RTXCR evaluates the spatial SSS branch at most once on each path.
 };
 
 /** Live state for the path tracer.

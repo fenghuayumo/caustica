@@ -565,6 +565,13 @@ namespace PathTracer
         const ShadingData shadingData    = surfaceData.shadingData;
         const ActiveBSDF bsdf   = surfaceData.bsdf;
 
+        // RTXCR classifies every transmissive-domain surface as an eye/cornea
+        // surface and keeps that classification for the remainder of the path.
+        // This is important for both the actual cornea/choroid pair and skin
+        // viewed through Claire's glasses.
+        if (bsdf.data.SpecularTransmission() > 0.0f)
+            path.setFlag(PathFlags::rtxcrEyePath);
+
 #if ENABLE_DEBUG_VIZUALISATIONS && ENABLE_DEBUG_LINES_VIZ && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
         if (debugPath)
         {
@@ -709,16 +716,37 @@ namespace PathTracer
 #else
         bool scatterValid = false;
 #endif
-       
+
         // Compute NextEventEstimation a.k.a. direct light sampling!
+#if !NON_PATH_TRACING_PASS && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+        const bool rtxcrSssSurface = CausticaIsSubsurfaceSurface(shadingData, bsdf);
+        const bool rtxcrSssAlreadyEvaluated =
+            preScatterPath.getCounter(PackedCounters::RTXCRSubsurfaceEvents) != 0;
+#endif
 #if NON_PATH_TRACING_PASS || PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES || !PT_NEE_ENABLED
         NEEResult neeResult = NEEResult::empty();
 #else
-        NEEResult neeResult = HandleNEE(preScatterPath, shadingData, bsdf, uniformSG, workingContext); 
+        // RTXCR stops NEE after the first SSS event. At that first surface,
+        // direct lighting contains only the normalized microfacet half; the
+        // spatial diffusion half is accumulated immediately below.
+        NEEResult neeResult = NEEResult::empty();
+        if (!rtxcrSssAlreadyEvaluated)
+        {
+            neeResult = HandleNEE(preScatterPath, shadingData, bsdf, rtxcrSssSurface,
+                uniformSG, workingContext);
+        }
 #endif
 #if !NON_PATH_TRACING_PASS && PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES
-        neeResult.AccumulateRadiance(HandleSubsurfaceNEE(
-            preScatterPath, shadingData, bsdf, InstanceIndex(), uniformSG, workingContext), 0.0f);
+        // RTXCR performs spatial SSS at most once on a path. Repeating it on
+        // subsequent hits disproportionately darkens/noises short multi-hit
+        // regions such as the eyelids and eye socket.
+        if (!rtxcrSssAlreadyEvaluated && rtxcrSssSurface)
+        {
+            neeResult.AccumulateRadiance(HandleSubsurfaceNEE(
+                preScatterPath, shadingData, bsdf, InstanceIndex(), GeometryIndex(),
+                uniformSG, workingContext), 0.0f);
+            path.setCounter(PackedCounters::RTXCRSubsurfaceEvents, 1);
+        }
 #endif
 
 #if PATH_TRACER_MODE!=PATH_TRACER_MODE_BUILD_STABLE_PLANES        
