@@ -14,6 +14,7 @@
 #define ICON_MS_SKIP_PREVIOUS         "\xee\x81\x85" // U+e045
 #define ICON_MS_DELETE                "\xee\xa4\xae" // U+e92e
 #define ICON_MS_ROTATE_90_DEGREES_CCW "\xee\x90\x98" // U+e418
+#define ICON_MS_COLORIZE              "\xee\x8e\xb8" // U+e3b8  eyedropper
 #define ICON_MS_GRID_ON               "\xee\x8f\xac" // U+e3ec
 #define ICON_MS_ZOOM_OUT_MAP          "\xee\x95\xab" // U+e56b
 #define ICON_MS_FIRST_PAGE            "\xee\x97\x9c" // U+e5dc

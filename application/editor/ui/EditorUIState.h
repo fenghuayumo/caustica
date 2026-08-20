@@ -101,6 +101,8 @@ struct EditorSelectionState
     float GizmoSnapTranslation[3] = { 1.f, 1.f, 1.f };
     float GizmoSnapRotation = 15.f;
     float GizmoSnapScale = 0.1f;
+    // Persistent viewport eyedropper mode; the toolbar button toggles it off again.
+    bool MaterialPickerActive = false;
     // Updated each UI frame; input router uses this to avoid stealing gizmo clicks.
     bool GizmoCapturingInput = false;
 };

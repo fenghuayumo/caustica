@@ -114,6 +114,7 @@ private:
     void BuildStatusBar();
     void BuildDockSpace();
     void BuildViewportPanel(const PanelLayout& layout);
+    void UpdateMaterialPickerCursor();
 
 public:
     void setViewportColorTexture(caustica::rhi::Texture* texture) { m_viewportColor = texture; }
@@ -132,6 +133,7 @@ private:
 
     float                       m_showSceneWidgets = 0.0f;
     caustica::rhi::Texture*            m_viewportColor = nullptr;
+    bool                        m_materialPickerCursorVisible = false;
 
     std::unique_ptr<caustica::ImGui_Console> m_console;
 

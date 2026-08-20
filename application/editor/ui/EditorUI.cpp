@@ -4,6 +4,7 @@
 
 #include "SceneEditor.h"
 #include "common/ImGuiManager.h"
+#include "common/IconsMaterialSymbols.h"
 #include "common/TransformGizmo.h"
 #include "ui/RenderSettingsConsole.h"
 
@@ -14,6 +15,7 @@
 #include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
+#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cstdio>
 #include <render/passes/debug/Korgi.h>
@@ -80,9 +82,52 @@ EditorUI::EditorUI(
 
 EditorUI::~EditorUI()
 {
+    if (m_materialPickerCursorVisible)
+    {
+        if (GLFWwindow* window = getGpuDevice() ? getGpuDevice()->getWindow() : nullptr)
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     ImNodes::Ez::FreeContext(m_ImNodesContext);
 #endif
+}
+
+void EditorUI::UpdateMaterialPickerCursor()
+{
+    const auto& viewport = m_editorUI.Viewport;
+    const bool visible = m_editorUI.MaterialPickerActive
+        && m_editorUI.ShowUI
+        && viewport.ShowViewport
+        && viewport.RectValid
+        && viewport.Hovered;
+
+    GLFWwindow* window = getGpuDevice() ? getGpuDevice()->getWindow() : nullptr;
+    if (window && visible != m_materialPickerCursorVisible)
+        glfwSetInputMode(window, GLFW_CURSOR, visible ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
+    m_materialPickerCursorVisible = visible;
+
+    if (!visible)
+        return;
+
+    // Draw the same Material Symbols eyedropper used by the toolbar. The real
+    // cursor is hidden only over the viewport; the glyph's top-left is the pick hotspot.
+    const ImVec2 mouse = ImGui::GetMousePos();
+    const ImVec2 glyphPos(mouse.x + 2.f, mouse.y + 2.f);
+    ImDrawList* drawList = ImGui::GetForegroundDrawList();
+    ImFont* font = ImGui::GetFont();
+    const float fontSize = ImGui::GetFontSize() * 1.4f;
+    drawList->AddText(
+        font,
+        fontSize,
+        ImVec2(glyphPos.x + 1.f, glyphPos.y + 1.f),
+        IM_COL32(0, 0, 0, 220),
+        ICON_MS_COLORIZE);
+    drawList->AddText(
+        font,
+        fontSize,
+        glyphPos,
+        IM_COL32(235, 242, 255, 255),
+        ICON_MS_COLORIZE);
 }
 
 bool EditorUI::mousePosUpdate(double xpos, double ypos)
@@ -167,6 +212,7 @@ void EditorUI::buildUI(void)
                 vp.RectValid ? ImVec2(vp.SizeX, vp.SizeY) : ImVec2(0.f, 0.f));
         }
         BuildStatusBar();
+        UpdateMaterialPickerCursor();
         return;
     }
 
@@ -190,6 +236,7 @@ void EditorUI::buildUI(void)
         if (BuildUIScriptsAndEtc())
         {
             BuildStatusBar();
+            UpdateMaterialPickerCursor();
             return;
         }
 
@@ -281,6 +328,8 @@ void EditorUI::buildUI(void)
             vp.RectValid ? ImVec2(vp.PosX, vp.PosY) : ImVec2(0.f, 0.f),
             vp.RectValid ? ImVec2(vp.SizeX, vp.SizeY) : ImVec2(0.f, 0.f));
     }
+
+    UpdateMaterialPickerCursor();
 }
 
 

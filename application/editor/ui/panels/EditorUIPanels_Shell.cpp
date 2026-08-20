@@ -332,8 +332,8 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     // Child window gives the tool strip its own hit-test layer above the canvas.
     {
         constexpr float kToolbarPad = 6.f;
-        // Match TransformGizmoToolbar strip: 7 buttons + 2 separators + padding.
-        constexpr float kToolbarW = 3.f * 2.f + 28.f * 7.f + 2.f * 4.f + 5.f * 2.f;
+        // Match TransformGizmoToolbar strip: 8 buttons + 2 separators + padding.
+        constexpr float kToolbarW = 3.f * 2.f + 28.f * 8.f + 2.f * 5.f + 5.f * 2.f;
         constexpr float kToolbarH = 28.f + 3.f * 2.f;
         ImGui::SetCursorScreenPos(ImVec2(canvasPos.x + kToolbarPad, canvasPos.y + kToolbarPad));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));

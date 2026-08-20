@@ -63,17 +63,6 @@ bool isRightMouseDown(SceneEditor& sceneEditor)
     return window && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 }
 
-struct RightClickPickState
-{
-    bool tracking = false;
-    bool dragged = false;
-    double pressX = 0.0;
-    double pressY = 0.0;
-};
-
-RightClickPickState g_rightClickPick;
-constexpr double kRightClickPickSlopPx = 4.0;
-
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
     const auto& editor = sceneEditor.editorUIState();
@@ -82,7 +71,7 @@ bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 
 void requestMaterialPick(SceneEditor& sceneEditor)
 {
-    // Right-click: pick the hit geometry's material (per sub-mesh), not the whole instance.
+    // Pick the hit geometry's material (per sub-mesh), not the whole instance.
     auto& picking = sceneEditor.renderAppState().runtime.Picking;
     picking.requestMaterialPick();
     if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor))
@@ -316,14 +305,6 @@ bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    if (g_rightClickPick.tracking)
-    {
-        const double dx = e.getX() - g_rightClickPick.pressX;
-        const double dy = e.getY() - g_rightClickPick.pressY;
-        if ((dx * dx + dy * dy) > (kRightClickPickSlopPx * kRightClickPickSlopPx))
-            g_rightClickPick.dragged = true;
-    }
-
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
@@ -366,10 +347,23 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
     auto& session = sceneEditor.renderAppState();
+    auto& editor = sceneEditor.editorUIState();
 
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwPress, mods))
         return true;
-    if (!(game && game->CameraActive()))
+
+    // While the eyedropper is active, each LMB click samples a material. Keep the
+    // mode armed so the user can inspect several objects without returning to the toolbar.
+    if (button == ToGlfwMouse(caustica::Mouse::Left) && editor.MaterialPickerActive)
+    {
+        syncPickPositionFromCursor(sceneEditor);
+        requestMaterialPick(sceneEditor);
+        return true;
+    }
+
+    // LMB rotates the editor camera. RMB is deliberately not forwarded: it no
+    // longer rotates and no longer doubles as a material-pick gesture.
+    if (!(game && game->CameraActive()) && button != ToGlfwMouse(caustica::Mouse::Right))
         camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
@@ -377,17 +371,6 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     {
         syncPickPositionFromCursor(sceneEditor);
         requestInstancePick(session.runtime);
-    }
-    else if (button == ToGlfwMouse(caustica::Mouse::Right))
-    {
-        // RMB is shared with fly-camera look. Decide click vs drag on release;
-        // injecting a synchronous feedback pick here would stall camera rotation.
-        g_rightClickPick.tracking = true;
-        g_rightClickPick.dragged = false;
-        g_rightClickPick.pressX = 0.0;
-        g_rightClickPick.pressY = 0.0;
-        if (GLFWwindow* window = sceneEditor.app()->getGpuDevice()->getWindow())
-            glfwGetCursorPos(window, &g_rightClickPick.pressX, &g_rightClickPick.pressY);
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))
@@ -401,17 +384,6 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
 {
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
-
-    if (button == ToGlfwMouse(caustica::Mouse::Right) && g_rightClickPick.tracking)
-    {
-        const bool clicked = !g_rightClickPick.dragged;
-        g_rightClickPick = {};
-        if (clicked && !uiCapturesMouseForEditor(sceneEditor) && !gizmoCapturesInput(sceneEditor))
-        {
-            syncPickPositionFromCursor(sceneEditor);
-            requestMaterialPick(sceneEditor);
-        }
-    }
 
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
@@ -427,7 +399,8 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
         return true;
     if (!(game && game->CameraActive()))
     {
-        camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
+        if (button != ToGlfwMouse(caustica::Mouse::Right))
+            camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
         if (button == ToGlfwMouse(caustica::Mouse::Right))
             camera->camera().clearFlyKeyboardState();
     }

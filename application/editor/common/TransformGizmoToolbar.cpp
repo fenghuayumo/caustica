@@ -82,10 +82,10 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-    // Select | Move | Rotate | Scale | Space | Snap | Grid
-    constexpr int toolCount = 7;
+    // Select | Move | Rotate | Scale | Space | Snap | Grid | Material picker
+    constexpr int toolCount = 8;
     constexpr int sepCount = 2;
-    const float stripW = kPad * 2.f + kBtn * toolCount + kGap * 4.f + 5.f * sepCount;
+    const float stripW = kPad * 2.f + kBtn * toolCount + kGap * 5.f + 5.f * sepCount;
     const float stripH = kBtn + kPad * 2.f;
 
     dl->AddRectFilled(
@@ -157,6 +157,17 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
             editorUI.ShowInfiniteGrid,
             editorUI.ShowInfiniteGrid ? "Hide infinite grid" : "Show infinite grid"))
         editorUI.ShowInfiniteGrid = !editorUI.ShowInfiniteGrid;
+
+    ImGui::SameLine(0.f, kGap);
+
+    if (ToolButton(
+            "##MaterialPicker",
+            ICON_MS_COLORIZE,
+            editorUI.MaterialPickerActive,
+            editorUI.MaterialPickerActive
+                ? "Cancel material picker"
+                : "Pick material from viewport"))
+        editorUI.MaterialPickerActive = !editorUI.MaterialPickerActive;
 
     ImGui::EndGroup();
 }
