@@ -13,12 +13,27 @@ using namespace caustica::math;
 
 #include "PathTracer/Lighting/LightingTypes.hlsli"
 #include "PathTracer/Lighting/EnvMap.hlsli"
+#include "light_types.h"
 
 #define GAUSSIAN_SPLAT_SH_FLOAT4_COUNT 12
 
 #define GAUSSIAN_SPLAT_SHADOWS_DISABLED 0
 #define GAUSSIAN_SPLAT_SHADOWS_HARD 1
 #define GAUSSIAN_SPLAT_SHADOWS_SOFT 2
+
+#define GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS 8
+
+struct GaussianSplatReceiverShadowLight
+{
+    // xyz = world-space position, w = LightType_* encoded as a float.
+    float4 positionAndType;
+    // xyz = direction from the light (directional stores direction to light), w = finite range (0 = infinite).
+    float4 directionAndRange;
+    // rgb = light color, w = irradiance/intensity/radiance scale.
+    float4 colorAndIntensity;
+    // x = source radius/angular radius, y/z = spot inner/outer cosine, w = reserved.
+    float4 shape;
+};
 
 
 struct SimpleViewConstants
@@ -121,6 +136,13 @@ struct GaussianSplatConstants
     uint shadowFrameIndex;
     uint sortMode;
     uint frustumCulling;
+
+    uint shadowLightCount;
+    uint shadowLightPadding0;
+    uint shadowLightPadding1;
+    uint shadowLightPadding2;
+
+    GaussianSplatReceiverShadowLight shadowLights[GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS];
 
     float frustumDilation;
     float minPixelCoverage;

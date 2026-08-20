@@ -425,6 +425,9 @@ struct PathTracerSettings
     // The graph temporarily converts the HDR target to sRGB around the sorted splat pass,
     // then restores linear color before Bloom / tone mapping.
     bool                                GaussianSplatReferenceGammaCompositing = true;
+    // When disabled, composite Gaussian splats directly into the post-tone-map LDR target.
+    // Meshes still use the regular HDR post-processing and tone-mapping path.
+    bool                                GaussianSplatApplyToneMapping = true;
     bool                                GaussianSplatQuantizeNormals = true;
     int                                 GaussianSplatFTBSyncMode = 0; // 0 = Disabled, 1 = Interlock
     float                               GaussianSplatDepthIsoThreshold = 0.70f;

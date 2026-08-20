@@ -1134,7 +1134,8 @@ void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
     (void)registerNrdPass(ctx, denoiseGuidesReady);
     (void)registerGaussianSplatPreAAPass(ctx);
     (void)registerDenoiseAAPass(ctx);
-    (void)registerGaussianSplatCompositePass(ctx);
+    if (ctx.settings->GaussianSplatApplyToneMapping)
+        (void)registerGaussianSplatCompositePass(ctx);
     registerPostProcessGraphPasses(ctx);
     const rg::PassHandle blitReady = registerCompositeGraphPasses(ctx);
     (void)registerDebugOverlayGraphPasses(ctx, blitReady);

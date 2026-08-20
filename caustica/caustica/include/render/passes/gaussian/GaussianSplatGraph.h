@@ -24,9 +24,9 @@ struct GaussianSplatFrameInputs
     int frameIndex = 0;
     int sampleIndex = 0;
     int temporalSampleIndex = 0;
-    bool renderToOutputColor = false;
+    GaussianSplatRenderTarget renderTarget = GaussianSplatRenderTarget::ProcessedOutputColor;
     dm::float2 displaySize = dm::float2(0.0f, 0.0f);
-    dm::float3 shadowDirectionToLight = dm::float3(0.0f, 1.0f, 0.0f);
+    std::span<const scene::LightRenderProxy> lights = {};
 };
 
 uint32_t resolveGaussianSplatShadowMode(const PathTracerSettings& settings);

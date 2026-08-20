@@ -475,27 +475,46 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
 
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
     float shadow = 1.0f;
-    if (g_Const.shadowsEnabled != 0 && g_Const.shadowStrength > 0.0f)
+    if (g_Const.shadowsEnabled != 0 && g_Const.shadowStrength > 0.0f && g_Const.shadowLightCount > 0)
     {
-        RayDesc shadowRay;
-        shadowRay.Origin = input.worldCenter + g_Const.shadowDirectionToLight.xyz * max(g_Const.shadowDirectionToLight.w, 0.001f);
-        shadowRay.Direction = g_Const.shadowDirectionToLight.xyz;
-        shadowRay.TMin = 0.0f;
-        shadowRay.TMax = g_Const.shadowRayTMax;
-
         uint2 pixel = uint2(input.position.xy);
-        uint shadowSeed = HybridGaussian_MakeShadowSeed(
-            shadowRay,
-            pixel,
-            g_Const.shadowFrameIndex,
-            primitiveId);
-        float visibility = HybridGaussian_TraceMeshShadowVisibility(
-            t_MeshBVH,
-            shadowRay,
-            g_Const.shadowMode,
-            g_Const.shadowSoftRadius,
-            g_Const.shadowSoftSampleCount,
-            shadowSeed);
+        float weightedVisibility = 0.0f;
+        float totalLightWeight = 0.0f;
+
+        [loop]
+        for (uint lightIndex = 0; lightIndex < min(g_Const.shadowLightCount, GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS); ++lightIndex)
+        {
+            RayDesc shadowRay;
+            float lightWeight;
+            float lightSoftRadius;
+            if (!HybridGaussian_BuildReceiverShadowRay(
+                    g_Const.shadowLights[lightIndex],
+                    input.worldCenter,
+                    g_Const.shadowDirectionToLight.w,
+                    g_Const.shadowRayTMax,
+                    g_Const.shadowSoftRadius,
+                    shadowRay,
+                    lightWeight,
+                    lightSoftRadius))
+                continue;
+
+            uint shadowSeed = HybridGaussian_MakeShadowSeed(
+                shadowRay,
+                pixel,
+                g_Const.shadowFrameIndex,
+                primitiveId ^ (lightIndex * 0x9e3779b9u));
+            float lightVisibility = HybridGaussian_TraceMeshShadowVisibility(
+                t_MeshBVH,
+                shadowRay,
+                g_Const.shadowMode,
+                lightSoftRadius,
+                g_Const.shadowSoftSampleCount,
+                shadowSeed);
+            weightedVisibility += lightVisibility * lightWeight;
+            totalLightWeight += lightWeight;
+        }
+
+        float visibility = totalLightWeight > 0.0f ? weightedVisibility / totalLightWeight : 1.0f;
         shadow = lerp(1.0f - saturate(g_Const.shadowStrength), 1.0f, visibility);
     }
 

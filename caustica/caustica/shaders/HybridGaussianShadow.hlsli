@@ -600,6 +600,88 @@ bool HybridGaussian_TraceMeshShadow(RaytracingAccelerationStructure meshBVH, Ray
     return rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
 }
 
+float HybridGaussian_ShadowLuminance(float3 color)
+{
+    return max(dot(max(color, 0.0f), float3(0.2126f, 0.7152f, 0.0722f)), 0.0f);
+}
+
+bool HybridGaussian_BuildReceiverShadowRay(
+    GaussianSplatReceiverShadowLight light,
+    float3 worldPosition,
+    float rayOffset,
+    float defaultRayTMax,
+    float defaultSoftRadius,
+    out RayDesc ray,
+    out float lightWeight,
+    out float lightSoftRadius)
+{
+    const int lightType = int(round(light.positionAndType.w));
+    const float intensity = max(light.colorAndIntensity.w, 0.0f);
+    lightWeight = HybridGaussian_ShadowLuminance(light.colorAndIntensity.rgb) * intensity;
+    lightSoftRadius = max(defaultSoftRadius, 0.0f);
+
+    ray.Origin = worldPosition;
+    ray.Direction = float3(0.0f, 1.0f, 0.0f);
+    ray.TMin = 0.0f;
+    ray.TMax = max(defaultRayTMax, 0.001f);
+
+    if (lightWeight <= 0.0f)
+        return false;
+
+    if (lightType == LightType_Directional || lightType == LightType_Environment)
+    {
+        ray.Direction = normalize(light.directionAndRange.xyz);
+        if (lightType == LightType_Directional)
+            lightSoftRadius = max(lightSoftRadius, max(light.shape.x, 0.0f));
+    }
+    else if (lightType == LightType_Point || lightType == LightType_Spot)
+    {
+        const float3 toLight = light.positionAndType.xyz - worldPosition;
+        const float distanceToLight = length(toLight);
+        const float range = light.directionAndRange.w;
+        if (distanceToLight <= 0.001f || (range > 0.0f && distanceToLight >= range))
+            return false;
+
+        ray.Direction = toLight / distanceToLight;
+        ray.TMax = max(distanceToLight - max(rayOffset, 0.001f), 0.001f);
+
+        float attenuation = rcp(max(distanceToLight * distanceToLight, 0.0001f));
+        if (range > 0.0f)
+        {
+            const float normalizedDistance = distanceToLight / range;
+            const float rangeFalloff = saturate(1.0f - normalizedDistance * normalizedDistance * normalizedDistance * normalizedDistance);
+            attenuation *= rangeFalloff * rangeFalloff;
+        }
+
+        if (lightType == LightType_Spot)
+        {
+            const float3 lightToReceiver = -ray.Direction;
+            const float coneCosine = dot(normalize(light.directionAndRange.xyz), lightToReceiver);
+            const float outerCosine = min(light.shape.z, light.shape.y);
+            const float innerCosine = max(light.shape.z, light.shape.y);
+            attenuation *= innerCosine > outerCosine + 1.0e-5f
+                ? smoothstep(outerCosine, innerCosine, coneCosine)
+                : (coneCosine >= outerCosine ? 1.0f : 0.0f);
+        }
+
+        lightWeight *= attenuation;
+        lightSoftRadius = max(lightSoftRadius, max(light.shape.x, 0.0f) / distanceToLight);
+    }
+    else
+    {
+        return false;
+    }
+
+    if (lightWeight <= 0.0f)
+        return false;
+
+    const float offset = max(rayOffset, 0.001f);
+    ray.Origin += ray.Direction * offset;
+    if (lightType == LightType_Directional || lightType == LightType_Environment)
+        ray.TMax = max(ray.TMax - offset, 0.001f);
+    return true;
+}
+
 float HybridGaussian_TraceMeshShadowVisibility(
     RaytracingAccelerationStructure meshBVH,
     RayDesc ray,

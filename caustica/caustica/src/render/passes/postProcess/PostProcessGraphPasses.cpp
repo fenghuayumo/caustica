@@ -173,6 +173,11 @@ void registerPostProcess(FrameGraphContext ctx)
         ctx.settings->EnableToneMapping,
         ctx.commandListWasClosed);
 
+    // Preserve the photographed/display-referred Gaussian appearance while
+    // keeping mesh lighting in the normal HDR tone-mapping path.
+    if (!ctx.settings->GaussianSplatApplyToneMapping)
+        (void)registerGaussianSplatCompositePass(ctx);
+
     registerEdgeDetectionGraphPasses(
         ldrColor,
         ldrColorScratch,

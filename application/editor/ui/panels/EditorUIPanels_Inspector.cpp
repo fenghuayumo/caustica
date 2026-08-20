@@ -274,6 +274,13 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             RESET_ON_CHANGE(InspectorDragFloat("Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
             RESET_ON_CHANGE(InspectorDragFloat("Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
             RESET_ON_CHANGE(InspectorColorEdit3("Tint Color", &m_settings.GaussianSplatTintColor.x));
+            RESET_ON_CHANGE(InspectorCheckbox("Apply Tone Mapping", &m_settings.GaussianSplatApplyToneMapping));
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(
+                    "Enabled: Gaussian splats are composited before Bloom/Tone Mapping.\n"
+                    "Disabled: meshes are tone mapped first, then Gaussian splats are composited directly.");
+            }
 
             ImGui::Spacing();
             ImGui::Separator();

@@ -10,6 +10,7 @@
 #include <scene/GaussianSplatData.h>
 
 #include <filesystem>
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -55,7 +56,8 @@ enum class GaussianSplatPrimaryMethod : uint32_t
 enum class GaussianSplatRenderTarget : uint32_t
 {
     ProcessedOutputColor = 0,
-    OutputColor = 1
+    OutputColor = 1,
+    LdrColor = 2
 };
 
 struct GaussianSplatRenderSettings
@@ -93,6 +95,8 @@ struct GaussianSplatRenderSettings
     float shadowSoftRadius = 0.08f;
     uint32_t shadowSoftSampleCount = 1;
     uint32_t shadowFrameIndex = 0;
+    uint32_t shadowLightCount = 0;
+    std::array<GaussianSplatReceiverShadowLight, GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS> shadowLights{};
     float frustumDilation = 0.20f;
     float minPixelCoverage = 1.0f;
     uint32_t stochasticFrameIndex = 0;
@@ -204,6 +208,7 @@ private:
     caustica::rhi::BufferHandle m_splatAabbBuffer;
     caustica::rhi::TextureHandle m_stochasticDepthBuffer;
     caustica::rhi::TextureHandle m_stochasticProcessedDepthBuffer;
+    caustica::rhi::TextureHandle m_stochasticLdrDepthBuffer;
 
     caustica::rhi::BindingLayoutHandle m_rasterRenderBindingLayout;
     caustica::rhi::BindingLayoutHandle m_hybridRenderBindingLayout;
@@ -225,6 +230,10 @@ private:
     caustica::rhi::GraphicsPipelineHandle m_hybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_gutRasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_gutHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_ldrRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_ldrHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutLdrRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutLdrHybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticRasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticHybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_stochasticProcessedRasterRenderPipeline;
@@ -233,12 +242,17 @@ private:
     caustica::rhi::GraphicsPipelineHandle m_gutStochasticHybridRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_gutStochasticProcessedRasterRenderPipeline;
     caustica::rhi::GraphicsPipelineHandle m_gutStochasticProcessedHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticLdrRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_stochasticLdrHybridRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticLdrRasterRenderPipeline;
+    caustica::rhi::GraphicsPipelineHandle m_gutStochasticLdrHybridRenderPipeline;
     caustica::rhi::ComputePipelineHandle m_sortKeyPipeline;
     caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
     caustica::render::GaussianSplatSorter m_sorter;
     caustica::rhi::rt::AccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
+    std::shared_ptr<caustica::FramebufferFactory> m_stochasticLdrFramebuffer;
 
     std::vector<caustica::GaussianSplatData> m_splats;
     std::vector<caustica::math::float4> m_colorOpacity;

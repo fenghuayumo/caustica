@@ -166,7 +166,7 @@ bool GaussianSplatFramePass::hasActiveSplats() const
 }
 
 std::vector<GaussianSplatGraphResources>
-GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
+GaussianSplatFramePass::prepareGraphResources(GaussianSplatRenderTarget renderTarget)
 {
     std::vector<GaussianSplatGraphResources> resources;
     if (!hasActiveSplats())
@@ -181,9 +181,9 @@ GaussianSplatFramePass::prepareGraphResources(bool renderToOutputColor)
         int(m_frameIndex),
         int(m_sampleIndex),
         *m_temporalSampleIndex,
-        renderToOutputColor,
+        renderTarget,
         dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
-        resolveGaussianSplatShadowDirection(m_context->frameLights()),
+        m_context->frameLights(),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
@@ -227,7 +227,9 @@ void GaussianSplatFramePass::executeAccelBuild(caustica::rhi::CommandList* comma
         m_context->activeSettings());
 }
 
-void GaussianSplatFramePass::executeUpload(caustica::rhi::CommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeUpload(
+    caustica::rhi::CommandList* commandList,
+    GaussianSplatRenderTarget renderTarget)
 {
     m_compositeRendered = false;
     if (commandList == nullptr || !hasActiveSplats())
@@ -257,14 +259,14 @@ void GaussianSplatFramePass::executeUpload(caustica::rhi::CommandList* commandLi
         int(m_frameIndex),
         int(m_sampleIndex),
         *m_temporalSampleIndex,
-        renderToOutputColor,
+        renderTarget,
         dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
-        resolveGaussianSplatShadowDirection(m_context->frameLights()),
+        m_context->frameLights(),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
     caustica::PlanarView splatView = *m_context->camera.view();
-    if (!renderToOutputColor)
+    if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.setPixelOffset(dm::float2::zero());
@@ -328,7 +330,9 @@ void GaussianSplatFramePass::executeColorSpaceConversion(
     commandList->endMarker();
 }
 
-void GaussianSplatFramePass::executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor)
+void GaussianSplatFramePass::executeRaster(
+    caustica::rhi::CommandList* commandList,
+    GaussianSplatRenderTarget renderTarget)
 {
     if (commandList == nullptr || !hasActiveSplats())
         return;
@@ -337,7 +341,7 @@ void GaussianSplatFramePass::executeRaster(caustica::rhi::CommandList* commandLi
     assert(m_scenePasses);
 
     caustica::PlanarView splatView = *m_context->camera.view();
-    if (!renderToOutputColor)
+    if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
         splatView.setPixelOffset(dm::float2::zero());
@@ -349,7 +353,7 @@ void GaussianSplatFramePass::executeRaster(caustica::rhi::CommandList* commandLi
         m_context->frameGaussianSplats(),
         *m_scenePasses,
         splatView);
-    m_compositeRendered = renderedAny && !renderToOutputColor;
+    m_compositeRendered = renderedAny && renderTarget == GaussianSplatRenderTarget::ProcessedOutputColor;
 }
 
 void GaussianSplatFramePass::executeAccumulate(caustica::rhi::CommandList* commandList)

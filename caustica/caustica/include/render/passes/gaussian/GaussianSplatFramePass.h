@@ -59,12 +59,12 @@ public:
         const PathTracerSettings& settings) const;
 
     [[nodiscard]] bool hasActiveSplats() const;
-    [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGraphResources(bool renderToOutputColor);
+    [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGraphResources(GaussianSplatRenderTarget renderTarget);
 
     void executeAccelBuild(caustica::rhi::CommandList* commandList);
-    void executeUpload(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
+    void executeUpload(caustica::rhi::CommandList* commandList, GaussianSplatRenderTarget renderTarget);
     void executeSort(caustica::rhi::CommandList* commandList);
-    void executeRaster(caustica::rhi::CommandList* commandList, bool renderToOutputColor);
+    void executeRaster(caustica::rhi::CommandList* commandList, GaussianSplatRenderTarget renderTarget);
     void executeColorSpaceConversion(caustica::rhi::CommandList* commandList, bool toLinear);
     void executeAccumulate(caustica::rhi::CommandList* commandList);
 

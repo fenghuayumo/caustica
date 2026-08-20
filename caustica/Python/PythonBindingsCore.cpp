@@ -1622,6 +1622,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("gaussian_splat_reference_gamma_compositing",
                 &PathTracerSettings::GaussianSplatReferenceGammaCompositing,
                 "Use vk_gaussian_splatting-compatible sRGB alpha compositing for GPU-sorted splats.")
+        .def_rw("gaussian_splat_apply_tone_mapping",
+                &PathTracerSettings::GaussianSplatApplyToneMapping,
+                "Composite Gaussian splats before tone mapping; disable to composite them into the post-tone-map LDR target.")
         .def_rw("gaussian_splat_quantize_normals", &PathTracerSettings::GaussianSplatQuantizeNormals)
         .def_rw("gaussian_splat_ftb_sync_mode", &PathTracerSettings::GaussianSplatFTBSyncMode,
                 "3DGS front-to-back synchronization mode (caustica.GaussianSplatFTBSyncMode).")

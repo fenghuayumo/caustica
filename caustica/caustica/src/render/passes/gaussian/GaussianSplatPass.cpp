@@ -581,6 +581,7 @@ void GaussianSplatPass::createStochasticFramebuffer(const RenderTargets& renderT
 
     createFramebuffer(renderTargets.outputColor, m_stochasticDepthBuffer, m_stochasticFramebuffer, "GaussianSplatStochasticDepth");
     createFramebuffer(renderTargets.processedOutputColor, m_stochasticProcessedDepthBuffer, m_stochasticProcessedFramebuffer, "GaussianSplatStochasticProcessedDepth");
+    createFramebuffer(renderTargets.ldrColor, m_stochasticLdrDepthBuffer, m_stochasticLdrFramebuffer, "GaussianSplatStochasticLdrDepth");
 }
 
 void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
@@ -633,7 +634,8 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
     alphaBlend.destBlendAlpha = caustica::rhi::BlendFactor::One;
     pipelineDesc.renderState.blendState.targets[0] = alphaBlend;
 
-    auto createAlphaPipeline = [&](caustica::rhi::BindingLayoutHandle layout,
+    auto createAlphaPipeline = [&](std::shared_ptr<caustica::FramebufferFactory> framebuffer,
+        caustica::rhi::BindingLayoutHandle layout,
         caustica::rhi::ShaderHandle vs, caustica::rhi::ShaderHandle ps)
     {
         pipelineDesc.bindingLayouts = { layout };
@@ -644,13 +646,17 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
         pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
         return m_device->createGraphicsPipeline(
             pipelineDesc,
-            renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+            framebuffer->getFramebuffer(caustica::rhi::AllSubresources));
     };
 
-    m_rasterRenderPipeline = createAlphaPipeline(m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
-    m_hybridRenderPipeline = createAlphaPipeline(m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
-    m_gutRasterRenderPipeline = createAlphaPipeline(m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
-    m_gutHybridRenderPipeline = createAlphaPipeline(m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
+    m_rasterRenderPipeline = createAlphaPipeline(renderTargets.processedOutputFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+    m_hybridRenderPipeline = createAlphaPipeline(renderTargets.processedOutputFramebuffer, m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+    m_gutRasterRenderPipeline = createAlphaPipeline(renderTargets.processedOutputFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+    m_gutHybridRenderPipeline = createAlphaPipeline(renderTargets.processedOutputFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
+    m_ldrRasterRenderPipeline = createAlphaPipeline(renderTargets.ldrFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+    m_ldrHybridRenderPipeline = createAlphaPipeline(renderTargets.ldrFramebuffer, m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+    m_gutLdrRasterRenderPipeline = createAlphaPipeline(renderTargets.ldrFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+    m_gutLdrHybridRenderPipeline = createAlphaPipeline(renderTargets.ldrFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
 
     auto createStochasticPipeline = [&](std::shared_ptr<caustica::FramebufferFactory> fb,
         caustica::rhi::BindingLayoutHandle layout,
@@ -692,6 +698,18 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
             m_stochasticProcessedFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
         m_gutStochasticProcessedHybridRenderPipeline = createStochasticPipeline(
             m_stochasticProcessedFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
+    }
+
+    if (m_stochasticLdrFramebuffer)
+    {
+        m_stochasticLdrRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticLdrFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
+        m_stochasticLdrHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticLdrFramebuffer, m_hybridRenderBindingLayout, m_hybridVertexShader, m_hybridPixelShader);
+        m_gutStochasticLdrRasterRenderPipeline = createStochasticPipeline(
+            m_stochasticLdrFramebuffer, m_rasterRenderBindingLayout, m_gutRasterVertexShader, m_gutRasterPixelShader);
+        m_gutStochasticLdrHybridRenderPipeline = createStochasticPipeline(
+            m_stochasticLdrFramebuffer, m_hybridRenderBindingLayout, m_gutHybridVertexShader, m_gutHybridPixelShader);
     }
 
     caustica::rhi::ComputePipelineDesc computePipelineDesc;
@@ -838,6 +856,8 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
     const bool stochasticSplats = settings.sortingMode == GaussianSplatSortMode::StochasticSplats;
     const bool stochasticToOutput = stochasticSplats
         && settings.renderTarget == GaussianSplatRenderTarget::OutputColor;
+    const bool stochasticToLdr = stochasticSplats
+        && settings.renderTarget == GaussianSplatRenderTarget::LdrColor;
 
     return GaussianSplatGraphResources{
         .constantBuffer = m_constantBuffer.Get(),
@@ -850,7 +870,9 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
         .drawIndirectBuffer = m_drawIndirectBuffer.Get(),
         .splatAabbBuffer = m_splatAabbBuffer.Get(),
         .stochasticDepth = stochasticSplats
-            ? (stochasticToOutput ? m_stochasticDepthBuffer.Get() : m_stochasticProcessedDepthBuffer.Get())
+            ? (stochasticToOutput
+                ? m_stochasticDepthBuffer.Get()
+                : (stochasticToLdr ? m_stochasticLdrDepthBuffer.Get() : m_stochasticProcessedDepthBuffer.Get()))
             : nullptr,
         .sortMode = settings.sortingMode,
         .distanceStageCulling =
@@ -875,10 +897,14 @@ bool GaussianSplatPass::upload(
     const bool stochasticSplats = settings.sortingMode == GaussianSplatSortMode::StochasticSplats;
     const bool distanceStageCulling = settings.frustumCulling == GaussianSplatFrustumCulling::AtDistanceStage;
     const bool stochasticToOutput = stochasticSplats && settings.renderTarget == GaussianSplatRenderTarget::OutputColor;
-    caustica::rhi::TextureHandle stochasticDepthBuffer = stochasticToOutput ? m_stochasticDepthBuffer : m_stochasticProcessedDepthBuffer;
+    const bool renderToLdr = settings.renderTarget == GaussianSplatRenderTarget::LdrColor;
+    const bool stochasticToLdr = stochasticSplats && renderToLdr;
+    caustica::rhi::TextureHandle stochasticDepthBuffer = stochasticToOutput
+        ? m_stochasticDepthBuffer
+        : (stochasticToLdr ? m_stochasticLdrDepthBuffer : m_stochasticProcessedDepthBuffer);
     std::shared_ptr<caustica::FramebufferFactory> stochasticFramebuffer = stochasticToOutput
         ? m_stochasticFramebuffer
-        : m_stochasticProcessedFramebuffer;
+        : (stochasticToLdr ? m_stochasticLdrFramebuffer : m_stochasticProcessedFramebuffer);
     if (stochasticSplats && (!stochasticFramebuffer || !stochasticDepthBuffer))
         return false;
     if (!stochasticSplats)
@@ -901,7 +927,10 @@ bool GaussianSplatPass::upload(
         return false;
     }
 
-    const bool useHybridShadows = settings.shadowsEnabled && meshTopLevelAS != nullptr && m_hybridRenderPipeline;
+    const bool useHybridShadows = settings.shadowsEnabled
+        && settings.shadowLightCount > 0
+        && meshTopLevelAS != nullptr
+        && m_hybridRenderPipeline;
 
     if (!m_rasterRenderBindingSet || (useHybridShadows && (!m_hybridRenderBindingSet || m_hybridRenderMeshTopLevelAS != meshTopLevelAS)))
         createBindingSets(renderTargets, useHybridShadows ? meshTopLevelAS : nullptr);
@@ -953,6 +982,11 @@ bool GaussianSplatPass::upload(
     constants.shadowSoftSampleCount = std::clamp(settings.shadowSoftSampleCount, 1u, 16u);
     constants.shadowSoftRadius = settings.shadowSoftRadius;
     constants.shadowFrameIndex = settings.shadowFrameIndex;
+    constants.shadowLightCount = useHybridShadows
+        ? std::min(settings.shadowLightCount, uint32_t(GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS))
+        : 0u;
+    for (uint32_t lightIndex = 0; lightIndex < constants.shadowLightCount; ++lightIndex)
+        constants.shadowLights[lightIndex] = settings.shadowLights[lightIndex];
     constants.sortMode = uint32_t(settings.sortingMode);
     constants.frustumCulling = uint32_t(settings.frustumCulling);
     constants.frustumDilation = settings.frustumDilation;
@@ -974,31 +1008,41 @@ bool GaussianSplatPass::upload(
         if (useGut)
         {
             renderPipeline = stochasticSplats
-                ? (stochasticToOutput ? m_gutStochasticHybridRenderPipeline : m_gutStochasticProcessedHybridRenderPipeline)
-                : m_gutHybridRenderPipeline;
+                ? (stochasticToOutput
+                    ? m_gutStochasticHybridRenderPipeline
+                    : (stochasticToLdr ? m_gutStochasticLdrHybridRenderPipeline : m_gutStochasticProcessedHybridRenderPipeline))
+                : (renderToLdr ? m_gutLdrHybridRenderPipeline : m_gutHybridRenderPipeline);
         }
         else
         {
             renderPipeline = stochasticSplats
-                ? (stochasticToOutput ? m_stochasticHybridRenderPipeline : m_stochasticProcessedHybridRenderPipeline)
-                : m_hybridRenderPipeline;
+                ? (stochasticToOutput
+                    ? m_stochasticHybridRenderPipeline
+                    : (stochasticToLdr ? m_stochasticLdrHybridRenderPipeline : m_stochasticProcessedHybridRenderPipeline))
+                : (renderToLdr ? m_ldrHybridRenderPipeline : m_hybridRenderPipeline);
         }
     }
     else if (useGut)
     {
         renderPipeline = stochasticSplats
-            ? (stochasticToOutput ? m_gutStochasticRasterRenderPipeline : m_gutStochasticProcessedRasterRenderPipeline)
-            : m_gutRasterRenderPipeline;
+            ? (stochasticToOutput
+                ? m_gutStochasticRasterRenderPipeline
+                : (stochasticToLdr ? m_gutStochasticLdrRasterRenderPipeline : m_gutStochasticProcessedRasterRenderPipeline))
+            : (renderToLdr ? m_gutLdrRasterRenderPipeline : m_gutRasterRenderPipeline);
     }
     else
     {
         renderPipeline = stochasticSplats
-            ? (stochasticToOutput ? m_stochasticRasterRenderPipeline : m_stochasticProcessedRasterRenderPipeline)
-            : m_rasterRenderPipeline;
+            ? (stochasticToOutput
+                ? m_stochasticRasterRenderPipeline
+                : (stochasticToLdr ? m_stochasticLdrRasterRenderPipeline : m_stochasticProcessedRasterRenderPipeline))
+            : (renderToLdr ? m_ldrRasterRenderPipeline : m_rasterRenderPipeline);
     }
     caustica::rhi::Framebuffer* framebuffer = stochasticSplats
         ? stochasticFramebuffer->getFramebuffer(caustica::rhi::AllSubresources)
-        : renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources);
+        : (renderToLdr
+            ? renderTargets.ldrFramebuffer->getFramebuffer(caustica::rhi::AllSubresources)
+            : renderTargets.processedOutputFramebuffer->getFramebuffer(caustica::rhi::AllSubresources));
     if (!renderPipeline || !framebuffer)
     {
         commandList->endMarker();

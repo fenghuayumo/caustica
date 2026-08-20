@@ -409,6 +409,8 @@ void InitializeEntries()
         SETTING_ACCESS(GaussianSplatSortingMode), { "gpu", "stochastic" }, reset);
     AddScalar("r.Gaussian.MipAntialiasing", "Enable mip-splatting antialiasing.",
         SETTING_ACCESS(GaussianSplatMipAntialiasing), reset);
+    AddScalar("r.Gaussian.ApplyToneMapping", "Composite Gaussian splats before tone mapping.",
+        SETTING_ACCESS(GaussianSplatApplyToneMapping), reset);
     AddScalar("r.Gaussian.QuantizeNormals", "Quantize Gaussian normal storage.",
         SETTING_ACCESS(GaussianSplatQuantizeNormals), reset);
     AddEnum("r.Gaussian.Culling.Mode", "Gaussian frustum-culling stage.",
