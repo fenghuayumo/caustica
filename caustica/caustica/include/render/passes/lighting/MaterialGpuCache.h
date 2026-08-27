@@ -257,6 +257,8 @@ struct StandardMaterial : public StandardMaterialBase
     // Display the sampled base color without BRDF/lighting, but modulate it by light visibility.
     bool                    unlitReceiveShadows                 = false;
     float                   unlitShadowStrength                 = 1.0f;
+    // Keep the reconstructed unlit/shadowed color linear at the tone-mapping stage.
+    bool                    unlitBypassToneMapping              = false;
 
     bool                    gpuDataDirty                        = true;         // params changed, GPU data needs update
     uint                    gpuDataIndex                        = 0xFFFFFFFF;   // 0xFFFFFFFF if no GPU buffer slot allocated

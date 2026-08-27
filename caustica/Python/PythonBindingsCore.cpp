@@ -953,6 +953,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("unlit_receive_shadows",
             [](StandardMaterial& self) { return self.unlitReceiveShadows; },
             [](StandardMaterial& self, bool v) { self.unlitReceiveShadows = v; self.gpuDataDirty = true; })
+        .def_prop_rw("unlit_bypass_tone_mapping",
+            [](StandardMaterial& self) { return self.unlitBypassToneMapping; },
+            [](StandardMaterial& self, bool v) { self.unlitBypassToneMapping = v; self.gpuDataDirty = true; })
         .def_prop_rw("unlit_shadow_strength",
             [](StandardMaterial& self) { return self.unlitShadowStrength; },
             [](StandardMaterial& self, float v) { self.unlitShadowStrength = std::clamp(v, 0.0f, 1.0f); self.gpuDataDirty = true; })

@@ -346,7 +346,7 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
 
     // we feed this as the main input into denoiser
 
-    u_OutputColor[pixelPos] = float4(combinedRadiance, 1.0);
+    u_OutputColor[pixelPos] = float4(combinedRadiance, u_OutputColor[pixelPos].a);
 
 #if 0 // remove guide buffers (but not motion vectors and depth!)
     diffAlbedo = 0.5.xxx;
@@ -446,7 +446,7 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
     StablePlanesContext stablePlanes = StablePlanesContext::make(u_StablePlanesHeader, u_StablePlanesBuffer, u_StableRadiance, g_Const.ptConsts);
 
     if (initWithStableRadiance)
-        u_OutputColor[pixelPos] = float4( stablePlanes.LoadStableRadiance(pixelPos), 1 );
+        u_OutputColor[pixelPos] = float4(stablePlanes.LoadStableRadiance(pixelPos), u_OutputColor[pixelPos].a);
 
     bool hasSurface = false;
     uint spBranchID = stablePlanes.GetBranchID(pixelPos, stablePlaneIndex);
@@ -694,7 +694,7 @@ void main( uint3 dispatchThreadID : SV_DispatchThreadID )
     const Ray cameraRay = Bridge::computeCameraRay( pixelPos );
     StablePlanesContext stablePlanes = StablePlanesContext::make(u_StablePlanesHeader, u_StablePlanesBuffer, u_StableRadiance, g_Const.ptConsts);
 
-    u_OutputColor[pixelPos] = float4(stablePlanes.GetAllRadiance(pixelPos), 1.0);
+    u_OutputColor[pixelPos] = float4(stablePlanes.GetAllRadiance(pixelPos), u_OutputColor[pixelPos].a);
 }
 #endif // NO_DENOISER_FINAL_MERGE
 

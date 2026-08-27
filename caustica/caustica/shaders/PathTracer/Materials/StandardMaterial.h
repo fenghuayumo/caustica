@@ -31,6 +31,7 @@ static const int StandardMaterialFlags_UnlitReceiveShadows            = (1 << 16
 static const int StandardMaterialFlags_UseCoatNormalTexture           = (1 << 17);
 static const int StandardMaterialFlags_Hair                           = (1 << 18);
 static const int StandardMaterialFlags_EyeChoroid                     = (1 << 19);
+static const int StandardMaterialFlags_UnlitBypassToneMapping         = (1 << 20);
 static const int StandardMaterialFlags_NestedPriorityMask             = 0xF0000000;
 static const int StandardMaterialFlags_NestedPriorityShift            = 28;
 static const int StandardMaterialFlags_PSDDominantDeltaLobeP1Mask     = 0x0F000000;

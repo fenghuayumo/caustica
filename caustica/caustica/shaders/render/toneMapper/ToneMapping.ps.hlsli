@@ -162,7 +162,12 @@ float4 applyToneMapping(float2 texC)
             finalColor = saturate(finalColor);
     }
 
-    return float4(finalColor, color.a);
+    // Alpha carries coverage through the same temporal/upscaling path as RGB,
+    // avoiding a separately reconstructed mask at sub-pixel mesh edges.
+    const float bypassWeight = saturate(color.a);
+    finalColor = lerp(finalColor, color.rgb, bypassWeight);
+
+    return float4(finalColor, 1.0);
 }
 
 #endif //__TONE_MAPPING_PS_HLSLI__
