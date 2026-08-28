@@ -496,7 +496,16 @@ def precompile(api: str, force: bool, global_preset: str = "default") -> int:
             continue
         pending.append(job)
 
-    worker_count = max(1, min(int(os.environ.get("CAUSTICA_PT_SHADER_JOBS", "4")), len(pending) or 1))
+    # DXC runs out-of-process, so the cook scales with core count rather than
+    # with the GIL. Cap it so a many-core machine does not thrash on memory.
+    requested_jobs = os.environ.get("CAUSTICA_PT_SHADER_JOBS")
+    default_jobs = min(16, max(4, (os.cpu_count() or 4)))
+    worker_count = int(requested_jobs) if requested_jobs else default_jobs
+    worker_count = max(1, min(worker_count, len(pending) or 1))
+    print(
+        f"[caustica] PT shader precompile ({api}, preset={global_preset}): "
+        f"{len(pending)} to compile, {skipped} cached, {worker_count} parallel jobs"
+    )
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         futures = [
             executor.submit(
