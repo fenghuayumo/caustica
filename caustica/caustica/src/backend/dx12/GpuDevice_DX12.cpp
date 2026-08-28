@@ -113,7 +113,6 @@ void GpuDevice_DX12::reportLiveObjects()
 
 bool GpuDevice_DX12::createInstanceInternal()
 {
-    caustica::info("GpuDevice_DX12: createInstanceInternal begin");
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     if (!m_DeviceParams.d3d12DeviceFactory)
     {
@@ -130,15 +129,9 @@ bool GpuDevice_DX12::createInstanceInternal()
     }
 #endif
 
-    caustica::info("GpuDevice_DX12: Agility SDK bootstrap done");
-
 #if CAUSTICA_WITH_STREAMLINE
     if (m_DeviceParams.enableStreamline)
-    {
         StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
-        caustica::info("GpuDevice_DX12: Streamline pre-device init done (signatureCheck=%d)",
-            m_DeviceParams.checkStreamlineSignature ? 1 : 0);
-    }
 #endif
 
     if (!m_DxgiFactory2)
@@ -152,7 +145,6 @@ bool GpuDevice_DX12::createInstanceInternal()
         }
     }
 
-    caustica::info("GpuDevice_DX12: DXGI factory ready");
     return true;
 }
 
@@ -161,7 +153,6 @@ bool GpuDevice_DX12::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
     if (!m_DxgiFactory2)
         return false;
 
-    caustica::info("GpuDevice_DX12: enumerateAdapters begin");
     outAdapters.clear();
 
     while (true)
@@ -257,7 +248,6 @@ bool GpuDevice_DX12::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
 bool GpuDevice_DX12::createDevice()
 {
-    caustica::info("GpuDevice_DX12: createDevice begin");
     if (m_DeviceParams.enableDebugRuntime)
     {
         RefCountPtr<ID3D12Debug> pDebug;
@@ -339,8 +329,6 @@ bool GpuDevice_DX12::createDevice()
         caustica::error("D3D12 device creation failed, error code = 0x%08x", hr);
         return false;
     }
-
-    caustica::info("GpuDevice_DX12: D3D12CreateDevice done");
 
 #if defined(CAUSTICA_D3D_AGILITY_SDK_VERSION) && (CAUSTICA_D3D_AGILITY_SDK_VERSION >= 619)
     if (!validateAgilityShaderModel(m_Device12))
@@ -428,13 +416,9 @@ bool GpuDevice_DX12::createDevice()
 
 #if CAUSTICA_WITH_STREAMLINE
     if (m_DeviceParams.enableStreamline)
-    {
         StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice);
-        caustica::info("GpuDevice_DX12: Streamline post-device init done");
-    }
 #endif
 
-    caustica::info("GpuDevice_DX12: createDevice end");
     return true;
 }
 
