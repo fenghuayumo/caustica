@@ -1,32 +1,33 @@
-/*
-* Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a
-* copy of this software and associated documentation files (the "Software"),
-* to deal in the Software without restriction, including without limitation
-* the rights to use, copy, modify, merge, publish, distribute, sublicense,
-* and/or sell copies of the Software, and to permit persons to whom the
-* Software is furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-* DEALINGS IN THE SOFTWARE.
-*/
+// Adapted for caustica from the NVIDIA RTX Character Rendering SDK.
+// Upstream algorithms: Chiang et al. 2016 hair BCSDF (https://benedikt-bitterli.me/pchfm/,
+// https://www.pbrt.org/hair.pdf) and the Burley normalized diffusion profile.
+//
+// Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef _RTXCR_SUBSURFACESCATTERING_HLSLI_
-#define _RTXCR_SUBSURFACESCATTERING_HLSLI_
+#ifndef __SUBSURFACE_SCATTERING_HLSLI__
+#define __SUBSURFACE_SCATTERING_HLSLI__
 
-#include "utils/RtxcrBsdf.hlsli"
+#include "ScatteringCommon.hlsli"
 #include "SubsurfaceMaterial.hlsli"
 
-float3 RTXCR_S(float3 albedo)
+float3 BurleyScalingFactor(float3 albedo)
 {
 #ifdef USE_DIFFUSE_MEAN_FREE_PATH
     const float3 a33 = albedo - 0.33f;
@@ -38,7 +39,7 @@ float3 RTXCR_S(float3 albedo)
 #endif
 }
 
-float4 RTXCR_SampleBurleyProfileMIS(
+float4 SampleBurleyProfileMIS(
     in float rand, in const float3 mfp, in const float3 diffuseAlbedo,
     in const float3 ssAlbedo, in const bool enableTransmission)
 {
@@ -63,7 +64,7 @@ float4 RTXCR_SampleBurleyProfileMIS(
     }
 
     rand = clamp(rand, 1e-7f, 1.0f - 1e-7f);
-    const float3 s = RTXCR_S(diffuseAlbedo);
+    const float3 s = BurleyScalingFactor(diffuseAlbedo);
     const float3 d = max(mfp * s, 1e-7f);
 
     float r;
@@ -86,29 +87,29 @@ float4 RTXCR_SampleBurleyProfileMIS(
         / max(dot(albedoNormalized, pdf3), 1e-7f).xxx, r);
 }
 
-void RTXCR_EvalBurleyDiffusionProfile(
-    in const RTXCR_SubsurfaceMaterialData material,
-    in const RTXCR_SubsurfaceInteraction interaction,
+void EvalBurleyDiffusionProfile(
+    in const SubsurfaceMaterialData material,
+    in const SubsurfaceInteraction interaction,
     in const float maxSampleRadius, in const bool enableTransmission,
-    in const float2 rand2, out RTXCR_SubsurfaceSample sample)
+    in const float2 rand2, out SubsurfaceSample sample)
 {
-    const RTXCR_SubsurfaceMaterialCoefficients coefficients =
-        RTXCR_ComputeSubsurfaceMaterialCoefficients(material);
-    const float4 profile = RTXCR_SampleBurleyProfileMIS(rand2.x,
+    const SubsurfaceMaterialCoefficients coefficients =
+        ComputeSubsurfaceMaterialCoefficients(material);
+    const float4 profile = SampleBurleyProfileMIS(rand2.x,
         coefficients.sigma_t, coefficients.albedo,
         coefficients.ssAlbedo, enableTransmission);
     const float r = profile.w;
     const float l = sqrt(max(maxSampleRadius * maxSampleRadius - r * r, 1e-7f));
-    sample.samplePosition = RTXCR_CalculateDiskSamplePosition(rand2.y, r,
+    sample.samplePosition = CalculateDiskSamplePosition(rand2.y, r,
         interaction.centerPosition, interaction.tangent, interaction.biTangent)
         + interaction.normal * l;
     sample.bssrdfWeight = profile.xyz;
 }
 
-float3 RTXCR_EvalBssrdf(in const RTXCR_SubsurfaceSample sample,
+float3 EvalBssrdf(in const SubsurfaceSample sample,
     in const float3 incidentRadiance, in const float NoL)
 {
-    return RTXCR_ONE_OVER_PI * sample.bssrdfWeight
+    return SCATTER_ONE_OVER_PI * sample.bssrdfWeight
         * incidentRadiance * saturate(NoL).xxx;
 }
 

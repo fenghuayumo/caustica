@@ -1,10 +1,10 @@
 #ifndef __PATH_TRACER_SUBSURFACE_HLSLI__
 #define __PATH_TRACER_SUBSURFACE_HLSLI__
 
-// RTXCR uses the diffuse mean-free-path fit for the Burley profile.
+// Use the diffuse mean-free-path fit for the Burley profile.
 #define USE_DIFFUSE_MEAN_FREE_PATH 1
-#include "../ThirdParty/RTXCR/SubsurfaceScattering.hlsli"
-#include "../ThirdParty/RTXCR/Transmission.hlsli"
+#include "Rendering/Materials/SubsurfaceScattering.hlsli"
+#include "Rendering/Materials/SubsurfaceTransmission.hlsli"
 
 inline float CausticaMax3(const float3 v)
 {
@@ -19,9 +19,9 @@ inline float CausticaSubsurfaceWeight(const ActiveBSDF bsdf)
 }
 
 inline void CausticaMakeSubsurfaceMaterial(
-    const ActiveBSDF bsdf, out RTXCR_SubsurfaceMaterialData material)
+    const ActiveBSDF bsdf, out SubsurfaceMaterialData material)
 {
-    material = RTXCR_CreateDefaultSubsurfaceMaterialData();
+    material = CreateDefaultSubsurfaceMaterialData();
     // RTXCR's character preset uses the textured diffuse albedo as the SSS
     // transmission color. Keep OpenPBR's subsurface_color as an additional
     // volume tint; using it alone turns white-tinted character skin into wax
@@ -34,7 +34,7 @@ inline void CausticaMakeSubsurfaceMaterial(
 }
 
 inline float CausticaSubsurfaceMaxRadius(
-    const RTXCR_SubsurfaceMaterialData material,
+    const SubsurfaceMaterialData material,
     const bool transmissionEncountered, const float roughness)
 {
     // Match RTXCR's character integrator. Once a path has crossed a
@@ -168,11 +168,11 @@ inline bool CausticaLoadSubsurfaceHit(
 inline float3 CausticaEvaluateBurleyDiffusion(
     const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
     const uint instanceIndex, const uint geometryIndex,
-    const RTXCR_SubsurfaceMaterialData material,
+    const SubsurfaceMaterialData material,
     const float maxRadius, inout UniformSampleSequenceGenerator sampleGenerator,
     const WorkingContext workingContext)
 {
-    RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
+    SubsurfaceInteraction interaction = CreateSubsurfaceInteraction(
         shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
 
     // RTXCR alternates between a surface-aligned disk and a camera-aligned
@@ -187,10 +187,10 @@ inline float3 CausticaEvaluateBurleyDiffusion(
         interaction.biTangent = normalize(cross(cameraUp, interaction.normal));
     }
 
-    RTXCR_SubsurfaceSample subsurfaceSample;
+    SubsurfaceSample subsurfaceSample;
     // RTXCR leaves single-scattering diffusion-profile correction disabled in
     // the Claire preset; enabling it shifts both the energy and the skin tint.
-    RTXCR_EvalBurleyDiffusionProfile(material, interaction, maxRadius, false,
+    EvalBurleyDiffusionProfile(material, interaction, maxRadius, false,
         sampleNext2D(sampleGenerator), subsurfaceSample);
 
     const float3 sampleOffset = subsurfaceSample.samplePosition - shadingData.posW;
@@ -232,20 +232,20 @@ inline float3 CausticaEvaluateBurleyDiffusion(
     const float3 visibility = CausticaSubsurfaceVisibility(
         sampleSurface.shadingData.posW, sampleSurface.shadingData.faceNCorrected,
         lightSample, path, workingContext);
-    return RTXCR_EvalBssrdf(subsurfaceSample,
+    return EvalBssrdf(subsurfaceSample,
         lightSample.Li * visibility, NoL);
 }
 
 inline float3 CausticaEvaluateSingleScatteringTransmission(
     const PathState path, const ShadingData shadingData, const ActiveBSDF bsdf,
-    const uint instanceIndex, const RTXCR_SubsurfaceMaterialData material,
+    const uint instanceIndex, const SubsurfaceMaterialData material,
     inout UniformSampleSequenceGenerator sampleGenerator, const WorkingContext workingContext)
 {
-    const RTXCR_SubsurfaceInteraction interaction = RTXCR_CreateSubsurfaceInteraction(
+    const SubsurfaceInteraction interaction = CreateSubsurfaceInteraction(
         shadingData.posW, shadingData.N, shadingData.T, shadingData.B);
-    const RTXCR_SubsurfaceMaterialCoefficients coefficients =
-        RTXCR_ComputeSubsurfaceMaterialCoefficients(material);
-    const float3 refractedDirection = RTXCR_CalculateRefractionRay(
+    const SubsurfaceMaterialCoefficients coefficients =
+        ComputeSubsurfaceMaterialCoefficients(material);
+    const float3 refractedDirection = CalculateRefractionRay(
         interaction, sampleNext2D(sampleGenerator));
 
     RayDesc transmissionRay;
@@ -277,11 +277,11 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
         const float3 visibility = CausticaSubsurfaceVisibility(
             exitSurface.shadingData.posW, exitOutwardFaceNormal,
             boundaryLight, path, workingContext);
-        const float3 boundary = RTXCR_EvaluateBoundaryTerm(
+        const float3 boundary = EvaluateBoundaryTerm(
             shadingData.N, boundaryLight.Direction, refractedDirection,
             exitOutwardNormal, thickness, coefficients);
         // Entry direction is cosine sampled, cancelling its cosine/pdf term.
-        radiance += boundaryLight.Li * visibility * boundary * RTXCR_PI;
+        radiance += boundaryLight.Li * visibility * boundary * SCATTER_PI;
     }
 
     // RTXCR's default is one evenly spaced interior sample, i.e. the midpoint
@@ -290,7 +290,7 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
     const float distanceSample = 0.5f * thickness;
     const float3 scatteringPosition = transmissionRay.Origin
         + refractedDirection * distanceSample;
-    const float3 scatteringDirection = RTXCR_SampleDirectionHenyeyGreenstein(
+    const float3 scatteringDirection = SampleDirectionHenyeyGreenstein(
         sampleNext2D(sampleGenerator), material.g, refractedDirection);
 
     RayDesc scatteringRay;
@@ -315,7 +315,7 @@ inline float3 CausticaEvaluateSingleScatteringTransmission(
             const float3 visibility = CausticaSubsurfaceVisibility(
                 scatteringExitSurface.shadingData.posW, scatteringExitFaceNormal,
                 scatteringLight, path, workingContext);
-            const float3 singleScattering = RTXCR_EvaluateSingleScattering(
+            const float3 singleScattering = EvaluateSingleScattering(
                 scatteringLight.Direction, scatteringExitNormal,
                 distanceSample + scatteringExitT, coefficients);
             radiance += scatteringLight.Li * visibility
@@ -336,7 +336,7 @@ inline float3 HandleSubsurfaceNEE(
     if (weight <= 0.0f || shadingData.mtl.isThinSurface() || bsdf.data.IsHair())
         return 0.0f;
 
-    RTXCR_SubsurfaceMaterialData material;
+    SubsurfaceMaterialData material;
     CausticaMakeSubsurfaceMaterial(bsdf, material);
     if (!any(material.transmissionColor > 1e-4f))
         return 0.0f;

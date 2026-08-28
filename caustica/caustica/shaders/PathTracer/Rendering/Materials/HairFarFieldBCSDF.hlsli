@@ -1,29 +1,30 @@
-/*
-* Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a
-* copy of this software and associated documentation files (the "Software"),
-* to deal in the Software without restriction, including without limitation
-* the rights to use, copy, modify, merge, publish, distribute, sublicense,
-* and/or sell copies of the Software, and to permit persons to whom the
-* Software is furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-* DEALINGS IN THE SOFTWARE.
-*/
+// Adapted for caustica from the NVIDIA RTX Character Rendering SDK.
+// Upstream algorithms: Chiang et al. 2016 hair BCSDF (https://benedikt-bitterli.me/pchfm/,
+// https://www.pbrt.org/hair.pdf) and the Burley normalized diffusion profile.
+//
+// Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef _RTXCR_HAIRFARFIELDBCSDF_HLSLI_
-#define _RTXCR_HAIRFARFIELDBCSDF_HLSLI_
+#ifndef __HAIR_FAR_FIELD_BCSDF_HLSLI__
+#define __HAIR_FAR_FIELD_BCSDF_HLSLI__
 
-#include "utils/RtxcrBsdf.hlsli"
+#include "ScatteringCommon.hlsli"
 #include "HairMaterial.hlsli"
 
 // tighten the R lobe (or not) with phi - [d'Eon et al. 2014 SIGGRAPH talk]
@@ -34,8 +35,8 @@
 //  R lobe: [d'Eon et al. 2014 - SIGGRAPH talk]
 //  TT lobe: [Marschner et al. 2003]
 //  TRT lobe: custom 3-Gaussian lobe based on fitting to MC simulation
-void RTXCR_HairFarFieldBcsdfEval(in const RTXCR_HairInteractionSurface hairInteractionSurface,
-                                 in const RTXCR_HairMaterialInteractionBcsdf hairMaterialInteractionBcsdf,
+void HairFarFieldBcsdfEval(in const HairInteractionSurface hairInteractionSurface,
+                                 in const HairMaterialInteractionBcsdf hairMaterialInteractionBcsdf,
                                  in const float3 wi,     // pointing to light
                                  in const float3 wo,     // pointing to camera
                                  out float3 bsdf,        // Farfield BSDF for hair lobes (R, TT, TRT)
@@ -60,39 +61,39 @@ void RTXCR_HairFarFieldBcsdfEval(in const RTXCR_HairInteractionSurface hairInter
     const float roughness = hairMaterialInteractionBcsdf.roughness;
     const float ior = hairMaterialInteractionBcsdf.ior;
     const float iorSqr = ior * ior;
-    const float f0 = RTXCR_CalculateBaseReflectivity(1.0f, ior);
+    const float f0 = CalculateBaseReflectivity(1.0f, ior);
     const float3 mua = hairMaterialInteractionBcsdf.absorptionCoefficient;
 
     // Compute R lobe - smooth N term, Gaussian M term
     const float fresCosR = cos(0.5f * acos(clamp(dot(wi, wo), -1.0f, 1.0f))); // [d'Eon et al. 2011 - (12)]
-    const float fresnelTermR = RTXCR_EvalFresnelSchlick(f0, fresCosR);
+    const float fresnelTermR = ScatterFresnelSchlick(f0, fresCosR);
     const float betaR = sqrt(2.0f) * roughness * R_TERM_AZIMUTHAL_SQUEEZE;
-    const float M_R = RTXCR_Gaussian1D(thetaH + hairMaterialInteractionBcsdf.cuticleAngle, betaR * 0.5f);
+    const float M_R = ScatterGaussian1D(thetaH + hairMaterialInteractionBcsdf.cuticleAngle, betaR * 0.5f);
     const float N_R = fresnelTermR * 0.25f * cos(0.5f * phi);
 
     // Compute TT lobe - smooth N term, Gaussian M term
-    const float betaTT = (sinThetaI < 1.0f) ? 0.25f * roughness * RTXCR_Sqrt0(-((-1.0f + iorSqr) / (-1.0f + sinThetaI * sinThetaI))) : 100000.0f;
-    const float M_TT = max((sinThetaI < 1.0f) ? RTXCR_Gaussian1D(thetaH - 0.5f * hairMaterialInteractionBcsdf.cuticleAngle, betaTT) : 0.0f, 0.0f);
+    const float betaTT = (sinThetaI < 1.0f) ? 0.25f * roughness * ScatterSqrt0(-((-1.0f + iorSqr) / (-1.0f + sinThetaI * sinThetaI))) : 100000.0f;
+    const float M_TT = max((sinThetaI < 1.0f) ? ScatterGaussian1D(thetaH - 0.5f * hairMaterialInteractionBcsdf.cuticleAngle, betaTT) : 0.0f, 0.0f);
     const float sinThetaD = sin(thetaD);
-    const float etaPrmInv = cos(thetaD) / RTXCR_Sqrt0(iorSqr - sinThetaD * sinThetaD); // 1.0 / eta_prime
+    const float etaPrmInv = cos(thetaD) / ScatterSqrt0(iorSqr - sinThetaD * sinThetaD); // 1.0 / eta_prime
     const float etaPrmInvSqr = etaPrmInv * etaPrmInv;
     // hTT: root of phi(h) for p = 1
-    const float hTT = clamp(RTXCR_Sqrt01((0.5f + 0.5f * cosPhi) / (1.0f + etaPrmInvSqr - 2.0f * etaPrmInv * RTXCR_Sqrt01(0.5f - 0.5f * cosPhi))), -1.0f, 1.0f);
+    const float hTT = clamp(ScatterSqrt01((0.5f + 0.5f * cosPhi) / (1.0f + etaPrmInvSqr - 2.0f * etaPrmInv * ScatterSqrt01(0.5f - 0.5f * cosPhi))), -1.0f, 1.0f);
     const float TTfresnelDot = cos(thetaD) * cos(asin(hTT));
-    const float TT_f = RTXCR_EvalFresnelSchlick(f0, TTfresnelDot); // [d'Eon et al. 2011 - (14)]
+    const float TT_f = ScatterFresnelSchlick(f0, TTfresnelDot); // [d'Eon et al. 2011 - (14)]
     const float fresnelTermTT = (1.0f - TT_f) * (1.0f - TT_f);
     const float N_TT =
-        -1.0f / (2.0f * (-2.0f / RTXCR_Sqrt01(1.0f - hTT * hTT) + (2.0f * etaPrmInv) / RTXCR_Sqrt01(1.0f - etaPrmInvSqr * hTT * hTT)));
+        -1.0f / (2.0f * (-2.0f / ScatterSqrt01(1.0f - hTT * hTT) + (2.0f * etaPrmInv) / ScatterSqrt01(1.0f - etaPrmInvSqr * hTT * hTT)));
     const float cosThetaT = cos(thetaD) / (etaPrmInv * ior);
     const float gammaT = asin(hTT * etaPrmInv);
     const float3 absorptionTT = exp(-mua * 2.0f * cos(gammaT) / cosThetaT); // TODO: absorption with Medulla
-    const float TTClamp = phi < 2.001f * acos(RTXCR_Sqrt01(1.0f - etaPrmInvSqr)) ? 0.0f : 1.0f;
+    const float TTClamp = phi < 2.001f * acos(ScatterSqrt01(1.0f - etaPrmInvSqr)) ? 0.0f : 1.0f;
     const float3 A_TT = fresnelTermTT * absorptionTT * TTClamp;
 
     // compute TRT lobe as sum of 3 Gaussians
     const float betaTRT = roughness * (2.0f + pow(abs(thetaI), 1.5f));
-    const float M_TRT = RTXCR_Gaussian1D(thetaH - 1.5f * hairMaterialInteractionBcsdf.cuticleAngle, betaTRT * 0.5f);
-    const float clampTT = (phi < 2.001f * acos(RTXCR_Sqrt01(1.0f - etaPrmInvSqr))) ? 0.0f : 1.0f;
+    const float M_TRT = ScatterGaussian1D(thetaH - 1.5f * hairMaterialInteractionBcsdf.cuticleAngle, betaTRT * 0.5f);
+    const float clampTT = (phi < 2.001f * acos(ScatterSqrt01(1.0f - etaPrmInvSqr))) ? 0.0f : 1.0f;
 
     const float ti = abs(thetaD);
 
@@ -123,10 +124,10 @@ void RTXCR_HairFarFieldBcsdfEval(in const RTXCR_HairInteractionSurface hairInter
         v2 = -1.86f + 2.73f * ti - 0.7437f * ti * ti;
     }
 
-    const float TRTwidth1 = roughness / 0.06f * RTXCR_Sqrt0(float(v1));
-    const float TRTwidth2 = roughness / 0.06f * RTXCR_Sqrt0(float(v2));
-    const float N_TRT = float((200.0f / RTXCR_PI) * (w1 * RTXCR_Gaussian1D(phi - float(p1), TRTwidth1) + w1 * RTXCR_Gaussian1D(phi + float(p1), TRTwidth1) +
-                        w2 * RTXCR_Gaussian1D(phi, TRTwidth2)));
+    const float TRTwidth1 = roughness / 0.06f * ScatterSqrt0(float(v1));
+    const float TRTwidth2 = roughness / 0.06f * ScatterSqrt0(float(v2));
+    const float N_TRT = float((200.0f / SCATTER_PI) * (w1 * ScatterGaussian1D(phi - float(p1), TRTwidth1) + w1 * ScatterGaussian1D(phi + float(p1), TRTwidth1) +
+                        w2 * ScatterGaussian1D(phi, TRTwidth2)));
 
     // assume h = 0 for absorption
     const float3 absorptionTRT = exp(-mua * 3.75f / cosThetaT);
@@ -137,7 +138,7 @@ void RTXCR_HairFarFieldBcsdfEval(in const RTXCR_HairInteractionSurface hairInter
            (M_R * N_R + M_TT * N_TT * A_TT * clampTT + M_TRT * N_TRT * A_TRT) / (cos(thetaD) * cos(thetaD)) * cos(thetaI), 0.0f);
 
     float pdfDiffuse = hairMaterialInteractionBcsdf.diffuseReflectionWeight *
-                   cos(thetaI) * (0.25f / RTXCR_PI) * abs((RTXCR_PI - phi) * cosPhi + sin(phi)) * cos(thetaI);
+                   cos(thetaI) * (0.25f / SCATTER_PI) * abs((SCATTER_PI - phi) * cosPhi + sin(phi)) * cos(thetaI);
     bsdfDiffuse = pdfDiffuse * hairMaterialInteractionBcsdf.diffuseReflectionTint;
 
     // pdf is just eval() without the absorption terms applied
@@ -145,8 +146,8 @@ void RTXCR_HairFarFieldBcsdfEval(in const RTXCR_HairInteractionSurface hairInter
           (M_R * N_R + M_TT * N_TT * fresnelTermTT * TTClamp + M_TRT * N_TRT) / cos(thetaD) / cos(thetaD) * cos(thetaI);
 }
 
-bool RTXCR_SampleFarFieldBcsdf(in const RTXCR_HairInteractionSurface hairInteractionSurface,
-                               in const RTXCR_HairMaterialInteractionBcsdf hairMaterialInteractionBcsdf,
+bool SampleFarFieldBcsdf(in const HairInteractionSurface hairInteractionSurface,
+                               in const HairMaterialInteractionBcsdf hairMaterialInteractionBcsdf,
                                in const float3 wo,
                                in const float h,
                                in const float lobeRandom,
@@ -161,18 +162,18 @@ bool RTXCR_SampleFarFieldBcsdf(in const RTXCR_HairInteractionSurface hairInterac
     const float3 B = cross(N, T);
 
     const float sinThetaO = clamp(dot(T, wo), -1.0f, 1.0f);
-    const float cosThetaO = RTXCR_Sqrt01(1.0f - sinThetaO * sinThetaO);
+    const float cosThetaO = ScatterSqrt01(1.0f - sinThetaO * sinThetaO);
     const float thetaO = asin(sinThetaO);
 
-    const float f0 = RTXCR_CalculateBaseReflectivity(1.0f, hairMaterialInteractionBcsdf.ior);
-    const float mua = RTXCR_Luminance(hairMaterialInteractionBcsdf.absorptionCoefficient);
+    const float f0 = CalculateBaseReflectivity(1.0f, hairMaterialInteractionBcsdf.ior);
+    const float mua = ScatterLuminance(hairMaterialInteractionBcsdf.absorptionCoefficient);
     const float ior = hairMaterialInteractionBcsdf.ior;
     const float roughness = hairMaterialInteractionBcsdf.roughness;
 
     // sample lobe using specular cone propagation at selected h offset
     // equivalent to assuming thetaI = thetaO
-    const float aSpec = cosThetaO / RTXCR_Sqrt0(pow(ior, 2.0f) - pow(sinThetaO, 2.0f));
-    const float fSpecR = RTXCR_EvalFresnelSchlick(f0, cosThetaO * RTXCR_Sqrt01(1.0 - h * h));
+    const float aSpec = cosThetaO / ScatterSqrt0(pow(ior, 2.0f) - pow(sinThetaO, 2.0f));
+    const float fSpecR = ScatterFresnelSchlick(f0, cosThetaO * ScatterSqrt01(1.0 - h * h));
     const float fSpecT = 1.0 - fSpecR;
     const float cosThetaTSpec = cosThetaO / (aSpec * ior);
     const float gammaTSpec = asin(h * aSpec);
@@ -197,29 +198,29 @@ bool RTXCR_SampleFarFieldBcsdf(in const RTXCR_HairInteractionSurface hairInterac
     if (lobeRandom < pdfLobeR)
     {
         // sample R
-        const float phi = RTXCR_PhiR(h);
+        const float phi = PhiR(h);
         const float betaR = sqrt(2.0f) * roughness * R_TERM_AZIMUTHAL_SQUEEZE;
-        const float thetaI = -thetaO + RTXCR_RandomGaussian1D(rand2[0].x, rand2[0].y) * betaR;
+        const float thetaI = -thetaO + ScatterRandomGaussian1D(rand2[0].x, rand2[0].y) * betaR;
 
         wi = cos(phi) * cos(thetaI) * N + sin(phi) * cos(thetaI) * B + sin(thetaI) * T;
 
-        const float fresnelTermR = RTXCR_EvalFresnelSchlick(f0, cos(0.5f * acos(dot(wi, wo))));
+        const float fresnelTermR = ScatterFresnelSchlick(f0, cos(0.5f * acos(dot(wi, wo))));
 
         sampleWeight = clamp(fresnelTermR / wR, 0.0f, 2.0f);
     }
     else if (lobeRandom < pdfLobeR + pdfLobeTT)
     {
         // sample TT
-        const float betaTT = (roughness * RTXCR_Sqrt0(-((-1.0f + pow(ior, 2.0f)) / (-1.0f + pow(sinThetaO, 2.0f))))) / 2.0f;
-        const float thetaI = -thetaO + RTXCR_RandomGaussian1D(rand2[0].x, rand2[0].y) * betaTT;
+        const float betaTT = (roughness * ScatterSqrt0(-((-1.0f + pow(ior, 2.0f)) / (-1.0f + pow(sinThetaO, 2.0f))))) / 2.0f;
+        const float thetaI = -thetaO + ScatterRandomGaussian1D(rand2[0].x, rand2[0].y) * betaTT;
         const float thetaD = 0.5f * (thetaI - thetaO);
 
-        const float a = cos(thetaD) / RTXCR_Sqrt0(pow(ior, 2.0f) - pow(sin(thetaD), 2.0f)); // 1.0 / eta_prime
-        const float phi = RTXCR_PhiTT(h, a);
+        const float a = cos(thetaD) / ScatterSqrt0(pow(ior, 2.0f) - pow(sin(thetaD), 2.0f)); // 1.0 / eta_prime
+        const float phi = PhiTT(h, a);
 
         wi = cos(phi) * cos(thetaI) * N + sin(phi) * cos(thetaI) * B + sin(thetaI) * T;
 
-        const float f = RTXCR_EvalFresnelSchlick(f0, cos(thetaD) * cos(asin(h))); // [d'Eon et al. 2011 - (14)]
+        const float f = ScatterFresnelSchlick(f0, cos(thetaD) * cos(asin(h))); // [d'Eon et al. 2011 - (14)]
 
         const float cosThetaT = cos(thetaD) / (a * ior);
         const float gammaT = asin(h * a);
@@ -231,15 +232,15 @@ bool RTXCR_SampleFarFieldBcsdf(in const RTXCR_HairInteractionSurface hairInterac
     {
         // sample TRT
         const float betaTRT = roughness * (2.0f + pow(abs(thetaO), 1.5f));
-        const float thetaI = -thetaO + RTXCR_RandomGaussian1D(rand2[0].x, rand2[0].y) * betaTRT;
+        const float thetaI = -thetaO + ScatterRandomGaussian1D(rand2[0].x, rand2[0].y) * betaTRT;
         const float thetaD = 0.5f * (thetaI - thetaO);
 
-        const float a = cos(thetaD) / RTXCR_Sqrt0(pow(ior, 2.0f) - pow(sin(thetaD), 2.0f)); // 1.0 / eta_prime
-        const float phi = RTXCR_PhiTRT(h, a) + RTXCR_RandomGaussian1D(rand2[1].x, rand2[1].y) * roughness;
+        const float a = cos(thetaD) / ScatterSqrt0(pow(ior, 2.0f) - pow(sin(thetaD), 2.0f)); // 1.0 / eta_prime
+        const float phi = PhiTRT(h, a) + ScatterRandomGaussian1D(rand2[1].x, rand2[1].y) * roughness;
 
         wi = cos(phi) * cos(thetaI) * N + sin(phi) * cos(thetaI) * B + sin(thetaI) * T;
 
-        const float f = RTXCR_EvalFresnelSchlick(f0, cos(thetaD) * cos(asin(h))); // [d'Eon et al. 2011 - (14)]
+        const float f = ScatterFresnelSchlick(f0, cos(thetaD) * cos(asin(h))); // [d'Eon et al. 2011 - (14)]
 
         const float cosThetaT = cos(thetaD) / (a * ior);
         const float gammaT = asin(h * a);
@@ -248,10 +249,9 @@ bool RTXCR_SampleFarFieldBcsdf(in const RTXCR_HairInteractionSurface hairInterac
         sampleWeight = clamp((1.0f - f) * (1.0f - f) * f * absorption / wTRT, 0.0f, 2.0f);
     }
 
-    RTXCR_HairFarFieldBcsdfEval(hairInteractionSurface, hairMaterialInteractionBcsdf, wi, wo, bsdf, bsdfDiffuse, pdf);
+    HairFarFieldBcsdfEval(hairInteractionSurface, hairMaterialInteractionBcsdf, wi, wo, bsdf, bsdfDiffuse, pdf);
 
     return pdf > 0.0f;
 }
 
 #endif
-

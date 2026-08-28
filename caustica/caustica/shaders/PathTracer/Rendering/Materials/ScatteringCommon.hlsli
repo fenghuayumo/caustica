@@ -1,41 +1,42 @@
-/*
-* Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a
-* copy of this software and associated documentation files (the "Software"),
-* to deal in the Software without restriction, including without limitation
-* the rights to use, copy, modify, merge, publish, distribute, sublicense,
-* and/or sell copies of the Software, and to permit persons to whom the
-* Software is furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-* DEALINGS IN THE SOFTWARE.
-*/
+// Adapted for caustica from the NVIDIA RTX Character Rendering SDK.
+// Upstream algorithms: Chiang et al. 2016 hair BCSDF (https://benedikt-bitterli.me/pchfm/,
+// https://www.pbrt.org/hair.pdf) and the Burley normalized diffusion profile.
+//
+// Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+// of the Software, and to permit persons to whom the Software is furnished to do
+// so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // Extension of "Crash Course in BRDF Implementation" specific for RTXCR
 
-#ifndef _RTXCR_BSDFEXT_HLSLI_
-#define _RTXCR_BSDFEXT_HLSLI_
+#ifndef __SCATTERING_COMMON_HLSLI__
+#define __SCATTERING_COMMON_HLSLI__
 
-#include "RtxcrMath.hlsli"
+#include "ScatteringMath.hlsli"
 
 // Evaluate Lamberian Diffuse BRDF
-float3 RTXCR_EvalLambertianBRDF(const float3 N, const float3 L, const float3 diffuseAlbedo)
+float3 EvalLambertianBRDF(const float3 N, const float3 L, const float3 diffuseAlbedo)
 {
     const float NoL = min(max(1e-5f, dot(N, L)), 1.0f);
-	return diffuseAlbedo * (RTXCR_ONE_OVER_PI * NoL).xxx;
+	return diffuseAlbedo * (SCATTER_ONE_OVER_PI * NoL).xxx;
 }
 
 // Calculates the monochromatic base reflectivity from a given incident and transmitted IoR
-float RTXCR_CalculateBaseReflectivity(const float incidentIoR, const float transmittedIoR)
+float CalculateBaseReflectivity(const float incidentIoR, const float transmittedIoR)
 {
     const float tmp = (incidentIoR - transmittedIoR) / (incidentIoR + transmittedIoR);
     return tmp * tmp;
@@ -44,7 +45,7 @@ float RTXCR_CalculateBaseReflectivity(const float incidentIoR, const float trans
 // Analytical fresnel equation for dielectric material:
 // https://en.wikipedia.org/wiki/Fresnel_equations#Power_(intensity)_reflection_and_transmission_coefficients
 // For approximation versions, check the bsdf shader.
-float RTXCR_DielectricFresnel(
+float DielectricFresnel(
     const float eta,        // refracted / reflected ior
     const float cosThetaI)  // cosine between of angle normal/half-vector and incident direction
 {
@@ -70,18 +71,18 @@ float RTXCR_DielectricFresnel(
 }
 
 // Schlick's approximation to Fresnel term
-float RTXCR_EvalFresnelSchlick(float f0, float NdotS)
+float ScatterFresnelSchlick(float f0, float NdotS)
 {
 	return f0 + (1.0f - f0) * pow(1.0f - NdotS, 5.0f);
 }
 
 // Calculates Beer-Lambert attenuation at a specified distance through a medium with a specified attenuation coefficient.
-float3 RTXCR_EvalBeerLambertAttenuation(in const float3 attenuationCoefficient, in const float distance)
+float3 EvalBeerLambertAttenuation(in const float3 attenuationCoefficient, in const float distance)
 {
     return exp(-attenuationCoefficient * distance);
 }
 
-float3 RTXCR_SampleDirectionHenyeyGreenstein(float2 rndSample, in float g, in float3 wo)
+float3 SampleDirectionHenyeyGreenstein(float2 rndSample, in float g, in float3 wo)
 {
     float cosTheta;
     if (abs(g) < 1e-3f)
@@ -96,19 +97,18 @@ float3 RTXCR_SampleDirectionHenyeyGreenstein(float2 rndSample, in float g, in fl
 
     // Compute direction for Henyey-Greenstein sample
     const float sinTheta = sqrt(max((float) 0, 1 - cosTheta * cosTheta));
-    const float phi = RTXCR_TWO_PI * rndSample.y;
+    const float phi = SCATTER_TWO_PI * rndSample.y;
     float3 x, y;
     const float3 z = wo;
-    RTXCR_CreateCoordinateSystemFromZ(true, z, x, y);
-    const float3 wi = RTXCR_SphericalDirection(sinTheta, cosTheta, phi, x, y, z);
+    ScatterCoordinateSystemFromZ(true, z, x, y);
+    const float3 wi = ScatterSphericalDirection(sinTheta, cosTheta, phi, x, y, z);
     return wi;
 }
 
-// Linear RGB 鈫?perceptual luminance (Rec.709).
-float RTXCR_Luminance(const float3 rgb)
+// Linear RGB to perceptual luminance (Rec.709).
+float ScatterLuminance(const float3 rgb)
 {
 	return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
 }
 
 #endif
-

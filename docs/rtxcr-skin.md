@@ -68,7 +68,7 @@ shim and launch it with:
 
 ```powershell
 python tools/prepare_rtxcr_claire_scene.py `
-  --rtxcr-assets "D:\ProgramCode\C++\RTXCR\assets"
+  --rtxcr-assets "D:\path\to\RTXCR\assets"
 .\bin\caustica.exe --scene Assets/rtxcr-claire.external.scene.json
 ```
 
@@ -81,10 +81,23 @@ Claire validation path.
 
 ## Source layout
 
-- `shaders/ThirdParty/RTXCR/SubsurfaceMaterial.hlsli`
-- `shaders/ThirdParty/RTXCR/SubsurfaceScattering.hlsli`
-- `shaders/ThirdParty/RTXCR/Transmission.hlsli`
+- `shaders/PathTracer/Rendering/Materials/SubsurfaceMaterial.hlsli`
+- `shaders/PathTracer/Rendering/Materials/SubsurfaceScattering.hlsli`
+- `shaders/PathTracer/Rendering/Materials/SubsurfaceTransmission.hlsli`
+- `shaders/PathTracer/Rendering/Materials/ScatteringCommon.hlsli`
+- `shaders/PathTracer/Rendering/Materials/ScatteringMath.hlsli`
 - `shaders/PathTracer/PathTracerSubsurface.hlsli`
 
-The upstream RTXCR copyright and MIT-style license notice is retained in every
-vendored library file.
+The hair counterparts live alongside them:
+
+- `shaders/PathTracer/Rendering/Materials/HairMaterial.hlsli`
+- `shaders/PathTracer/Rendering/Materials/HairChiangBSDF.hlsli`
+- `shaders/PathTracer/Rendering/Materials/HairFarFieldBCSDF.hlsli`
+- `shaders/PathTracer/Rendering/Materials/HairBsdfHelpers.hlsli`
+
+These files were adapted from the upstream RTXCR SDK rather than vendored
+verbatim: they follow caustica's shader naming and the `RTXCR_` symbol prefix
+is gone. Because they remain a derivative of the upstream MIT-licensed sources,
+the NVIDIA copyright and permission notice is retained at the top of each file,
+as MIT requires. Symbols that would otherwise collide with existing engine
+shader code carry a `Hair`, `Subsurface`, or `Scatter` prefix instead.

@@ -100,7 +100,7 @@ file(GLOB_RECURSE caustica_pt_shader_sources
     "${caustica_pt_shader_dir}/PathTracer*.hlsl"
     "${caustica_pt_shader_dir}/PathTracer*.hlsli"
     "${caustica_pt_shader_dir}/HairGeometry.hlsli"
-    "${caustica_pt_shader_dir}/ThirdParty/RTXCR/*.hlsli"
+    "${caustica_pt_shader_dir}/PathTracer/Rendering/Materials/*.hlsli"
 )
 set_source_files_properties(${caustica_pt_shader_sources} PROPERTIES VS_TOOL_OVERRIDE "None")
 

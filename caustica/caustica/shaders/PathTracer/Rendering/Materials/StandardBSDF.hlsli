@@ -8,31 +8,31 @@
 
 #include "IBSDF.hlsli"
 #include "BxDF.hlsli"
-#include "../../../ThirdParty/RTXCR/HairChiangBSDF.hlsli"
-#include "../../../ThirdParty/RTXCR/HairFarFieldBCSDF.hlsli"
+#include "HairChiangBSDF.hlsli"
+#include "HairFarFieldBCSDF.hlsli"
 
 static const uint CausticaHairModel_FarField = 0;
 static const uint CausticaHairModel_Chiang = 1;
 
-RTXCR_HairMaterialData CausticaMakeHairMaterialData(const StandardBSDFData data)
+HairMaterialData CausticaMakeHairMaterialData(const StandardBSDFData data)
 {
-    RTXCR_HairMaterialData material;
+    HairMaterialData material;
     material.baseColor = data.HairBaseColor();
     material.longitudinalRoughness = max((float)data.HairLongitudinalRoughness(), 0.001f);
     material.azimuthalRoughness = max((float)data.HairAzimuthalRoughness(), 0.001f);
     material.ior = max((float)data.HairIor(), 1.001f);
     material.eta = 1.0f / material.ior;
     material.fresnelApproximation = 1;
-    material.absorptionModel = RTXCR_HairAbsorptionModel_Physics;
+    material.absorptionModel = HairAbsorptionModel_Physics;
     material.melanin = saturate((float)data.HairMelanin());
     material.melaninRedness = saturate((float)data.HairMelaninRedness());
     material.cuticleAngleInDegrees = (float)data.HairCuticleAngle();
     return material;
 }
 
-RTXCR_HairInteractionSurface CausticaMakeHairInteraction(const ShadingData shadingData)
+HairInteractionSurface CausticaMakeHairInteraction(const ShadingData shadingData)
 {
-    RTXCR_HairInteractionSurface surface;
+    HairInteractionSurface surface;
     // RTXCR's local hair convention is X=strand tangent, Z=fiber normal.
     surface.incidentRayDirection = float3(
         dot(shadingData.V, shadingData.T),
@@ -53,30 +53,30 @@ float3 CausticaHairFromLocal(const ShadingData shadingData, float3 direction)
     return shadingData.T * direction.x + shadingData.B * direction.y + shadingData.N * direction.z;
 }
 
-// Evaluate the same directional mixture PDF used by RTXCR_SampleChiangBsdf().
+// Evaluate the same directional mixture PDF used by SampleChiangBsdf().
 // Keeping this separate from the BCSDF value is required for unbiased NEE/MIS.
 float CausticaHairChiangPdf(
-    const RTXCR_HairMaterialInteraction interaction, const float3 wi, const float3 wo)
+    const HairMaterialInteraction interaction, const float3 wi, const float3 wo)
 {
     const float sinThetaO = wo.x;
-    const float cosThetaO = RTXCR_Sqrt01(1.f - sinThetaO * sinThetaO);
-    const float phiO = RTXCR_Atan2safe(wo.z, wo.y);
+    const float cosThetaO = ScatterSqrt01(1.f - sinThetaO * sinThetaO);
+    const float phiO = ScatterAtan2Safe(wo.z, wo.y);
     const float sinThetaI = wi.x;
-    const float cosThetaI = RTXCR_Sqrt01(1.f - sinThetaI * sinThetaI);
-    const float phiI = RTXCR_Atan2safe(wi.z, wi.y);
+    const float cosThetaI = ScatterSqrt01(1.f - sinThetaI * sinThetaI);
+    const float phiI = ScatterAtan2Safe(wi.z, wi.y);
     const float dphi = phiI - phiO;
 
-    float apPdf[RTXCR_Hair_Max_Scattering_Events + 1];
-    RTXCR_ComputeApPdf(interaction, cosThetaO, apPdf);
+    float apPdf[Hair_Max_Scattering_Events + 1];
+    ComputeApPdf(interaction, cosThetaO, apPdf);
 
-    const float etap = RTXCR_Sqrt0(interaction.ior * interaction.ior - sinThetaO * sinThetaO) /
+    const float etap = ScatterSqrt0(interaction.ior * interaction.ior - sinThetaO * sinThetaO) /
         max(cosThetaO, 1e-6f);
     const float sinGammaT = interaction.h / max(etap, 1e-6f);
     const float gammaT = asin(clamp(sinGammaT, -1.f, 1.f));
 
     float pdf = 0.f;
     [unroll]
-    for (uint p = 0; p < RTXCR_Hair_Max_Scattering_Events; ++p)
+    for (uint p = 0; p < Hair_Max_Scattering_Events; ++p)
     {
         float sinThetaIp;
         float cosThetaIp;
@@ -96,13 +96,13 @@ float CausticaHairChiangPdf(
             cosThetaIp = cosThetaI * interaction.cos2kAlpha[2] - sinThetaI * interaction.sin2kAlpha[2];
         }
 
-        pdf += RTXCR_MP(abs(cosThetaIp), cosThetaO, sinThetaIp, sinThetaO, interaction.v[p]) *
-            apPdf[p] * RTXCR_NP(dphi, p, interaction.logisticDistributionScalar, interaction.gammaI, gammaT);
+        pdf += HairMp(abs(cosThetaIp), cosThetaO, sinThetaIp, sinThetaO, interaction.v[p]) *
+            apPdf[p] * HairNp(dphi, p, interaction.logisticDistributionScalar, interaction.gammaI, gammaT);
     }
 
-    pdf += RTXCR_MP(cosThetaI, cosThetaO, sinThetaI, sinThetaO,
-        interaction.v[RTXCR_Hair_Max_Scattering_Events]) *
-        apPdf[RTXCR_Hair_Max_Scattering_Events] * RTXCR_ONE_OVER_TWO_PI;
+    pdf += HairMp(cosThetaI, cosThetaO, sinThetaI, sinThetaO,
+        interaction.v[Hair_Max_Scattering_Events]) *
+        apPdf[Hair_Max_Scattering_Events] * SCATTER_ONE_OVER_TWO_PI;
     return max(pdf, 0.f);
 }
 
@@ -110,27 +110,27 @@ void CausticaEvalHair(
     const StandardBSDFData data, const ShadingData shadingData, const float3 wo,
     out float3 value, out float pdf, out float diffuseWeight)
 {
-    const RTXCR_HairMaterialData material = CausticaMakeHairMaterialData(data);
-    const RTXCR_HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
+    const HairMaterialData material = CausticaMakeHairMaterialData(data);
+    const HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
     const float3 wiLocal = surface.incidentRayDirection;
     const float3 woLocal = CausticaHairToLocal(shadingData, wo);
     diffuseWeight = 0.f;
 
     if (data.HairModel() == CausticaHairModel_Chiang)
     {
-        const RTXCR_HairMaterialInteraction interaction = RTXCR_CreateHairMaterialInteraction(material, surface);
-        value = RTXCR_HairChiangBsdfEval(interaction, woLocal, wiLocal);
+        const HairMaterialInteraction interaction = CreateHairMaterialInteraction(material, surface);
+        value = HairChiangBsdfEval(interaction, woLocal, wiLocal);
         pdf = CausticaHairChiangPdf(interaction, woLocal, wiLocal);
     }
     else
     {
-        const RTXCR_HairMaterialInteractionBcsdf interaction =
-            RTXCR_CreateHairMaterialInteractionBcsdf(
+        const HairMaterialInteractionBcsdf interaction =
+            CreateHairMaterialInteractionBcsdf(
                 material, data.HairDiffuseReflectionTint(),
                 data.HairDiffuseReflectionWeight(), material.longitudinalRoughness);
         float3 specular;
         float3 diffuse;
-        RTXCR_HairFarFieldBcsdfEval(surface, interaction, woLocal, wiLocal, specular, diffuse, pdf);
+        HairFarFieldBcsdfEval(surface, interaction, woLocal, wiLocal, specular, diffuse, pdf);
         value = specular + diffuse;
         diffuseWeight = saturate((float)data.HairDiffuseReflectionWeight());
     }
@@ -198,8 +198,8 @@ struct StandardBSDF // : IBSDF
     {
         if (data.IsHair())
         {
-            const RTXCR_HairMaterialData material = CausticaMakeHairMaterialData(data);
-            const RTXCR_HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
+            const HairMaterialData material = CausticaMakeHairMaterialData(data);
+            const HairInteractionSurface surface = CausticaMakeHairInteraction(shadingData);
             const float3 wiLocal = surface.incidentRayDirection;
             float3 woLocal = 0.f;
             float3 value = 0.f;
@@ -211,14 +211,14 @@ struct StandardBSDF // : IBSDF
                     preGeneratedSamples.xy,
                     float2(preGeneratedSamples.z, frac(preGeneratedSamples.x + preGeneratedSamples.y * 0.61803398875f))
                 };
-                RTXCR_HairLobeType hairLobe;
-                const RTXCR_HairMaterialInteraction interaction = RTXCR_CreateHairMaterialInteraction(material, surface);
-                valid = RTXCR_SampleChiangBsdf(interaction, wiLocal, u, woLocal, pdf, value, hairLobe);
+                HairLobeType hairLobe;
+                const HairMaterialInteraction interaction = CreateHairMaterialInteraction(material, surface);
+                valid = SampleChiangBsdf(interaction, wiLocal, u, woLocal, pdf, value, hairLobe);
             }
             else
             {
-                const RTXCR_HairMaterialInteractionBcsdf interaction =
-                    RTXCR_CreateHairMaterialInteractionBcsdf(
+                const HairMaterialInteractionBcsdf interaction =
+                    CreateHairMaterialInteractionBcsdf(
                         material, data.HairDiffuseReflectionTint(),
                         data.HairDiffuseReflectionWeight(), material.longitudinalRoughness);
                 float2 u[2] = {
@@ -229,7 +229,7 @@ struct StandardBSDF // : IBSDF
                 float3 specular;
                 float3 diffuse;
                 const float h = 2.f * preGeneratedSamples.z - 1.f;
-                valid = RTXCR_SampleFarFieldBcsdf(surface, interaction, wiLocal, h,
+                valid = SampleFarFieldBcsdf(surface, interaction, wiLocal, h,
                     frac(preGeneratedSamples.x + preGeneratedSamples.y + preGeneratedSamples.z),
                     u, woLocal, specular, diffuse, pdf);
                 value = specular + diffuse;
