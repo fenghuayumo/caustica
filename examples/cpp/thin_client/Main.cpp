@@ -122,7 +122,7 @@ int main(int, char**)
                 // Prefab spawn, then tag it so the per-frame system can select
                 // it with a Query rather than needing the world.
                 state->spawnedMesh = caustica::spawnFromFile(
-                    ctx.app, "Models/GlassSphere/GlassSphere.gltf");
+                    ctx.app, "models/GlassSphere/GlassSphere.gltf");
                 if (caustica::ecs::isValid(state->spawnedMesh))
                 {
                     scene.setLocalTransform(

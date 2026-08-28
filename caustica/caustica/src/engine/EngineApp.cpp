@@ -123,6 +123,13 @@ bool EngineApp::initialize(EngineAppDesc desc)
     setRuntimeDirectoryOverride(runtimeDirectory);
     setLocalPathBaseOverride(resourceRoot);
 
+    std::filesystem::path assetPackRoot = m_desc.assetPackRoot;
+    if (assetPackRoot.empty() && m_cmdLinePtr && !m_cmdLinePtr->assetsDir.empty())
+        assetPackRoot = m_cmdLinePtr->assetsDir;
+    if (assetPackRoot.empty())
+        assetPackRoot = discoverAssetPackRoot(runtimeDirectory, resourceRoot);
+    setAssetPackRootOverride(assetPackRoot);
+
     if (!m_desc.cmdLine)
     {
         m_cmdLine.width = m_desc.width;
@@ -180,7 +187,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
     m_viewStatePtr->progressLoading.start("Starting up...");
     m_viewStatePtr->progressLoading.Set(50);
 
-    const std::string preferredScene = m_desc.scene.empty() ? std::string("default.json") : m_desc.scene;
+    const std::string preferredScene = m_desc.scene.empty() ? std::string("default.scene.json") : m_desc.scene;
 
     m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window);
     m_app->addPlugins(DefaultPlugins{SceneAppConfig{

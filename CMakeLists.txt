@@ -371,15 +371,15 @@ endif()
 #----------------------------------------------------------------------------------------------------------------------
 
 
-#----------------------------------------------------------------------------------------------------------------------
-# Alternative way of obtaining assets (we're currently relying on git submodule but this is an option as well)
-#include(FetchContent)
-#set(CAUSTICA_ASSETS_FETCH_URL "https://gitlab-master.nvidia.com/rtx/path-tracing-sdk-assets")
-#set(CAUSTICA_ASSETS_FETCH_TAG "main")
-#set(CAUSTICA_ASSETS_FETCH_DIR "${CMAKE_SOURCE_DIR}/Assets")
-#message(STATUS "Updating assets from " ${CAUSTICA_ASSETS_FETCH_URL} ", tag " ${CAUSTICA_ASSETS_FETCH_TAG} ", into folder " ${CAUSTICA_ASSETS_FETCH_DIR} )
-#FetchContent_Declare(assets_download  GIT_REPOSITORY ${CAUSTICA_ASSETS_FETCH_URL}  GIT_TAG ${CAUSTICA_ASSETS_FETCH_TAG}  SOURCE_DIR ${CAUSTICA_ASSETS_FETCH_DIR}  GIT_PROGRESS TRUE)
-#FetchContent_MakeAvailable(assets_download)
-#----------------------------------------------------------------------------------------------------------------------
+# Asset pack is a git submodule at Assets/ (https://github.com/fenghuayumo/caustica-assets).
+# Override with -DCAUSTICA_ASSETS_DIR=... or the CAUSTICA_ASSETS_DIR environment variable.
+set(CAUSTICA_ASSETS_DIR "${CMAKE_SOURCE_DIR}/Assets" CACHE PATH "Caustica asset pack root")
+if (NOT EXISTS "${CAUSTICA_ASSETS_DIR}/pack.json")
+    message(WARNING
+        "Asset pack not found at ${CAUSTICA_ASSETS_DIR}. "
+        "Clone the Assets submodule (git submodule update --init Assets), "
+        "or set CAUSTICA_ASSETS_DIR / the CAUSTICA_ASSETS_DIR env var. "
+        "The engine can fall back to assets-builtin/ for a minimal default scene.")
+endif()
 
 #----------------------------------------------------------------------------------------------------------------------

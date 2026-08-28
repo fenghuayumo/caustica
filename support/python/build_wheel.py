@@ -20,7 +20,8 @@ DIST_DIR = ROOT / "dist"
 BASE_MINIMAL_ASSET_FILES = [
     "ArtLicenses.txt",
     "README.md",
-    "default.json",
+    "pack.json",
+    "scenes/default/default.scene.json",
     "loading_splash.png",
 ]
 

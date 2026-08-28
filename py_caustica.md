@@ -456,14 +456,14 @@ with caustica.Renderer(scene="builtin:plane", headless=True, accumulation_target
     app = r.app
 
     # One-shot: import + attach under the active scene root.
-    entity = app.spawn_from_file("Models/GlassSphere/GlassSphere.gltf")
+    entity = app.spawn_from_file("models/GlassSphere/GlassSphere.gltf")
     if entity is None:
         raise RuntimeError("spawn_from_file failed")
     entity.translation = (1.5, 0.5, 0.0)
     entity.scaling = (0.5, 0.5, 0.5)
 
     # Or split load/spawn when reusing a prefab:
-    prefab = app.load("Models/GlassSphere/GlassSphere.gltf")
+    prefab = app.load("models/GlassSphere/GlassSphere.gltf")
     if prefab:
         clone = app.spawn(prefab)
         if clone:

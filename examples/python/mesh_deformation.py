@@ -34,7 +34,7 @@ from _common import (
     save_screenshot,
 )
 
-DEFAULT_SCENE = ASSETS_DIR / "default.json"
+DEFAULT_SCENE = ASSETS_DIR / "scenes" / "default" / "default.scene.json"
 
 
 def parse_args() -> argparse.Namespace:

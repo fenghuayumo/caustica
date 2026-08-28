@@ -27,6 +27,7 @@
 #include <render/WorldRenderer.h>
 #include <assets/loader/TextureLoader.h>
 #include <assets/loader/ShaderMacro.h>
+#include <core/path_utils.h>
 #include <backend/GpuDevice.h>
 
 using namespace caustica::render;
@@ -216,7 +217,11 @@ Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
     if (!assets || !caches || path.empty())
         return {};
 
-    if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(path))
+    std::filesystem::path resolved = path;
+    if (!resolved.is_absolute() && !std::filesystem::exists(resolved))
+        resolved = resolveSceneMediaPath(path, {});
+
+    if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(resolved))
         return existing;
 
     auto textureLoader = caches->textureLoader;
@@ -226,14 +231,14 @@ Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
     RuntimeMeshLoadParams params{
         .TextureCache = textureLoader.get(),
         .SceneTypes = std::make_shared<render::RenderSceneTypeFactory>(),
-        .TextureSearchDirectory = path.parent_path(),
+        .TextureSearchDirectory = resolved.parent_path(),
     };
 
-    const RuntimeMeshLoadResult result = loadRuntimeMeshFile(params, path);
+    const RuntimeMeshLoadResult result = loadRuntimeMeshFile(params, resolved);
     if (!result)
         return {};
 
-    return assets->registerScenePrefab(result.ImportResult, path);
+    return assets->registerScenePrefab(result.ImportResult, resolved);
 }
 
 ecs::Entity spawn(App& app, const Handle<ScenePrefabAsset>& prefab, const SceneApplyCallbacks& callbacks)

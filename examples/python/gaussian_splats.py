@@ -53,7 +53,7 @@ from _gaussian import (
     rebuild_acceleration_structures,
 )
 
-DEFAULT_HYBRID_SCENE = ASSETS_DIR / "default.json"
+DEFAULT_HYBRID_SCENE = ASSETS_DIR / "scenes" / "default" / "default.scene.json"
 
 PLY_HINT = (
     "Pass --ply pointing at a binary little-endian 3DGS .ply file, for example a\n"
@@ -367,7 +367,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=str(DEFAULT_HYBRID_SCENE),
         help="Scene JSON path or Assets-relative name. The scene must declare "
         "GaussianSplat nodes for this mode to show anything "
-        "(default: Assets/default.json).",
+        "(default: Assets/scenes/default/default.scene.json).",
     )
     hybrid.add_argument("--out", default="hybrid_gaussian_scene.png")
     hybrid.add_argument("--denoiser", default="off", help="Realtime denoiser for --window.")

@@ -45,12 +45,15 @@ struct EngineAppDesc
     bool useVulkan = false;
     bool fullscreen = false;
     bool maximized = false;
-    std::string scene = "default.json";
+    std::string scene = "default.scene.json";
     std::string windowTitle = "caustica";
 
     // Empty = auto-discover next to the executable / module (ShaderBin, Assets).
     std::filesystem::path runtimeDirectory;
+    // Directory that contains the Assets/ pack folder. Empty = discover.
     std::filesystem::path resourceRoot;
+    // Direct path to the asset pack (Assets/ or CAUSTICA_ASSETS_DIR). Empty = discover.
+    std::filesystem::path assetPackRoot;
 
 #if CAUSTICA_WITH_DX12
     ID3D12DeviceFactory* d3d12DeviceFactory = nullptr;

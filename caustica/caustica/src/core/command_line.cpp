@@ -20,7 +20,8 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
         bool help = false;
 
         options.add_options()
-            ("s,scene", "Preferred scene to load (.scene.json)", value(scene))
+            ("s,scene", "Preferred scene to load (.scene.json). Relative names are resolved from the asset pack (Assets/scenes/).", value(scene))
+            ("assets", "Asset pack directory (overrides CAUSTICA_ASSETS_DIR and the Assets submodule)", value(assetsDir))
             ("nonInteractive", "start in non-interactive mode, disabling popups", value(nonInteractive))
             ("noWindow", "start without a window (headless)", value(noWindow))
             ("d,debug", "Enable D3D12/VK debug layer and RHI validation", value(debug))

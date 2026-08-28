@@ -28,7 +28,7 @@ int main()
     auto engine = caustica::EngineApp::create({
         .width = 1280,
         .height = 720,
-        .scene = "default.json",
+        .scene = "default.scene.json",
         .windowTitle = "My Caustica Host",
     });
 
@@ -50,7 +50,7 @@ the loop exits. For a host-owned loop, call `stepFrame()` and then `shutdown()`:
 ```cpp
 auto engine = caustica::EngineApp::create({
     .headless = true,
-    .scene = "default.json",
+    .scene = "default.scene.json",
 });
 
 while (engine && keepRunning)
@@ -77,9 +77,10 @@ Frequently used fields:
 | `adapter` | `AdapterSelector::automatic()` | GPU selector. Automatic mode chooses the highest-scoring suitable hardware adapter; explicit modes support index, name, UUID, and LUID. |
 | `useVulkan` | `false` | Select Vulkan when both Vulkan and DirectX 12 were compiled. |
 | `fullscreen` | `false` | Start the owned window fullscreen. |
-| `scene` | `default.json` | Initial scene. |
+| `scene` | `default.scene.json` | Initial scene. |
 | `runtimeDirectory` | auto | Directory containing cooked shaders and runtime libraries. |
-| `resourceRoot` | auto | Directory containing `Assets/`. |
+| `resourceRoot` | auto | Directory containing the `Assets/` pack folder. |
+| `assetPackRoot` | auto | Direct path to the asset pack (`CAUSTICA_ASSETS_DIR` / `--assets`). |
 | `device`, `window` | `nullptr` | Inject host-owned objects; `EngineApp` does not take ownership. |
 | `finishStartup` | `false` | Deprecated. `create()` leaves Startup pending; `run()` / `stepFrame()` finish automatically. Set true only if you need Startup inside `create()`. |
 
@@ -98,7 +99,7 @@ struct AppSimulationLabel
     static constexpr const char* name = "App.Simulation";
 };
 
-auto engine = caustica::EngineApp::create({ .scene = "default.json" });
+auto engine = caustica::EngineApp::create({ .scene = "default.scene.json" });
 
 engine->addSystem<AppSimulationLabel>(
     caustica::AppSchedule::update,
@@ -219,7 +220,7 @@ Prefab spawn example:
 
 ```cpp
 caustica::ecs::Entity entity =
-    caustica::spawnFromFile(app, "Models/GlassSphere/GlassSphere.gltf");
+    caustica::spawnFromFile(app, "models/GlassSphere/GlassSphere.gltf");
 
 if (caustica::ecs::isValid(entity))
 {

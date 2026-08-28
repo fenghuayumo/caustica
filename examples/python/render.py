@@ -8,8 +8,8 @@ and an interactive window -- plus runtime scene edits and framebuffer readback.
 Examples:
     python examples/python/render.py --scene builtin:plane_cube --out frame.png
     python examples/python/render.py --mode realtime --denoiser nrd --frames 32
-    python examples/python/render.py --mode window --scene Assets/default.json
-    python examples/python/render.py --spawn Assets/Models/GlassSphere/GlassSphere.gltf
+    python examples/python/render.py --mode window --scene Assets/scenes/default/default.scene.json
+    python examples/python/render.py --spawn Assets/models/GlassSphere/GlassSphere.gltf
 """
 
 from __future__ import annotations

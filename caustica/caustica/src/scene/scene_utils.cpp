@@ -1,10 +1,12 @@
 #include "scene/scene_utils.h"
 #include <scene/Scene.h>
 #include <scene/SceneLightAccess.h>
+#include <core/path_utils.h>
 
 #include <algorithm>
 #include <cctype>
 #include <deque>
+#include <vector>
 
 namespace caustica
 {
@@ -43,10 +45,45 @@ std::string findPreferredScene(const std::vector<std::string>& available,
 {
     if (available.empty())
         return "";
+    if (preferred.empty())
+        return available.front();
+
+    auto fileNameOf = [](const std::string& value) {
+        const std::filesystem::path path(value);
+        return path.filename().generic_string();
+    };
+
+    const std::string preferredNormalized = std::filesystem::path(preferred).generic_string();
+    const std::string preferredName = fileNameOf(preferred);
+    std::vector<std::string> preferredNames = { preferredName };
+    if (preferredName == "default.json")
+        preferredNames.emplace_back("default.scene.json");
+    else if (preferredName.size() >= 5 && preferredName.ends_with(".json")
+        && !(preferredName.size() >= 11 && preferredName.ends_with(".scene.json")))
+    {
+        const std::string stem = std::filesystem::path(preferredName).stem().string();
+        preferredNames.push_back(stem + ".scene.json");
+    }
 
     for (const auto& s : available)
-        if (s.find(preferred) != std::string::npos)
+    {
+        if (s == preferred || s == preferredNormalized)
             return s;
+    }
+    for (const auto& s : available)
+    {
+        const std::string name = fileNameOf(s);
+        for (const auto& preferredFile : preferredNames)
+        {
+            if (name == preferredFile)
+                return s;
+        }
+    }
+    for (const auto& s : available)
+    {
+        if (s.find(preferred) != std::string::npos || s.find(preferredNormalized) != std::string::npos)
+            return s;
+    }
 
     return available.front();
 }
@@ -81,11 +118,20 @@ void refreshEnvironmentMapMediaList(
     if (!currentScenePath.empty() && !isInlineScenePath(currentScenePath))
         sceneDirectory = currentScenePath.parent_path();
 
-    const std::filesystem::path sceneEnvFolder = sceneDirectory / envMapSubFolder;
-    const std::filesystem::path assetsEnvFolder = assetsPath / envMapSubFolder;
+    const std::filesystem::path sceneEnvFolder = sceneDirectory.empty()
+        ? std::filesystem::path()
+        : existingAssetSubfolder(sceneDirectory, c_EnvMapSubFolder, c_EnvMapSubFolderLegacy);
+    const std::filesystem::path assetsEnvFolder =
+        existingAssetSubfolder(assetsPath, c_EnvMapSubFolder, c_EnvMapSubFolderLegacy);
 
     AppendEnvironmentMapsFromFolder(assetsEnvFolder, outMediaList);
     AppendEnvironmentMapsFromFolder(sceneEnvFolder, outMediaList);
+    if (!envMapSubFolder.empty())
+    {
+        AppendEnvironmentMapsFromFolder(assetsPath / envMapSubFolder, outMediaList);
+        if (!sceneDirectory.empty())
+            AppendEnvironmentMapsFromFolder(sceneDirectory / envMapSubFolder, outMediaList);
+    }
 
     if (std::filesystem::exists(assetsEnvFolder))
         outMediaFolder = assetsEnvFolder;

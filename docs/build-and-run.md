@@ -9,7 +9,7 @@ Common requirements:
 
 - A C++20 compiler and CMake 3.18 or newer.
 - A ray-tracing-capable GPU and a recent vendor driver.
-- All Git submodules, including `Assets`, the RHI headers, and the
+- All Git submodules, including the `Assets` pack (`fenghuayumo/caustica-assets`), the RHI headers, and the
   libraries under `External/`.
 - Python 3.8 or newer, including development headers, when
   `CAUSTICA_WITH_PYTHON=ON` (the default).
@@ -33,7 +33,7 @@ Configure and build the editor:
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release --target caustica
-.\bin\caustica.exe --scene default.json
+.\bin\caustica.exe --scene default.scene.json
 ```
 
 Debug executables have a `D` suffix, for example `causticaD.exe`. CMake places
@@ -171,10 +171,18 @@ actual DXR 1.2 and Shader Model 6.9 support still depends on the GPU and driver.
    executable directory containing `ShaderBin`.
 2. A supplied `EngineAppDesc::resourceRoot`, otherwise the runtime directory
    containing `Assets`, then its parent.
+3. The asset pack root: `EngineAppDesc::assetPackRoot`, `--assets`,
+   `CAUSTICA_ASSETS_DIR`, `<resourceRoot>/Assets`, then `assets-builtin/`.
+
+Scene files live under `Assets/scenes/`. `--scene kitchen.scene.json` still
+resolves by filename. Media paths in scene JSON are pack-relative
+(`models/...`, `env/...`); the older `Models/` and `EnvironmentMaps/` prefixes
+are still accepted.
 
 For a copied binary distribution, keep the generated shader directories and
-runtime libraries with the executable, and put `Assets/` either beside the
-executable or one directory above it. A distribution build may use
+runtime libraries with the executable, and put the asset pack either in
+`Assets/` beside the executable or one directory above it, or point
+`CAUSTICA_ASSETS_DIR` at the pack. A distribution build may use
 `caustica.shaders.<api>.pack` beside the executable instead of loose
 shader bins.
 
@@ -185,7 +193,8 @@ options are:
 
 | Option | Meaning |
 | --- | --- |
-| `--scene <file>` | Preferred `.scene.json` or scene file. |
+| `--scene <file>` | Preferred `.scene.json` or scene file (resolved from the asset pack). |
+| `--assets <dir>` | Asset pack directory (overrides `CAUSTICA_ASSETS_DIR` and `Assets/`). |
 | `--width <px> --height <px>` | Initial output size. |
 | `--fullscreen` | Start fullscreen. |
 | `--backend <dx12\|d3d12\|vulkan\|vk>` | Select a compiled graphics backend. |

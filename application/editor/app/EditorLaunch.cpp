@@ -121,7 +121,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     installEditorLogFilter();
 
     GpuDeviceCreateDesc createDesc{};
-    std::string preferredScene = "default.json";
+    std::string preferredScene = "default.scene.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
     if (!ProcessEditorStartupCommandLine(argc, argv, editor.cmdLine(), createDesc, preferredScene))

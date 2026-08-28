@@ -16,6 +16,7 @@
 struct CommandLineOptions
 {
     std::string scene;
+    std::string assetsDir;
     bool nonInteractive = false;
     bool noWindow = false;
     bool debug = false;

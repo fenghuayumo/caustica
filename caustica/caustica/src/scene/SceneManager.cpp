@@ -4,12 +4,14 @@
 #include <assets/loader/TextureLoader.h>
 #include <scene/Scene.h>
 #include <scene/scene_utils.h>
+#include <core/path_utils.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <vector>
 
 namespace
 {
@@ -52,25 +54,53 @@ SceneManager::~SceneManager() = default;
 
 void SceneManager::discoverAvailableScenes(const std::filesystem::path& assetsPath)
 {
-    const std::string mediaExt = ".scene.json";
-    const std::string jsonExt = ".json";
-
     m_sceneFilesAvailable.clear();
 
     if (!std::filesystem::exists(assetsPath) || !std::filesystem::is_directory(assetsPath))
         return;
 
+    auto isSceneFile = [](const std::filesystem::path& path) {
+        const std::string fileName = path.filename().string();
+        if (fileName == caustica::c_AssetPackManifest)
+            return false;
+        if (fileName.size() >= 14 && fileName.compare(fileName.size() - 14, 14, ".material.json") == 0)
+            return false;
+        if (fileName.size() >= 11 && fileName.compare(fileName.size() - 11, 11, ".scene.json") == 0)
+            return true;
+        return path.extension() == ".json";
+    };
+
+    auto consider = [&](const std::filesystem::path& absolutePath) {
+        if (!isSceneFile(absolutePath))
+            return;
+        std::filesystem::path relative = std::filesystem::relative(absolutePath, assetsPath);
+        const std::string relativeGeneric = relative.generic_string();
+        if (relative.empty() || relativeGeneric.starts_with(".."))
+            relative = absolutePath.filename();
+        m_sceneFilesAvailable.push_back(relative.generic_string());
+    };
+
     for (const auto& file : std::filesystem::directory_iterator(assetsPath))
     {
-        if (!file.is_regular_file()) continue;
-        std::string fileName = file.path().filename().string();
-        std::string longExt = (fileName.size() <= mediaExt.length())
-            ? "" : fileName.substr(fileName.length() - mediaExt.length());
-        std::string shortExt = (fileName.size() <= jsonExt.length())
-            ? "" : fileName.substr(fileName.length() - jsonExt.length());
-        if (longExt == mediaExt || shortExt == jsonExt)
-            m_sceneFilesAvailable.push_back(file.path().filename().string());
+        if (file.is_regular_file())
+            consider(file.path());
     }
+
+    const std::filesystem::path scenesDir = assetsPath / caustica::c_ScenesSubFolder;
+    std::error_code ec;
+    if (std::filesystem::is_directory(scenesDir, ec))
+    {
+        for (const auto& file : std::filesystem::recursive_directory_iterator(scenesDir, ec))
+        {
+            if (file.is_regular_file())
+                consider(file.path());
+        }
+    }
+
+    std::sort(m_sceneFilesAvailable.begin(), m_sceneFilesAvailable.end());
+    m_sceneFilesAvailable.erase(
+        std::unique(m_sceneFilesAvailable.begin(), m_sceneFilesAvailable.end()),
+        m_sceneFilesAvailable.end());
 }
 
 // --- Scene path resolution ---
@@ -93,9 +123,60 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
     }
 
     std::filesystem::path scenePath(sceneName);
-    if (!scenePath.is_absolute() && !std::filesystem::exists(scenePath))
-        scenePath = assetsPath / scenePath;
-    result.path = scenePath;
+    if (scenePath.is_absolute())
+    {
+        result.path = scenePath;
+        return result;
+    }
+
+    if (std::filesystem::exists(scenePath))
+    {
+        result.path = std::filesystem::absolute(scenePath);
+        return result;
+    }
+
+    auto tryExisting = [&](const std::filesystem::path& candidate) -> bool {
+        if (candidate.empty() || !std::filesystem::exists(candidate))
+            return false;
+        result.path = std::filesystem::absolute(candidate);
+        return true;
+    };
+
+    if (tryExisting(assetsPath / scenePath))
+        return result;
+    if (tryExisting(assetsPath / caustica::c_ScenesSubFolder / scenePath))
+        return result;
+
+    const std::filesystem::path fileName = scenePath.filename();
+    std::vector<std::filesystem::path> nameCandidates = { fileName };
+    const std::string fileNameStr = fileName.string();
+    const bool isSceneJson = fileNameStr.size() >= 11
+        && fileNameStr.compare(fileNameStr.size() - 11, 11, ".scene.json") == 0;
+    if (fileNameStr == "default.json")
+        nameCandidates.emplace_back("default.scene.json");
+    else if (!isSceneJson && fileName.extension() == ".json")
+        nameCandidates.emplace_back(fileName.stem().string() + ".scene.json");
+
+    const std::filesystem::path scenesDir = assetsPath / caustica::c_ScenesSubFolder;
+    std::error_code ec;
+    if (std::filesystem::is_directory(scenesDir, ec))
+    {
+        for (const auto& file : std::filesystem::recursive_directory_iterator(scenesDir, ec))
+        {
+            if (!file.is_regular_file())
+                continue;
+            for (const auto& candidateName : nameCandidates)
+            {
+                if (file.path().filename() == candidateName && tryExisting(file.path()))
+                    return result;
+            }
+        }
+    }
+
+    if (tryExisting(assetsPath / fileName))
+        return result;
+
+    result.path = assetsPath / scenePath;
     return result;
 }
 

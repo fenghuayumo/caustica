@@ -18,7 +18,7 @@ tests/output/*
 /External/DLSS
 
 # Generated shim referencing the separately licensed RTXCR Claire assets.
-/Assets/rtxcr-claire.external.scene.json
+/Assets/scenes/rtxcr/rtxcr-claire.external.scene.json
 
 # Python
 __pycache__/

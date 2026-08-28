@@ -38,7 +38,7 @@ from _common import (
     run_window_loop,
 )
 
-DEFAULT_HDRI = "EnvironmentMaps/20060807_wells6_hd.hdr"
+DEFAULT_HDRI = "env/20060807_wells6_hd.hdr"
 
 # Environment source tokens understood by App.set_environment_map. Anything else
 # is treated as a file path.
@@ -100,14 +100,14 @@ def build_cases(hdri: str) -> list[EnvCase]:
 def resolve_hdri(path: str | Path) -> str:
     """Resolve an HDRI path against the repository Assets folder."""
     candidate = Path(path).expanduser()
-    tried = [candidate, ASSETS_DIR / candidate, ASSETS_DIR / "EnvironmentMaps" / candidate.name]
+    tried = [candidate, ASSETS_DIR / candidate, ASSETS_DIR / "env" / candidate.name, ASSETS_DIR / "EnvironmentMaps" / candidate.name]
     for entry in tried:
         if entry.is_file():
             return str(entry.resolve())
     listing = "\n".join(f"  {entry}" for entry in tried)
     raise SystemExit(
         f"HDRI not found. Tried:\n{listing}\n"
-        "Place HDRIs under Assets/EnvironmentMaps/ or pass an absolute --hdri path."
+        "Place HDRIs under Assets/env/ or pass an absolute --hdri path."
     )
 
 

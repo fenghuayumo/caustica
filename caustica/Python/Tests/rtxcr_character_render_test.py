@@ -6,8 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
-import tempfile
 import traceback
 from pathlib import Path
 
@@ -54,12 +52,11 @@ def main() -> int:
     import caustica
 
     root = Path(__file__).resolve().parents[3]
-    sys.path.insert(0, str(root / "tools"))
-    from generate_rtxcr_character_validation_asset import generate
-
-    temp_assets = tempfile.TemporaryDirectory(prefix="caustica-rtxcr-character-")
-    asset_root = Path(temp_assets.name)
-    _, skin_model, scene = generate(asset_root)
+    asset_root = root / "Assets"
+    skin_model = asset_root / "models" / "rtxcr-character-validation" / "rtxcr-character-validation-skin-only.gltf"
+    scene = asset_root / "scenes" / "rtxcr" / "rtxcr-character-validation.scene.json"
+    if not skin_model.is_file() or not scene.is_file():
+        raise RuntimeError("checked-in RTXCR character validation assets are missing")
     skin_only_scene = json.loads(scene.read_text(encoding="utf-8"))
     skin_only_scene["models"] = [str(skin_model)]
     with caustica.Renderer(

@@ -26,11 +26,11 @@ python examples/python/render.py --scene builtin:plane_cube --out frame.png
 python examples/python/render.py --mode realtime --denoiser nrd --frames 32
 
 # Interactive preview.
-python examples/python/render.py --mode window --scene Assets/default.json
+python examples/python/render.py --mode window --scene Assets/scenes/default/default.scene.json
 
 # Runtime asset spawn plus framebuffer readback.
 python examples/python/render.py \
-  --spawn Assets/Models/GlassSphere/GlassSphere.gltf \
+  --spawn Assets/models/GlassSphere/GlassSphere.gltf \
   --inspect-framebuffer
 ```
 

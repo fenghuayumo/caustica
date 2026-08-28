@@ -162,7 +162,7 @@ Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shad
 
 ### OpenPBR material system
 
-Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/Materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
+Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
 
 * **Authoring** — write parameters in OpenPBR snake_case (`base_color`, `coat_weight`, `subsurface_radius`, …) or inside an `OpenPBR` JSON block; existing PascalCase fields still load and bake to the same GPU layout
 * **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, **fuzz**, **coat** (with darkening), **thin-film** iridescence, **dispersion**, and RTXCR **subsurface** (Burley BSSRDF + ray-traced single scattering/transmission)
@@ -227,7 +227,8 @@ See [Building and running Caustica](docs/build-and-run.md) for backend-specific 
 | - | - |
 | `/bin` | default CMake folder for binaries and compiled shaders |
 | `/build` | default CMake folder for build files |
-| `/Assets` | models, textures, scene files |
+| `/Assets` | asset pack submodule (`scenes/`, `models/`, `materials/`, `env/`) |
+| `/assets-builtin` | minimal fallback pack when the Assets submodule is missing |
 | `/docs` | build, embedding, architecture, scene JSON, OpenPBR, and related docs |
 | `/External` | external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM |
 | `/support` | Python packaging / shader cook scripts and optional CLI tools |
@@ -249,6 +250,8 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
    cd caustica
    ```
 
+   `Assets/` is the [caustica-assets](https://github.com/fenghuayumo/caustica-assets) submodule (Git LFS). It is not the NVIDIA RTXPT asset repo. If the submodule URL is still the NVIDIA remote, run `git submodule sync` after pulling.
+
 2. Configure a 64-bit Visual Studio build:
 
    ```powershell
@@ -259,10 +262,10 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
 
    ```powershell
    cmake --build build --config Release --target caustica
-   .\bin\caustica.exe --scene default.json
+   .\bin\caustica.exe --scene kitchen.scene.json
    ```
 
-Optional application targets are `caustica_thin_client` (minimal C++ host) and `caustica_py` (Python extension). Binaries and cooked shaders land under `bin/`; assets are discovered in `Assets/` beside the runtime directory or one directory above it.
+Optional application targets are `caustica_thin_client` (minimal C++ host) and `caustica_py` (Python extension). Binaries and cooked shaders land under `bin/`; the asset pack is the `Assets/` submodule (or `CAUSTICA_ASSETS_DIR` / `--assets`). A minimal `assets-builtin/` pack is used if the submodule is missing.
 
 To build a new C++ host, start with the [C++ embedding guide](docs/embedding-cpp.md) and `examples/cpp/thin_client`.
 

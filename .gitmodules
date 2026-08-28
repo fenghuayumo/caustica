@@ -8,7 +8,7 @@
 	shallow = false
 [submodule "Assets"]
 	path = Assets
-	url = https://github.com/NVIDIA-RTX/caustica-Assets.git
+	url = https://github.com/fenghuayumo/caustica-assets.git
 	shallow = true
 [submodule "External/cgltf"]
 	path = External/cgltf

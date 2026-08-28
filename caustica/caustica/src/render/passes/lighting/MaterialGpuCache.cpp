@@ -1056,7 +1056,7 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
         RAII_SCOPE( ImGui::Indent();, ImGui::Unindent(); );
 
         ImGui::Checkbox("Share with all scenes", &sharedWithAllScenes);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("if checked, material saved to /Assets/Materials/ path and \nshared between all scenes; otherwise it will be saved to \n/Assets/Materials/SceneName specific to current scene");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("if checked, material saved to /Assets/materials/ and \nshared between all scenes; otherwise it is saved under \n/Assets/materials/<scene-stem>/ for the current scene");
 
         auto matPath = cache.getMaterialStoragePath(*this);
 
@@ -1516,14 +1516,10 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
     standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    // In glTF's metallic-roughness workflow the dielectric specular tint is
-    // white unless KHR_materials_specular says otherwise. SceneTypes keeps a
-    // zero default because the same field is also used by the legacy
-    // specular-glossiness workflow; carrying that zero into OpenPBR removes
-    // Fresnel reflection entirely (most visible on skin).
-    standardMaterial->specularColor = material.useSpecularGlossModel
-        ? material.specularColor
-        : dm::float3(1.0f);
+    // This value is the OpenPBR edge tint. Dielectric F0 is computed
+    // independently from IOR, so the legacy zero means "no edge tint" and
+    // must not be migrated to white.
+    standardMaterial->specularColor = material.specularColor;
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
@@ -1694,7 +1690,8 @@ void MaterialGpuCache::applyScenePaths(
         m_sceneDirectory = std::filesystem::path();
     if (!m_sceneDirectory.empty())
     {
-        m_sceneMaterialsPath = m_sceneDirectory / std::string(c_MaterialsSubFolder);
+        m_sceneMaterialsPath = existingAssetSubfolder(
+            m_sceneDirectory, c_MaterialsSubFolder, c_MaterialsSubFolderLegacy);
         std::filesystem::path justName = sceneFilePath.filename().stem();
         if (!justName.empty())
             m_sceneMaterialsSceneSpecializedPath = m_sceneMaterialsPath / justName;
@@ -1705,7 +1702,8 @@ void MaterialGpuCache::applyScenePaths(
         m_sceneMaterialsSceneSpecializedPath.clear();
     }
 
-    m_materialsPath = mediaPath / std::string(c_MaterialsSubFolder);
+    m_materialsPath = existingAssetSubfolder(
+        mediaPath, c_MaterialsSubFolder, c_MaterialsSubFolderLegacy);
     std::filesystem::path justName = sceneFilePath.filename().stem();
     m_materialsSceneSpecializedPath = m_materialsPath / justName;
 }

@@ -65,9 +65,24 @@ def resolve_scene_arg(scene_arg: str) -> str:
     path = Path(scene_arg)
     if path.is_file():
         return str(path.resolve())
-    assets_candidate = ASSETS_DIR / scene_arg
-    if assets_candidate.is_file():
-        return str(assets_candidate.resolve())
+
+    direct = ASSETS_DIR / scene_arg
+    if direct.is_file():
+        return str(direct.resolve())
+
+    name = Path(scene_arg).name
+    aliases = [name]
+    if name == "default.json":
+        aliases.append("default.scene.json")
+    elif name.endswith(".json") and not name.endswith(".scene.json"):
+        aliases.append(Path(name).stem + ".scene.json")
+
+    scenes_root = ASSETS_DIR / "scenes"
+    if scenes_root.is_dir():
+        for candidate in scenes_root.rglob("*"):
+            if candidate.is_file() and candidate.name in aliases:
+                return str(candidate.resolve())
+
     return scene_arg
 
 

@@ -51,10 +51,10 @@ these OpenPBR fields, so imported character materials enter the same RTXCR path.
 
 ## Combined character validation
 
-`Assets/rtxcr-character-validation.scene.json` is a project-owned synthetic
+`Assets/scenes/rtxcr/rtxcr-character-validation.scene.json` is a project-owned synthetic
 character scene that exercises a closed skin mesh and static DOTS hair in one
 render. Its glTF is checked in at
-`Assets/Models/rtxcr-character-validation/` (plus a `-skin-only` variant).
+`Assets/models/rtxcr-character-validation/` (plus a `-skin-only` variant).
 Run `caustica/Python/Tests/rtxcr_character_render_test.py`: it renders a
 surface-only control, skin disabled, and skin plus hair, and requires both
 branches to have a measurable image-space effect.
@@ -63,12 +63,12 @@ The Claire character distributed with the upstream RTXCR sample is deliberately
 not bundled: its separate NVIDIA Asset License limits the mesh, textures, and
 groom to NVIDIA ACE use.
 
-If you have an authorized local RTXCR asset checkout, `Assets/rtxcr-claire.external.scene.json`
+If you have an authorized local RTXCR asset checkout, `Assets/scenes/rtxcr/rtxcr-claire.external.scene.json`
 is a non-redistributing shim that references it. Point its `models` entries at your
 checkout (they are absolute paths) and launch:
 
 ```powershell
-.\bin\caustica.exe --scene Assets/rtxcr-claire.external.scene.json
+.\bin\caustica.exe --scene Assets/scenes/rtxcr/rtxcr-claire.external.scene.json
 ```
 
 The shim keeps all Claire geometry, textures, grooms, glasses, clothing, lights,

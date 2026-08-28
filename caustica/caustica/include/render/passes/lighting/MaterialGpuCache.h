@@ -421,10 +421,10 @@ private:
 
     std::filesystem::path           m_mediaPath;
     std::filesystem::path           m_sceneDirectory;                     // parent directory of the loaded scene description file
-    std::filesystem::path           m_sceneMaterialsPath;                 // <scene-dir>/Materials/
-    std::filesystem::path           m_sceneMaterialsSceneSpecializedPath; // <scene-dir>/Materials/<scene-stem>/
-    std::filesystem::path           m_materialsPath;                    // usually "Assets/Materials/"              <- used for materials shared between all scenes
-    std::filesystem::path           m_materialsSceneSpecializedPath;    // usually "Assets/Materials/SceneName/"    <- used for materials specific to scene (not shared between scenes)
+    std::filesystem::path           m_sceneMaterialsPath;                 // <scene-dir>/materials/
+    std::filesystem::path           m_sceneMaterialsSceneSpecializedPath; // <scene-dir>/materials/<scene-stem>/
+    std::filesystem::path           m_materialsPath;                    // usually Assets/materials/
+    std::filesystem::path           m_materialsSceneSpecializedPath;    // usually Assets/materials/<scene-stem>/
 
     // this ClosestHit/AnyHit should work for all materials (ubershader, not efficient) - it will likely be removed in the future, with only the specialized supported
     std::shared_ptr<MaterialShaderPermutation>
