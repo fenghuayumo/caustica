@@ -29,7 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start-time", type=float, default=0.0)
     parser.add_argument("--spp", type=int, default=64)
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter", default="auto")
+    parser.add_argument(
+        "--adapter",
+        default="auto",
+        help="GPU selector: auto, index:N, name:text, uuid:hex, or luid:hex",
+    )
     return parser.parse_args()
 
 

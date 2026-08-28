@@ -8,9 +8,9 @@ Modes:
   batch        Run reference then realtime
 
 Usage:
-    python caustica/Python/Examples/3dgs_example.py --ply path/to/splat.ply
-    python caustica/Python/Examples/3dgs_example.py --mode batch --out-dir ./3dgs_out
-    python caustica/Python/Examples/3dgs_example.py --mode reference --headless --out ref.png
+    python examples/python/gaussian_splats.py --ply path/to/splat.ply
+    python examples/python/gaussian_splats.py --mode batch --out-dir ./3dgs_out
+    python examples/python/gaussian_splats.py --mode reference --headless --out ref.png
 """
 
 from __future__ import annotations
@@ -391,14 +391,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=["interactive", "reference", "realtime", "batch"], default="interactive")
     parser.add_argument("--ply", type=Path, default=DEFAULT_PLY)
     parser.add_argument("--scene", default=None)
-    parser.add_argument("--out-dir", type=Path, default=Path("3dgs_example_out"))
+    parser.add_argument("--out-dir", type=Path, default=Path("gaussian_splats_out"))
     parser.add_argument("--out", default="splat.png", help="Screenshot for single reference/realtime mode.")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--frames", type=int, default=32)
     parser.add_argument("--bounces", type=int, default=8)
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter", default="auto")
+    parser.add_argument(
+        "--adapter",
+        default="auto",
+        help="GPU selector: auto, index:N, name:text, uuid:hex, or luid:hex",
+    )
     parser.add_argument("--side", choices=["front", "back", "left", "right", "top"], default="front")
     parser.add_argument("--distance-scale", type=float, default=3.0)
     parser.add_argument("--fov", type=float, default=45.0)

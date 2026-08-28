@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Animated mesh deformation test on top of render_default_scene.py.
+"""Animate CPU mesh vertices on top of the hybrid Gaussian scene example.
 
 Loads Assets/default.json with raster 3DGS, ray-traced soft shadows and emitter
 lighting, then animates the Antman mesh via Python vertex deformation.
@@ -8,13 +8,13 @@ Usage:
     cd <repo>
 
     # Interactive window with live deformation:
-    python caustica/Python/Examples/render_default_scene_animated.py --window
+    python examples/python/mesh_deformation.py --window
 
     # Headless animation sequence:
-    python caustica/Python/Examples/render_default_scene_animated.py \
+    python examples/python/mesh_deformation.py \
         --headless --frames 48 --out-dir default_scene_anim
 
-All options from render_default_scene.py are also available (hybrid mode,
+All options from hybrid_gaussian_scene.py are also available (hybrid mode,
 shadow/emission knobs, etc.).
 """
 
@@ -31,7 +31,7 @@ if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
 from _common import resolve_output_path, resolve_scene_arg
-from render_default_scene import (
+from hybrid_gaussian_scene import (
     DEFAULT_SCENE,
     apply_gaussian_settings_and_rebuild,
     build_arg_parser,

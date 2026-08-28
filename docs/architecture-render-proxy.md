@@ -112,7 +112,7 @@ handoff). Editor SampleGame (`application/editor/game`, `demo::`) is demo-only a
 Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).
 
-Official sample (no editor): `application/samples/thin_client` → target `caustica_thin_client`
+Official sample (no editor): `examples/cpp/thin_client` → target `caustica_thin_client`
 (`#include <caustica.h>` + Simulation systems). Frozen surface: [public-api.md](public-api.md).
 
 ## Extract schedule (P2)

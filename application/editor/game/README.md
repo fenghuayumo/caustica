@@ -17,7 +17,7 @@ Contents (editor-linked only; **not** in `causScene` / thin_client):
 
 Use the official sample instead:
 
-- [`application/samples/thin_client`](../../samples/thin_client/Main.cpp)
+- [`examples/cpp/thin_client`](../../../examples/cpp/thin_client/Main.cpp)
 - `EntityWorld` / `Query<>` / `SceneSpawn` / `SceneTransform`
 
 Do **not** copy `PropComponentBase`, `ModelInstance`, or `LightController` into engine or host code.

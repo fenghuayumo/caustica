@@ -53,7 +53,7 @@ What fits embodied-AI workflows well:
 | Consistent object appearance | **OpenPBR** materials + glTF import with per-model `.material.json` overrides |
 | Multi-view / sensor rigs | Multiple scene cameras; runtime camera selection and transform control via Python/C++ |
 | Interactive + batch modes | Real-time path tracing with denoisers; reference accumulation for ground-truth frames |
-| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `caustica/Python/Examples/offline_render.py` |
+| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `examples/python/offline_render.py` |
 | Automation & tuning | Python extension (`pip install .`) for offline jobs; embed mode for live parameter edits in the editor |
 | Dynamic environments | Scene graph animation, emissive/analytic lights, environment maps, 3D Gaussian splats |
 
@@ -66,8 +66,8 @@ Recommended starting points:
 * RTXCR skin transport: [docs/rtxcr-skin.md](docs/rtxcr-skin.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * RHI / render-thread contract: [docs/architecture-rhi-threading.md](docs/architecture-rhi-threading.md)
-* Python batch/headless API: [py_caustica.md](py_caustica.md), `caustica/Python/Examples/offline_render.py`
-* Minimal C++ host (no editor): `application/samples/thin_client` → target `caustica_thin_client`
+* Python batch/headless API: [py_caustica.md](py_caustica.md), `examples/python/offline_render.py`
+* Minimal C++ host (no editor): `examples/cpp/thin_client` → target `caustica_thin_client`
 
 ## Architecture
 
@@ -113,7 +113,7 @@ Key code locations:
 | Materials (OpenPBR) | `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`, `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli` |
 | Path tracing shaders | `caustica/caustica/shaders/PathTracer/` |
 | Desktop editor | `application/editor/app/Main.cpp` |
-| Thin client sample | `application/samples/thin_client/Main.cpp` |
+| Thin client sample | `examples/cpp/thin_client/Main.cpp` |
 
 ## Features
 
@@ -121,7 +121,7 @@ Key code locations:
 
 * **Scene JSON** workflow for reproducible environments, object placement, lights, and camera rigs
 * **ECS scene graph** (`SceneEntityWorld`) — entities/components map naturally to simulated actors and attachments
-* **`EngineApp` embed path** — one-call bootstrap for custom hosts; official thin client at `application/samples/thin_client`
+* **`EngineApp` embed path** — one-call bootstrap for custom hosts; official thin client at `examples/cpp/thin_client`
 * **Python extension** — headless and windowed `Renderer`, spawn/despawn, materials/lights/cameras, accumulation for dataset generation
 * **Reference + real-time modes** — interactive policy/debug preview and high-SPP offline captures from the same scene
 * Asset import for props, robots, and scanned environments: glTF / OBJ / URDF / USD (+ animation channels)
@@ -231,7 +231,8 @@ See [Building and running Caustica](docs/build-and-run.md) for backend-specific 
 | `/support` | Python packaging / shader cook scripts and optional CLI tools |
 | `/caustica` | engine tree: `caustica/caustica/` (C++), `Python/` bindings, shaders |
 | `/application/editor` | desktop editor — entry point at `app/Main.cpp` |
-| `/application/samples/thin_client` | minimal `EngineApp` host (no editor UI) |
+| `/examples/cpp/thin_client` | minimal `EngineApp` host (no editor UI) |
+| `/examples/python` | Python embed and extension examples |
 | `/python/caustica` | pip package loader for the native extension |
 | `/caustica/caustica/shaders/PathTracer` | core path tracing shaders |
 
@@ -261,7 +262,7 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
 
 Optional application targets are `caustica_thin_client` (minimal C++ host) and `caustica_py` (Python extension). Binaries and cooked shaders land under `bin/`; assets are discovered in `Assets/` beside the runtime directory or one directory above it.
 
-To build a new C++ host, start with the [C++ embedding guide](docs/embedding-cpp.md) and `application/samples/thin_client`.
+To build a new C++ host, start with the [C++ embedding guide](docs/embedding-cpp.md) and `examples/cpp/thin_client`.
 
 ## Python Extension Install
 
@@ -429,7 +430,7 @@ Rendering overrides and capture-sequence options are listed in [the command-line
 * [ECS + render proxies](docs/architecture-render-proxy.md)
 * [RHI threading contract](docs/architecture-rhi-threading.md)
 * [Python API reference](py_caustica.md)
-* [Python examples](caustica/Python/Examples/README.md)
+* [Python examples](examples/python/README.md)
 
 ## Contact
 

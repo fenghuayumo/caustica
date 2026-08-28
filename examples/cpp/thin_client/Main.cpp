@@ -1,4 +1,4 @@
-// Official thin client / public API reference (P0 freeze).
+// Official C++ thin client / public API reference (P0 freeze).
 // Depends only on <caustica.h> (+ math). No editor UI, ImGui, or WorldRenderer digs.
 // Coverage checklist: docs/public-api.md
 

@@ -7,7 +7,7 @@
 // LoadSession, RenderThread, or GpuSharedCaches from application code.
 //
 // Contract: docs/public-api.md
-// Reference app: application/samples/thin_client/Main.cpp
+// Reference app: examples/cpp/thin_client/Main.cpp
 
 #include <engine/EngineApp.h>
 #include <engine/EntityWorld.h>

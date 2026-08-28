@@ -9,17 +9,17 @@ between HDRI files and procedural-sky presets.
 
 Usage:
     cd <repo>
-    python caustica/Python/Examples/test_envmap_proc_sky.py
+    python examples/python/environment_lighting.py
 
     # Run only HDRI or proc-sky suites:
-    python caustica/Python/Examples/test_envmap_proc_sky.py --suite hdri
-    python caustica/Python/Examples/test_envmap_proc_sky.py --suite proc-sky
+    python examples/python/environment_lighting.py --suite hdri
+    python examples/python/environment_lighting.py --suite proc-sky
 
     # Single named case, interactive preview:
-    python caustica/Python/Examples/test_envmap_proc_sky.py --case hdri_rotation_y90 --window
+    python examples/python/environment_lighting.py --case hdri_rotation_y90 --window
 
     # Custom output folder and sample count:
-    python caustica/Python/Examples/test_envmap_proc_sky.py --out-dir ./env_tests --spp 64
+    python examples/python/environment_lighting.py --out-dir ./env_tests --spp 64
 """
 
 from __future__ import annotations

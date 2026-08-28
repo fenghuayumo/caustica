@@ -2,7 +2,7 @@
 """Demonstrate set_camera_intrinsics with centered vs off-center principal points.
 
 Usage:
-    python caustica/Python/Examples/test_intrinsics_demo.py --out-dir ./intrinsics_test
+    python examples/python/camera_intrinsics.py --out-dir ./intrinsics_test
 """
 
 from __future__ import annotations

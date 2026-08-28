@@ -9,14 +9,14 @@ from the 3DGS object.
 
 Usage:
     cd <repo>
-    python caustica/Python/Examples/render_default_scene.py
+    python examples/python/hybrid_gaussian_scene.py
 
     # Headless reference render (default):
-    python caustica/Python/Examples/render_default_scene.py --headless --out default_scene_3dgs.png
+    python examples/python/hybrid_gaussian_scene.py --headless --out default_scene_3dgs.png
 
     # Interactive preview window:
-    python caustica/Python/Examples/render_default_scene.py --window
-    python caustica/Python/Examples/render_default_scene.py --no-headless
+    python examples/python/hybrid_gaussian_scene.py --window
+    python examples/python/hybrid_gaussian_scene.py --no-headless
 """
 
 from __future__ import annotations

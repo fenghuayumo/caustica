@@ -224,7 +224,7 @@ For script-driven workflows, `load_gaussian_splats(path, convert_rdf_to_rub=True
 - The default 3DGS sorting mode is GPU sort. Pass `--sorting stochastic` to compare with stochastic splats.
 
 ```powershell
-python .\caustica\Python\Examples\3dgs_example.py ^
+python .\examples\python\3dgs_example.py ^
     --ply D:/ScanVideo/chuan/splats.ply ^
     --out-dir 3dgs_chuan_gpu_sort_out
 ```
@@ -232,7 +232,7 @@ python .\caustica\Python\Examples\3dgs_example.py ^
 Useful camera overrides:
 
 ```powershell
-python .\caustica\Python\Examples\3dgs_example.py ^
+python .\examples\python\3dgs_example.py ^
     --ply D:/ScanVideo/chuan/splats.ply ^
     --out-dir 3dgs_chuan_out ^
     --distance-scale 4.0 ^
@@ -253,7 +253,7 @@ D:/ProgramCode/Python/demo_gsplat&blender/GS/sparse
 Example:
 
 ```powershell
-python .\caustica\Python\Examples\render_gs_colmap_views.py ^
+python .\examples\python\render_gs_colmap_views.py ^
     --max-views 8 ^
     --frames-per-view 8 ^
     --warmup-frames 4 ^
@@ -1516,7 +1516,7 @@ All enums are arithmetic, so `int(enum_value)` works and enum values can be assi
 In embedded mode, scripts run inside `caustica.exe`:
 
 ```powershell
-caustica.exe --pythonScript caustica/Python/Examples/example_basic.py
+caustica.exe --pythonScript examples/python/example_basic.py
 caustica.exe --pythonExpr "import caustica; print(caustica.app().scene_name)"
 ```
 
@@ -1557,21 +1557,21 @@ For windowed extension usage:
 
 | File | Purpose |
 | --- | --- |
-| `caustica/Python/Examples/_common.py` | Shared path / framing helpers. |
-| `caustica/Python/Examples/offline_render.py` | Headless reference render and screenshot. |
-| `caustica/Python/Examples/realtime_render.py` | Realtime / denoiser smoke test. |
-| `caustica/Python/Examples/launch_default_scene.py` | Builtin scene, mesh import, FPS / OIDN smoke. |
-| `caustica/Python/Examples/render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT. |
-| `caustica/Python/Examples/render_default_scene_animated.py` | Animated default-scene capture via `SceneEntity` deform. |
-| `caustica/Python/Examples/3dgs_example.py` | 3DGS interactive / Reference+OIDN / Realtime+DLSS. |
-| `caustica/Python/Examples/render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics. |
-| `caustica/Python/Examples/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
-| `caustica/Python/Examples/test_envmap_proc_sky.py` | Environment map / procedural sky experiment. |
-| `caustica/Python/Examples/example_basic.py` | Basic embedded scripting. |
-| `caustica/Python/Examples/example_modes_dlss_oidn.py` | Realtime/reference mode, DLSS, OIDN settings. |
-| `caustica/Python/Examples/example_animate_lights.py` | Per-frame light edits. |
+| `examples/python/_common.py` | Shared path / framing helpers. |
+| `examples/python/offline_render.py` | Headless reference render and screenshot. |
+| `examples/python/realtime_render.py` | Realtime / denoiser smoke test. |
+| `examples/python/launch_default_scene.py` | Builtin scene, mesh import, FPS / OIDN smoke. |
+| `examples/python/render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT. |
+| `examples/python/render_default_scene_animated.py` | Animated default-scene capture via `SceneEntity` deform. |
+| `examples/python/3dgs_example.py` | 3DGS interactive / Reference+OIDN / Realtime+DLSS. |
+| `examples/python/render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics. |
+| `examples/python/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
+| `examples/python/test_envmap_proc_sky.py` | Environment map / procedural sky experiment. |
+| `examples/python/example_basic.py` | Basic embedded scripting. |
+| `examples/python/example_modes_dlss_oidn.py` | Realtime/reference mode, DLSS, OIDN settings. |
+| `examples/python/example_animate_lights.py` | Per-frame light edits. |
 
-Also see `caustica/Python/Examples/README.md` for embed vs extension setup.
+Also see `examples/python/README.md` for embed vs extension setup.
 
 ## Introspection
 

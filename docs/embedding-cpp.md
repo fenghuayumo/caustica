@@ -8,7 +8,7 @@ internal GPU/WR headers, or drive `WorldRenderer` directly.
 
 **Public API (P0):** prefer `#include <caustica.h>` and stay on the
 allowlist in [public-api.md](public-api.md). The complete in-tree example is
-[`application/samples/thin_client/Main.cpp`](../application/samples/thin_client/Main.cpp)
+[`examples/cpp/thin_client/Main.cpp`](../examples/cpp/thin_client/Main.cpp)
 (`caustica_thin_client`); CMake also runs `tools/check_public_api_includes.py`.
 
 Do **not** copy `application/editor/game` (`demo::Prop*`, `GameModel`, `LightController`) —

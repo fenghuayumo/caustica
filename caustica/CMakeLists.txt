@@ -417,7 +417,7 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
     endif()
 
     # Copy a few example python scripts next to the binary at build time
-    file(GLOB caustica_python_examples "${CMAKE_CURRENT_SOURCE_DIR}/Python/Examples/*.py")
+    file(GLOB caustica_python_examples "${CMAKE_SOURCE_DIR}/examples/python/*.py")
     if (caustica_python_examples)
         add_custom_target(causticaPythonExamples ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
@@ -530,7 +530,7 @@ add_caustica_sample(caustica "${CAUSTICA_EDITOR_ENTRY_SOURCE}")
 # Official thin client (EngineApp only - no editor / ImGui)
 # -------------------------------------------------------------------
 set(CAUSTICA_THIN_CLIENT_SOURCES
-    "${CMAKE_SOURCE_DIR}/application/samples/thin_client/Main.cpp"
+    "${CMAKE_SOURCE_DIR}/examples/cpp/thin_client/Main.cpp"
 )
 if (EXISTS "${CMAKE_SOURCE_DIR}/application/editor/app/D3D12AgilityExports.cpp")
     list(APPEND CAUSTICA_THIN_CLIENT_SOURCES

@@ -226,4 +226,4 @@ python -m pip install dist/caustica-*.whl
 ```
 
 See the [Python API reference](../py_caustica.md) and
-[Python examples](../caustica/Python/Examples/README.md) for renderer usage.
+[Python examples](../examples/python/README.md) for renderer usage.
