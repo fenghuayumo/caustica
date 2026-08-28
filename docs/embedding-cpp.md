@@ -162,7 +162,7 @@ transform, or attach one from the setup system.
 Ordering between conflicting systems is fixed by the plan, so results do not depend on thread
 timing; run with `--serialSystems` to rule parallelism out while debugging.
 `examples/cpp/thin_client/Main.cpp` is this split end to end. Details in
-[ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
+[architecture-render-proxy.md](architecture-render-proxy.md#concurrent-systems).
 
 An `update` system with no explicit set joins
 `system_set::Simulation`. The per-frame order is:

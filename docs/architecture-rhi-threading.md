@@ -2,15 +2,11 @@
 
 Caustica already splits **logic** and **render** via Extract + `RenderThread` (see [architecture-render-proxy.md](architecture-render-proxy.md)). This document defines the RHI rules that make that split and parallel command-list recording safe.
 
-> **Evolution:** P1–P3 + R1 upload fences + R2 `VolatileConstantBinder` are in
-> [ADR 0001](adr/0001-task-runtime-multithreading.md). R3 free-threaded create remains
-> out of scope. Phase-1 RHI create/submit rules below remain authoritative.
-> Frame-path sync (replace device-wide idle with fence/retire; Logic no frame-path
-> `AndWait`) is [ADR 0002](adr/0002-frame-path-rhi-sync.md) — not LoadSession debt;
-> do not drive-by delete annotated RT sync-points. **S0–S5 (partial) landed** — AE /
-> feedback / needNewPasses / OMM / DLSS+SL freeResources use graphics `EventQuery`
-> (`syncGraphicsQueueFence`); frame resize is non-blocking. Remaining Logic waits:
-> skip-render gap, splat Pass create, precache/editor tools (see ADR 0002).
+Do **not** reintroduce `ThreadPool` / `JobSystem` — `caustica::task` is the only scheduler.
+Do **not** add another Logic→Render enqueue helper — extend `EnqueueRenderCommand` /
+`EnqueueRenderCommandAndWait` only. Do **not** add another “are we loading?” flag —
+extend `LoadSession`. Do **not** make resource create free-threaded. Code comments may
+still say `ADR 0001` / `ADR 0002`; those labels mean the rules in this file.
 
 ## Thread roles
 
@@ -114,6 +110,25 @@ Implications:
 
 - **D3D12:** `Device::m_Mutex` serializes `executeCommandLists`, `queueWaitForCommandList`, `waitForIdle`, and `runGarbageCollection` (including `permanentState` writeback in `CommandList::executed`).
 - **Vulkan:** `Device::m_Mutex` serializes `executeCommandLists` + `executed` writeback and GC; `Queue::m_Mutex` serializes `submit`, wait/signal semaphore staging, and `retireCommandBuffers` (pool acquire in `getOrCreateCommandBuffer` remains free-threaded under the same queue lock).
+
+## Frame-path sync
+
+Prefer graphics `EventQuery` / queue fence / retire over device-wide `waitForIdle`
+on the interactive frame (AE, pick/feedback, `needNewPasses`, OMM, DLSS/SL
+`freeResources`). Frame resize is non-blocking `EnqueueRenderCommand`.
+
+Still allowed to idle **on the render thread**: app/device shutdown, LoadSession
+exclusive teardown, device-lost recovery, documented one-shot tools.
+
+Remaining Logic↔RT waits (not the editor frame loop): skip-render gap idle, splat
+Pass create/remove, precache `AndWait`, editor undo/redo. Do not delete annotated
+sync-points in drive-by PRs.
+
+```text
+// THREADING: sync-point, RT-only — (short reason)
+// THREADING: Logic↔RT wait — (short reason)
+// THREADING: sync-point, shutdown — allowed
+```
 
 ## Out of scope
 

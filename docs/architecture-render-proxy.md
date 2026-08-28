@@ -83,10 +83,7 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 ## RHI threading
 
-Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md).
-
-TaskRuntime + LoadSession streaming: [ADR 0001](adr/0001-task-runtime-multithreading.md).
-TaskGraph + concurrent system execution: [ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
+Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md). `caustica::task` is the only scheduler (`TaskGraph` nodes lower onto it). LoadSession owns scene-open streaming. Concurrent systems are described below.
 
 ## App scene-edit API
 
@@ -144,8 +141,11 @@ Official sample (no editor): `examples/cpp/thin_client` → target `caustica_thi
 `First` / `preUpdate` / `update` / `PostUpdate` / `Last` run their systems concurrently on
 TaskRuntime workers when it is provably safe. `Startup`, `Extract` and `render` stay serial.
 Hosts write no threading code: the scheduler reads each system's **parameter list** and lets two
-systems overlap only when neither writes what the other reads or writes. See
-[ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
+systems overlap only when neither writes what the other reads or writes. There is no public
+`addSystem` that takes a hand-written `SystemAccess`. Do not create `entt` change-tick storage
+lazily from a system body (warmups run before dispatch). Do not share one `CommandQueue`
+between systems that can run concurrently. Code comments may still say `ADR 0003`; that
+label means this section.
 
 | Parameter | Declares |
 | --- | --- |
@@ -174,7 +174,7 @@ identical results — turning parallelism off only changes timing.
 Inspect a phase with `app.schedules().describePlan(AppSchedule::update)`; `planInfo()` reports
 system / exclusive / edge counts and max parallel width.
 
-## Extract schedule (P2)
+## Extract schedule
 
 Leaf Extract is Bevy-style schedule composition on `AppSchedule::Extract`
 (`RenderExtractPlugin`) — no renderable type registry:
@@ -213,10 +213,10 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | --- | --- |
 | Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
 | Parallel RHI command-list recording | `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
-| TaskRuntime + Logic→RT enqueue | `caustica::task`; sole `EnqueueRenderCommand*` → `Affinity::Render` — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
-| LoadSession amortized streaming | `LoadSession` / `tickLoadSession`; present continues during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
-| Concurrent ECS systems | Access derived from system parameters; conflict-aware parallel executor on the simulation phases — [ADR 0003](adr/0003-taskgraph-parallel-ecs.md) |
-| TaskGraph | `task::TaskEvent` / `task::TaskGraph` DAG authoring over TaskRuntime — [ADR 0003](adr/0003-taskgraph-parallel-ecs.md) |
+| TaskRuntime + Logic→RT enqueue | `caustica::task`; sole `EnqueueRenderCommand*` → `Affinity::Render` |
+| LoadSession amortized streaming | `LoadSession` / `tickLoadSession`; present continues during GpuStreaming |
+| Concurrent ECS systems | Access derived from system parameters; conflict-aware parallel executor on the simulation phases |
+| TaskGraph | `task::TaskEvent` / `task::TaskGraph` DAG authoring over TaskRuntime |
 | SceneSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Apps use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
