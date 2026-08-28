@@ -22,7 +22,7 @@ namespace caustica::rhi::vulkan
         checked_cast<Device*>(device)->queueSignalSemaphore(executionQueue, semaphore, value);
     }
 
-    DeviceHandle createDevice(const DeviceDesc& desc)
+    DeviceHandle createDeviceFromNative(const DeviceDesc& desc)
     {
 #if defined(CAUSTICA_RHI_SHARED_LIBRARY_BUILD)
 #if VK_HEADER_VERSION >= 301

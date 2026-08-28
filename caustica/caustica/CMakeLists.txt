@@ -291,6 +291,15 @@ target_link_libraries(causBackend
     PUBLIC causCore causMath causPlatform
     PUBLIC caustica_rhi
 )
+
+if (BUILD_TESTING)
+    add_executable(causDeviceFactoryTests tests/DeviceFactoryTests.cpp)
+    target_link_libraries(causDeviceFactoryTests PRIVATE caustica_rhi)
+    if (MSVC)
+        target_compile_options(causDeviceFactoryTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causDeviceFactoryTests COMMAND causDeviceFactoryTests)
+endif()
 # Backend-specific link deps
 if (CAUSTICA_WITH_DX11)
     if (NOT CAUSTICA_RHI_BUILD_SHARED)

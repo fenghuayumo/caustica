@@ -38,7 +38,7 @@ public:
 #else
         bool        useVulkan         = true;
 #endif
-        int         adapterIndex      = -1;
+        std::string adapter           = "auto";
         bool        debug             = false;
         bool        nonInteractive    = true;
         std::string scene;

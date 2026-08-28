@@ -214,13 +214,6 @@ public:
 
     void shutdown();
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-    uint32_t findBestAdapterDX();
-#endif
-
-#if CAUSTICA_WITH_VULKAN
-    uint32_t findBestAdapterVulkan(const std::vector <vk::PhysicalDevice>& vkDevices);
-#endif
 };
 
 } // namespace caustica

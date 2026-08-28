@@ -38,7 +38,7 @@ struct EngineAppDesc
     bool headless = false;
     bool dedicatedRenderThread = true;
     bool debugDevice = false;
-    int adapterIndex = -1;
+    caustica::rhi::AdapterSelector adapter;
     bool useVulkan = false;
     bool fullscreen = false;
     bool maximized = false;

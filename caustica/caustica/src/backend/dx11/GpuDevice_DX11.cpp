@@ -100,7 +100,8 @@ void GpuDevice_DX11::reportLiveObjects()
 bool GpuDevice_DX11::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D11, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (!m_DxgiFactory)
@@ -138,11 +139,37 @@ bool GpuDevice_DX11::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
         AdapterInfo adapterInfo;
         
+        adapterInfo.index = uint32_t(outAdapters.size());
+        adapterInfo.api = caustica::rhi::GraphicsAPI::D3D11;
         adapterInfo.name = getAdapterName(desc);
-        adapterInfo.dxgiAdapter = adapter;
         adapterInfo.vendorID = desc.VendorId;
         adapterInfo.deviceID = desc.DeviceId;
         adapterInfo.dedicatedVideoMemory = desc.DedicatedVideoMemory;
+        constexpr uint64_t oneGiB = 1024ull * 1024ull * 1024ull;
+        const bool likelyIntegrated = desc.DedicatedVideoMemory == 0
+            || (desc.DedicatedVideoMemory <= oneGiB
+                && desc.SharedSystemMemory > desc.DedicatedVideoMemory * 4);
+        adapterInfo.type = likelyIntegrated
+            ? caustica::rhi::AdapterType::Integrated
+            : caustica::rhi::AdapterType::Discrete;
+
+        RefCountPtr<IDXGIAdapter1> adapter1;
+        DXGI_ADAPTER_DESC1 desc1{};
+        if (SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter1))) && SUCCEEDED(adapter1->GetDesc1(&desc1)))
+        {
+            adapterInfo.software = (desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
+            if (adapterInfo.software)
+                adapterInfo.type = caustica::rhi::AdapterType::Software;
+        }
+
+        adapterInfo.suitable = !adapterInfo.software && !m_DeviceParams.requirePathTracerFeatures;
+        const uint64_t typeScore = adapterInfo.type == caustica::rhi::AdapterType::Discrete
+            ? 4'000'000'000'000ull
+            : 2'000'000'000'000ull;
+        const uint64_t memoryMiB = adapterInfo.dedicatedVideoMemory / (1024ull * 1024ull);
+        adapterInfo.selectionScore = adapterInfo.suitable
+            ? typeScore + memoryMiB * 1'000'000ull
+            : 0;
 
         AdapterInfo::LUID luid;
         static_assert(luid.size() == sizeof(desc.AdapterLuid));
@@ -155,15 +182,9 @@ bool GpuDevice_DX11::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
 bool GpuDevice_DX11::createDevice()
 {
-    int adapterIndex = m_DeviceParams.adapterIndex;
+    int adapterIndex = m_RequestedAdapterIndex;
 
-#if CAUSTICA_WITH_STREAMLINE
-    // Auto select best adapter for streamline features
-    if (adapterIndex < 0)
-        adapterIndex = StreamlineIntegration::Get().findBestAdapterDX();
-#endif
-    if (adapterIndex < 0)
-        adapterIndex = 0;
+    m_SelectedAdapterIndex = adapterIndex;
 
     if (FAILED(m_DxgiFactory->EnumAdapters(adapterIndex, &m_DxgiAdapter)))
     {
@@ -203,7 +224,8 @@ bool GpuDevice_DX11::createDevice()
         return false;
     }
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().setD3DDevice(m_Device);
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().setD3DDevice(m_Device);
 #endif
 
     caustica::rhi::d3d11::DeviceDesc deviceDesc;
@@ -213,18 +235,21 @@ bool GpuDevice_DX11::createDevice()
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
-    m_RhiDevice = m_RhiDevice = caustica::rhi::d3d11::createDevice(deviceDesc);
+    m_RhiDevice = caustica::rhi::d3d11::createDeviceFromNative(deviceDesc);
 
     if (m_DeviceParams.enableRhiValidationLayer)
     {
-        m_RhiDevice = m_RhiDevice = caustica::rhi::validation::createValidationLayer(m_RhiDevice);
+        m_RhiDevice = caustica::rhi::validation::createValidationLayer(m_RhiDevice);
     }
 
 #if CAUSTICA_WITH_STREAMLINE
-    AdapterInfo::LUID luid;
-    static_assert(luid.size() == sizeof(aDesc.AdapterLuid));
-    memcpy(luid.data(), &aDesc.AdapterLuid, luid.size());
-    StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice, &luid);
+    if (m_DeviceParams.enableStreamline)
+    {
+        AdapterInfo::LUID luid;
+        static_assert(luid.size() == sizeof(aDesc.AdapterLuid));
+        memcpy(luid.data(), &aDesc.AdapterLuid, luid.size());
+        StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice, &luid);
+    }
 #endif
 
     return true;

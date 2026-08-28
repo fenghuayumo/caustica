@@ -357,6 +357,54 @@ Caustica optionally integrates the [DirectX 12 Agility SDK](https://devblogs.mic
 
 Set the version-name option to an empty value to use the system D3D12 runtime, or select one of the preview values listed in the root `CMakeLists.txt`. Recreate the build directory when switching. See [the Agility SDK section](docs/build-and-run.md#directx-12-agility-sdk).
 
+## Multi-GPU Selection
+
+Caustica supports backend-neutral GPU selection on DX12 and Vulkan. When no
+selector is supplied, the default `auto` mode enumerates the selected backend,
+removes software or path-tracing-incompatible devices, and chooses the suitable
+GPU with the highest capability score. The score considers hardware class,
+required ray-tracing features, device-local memory, and compute limits where
+the backend exposes useful comparable values. It is a selection heuristic
+rather than a benchmark. Equal scores prefer the
+lower enumerated index.
+
+| Selector | Meaning | Example |
+| --- | --- | --- |
+| `auto` | Choose the strongest suitable GPU. This is the default. | `--gpu auto` |
+| `index:N` | Select the current backend enumeration index. | `--gpu index:1` |
+| `name:text` | Case-insensitive device-name substring. It must match exactly one device. | `--gpu "name:RTX 5090"` |
+| `uuid:hex` | Select a Vulkan/device UUID. | `--gpu uuid:00112233445566778899aabbccddeeff` |
+| `luid:hex` | Select a Windows adapter LUID. | `--gpu luid:a100010000000000` |
+
+Explicit selectors are strict: unavailable, unsuitable, or ambiguous devices
+cause device creation to fail instead of silently switching GPUs. Indices can
+change after driver or hardware updates, so UUID/LUID selectors are preferred
+for persistent render-worker configuration.
+
+```powershell
+# Default backend, strongest compatible GPU
+.\bin\caustica.exe --gpu auto
+
+# Vulkan adapter 1
+.\bin\caustica.exe --backend vulkan --gpu index:1
+```
+
+Python can enumerate devices without constructing a renderer and can report the
+adapter ultimately selected by `auto`:
+
+```python
+import caustica
+
+for gpu in caustica.enumerate_adapters(vulkan=False):
+    print(gpu.index, gpu.name, gpu.type, gpu.luid, gpu.suitable)
+
+with caustica.Renderer(adapter="auto", headless=True) as renderer:
+    print("using", renderer.selected_adapter)
+```
+
+See [the Python GPU-selection reference](py_caustica.md#gpu-selection) for all
+adapter fields and stable-selector examples.
+
 ## Command Line
 
 Run `caustica.exe --help` for the parser-generated complete list.
@@ -364,7 +412,8 @@ Run `caustica.exe --help` for the parser-generated complete list.
 - `--scene <file>` selects a scene.
 - `--width <px> --height <px>` and `--fullscreen` configure the window.
 - `--backend <dx12|d3d12|vulkan|vk>` selects a compiled backend; `--vk` and `--vulkan` are aliases.
-- `--debug`, `--adapterIndex <n>`, and `--adapter <text>` configure device creation.
+- `--debug` and `--gpu <selector>` configure device creation; see
+  [Multi-GPU Selection](#multi-gpu-selection).
 - `--noWindow` creates an offscreen/headless device; `--syncRender` disables the dedicated render thread.
 - `--pythonScript <file>` and `--pythonExpr <expr>` run automation after scene load.
 

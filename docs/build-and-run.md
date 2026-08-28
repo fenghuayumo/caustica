@@ -191,8 +191,7 @@ options are:
 | `--backend <dx12\|d3d12\|vulkan\|vk>` | Select a compiled graphics backend. |
 | `--vk`, `--vulkan` | Vulkan aliases. |
 | `--debug` | Enable graphics debug layers and RHI validation. |
-| `--adapterIndex <n>` | Select an adapter by index; `-1` is automatic. |
-| `--adapter <text>` | Prefer an adapter whose name contains the text. |
+| `--gpu <selector>` | Select a GPU with `auto`, `index:N`, `name:text`, `uuid:hex`, or `luid:hex`. `auto` chooses the highest-scoring suitable hardware adapter. |
 | `--noWindow` | Use a headless device with offscreen back buffers. |
 | `--syncRender` | Disable the dedicated render thread. |
 | `--stopAnimations` | Start with scene animation disabled. |

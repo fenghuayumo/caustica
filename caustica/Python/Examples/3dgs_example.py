@@ -308,7 +308,7 @@ def make_renderer(caustica, args, scene: str, ply_path: Path, *, realtime: bool,
         height=args.height,
         headless=headless,
         vulkan=args.vulkan,
-        adapter_index=args.adapter_index,
+        adapter=args.adapter,
         scene=scene,
         realtime=realtime,
         accumulation_target=args.frames,
@@ -398,7 +398,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frames", type=int, default=32)
     parser.add_argument("--bounces", type=int, default=8)
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter-index", type=int, default=-1)
+    parser.add_argument("--adapter", default="auto")
     parser.add_argument("--side", choices=["front", "back", "left", "right", "top"], default="front")
     parser.add_argument("--distance-scale", type=float, default=3.0)
     parser.add_argument("--fov", type=float, default=45.0)

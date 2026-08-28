@@ -42,7 +42,7 @@ namespace caustica::rhi
 {
     // Version of the public Caustica RHI API.
     // Increment this when any changes to the API are made.
-    static constexpr uint32_t c_HeaderVersion = 23;
+    static constexpr uint32_t c_HeaderVersion = 24;
 
     // Verifies that the version of the implementation matches the version of the header.
     // Returns true if they match. Use this when initializing apps using the RHI as a shared library.

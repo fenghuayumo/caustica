@@ -129,7 +129,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         m_cmdLine.height = m_desc.height;
         m_cmdLine.noWindow = m_desc.headless;
         m_cmdLine.useVulkan = m_desc.useVulkan;
-        m_cmdLine.adapterIndex = m_desc.adapterIndex;
+        m_cmdLine.gpu = caustica::rhi::adapterSelectorToString(m_desc.adapter);
         m_cmdLine.debug = m_desc.debugDevice;
         m_cmdLine.scene = m_desc.scene;
         m_cmdLine.syncRender = !m_desc.dedicatedRenderThread;
@@ -152,7 +152,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.windowTitle = m_desc.windowTitle;
         createDesc.backBufferWidth = m_desc.width;
         createDesc.backBufferHeight = m_desc.height;
-        createDesc.adapterIndex = m_desc.adapterIndex;
+        createDesc.adapter = m_desc.adapter;
         createDesc.enableDebug = m_desc.debugDevice;
         createDesc.startFullscreen = m_desc.fullscreen;
         createDesc.startMaximized = m_desc.maximized && !m_desc.fullscreen;

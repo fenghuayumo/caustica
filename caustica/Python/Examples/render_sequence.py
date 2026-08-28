@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start-time", type=float, default=0.0)
     parser.add_argument("--spp", type=int, default=64)
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter-index", type=int, default=-1)
+    parser.add_argument("--adapter", default="auto")
     return parser.parse_args()
 
 
@@ -92,7 +92,7 @@ def main() -> int:
         height=args.height,
         headless=True,
         vulkan=args.vulkan,
-        adapter_index=args.adapter_index,
+        adapter=args.adapter,
         scene=scene,
         realtime=(args.mode == "realtime"),
         accumulation_target=args.spp if args.mode == "reference" else 1,

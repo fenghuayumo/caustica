@@ -19,6 +19,7 @@ This document describes how to use the current `caustica` Python bindings. The A
 
 - [Module-Level API](#module-level-api)
 - [Renderer](#renderer) — extension-mode standalone renderer
+- [GPU selection](#gpu-selection) — enumeration, automatic choice, and stable selectors
 - [Sample & Scene](#sample--scene) — `app()`, scene, camera, accumulation
 - [Spawn / Despawn](#spawn--despawn) — prefab load/spawn and entity removal
 - [Model](#model) — `SceneEntity`, `MeshHandle`, deformation, bounds
@@ -545,6 +546,7 @@ The sections below are grouped by topic so you can jump directly to the API you 
 | Category | Section |
 | --- | --- |
 | Renderer | [Renderer](#renderer) |
+| GPU selection | [GPU selection](#gpu-selection) |
 | Scene / app | [Sample & Scene](#sample--scene) |
 | Spawn / despawn | [Spawn / Despawn](#spawn--despawn) |
 | Mesh / entities | [Model](#model) |
@@ -566,6 +568,7 @@ These functions exist in both embed and extension mode unless noted.
 | `caustica.log_info(message)` | `None` | Writes to caustica log at info level. |
 | `caustica.log_warning(message)` | `None` | Writes to caustica log at warning level. |
 | `caustica.log_error(message)` | `None` | Writes to caustica log at error level. |
+| `caustica.enumerate_adapters(vulkan=False, debug=False)` | `list[AdapterInfo]` | Extension mode only. Enumerates DX12 or Vulkan adapters without creating a renderer. |
 | `caustica.Renderer(...)` | `Renderer` | Extension mode only. Creates a standalone renderer/device/window or headless backbuffer. |
 | `caustica.builtin_scene_json(builtin_model="plane_cube")` | `str` | Extension mode only. Returns minimal inline scene JSON for `plane`, `cube`, `sphere`, or `plane_cube`. |
 
@@ -581,7 +584,7 @@ caustica.Renderer(
     height=1080,
     headless=True,
     vulkan=False,
-    adapter_index=-1,
+    adapter="auto",
     debug=False,
     scene="",
     realtime=False,
@@ -594,7 +597,7 @@ caustica.Renderer(
 | `width`, `height` | Initial backbuffer/window size. |
 | `headless` | `True`: offscreen backbuffers, no OS window. `False`: create a window and swap chain. |
 | `vulkan` | `False` uses DX12. `True` requests Vulkan when available. |
-| `adapter_index` | GPU index, `-1` means default adapter. |
+| `adapter` | GPU selector: `auto`, `index:N`, `name:text`, `uuid:hex`, or `luid:hex`. Use `caustica.enumerate_adapters()` to discover values. |
 | `debug` | Enable graphics debug settings. |
 | `scene` | Scene file path/name, `builtin:*` primitive reference, or inline scene JSON string. Relative file paths are resolved from `Assets/`. |
 | `realtime` | Start in realtime mode if `True`, reference mode if `False`. |
@@ -624,6 +627,86 @@ caustica.Renderer(
 | `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` or `clear_camera_intrinsics()` is used. |
 | `app` | `Sample` | Underlying renderer instance (`EngineApp::app()` in extension mode). |
 | `settings` | `Settings` | Live UI/settings state. |
+| `selected_adapter` | `AdapterInfo` | Adapter actually selected during device creation. |
+
+### GPU selection
+
+`Renderer` uses `adapter="auto"` when the argument is omitted. Automatic mode
+enumerates the requested backend, filters out software and path-tracing-
+incompatible devices, and chooses the suitable GPU with the highest capability
+score. The score combines hardware class, required ray-tracing features,
+device-local memory, and compute limits where the backend exposes useful
+comparable values. It is a deterministic selection heuristic, not a performance
+benchmark. Equal scores prefer the lower index.
+
+#### Enumerating adapters
+
+`caustica.enumerate_adapters(vulkan=False, debug=False)` performs discovery
+without creating a renderer, logical device, window, or swap chain. Set
+`vulkan=True` to enumerate the Vulkan backend instead of DX12.
+
+```python
+import caustica
+
+gpus = caustica.enumerate_adapters(vulkan=False)
+for gpu in gpus:
+    print(
+        gpu.index,
+        gpu.name,
+        gpu.type,
+        f"{gpu.dedicated_video_memory / 2**30:.1f} GiB",
+        gpu.suitable,
+        gpu.luid,
+    )
+```
+
+`AdapterInfo` is read-only and exposes:
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `index` | `int` | Index for this backend enumeration. |
+| `name` | `str` | Driver-reported adapter name. |
+| `backend` | `str` | `"d3d12"` or `"vulkan"` for extension-mode discovery. |
+| `type` | `str` | `"discrete"`, `"integrated"`, `"virtual"`, `"software"`, or `"unknown"`. |
+| `vendor_id`, `device_id` | `int` | Driver-reported PCI/vendor identifiers. |
+| `dedicated_video_memory` | `int` | Device-local/dedicated memory in bytes. |
+| `selection_score` | `int` | Backend capability score used by `auto`; not a benchmark result. |
+| `supports_ray_tracing_pipeline` | `bool` | Hardware/driver exposes a ray-tracing pipeline. |
+| `supports_ray_query` | `bool` | Hardware/driver exposes ray queries. |
+| `suitable` | `bool` | Adapter meets the renderer's device requirements. |
+| `software` | `bool` | Adapter is a software implementation. |
+| `uuid` | `str \| None` | Stable 32-hex-digit device UUID when available. |
+| `luid` | `str \| None` | Stable 16-hex-digit Windows adapter LUID when available. |
+
+#### Selector formats
+
+| Value | Behavior |
+| --- | --- |
+| `auto` | Choose the highest-scoring suitable GPU. |
+| `index:N` | Match `AdapterInfo.index`. A bare non-negative integer is also accepted. |
+| `name:text` | Case-insensitive name substring. A bare non-numeric string is also treated as a name. |
+| `uuid:hex` | Match `AdapterInfo.uuid`; separators and an optional `0x` prefix are accepted. |
+| `luid:hex` | Match `AdapterInfo.luid`; separators and an optional `0x` prefix are accepted. |
+
+Explicit selectors are strict. A missing, unsuitable, or ambiguous match raises
+an initialization error; the renderer does not silently fall back to another
+GPU. Name selectors can become ambiguous on machines containing identical GPUs.
+For persistent worker configuration, prefer UUID/LUID because enumeration
+indices can change after driver or hardware updates.
+
+```python
+import caustica
+
+gpus = caustica.enumerate_adapters()
+target = next(gpu for gpu in gpus if gpu.suitable and gpu.luid)
+
+with caustica.Renderer(
+    adapter=f"luid:{target.luid}",
+    headless=True,
+) as renderer:
+    selected = renderer.selected_adapter
+    print(selected.index, selected.name, selected.backend)
+```
 
 ### `Framebuffer`
 

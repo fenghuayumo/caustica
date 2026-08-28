@@ -95,7 +95,7 @@ namespace
         params.startMaximized = desc.startMaximized;
         params.startBorderless = desc.startBorderless;
         params.vsyncEnabled = desc.vsyncEnabled;
-        params.adapterIndex = desc.adapterIndex;
+        params.adapter = desc.adapter;
         params.headlessDevice = desc.headless;
 
         if (desc.enableDebug)

@@ -95,7 +95,12 @@ bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
     createDesc.backBufferHeight = cmdLine.height;
     createDesc.startFullscreen = cmdLine.fullscreen;
     createDesc.startMaximized = !cmdLine.fullscreen;
-    createDesc.adapterIndex = cmdLine.adapterIndex;
+    std::string adapterError;
+    if (!caustica::rhi::parseAdapterSelector(cmdLine.gpu, createDesc.adapter, &adapterError))
+    {
+        caustica::error("Invalid --gpu selector '%s': %s", cmdLine.gpu.c_str(), adapterError.c_str());
+        return false;
+    }
 
     return true;
 }

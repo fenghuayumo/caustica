@@ -367,7 +367,13 @@ RenderSession::RenderSession(const Config& cfg)
     desc.height = uint32_t(cfg.height);
     desc.headless = cfg.headless;
     desc.debugDevice = cfg.debug;
-    desc.adapterIndex = cfg.adapterIndex;
+    std::string adapterError;
+    if (!caustica::rhi::parseAdapterSelector(cfg.adapter, desc.adapter, &adapterError))
+    {
+        caustica::error("RenderSession: invalid GPU adapter selector '%s': %s",
+            cfg.adapter.c_str(), adapterError.c_str());
+        return;
+    }
     desc.useVulkan = cfg.useVulkan;
     desc.scene = m_config.scene;
     desc.windowTitle = "caustica_py";

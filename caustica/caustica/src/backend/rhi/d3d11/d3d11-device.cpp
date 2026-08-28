@@ -16,7 +16,7 @@ namespace caustica::rhi::d3d11
         D3D_SET_OBJECT_NAME_N_A(pObject, UINT(strlen(name)), name);
     }
 
-    DeviceHandle createDevice(const DeviceDesc& desc)
+    DeviceHandle createDeviceFromNative(const DeviceDesc& desc)
     {
         Device* device = new Device(desc);
         return DeviceHandle::Create(device);

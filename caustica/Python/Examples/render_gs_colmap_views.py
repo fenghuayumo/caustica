@@ -402,7 +402,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frames-per-view", type=int, default=8)
     parser.add_argument("--warmup-frames", type=int, default=4)
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter-index", type=int, default=-1)
+    parser.add_argument("--adapter", default="auto")
     parser.add_argument("--windowed", action="store_true")
     parser.add_argument("--convert-rdf-to-rub", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--depth-test", action=argparse.BooleanOptionalAction, default=False)
@@ -476,7 +476,7 @@ def main() -> int:
         height=height,
         headless=not args.windowed,
         vulkan=args.vulkan,
-        adapter_index=args.adapter_index,
+        adapter=args.adapter,
         scene=scene,
         realtime=True,
         accumulation_target=1,

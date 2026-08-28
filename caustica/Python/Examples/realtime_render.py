@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frames", type=int, default=32)
     parser.add_argument("--out", default="realtime_frame.png")
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter-index", type=int, default=-1)
+    parser.add_argument("--adapter", default="auto")
     parser.add_argument(
         "--denoiser",
         choices=["off", "taa", "nrd", "dlss", "oidn"],
@@ -135,7 +135,7 @@ def main() -> int:
         height=args.height,
         headless=args.headless,
         vulkan=args.vulkan,
-        adapter_index=args.adapter_index,
+        adapter=args.adapter,
         scene=scene,
         realtime=True,
         accumulation_target=1,

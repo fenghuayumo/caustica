@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bounces", type=int, default=8)
     parser.add_argument("--out", default="frame.png")
     parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument("--adapter-index", type=int, default=-1)
+    parser.add_argument("--adapter", default="auto")
     parser.add_argument("--no-headless", dest="headless", action="store_false", default=True)
     parser.add_argument("--oidn", action="store_true")
     parser.add_argument("--oidn-gpu", dest="oidn_gpu", action=argparse.BooleanOptionalAction, default=True)
@@ -75,7 +75,7 @@ def main() -> int:
         height=args.height,
         headless=args.headless,
         vulkan=args.vulkan,
-        adapter_index=args.adapter_index,
+        adapter=args.adapter,
         scene=scene,
         realtime=False,
         accumulation_target=args.spp,

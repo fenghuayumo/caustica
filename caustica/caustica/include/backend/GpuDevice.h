@@ -92,6 +92,7 @@ namespace caustica
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
+        bool enableStreamline = true;
         int streamlineAppId = 1; // default app id
         bool checkStreamlineSignature = true; // check if the streamline dlls are signed
         bool enableStreamlineLog = false;
@@ -126,10 +127,9 @@ namespace caustica
         bool enableComputeQueue = false;
         bool enableCopyQueue = false;
 
-        // Index of the adapter (DX11, DX12) or physical device (Vk) on which to initialize the device.
-        // Negative values mean automatic detection.
-        // The order of indices matches that returned by GpuDevice::enumerateAdapters.
-        int adapterIndex = -1;
+        // Stable, backend-neutral GPU selection. Explicit selectors do not
+        // silently fall back unless AdapterSelector::allowFallback is enabled.
+        caustica::rhi::AdapterSelector adapter;
 
         // Set this to true if the application implements UI scaling for DPI explicitly instead of relying
         // on ImGUI's DisplayFramebufferScale. This produces crisp text and lines at any scale
@@ -188,26 +188,7 @@ namespace caustica
         uint64_t currentReservation = 0;
     };
 
-    struct AdapterInfo
-    {
-        typedef std::array<uint8_t, 16> UUID;
-        typedef std::array<uint8_t, 8> LUID;
-
-        std::string name;
-        uint32_t vendorID = 0;
-        uint32_t deviceID = 0;
-        uint64_t dedicatedVideoMemory = 0;
-
-        std::optional<UUID> uuid;
-        std::optional<LUID> luid;
-
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-        caustica::rhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
-#endif
-#if CAUSTICA_WITH_VULKAN
-        VkPhysicalDevice vkPhysicalDevice = nullptr;
-#endif
-    };
+    using AdapterInfo = caustica::rhi::AdapterDesc;
 
     struct GpuDeviceCreateDesc
     {
@@ -222,7 +203,7 @@ namespace caustica
         bool startMaximized = false;
         bool startBorderless = false;
         bool vsyncEnabled = true;
-        int adapterIndex = -1;
+        caustica::rhi::AdapterSelector adapter;
         bool enableDebug = false;
 
 #if CAUSTICA_WITH_DX12
@@ -261,6 +242,13 @@ namespace caustica
         // Application entry: creates GpuDevice (+ optional Window/swap chain or headless buffers).
         static GpuDeviceCreateResult createInitialized(const GpuDeviceCreateDesc& desc);
 
+        // Discovery entry for tools and Python. No logical device or swap chain is created.
+        static bool enumerateAvailableAdapters(
+            caustica::rhi::GraphicsAPI api,
+            std::vector<AdapterInfo>& outAdapters,
+            bool enableDebug = false,
+            std::string* outError = nullptr);
+
         [[nodiscard]] bool supportsRayTracingPipeline() const;
         [[nodiscard]] bool supportsRayQuery() const;
         [[nodiscard]] bool supportsShaderExecutionReordering() const;
@@ -274,6 +262,8 @@ namespace caustica
         // Enumerates adapters or physical devices present in the system.
         // Note: a call to createInstance() or createInitialized() is required before enumerateAdapters().
         virtual bool enumerateAdapters(std::vector<AdapterInfo>& outAdapters) = 0;
+
+        [[nodiscard]] const std::optional<AdapterInfo>& getSelectedAdapter() const;
 
         void setFrameDriver(IGpuFrameDriver* driver) { m_frameDriver = driver; }
         [[nodiscard]] IGpuFrameDriver* getFrameDriver() const { return m_frameDriver; }
@@ -296,6 +286,9 @@ namespace caustica
 
         SwapChain m_SwapChain;                     // Backend layer: swapchain state
         DeviceCreationParameters m_DeviceParams;
+        std::unique_ptr<caustica::rhi::DeviceFactory> m_DeviceFactory;
+        int m_RequestedAdapterIndex = -1;
+        int m_SelectedAdapterIndex = -1;
         GLFWwindow* m_Window = nullptr;       // Borrowed GLFW handle from GlfwWindow
         Window* m_WindowPtr = nullptr;        // Platform layer window (owns GLFW lifetime)
 

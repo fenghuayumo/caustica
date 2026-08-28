@@ -145,13 +145,86 @@ bool GpuDevice::initializeGraphicsDevice(const DeviceCreationParameters& params)
     if (!createInstance(m_DeviceParams))
         return false;
 
-    if (!createDevice())
+    m_DeviceFactory = std::make_unique<caustica::rhi::DeviceFactory>(
+        [this](std::vector<AdapterInfo>& adapters, std::string& errorText) {
+            if (enumerateAdapters(adapters))
+                return true;
+            errorText = "backend adapter enumeration failed";
+            return false;
+        },
+        [this](int index, std::string& errorText) {
+            m_RequestedAdapterIndex = index;
+            m_SelectedAdapterIndex = -1;
+            if (createDevice())
+                return true;
+            errorText = "backend device creation failed";
+            return false;
+        },
+        [this]() { return m_SelectedAdapterIndex; });
+
+    const caustica::rhi::DeviceFactoryCreateResult createResult =
+        m_DeviceFactory->createDevice(m_DeviceParams.adapter);
+    if (!createResult)
+    {
+        caustica::error("GPU device creation failed: %s", createResult.error.c_str());
         return false;
+    }
+
+    caustica::message(
+        m_DeviceParams.infoLogSeverity,
+        "Selected GPU adapter [%u]: %s (%s)",
+        createResult.adapter->index,
+        createResult.adapter->name.c_str(),
+        caustica::rhi::adapterTypeToString(createResult.adapter->type));
 
     if (m_DeviceParams.requirePathTracerFeatures && !validatePathTracerRequirements())
         return false;
 
     return true;
+}
+
+const std::optional<AdapterInfo>& GpuDevice::getSelectedAdapter() const
+{
+    static const std::optional<AdapterInfo> empty;
+    return m_DeviceFactory ? m_DeviceFactory->selectedAdapter() : empty;
+}
+
+bool GpuDevice::enumerateAvailableAdapters(
+    caustica::rhi::GraphicsAPI api,
+    std::vector<AdapterInfo>& outAdapters,
+    bool enableDebug,
+    std::string* outError)
+{
+    outAdapters.clear();
+    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::create(api));
+    if (!gpuDevice)
+    {
+        if (outError)
+            *outError = "requested graphics backend is not available in this build";
+        return false;
+    }
+
+    InstanceParameters params;
+    params.enableDebugRuntime = enableDebug;
+    params.headlessDevice = true;
+#if CAUSTICA_WITH_STREAMLINE
+    // Adapter discovery must not initialize or shut down process-global
+    // Streamline state owned by an active renderer.
+    params.enableStreamline = false;
+#endif
+    if (!gpuDevice->createInstance(params))
+    {
+        if (outError)
+            *outError = "failed to create the graphics API instance";
+        gpuDevice->shutdown();
+        return false;
+    }
+
+    const bool success = gpuDevice->enumerateAdapters(outAdapters);
+    if (!success && outError)
+        *outError = "failed to enumerate GPU adapters";
+    gpuDevice->shutdown();
+    return success;
 }
 
 bool GpuDevice::bindWindow(Window* window)
@@ -544,7 +617,8 @@ void GpuDevice::shutdown()
 {
 #if CAUSTICA_WITH_STREAMLINE
     // Shut down Streamline before destroying swap chain and device.
-    StreamlineIntegration::Get().shutdown();
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().shutdown();
 #endif
 
     prepareShutdown();

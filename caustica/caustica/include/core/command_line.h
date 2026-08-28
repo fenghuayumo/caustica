@@ -22,9 +22,8 @@ struct CommandLineOptions
     uint32_t width = 1920;
     uint32_t height = 1080;
     bool fullscreen = false;
-    std::string adapter;
+    std::string gpu = "auto";
     std::string graphicsBackend;
-    int adapterIndex = -1;
     bool useVulkan = false;
     bool stopAnimations = false;
     bool disableSER = false;

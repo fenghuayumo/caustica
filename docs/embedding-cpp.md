@@ -74,7 +74,7 @@ Frequently used fields:
 | `headless` | `false` | Create an offscreen device without a window. |
 | `dedicatedRenderThread` | `true` | Pipeline render work on a dedicated thread; ignored in headless mode. |
 | `debugDevice` | `false` | Enable backend debug support. |
-| `adapterIndex` | `-1` | GPU index; negative means automatic selection. |
+| `adapter` | `AdapterSelector::automatic()` | GPU selector. Automatic mode chooses the highest-scoring suitable hardware adapter; explicit modes support index, name, UUID, and LUID. |
 | `useVulkan` | `false` | Select Vulkan when both Vulkan and DirectX 12 were compiled. |
 | `fullscreen` | `false` | Start the owned window fullscreen. |
 | `scene` | `default.json` | Initial scene. |

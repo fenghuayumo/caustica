@@ -51,7 +51,7 @@ namespace caustica::rhi::vulkan
         std::string vulkanLibraryName; // if empty, use default
     };
 
-    CAUSTICA_RHI_API DeviceHandle createDevice(const DeviceDesc& desc);
+    CAUSTICA_RHI_API DeviceHandle createDeviceFromNative(const DeviceDesc& desc);
 
     CAUSTICA_RHI_API void queueWaitForSemaphore(caustica::rhi::Device* device, CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value);
     CAUSTICA_RHI_API void queueSignalSemaphore(caustica::rhi::Device* device, CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value);

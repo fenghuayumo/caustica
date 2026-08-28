@@ -130,7 +130,8 @@ bool GpuDevice_DX12::createInstanceInternal()
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::D3D12, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
     if (!m_DxgiFactory2)
@@ -168,11 +169,73 @@ bool GpuDevice_DX12::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
 
         AdapterInfo adapterInfo;
 
+        adapterInfo.index = uint32_t(outAdapters.size());
+        adapterInfo.api = caustica::rhi::GraphicsAPI::D3D12;
         adapterInfo.name = getAdapterName(desc);
-        adapterInfo.dxgiAdapter = adapter;
         adapterInfo.vendorID = desc.VendorId;
         adapterInfo.deviceID = desc.DeviceId;
         adapterInfo.dedicatedVideoMemory = desc.DedicatedVideoMemory;
+        constexpr uint64_t oneGiB = 1024ull * 1024ull * 1024ull;
+        const bool likelyIntegrated = desc.DedicatedVideoMemory == 0
+            || (desc.DedicatedVideoMemory <= oneGiB
+                && desc.SharedSystemMemory > desc.DedicatedVideoMemory * 4);
+        adapterInfo.type = likelyIntegrated
+            ? caustica::rhi::AdapterType::Integrated
+            : caustica::rhi::AdapterType::Discrete;
+
+        RefCountPtr<IDXGIAdapter1> adapter1;
+        DXGI_ADAPTER_DESC1 desc1{};
+        if (SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter1))) && SUCCEEDED(adapter1->GetDesc1(&desc1)))
+        {
+            adapterInfo.software = (desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
+            if (adapterInfo.software)
+                adapterInfo.type = caustica::rhi::AdapterType::Software;
+        }
+
+        RefCountPtr<ID3D12Device> probeDevice;
+        HRESULT probeResult = E_FAIL;
+        if (m_DeviceParams.d3d12DeviceFactory)
+        {
+            probeResult = m_DeviceParams.d3d12DeviceFactory->CreateDevice(
+                adapter,
+                m_DeviceParams.featureLevel,
+                IID_PPV_ARGS(&probeDevice));
+        }
+        else
+        {
+            probeResult = D3D12CreateDevice(
+                adapter,
+                m_DeviceParams.featureLevel,
+                IID_PPV_ARGS(&probeDevice));
+        }
+
+        if (SUCCEEDED(probeResult))
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5{};
+            if (SUCCEEDED(probeDevice->CheckFeatureSupport(
+                    D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))))
+            {
+                adapterInfo.supportsRayTracingPipeline =
+                    options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_0;
+                adapterInfo.supportsRayQuery =
+                    options5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
+            }
+        }
+
+        adapterInfo.suitable = !adapterInfo.software && SUCCEEDED(probeResult)
+            && (!m_DeviceParams.requirePathTracerFeatures
+                || (adapterInfo.supportsRayTracingPipeline && adapterInfo.supportsRayQuery));
+
+        const uint64_t typeScore = adapterInfo.type == caustica::rhi::AdapterType::Discrete
+            ? 4'000'000'000'000ull
+            : 2'000'000'000'000ull;
+        const uint64_t rayTracingScore = adapterInfo.supportsRayQuery
+            ? 200'000'000'000ull
+            : adapterInfo.supportsRayTracingPipeline ? 100'000'000'000ull : 0ull;
+        const uint64_t memoryMiB = adapterInfo.dedicatedVideoMemory / (1024ull * 1024ull);
+        adapterInfo.selectionScore = adapterInfo.suitable
+            ? typeScore + rayTracingScore + memoryMiB * 1'000'000ull
+            : 0;
 
         AdapterInfo::LUID luid;
         static_assert(luid.size() == sizeof(desc.AdapterLuid));
@@ -222,16 +285,9 @@ bool GpuDevice_DX12::createDevice()
         }
     }
 
-    int adapterIndex = m_DeviceParams.adapterIndex;
+    int adapterIndex = m_RequestedAdapterIndex;
 
-#if CAUSTICA_WITH_STREAMLINE
-    // Auto select best adapter for streamline features
-    if (adapterIndex < 0)
-        adapterIndex = StreamlineIntegration::Get().findBestAdapterDX();
-#endif
-
-    if (adapterIndex < 0)
-        adapterIndex = 0;
+    m_SelectedAdapterIndex = adapterIndex;
 
     if (FAILED(m_DxgiFactory2->EnumAdapters(adapterIndex, &m_DxgiAdapter)))
     {
@@ -280,7 +336,8 @@ bool GpuDevice_DX12::createDevice()
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().setD3DDevice(m_Device12);
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().setD3DDevice(m_Device12);
 #endif
 
     if (m_DeviceParams.enableDebugRuntime)
@@ -348,7 +405,7 @@ bool GpuDevice_DX12::createDevice()
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
     deviceDesc.enableHeapDirectlyIndexed = m_DeviceParams.enableHeapDirectlyIndexed;
 
-    m_RhiDevice = m_RhiDevice = caustica::rhi::d3d12::createDevice(deviceDesc);
+    m_RhiDevice = caustica::rhi::d3d12::createDeviceFromNative(deviceDesc);
 
 #if CAUSTICA_RHI_WITH_VALIDATION
     if (m_DeviceParams.enableRhiValidationLayer)
@@ -358,7 +415,8 @@ bool GpuDevice_DX12::createDevice()
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice);
+    if (m_DeviceParams.enableStreamline)
+        StreamlineIntegration::Get().initializeDeviceDX(m_RhiDevice);
 #endif
 
     return true;

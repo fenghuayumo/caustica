@@ -47,6 +47,7 @@ endif()
 set(include_common
     ${RHI_INCLUDE_DIR}/rhi.h
     ${RHI_INCLUDE_DIR}/rhi_types.h
+    ${RHI_INCLUDE_DIR}/device_factory.h
     ${RHI_INCLUDE_DIR}/rhi_hlsl.h
     ${RHI_INCLUDE_DIR}/caustica.h
     ${RHI_INCLUDE_DIR}/caustica/format.h
@@ -60,6 +61,7 @@ set(include_common
 
 set(src_common
     common/format-info.cpp
+    common/device_factory.cpp
     common/caustica-format.cpp
     common/misc.cpp
     common/state-tracking.cpp

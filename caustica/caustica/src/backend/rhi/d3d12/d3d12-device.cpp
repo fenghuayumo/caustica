@@ -180,7 +180,7 @@ namespace caustica::rhi::d3d12
     }
 
 
-    DeviceHandle createDevice(const DeviceDesc& desc)
+    DeviceHandle createDeviceFromNative(const DeviceDesc& desc)
     {
         Device* device = new Device(desc);
         return DeviceHandle::Create(device);

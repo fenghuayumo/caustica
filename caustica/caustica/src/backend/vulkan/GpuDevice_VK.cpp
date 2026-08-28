@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <memory>
 #include <sstream>
+#include <string_view>
 
 #include <backend/GpuDevice.h>
 #include <backend/vulkan/GpuDevice_VK.h>
@@ -252,7 +253,7 @@ bool GpuDevice_VK::pickPhysicalDevice()
 
     auto devices = m_VulkanInstance.enumeratePhysicalDevices();
 
-    int adapterIndex = m_DeviceParams.adapterIndex;
+    int adapterIndex = m_RequestedAdapterIndex;
 
     int firstDevice = 0;
     int lastDevice = int(devices.size()) - 1;
@@ -272,8 +273,13 @@ bool GpuDevice_VK::pickPhysicalDevice()
     errorStream << "Cannot find a Vulkan device that supports all the required extensions and properties.";
 
     // build a list of GPUs
-    std::vector<vk::PhysicalDevice> discreteGPUs;
-    std::vector<vk::PhysicalDevice> otherGPUs;
+    struct Candidate
+    {
+        int enumerationIndex = -1;
+        vk::PhysicalDevice device;
+    };
+    std::vector<Candidate> discreteGPUs;
+    std::vector<Candidate> otherGPUs;
     for (int deviceIndex = firstDevice; deviceIndex <= lastDevice; ++deviceIndex)
     {
         vk::PhysicalDevice const& dev = devices[deviceIndex];
@@ -408,37 +414,28 @@ bool GpuDevice_VK::pickPhysicalDevice()
 
         if (prop.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
         {
-            discreteGPUs.push_back(dev);
+            discreteGPUs.push_back({ deviceIndex, dev });
         }
         else
         {
-            otherGPUs.push_back(dev);
+            otherGPUs.push_back({ deviceIndex, dev });
         }
     }
 
     // pick the first discrete GPU if it exists, otherwise the first integrated GPU
     if (!discreteGPUs.empty())
     {
-        uint32_t selectedIndex = 0;
-#if CAUSTICA_WITH_STREAMLINE
-        // Auto select best adapter for streamline features
-        if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
-            selectedIndex = StreamlineIntegration::Get().findBestAdapterVulkan(discreteGPUs);
-#endif
-
-        m_VulkanPhysicalDevice = discreteGPUs[selectedIndex];
+        constexpr uint32_t selectedIndex = 0;
+        m_VulkanPhysicalDevice = discreteGPUs[selectedIndex].device;
+        m_SelectedAdapterIndex = discreteGPUs[selectedIndex].enumerationIndex;
         return true;
     }
 
     if (!otherGPUs.empty())
     {
-        uint32_t selectedIndex = 0;
-#if CAUSTICA_WITH_STREAMLINE
-        // Auto select best adapter for streamline features
-        if (!m_DeviceParams.headlessDevice && adapterIndex < 0)
-            selectedIndex = StreamlineIntegration::Get().findBestAdapterVulkan(otherGPUs);
-#endif
-        m_VulkanPhysicalDevice = otherGPUs[selectedIndex];
+        constexpr uint32_t selectedIndex = 0;
+        m_VulkanPhysicalDevice = otherGPUs[selectedIndex].device;
+        m_SelectedAdapterIndex = otherGPUs[selectedIndex].enumerationIndex;
         return true;
     }
 
@@ -449,6 +446,13 @@ bool GpuDevice_VK::pickPhysicalDevice()
 
 bool GpuDevice_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
 {
+    // Queue-family discovery is candidate-local. Reset every field before
+    // probing so one rejected physical device cannot contaminate the next.
+    m_GraphicsQueueFamily = -1;
+    m_ComputeQueueFamily = -1;
+    m_TransferQueueFamily = -1;
+    m_PresentQueueFamily = -1;
+
     auto props = physicalDevice.getQueueFamilyProperties();
 
     for(int i = 0; i < int(props.size()); i++)
@@ -881,7 +885,7 @@ bool GpuDevice_VK::createVulkanSwapChain()
 bool GpuDevice_VK::createInstanceInternal()
 {
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_DeviceParams.headlessDevice)
+    if (m_DeviceParams.enableStreamline && !m_DeviceParams.headlessDevice)
         StreamlineIntegration::Get().initializePreDevice(caustica::rhi::GraphicsAPI::VULKAN, m_DeviceParams.streamlineAppId, m_DeviceParams.checkStreamlineSignature, m_DeviceParams.enableStreamlineLog);
 #endif
 
@@ -892,7 +896,7 @@ bool GpuDevice_VK::createInstanceInternal()
     }
 
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_DeviceParams.headlessDevice)
+    if (m_DeviceParams.enableStreamline && !m_DeviceParams.headlessDevice)
         m_DeviceParams.vulkanLibraryName = "sl.interposer.dll";
 #endif
 
@@ -923,11 +927,54 @@ bool GpuDevice_VK::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
         auto const& properties = properties2.properties;
         
         AdapterInfo adapterInfo;
+        adapterInfo.index = uint32_t(outAdapters.size());
+        adapterInfo.api = caustica::rhi::GraphicsAPI::VULKAN;
         adapterInfo.name = properties.deviceName.data();
         adapterInfo.vendorID = properties.vendorID;
         adapterInfo.deviceID = properties.deviceID;
-        adapterInfo.vkPhysicalDevice = physicalDevice;
         adapterInfo.dedicatedVideoMemory = 0;
+        switch (properties.deviceType)
+        {
+        case vk::PhysicalDeviceType::eDiscreteGpu:
+            adapterInfo.type = caustica::rhi::AdapterType::Discrete;
+            break;
+        case vk::PhysicalDeviceType::eIntegratedGpu:
+            adapterInfo.type = caustica::rhi::AdapterType::Integrated;
+            break;
+        case vk::PhysicalDeviceType::eVirtualGpu:
+            adapterInfo.type = caustica::rhi::AdapterType::Virtual;
+            break;
+        case vk::PhysicalDeviceType::eCpu:
+            adapterInfo.type = caustica::rhi::AdapterType::Software;
+            adapterInfo.software = true;
+            break;
+        default:
+            adapterInfo.type = caustica::rhi::AdapterType::Unknown;
+            break;
+        }
+
+        bool hasRayTracingPipelineExtension = false;
+        bool hasRayQueryExtension = false;
+        for (const vk::ExtensionProperties& extension : physicalDevice.enumerateDeviceExtensionProperties())
+        {
+            const std::string_view name(extension.extensionName.data());
+            hasRayTracingPipelineExtension |= name == VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
+            hasRayQueryExtension |= name == VK_KHR_RAY_QUERY_EXTENSION_NAME;
+        }
+
+        vk::PhysicalDeviceFeatures2 features2{};
+        vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeatures{};
+        vk::PhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+        features2.pNext = &rayTracingFeatures;
+        rayTracingFeatures.pNext = &rayQueryFeatures;
+        physicalDevice.getFeatures2(&features2);
+
+        adapterInfo.supportsRayTracingPipeline =
+            hasRayTracingPipelineExtension && rayTracingFeatures.rayTracingPipeline;
+        adapterInfo.supportsRayQuery = hasRayQueryExtension && rayQueryFeatures.rayQuery;
+        adapterInfo.suitable = !adapterInfo.software
+            && (!m_DeviceParams.requirePathTracerFeatures
+                || (adapterInfo.supportsRayTracingPipeline && adapterInfo.supportsRayQuery));
 
         AdapterInfo::UUID uuid;
         static_assert(uuid.size() == idProperties.deviceUUID.size());
@@ -952,6 +999,23 @@ bool GpuDevice_VK::enumerateAdapters(std::vector<AdapterInfo>& outAdapters)
                 adapterInfo.dedicatedVideoMemory += heap.size;
             }
         }
+
+        const uint64_t typeScore = adapterInfo.type == caustica::rhi::AdapterType::Discrete
+            ? 4'000'000'000'000ull
+            : adapterInfo.type == caustica::rhi::AdapterType::Integrated
+                ? 2'000'000'000'000ull
+                : 1'000'000'000'000ull;
+        const uint64_t rayTracingScore = adapterInfo.supportsRayQuery
+            ? 200'000'000'000ull
+            : adapterInfo.supportsRayTracingPipeline ? 100'000'000'000ull : 0ull;
+        const uint64_t memoryMiB = adapterInfo.dedicatedVideoMemory / (1024ull * 1024ull);
+        const auto& limits = properties.limits;
+        const uint64_t computeLimitScore =
+            uint64_t(limits.maxComputeWorkGroupInvocations) * 1'000'000ull
+            + uint64_t(limits.maxComputeSharedMemorySize) * 1'000ull;
+        adapterInfo.selectionScore = adapterInfo.suitable
+            ? typeScore + rayTracingScore + memoryMiB * 1'000'000ull + computeLimitScore
+            : 0;
 
         outAdapters.push_back(std::move(adapterInfo));
     }
@@ -1022,7 +1086,7 @@ bool GpuDevice_VK::createDevice()
     deviceDesc.vulkanLibraryName = m_DeviceParams.vulkanLibraryName;
     deviceDesc.logBufferLifetime = m_DeviceParams.logBufferLifetime;
 
-    m_RhiDevice = caustica::rhi::vulkan::createDevice(deviceDesc);
+    m_RhiDevice = caustica::rhi::vulkan::createDeviceFromNative(deviceDesc);
 
 #if CAUSTICA_RHI_WITH_VALIDATION
     if (m_DeviceParams.enableRhiValidationLayer)
@@ -1032,7 +1096,7 @@ bool GpuDevice_VK::createDevice()
 #endif
 
 #if CAUSTICA_WITH_STREAMLINE
-    if (!m_DeviceParams.headlessDevice)
+    if (m_DeviceParams.enableStreamline && !m_DeviceParams.headlessDevice)
     {
         StreamlineIntegration::VulkanInfo vulkanInfo;
         vulkanInfo.vkDevice = m_VulkanDevice;

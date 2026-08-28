@@ -22,8 +22,7 @@ namespace caustica::rhi::d3d11
         bool aftermathEnabled = false;
     };
 
-    CAUSTICA_RHI_API DeviceHandle createDevice(const DeviceDesc& desc);
+    CAUSTICA_RHI_API DeviceHandle createDeviceFromNative(const DeviceDesc& desc);
 
     CAUSTICA_RHI_API DXGI_FORMAT convertFormat(caustica::rhi::Format format);
 }
-
