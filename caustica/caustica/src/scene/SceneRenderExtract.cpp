@@ -516,6 +516,7 @@ void ExtractMaterialSnapshots(
         snapshot.materialIndex = material->materialID;
         snapshot.debugName = material->name;
         snapshot.modelFileName = material->modelFileName;
+        snapshot.overrideSource = material->overrideSource;
         snapshot.materialIndexInModel = material->materialIndexInModel;
         snapshot.domain = material->domain;
         snapshot.baseOrDiffuseTexture = material->baseOrDiffuseTexture;

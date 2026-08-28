@@ -25,8 +25,10 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <sstream>
 #include <type_traits>
+#include <unordered_map>
 #include <variant>
 
 using namespace caustica::math;
@@ -724,17 +726,58 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
 
     for (const auto& loaded : m_Models)
     {
-        if (loaded.source == source && loaded.entityWorld && ecs::isValid(loaded.rootEntity))
+        if (loaded.source == source)
+        {
+            if (!loaded.entityWorld || !ecs::isValid(loaded.rootEntity))
+            {
+                caustica::error("Cyclic prefab reference '%s'.", source.c_str());
+                return {};
+            }
             return loaded;
+        }
     }
 
     SceneImportResult result;
     result.source = source;
+    m_Models.push_back(result);
     ++g_LoadingStats.ObjectsTotal;
 
     if (IsBuiltinModelReference(source))
     {
         result = loadBuiltinModel(source);
+        result.source = source;
+        ++g_LoadingStats.ObjectsLoaded;
+    }
+    else if (isPrefabAssetPath(source))
+    {
+        const std::filesystem::path fileName = resolveSceneMediaPath(source, m_textureSearchDirectory);
+        Json::Value document;
+        const bool loaded = (m_fs && caustica::json::loadFromFile(*m_fs, fileName, document))
+            || caustica::json::loadFromFile(fileName, document);
+        if (!loaded || !document.isObject())
+        {
+            caustica::error("Failed to load prefab '%s'.", fileName.generic_string().c_str());
+            m_Models.pop_back();
+            return {};
+        }
+
+        result.entityWorld = std::make_shared<scene::SceneEntityWorld>();
+        std::string prefabName;
+        if (document["name"].isString())
+            prefabName = document["name"].asString();
+        else
+        {
+            prefabName = std::filesystem::path(source).stem().string();
+            if (pathEndsWithIgnoreCase(prefabName, ".prefab"))
+                prefabName = std::filesystem::path(prefabName).stem().string();
+        }
+        result.rootEntity = result.entityWorld->createEntity(prefabName);
+        if (!instantiateEntities(*result.entityWorld, result.rootEntity, document, asyncTextures))
+        {
+            m_Models.pop_back();
+            return {};
+        }
+        result.entityWorld->rebuildPathsFromRoot();
         result.source = source;
         ++g_LoadingStats.ObjectsLoaded;
     }
@@ -746,7 +789,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
         ++g_LoadingStats.ObjectsLoaded;
     }
 
-    m_Models.push_back(result);
+    m_Models.back() = result;
     return result;
 }
 
@@ -754,26 +797,72 @@ ecs::Entity Scene::instantiatePrefab(
     const std::string& source,
     ecs::Entity parent,
     const std::string& name,
-    bool asyncTextures)
+    bool asyncTextures,
+    scene::SceneEntityWorld* destWorld,
+    const std::unordered_map<std::string, std::string>& materials)
 {
     const SceneImportResult loaded = loadOrGetPrefab(source, asyncTextures);
     if (!loaded.entityWorld || !ecs::isValid(loaded.rootEntity))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->importSubtree(
+    scene::SceneEntityWorld& world = destWorld ? *destWorld : *m_EntityWorld;
+    ecs::Entity entity = world.importSubtree(
         parent, *loaded.entityWorld, loaded.rootEntity, m_SceneTypeFactory.get());
     if (!ecs::isValid(entity))
         return ecs::NullEntity;
 
     if (!name.empty())
     {
-        if (auto* nameComp = m_EntityWorld->world().get<scene::NameComponent>(entity))
+        if (auto* nameComp = world.world().get<scene::NameComponent>(entity))
             nameComp->value = name;
     }
 
-    m_EntityWorld->world().emplace<scene::PrefabInstanceComponent>(
-        entity, scene::PrefabInstanceComponent{ source });
+    world.world().emplace<scene::PrefabInstanceComponent>(
+        entity, scene::PrefabInstanceComponent{ source, materials });
+    applyMaterialSlots(world, entity, materials);
     return entity;
+}
+
+void Scene::applyMaterialSlots(
+    scene::SceneEntityWorld& world,
+    ecs::Entity root,
+    const std::unordered_map<std::string, std::string>& slots)
+{
+    if (!ecs::isValid(root) || slots.empty())
+        return;
+
+    auto applyToMesh = [&](const std::shared_ptr<MeshInfo>& mesh)
+    {
+        if (!mesh)
+            return;
+        for (const auto& geometry : mesh->geometries)
+        {
+            if (!geometry || !geometry->material)
+                continue;
+            auto it = slots.find(geometry->material->name);
+            if (it == slots.end())
+                it = slots.find("*");
+            if (it != slots.end())
+            {
+                geometry->material->overrideSource =
+                    canonicalAssetRelativePath(it->second).generic_string();
+            }
+        }
+    };
+
+    std::function<void(ecs::Entity)> walk = [&](ecs::Entity entity)
+    {
+        if (const auto* mesh = world.world().get<scene::MeshInstanceComponent>(entity))
+            applyToMesh(mesh->mesh);
+        if (const auto* skinned = world.world().get<scene::SkinnedMeshComponent>(entity))
+            applyToMesh(skinned->prototypeMesh);
+        if (const auto* children = world.world().get<scene::ChildrenComponent>(entity))
+        {
+            for (ecs::Entity child : children->children)
+                walk(child);
+        }
+    };
+    walk(root);
 }
 
 SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
@@ -832,7 +921,10 @@ SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
     return result;
 }
 
-void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
+void Scene::attachLeafFromJson(
+    scene::SceneEntityWorld& world,
+    ecs::Entity entity,
+    const Json::Value& src)
 {
     const auto& leafTypeNode = src["type"];
     if (!leafTypeNode.isString())
@@ -849,13 +941,13 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
                 {
                     using T = std::decay_t<decltype(light)>;
                     if constexpr (std::is_same_v<T, scene::DirectionalLightComponent>)
-                        m_EntityWorld->setDirectionalLight(entity, std::move(light));
+                        world.setDirectionalLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::SpotLightComponent>)
-                        m_EntityWorld->setSpotLight(entity, std::move(light));
+                        world.setSpotLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::PointLightComponent>)
-                        m_EntityWorld->setPointLight(entity, std::move(light));
+                        world.setPointLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::EnvironmentLightComponent>)
-                        m_EntityWorld->setEnvironmentLight(entity, std::move(light));
+                        world.setEnvironmentLight(entity, std::move(light));
                 },
                 std::move(*component));
         }
@@ -867,7 +959,7 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     if (scene::isJsonCameraLeafType(type))
     {
         if (auto component = scene::makeCameraComponentFromJson(type, src))
-            m_EntityWorld->setCamera(entity, std::move(*component));
+            world.setCamera(entity, std::move(*component));
         else
             caustica::warning("Failed to build camera leaf type '%s'.", type.c_str());
         return;
@@ -884,19 +976,19 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     {
         auto splat = std::static_pointer_cast<GaussianSplat>(leaf);
         splat->load(src);
-        m_EntityWorld->setGaussianSplat(entity, *splat);
+        world.setGaussianSplat(entity, *splat);
     }
     else if (type == "SceneSettings" || type == "SampleSettings")
     {
         auto settings = std::static_pointer_cast<SceneSettings>(leaf);
         settings->load(src);
-        m_EntityWorld->setSceneSettings(entity, *settings);
+        world.setSceneSettings(entity, *settings);
     }
     else if (type == "GameSettings")
     {
         auto settings = std::static_pointer_cast<GameSettings>(leaf);
         settings->load(src);
-        m_EntityWorld->setGameSettings(entity, *settings);
+        world.setGameSettings(entity, *settings);
     }
     else
     {

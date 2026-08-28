@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <unordered_map>
 #include <utility>
 
@@ -31,7 +32,12 @@ void MergeObjectFields(Json::Value& target, const Json::Value& overlay)
 
     const auto names = overlay.getMemberNames();
     for (const auto& name : names)
-        target[name] = overlay[name];
+    {
+        if (target[name].isObject() && overlay[name].isObject())
+            MergeObjectFields(target[name], overlay[name]);
+        else
+            target[name] = overlay[name];
+    }
 }
 
 Json::Value* FindEntityById(Json::Value& entities, const std::string& id)
@@ -245,12 +251,32 @@ void patchEntityTransforms(
             continue;
 
         const auto* local = world.world().tryGet<LocalTransformComponent>(entity);
-        if (!local || !local->hasLocalTransform)
+        const auto* prefab = world.world().tryGet<PrefabInstanceComponent>(entity);
+        if ((!local || !local->hasLocalTransform) && prefab == nullptr)
             continue;
 
         if (!entityNode["components"].isObject())
             entityNode["components"] = Json::Value(Json::objectValue);
-        WriteTransformComponent(entityNode["components"]["Transform"], *local);
+
+        if (local && local->hasLocalTransform)
+            WriteTransformComponent(entityNode["components"]["Transform"], *local);
+
+        if (prefab)
+        {
+            Json::Value& prefabNode = entityNode["components"]["PrefabInstance"];
+            if (!prefabNode.isObject())
+                prefabNode = Json::Value(Json::objectValue);
+            prefabNode["source"] = prefab->source;
+            if (prefab->materials.empty())
+                prefabNode.removeMember("materials");
+            else
+            {
+                Json::Value materials(Json::objectValue);
+                for (const auto& [slot, path] : prefab->materials)
+                    materials[slot] = path;
+                prefabNode["materials"] = std::move(materials);
+            }
+        }
     }
 }
 
@@ -260,6 +286,42 @@ namespace caustica
 {
 namespace
 {
+
+std::unordered_map<std::string, std::string> ReadNamedMaterialMap(const Json::Value& node)
+{
+    std::unordered_map<std::string, std::string> slots;
+    if (!node.isObject())
+        return slots;
+    const auto names = node.getMemberNames();
+    for (const auto& name : names)
+    {
+        if (node[name].isString())
+            slots[name] = node[name].asString();
+    }
+    return slots;
+}
+
+std::unordered_map<std::string, std::string> ReadPrefabMaterialSlots(const Json::Value& prefab)
+{
+    return ReadNamedMaterialMap(prefab["materials"]);
+}
+
+std::unordered_map<std::string, std::string> ReadMaterialOverrideSlots(const Json::Value& node)
+{
+    std::unordered_map<std::string, std::string> slots;
+    if (node.isString())
+    {
+        slots.emplace("*", node.asString());
+        return slots;
+    }
+    if (!node.isObject())
+        return slots;
+    if (node["source"].isString())
+        slots.emplace("*", node["source"].asString());
+    auto named = ReadNamedMaterialMap(node["slots"]);
+    slots.insert(named.begin(), named.end());
+    return slots;
+}
 
 std::string ReadEntityId(const Json::Value& src, const std::string& fallbackName)
 {
@@ -308,34 +370,12 @@ void Scene::applyTopLevelSettings(const Json::Value& settingsNode)
     m_EntityWorld->setSceneSettings(settingsEntity, settings);
 }
 
-bool Scene::loadEntities(
-    Json::Value documentRoot,
-    const std::filesystem::path& scenePath,
+bool Scene::instantiateEntities(
+    scene::SceneEntityWorld& world,
+    ecs::Entity defaultParent,
+    const Json::Value& documentRoot,
     bool asyncTextures)
 {
-    if (documentRoot["base"].isString())
-    {
-        const std::string baseRef = documentRoot["base"].asString();
-        const std::filesystem::path basePath = resolveSceneMediaPath(baseRef, scenePath);
-        Json::Value baseDocument;
-        if (!caustica::json::loadFromFile(*m_fs, basePath, baseDocument))
-        {
-            caustica::error("Failed to load scene base '%s' (from '%s').",
-                basePath.generic_string().c_str(), baseRef.c_str());
-            return false;
-        }
-        if (!baseDocument.isObject() || !baseDocument["entities"].isArray())
-        {
-            caustica::error("Scene overlay base '%s' has no entities[].",
-                basePath.generic_string().c_str());
-            return false;
-        }
-        documentRoot = scene::mergeSceneOverlay(baseDocument, documentRoot);
-    }
-
-    if (!loadCustomData(documentRoot, asyncTextures))
-        return false;
-
     const Json::Value& entities = documentRoot["entities"];
     if (!entities.isArray())
     {
@@ -378,24 +418,29 @@ bool Scene::loadEntities(
             return ecs::NullEntity;
 
         const Json::Value& src = *defIt->second;
-        idToEntity.emplace(id, ecs::NullEntity); // recursion guard
+        idToEntity.emplace(id, ecs::NullEntity);
 
-        ecs::Entity parent = m_EntityWorld->root();
+        ecs::Entity parent = defaultParent;
         if (src["parent"].isString())
         {
             const std::string parentId = src["parent"].asString();
             parent = self(self, parentId);
             if (!ecs::isValid(parent))
             {
-                caustica::warning("Scene entity '%s' parent '%s' not found, parenting to scene root.",
+                caustica::warning("Scene entity '%s' parent '%s' not found, parenting to default parent.",
                     id.c_str(), parentId.c_str());
-                parent = m_EntityWorld->root();
+                parent = defaultParent;
             }
         }
 
         const std::string name = ReadEntityName(src);
         const Json::Value& components = src["components"];
         const Json::Value& prefab = ComponentNode(components, "PrefabInstance");
+        const Json::Value& materialOverride = ComponentNode(components, "MaterialOverride");
+
+        std::unordered_map<std::string, std::string> materialSlots = ReadPrefabMaterialSlots(prefab);
+        auto overrideSlots = ReadMaterialOverrideSlots(materialOverride);
+        materialSlots.insert(overrideSlots.begin(), overrideSlots.end());
 
         ecs::Entity entity = ecs::NullEntity;
         if (prefab.isObject())
@@ -403,11 +448,13 @@ bool Scene::loadEntities(
             std::string source;
             if (prefab["source"].isString())
                 source = prefab["source"].asString();
-            entity = instantiatePrefab(source, parent, name, asyncTextures);
+            entity = instantiatePrefab(source, parent, name, asyncTextures, &world, materialSlots);
         }
         else
         {
-            entity = m_EntityWorld->createEntity(name, parent);
+            entity = world.createEntity(name, parent);
+            if (!materialSlots.empty())
+                applyMaterialSlots(world, entity, materialSlots);
         }
 
         if (!ecs::isValid(entity))
@@ -416,23 +463,35 @@ bool Scene::loadEntities(
             return ecs::NullEntity;
         }
 
-        m_EntityWorld->world().emplace<scene::SceneAuthoringIdComponent>(
+        world.world().emplace<scene::SceneAuthoringIdComponent>(
             entity, scene::SceneAuthoringIdComponent{ id });
+        if (!overrideSlots.empty() || materialOverride.isObject() || materialOverride.isString())
+        {
+            scene::MaterialOverrideComponent component;
+            if (materialOverride.isString())
+                component.source = materialOverride.asString();
+            else if (materialOverride["source"].isString())
+                component.source = materialOverride["source"].asString();
+            component.slots = std::move(overrideSlots);
+            world.world().emplace<scene::MaterialOverrideComponent>(entity, std::move(component));
+        }
 
         if (!name.empty())
         {
-            if (auto* nameComp = m_EntityWorld->world().get<scene::NameComponent>(entity))
+            if (auto* nameComp = world.world().get<scene::NameComponent>(entity))
                 nameComp->value = name;
         }
 
-        scene::applyAuthoringTransform(*m_EntityWorld, entity, ComponentNode(components, "Transform"));
+        scene::applyAuthoringTransform(world, entity, ComponentNode(components, "Transform"));
 
         if (components.isObject())
         {
             const auto names = components.getMemberNames();
             for (const auto& componentName : names)
             {
-                if (componentName == "Transform" || componentName == "PrefabInstance")
+                if (componentName == "Transform"
+                    || componentName == "PrefabInstance"
+                    || componentName == "MaterialOverride")
                     continue;
 
                 Json::Value leaf = components[componentName];
@@ -444,7 +503,7 @@ bool Scene::loadEntities(
                     if (leaf["source"].isString())
                         leaf["path"] = scene::canonicalizeEnvSource(leaf["source"].asString());
                 }
-                attachLeafFromJson(entity, leaf);
+                attachLeafFromJson(world, entity, leaf);
             }
         }
 
@@ -454,6 +513,40 @@ bool Scene::loadEntities(
 
     for (const std::string& id : order)
         instantiateOne(instantiateOne, id);
+
+    return true;
+}
+
+bool Scene::loadEntities(
+    Json::Value documentRoot,
+    const std::filesystem::path& scenePath,
+    bool asyncTextures)
+{
+    if (documentRoot["base"].isString())
+    {
+        const std::string baseRef = documentRoot["base"].asString();
+        const std::filesystem::path basePath = resolveSceneMediaPath(baseRef, scenePath);
+        Json::Value baseDocument;
+        if (!caustica::json::loadFromFile(*m_fs, basePath, baseDocument))
+        {
+            caustica::error("Failed to load scene base '%s' (from '%s').",
+                basePath.generic_string().c_str(), baseRef.c_str());
+            return false;
+        }
+        if (!baseDocument.isObject() || !baseDocument["entities"].isArray())
+        {
+            caustica::error("Scene overlay base '%s' has no entities[].",
+                basePath.generic_string().c_str());
+            return false;
+        }
+        documentRoot = scene::mergeSceneOverlay(baseDocument, documentRoot);
+    }
+
+    if (!loadCustomData(documentRoot, asyncTextures))
+        return false;
+
+    if (!instantiateEntities(*m_EntityWorld, m_EntityWorld->root(), documentRoot, asyncTextures))
+        return false;
 
     if (documentRoot.isMember("settings"))
         applyTopLevelSettings(documentRoot["settings"]);

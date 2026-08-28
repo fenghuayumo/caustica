@@ -18,6 +18,7 @@
 #include <scene/SceneApply.h>
 #include <scene/SceneManager.h>
 #include <scene/Scene.h>
+#include <scene/SceneImport.h>
 #include <render/core/SceneGpuUpdater.h>
 #include <render/core/RenderSceneTypeFactory.h>
 #include <render/core/PathTracingShaderCompiler.h>
@@ -223,6 +224,19 @@ Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
 
     if (Handle<ScenePrefabAsset> existing = assets->findScenePrefab(resolved))
         return existing;
+
+    if (isPrefabAssetPath(path.generic_string()) || isPrefabAssetPath(resolved.generic_string()))
+    {
+        auto scenePtr = activeScene(app);
+        if (!scenePtr)
+            return {};
+
+        auto imported = std::make_shared<SceneImportResult>(
+            scenePtr->loadOrGetPrefab(path.generic_string(), /*asyncTextures=*/true));
+        if (!imported->entityWorld || !ecs::isValid(imported->rootEntity))
+            return {};
+        return assets->registerScenePrefab(imported, resolved);
+    }
 
     auto textureLoader = caches->textureLoader;
     if (!textureLoader)

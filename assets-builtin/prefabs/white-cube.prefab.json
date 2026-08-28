@@ -1,0 +1,14 @@
+{
+  "name": "white-cube",
+  "entities": [
+    {
+      "id": "cube",
+      "name": "Cube",
+      "components": {
+        "PrefabInstance": {
+          "source": "builtin:cube"
+        }
+      }
+    }
+  ]
+}

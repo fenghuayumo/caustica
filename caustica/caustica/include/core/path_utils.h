@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cctype>
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace caustica
 {
@@ -95,6 +97,9 @@ inline constexpr const char* c_EnvMapSubFolderLegacy    = "EnvironmentMaps";
 inline constexpr const char* c_MaterialsSubFolder       = "materials";
 inline constexpr const char* c_MaterialsSubFolderLegacy = "Materials";
 inline constexpr const char* c_MaterialsExtension       = ".material.json";
+inline constexpr const char* c_MaterialsExtensionAlt    = ".mat.json";
+inline constexpr const char* c_PrefabsSubFolder         = "prefabs";
+inline constexpr const char* c_PrefabExtension          = ".prefab.json";
 inline constexpr const char* c_GameDataSubFolder        = "game";
 inline constexpr const char* c_AssetsEnvVar             = "CAUSTICA_ASSETS_DIR";
 
@@ -106,6 +111,31 @@ inline constexpr const char* c_EnvMapProcSky_Evening    = "==PROCEDURAL_SKY_EVEN
 inline constexpr const char* c_EnvMapProcSky_Dawn       = "==PROCEDURAL_SKY_DAWN==";
 inline constexpr const char* c_EnvMapProcSky_PitchBlack = "==PROCEDURAL_SKY_PITCHBLACK==";
 inline constexpr const char* c_EnvMapSceneDefault       = "==SCENE_DEFAULT==";
+
+inline bool pathEndsWithIgnoreCase(std::string_view value, std::string_view suffix)
+{
+    if (value.size() < suffix.size())
+        return false;
+    for (size_t i = 0; i < suffix.size(); ++i)
+    {
+        const auto a = static_cast<unsigned char>(value[value.size() - suffix.size() + i]);
+        const auto b = static_cast<unsigned char>(suffix[i]);
+        if (std::tolower(a) != std::tolower(b))
+            return false;
+    }
+    return true;
+}
+
+inline bool isPrefabAssetPath(std::string_view source)
+{
+    return pathEndsWithIgnoreCase(source, c_PrefabExtension);
+}
+
+inline bool isMaterialAssetPath(std::string_view source)
+{
+    return pathEndsWithIgnoreCase(source, c_MaterialsExtension)
+        || pathEndsWithIgnoreCase(source, c_MaterialsExtensionAlt);
+}
 
 inline bool isProceduralSky(const char* str)
 {

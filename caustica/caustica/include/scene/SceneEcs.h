@@ -53,6 +53,14 @@ struct SceneAuthoringIdComponent
 struct PrefabInstanceComponent
 {
     std::string source;
+    std::unordered_map<std::string, std::string> materials;
+};
+
+// Explicit material asset on a mesh entity (or per imported slot).
+struct MaterialOverrideComponent
+{
+    std::string source;
+    std::unordered_map<std::string, std::string> slots;
 };
 
 struct ParentComponent

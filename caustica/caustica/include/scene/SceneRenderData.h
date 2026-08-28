@@ -156,6 +156,7 @@ namespace caustica::scene
         uint32_t materialIndex = 0;
         std::string debugName;
         std::string modelFileName;
+        std::string overrideSource;
         int materialIndexInModel = -1;
         MaterialDomain domain = MaterialDomain::Opaque;
         Handle<ImageAsset> baseOrDiffuseTexture;

@@ -1891,7 +1891,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return PyEntityFromEntity(scene.get(), caustica::spawnFromFile(self, path));
             },
             nb::arg("path"),
-            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*). Returns root SceneEntity.")
+            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*/.prefab.json). Returns root SceneEntity.")
         .def("load_mesh_file", [](App& self, const std::string& fileName) {
                 return caustica::spawnFromFile(self, fileName) != ecs::NullEntity;
             },

@@ -1,6 +1,6 @@
 # Caustica 场景 JSON 格式
 
-场景 JSON 描述实体、组件和资源引用。网格通过 `PrefabInstance.source` 指向 glTF/OBJ/USD 或 `builtin:*`；材质覆盖仍在 `Assets/materials` 的 `.material.json`。OpenPBR 字段见 [OpenPBR materials](openpbr.md)。
+场景 JSON 描述实体、组件和资源引用。网格通过 `PrefabInstance.source` 指向 glTF/OBJ/USD、`builtin:*`，或 `prefabs/*.prefab.json`。材质用 `PrefabInstance.materials` / `MaterialOverride` 显式引用 pack 相对 `.material.json`。OpenPBR 字段见 [OpenPBR materials](openpbr.md)。
 
 相关实现：
 
@@ -125,9 +125,49 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
-| `source` | string | pack 相对路径、绝对路径，或 `builtin:plane` / `cube` / `sphere` / `plane_cube`。 |
+| `source` | string | pack 相对路径、绝对路径，`builtin:plane` / `cube` / `sphere` / `plane_cube`，或 `prefabs/*.prefab.json`。 |
+| `materials` | object | 可选。导入材质名 → pack 相对 `.material.json` / `.mat.json`。 |
 
 相对路径相对资源包根解析（`models/...`），并回退到 scene 文件目录。
+
+`.prefab.json` 与场景相同，是 `entities[]` 文档，可以再嵌套 `PrefabInstance`（网格 glTF 或另一个 prefab）。不要把编辑器 `game/` 下的玩法 JSON 当成引擎 prefab。
+
+```json
+{
+  "name": "white-cube",
+  "entities": [
+    {
+      "id": "cube",
+      "name": "Cube",
+      "components": {
+        "PrefabInstance": { "source": "builtin:cube" }
+      }
+    }
+  ]
+}
+```
+
+场景里实例化：
+
+```json
+"PrefabInstance": { "source": "prefabs/white-cube.prefab.json" }
+```
+
+### `MaterialOverride`
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `source` | string | 该实体上所有材质槽使用的材质资产路径。 |
+| `slots` | object | 可选。按导入材质名覆盖。 |
+
+```json
+"PrefabInstance": {
+  "source": "models/kitchen/kitchen.gltf",
+  "materials": {
+    "Mushroom_Sliced_MDL": "materials/kitchen.Mushroom_Sliced_MDL.material.json"
+  }
+}
+```
 
 ## 组件类型
 
@@ -142,6 +182,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `PerspectiveCamera` / `PerspectiveCameraEx` | 透视相机。 |
 | `OrthographicCamera` | 正交相机。 |
 | `GaussianSplat` | 3DGS PLY。 |
+| `MaterialOverride` | 显式材质资产。 |
 | `GameSettings` | 编辑器 `game/` 层原始 JSON。 |
 
 ## 灯光参数
@@ -424,40 +465,17 @@ Keyframe 字段：
 
 ## 材质覆盖
 
-scene JSON 本身不推荐直接写材质参数。当前 `MaterialPatch` 已废弃。材质覆盖文件放在 `Assets/materials`，由 `MaterialsBaker` 按模型名和材质名查找。旧目录名 `Assets/Materials` 仍然能解析。
+材质文件在 `materials/`（旧名 `Materials/` 仍能解析），扩展名 `.material.json` 或 `.mat.json`。场景里用 `PrefabInstance.materials` 或 `MaterialOverride` **显式引用** pack 相对路径。
 
-查找顺序（先 scene 文件所在目录，再运行时 `Assets` 根）：
-
-1. `<scene-dir>/Materials/<scene-stem>/<model-name>.<material-name>.material.json`
-2. `<scene-dir>/Materials/<scene-stem>/<material-name>.material.json`
-3. `<scene-dir>/Materials/<model-name>.<material-name>.material.json`
-4. `<scene-dir>/Materials/<material-name>.material.json`
-5. `<Assets>/Materials/<scene-stem>/<model-name>.<material-name>.material.json`
-6. `<Assets>/Materials/<scene-stem>/<material-name>.material.json`
-7. `<Assets>/Materials/<model-name>.<material-name>.material.json`
-8. `<Assets>/Materials/<material-name>.material.json`
-
-其中 `<scene-dir>` 是 scene JSON 的父目录；`<Assets>` 是运行时资源根（`bin` 旁或 pip 包内）。
-
-`scene-stem` 是 scene 文件名去掉最后一层扩展名：
-
-| scene 文件 | scene-stem |
-| --- | --- |
-| `default.json` / `default.scene.json` | `default` / `default.scene` |
-| `bistro-programmer-art.scene.json` | `bistro-programmer-art.scene` |
-
-`model-name` 规则：
-
-- 普通文件模型：模型文件名去掉扩展名，例如 `antman_merged.obj` -> `antman_merged`。
-- builtin 模型：`builtin_` 加 builtin 名，例如 `builtin:plane` -> `builtin_plane`。
+按「模型名.材质名」扫目录的旧查找仍然能加载未迁移文件，但已经 deprecated。
 
 示例：
 
 ```text
-Assets/materials/default/antman_merged.antman_merged_0.material.json
+materials/kitchen.Mushroom_Sliced_MDL.material.json
 ```
 
-对应模型 `antman_merged.obj` 中名为 `antman_merged_0` 的材质。
+对应 `models/kitchen/kitchen.gltf` 中名为 `Mushroom_Sliced_MDL` 的导入材质。
 
 ### 材质 JSON 示例
 
@@ -562,7 +580,7 @@ Assets/materials/default/antman_merged.antman_merged_0.material.json
 | `sRGB` | bool | 是否按 sRGB 读取。 |
 | `NormalMap` | bool | 是否是法线贴图。 |
 
-如果缺少材质覆盖文件，引擎会从 glTF/GLB 或 runtime OBJ importer 的原始材质导入默认 StandardMaterial（OpenPBR），并在日志中提示可通过 UI 保存材质文件。
+如果场景没有写 `PrefabInstance.materials` / `MaterialOverride`，引擎会回退到按「模型名.材质名」扫 `materials/` 的旧查找（deprecated），再不行就用 glTF/OBJ 导入的默认 StandardMaterial。
 
 注意：一旦写了 `.material.json` 覆盖文件，引擎会用这个 StandardMaterial 文件替代导入材质，而不是只覆盖其中几个字段。因此，如果原模型依赖 base color、normal、emissive 等贴图，覆盖文件里也要显式写对应的 `BaseTexture`、`NormalTexture`、`EmissiveTexture` 等字段；否则贴图会丢失，只剩颜色常量。
 
@@ -570,7 +588,7 @@ Assets/materials/default/antman_merged.antman_merged_0.material.json
 
 - JSON 文件不能写注释。
 - scene JSON 中的 Transform 是节点 Transform；材质参数走 `.material.json`。
-- scene JSON 静态 `models` 已支持 `.gltf`、`.glb`、`.obj`、`.urdf` 和可选的 OpenUSD 格式；新增格式时应扩展模型 importer 分发，而不是把所有格式强制转成 glTF。
+- `PrefabInstance.source` 支持 `.gltf`、`.glb`、`.obj`、`.urdf`、可选 OpenUSD，以及 `prefabs/*.prefab.json` 和 `builtin:*`。新增网格格式应扩展 importer，而不是把所有格式强制转成 glTF。
 - `rotation` 是四元数 XYZW；`verticalFov` 和 `euler` 是弧度；灯光的 `angularSize`、`innerAngle`、`outerAngle` 是度。
 - 3DGS 的外观、排序、阴影等渲染选项目前是全局设置，不是每个 3DGS 节点的独立 scene JSON 字段。
 - scene-specific material 目录名来自文件 stem。`foo.scene.json` 对应 `Assets/materials/foo.scene/`，不是 `foo/`。旧名 `Assets/Materials/` 仍然能解析。

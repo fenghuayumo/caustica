@@ -20,7 +20,7 @@
       "name": "Cube",
       "components": {
         "Transform": { "translation": [0.0, 0.5, 0.0] },
-        "PrefabInstance": { "source": "builtin:cube" }
+        "PrefabInstance": { "source": "prefabs/white-cube.prefab.json" }
       }
     },
     {

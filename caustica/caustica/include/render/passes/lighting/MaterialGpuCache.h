@@ -382,6 +382,10 @@ private:
     void                            clear();
 
     std::shared_ptr<StandardMaterial> load(const std::string & modelFileName, const std::string& name);
+    std::shared_ptr<StandardMaterial> loadFromAssetPath(
+        const std::string& source,
+        const std::string& name,
+        const std::string& modelFileName);
     std::shared_ptr<StandardMaterial> importFromEngineMaterial(const caustica::scene::MaterialRenderResourceSnapshot& material);
 
     void                            completeDeferredTexturesLoad(caustica::rhi::CommandList* commandList);

@@ -476,7 +476,7 @@ if (BUILD_TESTING)
     add_test(NAME causSceneEcsTests COMMAND causSceneEcsTests)
 
     add_executable(causSceneSerializerTests tests/SceneSerializerTests.cpp)
-    target_link_libraries(causSceneSerializerTests PRIVATE causScene)
+    target_link_libraries(causSceneSerializerTests PRIVATE causScene causEngine)
     if (MSVC)
         target_compile_options(causSceneSerializerTests PRIVATE /utf-8)
     endif()

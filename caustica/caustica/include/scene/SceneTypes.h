@@ -84,6 +84,7 @@ namespace caustica
         Handle<MaterialAsset> asset; // app-facing MaterialHandle when registered
         std::string name;
         std::string modelFileName;      // where this material originated from, e.g. GLTF file name
+        std::string overrideSource;     // pack-relative .material.json / .mat.json when set
         int materialIndexInModel = -1;  // index of the material in the model file
         MaterialDomain domain = MaterialDomain::Opaque;
         Handle<ImageAsset> baseOrDiffuseTexture; // metal-rough: base color; spec-gloss: diffuse color; .a = opacity (both modes)

@@ -455,7 +455,7 @@ r.close()
 ### Spawn / Despawn Assets
 
 `Sample.load` / `spawn` / `spawn_from_file` / `despawn` mirror the C++ `SceneSpawn` API.
-Supported mesh/prefab extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`.
+Supported mesh/prefab extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`.
 
 ```python
 import caustica

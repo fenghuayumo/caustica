@@ -187,6 +187,8 @@ bool isAssetPackDirectory(const std::filesystem::path& dir)
         return true;
     if (std::filesystem::is_directory(dir / c_EnvMapSubFolder, ec))
         return true;
+    if (std::filesystem::is_directory(dir / c_PrefabsSubFolder, ec))
+        return true;
     if (std::filesystem::is_directory(dir / c_EnvMapSubFolderLegacy, ec))
         return true;
     return false;

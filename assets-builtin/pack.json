@@ -2,5 +2,9 @@
   "format": "caustica.assetpack",
   "version": 1,
   "name": "caustica-builtin",
-  "kind": "builtin"
+  "kind": "builtin",
+  "layout": {
+    "scenes": "scenes/",
+    "prefabs": "prefabs/"
+  }
 }

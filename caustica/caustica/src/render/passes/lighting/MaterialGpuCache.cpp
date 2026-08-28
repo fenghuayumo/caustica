@@ -34,7 +34,7 @@
 
 #include <algorithm>
 #include <fstream>
-
+#include <mutex>
 #include <unordered_set>
 
 #include <cctype>      // std::tolower
@@ -1608,6 +1608,35 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     return standardMaterial;
 }
 
+std::shared_ptr<StandardMaterial> MaterialGpuCache::loadFromAssetPath(
+    const std::string& source,
+    const std::string& name,
+    const std::string& modelFileName)
+{
+    if (source.empty())
+        return nullptr;
+
+    const std::filesystem::path resolved = resolveSceneMediaPath(source, m_sceneDirectory, m_mediaPath);
+    Json::Value rootJ;
+    if (!std::filesystem::exists(resolved) || !caustica::json::loadFromFile(resolved, rootJ))
+    {
+        caustica::warning("Material asset '%s' was not found.", source.c_str());
+        return nullptr;
+    }
+
+    const std::string modelName = ModelNameFromModelFileName(
+        modelFileName.empty() ? source : modelFileName);
+    std::shared_ptr<StandardMaterial> standardMaterial = StandardMaterial::fromJson(
+        rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
+    if (!standardMaterial)
+    {
+        caustica::warning("Error while parsing material file '%s'", resolved.generic_string().c_str());
+        return nullptr;
+    }
+    standardMaterial->sharedWithAllScenes = true;
+    return standardMaterial;
+}
+
 std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & modelFileName, const std::string & name)
 {
     std::string modelName = ModelNameFromModelFileName(modelFileName);
@@ -1625,16 +1654,20 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
         if (folder.empty())
             return;
 
-        MaterialFileCandidate modelAndName;
-        modelAndName.path = folder / (modelName + "." + name + c_MaterialsExtension);
-        modelAndName.sharedWithAllScenes = sharedWithAllScenes;
-        candidates.push_back(modelAndName);
+        const char* extensions[] = { c_MaterialsExtension, c_MaterialsExtensionAlt };
+        for (const char* extension : extensions)
+        {
+            MaterialFileCandidate modelAndName;
+            modelAndName.path = folder / (modelName + "." + name + extension);
+            modelAndName.sharedWithAllScenes = sharedWithAllScenes;
+            candidates.push_back(modelAndName);
 
-        MaterialFileCandidate nameOnlyCandidate;
-        nameOnlyCandidate.path = folder / (name + c_MaterialsExtension);
-        nameOnlyCandidate.sharedWithAllScenes = sharedWithAllScenes;
-        nameOnlyCandidate.nameOnly = true;
-        candidates.push_back(nameOnlyCandidate);
+            MaterialFileCandidate nameOnlyCandidate;
+            nameOnlyCandidate.path = folder / (name + extension);
+            nameOnlyCandidate.sharedWithAllScenes = sharedWithAllScenes;
+            nameOnlyCandidate.nameOnly = true;
+            candidates.push_back(nameOnlyCandidate);
+        }
     };
 
     // Scene-local Materials/ (e.g. <scene-dir>/Materials/ when scene lives next to project assets).
@@ -1664,6 +1697,11 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
         caustica::warning("No material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str());
         return nullptr;
     }
+
+    static std::once_flag deprecatedNameLookup;
+    std::call_once(deprecatedNameLookup, []() {
+        caustica::warning("Material lookup by model/material file name is deprecated; set PrefabInstance.materials or MaterialOverride.source to a pack-relative asset path.");
+    });
 
     std::shared_ptr<StandardMaterial> standardMaterial = StandardMaterial::fromJson(rootJ, m_mediaPath, m_textureCache, modelName, name, m_sceneDirectory);
     if (standardMaterial == nullptr)
@@ -1831,7 +1869,10 @@ int MaterialGpuCache::ensureMaterialsFromScene(
             continue;
 
         std::shared_ptr<StandardMaterial> standardMaterial;
-        if (IsBuiltinModelFileName(material.modelFileName))
+        if (!material.overrideSource.empty())
+            standardMaterial = loadFromAssetPath(
+                material.overrideSource, material.debugName, material.modelFileName);
+        else if (IsBuiltinModelFileName(material.modelFileName))
             standardMaterial = importFromEngineMaterial(material);
         else
         {
@@ -1839,6 +1880,9 @@ int MaterialGpuCache::ensureMaterialsFromScene(
             if (standardMaterial == nullptr)
                 standardMaterial = importFromEngineMaterial(material);
         }
+
+        if (standardMaterial == nullptr)
+            standardMaterial = importFromEngineMaterial(material);
 
         standardMaterial->runtimeMaterialGpuCache = this;
 

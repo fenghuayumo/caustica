@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -89,15 +90,24 @@ namespace caustica
         SceneImportResult loadBuiltinModel(
             const std::string& builtinName);
 
-        SceneImportResult loadOrGetPrefab(
-            const std::string& source,
-            bool asyncTextures);
-
         ecs::Entity instantiatePrefab(
             const std::string& source,
             ecs::Entity parent,
             const std::string& name,
+            bool asyncTextures,
+            scene::SceneEntityWorld* destWorld = nullptr,
+            const std::unordered_map<std::string, std::string>& materials = {});
+
+        bool instantiateEntities(
+            scene::SceneEntityWorld& world,
+            ecs::Entity defaultParent,
+            const Json::Value& documentRoot,
             bool asyncTextures);
+
+        void applyMaterialSlots(
+            scene::SceneEntityWorld& world,
+            ecs::Entity root,
+            const std::unordered_map<std::string, std::string>& slots);
 
         void applyTopLevelSettings(const Json::Value& settingsNode);
 
@@ -118,7 +128,10 @@ namespace caustica
         std::optional<SceneSettings> m_loadedSettings;
         std::optional<GameSettings>   m_loadedGameSettings;
 
-        void attachLeafFromJson(ecs::Entity entity, const Json::Value& src);
+        void attachLeafFromJson(
+            scene::SceneEntityWorld& world,
+            ecs::Entity entity,
+            const Json::Value& src);
 
         [[nodiscard]] const scene::SceneRenderData& getRenderSnapshotForRead() const;
 
@@ -131,6 +144,10 @@ namespace caustica
             std::shared_ptr<caustica::IFileSystem> fs,
             std::shared_ptr<TextureLoader> textureCache,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
+
+        SceneImportResult loadOrGetPrefab(
+            const std::string& source,
+            bool asyncTextures);
 
         void refreshEntityWorldForFrame(uint32_t frameIndex);
 

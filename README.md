@@ -162,7 +162,7 @@ Key paths: `caustica/caustica/src/render/passes/rtxdi/`, `caustica/caustica/shad
 
 ### OpenPBR material system
 
-Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/materials/*.material.json` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
+Caustica uses **OpenPBR** as the built-in material model on top of the internal `StandardMaterial` GPU/shader backend. Scene materials are authored in `Assets/materials/*.material.json` and referenced from scene JSON via `PrefabInstance.materials` (see [scene JSON](docs/scene-json.md#材质覆盖)); existing legacy field names remain valid.
 
 * **Authoring** — write parameters in OpenPBR snake_case (`base_color`, `coat_weight`, `subsurface_radius`, …) or inside an `OpenPBR` JSON block; existing PascalCase fields still load and bake to the same GPU layout
 * **Shader lobes** — diffuse/base, GGX specular (with **anisotropy**), specular/diffuse **transmission**, **fuzz**, **coat** (with darkening), **thin-film** iridescence, **dispersion**, and RTXCR **subsurface** (Burley BSSRDF + ray-traced single scattering/transmission)
@@ -227,7 +227,7 @@ See [Building and running Caustica](docs/build-and-run.md) for backend-specific 
 | - | - |
 | `/bin` | default CMake folder for binaries and compiled shaders |
 | `/build` | default CMake folder for build files |
-| `/Assets` | asset pack submodule (`scenes/`, `models/`, `materials/`, `env/`) |
+| `/Assets` | asset pack submodule (`scenes/`, `models/`, `materials/`, `prefabs/`, `env/`) |
 | `/assets-builtin` | minimal fallback pack when the Assets submodule is missing |
 | `/docs` | build, embedding, architecture, scene JSON, OpenPBR, and related docs |
 | `/External` | external libraries and SDKs, including Streamline, NRD, RTXDI, and OMM |

@@ -225,6 +225,10 @@ void CopyEntityComponents(
     }
     if (const auto* skinRef = srcWorld.get<SkinnedMeshReferenceComponent>(srcEntity))
         dstWorld.emplace<SkinnedMeshReferenceComponent>(dstEntity, *skinRef);
+    if (const auto* prefab = srcWorld.get<PrefabInstanceComponent>(srcEntity))
+        dstWorld.emplace<PrefabInstanceComponent>(dstEntity, *prefab);
+    if (const auto* materialOverride = srcWorld.get<MaterialOverrideComponent>(srcEntity))
+        dstWorld.emplace<MaterialOverrideComponent>(dstEntity, *materialOverride);
     if (const auto* directional = srcWorld.get<DirectionalLightComponent>(srcEntity))
         dstWorld.emplace<DirectionalLightComponent>(dstEntity, *directional);
     if (const auto* spot = srcWorld.get<SpotLightComponent>(srcEntity))

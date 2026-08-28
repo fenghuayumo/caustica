@@ -1,6 +1,7 @@
 #include <scene/SceneSerializer.h>
 #include <scene/SceneEcs.h>
 #include <core/json.h>
+#include <core/path_utils.h>
 
 #include <cstdio>
 #include <string>
@@ -90,6 +91,121 @@ int main()
         passed &= expect(
             entities[0]["components"]["Transform"]["translation"].isArray(),
             "save patch did not write Transform.translation");
+    }
+
+    {
+        passed &= expect(caustica::isPrefabAssetPath("prefabs/orb.prefab.json"),
+            "prefab path not recognized");
+        passed &= expect(caustica::isPrefabAssetPath("PREFAB/CUBE.PREFAB.JSON"),
+            "prefab path matching should ignore case");
+        passed &= expect(!caustica::isPrefabAssetPath("models/kitchen/kitchen.gltf"),
+            "gltf was treated as a prefab");
+        passed &= expect(caustica::isMaterialAssetPath("materials/foo.mat.json"),
+            ".mat.json path not recognized");
+        passed &= expect(caustica::isMaterialAssetPath("materials/foo.material.json"),
+            ".material.json path not recognized");
+    }
+
+    {
+        Json::Value base = parse(R"({
+            "entities": [{
+                "id": "kitchen",
+                "components": {
+                    "PrefabInstance": {
+                        "source": "models/kitchen/kitchen.gltf",
+                        "materials": { "Glass": "materials/kitchen.Glass.material.json" }
+                    }
+                }
+            }]
+        })");
+        Json::Value overlay = parse(R"({
+            "overrides": [{
+                "id": "kitchen",
+                "components": {
+                    "PrefabInstance": {
+                        "materials": { "Floor_MDL": "materials/kitchen.Floor_MDL.material.json" }
+                    }
+                }
+            }]
+        })");
+        const Json::Value merged = caustica::scene::mergeSceneOverlay(base, overlay);
+        passed &= expect(
+            merged["entities"][0]["components"]["PrefabInstance"]["source"].asString()
+                == "models/kitchen/kitchen.gltf",
+            "material overlay dropped PrefabInstance.source");
+        passed &= expect(
+            merged["entities"][0]["components"]["PrefabInstance"]["materials"]["Glass"].asString()
+                == "materials/kitchen.Glass.material.json",
+            "material overlay dropped existing slot");
+        passed &= expect(
+            merged["entities"][0]["components"]["PrefabInstance"]["materials"]["Floor_MDL"].asString()
+                == "materials/kitchen.Floor_MDL.material.json",
+            "material overlay did not add the new slot");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity kitchen = world.createEntity("Kitchen", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            kitchen, caustica::scene::SceneAuthoringIdComponent{ "kitchen" });
+        world.world().emplace<caustica::scene::PrefabInstanceComponent>(
+            kitchen,
+            caustica::scene::PrefabInstanceComponent{
+                "models/kitchen/kitchen.gltf",
+                { { "Glass", "materials/kitchen.Glass.material.json" } } });
+
+        Json::Value entities = parse(R"([{
+            "id":"kitchen",
+            "name":"Kitchen",
+            "components": { "PrefabInstance": { "source": "models/kitchen/kitchen.gltf" } }
+        }])");
+        caustica::scene::patchEntityTransforms(entities, world);
+        passed &= expect(
+            entities[0]["components"]["PrefabInstance"]["source"].asString()
+                == "models/kitchen/kitchen.gltf",
+            "save patch dropped PrefabInstance.source");
+        passed &= expect(
+            entities[0]["components"]["PrefabInstance"]["materials"]["Glass"].asString()
+                == "materials/kitchen.Glass.material.json",
+            "save patch did not write PrefabInstance.materials");
+    }
+
+    {
+        Json::Value base = parse(R"({
+            "entities": [{
+                "id": "prop",
+                "components": {
+                    "MaterialOverride": {
+                        "source": "materials/shared.Default.material.json",
+                        "slots": { "Glass": "materials/kitchen.Glass.material.json" }
+                    }
+                }
+            }]
+        })");
+        Json::Value overlay = parse(R"({
+            "overrides": [{
+                "id": "prop",
+                "components": {
+                    "MaterialOverride": {
+                        "slots": { "Floor_MDL": "materials/kitchen.Floor_MDL.material.json" }
+                    }
+                }
+            }]
+        })");
+        const Json::Value merged = caustica::scene::mergeSceneOverlay(base, overlay);
+        passed &= expect(
+            merged["entities"][0]["components"]["MaterialOverride"]["source"].asString()
+                == "materials/shared.Default.material.json",
+            "MaterialOverride overlay dropped source");
+        passed &= expect(
+            merged["entities"][0]["components"]["MaterialOverride"]["slots"]["Glass"].asString()
+                == "materials/kitchen.Glass.material.json",
+            "MaterialOverride overlay dropped existing slot");
+        passed &= expect(
+            merged["entities"][0]["components"]["MaterialOverride"]["slots"]["Floor_MDL"].asString()
+                == "materials/kitchen.Floor_MDL.material.json",
+            "MaterialOverride overlay did not add the new slot");
     }
 
     return passed ? 0 : 1;
