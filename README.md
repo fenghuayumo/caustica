@@ -73,7 +73,9 @@ Recommended starting points:
 
 ```
 EngineApp / App (frame loop, plugins, schedules)
- └── App world (resources) + SceneEntityWorld (scene ECS)
+ └── App::world() — resources + live scene graph
+      SceneEntityWorld borrows that registry after commit
+      (importers / pending loads keep a scratch World)
       ├── Startup / First / preUpdate
       ├── update (SystemSet.Simulation)     — gameplay / animation / host systems
       ├── PostUpdate (TransformPropagate)   — hierarchy refresh after other PostUpdate work
@@ -88,7 +90,7 @@ WorldRenderer (UE-like render pipeline)
  └── Path-trace / ReSTIR / NRD / DLSS features
 ```
 
-**ECS × Render Proxy:** the logic thread owns `SceneEntityWorld`; Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` / committed proxies and must not walk live ECS for frame lighting. Runtime spawn/despawn publishes a new extract generation and builds mesh/AS/SBT work on the render thread asynchronously (see [architecture-render-proxy.md](docs/architecture-render-proxy.md)).
+**ECS × Render Proxy:** the live scene graph lives in `App::world()`; `SceneEntityWorld` is the hierarchy/bookkeeping layer over that registry after commit. Extract copies lights/meshes into `LightRenderProxy` / `MeshInstanceRenderProxy`; the render thread consumes `Scene::getRenderData()` / committed proxies and must not walk live ECS for frame lighting. Runtime spawn/despawn publishes a new extract generation and builds mesh/AS/SBT work on the render thread asynchronously (see [architecture-render-proxy.md](docs/architecture-render-proxy.md)).
 
 **Embedding:** prefer `EngineApp::create` → `addSystem` / `EntityWorld` / `Query<>` → `run()` (Startup is automatic). Scene edits go through `EntityWorld::spawn` / focused APIs (`SceneSpawn`, `SceneTransform`, …). Occasional render-thread work from Logic uses `EnqueueRenderCommand`.
 

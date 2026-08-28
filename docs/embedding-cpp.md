@@ -120,6 +120,13 @@ APIs). `EngineApp` does not expose `scene()`; use `setScene` + `entityWorld` /
 `isSceneLoaded`. CameraController and path-tracer settings are App resources — use
 `RenderSessionApi` / `CameraApi`.
 
+After a scene commits, the live graph is grafted into `App::world()` and
+`SceneEntityWorld` borrows that registry. `Query`, `Commands`, `Res`, and
+`SceneTransforms` therefore see the same entities and resources. Importers still
+load into a scratch World on the load thread; that is not a second scheduled ECS.
+`EntityWorld::spawn` / `spawnNamed` (or `SceneSpawn.h`) create scene nodes with
+hierarchy and transforms. `Commands.spawn()` is a raw `World::spawn` and does not.
+
 ### Parameters decide parallelism
 
 The parameter list is also what makes systems run in parallel: the scheduler derives each
@@ -181,9 +188,10 @@ Prefer system parameters, then focused application headers:
 
 | API | Supported operations |
 | --- | --- |
-| `EntityWorld` (system param) | `spawn` / `spawnNamed` bundles, `emplace` tags, `setLocalTransform`, scene ECS access. Exclusive. |
+| `EntityWorld` (system param) | Hierarchy-aware `spawn` / `spawnNamed`, `emplace` tags, `setLocalTransform`. Exclusive. |
+| `Commands` (system param) | Deferred edits on `App::world()`. `spawn()` is raw ECS — not a scene node. |
 | `SceneTransforms` (system param) | Local transform writes only, safe to run in parallel. |
-| `Query<...>` (system param) | Bevy-style `each` over scene components (`Changed<>` / `With<>` supported). |
+| `Query<...>` (system param) | Bevy-style `each` over `App::world()` (`Changed<>` / `With<>` supported). |
 | `engine/SceneQuery.h` | `entityWorld`, load status, materials, entity lookup (no diggable `Scene*`). |
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
@@ -224,11 +232,12 @@ if (caustica::ecs::isValid(entity))
 }
 ```
 
-These functions mutate the logic-side `SceneEntityWorld`. Extract handles proxy
-publication and schedules structure-related GPU work; callers should not wait
-for the GPU or rebuild acceleration structures directly. Query the live scene
-through `SystemContext::entityWorld()`, `SystemContext::sceneEcs()`, or the
-functions in `SceneQuery.h`.
+These functions mutate the live scene graph in `App::world()`. Extract handles
+proxy publication and schedules structure-related GPU work; callers should not
+wait for the GPU or rebuild acceleration structures directly. Look up the live
+graph through `SystemContext::entityWorld()` or `SceneQuery.h`. After commit,
+`sceneEcs()` is the same registry as `App::world()` (or null if no scene is
+active).
 
 ## Camera and frame control
 

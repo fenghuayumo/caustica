@@ -9,6 +9,7 @@
 #include <scene/SceneResources.h>
 #include <scene/SceneTypes.h>
 
+#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <filesystem>
@@ -328,6 +329,24 @@ void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std
 class SceneEntityWorld : public SceneResources
 {
 public:
+    // Scratch / tests / async pending Scene: owns a registry.
+    SceneEntityWorld();
+    // Live scene: borrows App::m_world so Query / Res / Commands share one registry.
+    explicit SceneEntityWorld(ecs::World& liveWorld);
+    ~SceneEntityWorld() override;
+
+    SceneEntityWorld(const SceneEntityWorld&) = delete;
+    SceneEntityWorld& operator=(const SceneEntityWorld&) = delete;
+
+    [[nodiscard]] bool ownsRegistry() const { return m_owned != nullptr; }
+
+    // Drop the scene graph without touching ecs resources (Time, plugins, ...).
+    void resetScene();
+
+    // Graft this scratch registry into `liveWorld` (logic thread, after async load).
+    // Rebinds this object to `liveWorld` and releases the owned registry.
+    void adoptInto(ecs::World& liveWorld, SceneTypeFactory* factory = nullptr);
+
     void refreshHierarchy(PreviousTransformPolicy previousPolicy = PreviousTransformPolicy::CaptureCurrent);
     // Align previous-frame transforms with current (avoids bogus motion after scene load).
     void syncPreviousTransformsFromCurrent();
@@ -395,12 +414,14 @@ public:
     [[nodiscard]] ecs::World& world()
     {
         assertLogicThread();
-        return m_world;
+        assert(m_world);
+        return *m_world;
     }
     [[nodiscard]] const ecs::World& world() const
     {
         assertLogicThread();
-        return m_world;
+        assert(m_world);
+        return *m_world;
     }
 
     [[nodiscard]] ecs::Entity root() const { return m_root; }
@@ -452,7 +473,7 @@ private:
     template<typename T>
     void insertSpawnComponent(ecs::Entity entity, T&& component)
     {
-        m_world.emplace<std::remove_cvref_t<T>>(entity, std::forward<T>(component));
+        m_world->emplace<std::remove_cvref_t<T>>(entity, std::forward<T>(component));
     }
 
     void beginRefreshFrame();
@@ -463,7 +484,8 @@ private:
     void assignGlobalResourceIndicesIfNeeded();
     void finalizeRefreshFrame();
 
-    ecs::World m_world;
+    std::unique_ptr<ecs::World> m_owned;
+    ecs::World* m_world = nullptr;
     bool m_frameStructureDirty = false;   // per-frame snapshot of m_structureDirty for systems
     bool m_frameTransformDirty = false;   // per-frame snapshot of m_transformDirty for systems
     bool m_frameLightDirty = false;       // survives refresh until Extract publishes the light list

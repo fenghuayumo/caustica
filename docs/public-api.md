@@ -16,7 +16,7 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 | `caustica.h` | Umbrella include (preferred) |
 | `engine/EngineApp.h` | Create / run / stepFrame / setScene / camera / settings |
 | `engine/EntryPoint.h` | `initializeAppPlatform`, `runEngineApp` |
-| `engine/EntityWorld.h` | System-param scene ECS (`spawn`, `emplace`, transform, `findEntity`, `setVisible`) |
+| `engine/EntityWorld.h` | System-param scene graph (`spawn` / `spawnNamed`, `emplace`, transform, `findEntity`, `setVisible`) |
 | `engine/SceneTransforms.h` | System-param transform writes that keep a system parallel |
 | `engine/Time.h` | `Time` resource (`deltaSeconds`, `elapsedSeconds`, `frameCount`) |
 | `engine/Plugin.h` | `addPlugin` extension point |
@@ -40,11 +40,14 @@ Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`
 
 Simulation systems run concurrently when their parameter lists prove they cannot conflict — you
 never declare access by hand and there is no `addSystem` overload that accepts it. `Query` /
-`Res` / `ResMut` / `Commands` / `SceneTransforms` participate; `EntityWorld` and `SystemContext&`
-run exclusively because they reach the whole engine. Keep those two in structural, ideally
-one-shot systems and give per-frame systems narrow parameters — `Res<Time>` instead of
-`SystemContext&` for the clock, `SceneTransforms` instead of `EntityWorld` for movement. See
-[architecture-render-proxy.md](architecture-render-proxy.md#concurrent-systems).
+`Res` / `ResMut` / `Commands` / `SceneTransforms` all target `App::world()` after the live
+scene is committed (`SceneEntityWorld` borrows that registry). `EntityWorld` and
+`SystemContext&` run exclusively because they reach the whole engine. Keep those two in
+structural, ideally one-shot systems and give per-frame systems narrow parameters —
+`Res<Time>` instead of `SystemContext&` for the clock, `SceneTransforms` instead of
+`EntityWorld` for movement. Scene nodes go through `EntityWorld::spawn`, not
+`Commands.spawn()`. See
+[architecture-render-proxy.md](architecture-render-proxy.md#one-live-logic-world).
 
 ## Not for applications
 

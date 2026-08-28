@@ -88,7 +88,7 @@ struct SystemParameter<EntityWorld>
 template<>
 struct SystemParameter<SceneTransforms>
 {
-    static SceneTransforms make(SystemContext& context) { return SceneTransforms(context.sceneEcs()); }
+    static SceneTransforms make(SystemContext& context) { return SceneTransforms(&context.world); }
 };
 
 template<typename... Components>
@@ -96,7 +96,7 @@ struct SystemParameter<ecs::Query<Components...>>
 {
     static ecs::Query<Components...> make(SystemContext& context)
     {
-        return ecs::Query<Components...>(context.sceneEcs());
+        return ecs::Query<Components...>(&context.world);
     }
 };
 

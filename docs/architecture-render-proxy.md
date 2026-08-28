@@ -4,7 +4,8 @@ Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game
 
 | Layer | Responsibility | Thread |
 | --- | --- | --- |
-| `SceneEntityWorld` (ECS) | Entities, components, queries, animation, hierarchy, `Changed<>` | Logic / game |
+| `App::world()` | One live logic registry: resources (`Time`, plugins, …) and scene entities | Logic / game |
+| `SceneEntityWorld` | Hierarchy, mesh/light/camera lists, `Changed<>` over that registry | Logic / game |
 | Extract | Copy ECS + active camera/settings → flat proxies | Logic (Extract schedule) |
 | `SceneRenderData` / `SceneRenderSnapshot` | Triple-buffered, ECS-free frame packet | Logic writes, render reads |
 | `WorldRenderer` + passes | AS build, path trace, denoise, present | Render thread |
@@ -12,12 +13,12 @@ Caustica combines a **Bevy-inspired logic-side ECS** with an **Unreal-style game
 ## Intended contract
 
 ```
-SceneWorld (ECS)     PostUpdate resolve      Extract (copy)         SceneRenderData[N%3]      WorldRenderer
+App::world() (ECS)   PostUpdate resolve      Extract (copy)         SceneRenderData[N%3]      WorldRenderer
 ─────────────────    ──────────────────      ──────────────         ────────────────────     ─────────────
 TransformComponent   ResolvedActiveCamera ─► ActiveCamera copy  ──► ActiveCameraRenderProxy  read-only
-*LightComponent      (App resource)          Light/mesh proxies ──► LightRenderProxy          no getEntityWorld()
+*LightComponent      (same registry)         Light/mesh proxies ──► LightRenderProxy          no getEntityWorld()
 CameraController      after TransformPropagate PathTracerSettings ─► RenderSettingsSnapshot    activeSettings()
-PathTracerSettings   (already App resource)  one-shot clear
+PathTracerSettings   (App resource)          one-shot clear
 ```
 
 **Rules**
@@ -29,6 +30,29 @@ PathTracerSettings   (already App resource)  one-shot clear
 5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
 6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
 7. Structure-only republish (runtime drag-drop import) must not stomp `ActiveCameraRenderProxy` — either pass `FrameExtractInputs`, preserve a same-frame frame extract, or leave `camera.valid == false` so WorldRenderer skips apply.
+
+## One live logic World
+
+There is **one** scheduled ECS for simulation. `Query`, `Commands`, `Res` / `ResMut`, and
+`SceneTransforms` all target `App::world()`. That is not a render-thread World and not a
+Bevy `RenderWorld`.
+
+| Registry | When | Who writes it |
+| --- | --- | --- |
+| `App::world()` | Every logic frame after commit | Systems, `EntityWorld`, `Commands` apply |
+| Scratch `ecs::World` owned by `SceneEntityWorld` | Async import / pending `Scene` / tests | Load thread, then discarded |
+| `SceneRenderData` | Extract → render | Flat proxies; not an EnTT world |
+
+`commitActiveScene` grafts the pending graph into `App::world()` (`SceneEntityWorld::adoptInto`)
+and rebinds the live `SceneEntityWorld` to that registry. Switching scenes calls `resetScene()`
+on the old graph and leaves App resources (`Time`, plugins, settings) in place.
+
+`EntityWorld::spawn` / `spawnNamed` (and `SceneSpawn.h`) create hierarchy-aware scene nodes
+(Parent / Children / local+global transform). `Commands.spawn()` is a raw `World::spawn` and
+does not attach those components — use it for deferred component edits, not for scene actors.
+
+Importers must not write `App::world()` from the load thread. `Scene::load` always populates a
+scratch registry; only the logic-thread commit adopts it.
 
 ## What is extracted today
 
@@ -204,6 +228,8 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 
 | Piece | Path |
 | --- | --- |
+| Live registry + scene graph | `caustica/caustica/include/ecs/World.h`, `include/scene/SceneEcs.h` (`adoptInto`) |
+| Commit / Query / Commands wiring | `caustica/caustica/src/engine/SceneQuery.cpp`, `include/engine/App.h` |
 | Proxy + frame extract types | `caustica/caustica/include/scene/SceneRenderData.h` |
 | Extract | `caustica/caustica/src/scene/SceneRenderExtract.cpp` |
 | Extract schedule | `caustica/caustica/src/engine/RenderExtractPlugin.cpp` |
@@ -215,4 +241,4 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 
 ## Why not a “render ECS”
 
-A second EnTT world on the render thread would add sync cost without helping path tracing. Flat proxy arrays match bindless / light-buffer upload and match UE’s `F*SceneProxy` model. Keep ECS where queries and composition pay off (simulation); keep proxies where the GPU thread needs stable, read-only packets.
+A second EnTT world on the render thread would add sync cost without helping path tracing, and it is not how we fixed `Query` / `Commands` targeting different registries. Flat proxy arrays match bindless / light-buffer upload and match UE’s `F*SceneProxy` model. Keep ECS where queries and composition pay off (one live logic World); keep proxies where the GPU thread needs stable, read-only packets.

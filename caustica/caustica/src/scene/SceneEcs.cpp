@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <functional>
+#include <memory>
+#include <utility>
 #include <vector>
 #include <cstring>
 
@@ -261,9 +263,86 @@ void updateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy)
         });
 }
 
+SceneEntityWorld::SceneEntityWorld()
+    : m_owned(std::make_unique<ecs::World>())
+    , m_world(m_owned.get())
+{
+}
+
+SceneEntityWorld::SceneEntityWorld(ecs::World& liveWorld)
+    : m_world(&liveWorld)
+{
+}
+
+SceneEntityWorld::~SceneEntityWorld()
+{
+    if (!m_owned)
+        resetScene();
+}
+
+void SceneEntityWorld::resetScene()
+{
+    if (!m_world)
+        return;
+
+    if (ecs::isValid(m_root) && m_world->isAlive(m_root))
+        destroyEntity(m_root);
+
+    m_root = ecs::NullEntity;
+    m_CameraEntities.clear();
+    m_pathToEntity.clear();
+    m_registeredMeshByEntity.clear();
+    m_Materials = {};
+    m_Meshes = {};
+    m_GeometryCount = 0;
+    m_MaxGeometryCountPerMesh = 0;
+    m_GeometryInstancesCount = 0;
+    m_structureDirty = true;
+    m_transformDirty = true;
+    m_lightDirty = true;
+    m_frameStructureDirty = false;
+    m_frameTransformDirty = false;
+    m_frameLightDirty = false;
+    m_previousTransformDirty = false;
+}
+
+void SceneEntityWorld::adoptInto(ecs::World& liveWorld, SceneTypeFactory* factory)
+{
+    if (m_world == &liveWorld)
+        return;
+
+    const ecs::Entity sourceRoot = m_root;
+    SceneEntityWorld dest(liveWorld);
+    if (ecs::isValid(sourceRoot) && m_world && m_world->isAlive(sourceRoot))
+        dest.importSubtree(ecs::NullEntity, *this, sourceRoot, factory);
+
+    m_root = dest.m_root;
+    m_CameraEntities = std::move(dest.m_CameraEntities);
+    m_pathToEntity = std::move(dest.m_pathToEntity);
+    m_registeredMeshByEntity = std::move(dest.m_registeredMeshByEntity);
+    m_Materials = std::move(dest.m_Materials);
+    m_Meshes = std::move(dest.m_Meshes);
+    m_GeometryCount = dest.m_GeometryCount;
+    m_MaxGeometryCountPerMesh = dest.m_MaxGeometryCountPerMesh;
+    m_GeometryInstancesCount = dest.m_GeometryInstancesCount;
+    dest.m_GeometryCount = 0;
+    dest.m_MaxGeometryCountPerMesh = 0;
+    dest.m_GeometryInstancesCount = 0;
+    dest.m_root = ecs::NullEntity;
+    dest.m_world = nullptr;
+
+    m_world = &liveWorld;
+    m_owned.reset();
+
+    m_structureDirty = true;
+    m_transformDirty = true;
+    m_lightDirty = true;
+    ensureChangeDetection();
+}
+
 void SceneEntityWorld::registerCameraEntity(ecs::Entity entity)
 {
-    if (!m_world.isAlive(entity) || !m_world.has<CameraComponent>(entity))
+    if (!m_world->isAlive(entity) || !m_world->has<CameraComponent>(entity))
         return;
 
     if (std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity) != m_CameraEntities.end())
@@ -281,37 +360,44 @@ void SceneEntityWorld::unregisterCameraEntity(ecs::Entity entity)
 
 void SceneEntityWorld::clear()
 {
-    m_world.clear();
-    m_root = ecs::NullEntity;
-    m_CameraEntities.clear();
-    m_pathToEntity.clear();
-    m_registeredMeshByEntity.clear();
-    m_Materials = {};
-    m_Meshes = {};
-    m_GeometryCount = 0;
-    m_MaxGeometryCountPerMesh = 0;
-    m_GeometryInstancesCount = 0;
-    m_structureDirty = true;
-    m_transformDirty = true;
-    m_lightDirty = true;
-    m_frameLightDirty = false;
-    m_previousTransformDirty = false;
-    ensureChangeDetection();
+    if (m_owned)
+        m_world->clear();
+    else
+        resetScene();
+
+    if (m_owned)
+    {
+        m_root = ecs::NullEntity;
+        m_CameraEntities.clear();
+        m_pathToEntity.clear();
+        m_registeredMeshByEntity.clear();
+        m_Materials = {};
+        m_Meshes = {};
+        m_GeometryCount = 0;
+        m_MaxGeometryCountPerMesh = 0;
+        m_GeometryInstancesCount = 0;
+        m_structureDirty = true;
+        m_transformDirty = true;
+        m_lightDirty = true;
+        m_frameLightDirty = false;
+        m_previousTransformDirty = false;
+        ensureChangeDetection();
+    }
 }
 
 void SceneEntityWorld::ensureChangeDetection()
 {
-    m_world.enableChangeDetection();
+    m_world->enableChangeDetection();
 }
 
 void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 {
     ensureChangeDetection();
-    const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
+    const auto* changeDetection = m_world->getResource<ecs::ChangeDetection>();
     if (!changeDetection)
         return;
 
-    const auto& registry = m_world.registry();
+    const auto& registry = m_world->registry();
 
     const bool worldStructureChanged = changeDetection->worldStructureChanged();
     const bool renderStructureChanged = worldStructureChanged
@@ -357,7 +443,7 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
     // A transform on a light-only subtree must not masquerade as a mesh transform
     // change. The old global flag rewrote every mesh instance buffer while dragging
     // a light, disturbing temporal rendering even though no geometry moved.
-    m_world.each<LocalTransformComponent, SceneContentComponent, ecs::Changed<LocalTransformComponent>>(
+    m_world->each<LocalTransformComponent, SceneContentComponent, ecs::Changed<LocalTransformComponent>>(
         [&](ecs::Entity, LocalTransformComponent&, SceneContentComponent& content) {
             const SceneContentFlags subtree = content.subgraphContent;
             const bool containsLights = (subtree & SceneContentFlags::Lights) != 0;
@@ -390,11 +476,11 @@ const std::vector<ecs::Entity>& SceneEntityWorld::cameraEntitiesInRegistrationOr
 void SceneEntityWorld::syncSceneResourcesFromEcs()
 {
     ensureChangeDetection();
-    const auto* changeDetection = m_world.getResource<ecs::ChangeDetection>();
+    const auto* changeDetection = m_world->getResource<ecs::ChangeDetection>();
     if (!changeDetection)
         return;
 
-    const auto& registry = m_world.registry();
+    const auto& registry = m_world->registry();
 
     const bool meshDirty =
         changeDetection->anyOfAddedThisFrame<MeshInstanceComponent, SkinnedMeshComponent>(registry)
@@ -426,7 +512,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
 
     if (meshDirty)
     {
-        m_world.each<MeshInstanceComponent>(
+        m_world->each<MeshInstanceComponent>(
             [&](ecs::Entity entity, MeshInstanceComponent& meshInstance) {
                 const bool added = changeDetection->isAddedThisFrame<MeshInstanceComponent>(entity, registry);
                 const bool changed = changeDetection->isChangedThisFrame<MeshInstanceComponent>(entity, registry);
@@ -434,7 +520,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
                     return;
 
                 const std::shared_ptr<MeshInfo>& newMesh = meshInstance.mesh;
-                const bool skinned = m_world.has<SkinnedMeshComponent>(entity);
+                const bool skinned = m_world->has<SkinnedMeshComponent>(entity);
                 auto it = m_registeredMeshByEntity.find(entity);
                 if (it != m_registeredMeshByEntity.end())
                 {
@@ -463,11 +549,11 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
         // Component removed while entity lives (rare): drop stale registrations.
         for (auto it = m_registeredMeshByEntity.begin(); it != m_registeredMeshByEntity.end();)
         {
-            if (!m_world.isAlive(it->first) || !m_world.has<MeshInstanceComponent>(it->first))
+            if (!m_world->isAlive(it->first) || !m_world->has<MeshInstanceComponent>(it->first))
             {
-                if (m_world.isAlive(it->first))
+                if (m_world->isAlive(it->first))
                     unregisterMeshInstanceEntity(
-                        it->first, it->second, m_world.has<SkinnedMeshComponent>(it->first));
+                        it->first, it->second, m_world->has<SkinnedMeshComponent>(it->first));
                 it = m_registeredMeshByEntity.erase(it);
             }
             else
@@ -479,7 +565,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
 
     if (cameraDirty)
     {
-        m_world.each<CameraComponent>([&](ecs::Entity entity, CameraComponent&) {
+        m_world->each<CameraComponent>([&](ecs::Entity entity, CameraComponent&) {
             if (changeDetection->isAddedThisFrame<CameraComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<CameraComponent>(entity, registry))
             {
@@ -492,7 +578,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
                 m_CameraEntities.begin(),
                 m_CameraEntities.end(),
                 [this](ecs::Entity entity) {
-                    return !m_world.isAlive(entity) || !m_world.has<CameraComponent>(entity);
+                    return !m_world->isAlive(entity) || !m_world->has<CameraComponent>(entity);
                 }),
             m_CameraEntities.end());
     }
@@ -503,47 +589,47 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             updateLeafContentAndBounds(entity);
         };
 
-        m_world.each<MeshInstanceComponent>([&](ecs::Entity entity, MeshInstanceComponent&) {
+        m_world->each<MeshInstanceComponent>([&](ecs::Entity entity, MeshInstanceComponent&) {
             if (changeDetection->isAddedThisFrame<MeshInstanceComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<MeshInstanceComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<CameraComponent>([&](ecs::Entity entity, CameraComponent&) {
+        m_world->each<CameraComponent>([&](ecs::Entity entity, CameraComponent&) {
             if (changeDetection->isAddedThisFrame<CameraComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<CameraComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<DirectionalLightComponent>([&](ecs::Entity entity, DirectionalLightComponent&) {
+        m_world->each<DirectionalLightComponent>([&](ecs::Entity entity, DirectionalLightComponent&) {
             if (changeDetection->isAddedThisFrame<DirectionalLightComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<DirectionalLightComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<SpotLightComponent>([&](ecs::Entity entity, SpotLightComponent&) {
+        m_world->each<SpotLightComponent>([&](ecs::Entity entity, SpotLightComponent&) {
             if (changeDetection->isAddedThisFrame<SpotLightComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<SpotLightComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<PointLightComponent>([&](ecs::Entity entity, PointLightComponent&) {
+        m_world->each<PointLightComponent>([&](ecs::Entity entity, PointLightComponent&) {
             if (changeDetection->isAddedThisFrame<PointLightComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<PointLightComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<EnvironmentLightComponent>([&](ecs::Entity entity, EnvironmentLightComponent&) {
+        m_world->each<EnvironmentLightComponent>([&](ecs::Entity entity, EnvironmentLightComponent&) {
             if (changeDetection->isAddedThisFrame<EnvironmentLightComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<EnvironmentLightComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<AnimationComponent>([&](ecs::Entity entity, AnimationComponent&) {
+        m_world->each<AnimationComponent>([&](ecs::Entity entity, AnimationComponent&) {
             if (changeDetection->isAddedThisFrame<AnimationComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<AnimationComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<GaussianSplatComponent>([&](ecs::Entity entity, GaussianSplatComponent&) {
+        m_world->each<GaussianSplatComponent>([&](ecs::Entity entity, GaussianSplatComponent&) {
             if (changeDetection->isAddedThisFrame<GaussianSplatComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<GaussianSplatComponent>(entity, registry))
                 updateIfTouched(entity);
         });
-        m_world.each<SkinnedMeshReferenceComponent>([&](ecs::Entity entity, SkinnedMeshReferenceComponent&) {
+        m_world->each<SkinnedMeshReferenceComponent>([&](ecs::Entity entity, SkinnedMeshReferenceComponent&) {
             if (changeDetection->isAddedThisFrame<SkinnedMeshReferenceComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<SkinnedMeshReferenceComponent>(entity, registry))
                 updateIfTouched(entity);
@@ -574,12 +660,12 @@ bool SceneEntityWorld::hasPendingLightChanges()
 
 void SceneEntityWorld::refreshHierarchy(PreviousTransformPolicy previousPolicy)
 {
-    updateHierarchy(m_world, previousPolicy);
+    updateHierarchy(*m_world, previousPolicy);
 }
 
 void SceneEntityWorld::syncPreviousTransformsFromCurrent()
 {
-    m_world.each<GlobalTransformComponent>([](ecs::Entity, GlobalTransformComponent& global) {
+    m_world->each<GlobalTransformComponent>([](ecs::Entity, GlobalTransformComponent& global) {
         global.previousTransform = global.transform;
         global.previousTransformFloat = global.transformFloat;
     });
@@ -616,29 +702,29 @@ void SceneEntityWorld::markDirtySkinnedMeshes(uint32_t frameIndex)
     if (!(m_frameTransformDirty || m_frameStructureDirty))
         return;
 
-    m_world.each<SkinnedMeshReferenceComponent>(
+    m_world->each<SkinnedMeshReferenceComponent>(
         [frameIndex, this](ecs::Entity, SkinnedMeshReferenceComponent& ref) {
             if (!ecs::isValid(ref.skinnedMeshEntity))
                 return;
-            if (auto* skinned = m_world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
+            if (auto* skinned = m_world->get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
                 skinned->lastUpdateFrameIndex = frameIndex;
         });
 }
 
 void SceneEntityWorld::markDirtySkinnedMeshesFromChangedJoints(uint32_t frameIndex)
 {
-    m_world.each<SkinnedMeshReferenceComponent, ecs::Changed<LocalTransformComponent>>(
+    m_world->each<SkinnedMeshReferenceComponent, ecs::Changed<LocalTransformComponent>>(
         [&](ecs::Entity, SkinnedMeshReferenceComponent& ref, LocalTransformComponent&) {
             if (!ecs::isValid(ref.skinnedMeshEntity))
                 return;
-            if (auto* skinned = m_world.get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
+            if (auto* skinned = m_world->get<SkinnedMeshComponent>(ref.skinnedMeshEntity))
                 skinned->lastUpdateFrameIndex = frameIndex;
         });
 }
 
 void SceneEntityWorld::resetSkinnedMeshMotionHistory()
 {
-    m_world.each<SkinnedMeshComponent>([](ecs::Entity, SkinnedMeshComponent& skinned) {
+    m_world->each<SkinnedMeshComponent>([](ecs::Entity, SkinnedMeshComponent& skinned) {
         skinned.resetMotionHistory = true;
         skinned.lastUpdateFrameIndex = kForceSkinnedMeshUpdateFrameIndex;
     });
@@ -646,10 +732,13 @@ void SceneEntityWorld::resetSkinnedMeshMotionHistory()
 
 void SceneEntityWorld::applyDeferredCommands()
 {
-    if (auto* commands = m_world.getResource<ecs::CommandQueue>())
+    // Live App world: App::runSchedule is the sole CommandQueue apply.
+    if (!m_owned)
+        return;
+    if (auto* commands = m_world->getResource<ecs::CommandQueue>())
     {
         if (!commands->empty())
-            commands->apply(m_world);
+            commands->apply(*m_world);
     }
 }
 
@@ -663,11 +752,11 @@ void SceneEntityWorld::markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity)
     if (!ecs::isValid(jointEntity))
         return;
 
-    const auto* ref = m_world.get<SkinnedMeshReferenceComponent>(jointEntity);
+    const auto* ref = m_world->get<SkinnedMeshReferenceComponent>(jointEntity);
     if (!ref || !ecs::isValid(ref->skinnedMeshEntity))
         return;
 
-    if (auto* skinned = m_world.get<SkinnedMeshComponent>(ref->skinnedMeshEntity))
+    if (auto* skinned = m_world->get<SkinnedMeshComponent>(ref->skinnedMeshEntity))
         skinned->lastUpdateFrameIndex = kForceSkinnedMeshUpdateFrameIndex;
 }
 
@@ -700,11 +789,11 @@ void SceneEntityWorld::finalizeRefreshFrame()
 
 void SceneEntityWorld::endChangeDetectionFrame()
 {
-    m_world.endChangeFrame();
+    m_world->endChangeFrame();
     m_frameLightDirty = false;
-    if (auto* changeDetection = m_world.getResource<ecs::ChangeDetection>())
+    if (auto* changeDetection = m_world->getResource<ecs::ChangeDetection>())
         changeDetection->clearWorldStructureChange();
-    if (auto* transformEvents = m_world.getResource<ecs::Events<TransformChangedEvent>>())
+    if (auto* transformEvents = m_world->getResource<ecs::Events<TransformChangedEvent>>())
         transformEvents->clear();
 }
 
@@ -721,7 +810,7 @@ void SceneEntityWorld::refreshInstanceIndices()
         MeshInstanceComponent* mesh = nullptr;
     };
     std::vector<MeshInstanceRef> instances;
-    m_world.each<MeshInstanceComponent, GlobalTransformComponent, BoundsComponent, SceneContentComponent>(
+    m_world->each<MeshInstanceComponent, GlobalTransformComponent, BoundsComponent, SceneContentComponent>(
         [&](ecs::Entity entity, MeshInstanceComponent& mesh, GlobalTransformComponent&, BoundsComponent&, SceneContentComponent&)
         {
             instances.push_back(MeshInstanceRef{ entity, &mesh });
@@ -766,7 +855,7 @@ void SceneEntityWorld::assignGlobalResourceIndices()
 
 void SceneEntityWorld::applyAnimations(float time)
 {
-    m_world.each<AnimationComponent>([&](ecs::Entity, AnimationComponent& animation) {
+    m_world->each<AnimationComponent>([&](ecs::Entity, AnimationComponent& animation) {
         (void)applyAnimation(animation, time, *this);
     });
 }
@@ -774,19 +863,19 @@ void SceneEntityWorld::applyAnimations(float time)
 ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity parent)
 {
     ensureChangeDetection();
-    ecs::Entity entity = m_world.spawn();
-    m_world.emplace<NameComponent>(entity, NameComponent{ name });
-    m_world.emplace<ChildrenComponent>(entity, ChildrenComponent{});
-    m_world.emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
-    m_world.emplace<GlobalTransformComponent>(entity, GlobalTransformComponent{});
-    m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{});
-    m_world.emplace<BoundsComponent>(entity, BoundsComponent{});
-    m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{});
+    ecs::Entity entity = m_world->spawn();
+    m_world->emplace<NameComponent>(entity, NameComponent{ name });
+    m_world->emplace<ChildrenComponent>(entity, ChildrenComponent{});
+    m_world->emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
+    m_world->emplace<GlobalTransformComponent>(entity, GlobalTransformComponent{});
+    m_world->emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{});
+    m_world->emplace<BoundsComponent>(entity, BoundsComponent{});
+    m_world->emplace<SceneContentComponent>(entity, SceneContentComponent{});
 
     if (!ecs::isValid(m_root))
     {
         m_root = entity;
-        m_world.insertResource<SceneRootResource>(SceneRootResource{ m_root });
+        m_world->insertResource<SceneRootResource>(SceneRootResource{ m_root });
     }
 
     if (ecs::isValid(parent))
@@ -799,21 +888,21 @@ ecs::Entity SceneEntityWorld::createEntity(const std::string& name, ecs::Entity 
 
 void SceneEntityWorld::unregisterEntityLeaves(ecs::Entity entity)
 {
-    if (m_world.has<CameraComponent>(entity))
+    if (m_world->has<CameraComponent>(entity))
         unregisterCameraEntity(entity);
 
-    if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
-        unregisterMeshInstanceEntity(entity, mesh->mesh, m_world.has<SkinnedMeshComponent>(entity));
+    if (auto* mesh = m_world->get<MeshInstanceComponent>(entity))
+        unregisterMeshInstanceEntity(entity, mesh->mesh, m_world->has<SkinnedMeshComponent>(entity));
 
     m_registeredMeshByEntity.erase(entity);
 }
 
 void SceneEntityWorld::destroyEntity(ecs::Entity entity)
 {
-    if (!m_world.isAlive(entity))
+    if (!m_world->isAlive(entity))
         return;
 
-    const auto* content = m_world.get<SceneContentComponent>(entity);
+    const auto* content = m_world->get<SceneContentComponent>(entity);
     const SceneContentFlags subtree = content ? content->subgraphContent : SceneContentFlags::None;
     const bool containsLights = (subtree & SceneContentFlags::Lights) != 0;
     const bool lightOnly = containsLights && (subtree & ~SceneContentFlags::Lights) == 0;
@@ -833,7 +922,7 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
             m_lightDirty = true;
     }
 
-    if (auto* children = m_world.get<ChildrenComponent>(entity))
+    if (auto* children = m_world->get<ChildrenComponent>(entity))
     {
         auto childCopy = children->children;
         for (ecs::Entity child : childCopy)
@@ -842,55 +931,55 @@ void SceneEntityWorld::destroyEntity(ecs::Entity entity)
 
     unregisterEntityLeaves(entity);
 
-    if (auto* parent = m_world.get<ParentComponent>(entity))
-        RemoveChildReference(m_world, parent->parent, entity);
+    if (auto* parent = m_world->get<ParentComponent>(entity))
+        RemoveChildReference(*m_world, parent->parent, entity);
 
-    if (auto* path = m_world.get<PathComponent>(entity))
+    if (auto* path = m_world->get<PathComponent>(entity))
         m_pathToEntity.erase(path->value.generic_string());
 
     if (entity == m_root)
     {
         m_root = ecs::NullEntity;
-        if (auto* root = m_world.getResource<SceneRootResource>())
+        if (auto* root = m_world->getResource<SceneRootResource>())
             root->root = ecs::NullEntity;
     }
 
     // ChangeDetection's generic structure bit implies a full mesh/AS rebuild.
     // Light-only deletion is tracked by m_lightDirty instead.
-    m_world.despawn(entity, !lightOnly);
+    m_world->despawn(entity, !lightOnly);
 }
 
 bool SceneEntityWorld::setParent(ecs::Entity entity, ecs::Entity parent)
 {
-    if (!m_world.isAlive(entity))
+    if (!m_world->isAlive(entity))
         return false;
-    if (ecs::isValid(parent) && (!m_world.isAlive(parent) || parent == entity || IsDescendantOf(m_world, parent, entity)))
+    if (ecs::isValid(parent) && (!m_world->isAlive(parent) || parent == entity || IsDescendantOf(*m_world, parent, entity)))
         return false;
 
     ecs::Entity oldParent = ecs::NullEntity;
-    if (auto* oldParentComponent = m_world.get<ParentComponent>(entity))
+    if (auto* oldParentComponent = m_world->get<ParentComponent>(entity))
         oldParent = oldParentComponent->parent;
 
     if (oldParent == parent)
         return true;
 
-    RemoveChildReference(m_world, oldParent, entity);
+    RemoveChildReference(*m_world, oldParent, entity);
 
     if (ecs::isValid(parent))
     {
-        m_world.emplace<ParentComponent>(entity, ParentComponent{ parent });
-        auto* children = m_world.get<ChildrenComponent>(parent);
+        m_world->emplace<ParentComponent>(entity, ParentComponent{ parent });
+        auto* children = m_world->get<ChildrenComponent>(parent);
         if (!children)
-            children = &m_world.emplace<ChildrenComponent>(parent, ChildrenComponent{});
+            children = &m_world->emplace<ChildrenComponent>(parent, ChildrenComponent{});
         if (std::find(children->children.begin(), children->children.end(), entity) == children->children.end())
         {
             children->children.push_back(entity);
-            m_world.notifyComponentChanged<ChildrenComponent>(parent);
+            m_world->notifyComponentChanged<ChildrenComponent>(parent);
         }
     }
     else
     {
-        m_world.remove<ParentComponent>(entity);
+        m_world->remove<ParentComponent>(entity);
     }
 
     return true;
@@ -902,12 +991,12 @@ void SceneEntityWorld::setLocalTransform(
     const dm::dquat* rotation,
     const dm::double3* scaling)
 {
-    if (!m_world.isAlive(entity))
+    if (!m_world->isAlive(entity))
         return;
 
-    auto* local = m_world.get<LocalTransformComponent>(entity);
+    auto* local = m_world->get<LocalTransformComponent>(entity);
     if (!local)
-        local = &m_world.emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
+        local = &m_world->emplace<LocalTransformComponent>(entity, LocalTransformComponent{});
 
     bool changed = !local->hasLocalTransform;
     if (translation && any(*translation != local->translation))
@@ -937,8 +1026,8 @@ void SceneEntityWorld::setLocalTransform(
 
     local->hasLocalTransform = true;
     local->compose();
-    m_world.notifyComponentChanged<LocalTransformComponent>(entity);
-    m_world.events<TransformChangedEvent>().send(TransformChangedEvent{ entity });
+    m_world->notifyComponentChanged<LocalTransformComponent>(entity);
+    m_world->events<TransformChangedEvent>().send(TransformChangedEvent{ entity });
 }
 
 void SceneEntityWorld::setTranslation(ecs::Entity entity, const dm::double3& translation)
@@ -958,13 +1047,13 @@ void SceneEntityWorld::setScaling(ecs::Entity entity, const dm::double3& scaling
 
 void SceneEntityWorld::setPath(ecs::Entity entity, const std::filesystem::path& path)
 {
-    if (!m_world.isAlive(entity))
+    if (!m_world->isAlive(entity))
         return;
 
-    if (auto* current = m_world.get<PathComponent>(entity))
+    if (auto* current = m_world->get<PathComponent>(entity))
         m_pathToEntity.erase(current->value.generic_string());
 
-    m_world.emplace<PathComponent>(entity, PathComponent{ path });
+    m_world->emplace<PathComponent>(entity, PathComponent{ path });
     m_pathToEntity[path.generic_string()] = entity;
 }
 
@@ -994,7 +1083,7 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
     SceneContentFlags leafContent = SceneContentFlags::None;
     dm::box3 localBounds = dm::box3::empty();
 
-    if (auto* mesh = m_world.get<MeshInstanceComponent>(entity))
+    if (auto* mesh = m_world->get<MeshInstanceComponent>(entity))
     {
         if (mesh->mesh)
         {
@@ -1002,21 +1091,21 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
             localBounds = getMeshLocalBounds(*mesh->mesh);
         }
     }
-    else if (m_world.has<GaussianSplatComponent>(entity))
+    else if (m_world->has<GaussianSplatComponent>(entity))
     {
         // Local AABB is filled after GaussianSplatPass load; preserve it across refresh.
-        if (const auto* existing = m_world.get<LocalBoundsComponent>(entity))
+        if (const auto* existing = m_world->get<LocalBoundsComponent>(entity))
             localBounds = existing->bounds;
     }
-    else if (m_world.has<CameraComponent>(entity))
+    else if (m_world->has<CameraComponent>(entity))
         leafContent = getCameraContentFlags();
-    else if (hasAnyLightComponent(m_world, entity))
+    else if (hasAnyLightComponent(*m_world, entity))
         leafContent = getLightContentFlags();
-    else if (m_world.has<AnimationComponent>(entity))
+    else if (m_world->has<AnimationComponent>(entity))
         leafContent = getAnimationContentFlags();
 
-    m_world.emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ localBounds });
-    m_world.emplace<SceneContentComponent>(entity, SceneContentComponent{
+    m_world->emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ localBounds });
+    m_world->emplace<SceneContentComponent>(entity, SceneContentComponent{
         .leafContent = leafContent,
         .subgraphContent = leafContent,
     });
@@ -1029,12 +1118,12 @@ void SceneEntityWorld::setMeshInstance(ecs::Entity entity, const std::shared_ptr
 
     MeshInstanceComponent component;
     initializeMeshInstanceComponent(component, mesh);
-    m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
+    m_world->emplace<MeshInstanceComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, NameComponent component)
 {
-    m_world.emplace<NameComponent>(entity, std::move(component));
+    m_world->emplace<NameComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, LocalTransformComponent component)
@@ -1056,46 +1145,46 @@ void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, MeshInstanceComp
         component.enabled = enabled;
         component.proxiedAnalyticLight = proxied;
     }
-    m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
+    m_world->emplace<MeshInstanceComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, DirectionalLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<DirectionalLightComponent>(entity, std::move(component));
+    m_world->emplace<DirectionalLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, SpotLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<SpotLightComponent>(entity, std::move(component));
+    m_world->emplace<SpotLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, PointLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<PointLightComponent>(entity, std::move(component));
+    m_world->emplace<PointLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, EnvironmentLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<EnvironmentLightComponent>(entity, std::move(component));
+    m_world->emplace<EnvironmentLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, CameraComponent component)
 {
-    m_world.emplace<CameraComponent>(entity, std::move(component));
+    m_world->emplace<CameraComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, AnimationComponent component)
 {
-    m_world.emplace<AnimationComponent>(entity, std::move(component));
+    m_world->emplace<AnimationComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, GaussianSplatComponent component)
 {
-    m_world.emplace<GaussianSplatComponent>(entity, std::move(component));
+    m_world->emplace<GaussianSplatComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setSkinnedMeshInstance(
@@ -1105,75 +1194,75 @@ void SceneEntityWorld::setSkinnedMeshInstance(
 
     MeshInstanceComponent component;
     initializeMeshInstanceComponent(component, skinnedMesh);
-    m_world.emplace<MeshInstanceComponent>(entity, std::move(component));
+    m_world->emplace<MeshInstanceComponent>(entity, std::move(component));
 
     SkinnedMeshComponent skinned;
     skinned.prototypeMesh = prototypeMesh;
-    m_world.emplace<SkinnedMeshComponent>(entity, std::move(skinned));
+    m_world->emplace<SkinnedMeshComponent>(entity, std::move(skinned));
 }
 
 void SceneEntityWorld::setSkinnedMeshReference(ecs::Entity entity, ecs::Entity skinnedMeshEntity)
 {
     if (!ecs::isValid(skinnedMeshEntity))
         return;
-    m_world.emplace<SkinnedMeshReferenceComponent>(entity, SkinnedMeshReferenceComponent{ skinnedMeshEntity });
+    m_world->emplace<SkinnedMeshReferenceComponent>(entity, SkinnedMeshReferenceComponent{ skinnedMeshEntity });
 }
 
 void SceneEntityWorld::reconcileLightExclusivity(ecs::Entity entity)
 {
-    m_world.remove<DirectionalLightComponent>(entity);
-    m_world.remove<SpotLightComponent>(entity);
-    m_world.remove<PointLightComponent>(entity);
-    m_world.remove<EnvironmentLightComponent>(entity);
+    m_world->remove<DirectionalLightComponent>(entity);
+    m_world->remove<SpotLightComponent>(entity);
+    m_world->remove<PointLightComponent>(entity);
+    m_world->remove<EnvironmentLightComponent>(entity);
 }
 
 void SceneEntityWorld::setDirectionalLight(ecs::Entity entity, DirectionalLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<DirectionalLightComponent>(entity, std::move(component));
+    m_world->emplace<DirectionalLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setSpotLight(ecs::Entity entity, SpotLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<SpotLightComponent>(entity, std::move(component));
+    m_world->emplace<SpotLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setPointLight(ecs::Entity entity, PointLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<PointLightComponent>(entity, std::move(component));
+    m_world->emplace<PointLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component)
 {
     reconcileLightExclusivity(entity);
-    m_world.emplace<EnvironmentLightComponent>(entity, std::move(component));
+    m_world->emplace<EnvironmentLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setCamera(ecs::Entity entity, CameraComponent component)
 {
-    m_world.emplace<CameraComponent>(entity, std::move(component));
+    m_world->emplace<CameraComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setAnimation(ecs::Entity entity, AnimationComponent component)
 {
-    m_world.emplace<AnimationComponent>(entity, std::move(component));
+    m_world->emplace<AnimationComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setGaussianSplat(ecs::Entity entity, const GaussianSplat& splat)
 {
-    m_world.emplace<GaussianSplatComponent>(entity, GaussianSplatComponent{ splat });
+    m_world->emplace<GaussianSplatComponent>(entity, GaussianSplatComponent{ splat });
 }
 
 void SceneEntityWorld::setSceneSettings(ecs::Entity entity, const SceneSettings& settings)
 {
-    m_world.emplace<SceneSettingsComponent>(entity, SceneSettingsComponent{ settings });
+    m_world->emplace<SceneSettingsComponent>(entity, SceneSettingsComponent{ settings });
 }
 
 void SceneEntityWorld::setGameSettings(ecs::Entity entity, const GameSettings& settings)
 {
-    m_world.emplace<GameSettingsComponent>(entity, GameSettingsComponent{ settings });
+    m_world->emplace<GameSettingsComponent>(entity, GameSettingsComponent{ settings });
 }
 
 ecs::Entity SceneEntityWorld::importSubtree(
@@ -1192,7 +1281,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
 
     std::function<void(ecs::Entity, ecs::Entity)> copyRecursive =
         [&](ecs::Entity srcEntity, ecs::Entity dstParent) {
-            const auto* srcName = source.m_world.get<NameComponent>(srcEntity);
+            const auto* srcName = source.m_world->get<NameComponent>(srcEntity);
             const std::string name = srcName ? srcName->value : std::string{};
             ecs::Entity dstEntity = createEntity(name, dstParent);
             entityMap[srcEntity] = dstEntity;
@@ -1200,21 +1289,21 @@ ecs::Entity SceneEntityWorld::importSubtree(
             if (srcEntity == sourceRoot)
                 newRoot = dstEntity;
 
-            CopyEntityComponents(m_world, dstEntity, source.m_world, srcEntity, false);
+            CopyEntityComponents(*m_world, dstEntity, *source.m_world, srcEntity, false);
             // Camera list / mesh ResourceTracker: syncSceneResourcesFromEcs() at import end.
 
-            if (m_world.has<AnimationComponent>(dstEntity))
+            if (m_world->has<AnimationComponent>(dstEntity))
                 importedAnimationEntities.push_back(dstEntity);
 
-            const auto* srcMesh = source.m_world.get<MeshInstanceComponent>(srcEntity);
-            const auto* srcSkinned = source.m_world.get<SkinnedMeshComponent>(srcEntity);
+            const auto* srcMesh = source.m_world->get<MeshInstanceComponent>(srcEntity);
+            const auto* srcSkinned = source.m_world->get<SkinnedMeshComponent>(srcEntity);
             if (srcMesh && srcMesh->mesh)
             {
                 if (srcSkinned && srcSkinned->prototypeMesh && factory)
                 {
                     setSkinnedMeshInstance(dstEntity, *factory, srcSkinned->prototypeMesh);
 
-                    if (auto* dstMesh = m_world.get<MeshInstanceComponent>(dstEntity))
+                    if (auto* dstMesh = m_world->get<MeshInstanceComponent>(dstEntity))
                     {
                         std::shared_ptr<MeshInfo> skinnedMesh = dstMesh->mesh;
                         *dstMesh = *srcMesh;
@@ -1224,7 +1313,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
                         dstMesh->geometryInstanceIndex = -1;
                     }
 
-                    if (auto* dstSkinned = m_world.get<SkinnedMeshComponent>(dstEntity))
+                    if (auto* dstSkinned = m_world->get<SkinnedMeshComponent>(dstEntity))
                     {
                         *dstSkinned = *srcSkinned;
                         dstSkinned->lastUpdateFrameIndex = 0;
@@ -1240,13 +1329,13 @@ ecs::Entity SceneEntityWorld::importSubtree(
                     {
                         SkinnedMeshComponent copiedSkinned = *srcSkinned;
                         copiedSkinned.lastUpdateFrameIndex = 0;
-                        m_world.emplace<SkinnedMeshComponent>(dstEntity, std::move(copiedSkinned));
+                        m_world->emplace<SkinnedMeshComponent>(dstEntity, std::move(copiedSkinned));
                         importedSkinnedEntities.push_back(dstEntity);
                     }
                 }
             }
 
-            if (const auto* children = source.m_world.get<ChildrenComponent>(srcEntity))
+            if (const auto* children = source.m_world->get<ChildrenComponent>(srcEntity))
             {
                 for (ecs::Entity srcChild : children->children)
                     copyRecursive(srcChild, dstEntity);
@@ -1259,7 +1348,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
     // SkinnedMeshComponents causes entity-id collisions when later models are imported.
     for (ecs::Entity skinnedEntity : importedSkinnedEntities)
     {
-        auto* skinned = m_world.get<SkinnedMeshComponent>(skinnedEntity);
+        auto* skinned = m_world->get<SkinnedMeshComponent>(skinnedEntity);
         if (!skinned)
             continue;
 
@@ -1276,7 +1365,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
     for (const auto& [srcEntity, dstEntity] : entityMap)
     {
         (void)srcEntity;
-        auto* ref = m_world.get<SkinnedMeshReferenceComponent>(dstEntity);
+        auto* ref = m_world->get<SkinnedMeshReferenceComponent>(dstEntity);
         if (!ref || !ecs::isValid(ref->skinnedMeshEntity))
             continue;
         auto it = entityMap.find(ref->skinnedMeshEntity);
@@ -1284,7 +1373,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
             ref->skinnedMeshEntity = it->second;
     }
 
-    m_world.each<MeshInstanceComponent>([&](ecs::Entity entity, MeshInstanceComponent& mesh) {
+    m_world->each<MeshInstanceComponent>([&](ecs::Entity entity, MeshInstanceComponent& mesh) {
         if (!ecs::isValid(mesh.proxiedAnalyticLight))
             return;
         auto it = entityMap.find(mesh.proxiedAnalyticLight);
@@ -1296,7 +1385,7 @@ ecs::Entity SceneEntityWorld::importSubtree(
     // every AnimationComponent causes entity-id collisions when later models load.
     for (ecs::Entity animEntity : importedAnimationEntities)
     {
-        auto* animation = m_world.get<AnimationComponent>(animEntity);
+        auto* animation = m_world->get<AnimationComponent>(animEntity);
         if (!animation)
             continue;
 
@@ -1343,7 +1432,7 @@ ecs::Entity SceneEntityWorld::findEntity(const std::filesystem::path& path, ecs:
     {
         if (*pathComponent == "..")
         {
-            if (const auto* parent = m_world.get<ParentComponent>(current))
+            if (const auto* parent = m_world->get<ParentComponent>(current))
                 current = parent->parent;
             else
                 current = ecs::NullEntity;
@@ -1352,7 +1441,7 @@ ecs::Entity SceneEntityWorld::findEntity(const std::filesystem::path& path, ecs:
         }
 
         ecs::Entity found = ecs::NullEntity;
-        if (const auto* children = m_world.get<ChildrenComponent>(current))
+        if (const auto* children = m_world->get<ChildrenComponent>(current))
         {
             for (ecs::Entity child : children->children)
             {
@@ -1376,21 +1465,21 @@ ecs::Entity SceneEntityWorld::findEntity(const std::filesystem::path& path, ecs:
 
 std::filesystem::path SceneEntityWorld::getEntityPath(ecs::Entity entity) const
 {
-    if (const auto* path = m_world.get<PathComponent>(entity))
+    if (const auto* path = m_world->get<PathComponent>(entity))
         return path->value;
     return {};
 }
 
 std::string SceneEntityWorld::getEntityName(ecs::Entity entity) const
 {
-    if (const auto* name = m_world.get<NameComponent>(entity))
+    if (const auto* name = m_world->get<NameComponent>(entity))
         return name->value;
     return {};
 }
 
 const std::vector<ecs::Entity>& SceneEntityWorld::getEntityChildren(ecs::Entity entity) const
 {
-    if (const auto* children = m_world.get<ChildrenComponent>(entity))
+    if (const auto* children = m_world->get<ChildrenComponent>(entity))
         return children->children;
     return s_emptyChildren;
 }

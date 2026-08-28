@@ -133,7 +133,7 @@ struct SystemContext
         return deferredCommands ? *deferredCommands : world.commands();
     }
 
-    // Live scene ECS (not App resource world). Prefer over internal GPU digs.
+    // Live scene graph (borrows App::world() after commit). Prefer over GPU digs.
     [[nodiscard]] scene::SceneEntityWorld* entityWorld();
     [[nodiscard]] const scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] ecs::World* sceneEcs();

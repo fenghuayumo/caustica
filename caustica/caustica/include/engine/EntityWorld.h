@@ -12,7 +12,7 @@
 namespace caustica
 {
 
-// Thin system-parameter wrapper around the live scene ECS (not App resource world).
+// Thin system-parameter wrapper around the live scene graph (App::world() after commit).
 // Prefer this over ctx.entityWorld() / SceneEntityWorld::set* digs in host systems.
 class EntityWorld
 {

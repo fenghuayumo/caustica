@@ -81,5 +81,38 @@ int main()
             "skipped frame replayed a stale ring-slot temporal reset");
     }
 
+    {
+        struct Clock
+        {
+            int ticks = 7;
+        };
+
+        caustica::ecs::World live;
+        live.insertResource<Clock>();
+
+        caustica::scene::SceneEntityWorld scratch;
+        const caustica::ecs::Entity root = scratch.createEntity("Root");
+        const caustica::ecs::Entity light = scratch.createEntity("Sun", root);
+        scratch.setDirectionalLight(light, caustica::scene::DirectionalLightComponent{});
+
+        scratch.adoptInto(live);
+
+        passed &= expect(&scratch.world() == &live,
+            "adoptInto did not rebind the scene graph onto the live registry");
+        passed &= expect(!scratch.ownsRegistry(),
+            "adoptInto kept a scratch registry");
+        passed &= expect(live.resource<Clock>().ticks == 7,
+            "adoptInto cleared live resources");
+        passed &= expect(live.isAlive(scratch.root()),
+            "adoptInto lost the scene root");
+        const caustica::ecs::Entity sun = scratch.findEntity("Sun", scratch.root());
+        passed &= expect(
+            live.has<caustica::scene::DirectionalLightComponent>(sun),
+            "adoptInto dropped scene components");
+        const caustica::ecs::Entity extra = scratch.createEntity("Extra", scratch.root());
+        passed &= expect(live.isAlive(extra) && &scratch.world() == &live,
+            "borrowed SceneEntityWorld did not spawn into the live registry");
+    }
+
     return passed ? 0 : 1;
 }

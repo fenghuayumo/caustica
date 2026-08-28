@@ -492,13 +492,10 @@ void AppSchedules::runParallel(const PhaseSchedule& phase, SystemContext& contex
 {
     // Change-tick storages for every written component must exist before workers
     // can mark components changed; creating one lazily would mutate the registry
-    // context while other workers read it.
-    if (ecs::World* sceneWorld = context.sceneEcs())
-    {
-        for (const System& system : phase.systems)
-            system.access.applyWarmups(*sceneWorld);
-    }
-    // Same reason, for the deferred queue on the resource world.
+    // context while other workers read it. Query / Commands / SceneTransforms
+    // all target App::world() after the live scene is grafted in.
+    for (const System& system : phase.systems)
+        system.access.applyWarmups(context.world);
     (void)context.world.commands();
 
     if (phase.commandBuffers.size() != phase.systems.size())

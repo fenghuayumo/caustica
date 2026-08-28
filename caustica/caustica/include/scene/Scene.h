@@ -77,6 +77,10 @@ namespace caustica
             const std::filesystem::path& fileName,
             bool asyncTextures);
 
+        // Importers always populate a scratch registry. Live scenes that already
+        // borrow App::world() drop their graph first, then switch back to owned.
+        void resetToOwnedScratchRegistry();
+
         virtual bool loadModelFile(
             const std::filesystem::path& fileName,
             bool asyncTextures,
@@ -190,6 +194,9 @@ namespace caustica
             assertLogicThread();
             return m_EntityWorld.get();
         }
+
+        // Bind the live scene graph to App::m_world after async load (logic thread).
+        void adoptLiveEcs(ecs::World& liveWorld);
         [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
         [[nodiscard]] dm::box3 getSceneBounds() const;
 

@@ -53,6 +53,14 @@ void commitActiveScene(
     if (!active)
         return;
 
+    scene::SceneEntityWorld* oldWorld = entityWorld(app);
+    scene::SceneEntityWorld* incoming = scene ? scene->getEntityWorld() : nullptr;
+    if (oldWorld && oldWorld != incoming)
+        oldWorld->resetScene();
+
+    if (scene)
+        scene->adoptLiveEcs(app.world());
+
     active->m_scene = std::move(scene);
     active->name = std::move(name);
     active->path = std::move(path);

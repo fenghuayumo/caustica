@@ -7,7 +7,7 @@
 namespace caustica::ecs
 {
 
-// Bevy-style query view over a World (typically the scene entity world).
+// Bevy-style query view over a World (the live App registry after scene commit).
 // Injected as a typed system parameter: Query<LocalTransformComponent, MeshInstanceComponent>.
 template<typename... Components>
 class Query

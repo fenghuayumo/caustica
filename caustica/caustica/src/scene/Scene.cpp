@@ -594,6 +594,20 @@ Scene::Scene(
 
 }
 
+void Scene::resetToOwnedScratchRegistry()
+{
+    if (m_EntityWorld && !m_EntityWorld->ownsRegistry())
+        m_EntityWorld->resetScene();
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+}
+
+void Scene::adoptLiveEcs(ecs::World& liveWorld)
+{
+    if (!m_EntityWorld)
+        return;
+    m_EntityWorld->adoptInto(liveWorld, m_SceneTypeFactory.get());
+}
+
 bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
 {
     // Model import is always serial: texture and typed-asset registration are
@@ -601,7 +615,7 @@ bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
 
-    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    resetToOwnedScratchRegistry();
     m_LogicExtractCache.clear();
     m_LogicExtractCacheValid = false;
 
@@ -639,7 +653,7 @@ bool Scene::loadFromJsonString(const std::string& sceneJson, const std::filesyst
     g_LoadingStats.ObjectsLoaded = 0;
     g_LoadingStats.ObjectsTotal = 0;
 
-    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    resetToOwnedScratchRegistry();
     m_LogicExtractCache.clear();
     m_LogicExtractCacheValid = false;
 

@@ -104,6 +104,12 @@ pack: `Query<const T, U>` yields a read of `T` and a write of `U`, query filters
 reads / writes, and `Commands` sets `deferred`. A system taking `SystemContext&` or `EntityWorld`
 falls back to exclusive, because both can reach the whole world.
 
+`Query` and `Commands` target **`App::world()`**. After commit the live scene graph is grafted
+into that same registry (`SceneEntityWorld::adoptInto`), so deferred `Commands` and component
+`Query`s cannot miss each other. Importer / pending `Scene` objects still own a scratch World
+on the load thread; that World is not scheduled. A render-thread EnTT world is a non-goal
+(see [architecture-render-proxy.md](../architecture-render-proxy.md#one-live-logic-world)).
+
 ### Narrow parameters for the two things every frame needs
 
 Exclusive-by-default is safe, but it is only useful if hosts have a non-exclusive way to write
@@ -189,7 +195,8 @@ Overridable per phase with `AppSchedules::setExecutionMode`. Global kill switch:
 - Fibers, work-stealing named threads, or a UE `FTaskGraphInterface` clone
 - Parallelising Extract or the render phase (ADR 0001 R3 territory)
 - Automatic access for systems taking `SystemContext&` / `World&` — those stay exclusive by design
-- Multi-world / sub-app scheduling
+- Multi-world / sub-app scheduling. Scratch import Worlds are not a second Bevy App.
+- A render-thread ECS (`RenderWorld`). Isolation is `SceneRenderData`, not a second EnTT registry.
 - Replacing `parallelFor`; `TaskGraph` is for shaped graphs, not flat fan-out
 
 ## Consequences
@@ -234,6 +241,8 @@ Overridable per phase with `AppSchedules::setExecutionMode`. Global kill switch:
 - [x] `examples/cpp/thin_client` split into exclusive setup + parallel per-frame systems
 - [x] Tests: `causTaskGraphTests`, `causSystemSchedulerTests`, `causSchedulePlanTests`
       (including that the documented system shapes derive non-conflicting access)
+- [x] Live scene graph grafted into `App::world()` so `Query` / `Commands` share one registry;
+      pending loads keep a scratch World (`SceneEntityWorld::adoptInto`)
 
 ## Frozen rules
 
