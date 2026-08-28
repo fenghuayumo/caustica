@@ -1,6 +1,10 @@
 bin/
 build*/
 dist/
+
+# Content-addressed shader compile cache + external shader PDBs (see
+# support/python/shader_cook_cache.py). Safe to delete; forces a full recook.
+.shadercache/
 *.egg-info/
 .vs
 Nrd.cfg

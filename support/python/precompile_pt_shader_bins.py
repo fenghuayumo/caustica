@@ -5,8 +5,23 @@ import hashlib
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from shader_cook_cache import (
+    CookStats,
+    DependencyManifest,
+    ShaderDdc,
+    collect_pdbs,
+    compute_l2_key,
+    preprocess,
+    shader_relative,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +29,12 @@ BIN_DIR = ROOT / "bin"
 SHADER_ROOT = ROOT / "caustica" / "caustica" / "shaders"
 INCLUDE_ROOT = ROOT / "caustica" / "caustica"
 EXTERNAL_ROOT = ROOT / "External"
+
+# L2 (content-addressed) compile cache and the external PDBs that go with it. Kept
+# out of bin/ because bin/ is the shipped runtime layout: these are build
+# intermediates, and only ShaderBin (plus the .pack) is meant to be distributed.
+# Point CAUSTICA_SHADER_DDC at a share to let a team reuse CI's compiles.
+DDC_DIR = Path(os.environ.get("CAUSTICA_SHADER_DDC", ROOT / ".shadercache"))
 
 # Stable pipeline variants used at runtime (see SceneRayTracingResources.cpp).
 PIPELINE_VARIANTS = [
@@ -286,8 +307,16 @@ def build_hash_command(
     *,
     api: str,
     profile: str = "lib_6_6",
+    debug_info: bool = True,
 ) -> str:
-    parts = [f' "{logical_source}"', " -Zi", " -Zsb", " -O3", " -enable-16bit-types", " -WX", " -all_resources_bound"]
+    # L1 key. Must stay byte-identical to ShaderCompilerUtils::buildDxcCommand()'s
+    # hashCommand or the runtime will look for bins the cook never wrote. Note that
+    # -Fo/-Fd are appended downstream and are deliberately outside the hash, which
+    # is what lets the cook switch to external PDBs without invalidating anything.
+    parts = [f' "{logical_source}"']
+    if debug_info:
+        parts.append(" -Zi")
+    parts += [" -Zsb", " -O3", " -enable-16bit-types", " -WX", " -all_resources_bound"]
     parts.append(f" -T {profile}")
     if profile.startswith("lib_6_6"):
         parts.append(" -enable-payload-qualifiers")
@@ -317,6 +346,67 @@ def hash_hex(command: str) -> str:
     return hashlib.sha256(command.encode("utf-8")).hexdigest()
 
 
+# The argument split below is what makes L2 dedup sound. `codegen_flags` holds every
+# switch that changes output but is invisible to the preprocessor; macros and include
+# dirs are excluded because their whole effect is already captured by hashing the
+# preprocessed text. Getting this split wrong in either direction is a correctness
+# bug: too narrow and distinct outputs collide, too wide and dedup stops firing.
+def codegen_flags(api: str, profile: str = "lib_6_6", *, debug_info: bool = True) -> list[str]:
+    flags = ["-Zsb", "-O3", "-enable-16bit-types", "-WX", "-all_resources_bound", "-T", profile]
+    if debug_info:
+        flags.insert(0, "-Zi")
+    if profile.startswith("lib_6_6"):
+        flags.append("-enable-payload-qualifiers")
+    if api != "d3d12":
+        flags += [
+            "-spirv",
+            "-fspv-target-env=vulkan1.2",
+            "-fspv-extension=SPV_EXT_descriptor_indexing",
+            "-fspv-extension=KHR",
+            *vulkan_binding_shift_args(),
+        ]
+    return flags
+
+
+def macro_flags(macros: list[tuple[str, str]], api: str) -> list[str]:
+    flags = ["-D", "ENABLE_DEBUG_PRINT"]
+    for name, definition in macros:
+        flags += ["-D", f"{name}={definition}"]
+    if api == "d3d12":
+        flags += ["-D", "TARGET_D3D12"]
+    else:
+        flags += ["-D", "TARGET_VULKAN", "-D", "SPIRV"]
+    return flags
+
+
+def include_flags() -> list[str]:
+    return ["-I", str(INCLUDE_ROOT), "-I", str(EXTERNAL_ROOT)]
+
+
+def flag_signature(api: str, profile: str = "lib_6_6", *, debug_info: bool = True) -> str:
+    return " ".join(codegen_flags(api, profile, debug_info=debug_info))
+
+
+def emits_external_pdb(api: str) -> bool:
+    """DXIL supports `/Fd`; SPIR-V carries debug info inline and rejects it.
+
+    Mirrors the runtime choice in PathTracingShaderCompiler::resolveCacheIdentity,
+    which already writes external PDBs for D3D12 and none for Vulkan.
+    """
+    return api == "d3d12"
+
+
+def pdb_root(api: str) -> Path:
+    """Shared PDB directory. Add it to the debugger's symbol search path.
+
+    DXC names each PDB after the shader hash, which is exactly what PIX looks up,
+    so one directory serves every cooked shader and duplicates collapse on their own.
+    """
+    root = DDC_DIR / "pdb" / runtime_bin_folder(api)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 # Compile API names (d3d12/vulkan) vs runtime bin folders (dxil/spirv).
 # Must match caustica::getShaderTypeName() / ShaderCompilerConfig::ShaderBinariesPath.
 RUNTIME_BIN_FOLDER = {
@@ -332,7 +422,7 @@ def runtime_bin_folder(compile_api: str) -> str:
         raise ValueError(f"Unsupported compile API '{compile_api}'") from exc
 
 
-def cache_paths(compile_api: str, digest: str) -> tuple[Path, str]:
+def cache_paths(compile_api: str, digest: str, *, create: bool = True) -> tuple[Path, str]:
     # Match ShaderKey::formatCacheFileNameNoExt: split the first two hex chars
     # into the directory and store only the remaining suffix as the file name.
     # Folder must be the runtime type name (dxil/spirv), not the cook CLI name.
@@ -340,7 +430,8 @@ def cache_paths(compile_api: str, digest: str) -> tuple[Path, str]:
     file_stem = digest[2:] if len(digest) >= 2 else digest
     rel = f"{digest[:2]}/{file_stem}.bin"
     out_dir = BIN_DIR / "ShaderBin" / folder / digest[:2]
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if create:
+        out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir / f"{file_stem}.bin", rel
 
 
@@ -365,6 +456,96 @@ def find_dxc(api: str) -> Path:
     raise FileNotFoundError(f"DXC not found for API {api}")
 
 
+@dataclass
+class CookJob:
+    api: str
+    source: Path
+    logical: str
+    macros: list[tuple[str, str]]
+    label: str
+    profile: str = "lib_6_6"
+    l1_digest: str = ""
+    l1_path: Path = field(default_factory=Path)
+    l2_key: str = ""
+    closure: tuple[str, ...] = ()
+
+    @property
+    def source_relpath(self) -> str:
+        # Matches ShaderPermutation::shaderSrcFileName, which is how the runtime
+        # identifies the root source it is resolving.
+        return self.source.resolve().relative_to(SHADER_ROOT).as_posix()
+
+
+def plan_jobs(apis: list[str], global_preset: str, *, debug_info: bool = True) -> list[CookJob]:
+    """Expand the preset matrix across every requested API into one flat job list.
+
+    Both APIs share a single pool so a d3d12/vulkan cook saturates the machine
+    instead of draining one API's tail before starting the next.
+    """
+    planned: list[CookJob] = []
+    for api in apis:
+        for job in build_jobs(global_preset):
+            digest = hash_hex(
+                build_hash_command(
+                    job["logical"], job["macros"], api=api, debug_info=debug_info
+                )
+            )
+            l1_path, _ = cache_paths(api, digest, create=False)
+            planned.append(
+                CookJob(
+                    api=api,
+                    source=job["source"],
+                    logical=job["logical"],
+                    macros=job["macros"],
+                    label=job["label"],
+                    l1_digest=digest,
+                    l1_path=l1_path,
+                )
+            )
+    return planned
+
+
+def compile_to_ddc(
+    dxc: Path,
+    ddc: ShaderDdc,
+    *,
+    job: CookJob,
+    debug_info: bool = True,
+) -> None:
+    """Compile one distinct L2 entry and publish it to the content-addressed store.
+
+    Output goes to a scratch directory first so a failed or interrupted DXC run can
+    never publish a partial blob that a later cook would treat as a cache hit.
+    """
+    external_pdb = debug_info and emits_external_pdb(job.api)
+    with tempfile.TemporaryDirectory(prefix="caus_cc_") as tmp:
+        blob = Path(tmp) / "out.bin"
+        cmd = [
+            str(dxc), str(job.source),
+            *codegen_flags(job.api, job.profile, debug_info=debug_info),
+            *macro_flags(job.macros, job.api),
+            *include_flags(),
+        ]
+        pdb_scratch = Path(tmp) / "pdb"
+        if external_pdb:
+            pdb_scratch.mkdir()
+            # Trailing separator is load-bearing: it tells DXC to auto-name the PDB
+            # after the shader hash instead of embedding a caller-supplied filename,
+            # which would otherwise leak the scratch path into the container and
+            # make otherwise-identical variants differ byte-wise.
+            cmd += ["-Fd", str(pdb_scratch) + os.sep]
+        cmd += ["-Fo", str(blob)]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0 or not blob.is_file():
+            detail = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(f"DXC failed for {job.logical} [{job.label}]: {detail}")
+
+        ddc.publish(job.l2_key, blob)
+        if external_pdb:
+            collect_pdbs(pdb_scratch, pdb_root(job.api))
+
+
 def compile_library(
     dxc: Path,
     *,
@@ -375,34 +556,19 @@ def compile_library(
     profile: str = "lib_6_6",
     force: bool = False,
 ) -> Path | None:
+    """Compile a single library straight to its L1 path, bypassing the L2 cache.
+
+    Retained for callers that want a one-off compile; the cook itself goes through
+    `cook()` so it gets dedup and content-addressed caching.
+    """
     digest = hash_hex(build_hash_command(logical_source, macros, api=api, profile=profile))
     out_path, _ = cache_paths(api, digest)
 
-    cmd = [str(dxc), str(source), "-Zi", "-Zsb", "-O3", "-enable-16bit-types", "-WX", "-all_resources_bound", "-T", profile]
-    if profile.startswith("lib_6_6"):
-        cmd.append("-enable-payload-qualifiers")
-    cmd.extend(["-D", "ENABLE_DEBUG_PRINT"])
-    for name, definition in macros:
-        cmd.extend(["-D", f"{name}={definition}"])
-    cmd.extend(["-I", str(INCLUDE_ROOT)])
-    cmd.extend(["-I", str(EXTERNAL_ROOT)])
-    if api == "d3d12":
-        cmd.extend(["-D", "TARGET_D3D12"])
-    else:
-        cmd.extend(
-            [
-                "-D",
-                "TARGET_VULKAN",
-                "-D",
-                "SPIRV",
-                "-spirv",
-                "-fspv-target-env=vulkan1.2",
-                "-fspv-extension=SPV_EXT_descriptor_indexing",
-                "-fspv-extension=KHR",
-            ]
-        )
-        cmd.extend(vulkan_binding_shift_args())
-    cmd.extend(["-Fo", str(out_path)])
+    cmd = [str(dxc), str(source), *codegen_flags(api, profile),
+           *macro_flags(macros, api), *include_flags()]
+    if emits_external_pdb(api):
+        cmd += ["-Fd", str(pdb_root(api)) + os.sep]
+    cmd += ["-Fo", str(out_path)]
 
     print(f"[caustica] DXC {logical_source} -> {out_path.name}")
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -411,32 +577,6 @@ def compile_library(
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"DXC failed for {logical_source}")
     return out_path
-
-
-def shader_dependency_mtime() -> float:
-    """Newest source timestamp for the path-tracing shader include tree."""
-    newest = 0.0
-    # NRD and the other render-pass shaders are built by separate targets and
-    # are not included by PathTracerEntryPoint/MaterialSpecializations. Scanning
-    # the entire shader tree made those targets spuriously invalidate all 1456
-    # path-tracer variants during an otherwise incremental build.
-    dependency_roots = (
-        SHADER_ROOT / "PathTracer",
-        SHADER_ROOT / "Misc",
-    )
-    dependency_files = (
-        SHADER_ROOT / "PathTracerEntryPoint.hlsl",
-        SHADER_ROOT / "PathTracerMaterialSpecializations.hlsl",
-        SHADER_ROOT / "PathTracerBridgeEngine.hlsli",
-    )
-    for path in dependency_files:
-        if path.exists():
-            newest = max(newest, path.stat().st_mtime)
-    for dependency_root in dependency_roots:
-        for pattern in ("*.hlsl", "*.hlsli", "*.h"):
-            for path in dependency_root.rglob(pattern):
-                newest = max(newest, path.stat().st_mtime)
-    return newest
 
 
 def build_jobs(global_preset: str) -> list[dict]:
@@ -483,51 +623,188 @@ def build_jobs(global_preset: str) -> list[dict]:
     return jobs
 
 
-def precompile(api: str, force: bool, global_preset: str = "default") -> int:
-    dxc = find_dxc(api)
-    dependency_mtime = shader_dependency_mtime()
-    pending: list[dict] = []
-    skipped = 0
-    for job in build_jobs(global_preset):
-        digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=api))
-        out_path, _ = cache_paths(api, digest)
-        if out_path.exists() and out_path.stat().st_mtime >= dependency_mtime and not force:
-            skipped += 1
-            continue
-        pending.append(job)
+def worker_count(pending: int) -> int:
+    """DXC runs out-of-process, so the cook scales with cores rather than the GIL.
 
-    # DXC runs out-of-process, so the cook scales with core count rather than
-    # with the GIL. Cap it so a many-core machine does not thrash on memory.
-    requested_jobs = os.environ.get("CAUSTICA_PT_SHADER_JOBS")
-    default_jobs = min(16, max(4, (os.cpu_count() or 4)))
-    worker_count = int(requested_jobs) if requested_jobs else default_jobs
-    worker_count = max(1, min(worker_count, len(pending) or 1))
+    Measured scaling on a 32-thread box: 4 workers 3.4x, 8 workers 6.0x, 16 workers
+    8.4x, 32 workers 9.1x. Past 16 the curve is flat — the limit is memory bandwidth,
+    not core count — so the remaining ~8% is not worth another 16 concurrent DXC
+    working sets. Override with CAUSTICA_PT_SHADER_JOBS to retune per machine.
+    """
+    requested = os.environ.get("CAUSTICA_PT_SHADER_JOBS")
+    default = min(16, max(2, os.cpu_count() or 4))
+    count = int(requested) if requested else default
+    return max(1, min(count, pending or 1))
+
+
+def _guarded(fn):
+    """Let a whole parallel phase finish so every failure is reported at once."""
+
+    def wrapper(item):
+        try:
+            return fn(item)
+        except Exception as exc:  # noqa: BLE001 - surfaced via CookStats.errors
+            return exc
+
+    return wrapper
+
+
+def _resolve_l2_keys(
+    dxc_for_api: dict[str, Path],
+    jobs: list[CookJob],
+    stats: CookStats,
+    manifests: dict[str, DependencyManifest],
+    *,
+    debug_info: bool,
+) -> list[CookJob]:
+    """Preprocess every job to derive its content-based L2 key and include closure.
+
+    This replaces the old directory-mtime check. Preprocessing is ~100x cheaper than
+    compiling, so paying it unconditionally buys exact invalidation: an edit that
+    does not change a variant's preprocessed text leaves that variant's key — and
+    therefore its cached blob — untouched.
+    """
+    signatures = {api: flag_signature(api, debug_info=debug_info) for api in dxc_for_api}
+
+    def resolve(job: CookJob) -> CookJob:
+        result = preprocess(
+            dxc_for_api[job.api],
+            source=job.source,
+            macro_args=macro_flags(job.macros, job.api),
+            include_args=include_flags(),
+            profile_args=["-T", job.profile]
+            + (["-enable-payload-qualifiers"] if job.profile.startswith("lib_6_6") else []),
+        )
+        job.l2_key = compute_l2_key(
+            api=job.api,
+            flag_signature=signatures[job.api],
+            source_sha=result.source_sha,
+        )
+        job.closure = tuple(
+            shader_relative(path, SHADER_ROOT, ROOT) for path in result.includes
+        )
+        return job
+
+    resolved: list[CookJob] = []
+    with ThreadPoolExecutor(max_workers=worker_count(len(jobs))) as executor:
+        for job, outcome in zip(jobs, executor.map(_guarded(resolve), jobs)):
+            if isinstance(outcome, Exception):
+                stats.errors.append((job.label, str(outcome)))
+                continue
+            resolved.append(outcome)
+            stats.preprocessed += 1
+            manifests[outcome.api].add_closure(outcome.source_relpath, outcome.closure)
+    return resolved
+
+
+def _report_errors(stats: CookStats) -> int:
+    print(f"[caustica] ERROR: {len(stats.errors)} shader(s) failed:", file=sys.stderr)
+    for label, detail in stats.errors[:16]:
+        print(f"  - {label}: {detail}", file=sys.stderr)
+    if len(stats.errors) > 16:
+        print(f"  ... and {len(stats.errors) - 16} more", file=sys.stderr)
+    raise RuntimeError(f"{len(stats.errors)} shader(s) failed to cook")
+
+
+def cook(
+    apis: list[str],
+    *,
+    force: bool = False,
+    global_preset: str = "coverage",
+    debug_info: bool = True,
+) -> int:
+    dxc_for_api = {api: find_dxc(api) for api in apis}
+    ddc = ShaderDdc(DDC_DIR)
+    stats = CookStats()
+
+    jobs = plan_jobs(apis, global_preset, debug_info=debug_info)
+    stats.jobs = len(jobs)
+    label = "+".join(apis)
     print(
-        f"[caustica] PT shader precompile ({api}, preset={global_preset}): "
-        f"{len(pending)} to compile, {skipped} cached, {worker_count} parallel jobs"
+        f"[caustica] PT shader cook ({label}, preset={global_preset}): "
+        f"{stats.jobs} variants, {worker_count(stats.jobs)} parallel jobs"
     )
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = [
-            executor.submit(
-                compile_library,
-                dxc,
-                source=job["source"],
-                logical_source=job["logical"],
-                macros=job["macros"],
-                api=api,
-                force=force,
-            )
-            for job in pending
-        ]
-        for future in as_completed(futures):
-            future.result()
 
-    compiled = len(pending)
+    manifests = {api: DependencyManifest() for api in apis}
+    started = time.perf_counter()
+    jobs = _resolve_l2_keys(dxc_for_api, jobs, stats, manifests, debug_info=debug_info)
+    preprocess_seconds = time.perf_counter() - started
+    if stats.errors:
+        return _report_errors(stats)
+
+    distinct: dict[tuple[str, str], CookJob] = {}
+    for job in jobs:
+        distinct.setdefault((job.api, job.l2_key), job)
+    stats.distinct = len(distinct)
+    root_sources = {src for m in manifests.values() for src in m.closures}
     print(
-        f"[caustica] PT shader precompile ({api}, preset={global_preset}): "
-        f"compiled={compiled}, skipped={skipped}"
+        f"[caustica] preprocessed {stats.preprocessed} variants in "
+        f"{preprocess_seconds:.1f}s over {len(root_sources)} root sources; "
+        f"{stats.distinct} distinct compiles ({stats.deduped} deduplicated)"
+    )
+
+    pending = [job for job in distinct.values() if force or not ddc.has(job.l2_key)]
+    stats.ddc_hits = stats.distinct - len(pending)
+    print(f"[caustica] compile cache: {stats.ddc_hits} hits, {len(pending)} to compile")
+
+    if pending:
+        started = time.perf_counter()
+        completed = 0
+        with ThreadPoolExecutor(max_workers=worker_count(len(pending))) as executor:
+            work = _guarded(
+                lambda job: compile_to_ddc(
+                    dxc_for_api[job.api], ddc, job=job, debug_info=debug_info
+                )
+            )
+            for job, outcome in zip(pending, executor.map(work, pending)):
+                if isinstance(outcome, Exception):
+                    stats.errors.append((job.label, str(outcome)))
+                    continue
+                stats.compiled += 1
+                completed += 1
+                if completed % 25 == 0 or completed == len(pending):
+                    print(f"[caustica]   compiled {completed}/{len(pending)}")
+        print(f"[caustica] compiled {stats.compiled} libraries in "
+              f"{time.perf_counter() - started:.1f}s")
+
+    if stats.errors:
+        return _report_errors(stats)
+
+    fingerprints = {
+        api: {
+            source: manifest.fingerprint(source, SHADER_ROOT)
+            for source in manifest.closures
+        }
+        for api, manifest in manifests.items()
+    }
+    for job in jobs:
+        if ddc.materialize(job.l2_key, job.l1_path):
+            stats.l1_written += 1
+        else:
+            stats.l1_reused += 1
+        manifests[job.api].add_bin(
+            job.l1_digest, job.source_relpath, fingerprints[job.api][job.source_relpath]
+        )
+
+    for api, manifest in manifests.items():
+        manifest.write(BIN_DIR / "ShaderBin" / runtime_bin_folder(api) / "deps.manifest")
+
+    print(
+        f"[caustica] PT shader cook ({label}): compiled={stats.compiled}, "
+        f"cache_hits={stats.ddc_hits}, deduplicated={stats.deduped}, "
+        f"bins_written={stats.l1_written}, bins_unchanged={stats.l1_reused}"
     )
     return 0
+
+
+def precompile(
+    api: str,
+    force: bool,
+    global_preset: str = "default",
+    *,
+    debug_info: bool = True,
+) -> int:
+    return cook([api], force=force, global_preset=global_preset, debug_info=debug_info)
 
 
 def run_pt_shader_precompile(
@@ -543,8 +820,7 @@ def run_pt_shader_precompile(
         if shader_api == "vulkan"
         else ["d3d12", "vulkan"]
     )
-    for compile_api in compile_apis:
-        precompile(compile_api, force, global_preset)
+    cook(compile_apis, force=force, global_preset=global_preset)
 
 
 def parse_args() -> argparse.Namespace:
@@ -565,14 +841,38 @@ def parse_args() -> argparse.Namespace:
             "'coverage' is required for UE-style load-only runtime switching."
         ),
     )
-    parser.add_argument("--force", action="store_true", help="Recompile even if output bins already exist.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Recompile every variant, ignoring the content-addressed compile cache.",
+    )
+    parser.add_argument(
+        "--no-debug-info",
+        action="store_true",
+        help=(
+            "Drop -Zi entirely: ~30%% faster per compile and no PDBs, at the cost of "
+            "shader debugging. Changes the L1 hash, so these bins are not "
+            "interchangeable with a debug cook."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    run_pt_shader_precompile(args.shader_api, force=args.force, global_preset=args.global_preset)
-    return 0
+    apis = (
+        ["d3d12"]
+        if args.shader_api == "d3d12"
+        else ["vulkan"]
+        if args.shader_api == "vulkan"
+        else ["d3d12", "vulkan"]
+    )
+    return cook(
+        apis,
+        force=args.force,
+        global_preset=args.global_preset,
+        debug_info=not args.no_debug_info,
+    )
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <assets/loader/ShaderCompilerUtils.h>
+#include <assets/loader/ShaderDependencyIndex.h>
 #include <assets/loader/ShaderKey.h>
 
 namespace caustica
@@ -41,7 +42,7 @@ class PTPipelineVariant
 
         void                                    setPath(const std::filesystem::path & path);
         void                                    fromMaterialPermutation(const std::string & shortUniqueDebugID, const std::vector<caustica::ShaderMacro> & macros, const struct MaterialShaderPermutation & msp);
-        void                                    resolveCacheIdentity(class PathTracingShaderCompiler & compiler, std::filesystem::file_time_type lastModifiedSourceCode);
+        void                                    resolveCacheIdentity(class PathTracingShaderCompiler & compiler);
         void                                    compileIfNeeded();
         void                                    resetShaderLibrary();
         void                                    loadShaderLibraryIfNeeded(class PathTracingShaderCompiler & compiler);
@@ -63,13 +64,13 @@ public:
     [[nodiscard]] bool                      isReady() const { return m_pipeline != nullptr && m_shaderTable != nullptr; }
 
 private:
-    void                                    updateStart(std::filesystem::file_time_type lastModifiedSourceCode);
+    void                                    updateStart();
     void                                    updateFinalize();
     void                                    rebuildShaderTableOnly();
     int64_t                                 getVersion() const { return m_localVersion; }
 
 private:
-    void                                    compileIfNeededEnqueue(std::filesystem::file_time_type lastModifiedSourceCode);
+    void                                    compileIfNeededEnqueue();
     void                                    resetPipeline();
 
 private:
@@ -171,6 +172,12 @@ private:
                                         getFs()                             { return m_shadersFS; }
     std::mutex &                        getMutex()                          { return m_mutex; }
 
+    caustica::ShaderDependencyIndex &   getDependencyIndex()                { return m_dependencyIndex; }
+    // Lazily loads the cook's manifest. Safe to call every update.
+    void                                ensureDependencyIndexReady();
+    // Persist what the shaders compiled in this batch were built from.
+    void                                recordCompiledDependencies();
+
     void                                enqueueShaderPermutation(PTPipelineVariant::ShaderPermutation* perm);
 
     bool                                registerShortUniqueDebugID(const std::string & id);
@@ -200,7 +207,10 @@ private:
     std::vector<HitGroupInfo>                       m_perSubInstanceHitGroup;
     std::unordered_map<int, HitGroupInfo>           m_uniqueHitGroups;
 
-    std::optional<std::filesystem::file_time_type>  m_lastUpdatedSourceTimestamp;
+    // Per-shader staleness, from the include closure the cook recorded. Replaces the
+    // whole-tree timestamp that used to invalidate every RT shader on any edit.
+    caustica::ShaderDependencyIndex                 m_dependencyIndex;
+    bool                                            m_dependencyIndexReady = false;
 
     bool                                            m_verbose = false;
     bool                                            m_enableNVAPIShaderExtension = false;
@@ -217,5 +227,4 @@ private:
 
     // Auto-reload via polling
     float                                           m_autoReloadPollIntervalSeconds = 0.5f;
-    std::optional<std::filesystem::file_time_type>  m_cachedSourceTimestamp;
 };

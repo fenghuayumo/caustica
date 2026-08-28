@@ -128,8 +128,7 @@ void PTPipelineVariant::ShaderPermutation::loadShaderLibraryIfNeeded(PathTracing
 }
 
 void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
-    PathTracingShaderCompiler& compiler,
-    std::filesystem::file_time_type lastModifiedSourceCode)
+    PathTracingShaderCompiler& compiler)
 {
     usCompileError = "";
     usCompileCmdLine = "";
@@ -162,9 +161,12 @@ void PTPipelineVariant::ShaderPermutation::resolveCacheIdentity(
     const bool compiledBlobAvailable = compiler.getFs()->fileExists(packVfsPath)
         || (std::filesystem::exists(compiledFullPath)
             && std::filesystem::is_regular_file(compiledFullPath));
-    const bool diskBlobUpToDate = ShaderCompilerUtils::isCompiledShaderUpToDate(
-        compiledFullPath,
-        lastModifiedSourceCode);
+    // Per-shader check against the include closure the cook recorded. The blob is
+    // current only if every file this shader actually includes still hashes to what
+    // it did when the blob was produced, so editing an unrelated shader no longer
+    // invalidates it.
+    const bool diskBlobUpToDate =
+        compiler.getDependencyIndex().isUpToDate(cacheKey.effectiveCacheHashHex());
 
     if (compiledBlobAvailable && (!compiler.canCompileShaders() || diskBlobUpToDate))
     {
@@ -254,7 +256,7 @@ void PTPipelineVariant::resetPipeline()
     m_localVersion = -1;
 }
 
-void PTPipelineVariant::compileIfNeededEnqueue(std::filesystem::file_time_type lastModifiedSourceCode)
+void PTPipelineVariant::compileIfNeededEnqueue()
 {
     std::shared_ptr<PathTracingShaderCompiler> & baker = m_lockedCompiler; assert( baker != nullptr );
 
@@ -285,7 +287,7 @@ void PTPipelineVariant::compileIfNeededEnqueue(std::filesystem::file_time_type l
     for( ShaderPermutation * permutation : currentList )
     {
         const std::string previousHashHex = permutation->cacheKey.cacheHashHex;
-        permutation->resolveCacheIdentity(*baker, lastModifiedSourceCode);
+        permutation->resolveCacheIdentity(*baker);
         if (permutation->cacheKey.cacheHashHex != previousHashHex || !permutation->usCompileCmdLine.empty())
             resetPipelineNeeded = true;
         baker->enqueueShaderPermutation(permutation);
@@ -300,7 +302,7 @@ void PTPipelineVariant::compileIfNeededEnqueue(std::filesystem::file_time_type l
 //    std::shared_ptr<PathTracingShaderCompiler>& baker = m_lockedCompiler; assert(baker != nullptr);
 //}
 
-void PTPipelineVariant::updateStart(std::filesystem::file_time_type lastModifiedSourceCode)
+void PTPipelineVariant::updateStart()
 {
     assert( m_lockedCompiler == nullptr );
 
@@ -336,7 +338,7 @@ void PTPipelineVariant::updateStart(std::filesystem::file_time_type lastModified
     m_exportMiss = true; // it looks like not exporting a miss is a bug or considered a bug - need to verify
     assert(foundExportAnyHitDependency); // any changes in the way USE_NVAPI_HIT_OBJECT_EXTENSION is used?
 
-    compileIfNeededEnqueue(lastModifiedSourceCode);
+    compileIfNeededEnqueue();
 }
 
 void PTPipelineVariant::rebuildShaderTableOnly()
@@ -638,9 +640,40 @@ void PathTracingShaderCompiler::enqueueShaderPermutation(PTPipelineVariant::Shad
     m_parallelCompileListAll.push_back(perm);
 }
 
+void PathTracingShaderCompiler::ensureDependencyIndexReady()
+{
+    if (m_dependencyIndexReady)
+        return;
+
+    m_dependencyIndex.initialize(
+        m_compilerConfig.ShaderBinariesPath / "deps.manifest",
+        m_compilerConfig.ShadersPath);
+    m_dependencyIndex.load();
+    m_dependencyIndexReady = true;
+}
+
+void PathTracingShaderCompiler::recordCompiledDependencies()
+{
+    for (const auto& [_, permutation] : m_parallelCompileListUnique)
+    {
+        if (permutation->usCompileError.empty() && !permutation->usCompileCmdLine.empty())
+        {
+            m_dependencyIndex.record(
+                permutation->cacheKey.effectiveCacheHashHex(),
+                permutation->shaderSrcFileName.generic_string());
+        }
+    }
+    m_dependencyIndex.save();
+}
+
 void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* sceneData, unsigned int subInstanceCount, const std::function<void(std::vector<caustica::ShaderMacro>& macros)>& globalMacrosGetter, bool forceShaderReload)
 {
-    // Auto-reload: poll for source file changes
+    ensureDependencyIndexReady();
+
+    // Auto-reload: poll for source file changes.
+    // Only the files the RT shaders actually include count: the previous whole-tree
+    // timestamp fired for any shader edit, so touching a post-process or denoiser
+    // shader forced a full RT recompile and PSO rebuild.
     if (m_compilerConfig.canCompile() && !forceShaderReload && !m_variants.empty())
     {
         static auto lastPollTime = std::chrono::steady_clock::now();
@@ -650,22 +683,13 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         if (elapsed >= m_autoReloadPollIntervalSeconds)
         {
             lastPollTime = now;
-            auto currentTimestamp = getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath);
-            
-            if (currentTimestamp.has_value())
+            const std::vector<std::string> changedSources =
+                m_dependencyIndex.takeChangedSources();
+            if (!changedSources.empty())
             {
-                if (!m_cachedSourceTimestamp.has_value())
-                {
-                    // First poll - just cache the timestamp
-                    m_cachedSourceTimestamp = currentTimestamp;
-                }
-                else if (*currentTimestamp != *m_cachedSourceTimestamp)
-                {
-                    // Source files changed - trigger reload
-                    m_cachedSourceTimestamp = currentTimestamp;
-                    forceShaderReload = true;
-                    caustica::info("RT shader source changes detected - triggering hot reload...");
-                }
+                forceShaderReload = true;
+                for (const std::string& source : changedSources)
+                    caustica::info("RT shader source '%s' changed - triggering hot reload...", source.c_str());
             }
         }
     }
@@ -811,12 +835,6 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         }
 
         m_uniqueHitGroupsFrozen = true;
-        if (!m_lastUpdatedSourceTimestamp.has_value())
-        {
-            m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
-                ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
-                : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
-        }
         return;
     }
 
@@ -889,19 +907,9 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
         ensureDirectoryExists(m_compilerConfig.ShaderBinariesPath);
     }
 
-    std::optional<std::filesystem::file_time_type> a = m_compilerConfig.canCompile()
-        ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
-        : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
-    // let's not track externals for perf reasons but here's the code in case it's needed
-    //std::optional<std::filesystem::file_time_type> b = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes1);
-    //std::optional<std::filesystem::file_time_type> c = GetLatestModifiedTimeRecursive(m_compilerConfig.ShadersPathExternalIncludes2);
-    m_lastUpdatedSourceTimestamp = a;
-
-    if (!m_lastUpdatedSourceTimestamp.has_value())
-    {
-        caustica::error("There is something wrong with the shader source path or logic - unable to load or dynamically compile shaders");
-        return;
-    }
+    // Re-read source contents once per update; individual staleness checks then hit
+    // the memoized hashes rather than the filesystem.
+    m_dependencyIndex.invalidateContentCache();
 
     do // in case of compile errors allow user to modify and attempt recompile
     {
@@ -917,7 +925,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
             {
                 updateQueue.push_back(variant);
                 variant->resetPipeline();
-                variant->updateStart(*m_lastUpdatedSourceTimestamp);
+                variant->updateStart();
             }
         }
 
@@ -992,6 +1000,7 @@ void PathTracingShaderCompiler::update(const caustica::scene::SceneRenderData* s
                 m_parallelCompileListAll.size(), updateQueue.size());
 
         progressPreparing.Set(100);
+        recordCompiledDependencies();
         m_parallelCompileListAll.clear();
         m_parallelCompileListUnique.clear();
 
@@ -1093,17 +1102,8 @@ void PathTracingShaderCompiler::buildPipelines(
     if (missing.empty())
         return;
 
-    if (!m_lastUpdatedSourceTimestamp.has_value())
-    {
-        m_lastUpdatedSourceTimestamp = m_compilerConfig.canCompile()
-            ? getLatestModifiedTimeDirectoryRecursive(m_compilerConfig.ShadersPath)
-            : std::optional<std::filesystem::file_time_type>(std::filesystem::file_time_type::min());
-    }
-    if (!m_lastUpdatedSourceTimestamp.has_value())
-    {
-        caustica::error("PathTracingShaderCompiler: cannot build pipelines — no shader timestamp");
-        return;
-    }
+    ensureDependencyIndexReady();
+    m_dependencyIndex.invalidateContentCache();
 
     if (m_version < 0)
         m_version = 0;
@@ -1115,7 +1115,7 @@ void PathTracingShaderCompiler::buildPipelines(
         progressMissing.start("Preparing ray tracing...");
 
     for (const std::shared_ptr<PTPipelineVariant>& variant : missing)
-        variant->updateStart(*m_lastUpdatedSourceTimestamp);
+        variant->updateStart();
 
     std::atomic_int progressCounterCompleted = 0;
     const int progressTotal = (int)m_parallelCompileListUnique.size();
@@ -1161,6 +1161,7 @@ void PathTracingShaderCompiler::buildPipelines(
         }
     }
 
+    recordCompiledDependencies();
     m_parallelCompileListAll.clear();
     m_parallelCompileListUnique.clear();
 

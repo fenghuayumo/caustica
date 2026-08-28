@@ -389,6 +389,15 @@ if (CAUSTICA_WITH_TINYEXR)
     target_compile_definitions(causAssets PUBLIC CAUSTICA_WITH_TINYEXR)
 endif()
 
+if (BUILD_TESTING)
+    add_executable(causShaderDependencyIndexTests tests/ShaderDependencyIndexTests.cpp)
+    target_link_libraries(causShaderDependencyIndexTests PRIVATE causAssets)
+    if (MSVC)
+        target_compile_options(causShaderDependencyIndexTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causShaderDependencyIndexTests COMMAND causShaderDependencyIndexTests)
+endif()
+
 # ── causScene ─────────────────────────────────────────────────────────────
 # Scene graph, scene management, camera.
 
