@@ -1,6 +1,11 @@
 #include <core/log.h>
+#include <chrono>
 #include <cstdio>
 #include <cstdarg>
+#include <cstdlib>
+#if _WIN32
+#include <share.h>
+#endif
 #include <iterator>
 #include <mutex>
 #include <utility>
@@ -31,6 +36,52 @@ namespace caustica
     static std::mutex g_LogMutex;
     static std::mutex g_CallbackMutex;
     
+    // Seconds since the first log line. Opt-in via CAUSTICA_LOG_TIMESTAMPS=1 so the
+    // default output format stays byte-identical for anything parsing it. Startup
+    // cost is otherwise invisible: most startup work logs nothing, and the one
+    // existing timestamped trace (sceneSwitchTrace) only starts at the first scene
+    // switch, well after device and pipeline bring-up.
+    bool timestampsEnabled()
+    {
+        static const bool enabled = []() {
+            const char* value = std::getenv("CAUSTICA_LOG_TIMESTAMPS");
+            return value != nullptr && value[0] != '\0' && value[0] != '0';
+        }();
+        return enabled;
+    }
+
+    double secondsSinceFirstLog()
+    {
+        static const auto origin = std::chrono::steady_clock::now();
+        return std::chrono::duration<double>(std::chrono::steady_clock::now() - origin).count();
+    }
+
+    // Optional file sink, enabled with CAUSTICA_LOG_FILE=<path>. Needed because
+    // initNativeConsole() freopen()s stdout onto CONOUT$, which silently detaches any
+    // redirection the launcher set up —so piping the process to a file captures only
+    // the lines emitted before the console is created, which is a small and
+    // misleading prefix of startup.
+    FILE* logFileSink()
+    {
+        static FILE* sink = []() -> FILE* {
+            const char* path = std::getenv("CAUSTICA_LOG_FILE");
+            if (path == nullptr || path[0] == '\0')
+                return nullptr;
+#if _WIN32
+            // Share for reading: fopen() denies all other access on Windows, which makes
+            // the log impossible to tail while the app is running — and startup traces
+            // are most useful exactly while you are waiting on startup.
+            return _fsopen(path, "w", _SH_DENYWR);
+#else
+            FILE* file = nullptr;
+            if (fopen_s(&file, path, "w") != 0)
+                return nullptr;
+            return file;
+#endif
+        }();
+        return sink;
+    }
+
     void DefaultCallback(Severity severity, const char* message)
     {
         const char* severityText = "";
@@ -46,7 +97,15 @@ namespace caustica
         }
 
         char buf[g_MessageBufferSize];
-        snprintf(buf, std::size(buf), "%s: %s", severityText, message);
+        if (timestampsEnabled())
+        {
+            snprintf(buf, std::size(buf), "[%9.3fs] %s: %s",
+                secondsSinceFirstLog(), severityText, message);
+        }
+        else
+        {
+            snprintf(buf, std::size(buf), "%s: %s", severityText, message);
+        }
 
         {
             std::lock_guard<std::mutex> lockGuard(g_LogMutex);
@@ -128,6 +187,36 @@ namespace caustica
 		std::lock_guard<std::mutex> lockGuard(g_CallbackMutex);
 		return g_Callback ? g_Callback : Callback(&DefaultCallback);
 	}
+
+    // Deliberately outside the callback chain. ImGui_Console installs a callback that
+    // does not chain to the previous one, so from the moment the in-game console is
+    // created every message goes only into its ring buffer —stdout, OutputDebugString
+    // and DebugView all go silent. That makes startup and shutdown impossible to
+    // diagnose from a terminal, so the file sink is fed here instead.
+    static void writeFileSink(Severity severity, const char* message)
+    {
+        FILE* sink = logFileSink();
+        if (sink == nullptr)
+            return;
+
+        const char* severityText = "";
+        switch (severity)
+        {
+        case Severity::Debug: severityText = "DEBUG"; break;
+        case Severity::Info: severityText = "INFO"; break;
+        case Severity::Warning: severityText = "WARNING"; break;
+        case Severity::Error: severityText = "ERROR"; break;
+        case Severity::Fatal: severityText = "FATAL ERROR"; break;
+        default: break;
+        }
+
+        std::lock_guard<std::mutex> lockGuard(g_LogMutex);
+        if (timestampsEnabled())
+            fprintf(sink, "[%9.3fs] %s: %s\n", secondsSinceFirstLog(), severityText, message);
+        else
+            fprintf(sink, "%s: %s\n", severityText, message);
+        fflush(sink);
+    }
     
     void enableOutputToMessageBox(bool enable)
     {
@@ -277,6 +366,8 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
+        writeFileSink(severity, buffer);
+
         snapshotCallback()(severity, buffer);
 
         va_end(args);
@@ -291,6 +382,8 @@ namespace caustica
         va_list args;
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
+
+        writeFileSink(Severity::Debug, buffer);
 
         snapshotCallback()(Severity::Debug, buffer);
 
@@ -307,6 +400,8 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
+        writeFileSink(Severity::Info, buffer);
+
         snapshotCallback()(Severity::Info, buffer);
 
         va_end(args);
@@ -321,6 +416,8 @@ namespace caustica
         va_list args;
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
+
+        writeFileSink(Severity::Warning, buffer);
 
         snapshotCallback()(Severity::Warning, buffer);
 
@@ -337,6 +434,8 @@ namespace caustica
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
 
+        writeFileSink(Severity::Error, buffer);
+
         snapshotCallback()(Severity::Error, buffer);
 
         va_end(args);
@@ -348,6 +447,8 @@ namespace caustica
         va_list args;
         va_start(args, fmt);
         vsnprintf(buffer, std::size(buffer), fmt, args);
+
+        writeFileSink(Severity::Fatal, buffer);
 
         snapshotCallback()(Severity::Fatal, buffer);
 
