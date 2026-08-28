@@ -551,8 +551,6 @@ void ExtractMaterialSnapshots(
         snapshot.subsurface = material->subsurface;
         snapshot.enableHair = material->enableHair;
         snapshot.hair = material->hair;
-        material->fillConstantBuffer(snapshot.constants, false);
-        material->fillConstantBuffer(snapshot.bindlessConstants, true);
         out.materialSnapshotIndex.emplace(
             snapshot.id,
             static_cast<uint32_t>(out.materialSnapshots.size()));

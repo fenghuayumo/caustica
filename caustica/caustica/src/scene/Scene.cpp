@@ -29,7 +29,6 @@
 #include <variant>
 
 using namespace caustica::math;
-#include <shaders/material_cb.h>
 #include <shaders/bindless.h>
 
 using namespace caustica;

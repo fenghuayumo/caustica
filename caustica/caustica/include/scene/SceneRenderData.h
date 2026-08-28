@@ -7,7 +7,6 @@
 #include <scene/SceneContent.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneTypes.h>
-#include <shaders/material_cb.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -195,8 +194,6 @@ namespace caustica::scene
         Material::SubsurfaceParams subsurface;
         bool enableHair = false;
         Material::HairParams hair;
-        MaterialConstants constants = {};
-        MaterialConstants bindlessConstants = {};
     };
 
     // Deep-copied only when structure is extracted. The immutable blob may be shared by

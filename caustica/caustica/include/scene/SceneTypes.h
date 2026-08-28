@@ -12,7 +12,6 @@
 #include <unordered_map>
 #include <vector>
 
-struct MaterialConstants;
 struct LightConstants;
 
 namespace Json
@@ -160,7 +159,6 @@ namespace caustica
         int materialID = 0; // dense scene-list index (legacy); pick uses StandardMaterial::gpuDataIndex
 
         virtual ~Material() = default;
-        void fillConstantBuffer(struct MaterialConstants& constants, bool useResourceDescriptorHeapBindless = false) const;
         bool setProperty(const std::string& name, const dm::float4& value);
 
     private:
