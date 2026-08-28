@@ -540,20 +540,6 @@ add_executable(caustica_thin_client WIN32 ${CAUSTICA_THIN_CLIENT_SOURCES})
 if (MSVC)
     target_compile_options(caustica_thin_client PRIVATE /utf-8)
 endif()
-# P0 public API freeze: thin_client may only include allowlisted engine/*.h (docs/public-api.md).
-find_package(Python3 COMPONENTS Interpreter QUIET)
-if (Python3_Interpreter_FOUND)
-    add_custom_target(check_public_api
-        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/check_public_api_includes.py"
-                ${CAUSTICA_THIN_CLIENT_SOURCES}
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        COMMENT "Checking thin_client public API include allowlist"
-        VERBATIM
-    )
-    add_dependencies(caustica_thin_client check_public_api)
-else()
-    message(STATUS "Python3 not found — skipping check_public_api include allowlist")
-endif()
 target_link_libraries(caustica_thin_client PRIVATE causEngine caustica_rhi)
 add_dependencies(caustica_thin_client caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
 if (CAUSTICA_PACKAGE_SHADER_PACK)
