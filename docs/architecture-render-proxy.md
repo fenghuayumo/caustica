@@ -28,7 +28,7 @@ PathTracerSettings   (already App resource)  one-shot clear
 4. Operate on `LightRenderProxy` / `LightData` directly — **no** `asComponent()` glue back to ECS.
 5. ECS lights are UE-style typed components (`DirectionalLightComponent`, `SpotLightComponent`, `PointLightComponent`, `EnvironmentLightComponent`); Extract packs them into unified `LightRenderProxy` + `LightData` for the GPU thread.
 6. Game-thread scene-load / editor mutation may still touch ECS; that is not the render path.
-7. Structure-only republish (runtime drag-drop import) must not stomp `CameraSnapshot` — either pass `FrameExtractInputs`, preserve a same-frame frame extract, or leave `camera.valid == false` so WorldRenderer skips apply.
+7. Structure-only republish (runtime drag-drop import) must not stomp `ActiveCameraRenderProxy` — either pass `FrameExtractInputs`, preserve a same-frame frame extract, or leave `camera.valid == false` so WorldRenderer skips apply.
 
 ## What is extracted today
 
@@ -39,7 +39,7 @@ PathTracerSettings   (already App resource)  one-shot clear
 - `SkinnedMeshRenderProxy` — joint matrices / debug lines
 - `LightRenderProxy` — color, `LightData`, world transform (no shadow maps)
 - `CameraRenderProxy` — every scene camera and its projection/exposure data
-- `ActiveCameraRenderProxy` (`CameraSnapshot` compatibility alias) — resolved free/selected camera pose, FOV, clipping, and intrinsics
+- `ActiveCameraRenderProxy` — resolved free/selected camera pose, FOV, clipping, and intrinsics
 - `GaussianSplatRenderProxy` — entity, enable state, and object-to-world transform
 - `RenderSettingsSnapshot` — `PathTracerSettings` copy, invalidation, picking, splat temporal reset, scene time
 - Immutable material, geometry, and mesh resource snapshots when scene structure changes
@@ -61,8 +61,8 @@ Frame rendering already uses light proxies + cached splat transforms; do not mov
 
 Game/render split above is necessary but not sufficient for parallel GPU recording. Queue submit, GC, and deferred command-list rules live in [architecture-rhi-threading.md](architecture-rhi-threading.md).
 
-TaskRuntime + LoadSession streaming (P1–P3):
-[ADR 0001](adr/0001-task-runtime-multithreading.md).
+TaskRuntime + LoadSession streaming: [ADR 0001](adr/0001-task-runtime-multithreading.md).
+TaskGraph + concurrent system execution: [ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
 
 ## App scene-edit API
 
@@ -115,6 +115,30 @@ Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRende
 Official sample (no editor): `examples/cpp/thin_client` → target `caustica_thin_client`
 (`#include <caustica.h>` + Simulation systems). Frozen surface: [public-api.md](public-api.md).
 
+## Concurrent systems
+
+`First` / `preUpdate` / `update` / `PostUpdate` / `Last` run their systems concurrently on
+TaskRuntime workers when it is provably safe. `Startup`, `Extract` and `render` stay serial.
+Hosts write no threading code: the scheduler reads each system's **parameter list** and lets two
+systems overlap only when neither writes what the other reads or writes. See
+[ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
+
+| Parameter | Declares |
+| --- | --- |
+| `Query<const T, U>` | read `T`, write `U` (filters `With` / `Without` / `Changed` / `Added` are reads) |
+| `Res<T>` / `ResMut<T>` | read / write resource `T` |
+| `Commands` | deferred; gets its own buffer, merged in plan order after the phase |
+| `EntityWorld` or `SystemContext&` | **exclusive** — reaches everything, so it runs alone |
+
+`EntityWorld` is the convenient way to spawn and move things, but it opts a system out of
+parallelism. That is the right default (it can touch anything), so take it when you want it and
+reach for `Query` / `Res` / `ResMut` / `Commands` in the systems that run every frame over many
+entities. Conflicting systems are ordered by the plan, so parallel and `--serialSystems` runs
+produce identical results — turning parallelism off only changes timing.
+
+Inspect a phase with `app.schedules().describePlan(AppSchedule::update)`; `planInfo()` reports
+system / exclusive / edge counts and max parallel width.
+
 ## Extract schedule (P2)
 
 Leaf Extract is Bevy-style schedule composition on `AppSchedule::Extract`
@@ -152,18 +176,18 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 
 | Item | Status |
 | --- | --- |
-| OO mesh/camera leaf classes | Removed; meshes/cameras are ECS components + Extract proxies |
-| `SceneRenderCommandQueue` | Removed (Extract + RenderThread dispatch is the sync path) |
 | Async structure GPU build | Committed serve + RT enqueue + double-buffered TLAS/BLAS/SBT (retired handles; no structure `waitForIdle`) |
-| Parallel RHI command-list recording | Implemented with `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
-| TaskRuntime + Logic→RT enqueue | Landed — `caustica::task`, sole `EnqueueRenderCommand*` → `Affinity::Render`; JobSystem/ThreadPool removed — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
-| LoadSession amortized streaming | P3 landed — `LoadSession` / `tickLoadSession`; present during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| Parallel RHI command-list recording | `FrameCommandContext` + GraphBuilder waves; see [architecture-rhi-threading.md](architecture-rhi-threading.md) |
+| TaskRuntime + Logic→RT enqueue | `caustica::task`; sole `EnqueueRenderCommand*` → `Affinity::Render` — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| LoadSession amortized streaming | `LoadSession` / `tickLoadSession`; present continues during GpuStreaming — [ADR 0001](adr/0001-task-runtime-multithreading.md) |
+| Concurrent ECS systems | Access derived from system parameters; conflict-aware parallel executor on the simulation phases — [ADR 0003](adr/0003-taskgraph-parallel-ecs.md) |
+| TaskGraph | `task::TaskEvent` / `task::TaskGraph` DAG authoring over TaskRuntime — [ADR 0003](adr/0003-taskgraph-parallel-ecs.md) |
 | SceneSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Apps use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
-| Camera wrappers | `SceneCameraController` removed; interactive side effects live on `CameraController::bindSideEffects` |
+| Camera wrappers | Interactive side effects live on `CameraController::bindSideEffects` |
 
 ## File map
 
@@ -174,6 +198,9 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | Extract schedule | `caustica/caustica/src/engine/RenderExtractPlugin.cpp` |
 | Snapshot buffer | `caustica/caustica/include/scene/SceneRenderSnapshot.h` |
 | Frame settings binding | `PathTracingContext::activeSettings()` / `WorldRenderer::render()` |
+| Schedules + parallel plan | `caustica/caustica/include/engine/AppSchedules.h` |
+| System access derivation | `caustica/caustica/include/ecs/SystemAccess.h` |
+| TaskGraph | `caustica/caustica/include/core/task/TaskGraph.h` |
 
 ## Why not a “render ECS”
 

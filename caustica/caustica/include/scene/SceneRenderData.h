@@ -132,9 +132,6 @@ namespace caustica::scene
         dm::float2 intrinsicsViewport = { 0.f, 0.f };
     };
 
-    // Backward-compatible name used by older call sites.
-    using CameraSnapshot = ActiveCameraRenderProxy;
-
     // One ECS GaussianSplatComponent + GlobalTransform, extracted for the render world.
     // GPU pass ownership stays in SceneGaussianSplatPasses and is resolved by entity.
     struct GaussianSplatRenderProxy

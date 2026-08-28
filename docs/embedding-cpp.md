@@ -120,6 +120,16 @@ Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
 `setScene` + `entityWorld` / `isSceneLoaded`. CameraController and path-tracer
 settings are App resources — use `RenderSessionApi` / `CameraApi`.
 
+The parameter list is also what makes systems run in parallel: the scheduler derives each
+system's reads and writes from it and overlaps systems that cannot conflict, with no threading
+code on your side. `Query<const T, U>` reads `T` and writes `U`; `Res<T>` / `ResMut<T>` do the
+same for resources; `Commands` is deferred and gets its own buffer. `EntityWorld` and
+`SystemContext&` can reach anything, so a system taking either runs alone — fine for setup and
+occasional work, worth avoiding in per-frame systems that touch many entities. Ordering between
+conflicting systems is fixed by the plan, so results do not depend on thread timing; run with
+`--serialSystems` to rule parallelism out while debugging. Details in
+[ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
+
 An `update` system with no explicit set joins
 `system_set::Simulation`. The per-frame order is:
 

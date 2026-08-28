@@ -129,7 +129,9 @@ void then(TaskHandle prerequisite, TaskHandle subsequent);
 void wait(TaskHandle);
 [[nodiscard]] bool poll(TaskHandle);
 
-void helpOnce();
+// Runs one queued Any-affinity task on the calling thread. False when the queue
+// was empty, so callers can fall back to blocking instead of spinning.
+bool helpOnce();
 
 // --- Domain pumps ----------------------------------------------------------
 void setRenderWake(std::function<void()> wake);

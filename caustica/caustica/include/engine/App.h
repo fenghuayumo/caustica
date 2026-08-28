@@ -100,6 +100,70 @@ decltype(auto) makeSystemParameter(SystemContext& context)
     return SystemParameter<RawParameter>::make(context);
 }
 
+// Data access implied by each system parameter, mirroring the SystemParameter
+// specializations above. Anything that hands out the whole world is exclusive;
+// the scheduler then runs it alone. See ADR 0003.
+template<typename T>
+struct SystemParameterAccess
+{
+    static void apply(ecs::SystemAccess& access) { access.exclusive = true; }
+};
+
+template<typename T>
+struct SystemParameterAccess<Res<T>>
+{
+    static void apply(ecs::SystemAccess& access) { access.template readResource<T>(); }
+};
+
+template<typename T>
+struct SystemParameterAccess<ResMut<T>>
+{
+    static void apply(ecs::SystemAccess& access) { access.template writeResource<T>(); }
+};
+
+template<>
+struct SystemParameterAccess<Commands>
+{
+    static void apply(ecs::SystemAccess& access) { access.deferred = true; }
+};
+
+template<>
+struct SystemParameterAccess<SystemContext>
+{
+    static void apply(ecs::SystemAccess& access) { access.exclusive = true; }
+};
+
+template<>
+struct SystemParameterAccess<EntityWorld>
+{
+    static void apply(ecs::SystemAccess& access) { access.exclusive = true; }
+};
+
+template<typename... Components>
+struct SystemParameterAccess<ecs::Query<Components...>>
+{
+    static void apply(ecs::SystemAccess& access)
+    {
+        (ecs::detail::applyQueryTermAccess<Components>(access), ...);
+    }
+};
+
+template<typename Tuple, std::size_t... Indices>
+ecs::SystemAccess deriveSystemAccess(std::index_sequence<Indices...>)
+{
+    ecs::SystemAccess access = ecs::SystemAccess::makeParallel();
+    (SystemParameterAccess<std::remove_cvref_t<std::tuple_element_t<Indices, Tuple>>>::apply(access), ...);
+    return access;
+}
+
+template<typename F>
+ecs::SystemAccess makeTypedSystemAccess()
+{
+    using Callable = std::remove_cvref_t<F>;
+    using Arguments = typename SystemCallableTraits<decltype(&Callable::operator())>::ArgsTuple;
+    return deriveSystemAccess<Arguments>(std::make_index_sequence<std::tuple_size_v<Arguments>>{});
+}
+
 template<typename F, typename Tuple, std::size_t... Indices>
 void invokeTypedSystem(F& system, SystemContext& context, std::index_sequence<Indices...>)
 {
@@ -240,6 +304,8 @@ public:
     [[nodiscard]] ecs::World& world() { return m_world; }
     [[nodiscard]] const ecs::World& world() const { return m_world; }
 
+    // Untyped systems see the whole SystemContext, so they are registered as
+    // exclusive and never overlap with anything else in their phase.
     App& addSystem(
         AppSchedule schedule,
         SystemLabel label,
@@ -252,14 +318,17 @@ public:
         return addSystem(schedule, systemLabel<Label>(), std::move(system), std::move(ordering));
     }
 
+    // Typed systems declare their access through their parameter list
+    // (Res / ResMut / Query / Commands), which lets the scheduler overlap them.
     template<typename Label, class F>
     App& addSystem(AppSchedule schedule, F&& system, AppSystemOrdering ordering = {})
         requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
     {
-        return addSystem(
+        return addSystemWithAccess(
             schedule,
             systemLabel<Label>(),
             detail::makeTypedSystem(std::forward<F>(system)),
+            detail::makeTypedSystemAccess<F>(),
             std::move(ordering));
     }
 
@@ -273,8 +342,8 @@ public:
     App& addSystemAfter(AppSchedule schedule, F&& system)
         requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
     {
-        return addSystemAfter<Label, AfterLabel>(
-            schedule, detail::makeTypedSystem(std::forward<F>(system)));
+        return addSystem<Label>(
+            schedule, std::forward<F>(system), AppSystemOrdering{}.runAfter<AfterLabel>());
     }
 
     template<typename Label, typename BeforeLabel>
@@ -287,8 +356,8 @@ public:
     App& addSystemBefore(AppSchedule schedule, F&& system)
         requires (!std::is_convertible_v<std::decay_t<F>, SystemFn>)
     {
-        return addSystemBefore<Label, BeforeLabel>(
-            schedule, detail::makeTypedSystem(std::forward<F>(system)));
+        return addSystem<Label>(
+            schedule, std::forward<F>(system), AppSystemOrdering{}.runBefore<BeforeLabel>());
     }
     void runSchedule(AppSchedule schedule, SystemContext& context);
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
@@ -394,6 +463,16 @@ protected:
     ecs::World m_world;
 
 private:
+    // Backing for the typed addSystem. Access is always derived from the system
+    // signature; hand-written access would silently un-declare what a system
+    // touches, so this is not part of the public surface.
+    App& addSystemWithAccess(
+        AppSchedule schedule,
+        SystemLabel label,
+        SystemFn system,
+        ecs::SystemAccess access,
+        AppSystemOrdering ordering);
+
     void syncWindowState();
     void updateWindowSize();
     void syncDpiScaleFromWindow();

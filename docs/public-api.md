@@ -36,6 +36,11 @@ Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`
 `Query<>`, `math` / `dm::` types, `PathTracerSettings` via `EngineApp::settings()`,
 `Handle` / `MeshHandle` / `MaterialHandle`.
 
+Simulation systems run concurrently when their parameter lists prove they cannot conflict — you
+never declare access by hand and there is no `addSystem` overload that accepts it. `Query` /
+`Res` / `ResMut` / `Commands` participate; `EntityWorld` and `SystemContext&` run exclusively.
+See [architecture-render-proxy.md](architecture-render-proxy.md#concurrent-systems).
+
 ## Not for applications
 
 | Area | Headers / APIs |

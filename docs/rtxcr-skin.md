@@ -53,9 +53,9 @@ these OpenPBR fields, so imported character materials enter the same RTXCR path.
 
 `Assets/rtxcr-character-validation.scene.json` is a project-owned synthetic
 character scene that exercises a closed skin mesh and static DOTS hair in one
-render. Regenerate its embedded glTF with
-`tools/generate_rtxcr_character_validation_asset.py`, then run
-`caustica/Python/Tests/rtxcr_character_render_test.py`. The test renders a
+render. Its glTF is checked in at
+`Assets/Models/rtxcr-character-validation/` (plus a `-skin-only` variant).
+Run `caustica/Python/Tests/rtxcr_character_render_test.py`: it renders a
 surface-only control, skin disabled, and skin plus hair, and requires both
 branches to have a measurable image-space effect.
 
@@ -63,21 +63,19 @@ The Claire character distributed with the upstream RTXCR sample is deliberately
 not bundled: its separate NVIDIA Asset License limits the mesh, textures, and
 groom to NVIDIA ACE use.
 
-For an authorized local RTXCR asset checkout, create a non-redistributing scene
-shim and launch it with:
+If you have an authorized local RTXCR asset checkout, `Assets/rtxcr-claire.external.scene.json`
+is a non-redistributing shim that references it. Point its `models` entries at your
+checkout (they are absolute paths) and launch:
 
 ```powershell
-python tools/prepare_rtxcr_claire_scene.py `
-  --rtxcr-assets "D:\path\to\RTXCR\assets"
 .\bin\caustica.exe --scene Assets/rtxcr-claire.external.scene.json
 ```
 
 The shim keeps all Claire geometry, textures, grooms, glasses, clothing, lights,
 and camera in the upstream asset directory. Curve materials without an explicit
-`NV_materials_hair` block use the RTXCR Far-Field defaults automatically. Use
-`--animated` to prepare the upstream animation scene; strand morph targets are
-currently imported as static DOTS, so static visual parity is the supported
-Claire validation path.
+`NV_materials_hair` block use the RTXCR Far-Field defaults automatically. Strand
+morph targets are imported as static DOTS, so static visual parity is the
+supported Claire validation path.
 
 ## Source layout
 

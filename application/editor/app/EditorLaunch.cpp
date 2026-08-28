@@ -152,6 +152,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     desc.height = createDesc.backBufferHeight;
     desc.headless = editor.cmdLine().noWindow;
     desc.dedicatedRenderThread = !editor.cmdLine().syncRender;
+    desc.parallelSystems = !editor.cmdLine().serialSystems;
     desc.debugDevice = editor.cmdLine().debug || createDesc.enableDebug;
     desc.adapter = createDesc.adapter;
     desc.useVulkan = editor.cmdLine().useVulkan;

@@ -133,6 +133,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         m_cmdLine.debug = m_desc.debugDevice;
         m_cmdLine.scene = m_desc.scene;
         m_cmdLine.syncRender = !m_desc.dedicatedRenderThread;
+        m_cmdLine.serialSystems = !m_desc.parallelSystems;
     }
 
     if (m_desc.device)
@@ -193,6 +194,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         .sceneCallbacks = m_desc.sceneCallbacks,
     }});
     m_app->setUseDedicatedRenderThread(m_desc.dedicatedRenderThread && !m_desc.headless);
+    m_app->schedules().setParallelExecutionEnabled(m_desc.parallelSystems);
 
     if (m_desc.finishStartup)
     {

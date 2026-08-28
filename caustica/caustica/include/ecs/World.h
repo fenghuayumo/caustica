@@ -9,6 +9,7 @@
 #include <entt/entity/registry.hpp>
 
 #include <functional>
+#include <iterator>
 #include <stdexcept>
 #include <typeindex>
 #include <type_traits>
@@ -77,6 +78,17 @@ public:
     {
         if (auto* changeDetection = getResource<ChangeDetection>())
             changeDetection->endFrame();
+    }
+
+    // Pre-creates the change-tick storage for T. The parallel schedule executor
+    // calls this on the scheduling thread for every component a system writes,
+    // so notifyComponentChanged<T> from a worker never inserts into the
+    // registry context while other workers read it.
+    template<typename T>
+    void ensureChangeTicks()
+    {
+        if (auto* changeDetection = getResource<ChangeDetection>())
+            changeDetection->ensureStorage<T>(m_registry);
     }
 
     template<typename T>
@@ -303,6 +315,18 @@ inline void CommandQueue::apply(World& world)
 inline void CommandQueue::clear()
 {
     m_commands.clear();
+}
+
+inline void CommandQueue::append(CommandQueue& other)
+{
+    if (other.m_commands.empty())
+        return;
+
+    m_commands.insert(
+        m_commands.end(),
+        std::make_move_iterator(other.m_commands.begin()),
+        std::make_move_iterator(other.m_commands.end()));
+    other.m_commands.clear();
 }
 
 template<typename T, typename... Args>

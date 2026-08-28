@@ -178,6 +178,13 @@ if (BUILD_TESTING)
     endif()
     add_test(NAME causTaskRuntimeTests COMMAND causTaskRuntimeTests)
 
+    add_executable(causTaskGraphTests tests/TaskGraphTests.cpp)
+    target_link_libraries(causTaskGraphTests PRIVATE causCore)
+    if (MSVC)
+        target_compile_options(causTaskGraphTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causTaskGraphTests COMMAND causTaskGraphTests)
+
     add_executable(causOpenPBRMaterialTests tests/OpenPBRMaterialTests.cpp)
     if (MSVC)
         target_compile_options(causOpenPBRMaterialTests PRIVATE /utf-8)
@@ -210,6 +217,15 @@ file(GLOB_RECURSE caus_ecs_headers include/ecs/*.h)
 add_library(causEcs INTERFACE ${caus_ecs_headers})
 caus_configure_interface(causEcs)
 target_link_libraries(causEcs INTERFACE causCore causMath EnTT::EnTT)
+
+if (BUILD_TESTING)
+    add_executable(causSystemSchedulerTests tests/SystemSchedulerTests.cpp)
+    target_link_libraries(causSystemSchedulerTests PRIVATE causEcs)
+    if (MSVC)
+        target_compile_options(causSystemSchedulerTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causSystemSchedulerTests COMMAND causSystemSchedulerTests)
+endif()
 
 # ── causAudio ─────────────────────────────────────────────────────────────
 # Audio engine. Depends only on math. Optional: XAudio2 on Windows.
@@ -456,6 +472,13 @@ if (BUILD_TESTING)
         target_compile_options(causHairDotsTests PRIVATE /utf-8)
     endif()
     add_test(NAME causHairDotsTests COMMAND causHairDotsTests)
+
+    add_executable(causSchedulePlanTests tests/SchedulePlanTests.cpp)
+    target_link_libraries(causSchedulePlanTests PRIVATE causEngine)
+    if (MSVC)
+        target_compile_options(causSchedulePlanTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causSchedulePlanTests COMMAND causSchedulePlanTests)
 endif()
 
 file(GLOB_RECURSE caus_render_headers include/render/*.h)

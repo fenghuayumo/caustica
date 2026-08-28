@@ -37,6 +37,9 @@ struct EngineAppDesc
     uint32_t height = 1080;
     bool headless = false;
     bool dedicatedRenderThread = true;
+    // Bevy-style concurrent system execution (ADR 0003). Turn off to make a
+    // schedule run one system at a time while debugging.
+    bool parallelSystems = true;
     bool debugDevice = false;
     caustica::rhi::AdapterSelector adapter;
     bool useVulkan = false;

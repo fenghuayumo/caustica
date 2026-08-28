@@ -687,9 +687,9 @@ bool poll(TaskHandle handle)
     return state && state->done.load(std::memory_order_acquire);
 }
 
-void helpOnce()
+bool helpOnce()
 {
-    detail::helpOnceInternal();
+    return detail::helpOnceInternal();
 }
 
 void setRenderWake(std::function<void()> wake)

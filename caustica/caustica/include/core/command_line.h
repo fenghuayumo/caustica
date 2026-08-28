@@ -66,6 +66,8 @@ struct CommandLineOptions
     int sceneSwitchTestInterval = 0;
     int sceneSwitchTestCount = 0;
     bool syncRender = false;
+    // Disables Bevy-style concurrent system execution (ADR 0003) for debugging.
+    bool serialSystems = false;
 
     // Generic console bootstrap. Repeat either option to apply multiple values
     // or commands after subsystems have registered their CVars.

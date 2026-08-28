@@ -68,6 +68,7 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
             ("sceneSwitchTest", "Auto-switch scenes every N render frames (render-thread path)", value(sceneSwitchTestInterval))
             ("sceneSwitchTestCount", "Exit after this many auto scene switches (0 = unlimited)", value(sceneSwitchTestCount))
             ("syncRender", "Run rendering on the main thread (disable async render thread)", value(syncRender))
+            ("serialSystems", "Run ECS systems one at a time instead of in parallel", value(serialSystems))
             ("set", "Set a console variable (repeatable): --set r.Name=value", value(consoleSets))
             ("exec", "Execute a console command (repeatable): --exec \"command args\"", value(consoleExec));
 

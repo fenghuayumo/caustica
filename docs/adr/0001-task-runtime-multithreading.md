@@ -1,11 +1,13 @@
 # ADR 0001: TaskRuntime + unified streaming / render threading
 
-| Field | Value |
-| --- | --- |
-| Status | **Accepted**; P1–P3 + R1/R2 + TaskRuntime domain pumps / LoadSession / sole Affinity::Render queue landed (R3 follow) |
-| Date | 2026-08-07 |
-| Deciders | Caustica engine |
-| Relates | [architecture-render-proxy.md](../architecture-render-proxy.md), [architecture-rhi-threading.md](../architecture-rhi-threading.md) |
+
+| Field    | Value                                                                                                                                                                                                                   |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status   | **Accepted**; P1–P3 + R1/R2 + TaskRuntime domain pumps / LoadSession / sole Affinity::Render queue landed (R3 follow)                                                                                                   |
+| Date     | 2026-08-07                                                                                                                                                                                                              |
+| Deciders | Caustica engine                                                                                                                                                                                                         |
+| Relates  | [ADR 0002](0002-frame-path-rhi-sync.md), [ADR 0003](0003-taskgraph-parallel-ecs.md), [architecture-render-proxy.md](../architecture-render-proxy.md), [architecture-rhi-threading.md](../architecture-rhi-threading.md) |
+
 
 ## Context
 
@@ -21,15 +23,18 @@ Before P1–P3 the engine already had Logic / Extract / RenderThread, triple-buf
 
 ### Current state (post P1–P3 + follow-ups)
 
-| Area | Status |
-| --- | --- |
-| Scheduler | `caustica::task` only; `JobSystem` / `ThreadPool` **deleted** |
-| Logic→RT | Sole public API `EnqueueRenderCommand*` → App private impl → **one** `Affinity::Render` queue (`RenderThread` pumps; `--syncRender` pumps on Logic) |
-| Open Scene | `LoadSession` + budgeted GpuStreaming; host busy = `LoadSession::isBusy()` |
-| Structure | Enqueue-only + committed-serve; sync flush **removed** |
-| Upload happy path | R1 `StreamingUploadBudget` (no per-batch `waitForIdle`) |
-| Remaining sync | Frame-path sync → **[ADR 0002](0002-frame-path-rhi-sync.md)** (fence/retire; not LoadSession glue) |
-| Next | ADR 0002 S1–S5; R3 free-threaded create (separate ADR + profiling) |
+
+| Area              | Status                                                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scheduler         | `caustica::task` only; `JobSystem` / `ThreadPool` **deleted**                                                                                       |
+| Logic→RT          | Sole public API `EnqueueRenderCommand*` → App private impl → **one** `Affinity::Render` queue (`RenderThread` pumps; `--syncRender` pumps on Logic) |
+| Open Scene        | `LoadSession` + budgeted GpuStreaming; host busy = `LoadSession::isBusy()`                                                                          |
+| Structure         | Enqueue-only + committed-serve; sync flush **removed**                                                                                              |
+| Upload happy path | R1 `StreamingUploadBudget` (no per-batch `waitForIdle`)                                                                                             |
+| Remaining sync    | Frame-path sync → **[ADR 0002](0002-frame-path-rhi-sync.md)** (fence/retire; not LoadSession glue)                                                  |
+| Built on         | DAG authoring + concurrent ECS systems → **[ADR 0003](0003-taskgraph-parallel-ecs.md)**                                                             |
+| Next              | ADR 0002 S1–S5; R3 free-threaded create (separate ADR + profiling)                                                                                  |
+
 
 ## Decision
 
@@ -55,16 +60,18 @@ GraphBuilder waves                   ← task deps (not a private JobSystem call
 
 Required semantics (implementation may start with mutex queues; lock-free steal is a later optimization):
 
-| Capability | Requirement |
-| --- | --- |
-| Launch | `launch(TaskDesc) → TaskHandle` |
-| Dependencies | prerequisite / subsequent (or equivalent fence chaining) |
-| Pipe | tasks on the same `Pipe` run serially in submission order |
-| Priority | at least `High` / `Normal` / `Background` (frame record must not starve under load decode) |
-| Affinity | `Any` \| `Logic` (`pumpLogic`) \| `Render` (`pumpRender`) \| `IO` (dedicated worker) |
-| Wait / poll | `wait(handle)`, `poll(handle)`, context/group wait |
-| Generation | `FrameGen` / `LoadGen` so abandoned work can be discarded |
-| Observability | `snapshotStats()` queue depths + LoadSession phase in editor Debugging panel |
+
+| Capability    | Requirement                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| Launch        | `launch(TaskDesc) → TaskHandle`                                                            |
+| Dependencies  | prerequisite / subsequent (or equivalent fence chaining)                                   |
+| Pipe          | tasks on the same `Pipe` run serially in submission order                                  |
+| Priority      | at least `High` / `Normal` / `Background` (frame record must not starve under load decode) |
+| Affinity      | `Any` | `Logic` (`pumpLogic`) | `Render` (`pumpRender`) | `IO` (dedicated worker)          |
+| Wait / poll   | `wait(handle)`, `poll(handle)`, context/group wait                                         |
+| Generation    | `FrameGen` / `LoadGen` so abandoned work can be discarded                                  |
+| Observability | `snapshotStats()` queue depths + LoadSession phase in editor Debugging panel               |
+
 
 Conceptual API (names may shift; shape must not):
 
@@ -104,11 +111,13 @@ void shutdown();
 
 **Pipes:**
 
-| Pipe | Status |
-| --- | --- |
-| `LoadSession` | Registered at `task::initialize`; Import + GpuStreaming steps |
-| `Logic` / `RHI.Submit` | Reserved names via `getPipe()` on demand (not eagerly registered) |
-| Affinity::Render | Sole Logic→RT domain queue (frames, commands, LoadSession GPU steps) |
+
+| Pipe                   | Status                                                               |
+| ---------------------- | -------------------------------------------------------------------- |
+| `LoadSession`          | Registered at `task::initialize`; Import + GpuStreaming steps        |
+| `Logic` / `RHI.Submit` | Reserved names via `getPipe()` on demand (not eagerly registered)    |
+| Affinity::Render       | Sole Logic→RT domain queue (frames, commands, LoadSession GPU steps) |
+
 
 Workers never close / submit / present / GC. That stays the RHI threading contract.
 
@@ -150,51 +159,32 @@ Rules:
 
 ### RHI evolution (separate phases; this ADR does not widen create)
 
-| Stage | Scope |
-| --- | --- |
-| **R0** (with P1–P2) | Keep Phase-1: create/submit/present/GC on Render pipe; parallel record OK |
-| **R1** | Fence / timeline instead of `device->waitForIdle` for upload batches — **landed** (`StreamingUploadBudget`) |
-| **R2** | First-class `rg::VolatileConstantBinder` — **landed** (`GraphBuilder::volatileConstants()`) |
-| **R3** | Future ADR: free-threaded create / multi-queue — **out of scope here** |
 
-## Current inventory (as of this ADR)
+| Stage               | Scope                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **R0** (with P1–P2) | Keep Phase-1: create/submit/present/GC on Render pipe; parallel record OK                                   |
+| **R1**              | Fence / timeline instead of `device->waitForIdle` for upload batches — **landed** (`StreamingUploadBudget`) |
+| **R2**              | First-class `rg::VolatileConstantBinder` — **landed** (`GraphBuilder::volatileConstants()`)                 |
+| **R3**              | Future ADR: free-threaded create / multi-queue — **out of scope here**                                      |
 
-### Schedulers
 
-| Symbol | Path | Fate |
-| --- | --- | --- |
-| `JobSystem::*` / `ThreadPool` | (removed) | Deleted; sole scheduler is `caustica::task` |
+## Where it landed
 
-### Logic → Render
 
-| Symbol | Path | Fate |
-| --- | --- | --- |
-| `RenderThread` | `include/engine/RenderThread.h` | Dedicated OS thread that **only** pumps `Affinity::Render` (+ frame in-flight pacing); no side `m_queue` |
-| `EnqueueRenderCommand*` | `include/engine/EnqueueRenderCommand.h` | **Sole public API** → Affinity::Render |
-| `App::enqueueRenderCommand*Impl` | `include/engine/App.h` (private) | Thin backing; not a second public surface |
-| `GpuDevice::waitForRenderThreadIdle` | device / frame driver | Drains Affinity::Render (+ paced in-flight) |
+| Piece              | Path                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| Scheduler          | `include/core/task/TaskRuntime.h`                                                               |
+| Render-domain pump | `include/engine/RenderThread.h` (pumps `Affinity::Render` only)                                 |
+| Logic→RT enqueue   | `include/engine/EnqueueRenderCommand.h` (sole public pair)                                      |
+| RT drain           | `GpuDevice::waitForRenderThreadIdle`                                                            |
+| Frame packet       | `include/scene/SceneRenderSnapshot.h`                                                           |
+| Structure handoff  | `include/scene/SceneStructureGpu.h`, `enqueuePendingStructureGpu` (`src/engine/SceneSpawn.cpp`) |
+| Parallel record    | `include/render/graph/GraphBuilder.h` + `FrameCommandContext`                                   |
+| Volatile CBs       | `rg::VolatileConstantBinder` / `GraphBuilder::volatileConstants()`                              |
+| CPU import         | `include/scene/SceneLoader.h` (Background tasks)                                                |
+| Load state machine | `LoadSession` / `tickLoadSession`; budgets on `SceneLifecycle` / `SceneGpuUpdater`              |
+| Teardown window    | `sceneGpuSuspended` (`SceneViewState` / `App::skipRenderPhase`)                                 |
 
-### Frame / structure
-
-| Symbol | Path | Fate |
-| --- | --- | --- |
-| `SceneRenderSnapshot` | `include/scene/SceneRenderSnapshot.h` | Keep |
-| `SceneStructureGpuSync` | `include/scene/SceneStructureGpu.h` | Keep; become default for full load too |
-| `enqueuePendingStructureGpu` | `src/engine/SceneSpawn.cpp` | Keep; sync flush removed |
-| `GraphBuilder` + `parallelWaves` | `include/render/graph/GraphBuilder.h` | Keep; dispatch via TaskRuntime |
-| `FrameCommandContext` | `include/backend/rhi/command_list_pool.h` | Keep |
-| Volatile CB binder | `rg::VolatileConstantBinder` / `GraphBuilder::volatileConstants()` | **R2 landed** |
-
-### Load path
-
-| Symbol | Path | Fate |
-| --- | --- | --- |
-| `SceneLoader` | `include/scene/SceneLoader.h` | Keep as CPU import worker host; jobs become Background tasks |
-| `loadSceneToPending` / `promotePendingScene` | `SceneManager` | Keep |
-| `GpuBindPhase` / `tickSceneGpuBind` | (removed) | Folded into `LoadSession` / `tickLoadSession` |
-| `sceneGpuSuspended` | `SceneViewState` / `App::skipRenderPhase` | Narrow window |
-| `GpuRenderSubsystem` trampoline | lifecycle / GPU bind | Thin or absorb into LoadSession owner |
-| `flushTextures(8.f)` / `uploadMeshes(..., 1)` | `SceneLifecycle` / `SceneGpuUpdater` | Budget knobs on LoadSession |
 
 ### Remaining frame-path sync (out of R1 scope)
 
@@ -205,7 +195,8 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 ## Non-goals
 
 - Rewriting NVRHI or replacing COM refcounts
-- Full UE TaskGraph / fiber runtime clone
+- Fiber runtime. (The UE-style DAG / completion-event *shape* later landed as a thin layer over
+  this runtime in [ADR 0003](0003-taskgraph-parallel-ecs.md); still no fibers.)
 - Free-threaded `createTexture` / `createBuffer` in this ADR
 - Streaming levels / disk mip streaming (future; LoadSession budgets come first)
 - New public enqueue API layers
@@ -229,12 +220,14 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 
 ### Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Desktop hard-lock without per-upload `waitForIdle` | R1 fence budgets + capped in-flight upload bytes before removing idles |
-| Streamline / AS overlap hangs | Keep exclusive teardown window; FirstPresent only after safe committed packet |
-| Priority inversion | Document Pipe + Priority rules; add queue-depth stats before P3 |
-| Sync mode regressions | Single pipe pump path; PIX/headless CI on `--syncRender` |
+
+| Risk                                               | Mitigation                                                                    |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Desktop hard-lock without per-upload `waitForIdle` | R1 fence budgets + capped in-flight upload bytes before removing idles        |
+| Streamline / AS overlap hangs                      | Keep exclusive teardown window; FirstPresent only after safe committed packet |
+| Priority inversion                                 | Document Pipe + Priority rules; add queue-depth stats before P3               |
+| Sync mode regressions                              | Single pipe pump path; PIX/headless CI on `--syncRender`                      |
+
 
 ## Implementation plan
 
@@ -243,17 +236,16 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 - [x] ADR accepted
 - [x] Link from render-proxy + RHI threading docs
 - [x] Engineering rule: no new `ThreadPool` APIs, no new load bools, no new enqueue wrappers
-- [x] TaskRuntime skeleton landed (`include/core/task/TaskRuntime.h`)
 
-### P1 — TaskRuntime replaces JobSystem
-
-1. [x] Add `caustica::task` (`include/core/task/TaskRuntime.h`, `src/core/task/TaskRuntime.cpp`).
-2. [x] Implement initialize/shutdown, launch, pipe serial, priority queues, wait/poll, parallelFor, generations.
-3. [x] Migrate `GraphBuilder` off `JobSystem` → `task::parallelFor` (`Priority::High`).
-4. [x] EntryPoint calls `task::initialize` (JobSystem/ThreadPool removed).
-5. [x] Migrate shader / compute compile + texture async + audio to `task::`.
-6. [x] Collapse Logic→Render to `EnqueueRenderCommand*` (`App` enqueue methods private + friend).
-7. [x] Delete `ThreadPool` / `JobSystem` files; importers use `bool asyncTextures` gate.
+1. TaskRuntime skeleton landed (`include/core/task/TaskRuntime.h`)
+2. P1 — TaskRuntime replaces JobSystem
+3. [x] Add `caustica::task` (`include/core/task/TaskRuntime.h`, `src/core/task/TaskRuntime.cpp`).
+4. [x] Implement initialize/shutdown, launch, pipe serial, priority queues, wait/poll, parallelFor, generations.
+5. [x] Migrate `GraphBuilder` off `JobSystem` → `task::parallelFor` (`Priority::High`).
+6. [x] EntryPoint calls `task::initialize` (JobSystem/ThreadPool removed).
+7. [x] Migrate shader / compute compile + texture async + audio to `task::`.
+8. [x] Collapse Logic→Render to `EnqueueRenderCommand*` (`App` enqueue methods private + friend).
+9. [x] Delete `ThreadPool` / `JobSystem` files; importers use `bool asyncTextures` gate.
 
 **Exit (P1):** feature-equivalent editor / samples; `parallelWaves` on; sole public RT enqueue pair; zero `ThreadPool`/`JobSystem` in code.
 
@@ -295,7 +287,7 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 ## Frozen rules (effective immediately)
 
 1. **Do not** reintroduce `ThreadPool` / `JobSystem` — use `caustica::task` only.
-2. **Do not** add a second Logic→Render enqueue helper — extend `EnqueueRenderCommand*` only.
+2. **Do not** add a second Logic→Render enqueue helper — extend `EnqueueRenderCommand`* only.
 3. **Do not** add another “are we loading?” bool — extend `LoadSession` (phase / `secondaryStreaming` / `isBusy`) only.
 4. **Do not** widen RHI create to AnyThread without a new ADR (R3).
 5. Full scene GPU bind changes stay on StructureGpu / LoadSession budgets — no new Logic-thread `dispatchAndWait` / device `waitForIdle` on the happy path.
@@ -303,13 +295,15 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 
 ## Success metrics
 
-| Metric | Signal |
-| --- | --- |
-| API | One public RT enqueue pair; zero `ThreadPool` references |
-| Load UX | Logic + present continue during GpuStreaming (P3) |
-| Correctness | No Streamline/AS hard-hang on scene switch; PIX `--syncRender` green |
-| Perf | P1 may be neutral; P3 reduces hitch length / peak stall ms during large open |
+
+| Metric        | Signal                                                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| API           | One public RT enqueue pair; zero `ThreadPool` references                                                         |
+| Load UX       | Logic + present continue during GpuStreaming (P3)                                                                |
+| Correctness   | No Streamline/AS hard-hang on scene switch; PIX `--syncRender` green                                             |
+| Perf          | P1 may be neutral; P3 reduces hitch length / peak stall ms during large open                                     |
 | Observability | Queue depth + load session phase visible in debug UI or log — **landed** (Debugging → TaskRuntime / LoadSession) |
+
 
 ## References
 
@@ -317,3 +311,4 @@ frame-path `AndWait`). Cold start / shutdown may keep `waitForIdle`.
 - Extract / proxy / structure handoff: [architecture-render-proxy.md](../architecture-render-proxy.md)
 - Embedding note for `EnqueueRenderCommand`: [embedding-cpp.md](../embedding-cpp.md)
 - Industry direction (informational, not a mandate): UE named threads → `UE::Tasks` + Pipe; keep submit-domain serialization until RHI is proven free-threaded
+

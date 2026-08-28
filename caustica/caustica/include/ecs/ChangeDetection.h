@@ -35,6 +35,14 @@ public:
 
     void clearWorldStructureChange() { m_worldStructureChanged = false; }
 
+    // Creates the tick map up front so parallel systems never race to insert it
+    // into the registry context.
+    template<typename T>
+    void ensureStorage(entt::registry& registry)
+    {
+        (void)storageFor<T>(registry);
+    }
+
     template<typename T>
     void markAdded(Entity entity, entt::registry& registry)
     {

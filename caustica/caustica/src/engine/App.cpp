@@ -131,11 +131,27 @@ App& App::addSystem(
     SystemFn system,
     AppSystemOrdering ordering)
 {
+    return addSystemWithAccess(
+        schedule,
+        std::move(label),
+        std::move(system),
+        ecs::SystemAccess{},
+        std::move(ordering));
+}
+
+App& App::addSystemWithAccess(
+    AppSchedule schedule,
+    SystemLabel label,
+    SystemFn system,
+    ecs::SystemAccess access,
+    AppSystemOrdering ordering)
+{
     // Default: gameplay / host systems on `update` join Simulation unless tagged otherwise.
     if (schedule == AppSchedule::update && !ordering.set.valid())
         ordering.inSet<system_set::Simulation>();
 
-    m_schedules.addSystem(schedule, std::move(label), std::move(system), std::move(ordering));
+    m_schedules.addSystem(
+        schedule, std::move(label), std::move(system), std::move(access), std::move(ordering));
     return *this;
 }
 
