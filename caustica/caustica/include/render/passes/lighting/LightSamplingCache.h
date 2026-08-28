@@ -1,6 +1,7 @@
 #pragma once
 
 #include <render/core/BindingCache.h>
+#include <render/core/PtPipelineFeaturePresets.h>
 #include <render/SceneGpuResources.h>
 #include <rhi/rhi.h>
 #include <math/math.h>
@@ -242,7 +243,7 @@ private:
     bool                            m_dbgDebugDisableLastFrameFeedback  = false;
 
     float                           m_advSetting_ScreenSpaceVsWorldSpaceThreshold = 0.3f;
-    bool                            m_advSetting_SampleBakedEnvironment = true;
+    bool                            m_advSetting_SampleBakedEnvironment = caustica::render::kDefaultSampleBakedEnvironment;
 
     bool                            m_deviceHas32ThreadWaves            = false;
 

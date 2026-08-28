@@ -51,11 +51,18 @@ enum class PtFeaturePresetId : uint32_t
     Count
 };
 
+// Mirrors LightSamplingCache::m_advSetting_SampleBakedEnvironment, which is a plain
+// user toggle rather than something derived from the scene. Cold init resolves a preset
+// before that pass exists, so the two defaults have to agree: if they disagree, startup
+// commits to one preset, builds its REF/BUILD/FILL state objects, and then throws them
+// away the moment the pass appears and reports the other value.
+inline constexpr bool kDefaultSampleBakedEnvironment = true;
+
 struct PtFeaturePresetResolveInput
 {
     const PathTracerSettings* settings = nullptr;
     bool useOpacityMicromaps = false;
-    bool sampleBakedEnvironment = false;
+    bool sampleBakedEnvironment = kDefaultSampleBakedEnvironment;
 };
 
 [[nodiscard]] constexpr uint32_t ptFeaturePresetCount()
