@@ -229,9 +229,14 @@ inline float3 CausticaEvaluateBurleyDiffusion(
     if (NoL <= 0.0f)
         return 0.0f;
 
-    const float3 visibility = CausticaSubsurfaceVisibility(
-        sampleSurface.shadingData.posW, sampleSurface.shadingData.faceNCorrected,
-        lightSample, path, workingContext);
+    // A directly sampled environment has no finite light geometry to test.
+    // Treat it as incident irradiance at the projected diffusion point; finite
+    // scene lights retain the regular visibility query below.
+    const float3 visibility = lightSample.LightIndex == CAUSTICA_INVALID_LIGHT_INDEX
+        ? 1.0f
+        : CausticaSubsurfaceVisibility(sampleSurface.shadingData.posW,
+            sampleSurface.shadingData.faceNCorrected, lightSample, path,
+            workingContext);
     return EvalBssrdf(subsurfaceSample,
         lightSample.Li * visibility, NoL);
 }
