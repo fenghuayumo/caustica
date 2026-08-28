@@ -41,6 +41,19 @@ public:
         return m_world->spawnNamed(name, ecs::NullEntity, std::forward<Components>(components)...);
     }
 
+    // Tag an existing entity, typically with a marker component so per-frame
+    // systems can select it with Query<..., With<Marker>> instead of taking the
+    // whole world. Needed for entities this system did not spawn itself, such as
+    // prefabs loaded through spawnFromFile.
+    template<typename T, typename... Args>
+    bool emplace(ecs::Entity entity, Args&&... args)
+    {
+        if (!m_world || !ecs::isValid(entity) || !m_world->world().isAlive(entity))
+            return false;
+        m_world->world().emplace<T>(entity, std::forward<Args>(args)...);
+        return true;
+    }
+
     bool setLocalTransform(
         ecs::Entity entity,
         const std::optional<dm::double3>& translation = std::nullopt,

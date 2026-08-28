@@ -6,6 +6,7 @@
 #include <engine/EntityWorld.h>
 #include <engine/Plugin.h>
 #include <engine/RenderThread.h>
+#include <engine/SceneTransforms.h>
 #include <ecs/QueryView.h>
 #include <ecs/World.h>
 #include <events/event.h>
@@ -84,6 +85,12 @@ struct SystemParameter<EntityWorld>
     static EntityWorld make(SystemContext& context) { return EntityWorld(context.entityWorld()); }
 };
 
+template<>
+struct SystemParameter<SceneTransforms>
+{
+    static SceneTransforms make(SystemContext& context) { return SceneTransforms(context.sceneEcs()); }
+};
+
 template<typename... Components>
 struct SystemParameter<ecs::Query<Components...>>
 {
@@ -137,6 +144,15 @@ template<>
 struct SystemParameterAccess<EntityWorld>
 {
     static void apply(ecs::SystemAccess& access) { access.exclusive = true; }
+};
+
+template<>
+struct SystemParameterAccess<SceneTransforms>
+{
+    static void apply(ecs::SystemAccess& access)
+    {
+        access.writeComponent<scene::LocalTransformComponent>();
+    }
 };
 
 template<typename... Components>

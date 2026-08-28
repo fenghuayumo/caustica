@@ -8,6 +8,7 @@
 #include <engine/SceneScheduleRegistration.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
+#include <engine/Time.h>
 
 #include <backend/GpuDevice.h>
 #include <core/ThreadContext.h>
@@ -851,6 +852,14 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     scheduleContext.elapsedTime = elapsedTime;
     scheduleContext.currentTime = curTime;
     scheduleContext.runUpdate = windowVisible;
+
+    if (Time* time = tryResource<Time>())
+    {
+        time->deltaSeconds = float(elapsedTime);
+        time->elapsedSeconds += elapsedTime;
+        ++time->frameCount;
+    }
+
     scheduleContext.runRender = windowVisible && wantsRender && !skipRenderPhase();
 
     render::FrameTelemetry* telemetry = nullptr;

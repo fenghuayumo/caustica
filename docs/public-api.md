@@ -16,7 +16,9 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 | `caustica.h` | Umbrella include (preferred) |
 | `engine/EngineApp.h` | Create / run / stepFrame / setScene / camera / settings |
 | `engine/EntryPoint.h` | `initializeAppPlatform`, `runEngineApp` |
-| `engine/EntityWorld.h` | System-param scene ECS (`spawn`, transform, `findEntity`, `setVisible`) |
+| `engine/EntityWorld.h` | System-param scene ECS (`spawn`, `emplace`, transform, `findEntity`, `setVisible`) |
+| `engine/SceneTransforms.h` | System-param transform writes that keep a system parallel |
+| `engine/Time.h` | `Time` resource (`deltaSeconds`, `elapsedSeconds`, `frameCount`) |
 | `engine/Plugin.h` | `addPlugin` extension point |
 | `engine/SystemSets.h` / `engine/SystemLabel.h` | `Simulation` membership + labels |
 | `engine/AppSchedules.h` | Via `App.h`: `AppSchedule`, `Query`, `Res` / `ResMut`, `SystemContext` |
@@ -38,8 +40,11 @@ Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`
 
 Simulation systems run concurrently when their parameter lists prove they cannot conflict — you
 never declare access by hand and there is no `addSystem` overload that accepts it. `Query` /
-`Res` / `ResMut` / `Commands` participate; `EntityWorld` and `SystemContext&` run exclusively.
-See [architecture-render-proxy.md](architecture-render-proxy.md#concurrent-systems).
+`Res` / `ResMut` / `Commands` / `SceneTransforms` participate; `EntityWorld` and `SystemContext&`
+run exclusively because they reach the whole engine. Keep those two in structural, ideally
+one-shot systems and give per-frame systems narrow parameters — `Res<Time>` instead of
+`SystemContext&` for the clock, `SceneTransforms` instead of `EntityWorld` for movement. See
+[architecture-render-proxy.md](architecture-render-proxy.md#concurrent-systems).
 
 ## Not for applications
 
@@ -60,11 +65,15 @@ Editor SampleGame (`application/editor/game`, `demo::`) is **not** an embedding 
 | --- | --- | --- |
 | Create + run | `EngineApp::create` / `runEngineApp` | yes |
 | Simulation system | `addSystem` + `system_set::Simulation` | yes |
+| Parallel-friendly split | exclusive setup vs. `Res<Time>` + `SceneTransforms` per-frame | yes |
 | Prefab spawn | `spawnFromFile` | yes |
 | Bundle spawn | `EntityWorld::spawn` (e.g. light) | yes |
-| Transform | `EntityWorld::setLocalTransform` | yes |
+| Marker tagging | `EntityWorld::emplace` | yes |
+| Transform (setup) | `EntityWorld::setLocalTransform` | yes |
+| Transform (per frame) | `SceneTransforms::setRotation` | yes |
+| Frame timing | `Res<Time>` | yes |
 | Visibility | `EntityWorld::setVisible` | yes |
-| Query | `Query<LocalTransformComponent, MeshInstanceComponent>` | yes |
+| Query | `Query<const ThinClientSpun>` / `Query<const MeshInstanceComponent>` | yes |
 | Find by path | `EntityWorld::findEntity` / `findEntity(app, …)` | yes |
 | Despawn | `despawn(app, entity)` | yes |
 | Camera | `EngineApp::setCameraVerticalFOV` | yes |

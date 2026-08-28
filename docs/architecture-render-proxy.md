@@ -128,13 +128,24 @@ systems overlap only when neither writes what the other reads or writes. See
 | `Query<const T, U>` | read `T`, write `U` (filters `With` / `Without` / `Changed` / `Added` are reads) |
 | `Res<T>` / `ResMut<T>` | read / write resource `T` |
 | `Commands` | deferred; gets its own buffer, merged in plan order after the phase |
+| `SceneTransforms` | write `LocalTransformComponent` — nothing else |
 | `EntityWorld` or `SystemContext&` | **exclusive** — reaches everything, so it runs alone |
 
 `EntityWorld` is the convenient way to spawn and move things, but it opts a system out of
-parallelism. That is the right default (it can touch anything), so take it when you want it and
-reach for `Query` / `Res` / `ResMut` / `Commands` in the systems that run every frame over many
-entities. Conflicting systems are ordered by the plan, so parallel and `--serialSystems` runs
-produce identical results — turning parallelism off only changes timing.
+parallelism, and that is correct: it can touch anything. The fix is not to avoid it but to
+split the system in two. Structural work (spawn, despawn, attaching components) keeps
+`EntityWorld` and is usually one-shot; the per-frame work takes narrow parameters and runs in
+parallel. `Res<Time>` and `SceneTransforms` exist for exactly this — they cover the two reasons
+a per-frame system used to need the whole world, namely reading the clock and moving something.
+`examples/cpp/thin_client/Main.cpp` shows the split.
+
+`SceneTransforms` is safe to run concurrently because the conflict rule already guarantees only
+one system writes `LocalTransformComponent` at a time, and the change-tick storage for every
+written component is created before dispatch. It refuses to add a missing transform, since that
+would be a structural edit against systems iterating the registry.
+
+Conflicting systems are ordered by the plan, so parallel and `--serialSystems` runs produce
+identical results — turning parallelism off only changes timing.
 
 Inspect a phase with `app.schedules().describePlan(AppSchedule::update)`; `planInfo()` reports
 system / exclusive / edge counts and max parallel width.

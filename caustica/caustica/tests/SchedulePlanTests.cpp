@@ -1,4 +1,7 @@
+#include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/SceneTransforms.h>
+#include <engine/Time.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -201,6 +204,42 @@ int main()
             "the exclusive system was not ordered before the later systems");
         passed &= expect(!dependsOn(nodes, 2, 3) && !dependsOn(nodes, 3, 2),
             "disjoint systems after the exclusive one were serialized");
+    }
+
+    // The shapes docs/embedding-cpp.md recommends must actually derive parallel
+    // access. These mirror the thin_client sample: a per-frame animation system
+    // and a per-frame read-only system.
+    {
+        using caustica::detail::makeTypedSystemAccess;
+
+        const auto spin = [](caustica::Res<caustica::Time>,
+                             caustica::SceneTransforms,
+                             caustica::Query<const Position>) {};
+        const SystemAccess spinAccess = makeTypedSystemAccess<decltype(spin)>();
+        passed &= expect(!spinAccess.exclusive,
+            "Res + SceneTransforms + Query was derived as exclusive");
+
+        const auto report = [](caustica::Res<caustica::Time>,
+                               caustica::Query<const Velocity>) {};
+        const SystemAccess reportAccess = makeTypedSystemAccess<decltype(report)>();
+        passed &= expect(!reportAccess.exclusive, "a read-only system was derived as exclusive");
+        passed &= expect(!spinAccess.conflictsWith(reportAccess),
+            "the sample's per-frame systems cannot overlap");
+
+        // SceneTransforms must still serialize against anything else touching
+        // transforms, otherwise its narrow declaration would be a lie.
+        SystemAccess transformReader = SystemAccess::makeParallel();
+        transformReader.readComponent<caustica::scene::LocalTransformComponent>();
+        passed &= expect(spinAccess.conflictsWith(transformReader),
+            "SceneTransforms did not declare its LocalTransformComponent write");
+
+        // Taking the whole world stays exclusive.
+        const auto setup = [](caustica::EntityWorld) {};
+        passed &= expect(makeTypedSystemAccess<decltype(setup)>().exclusive,
+            "EntityWorld stopped being exclusive");
+        const auto contextual = [](caustica::SystemContext&) {};
+        passed &= expect(makeTypedSystemAccess<decltype(contextual)>().exclusive,
+            "SystemContext stopped being exclusive");
     }
 
     // Serial mode never builds a parallel graph even when systems could overlap.

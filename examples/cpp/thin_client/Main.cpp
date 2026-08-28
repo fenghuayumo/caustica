@@ -1,6 +1,18 @@
 // Official C++ thin client / public API reference (P0 freeze).
 // Depends only on <caustica.h> (+ math). No editor UI, ImGui, or WorldRenderer digs.
 // Coverage checklist: docs/public-api.md
+//
+// Systems are split by what they need to touch, which is also what decides
+// whether they can run in parallel (ADR 0003):
+//
+//   Setup  - structural (spawn / despawn / tag). Takes EntityWorld, so it is
+//            exclusive. Kept one-shot so it costs nothing after the first frame.
+//   Spin   - per-frame animation. Takes Res<Time> + SceneTransforms + a Query,
+//            all of which declare narrow access, so it runs in parallel.
+//   Report - per-frame read-only. Res<Time> + a const Query. Also parallel.
+//
+// The rule of thumb: keep the whole world (EntityWorld / SystemContext&) out of
+// systems that run every frame, and the scheduler will overlap them for you.
 
 #include <caustica.h>
 
@@ -19,23 +31,40 @@
 namespace
 {
 
+struct ThinClientSetupLabel
+{
+    static constexpr const char* name = "ThinClient.Setup";
+};
+
 struct ThinClientSpinLabel
 {
     static constexpr const char* name = "ThinClient.SpinSpawned";
 };
 
+struct ThinClientReportLabel
+{
+    static constexpr const char* name = "ThinClient.Report";
+};
+
+// Marker component. Tagging the entity is what lets the per-frame system find
+// it with a Query instead of asking the world for it by handle.
+struct ThinClientSpun
+{
+    float radiansPerSecond = 0.8f;
+};
+
+// App resource shared by the systems below. Res / ResMut declare access to it,
+// so the scheduler knows Setup and Report cannot overlap while Spin can.
 struct ThinClientState
 {
     caustica::ecs::Entity spawnedMesh = caustica::ecs::NullEntity;
     caustica::ecs::Entity spawnedLight = caustica::ecs::NullEntity;
     bool spawnRequested = false;
-    bool loggedScene = false;
     bool loggedQuery = false;
     bool loggedRenderEnqueue = false;
-    bool toggledVisibility = false;
     bool despawnedLight = false;
-    float angleRadians = 0.f;
     float elapsedSeconds = 0.f;
+    float angleRadians = 0.f;
 };
 
 } // namespace
@@ -70,31 +99,28 @@ int main(int, char**)
     (void)engine->settings();
 
     engine->emplaceResource<ThinClientState>();
-    engine->addSystem<ThinClientSpinLabel>(
+
+    // ---------------------------------------------------------------------
+    // Setup: structural work. Exclusive because EntityWorld can reach anything,
+    // which is fine here — every branch is one-shot.
+    // ---------------------------------------------------------------------
+    engine->addSystem<ThinClientSetupLabel>(
         caustica::AppSchedule::update,
         [](caustica::ResMut<ThinClientState> state,
            caustica::EntityWorld scene,
-           caustica::Query<
-               caustica::scene::LocalTransformComponent,
-               caustica::scene::MeshInstanceComponent> meshes,
            caustica::SystemContext& ctx) {
-            if (!scene)
+            if (!scene || !caustica::isSceneLoaded(ctx.app))
                 return;
 
-            state->elapsedSeconds += ctx.deltaTimeSeconds;
-
-            if (!state->loggedScene && caustica::isSceneLoaded(ctx.app))
+            if (!state->spawnRequested)
             {
-                state->loggedScene = true;
+                state->spawnRequested = true;
                 caustica::info(
                     "thin_client: scene ready name=%s",
                     caustica::currentSceneName(ctx.app).c_str());
-            }
 
-            // Prefab spawn + ECS bundle spawn (point light).
-            if (!state->spawnRequested && caustica::isSceneLoaded(ctx.app))
-            {
-                state->spawnRequested = true;
+                // Prefab spawn, then tag it so the per-frame system can select
+                // it with a Query rather than needing the world.
                 state->spawnedMesh = caustica::spawnFromFile(
                     ctx.app, "Models/GlassSphere/GlassSphere.gltf");
                 if (caustica::ecs::isValid(state->spawnedMesh))
@@ -104,6 +130,8 @@ int main(int, char**)
                         dm::double3{ 2.0, 1.0, 0.0 },
                         std::nullopt,
                         dm::double3{ 0.5, 0.5, 0.5 });
+                    scene.setVisible(state->spawnedMesh, true);
+                    scene.emplace<ThinClientSpun>(state->spawnedMesh);
                     caustica::info("thin_client: spawned GlassSphere entity");
                 }
                 else
@@ -111,6 +139,7 @@ int main(int, char**)
                     caustica::warning("thin_client: spawnFromFile failed");
                 }
 
+                // ECS bundle spawn (point light).
                 state->spawnedLight = scene.spawnNamed(
                     "ThinClient.PointLight",
                     caustica::scene::LocalTransformComponent::fromTRS(
@@ -126,36 +155,15 @@ int main(int, char**)
                 if (byPath != state->spawnedLight)
                     caustica::warning("thin_client: findEntity path mismatch");
                 (void)caustica::findEntity(ctx.app, "ThinClient.PointLight");
-            }
 
-            // One-shot Query over mesh instances.
-            if (!state->loggedQuery && caustica::isSceneLoaded(ctx.app))
-            {
-                state->loggedQuery = true;
-                std::size_t count = 0;
-                meshes.each([&](caustica::ecs::Entity, auto&, auto&) { ++count; });
-                caustica::info("thin_client: Query mesh instances=%zu", count);
-            }
-
-            if (!caustica::ecs::isValid(state->spawnedMesh))
-                return;
-
-            state->angleRadians += ctx.deltaTimeSeconds * 0.8f;
-            const double half = 0.5 * static_cast<double>(state->angleRadians);
-            const dm::dquat rotation = dm::dquat::fromWXYZ(
-                std::cos(half),
-                dm::double3{ 0.0, std::sin(half), 0.0 });
-            scene.setLocalTransform(
-                state->spawnedMesh,
-                dm::double3{ 2.0, 1.0, 0.0 },
-                rotation,
-                dm::double3{ 0.5, 0.5, 0.5 });
-
-            // Visibility toggle.
-            if (!state->toggledVisibility && state->elapsedSeconds > 2.f)
-            {
-                state->toggledVisibility = true;
-                scene.setVisible(state->spawnedMesh, true);
+                // Thin RT enqueue (non-blocking; no Logic ECS on the render thread).
+                if (!state->loggedRenderEnqueue)
+                {
+                    state->loggedRenderEnqueue = true;
+                    caustica::EnqueueRenderCommand(ctx.app, []() {
+                        caustica::info("thin_client: EnqueueRenderCommand ran on render thread");
+                    });
+                }
             }
 
             // Despawn the temporary light (structure edit via SceneSpawn::despawn).
@@ -170,17 +178,54 @@ int main(int, char**)
                     caustica::info("thin_client: despawned point light");
                 }
             }
-
-            // Demonstrate the thin RT enqueue once (non-blocking; no Logic ECS).
-            if (!state->loggedRenderEnqueue)
-            {
-                state->loggedRenderEnqueue = true;
-                caustica::EnqueueRenderCommand(ctx.app, []() {
-                    caustica::info("thin_client: EnqueueRenderCommand ran on render thread");
-                });
-            }
         },
         caustica::AppSystemOrdering{}.inSet<caustica::system_set::Simulation>());
+
+    // ---------------------------------------------------------------------
+    // Spin: runs every frame and runs in parallel. Res<Time> replaces the usual
+    // reason for taking SystemContext&, and SceneTransforms declares only
+    // "writes LocalTransformComponent" instead of handing over the world.
+    // ---------------------------------------------------------------------
+    engine->addSystem<ThinClientSpinLabel>(
+        caustica::AppSchedule::update,
+        [](caustica::Res<caustica::Time> time,
+           caustica::SceneTransforms transforms,
+           caustica::Query<const ThinClientSpun> spun) {
+            spun.each([&](caustica::ecs::Entity entity, const ThinClientSpun& spin) {
+                const double angle = time->elapsedSeconds * double(spin.radiansPerSecond);
+                const double half = 0.5 * angle;
+                transforms.setRotation(
+                    entity,
+                    dm::dquat::fromWXYZ(
+                        std::cos(half), dm::double3{ 0.0, std::sin(half), 0.0 }));
+            });
+        },
+        caustica::AppSystemOrdering{}
+            .inSet<caustica::system_set::Simulation>()
+            .runAfter<ThinClientSetupLabel>());
+
+    // ---------------------------------------------------------------------
+    // Report: read-only per-frame work, also parallel. It writes only its own
+    // resource and reads mesh components, so it overlaps with Spin.
+    // ---------------------------------------------------------------------
+    engine->addSystem<ThinClientReportLabel>(
+        caustica::AppSchedule::update,
+        [](caustica::Res<caustica::Time> time,
+           caustica::ResMut<ThinClientState> state,
+           caustica::Query<const caustica::scene::MeshInstanceComponent> meshes) {
+            state->elapsedSeconds += time->deltaSeconds;
+
+            if (!state->loggedQuery && state->spawnRequested)
+            {
+                state->loggedQuery = true;
+                std::size_t count = 0;
+                meshes.each([&](caustica::ecs::Entity, const auto&) { ++count; });
+                caustica::info("thin_client: Query mesh instances=%zu", count);
+            }
+        },
+        caustica::AppSystemOrdering{}
+            .inSet<caustica::system_set::Simulation>()
+            .runAfter<ThinClientSetupLabel>());
 
     return caustica::runEngineApp(std::move(engine));
 }

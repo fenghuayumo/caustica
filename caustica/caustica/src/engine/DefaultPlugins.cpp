@@ -9,6 +9,7 @@
 #include <engine/ScenePlugins.h>
 #include <render/WorldRenderer.h>
 #include <engine/ActiveScene.h>
+#include <engine/Time.h>
 #include <engine/SceneAppResources.h>
 #include <engine/SceneStartup.h>
 
@@ -19,6 +20,7 @@ void SceneRuntimePlugin::build(App& app)
 {
     registerSceneAppResources(app, appConfig);
     app.emplaceResource<ActiveScene>();
+    app.emplaceResource<Time>();
     app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<CameraController>();
     app.emplaceResource<ResolvedActiveCamera>();

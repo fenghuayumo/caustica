@@ -64,6 +64,14 @@ struct LocalTransformComponent
     dm::daffine3 transform = dm::daffine3::identity();
     bool hasLocalTransform = false;
 
+    // Recomputes the cached matrix after translation / rotation / scaling change.
+    void compose()
+    {
+        transform = dm::scaling(scaling);
+        transform *= rotation.toAffine();
+        transform *= dm::translation(translation);
+    }
+
     // Authoring helper for Bundle spawn / system code.
     [[nodiscard]] static LocalTransformComponent fromTRS(
         const dm::double3& translation,
@@ -75,9 +83,7 @@ struct LocalTransformComponent
         local.rotation = rotation;
         local.scaling = scaling;
         local.hasLocalTransform = true;
-        local.transform = dm::scaling(local.scaling);
-        local.transform *= local.rotation.toAffine();
-        local.transform *= dm::translation(local.translation);
+        local.compose();
         return local;
     }
 };

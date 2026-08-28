@@ -19,6 +19,8 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneTransform.h>
+#include <engine/SceneTransforms.h>
+#include <engine/Time.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SystemSets.h>
 #include <engine/EntryPoint.h>

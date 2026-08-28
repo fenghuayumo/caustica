@@ -104,6 +104,33 @@ pack: `Query<const T, U>` yields a read of `T` and a write of `U`, query filters
 reads / writes, and `Commands` sets `deferred`. A system taking `SystemContext&` or `EntityWorld`
 falls back to exclusive, because both can reach the whole world.
 
+### Narrow parameters for the two things every frame needs
+
+Exclusive-by-default is safe, but it is only useful if hosts have a non-exclusive way to write
+ordinary per-frame systems. Two parameters existed only inside `SystemContext` / `EntityWorld`
+and were dragging otherwise-parallel systems into exclusivity:
+
+| Added | Replaces | Declares |
+| --- | --- | --- |
+| `Time` resource (`engine/Time.h`) | `SystemContext::deltaTimeSeconds` | read of one resource |
+| `SceneTransforms` (`engine/SceneTransforms.h`) | `EntityWorld::setLocalTransform` | write of `LocalTransformComponent` |
+
+`Time` is refreshed once per frame in `App::runFrame` before any schedule runs. Reading the clock
+was the single most common reason a gameplay system took `SystemContext&`, so this alone converts
+most host systems.
+
+`SceneTransforms` is sound under the conflict rule rather than by locking: only one system can
+write `LocalTransformComponent` at a time, so the per-type change-tick map has a single writer,
+and rule 4 already guarantees the storage exists before dispatch. It deliberately does **not**
+create a missing transform — that would be a structural edit racing systems that iterate the
+registry — and it skips the `TransformChangedEvent` send that `SceneEntityWorld` performs, since
+nothing reads that event (it is cleared each frame in `endChangeDetectionFrame`).
+
+The resulting host pattern is a split rather than an avoidance: structural work keeps
+`EntityWorld` and is usually one-shot, tagging entities with a marker component via
+`EntityWorld::emplace`; per-frame work selects those entities with a `Query` and writes through
+narrow parameters. `examples/cpp/thin_client/Main.cpp` is the reference.
+
 There is deliberately **no public API that accepts a hand-written `SystemAccess`**. The backing
 `App::addSystemWithAccess` is private and only the typed `addSystem` calls it. A hand-written
 declaration is a silent correctness hazard — it can claim less than the system touches, and
@@ -203,7 +230,10 @@ Overridable per phase with `AppSchedules::setExecutionMode`. Global kill switch:
 - [x] Access derived from typed system parameters in `App::addSystem` (no hand-written overload)
 - [x] Per-system deferred `CommandQueue` + `CommandQueue::append` merge
 - [x] `--serialSystems` → `EngineAppDesc::parallelSystems` → `setParallelExecutionEnabled`
+- [x] `Time` resource + `SceneTransforms` / `EntityWorld::emplace` so per-frame systems stay narrow
+- [x] `examples/cpp/thin_client` split into exclusive setup + parallel per-frame systems
 - [x] Tests: `causTaskGraphTests`, `causSystemSchedulerTests`, `causSchedulePlanTests`
+      (including that the documented system shapes derive non-conflicting access)
 
 ## Frozen rules
 

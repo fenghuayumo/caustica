@@ -86,14 +86,6 @@ std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
 
 namespace
 {
-dm::daffine3 ComposeLocalTransform(const LocalTransformComponent& local)
-{
-    dm::daffine3 transform = dm::scaling(local.scaling);
-    transform *= local.rotation.toAffine();
-    transform *= dm::translation(local.translation);
-    return transform;
-}
-
 void RemoveChildReference(ecs::World& world, ecs::Entity parent, ecs::Entity child)
 {
     if (!ecs::isValid(parent))
@@ -147,7 +139,7 @@ void RefreshEntityHierarchy(
     if (!local || !global)
         return;
 
-    local->transform = ComposeLocalTransform(*local);
+    local->compose();
 
     if (previousPolicy == PreviousTransformPolicy::CaptureCurrent)
     {
@@ -944,7 +936,7 @@ void SceneEntityWorld::setLocalTransform(
         return;
 
     local->hasLocalTransform = true;
-    local->transform = ComposeLocalTransform(*local);
+    local->compose();
     m_world.notifyComponentChanged<LocalTransformComponent>(entity);
     m_world.events<TransformChangedEvent>().send(TransformChangedEvent{ entity });
 }

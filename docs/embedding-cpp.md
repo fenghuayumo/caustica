@@ -102,32 +102,59 @@ auto engine = caustica::EngineApp::create({ .scene = "default.json" });
 
 engine->addSystem<AppSimulationLabel>(
     caustica::AppSchedule::update,
-    [](caustica::EntityWorld scene, caustica::SystemContext& ctx) {
-        if (!scene || !caustica::isSceneLoaded(ctx.app))
-            return;
-
-        // Mutate host state or the logic-side scene here.
-        // Extract publishes the render-thread snapshot after update/PostUpdate.
+    [](caustica::Res<caustica::Time> time,
+       caustica::SceneTransforms transforms,
+       caustica::Query<const MySpinner> spinners) {
+        spinners.each([&](caustica::ecs::Entity entity, const MySpinner& spin) {
+            transforms.setRotation(entity, spin.rotationAt(time->elapsedSeconds));
+        });
     });
 
 engine->run();
 ```
 
-Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `EntityWorld`,
-`Query<Components...>`, and `SystemContext&`. Prefer `EntityWorld` /
-`Query<>` over digging through internal GPU/WR headers, `WorldRenderer`, or a raw
-`Scene*` (extract / GPU APIs). `EngineApp` does not expose `scene()`; use
-`setScene` + `entityWorld` / `isSceneLoaded`. CameraController and path-tracer
-settings are App resources — use `RenderSessionApi` / `CameraApi`.
+Typed system parameters: `Res<T>`, `ResMut<T>`, `Commands`, `Query<Components...>`,
+`SceneTransforms`, `EntityWorld`, and `SystemContext&`. Prefer them over digging
+through internal GPU/WR headers, `WorldRenderer`, or a raw `Scene*` (extract / GPU
+APIs). `EngineApp` does not expose `scene()`; use `setScene` + `entityWorld` /
+`isSceneLoaded`. CameraController and path-tracer settings are App resources — use
+`RenderSessionApi` / `CameraApi`.
+
+### Parameters decide parallelism
 
 The parameter list is also what makes systems run in parallel: the scheduler derives each
 system's reads and writes from it and overlaps systems that cannot conflict, with no threading
 code on your side. `Query<const T, U>` reads `T` and writes `U`; `Res<T>` / `ResMut<T>` do the
-same for resources; `Commands` is deferred and gets its own buffer. `EntityWorld` and
-`SystemContext&` can reach anything, so a system taking either runs alone — fine for setup and
-occasional work, worth avoiding in per-frame systems that touch many entities. Ordering between
-conflicting systems is fixed by the plan, so results do not depend on thread timing; run with
-`--serialSystems` to rule parallelism out while debugging. Details in
+same for resources; `SceneTransforms` declares exactly one write (`LocalTransformComponent`);
+`Commands` is deferred and gets its own buffer.
+
+`EntityWorld` and `SystemContext&` are the two that opt out. Both can reach anything — spawn,
+despawn, `App&`, the whole engine — so the scheduler has no choice but to run those systems
+alone. That is the right trade for setup and occasional structural work, and the wrong one for
+a system that runs every frame.
+
+So split by what the work actually needs:
+
+| Work | Parameters | Runs |
+| --- | --- | --- |
+| Spawn, despawn, attach components, reach `App&` | `EntityWorld`, `SystemContext&` | Alone |
+| Move / rotate / scale existing entities | `SceneTransforms` + `Query<>` | In parallel |
+| Read components, update your own resources | `Query<const T>`, `Res<T>`, `ResMut<T>` | In parallel |
+| Timing | `Res<Time>` | In parallel |
+
+Two habits carry most of the benefit. Take `Res<Time>` instead of `SystemContext&` when all you
+wanted was `deltaTimeSeconds` — that alone is the most common reason a system ends up exclusive.
+And keep structural work in a separate, ideally one-shot system, tagging entities with a marker
+component (`EntityWorld::emplace`) so the per-frame system can find them with a `Query` instead
+of asking for the world.
+
+`SceneTransforms` will not create a transform: adding a component is a structural change, so an
+entity without `LocalTransformComponent` is skipped and the call returns `false`. Spawn with a
+transform, or attach one from the setup system.
+
+Ordering between conflicting systems is fixed by the plan, so results do not depend on thread
+timing; run with `--serialSystems` to rule parallelism out while debugging.
+`examples/cpp/thin_client/Main.cpp` is this split end to end. Details in
 [ADR 0003](adr/0003-taskgraph-parallel-ecs.md).
 
 An `update` system with no explicit set joins
@@ -154,7 +181,8 @@ Prefer system parameters, then focused application headers:
 
 | API | Supported operations |
 | --- | --- |
-| `EntityWorld` (system param) | `spawn` / `spawnNamed` bundles, `setLocalTransform`, scene ECS access. |
+| `EntityWorld` (system param) | `spawn` / `spawnNamed` bundles, `emplace` tags, `setLocalTransform`, scene ECS access. Exclusive. |
+| `SceneTransforms` (system param) | Local transform writes only, safe to run in parallel. |
 | `Query<...>` (system param) | Bevy-style `each` over scene components (`Changed<>` / `With<>` supported). |
 | `engine/SceneQuery.h` | `entityWorld`, load status, materials, entity lookup (no diggable `Scene*`). |
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
