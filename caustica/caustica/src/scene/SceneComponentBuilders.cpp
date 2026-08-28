@@ -1,5 +1,5 @@
 #include <scene/SceneComponentBuilders.h>
-
+#include <scene/SceneSerializer.h>
 #include <core/json.h>
 
 namespace caustica::scene
@@ -79,7 +79,11 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
         src["radianceScale"] >> component.radianceScale;
         src["textureIndex"] >> component.textureIndex;
         src["rotation"] >> component.rotation;
-        src["path"] >> component.path;
+        if (src["source"].isString())
+            src["source"] >> component.path;
+        else
+            src["path"] >> component.path;
+        component.path = canonicalizeEnvSource(component.path);
         return component;
     }
 

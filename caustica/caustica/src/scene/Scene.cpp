@@ -14,6 +14,7 @@
 #include <core/ThreadContext.h>
 #include <core/json.h>
 #include <core/log.h>
+#include <core/path_utils.h>
 #include <core/string_utils.h>
 #include <cassert>
 #include <rhi/common/misc.h>
@@ -679,23 +680,13 @@ bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
 
     m_EntityWorld->createEntity("SceneRoot");
 
-    if (documentRoot.isObject())
-    {
-        if (!loadCustomData(documentRoot, asyncTextures))
-            return false;
-
-        loadModels(documentRoot["models"], scenePath, asyncTextures);
-        loadSceneEntities(documentRoot["graph"], m_EntityWorld->root());
-        loadAnimations(documentRoot["animations"]);
-        m_EntityWorld->rebuildPathsFromRoot();
-    }
-    else
+    if (!documentRoot.isObject())
     {
         caustica::error("Unrecognized structure of the scene description.");
         return false;
     }
 
-    return true;
+    return loadEntities(std::move(documentRoot), scenePath, asyncTextures);
 }
 
 void Scene::loadModelAsync(
@@ -726,40 +717,63 @@ bool Scene::loadModelFile(
     return m_GltfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
 }
 
-void Scene::loadModels(
-    const Json::Value& modelList,
-    const std::filesystem::path& scenePath,
+SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTextures)
+{
+    if (source.empty())
+        return {};
+
+    for (const auto& loaded : m_Models)
+    {
+        if (loaded.source == source && loaded.entityWorld && ecs::isValid(loaded.rootEntity))
+            return loaded;
+    }
+
+    SceneImportResult result;
+    result.source = source;
+    ++g_LoadingStats.ObjectsTotal;
+
+    if (IsBuiltinModelReference(source))
+    {
+        result = loadBuiltinModel(source);
+        result.source = source;
+        ++g_LoadingStats.ObjectsLoaded;
+    }
+    else
+    {
+        const std::filesystem::path fileName = resolveSceneMediaPath(source, m_textureSearchDirectory);
+        loadModelFile(fileName, asyncTextures, result);
+        result.source = source;
+        ++g_LoadingStats.ObjectsLoaded;
+    }
+
+    m_Models.push_back(result);
+    return result;
+}
+
+ecs::Entity Scene::instantiatePrefab(
+    const std::string& source,
+    ecs::Entity parent,
+    const std::string& name,
     bool asyncTextures)
 {
-    if (!modelList.isArray())
+    const SceneImportResult loaded = loadOrGetPrefab(source, asyncTextures);
+    if (!loaded.entityWorld || !ecs::isValid(loaded.rootEntity))
+        return ecs::NullEntity;
+
+    ecs::Entity entity = m_EntityWorld->importSubtree(
+        parent, *loaded.entityWorld, loaded.rootEntity, m_SceneTypeFactory.get());
+    if (!ecs::isValid(entity))
+        return ecs::NullEntity;
+
+    if (!name.empty())
     {
-        return;
+        if (auto* nameComp = m_EntityWorld->world().get<scene::NameComponent>(entity))
+            nameComp->value = name;
     }
 
-    m_Models.resize(modelList.size());
-    uint32_t index = 0;
-    for (const auto& model : modelList)
-    {
-        ++g_LoadingStats.ObjectsTotal;
-
-        if (model.isString() && IsBuiltinModelReference(model.asString()))
-        {
-            m_Models[index] = loadBuiltinModel(model.asString());
-            ++g_LoadingStats.ObjectsLoaded;
-        }
-        else if (model.isObject() && model["builtin"].isString())
-        {
-            m_Models[index] = loadBuiltinModel(model["builtin"].asString());
-            ++g_LoadingStats.ObjectsLoaded;
-        }
-        else
-        {
-            std::filesystem::path fileName = scenePath / std::filesystem::path(model.asString());
-            loadModelAsync(index, fileName, asyncTextures);
-        }
-
-        ++index;
-    }
+    m_EntityWorld->world().emplace<scene::PrefabInstanceComponent>(
+        entity, scene::PrefabInstanceComponent{ source });
+    return entity;
 }
 
 SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
@@ -814,6 +828,7 @@ SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
     result.entityWorld->setMeshInstance(rootEntity, mesh);
     result.entityWorld->rebuildPathsFromRoot();
     result.rootEntity = rootEntity;
+    result.source = std::string("builtin:") + NormalizeBuiltinModelName(builtinName);
     return result;
 }
 
@@ -886,125 +901,6 @@ void Scene::attachLeafFromJson(ecs::Entity entity, const Json::Value& src)
     else
     {
         caustica::warning("Unsupported leaf type '%s' in scene JSON.", type.c_str());
-    }
-}
-
-void Scene::loadSceneEntities(const Json::Value& nodeList, ecs::Entity parent)
-{
-    for (const auto& src : nodeList)
-    {
-        if (!src.isObject())
-        {
-            caustica::warning("Non-object node in the scene definition.");
-            continue;
-        }
-
-        std::string nodeName;
-        const auto& name = src["name"];
-        if (name.isString())
-            nodeName = name.asString();
-
-        ecs::Entity customParent = parent;
-        const auto& parentNode = src["parent"];
-        if (parentNode.isString())
-        {
-            customParent = m_EntityWorld->findEntity(parentNode.asString());
-            if (!ecs::isValid(customParent))
-            {
-                caustica::warning("Custom parent '%s' specified for node '%s' not found, skipping the node.",
-                    parentNode.asCString(), nodeName.c_str());
-                continue;
-            }
-        }
-        else if (!parentNode.isNull())
-        {
-            caustica::warning("Custom parent specification for node '%s' is not a string, ignoring.",
-                nodeName.c_str());
-        }
-
-        ecs::Entity entity = ecs::NullEntity;
-
-        const auto& modelNode = src["model"];
-        if (!modelNode.isNull())
-        {
-            if (!modelNode.isIntegral())
-            {
-                caustica::warning("Model references in the scene must be indices into the model array.");
-                continue;
-            }
-
-            int modelIndex = modelNode.asInt();
-            if (modelIndex < 0 || modelIndex >= int(m_Models.size()))
-            {
-                caustica::warning("Referenced model %d is not defined in the model array.", modelIndex);
-                continue;
-            }
-
-            const auto& loadedModel = m_Models[modelIndex];
-            if (!loadedModel.entityWorld || !ecs::isValid(loadedModel.rootEntity))
-                continue;
-
-            entity = m_EntityWorld->importSubtree(customParent, *loadedModel.entityWorld, loadedModel.rootEntity, m_SceneTypeFactory.get());
-        }
-        else
-        {
-            entity = m_EntityWorld->createEntity(nodeName, customParent);
-        }
-
-        if (!ecs::isValid(entity))
-            continue;
-
-        if (!nodeName.empty())
-        {
-            if (auto* nameComp = m_EntityWorld->world().get<scene::NameComponent>(entity))
-                nameComp->value = nodeName;
-        }
-
-        const auto& translation = src["translation"];
-        if (!translation.isNull())
-        {
-            double3 value = double3::zero();
-            translation >> value;
-            m_EntityWorld->setTranslation(entity, value);
-        }
-
-        const auto& rotation = src["rotation"];
-        if (!rotation.isNull())
-        {
-            double4 value = double4(0.0, 0.0, 0.0, 1.0);
-            rotation >> value;
-            m_EntityWorld->setRotation(entity, dm::dquat::fromXYZW(value));
-        }
-        else
-        {
-            const auto& euler = src["euler"];
-            if (!euler.isNull())
-            {
-                double3 value = double3::zero();
-                euler >> value;
-                m_EntityWorld->setRotation(entity, rotationQuat(value));
-            }
-        }
-
-        const auto& scaling = src["scaling"];
-        if (!scaling.isNull())
-        {
-            double3 value = double3(1.0);
-            scaling >> value;
-            m_EntityWorld->setScaling(entity, value);
-        }
-
-        const auto& children = src["children"];
-        if (!children.isNull())
-            loadSceneEntities(children, entity);
-
-        if (src["type"].isString())
-            attachLeafFromJson(entity, src);
-        else if (!src["type"].isNull())
-        {
-            caustica::warning("Leaf type specification for node '%s' is not a string, skipping.",
-                nodeName.c_str());
-        }
     }
 }
 
@@ -1353,6 +1249,31 @@ void Scene::processNodesRecursive()
     {
         m_loadedSettings = component.settings;
     });
+
+    if (m_loadedSettings && m_loadedSettings->startingCameraId && !m_loadedSettings->startingCameraId->empty())
+    {
+        const std::string wanted = *m_loadedSettings->startingCameraId;
+        const auto& cameras = m_EntityWorld->cameraEntitiesInRegistrationOrder();
+        for (size_t i = 0; i < cameras.size(); ++i)
+        {
+            bool match = m_EntityWorld->getEntityName(cameras[i]) == wanted;
+            if (!match)
+            {
+                if (const auto* authoring = world.tryGet<scene::SceneAuthoringIdComponent>(cameras[i]))
+                    match = authoring->id == wanted;
+            }
+            if (!match)
+            {
+                const std::string path = m_EntityWorld->getEntityPath(cameras[i]).generic_string();
+                match = path == wanted || path.ends_with("/" + wanted);
+            }
+            if (match)
+            {
+                m_loadedSettings->startingCamera = static_cast<int>(i) - 1;
+                break;
+            }
+        }
+    }
 
     world.each<scene::GameSettingsComponent>([this](ecs::Entity, scene::GameSettingsComponent& component)
     {

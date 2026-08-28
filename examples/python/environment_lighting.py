@@ -113,50 +113,67 @@ def resolve_hdri(path: str | Path) -> str:
 
 def build_scene_json(env_path: str) -> str:
     scene = {
-        "models": ["builtin:plane", "builtin:cube", "builtin:sphere"],
-        "graph": [
-            {"name": "GroundPlane", "model": 0, "scaling": [2.0, 1.0, 2.0]},
-            {"name": "SubjectCube", "model": 1, "translation": [-0.75, 0.5, 0.0]},
+        "settings": {
+            "maxBounces": 8,
+            "maxDiffuseBounces": 4,
+        },
+        "entities": [
             {
+                "id": "GroundPlane",
+                "name": "GroundPlane",
+                "components": {
+                    "Transform": {"scale": [2.0, 1.0, 2.0]},
+                    "PrefabInstance": {"source": "builtin:plane"},
+                },
+            },
+            {
+                "id": "SubjectCube",
+                "name": "SubjectCube",
+                "components": {
+                    "Transform": {"translation": [-0.75, 0.5, 0.0]},
+                    "PrefabInstance": {"source": "builtin:cube"},
+                },
+            },
+            {
+                "id": "MirrorBall",
                 "name": "MirrorBall",
-                "model": 2,
-                "translation": [0.85, 0.55, -0.35],
-                "scaling": [0.55, 0.55, 0.55],
+                "components": {
+                    "Transform": {
+                        "translation": [0.85, 0.55, -0.35],
+                        "scale": [0.55, 0.55, 0.55],
+                    },
+                    "PrefabInstance": {"source": "builtin:sphere"},
+                },
             },
+            {"id": "Lights", "name": "Lights"},
             {
-                "name": "Lights",
-                "children": [
-                    {
-                        "name": "Sky",
-                        "type": "EnvironmentLight",
+                "id": "Sky",
+                "name": "Sky",
+                "parent": "Lights",
+                "components": {
+                    "EnvironmentLight": {
                         "radianceScale": [1.0, 1.0, 1.0],
-                        "textureIndex": [0],
-                        "rotation": [0.0],
-                        "path": env_path,
-                    }
-                ],
+                        "source": env_path,
+                    },
+                },
             },
+            {"id": "Cameras", "name": "Cameras"},
             {
-                "name": "Cameras",
-                "children": [
-                    {
-                        "name": "Default",
-                        "type": "PerspectiveCameraEx",
+                "id": "Default",
+                "name": "Default",
+                "parent": "Cameras",
+                "components": {
+                    "Transform": {
                         "translation": [0.0, 1.6, 6.0],
                         "rotation": [0.0, 0.0, 0.0, 1.0],
+                    },
+                    "PerspectiveCameraEx": {
                         "verticalFov": 0.7,
                         "zNear": 0.001,
                         "enableAutoExposure": False,
                         "exposureCompensation": 1.0,
-                    }
-                ],
-            },
-            {
-                "name": "SceneSettings",
-                "type": "SceneSettings",
-                "startingCamera": -1,
-                "maxBounces": 8,
-                "maxDiffuseBounces": 4,
+                    },
+                },
             },
         ],
     }

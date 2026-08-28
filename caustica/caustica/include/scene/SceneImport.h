@@ -3,6 +3,7 @@
 #include <ecs/Entity.h>
 
 #include <memory>
+#include <string>
 
 namespace caustica::scene
 {
@@ -15,5 +16,6 @@ namespace caustica
     {
         std::shared_ptr<scene::SceneEntityWorld> entityWorld;
         ecs::Entity rootEntity = ecs::NullEntity;
+        std::string source;
     };
 }

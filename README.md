@@ -250,7 +250,7 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
    cd caustica
    ```
 
-   `Assets/` is the [caustica-assets](https://github.com/fenghuayumo/caustica-assets) submodule (Git LFS). It is not the NVIDIA RTXPT asset repo. If the submodule URL is still the NVIDIA remote, run `git submodule sync` after pulling.
+   `Assets/` is the [caustica-assets](https://github.com/fenghuayumo/caustica-assets) submodule (Git LFS).
 
 2. Configure a 64-bit Visual Studio build:
 

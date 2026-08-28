@@ -1,58 +1,75 @@
 {
-  "models": [
-    "builtin:plane",
-    "builtin:cube"
-  ],
-  "graph": [
+  "format": "caustica.scene",
+  "version": 2,
+  "name": "default",
+  "settings": {
+    "realtimeMode": true,
+    "enableAnimations": false
+  },
+  "entities": [
     {
+      "id": "GroundPlane",
       "name": "GroundPlane",
-      "model": 0,
-      "scaling": [2.0, 1.0, 2.0]
+      "components": {
+        "Transform": { "scale": [2.0, 1.0, 2.0] },
+        "PrefabInstance": { "source": "builtin:plane" }
+      }
     },
     {
+      "id": "Cube",
       "name": "Cube",
-      "model": 1,
-      "translation": [0.0, 0.5, 0.0]
+      "components": {
+        "Transform": { "translation": [0.0, 0.5, 0.0] },
+        "PrefabInstance": { "source": "builtin:cube" }
+      }
     },
     {
-      "name": "Lights",
-      "children": [
-        {
-          "name": "Sun",
-          "type": "DirectionalLight",
-          "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975],
+      "id": "Lights",
+      "name": "Lights"
+    },
+    {
+      "id": "Sun",
+      "name": "Sun",
+      "parent": "Lights",
+      "components": {
+        "Transform": {
+          "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975]
+        },
+        "DirectionalLight": {
           "angularSize": 1.5,
           "color": [1.0, 0.96, 0.9],
           "irradiance": 4.0
-        },
-        {
-          "name": "Sky",
-          "type": "EnvironmentLight",
-          "radianceScale": [1, 1, 1],
-          "path": "==PROCEDURAL_SKY=="
         }
-      ]
+      }
     },
     {
-      "name": "Cameras",
-      "children": [
-        {
-          "name": "Default",
-          "type": "PerspectiveCameraEx",
-          "translation": [0.0, 1.15, 5.0],
+      "id": "Sky",
+      "name": "Sky",
+      "parent": "Lights",
+      "components": {
+        "EnvironmentLight": {
+          "radianceScale": [1, 1, 1],
+          "source": "procedural:sky"
+        }
+      }
+    },
+    {
+      "id": "Cameras",
+      "name": "Cameras"
+    },
+    {
+      "id": "Default",
+      "name": "Default",
+      "parent": "Cameras",
+      "components": {
+        "Transform": { "translation": [0.0, 1.15, 5.0] },
+        "PerspectiveCameraEx": {
           "verticalFov": 0.7,
           "zNear": 0.001,
           "enableAutoExposure": false,
           "exposureCompensation": 1.0
         }
-      ]
-    },
-    {
-      "name": "SceneSettings",
-      "type": "SceneSettings",
-      "realtimeMode": true,
-      "enableAnimations": false,
-      "startingCamera": -1
+      }
     }
   ]
 }

@@ -42,6 +42,19 @@ struct PathComponent
     std::filesystem::path value;
 };
 
+// Stable id from scene JSON `entities[].id`.
+struct SceneAuthoringIdComponent
+{
+    std::string id;
+};
+
+// Root of an imported glTF/OBJ/USD/builtin prefab. Scene save writes this
+// instead of the expanded import subtree.
+struct PrefabInstanceComponent
+{
+    std::string source;
+};
+
 struct ParentComponent
 {
     ecs::Entity parent = ecs::NullEntity;

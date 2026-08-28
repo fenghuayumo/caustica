@@ -1,85 +1,86 @@
 # Caustica 场景 JSON 格式
 
-本文档说明 Caustica 当前支持的场景 JSON 描述方式。场景 JSON 负责描述“加载哪些模型”和“这些对象如何挂到场景图里”；材质参数通常不直接写在 scene JSON 节点中，而是通过 `Assets/materials` 下的 `.material.json` 文件覆盖。OpenPBR 字段的完整说明见 [OpenPBR materials](openpbr.md)。
+场景 JSON 描述实体、组件和资源引用。网格通过 `PrefabInstance.source` 指向 glTF/OBJ/USD 或 `builtin:*`；材质覆盖仍在 `Assets/materials` 的 `.material.json`。OpenPBR 字段见 [OpenPBR materials](openpbr.md)。
 
-相关实现主要在：
+相关实现：
 
 - `caustica/caustica/src/scene/Scene.cpp`
+- `caustica/caustica/src/scene/SceneSerializer.cpp`
 - `caustica/caustica/src/scene/SceneEcs.cpp`
-- `caustica/caustica/src/scene/SceneObjects.cpp`
-- `caustica/caustica/src/scene/SceneTypes.cpp`
 - `caustica/caustica/src/scene/SceneComponentBuilders.cpp`
 - `caustica/caustica/src/scene/loader/`
-- `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp`
 
 ## 最小示例
 
 ```json
 {
-  "models": [
-    "builtin:plane",
-    "D:/path/to/models/antman_merged.obj"
-  ],
-  "graph": [
+  "settings": {
+    "realtimeMode": true,
+    "enableAnimations": false
+  },
+  "entities": [
     {
+      "id": "GroundPlane",
       "name": "GroundPlane",
-      "model": 0,
-      "translation": [0.0, 0.0, 0.0],
-      "rotation": [0.0, 0.0, 0.0, 1.0],
-      "scaling": [2.0, 1.0, 2.0]
+      "components": {
+        "Transform": { "scale": [2.0, 1.0, 2.0] },
+        "PrefabInstance": { "source": "builtin:plane" }
+      }
     },
     {
+      "id": "Antman",
       "name": "Antman",
-      "model": 1,
-      "translation": [-1.25, 0.0, 0.0],
-      "euler": [0.0, 0.0, 0.0],
-      "scaling": 0.85
+      "components": {
+        "Transform": {
+          "translation": [-1.25, 0.0, 0.0],
+          "euler": [0.0, 0.0, 0.0],
+          "scale": 0.85
+        },
+        "PrefabInstance": { "source": "models/antman_merged.obj" }
+      }
     },
     {
+      "id": "GingySplat",
       "name": "GingySplat",
-      "type": "GaussianSplat",
-      "path": "D:/path/to/scans/splat_crop.ply",
-      "translation": [1.25, 0.0, 0.0],
-      "rotation": [0.0, 0.0, 0.0, 1.0],
-      "scaling": [1.0, 1.0, 1.0],
-      "convertRdfToRub": true,
-      "enabled": true
+      "components": {
+        "Transform": { "translation": [1.25, 0.0, 0.0] },
+        "GaussianSplat": {
+          "path": "D:/path/to/scans/splat_crop.ply",
+          "convertRdfToRub": true,
+          "enabled": true
+        }
+      }
     },
+    { "id": "Lights", "name": "Lights" },
     {
-      "name": "Lights",
-      "children": [
-        {
-          "name": "Sun",
-          "type": "DirectionalLight",
-          "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975],
+      "id": "Sun",
+      "name": "Sun",
+      "parent": "Lights",
+      "components": {
+        "Transform": {
+          "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975]
+        },
+        "DirectionalLight": {
           "angularSize": 1.5,
           "color": [1.0, 0.96, 0.9],
           "irradiance": 4.0
         }
-      ]
+      }
     },
+    { "id": "Cameras", "name": "Cameras" },
     {
-      "name": "Cameras",
-      "children": [
-        {
-          "name": "Default",
-          "type": "PerspectiveCameraEx",
-          "translation": [0.0, 1.6, 6.0],
-          "rotation": [0.0, 0.0, 0.0, 1.0],
+      "id": "Default",
+      "name": "Default",
+      "parent": "Cameras",
+      "components": {
+        "Transform": { "translation": [0.0, 1.6, 6.0], "rotation": [0.0, 0.0, 0.0, 1.0] },
+        "PerspectiveCameraEx": {
           "verticalFov": 0.7,
           "zNear": 0.001,
           "enableAutoExposure": false,
           "exposureCompensation": 1.0
         }
-      ]
-    },
-    {
-      "name": "SceneSettings",
-      "type": "SceneSettings",
-      "realtimeMode": true,
-      "enableAnimations": false,
-      "enableKeyframes": false,
-      "startingCamera": -1
+      }
     }
   ]
 }
@@ -97,94 +98,51 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
-| `models` | array | 模型资源列表。`graph` 节点用整数 `model` 引用这里的索引。 |
-| `graph` | array | 场景图根节点列表。模型、灯光、相机、3DGS、设置节点都写在这里。 |
-| `animations` | array | 可选。场景图动画通道列表。 |
+| `entities` | array | 扁平实体列表。层级用 `parent` 指向另一个实体的 `id`。 |
+| `settings` | object | 可选。初始渲染设置（原 SceneSettings 节点）。 |
+| `animations` | array | 可选。场景动画通道。 |
+| `base` / `overrides` | string / array | 可选。在另一个场景上做少量覆盖（例如只改天空）。 |
 
-未知顶层字段目前不会参与标准场景加载。
-
-## `models`
-
-`models` 数组的每个元素可以是：
-
-```json
-"models/kitchen/kitchen.gltf"
-```
-
-```json
-"D:/path/to/models/antman_merged.obj"
-```
-
-```json
-"builtin:plane"
-```
-
-```json
-{ "builtin": "cube" }
-```
-
-支持的 builtin 模型：
-
-| 名称 | 含义 |
-| --- | --- |
-| `builtin:plane` | 一个内置地面平面。 |
-| `builtin:cube` | 一个内置立方体。 |
-| `builtin:sphere` | 一个内置球体。 |
-| `builtin:plane_cube` | 一个平面加一个立方体。 |
-| `builtin:default` | `plane_cube` 的别名。 |
-| `builtin:default_scene` | `plane_cube` 的别名。 |
-
-路径规则：
-
-- scene 文件中的相对模型路径相对于该 scene JSON 文件所在目录解析。
-- 放在 `Assets/` 下的 scene 通常写 `models/...`。旧的 `Models/...` 仍然能解析。
-- 绝对路径也可以使用，建议使用 `/`，例如 `D:/path/to/models/foo.glb`。
-- 静态 `models` 与 `spawnFromFile` 支持 `.gltf`、`.glb`、`.obj`、`.urdf`、`.usd`、`.usda` 和 `.usdc`。USD 需要构建时成功启用 `CAUSTICA_WITH_OPENUSD`。静态 `models` 中的其他扩展会回退到 glTF importer；`spawnFromFile` 则会直接报告不支持的格式。
-- 如果仍然把 OBJ 转成 GLB，要按 OBJ 的 `(position, texcoord, normal)` 三元组生成顶点，不能只按 position 合并顶点；否则 UV seam 会被破坏，表现为贴图已加载但 atlas 块贴错。OBJ 的 `vt.y` 通常还需要转换为 `1 - v`，与 Caustica runtime OBJ importer 的行为保持一致。
-
-## `graph` 节点通用字段
-
-每个 `graph` 元素都是一个场景图节点。节点可以只是分组，也可以引用模型，或者通过 `type` 创建一个灯光、相机、3DGS 等 leaf。
+## 实体字段
 
 | 字段 | 类型 | 含义 |
 | --- | --- | --- |
-| `name` | string | 节点名。用于 UI、查找节点、动画 target、材质/灯光代理引用。 |
-| `model` | integer | 引用 `models` 数组中的模型索引。设置后该节点会使用对应模型的根节点。 |
-| `type` | string | 创建 leaf 对象，如 `DirectionalLight`、`PerspectiveCameraEx`、`GaussianSplat`。 |
-| `parent` | string | 可选。把节点挂到已有节点下。建议使用从场景根开始的绝对路径，如 `/Lights`。 |
-| `children` | array | 子节点数组。 |
-| `translation` | number 或 `[x, y, z]` | 本地平移，单位为场景世界单位。 |
-| `rotation` | number 或 `[x, y, z, w]` | 本地旋转四元数，顺序为 XYZW。常用单位四元数 `[0, 0, 0, 1]`。 |
-| `euler` | number 或 `[x, y, z]` | 本地欧拉角旋转，单位为弧度。只有未设置 `rotation` 时才会读取。 |
-| `scaling` | number 或 `[x, y, z]` | 本地缩放。单个数字会扩展到三个轴。 |
+| `id` | string | 稳定引用。`parent` 和 overlay 用这个。 |
+| `name` | string | 显示名；省略时用 `id`。 |
+| `parent` | string | 父实体 `id`。省略则挂到场景根。 |
+| `components` | object | 组件字典。键是组件名。 |
 
-说明：
+### `Transform`
 
-- `translation`、`euler`、`scaling` 都支持单个数字，读取为所有分量相同；实际使用中更推荐写数组，意图更清楚。
-- `rotation` 是四元数 `[x, y, z, w]`，不是角度数组。
-- `euler` 使用弧度，不是度。90 度应写约 `1.5707963`。
-- 如果一个节点只有 `name` 和 `children`，它就是普通分组节点。
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `translation` | `[x, y, z]` | 本地平移。 |
+| `rotation` | `[x, y, z, w]` | 本地四元数 XYZW。 |
+| `euler` | `[x, y, z]` | 弧度欧拉角；未写 `rotation` 时读取。 |
+| `scale` | number 或 `[x, y, z]` | 本地缩放。 |
 
-## Leaf 类型
+### `PrefabInstance`
 
-`type` 字段会创建具体 leaf。当前 RTXPT 扩展和引擎基础类型支持如下。
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `source` | string | pack 相对路径、绝对路径，或 `builtin:plane` / `cube` / `sphere` / `plane_cube`。 |
 
-| `type` | 含义 |
+相对路径相对资源包根解析（`models/...`），并回退到 scene 文件目录。
+
+## 组件类型
+
+灯光、相机、3DGS 写在 `components` 下，字段与下文各节相同（不再使用节点上的 `type` / `children` / `model` 下标）。
+
+| 组件 | 含义 |
 | --- | --- |
-| `DirectionalLight` | 方向光。 |
-| `PointLight` | 点光。支持 `proxyMeshNodes`。 |
-| `SpotLight` | 聚光灯。支持 `proxyMeshNodes`。 |
-| `EnvironmentLight` | 环境贴图光。 |
-| `PerspectiveCamera` | 透视相机。 |
-| `PerspectiveCameraEx` | 扩展透视相机，支持曝光参数。推荐使用这个。 |
+| `DirectionalLight` | 方向光。方向来自同实体 `Transform.rotation`。 |
+| `PointLight` | 点光。 |
+| `SpotLight` | 聚光灯。 |
+| `EnvironmentLight` | 环境光。贴图用 `source`（可用 `procedural:sky`）。 |
+| `PerspectiveCamera` / `PerspectiveCameraEx` | 透视相机。 |
 | `OrthographicCamera` | 正交相机。 |
-| `GaussianSplat` | 3D Gaussian Splat PLY 节点。 |
-| `GaussianSplats` | `GaussianSplat` 的别名。 |
-| `3DGaussianSplat` | `GaussianSplat` 的别名。 |
-| `SceneSettings` | 初始渲染设置节点。 |
-| `GameSettings` | SampleGame 使用的设置节点，会保存原始 JSON。 |
-
-`MaterialPatch` 是旧格式，当前已经不再支持，不要在新 scene 中使用。
+| `GaussianSplat` | 3DGS PLY。 |
+| `GameSettings` | SampleGame 原始 JSON。 |
 
 ## 灯光参数
 
@@ -262,12 +220,9 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 ```json
 {
-  "name": "Sky",
-  "type": "EnvironmentLight",
   "radianceScale": [1.0, 1.0, 1.0],
-  "textureIndex": 0,
   "rotation": 0.0,
-  "path": "env/simons_town_rocks_4k_cube_bc6u.dds"
+  "source": "env/simons_town_rocks_4k_cube_bc6u.dds"
 }
 ```
 
@@ -276,7 +231,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `radianceScale` | `[r, g, b]` | 环境光辐射亮度倍率。 |
 | `textureIndex` | integer | 环境贴图索引，通常写 `0`。 |
 | `rotation` | number | 环境贴图旋转值。 |
-| `path` | string | 环境贴图路径。解析顺序：绝对路径 → 资源包根 → scene 文件所在目录。UI 环境贴图列表先扫 `Assets/env/`，再扫旧名 `Assets/EnvironmentMaps/` 和 `<scene-dir>/env/`。 |
+| `source` | string | 环境贴图路径，或 `procedural:sky`。 |
 
 ## 相机参数
 
@@ -371,24 +326,21 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 - 节点 Transform 控制对象整体位置、旋转、缩放。
 - 当前 RTX/path-tracing splat shadow 资源槽仍以第一个启用的 3DGS 对象为主要 shadow source。
 
-## `SceneSettings`
+## `settings`
 
-`SceneSettings` 用来初始化 Caustica UI/渲染状态。
-
-旧场景中的 `SampleSettings` 类型仍可读取，但已弃用；新场景应使用 `SceneSettings`。
+顶层 `settings` 用来初始化渲染状态。`startingCamera` 可以是相机实体的 `id`。
 
 ```json
 {
-  "name": "SceneSettings",
-  "type": "SceneSettings",
-      "realtimeMode": true,
-      "enableAnimations": false,
-      "enableKeyframes": false,
-      "startingCamera": -1,
-  "realtimeFireflyFilter": 0.15,
-  "maxBounces": 8,
-  "maxDiffuseBounces": 4,
-  "textureMIPBias": 0.0
+  "settings": {
+    "realtimeMode": true,
+    "enableAnimations": false,
+    "enableKeyframes": false,
+    "realtimeFireflyFilter": 0.15,
+    "maxBounces": 8,
+    "maxDiffuseBounces": 4,
+    "textureMIPBias": 0.0
+  }
 }
 ```
 

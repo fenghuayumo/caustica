@@ -40,28 +40,35 @@ def create_splat_only_scene(name: str = "caustica_splat_only") -> str:
     3DGS content is appended afterwards with ``renderer.load_gaussian_splats``.
     """
     scene = {
-        "models": ["builtin:plane"],
-        "graph": [
+        "entities": [
             {
+                "id": "HiddenDummyMesh",
                 "name": "HiddenDummyMesh",
-                "model": 0,
-                "translation": [_DUMMY_MESH_DISTANCE] * 3,
-                "scaling": 0.001,
+                "components": {
+                    "Transform": {
+                        "translation": [_DUMMY_MESH_DISTANCE] * 3,
+                        "scale": 0.001,
+                    },
+                    "PrefabInstance": {"source": "builtin:plane"},
+                },
             },
+            {"id": "Cameras", "name": "Cameras"},
             {
-                "name": "Cameras",
-                "children": [
-                    {
-                        "name": "Default",
-                        "type": "PerspectiveCameraEx",
+                "id": "Default",
+                "name": "Default",
+                "parent": "Cameras",
+                "components": {
+                    "Transform": {
                         "translation": [0.0, 0.0, -5.0],
                         "rotation": [0.0, 0.0, 0.0, 1.0],
+                    },
+                    "PerspectiveCameraEx": {
                         "verticalFov": 0.785398,
                         "zNear": 0.001,
                         "exposureCompensation": 0.0,
                         "enableAutoExposure": False,
-                    }
-                ],
+                    },
+                },
             },
         ],
     }

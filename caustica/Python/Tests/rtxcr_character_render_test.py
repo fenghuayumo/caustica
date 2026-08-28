@@ -58,7 +58,10 @@ def main() -> int:
     if not skin_model.is_file() or not scene.is_file():
         raise RuntimeError("checked-in RTXCR character validation assets are missing")
     skin_only_scene = json.loads(scene.read_text(encoding="utf-8"))
-    skin_only_scene["models"] = [str(skin_model)]
+    for entity in skin_only_scene.get("entities", []):
+        prefab = (entity.get("components") or {}).get("PrefabInstance")
+        if prefab is not None:
+            prefab["source"] = str(skin_model)
     with caustica.Renderer(
         width=args.width,
         height=args.height,

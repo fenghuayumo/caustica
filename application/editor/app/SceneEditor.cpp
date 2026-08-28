@@ -29,6 +29,7 @@
 #include <core/json.h>
 #include <core/log.h>
 #include <platform/file_dialog.h>
+#include <scene/SceneSerializer.h>
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
@@ -642,70 +643,6 @@ void SceneEditor::syncLoadedSceneSystems()
 namespace
 {
 
-ecs::Entity FindChildEntityByName(scene::SceneEntityWorld& ew, ecs::Entity parent, const std::string& name)
-{
-    if (!ecs::isValid(parent) || name.empty())
-        return ecs::NullEntity;
-
-    for (ecs::Entity child : ew.getEntityChildren(parent))
-    {
-        if (ew.getEntityName(child) == name)
-            return child;
-    }
-    return ecs::NullEntity;
-}
-
-void WriteLocalTransformToJson(Json::Value& node, const scene::LocalTransformComponent& local)
-{
-    {
-        Json::Value translation(Json::arrayValue);
-        caustica::json::write(translation, local.translation);
-        node["translation"] = translation;
-    }
-    {
-        Json::Value rotation(Json::arrayValue);
-        const dm::double4 xyzw(
-            local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w);
-        caustica::json::write(rotation, xyzw);
-        node["rotation"] = rotation;
-        node.removeMember("euler");
-    }
-    {
-        Json::Value scaling(Json::arrayValue);
-        caustica::json::write(scaling, local.scaling);
-        node["scaling"] = scaling;
-    }
-}
-
-void PatchSceneGraphTransforms(
-    Json::Value& nodes,
-    scene::SceneEntityWorld& ew,
-    ecs::Entity parent)
-{
-    if (!nodes.isArray())
-        return;
-
-    for (Json::Value& node : nodes)
-    {
-        if (!node.isObject() || !node["name"].isString())
-            continue;
-
-        const std::string name = node["name"].asString();
-        const ecs::Entity entity = FindChildEntityByName(ew, parent, name);
-        if (!ecs::isValid(entity))
-            continue;
-
-        if (const auto* local = ew.world().tryGet<scene::LocalTransformComponent>(entity);
-            local && local->hasLocalTransform)
-        {
-            WriteLocalTransformToJson(node, *local);
-        }
-
-        if (node.isMember("children"))
-            PatchSceneGraphTransforms(node["children"], ew, entity);
-    }
-}
-
 void SaveSceneMaterials(App& app)
 {
     auto* wr = app.tryResource<render::WorldRenderer>();
@@ -866,8 +803,8 @@ bool SaveSceneDocumentToPath(
     if (!ew || !ecs::isValid(ew->root()))
         return false;
 
-    if (editorState.sceneDocument.isMember("graph"))
-        PatchSceneGraphTransforms(editorState.sceneDocument["graph"], *ew, ew->root());
+    if (editorState.sceneDocument.isMember("entities"))
+        caustica::scene::patchEntityTransforms(editorState.sceneDocument["entities"], *ew);
     PatchEditorAnimations(editorState.sceneDocument, *ew);
 
     if (!caustica::json::saveToFile(path, editorState.sceneDocument))

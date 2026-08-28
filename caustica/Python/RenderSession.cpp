@@ -173,57 +173,60 @@ namespace
     std::string BuildBuiltinDefaultSceneJson(const std::string& builtinModel)
     {
         Json::Value root(Json::objectValue);
-        root["models"].append(std::string("builtin:") + NormalizeBuiltinModelName(builtinModel));
+        root["entities"] = Json::Value(Json::arrayValue);
 
         Json::Value modelNode(Json::objectValue);
+        modelNode["id"] = "DefaultBuiltinModel";
         modelNode["name"] = "DefaultBuiltinModel";
-        modelNode["model"] = 0;
-        root["graph"].append(modelNode);
-
-        Json::Value sun(Json::objectValue);
-        sun["name"] = "Sun";
-        sun["type"] = "DirectionalLight";
-        sun["rotation"] = MakeFloatArray({ -0.23053891f, -0.15879166f, -0.6890466f, 0.6684697f });
-        sun["angularSize"] = 1.5f;
-        sun["color"] = MakeFloatArray({ 1.0f, 0.96f, 0.9f });
-        sun["irradiance"] = 4.0f;
-
-        Json::Value fill(Json::objectValue);
-        fill["name"] = "Fill";
-        fill["type"] = "PointLight";
-        fill["translation"] = MakeFloatArray({ 0.0f, 2.5f, 3.0f });
-        fill["color"] = MakeFloatArray({ 1.0f, 0.95f, 0.85f });
-        fill["intensity"] = 30.0f;
-        fill["radius"] = 0.05f;
-        fill["range"] = 10.0f;
+        modelNode["components"]["PrefabInstance"]["source"] =
+            std::string("builtin:") + NormalizeBuiltinModelName(builtinModel);
+        root["entities"].append(modelNode);
 
         Json::Value lights(Json::objectValue);
+        lights["id"] = "Lights";
         lights["name"] = "Lights";
-        lights["children"].append(sun);
-        lights["children"].append(fill);
-        root["graph"].append(lights);
+        root["entities"].append(lights);
 
-        Json::Value camera(Json::objectValue);
-        camera["name"] = "Default";
-        camera["type"] = "PerspectiveCameraEx";
-        camera["translation"] = MakeFloatArray({ 0.0f, 1.15f, 5.0f });
-        camera["rotation"] = MakeFloatArray({ 0.0f, 0.0f, 0.0f, 1.0f });
-        camera["verticalFov"] = 0.7f;
-        camera["zNear"] = 0.001f;
-        camera["exposureCompensation"] = 1.0f;
-        camera["enableAutoExposure"] = false;
+        Json::Value sun(Json::objectValue);
+        sun["id"] = "Sun";
+        sun["name"] = "Sun";
+        sun["parent"] = "Lights";
+        sun["components"]["Transform"]["rotation"] =
+            MakeFloatArray({ -0.23053891f, -0.15879166f, -0.6890466f, 0.6684697f });
+        sun["components"]["DirectionalLight"]["angularSize"] = 1.5f;
+        sun["components"]["DirectionalLight"]["color"] = MakeFloatArray({ 1.0f, 0.96f, 0.9f });
+        sun["components"]["DirectionalLight"]["irradiance"] = 4.0f;
+        root["entities"].append(sun);
+
+        Json::Value fill(Json::objectValue);
+        fill["id"] = "Fill";
+        fill["name"] = "Fill";
+        fill["parent"] = "Lights";
+        fill["components"]["Transform"]["translation"] = MakeFloatArray({ 0.0f, 2.5f, 3.0f });
+        fill["components"]["PointLight"]["color"] = MakeFloatArray({ 1.0f, 0.95f, 0.85f });
+        fill["components"]["PointLight"]["intensity"] = 30.0f;
+        fill["components"]["PointLight"]["radius"] = 0.05f;
+        fill["components"]["PointLight"]["range"] = 10.0f;
+        root["entities"].append(fill);
 
         Json::Value cameras(Json::objectValue);
+        cameras["id"] = "Cameras";
         cameras["name"] = "Cameras";
-        cameras["children"].append(camera);
-        root["graph"].append(cameras);
+        root["entities"].append(cameras);
 
-        Json::Value settings(Json::objectValue);
-        settings["name"] = "SceneSettings";
-        settings["type"] = "SceneSettings";
-        settings["realtimeMode"] = true;
-        settings["startingCamera"] = -1;
-        root["graph"].append(settings);
+        Json::Value camera(Json::objectValue);
+        camera["id"] = "Default";
+        camera["name"] = "Default";
+        camera["parent"] = "Cameras";
+        camera["components"]["Transform"]["translation"] = MakeFloatArray({ 0.0f, 1.15f, 5.0f });
+        camera["components"]["Transform"]["rotation"] = MakeFloatArray({ 0.0f, 0.0f, 0.0f, 1.0f });
+        camera["components"]["PerspectiveCameraEx"]["verticalFov"] = 0.7f;
+        camera["components"]["PerspectiveCameraEx"]["zNear"] = 0.001f;
+        camera["components"]["PerspectiveCameraEx"]["exposureCompensation"] = 1.0f;
+        camera["components"]["PerspectiveCameraEx"]["enableAutoExposure"] = false;
+        root["entities"].append(camera);
+
+        root["settings"]["realtimeMode"] = true;
 
         return caustica::json::toString(root);
     }

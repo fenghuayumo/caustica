@@ -51,32 +51,40 @@ def write_constant_hdr(path: Path, width: int = 4, height: int = 2) -> None:
 
 def make_scene_json(environment_path: Path) -> str:
     scene = {
-        "models": ["builtin:sphere"],
-        "graph": [
-            {"name": "FurnaceSphere", "model": 0},
+        "settings": {"realtimeMode": False},
+        "entities": [
             {
+                "id": "FurnaceSphere",
+                "name": "FurnaceSphere",
+                "components": {
+                    "PrefabInstance": {"source": "builtin:sphere"},
+                },
+            },
+            {
+                "id": "WhiteFurnace",
                 "name": "WhiteFurnace",
-                "type": "EnvironmentLight",
-                "radianceScale": [1.0, 1.0, 1.0],
-                "textureIndex": [0],
-                "rotation": [0.0],
-                "path": str(environment_path.resolve()),
+                "components": {
+                    "EnvironmentLight": {
+                        "radianceScale": [1.0, 1.0, 1.0],
+                        "source": str(environment_path.resolve()),
+                    },
+                },
             },
             {
+                "id": "FurnaceCamera",
                 "name": "FurnaceCamera",
-                "type": "PerspectiveCameraEx",
-                "translation": [0.0, 0.5, 3.0],
-                "rotation": [0.0, 0.0, 0.0, 1.0],
-                "verticalFov": math.radians(35.0),
-                "zNear": 0.001,
-                "exposureCompensation": 0.0,
-                "enableAutoExposure": False,
-            },
-            {
-                "name": "SceneSettings",
-                "type": "SceneSettings",
-                "realtimeMode": False,
-                "startingCamera": -1,
+                "components": {
+                    "Transform": {
+                        "translation": [0.0, 0.5, 3.0],
+                        "rotation": [0.0, 0.0, 0.0, 1.0],
+                    },
+                    "PerspectiveCameraEx": {
+                        "verticalFov": math.radians(35.0),
+                        "zNear": 0.001,
+                        "exposureCompensation": 0.0,
+                        "enableAutoExposure": False,
+                    },
+                },
             },
         ],
     }

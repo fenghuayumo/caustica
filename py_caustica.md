@@ -183,16 +183,24 @@ import caustica
 
 scene = r'''
 {
-  "models": ["builtin:plane"],
-  "graph": [
-    { "name": "Ground", "model": 0 },
+  "entities": [
     {
+      "id": "Ground",
+      "name": "Ground",
+      "components": {
+        "PrefabInstance": { "source": "builtin:plane" }
+      }
+    },
+    {
+      "id": "Scan",
       "name": "Scan",
-      "type": "GaussianSplat",
-      "path": "D:/path/to/scans/splats.ply",
-      "convertRdfToRub": true,
-      "translation": [0, 0, 0],
-      "scaling": [1, 1, 1]
+      "components": {
+        "Transform": { "translation": [0, 0, 0], "scale": [1, 1, 1] },
+        "GaussianSplat": {
+          "path": "D:/path/to/scans/splats.ply",
+          "convertRdfToRub": true
+        }
+      }
     }
   ]
 }
@@ -752,22 +760,28 @@ Scene JSON may also declare one or more 3DGS nodes directly:
 ```python
 scene = r"""
 {
-  "graph": [
+  "entities": [
     {
+      "id": "ScanA",
       "name": "ScanA",
-      "type": "GaussianSplat",
-      "path": "D:/path/to/scans/splats_a.ply",
-      "translation": [0.0, 0.0, 0.0],
-      "scaling": 1.0,
-      "convertRdfToRub": true,
-      "enabled": true
+      "components": {
+        "Transform": { "translation": [0.0, 0.0, 0.0], "scale": 1.0 },
+        "GaussianSplat": {
+          "path": "D:/path/to/scans/splats_a.ply",
+          "convertRdfToRub": true,
+          "enabled": true
+        }
+      }
     },
     {
+      "id": "ScanB",
       "name": "ScanB",
-      "type": "GaussianSplat",
-      "path": "D:/path/to/scans/splats_b.ply",
-      "translation": [2.0, 0.0, 0.0],
-      "scaling": 0.75
+      "components": {
+        "Transform": { "translation": [2.0, 0.0, 0.0], "scale": 0.75 },
+        "GaussianSplat": {
+          "path": "D:/path/to/scans/splats_b.ply"
+        }
+      }
     }
   ]
 }

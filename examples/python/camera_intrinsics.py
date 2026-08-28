@@ -33,32 +33,31 @@ LOOK_AT = (0.0, 0.0, 0.0)
 def build_scene_json() -> str:
     """A lit ground plane and cube with no camera node, so the script owns the camera."""
     scene = {
-        "models": ["builtin:plane_cube"],
-        "graph": [
+        "settings": {"realtimeMode": False},
+        "entities": [
             {
+                "id": "Ground",
                 "name": "Ground",
-                "model": 0,
-                "translation": [0.0, 0.0, 0.0],
-                "scaling": [2.0, 1.0, 2.0],
+                "components": {
+                    "Transform": {"scale": [2.0, 1.0, 2.0]},
+                    "PrefabInstance": {"source": "builtin:plane_cube"},
+                },
             },
+            {"id": "Lights", "name": "Lights"},
             {
-                "name": "Lights",
-                "children": [
-                    {
-                        "name": "Sun",
-                        "type": "DirectionalLight",
-                        "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975],
+                "id": "Sun",
+                "name": "Sun",
+                "parent": "Lights",
+                "components": {
+                    "Transform": {
+                        "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975]
+                    },
+                    "DirectionalLight": {
                         "angularSize": 1.5,
                         "color": [1.0, 0.96, 0.9],
                         "irradiance": 3.0,
-                    }
-                ],
-            },
-            {
-                "name": "SceneSettings",
-                "type": "SceneSettings",
-                "realtimeMode": False,
-                "startingCamera": -1,
+                    },
+                },
             },
         ],
     }

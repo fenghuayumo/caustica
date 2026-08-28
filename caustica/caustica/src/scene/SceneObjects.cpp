@@ -27,7 +27,10 @@ void SceneSettings::load(const Json::Value& node)
     node["realtimeMode"]          >> realtimeMode;
     node["enableAnimations"]      >> enableAnimations;
     node["enableKeyframes"]       >> enableKeyframes;
-    node["startingCamera"]        >> startingCamera;
+    if (node["startingCamera"].isString())
+        node["startingCamera"] >> startingCameraId;
+    else
+        node["startingCamera"] >> startingCamera;
     node["realtimeFireflyFilter"] >> realtimeFireflyFilter;
     node["maxBounces"]            >> maxBounces;
     node["maxDiffuseBounces"]     >> maxDiffuseBounces;

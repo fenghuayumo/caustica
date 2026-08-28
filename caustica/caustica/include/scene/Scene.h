@@ -86,20 +86,31 @@ namespace caustica
             bool asyncTextures,
             SceneImportResult& result);
 
-        void loadModels(
-            const Json::Value& modelList, 
-            const std::filesystem::path& scenePath, 
-            bool asyncTextures);
-
         SceneImportResult loadBuiltinModel(
             const std::string& builtinName);
+
+        SceneImportResult loadOrGetPrefab(
+            const std::string& source,
+            bool asyncTextures);
+
+        ecs::Entity instantiatePrefab(
+            const std::string& source,
+            ecs::Entity parent,
+            const std::string& name,
+            bool asyncTextures);
+
+        void applyTopLevelSettings(const Json::Value& settingsNode);
 
         bool loadJsonDocument(
             Json::Value documentRoot,
             const std::filesystem::path& scenePath,
             bool asyncTextures);
 
-        void loadSceneEntities(const Json::Value& nodeList, ecs::Entity parent);
+        bool loadEntities(
+            Json::Value documentRoot,
+            const std::filesystem::path& scenePath,
+            bool asyncTextures);
+
         void loadAnimations(const Json::Value& nodeList);
         
         virtual bool loadCustomData(Json::Value& rootNode, bool asyncTextures);

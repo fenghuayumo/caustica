@@ -475,6 +475,13 @@ if (BUILD_TESTING)
     endif()
     add_test(NAME causSceneEcsTests COMMAND causSceneEcsTests)
 
+    add_executable(causSceneSerializerTests tests/SceneSerializerTests.cpp)
+    target_link_libraries(causSceneSerializerTests PRIVATE causScene)
+    if (MSVC)
+        target_compile_options(causSceneSerializerTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causSceneSerializerTests COMMAND causSceneSerializerTests)
+
     add_executable(causHairDotsTests tests/HairDotsTests.cpp)
     target_link_libraries(causHairDotsTests PRIVATE causScene)
     if (MSVC)
