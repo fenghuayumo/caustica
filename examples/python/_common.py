@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 EXAMPLES_DIR = Path(__file__).resolve().parent
-REPO_ROOT = EXAMPLES_DIR.parents[2]
+REPO_ROOT = EXAMPLES_DIR.parents[1]
 ASSETS_DIR = REPO_ROOT / "Assets"
 
 #: Denoiser / anti-aliasing paths accepted by :func:`apply_realtime_mode`.

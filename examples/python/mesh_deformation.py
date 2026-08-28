@@ -44,8 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scene", default=str(DEFAULT_SCENE))
     parser.add_argument(
         "--mesh-name",
-        default="antman_merged",
-        help="Target mesh entity. Falls back to the first non-builtin mesh in the scene.",
+        default="",
+        help="Target mesh entity. Defaults to the densest mesh in the scene.",
     )
     parser.add_argument(
         "--deform-mode",
@@ -80,17 +80,14 @@ def find_target_mesh(app, mesh_name: str):
         entity = app.find_mesh_entity(mesh_name)
         if entity is not None:
             return entity
-        print(f"[caustica] Mesh {mesh_name!r} not found; picking the first non-builtin mesh.")
+        print(f"[caustica] Mesh {mesh_name!r} not found; picking the densest mesh instead.")
 
     entities = app.get_mesh_entities()
-    for entity in entities:
-        name = entity.name.lower()
-        if name in {"plane", "builtin_plane"} or name.startswith("builtin:"):
-            continue
-        return entity
-    if entities:
-        return entities[-1]
-    raise SystemExit("No deformable mesh entity found in the loaded scene.")
+    if not entities:
+        raise SystemExit("No deformable mesh entity found in the loaded scene.")
+    # Vertex count is a better proxy than the entity name: deforming a
+    # four-vertex ground plane technically works but shows nothing.
+    return max(entities, key=lambda entity: len(app.get_mesh_vertices(entity)))
 
 
 def mesh_center(vertices) -> tuple[float, float, float]:
