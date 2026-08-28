@@ -189,7 +189,7 @@ scene = r'''
     {
       "name": "Scan",
       "type": "GaussianSplat",
-      "path": "D:/ScanVideo/chuan/splats.ply",
+      "path": "D:/path/to/scans/splats.ply",
       "convertRdfToRub": true,
       "translation": [0, 0, 0],
       "scaling": [1, 1, 1]
@@ -215,55 +215,53 @@ while r.step(-1.0):
 
 For script-driven workflows, `load_gaussian_splats(path, convert_rdf_to_rub=True)` appends a `GaussianSplat` node to the current scene root. Calling `load_scene(...)` replaces the current scene graph and destroys previously appended splat nodes, so load them again after switching scenes or declare them in the target scene JSON.
 
-### 3DGS Reference / Realtime Batch Test
+### 3DGS Reference / Realtime Batch Render
 
-`3dgs_example.py` renders the same PLY twice:
+`gaussian_splats.py view --mode batch` renders the same PLY twice:
 
-- Reference mode accumulates 32 spp, then applies OIDN and writes `reference_oidn.png`.
-- Realtime mode steps 32 frames and uses DLSS-RR when supported, falling back to DLSS/TAA/off, then writes `realtime_<aa>.png`.
+- Reference mode accumulates `--spp` samples, applies OIDN, and writes `reference_oidn.png`.
+- Realtime mode steps `--frames` frames and uses DLSS-RR when supported, falling back to DLSS, then NRD + TAA, and writes `realtime.png`.
 - The default 3DGS sorting mode is GPU sort. Pass `--sorting stochastic` to compare with stochastic splats.
 
 ```powershell
-python .\examples\python\3dgs_example.py ^
-    --ply D:/ScanVideo/chuan/splats.ply ^
-    --out-dir 3dgs_chuan_gpu_sort_out
+python .\examples\python\gaussian_splats.py view ^
+    --ply D:/path/to/splats.ply ^
+    --mode batch ^
+    --out-dir splat_batch_out
 ```
 
 Useful camera overrides:
 
 ```powershell
-python .\examples\python\3dgs_example.py ^
-    --ply D:/ScanVideo/chuan/splats.ply ^
-    --out-dir 3dgs_chuan_out ^
+python .\examples\python\gaussian_splats.py view ^
+    --ply D:/path/to/splats.ply ^
+    --mode batch ^
+    --out-dir splat_batch_out ^
     --distance-scale 4.0 ^
     --side front
 ```
 
-### COLMAP Camera 3DGS Alignment Test
+The camera is framed from bounds sampled directly out of the PLY, because the engine exposes no bounds query for loaded splats.
 
-`render_gs_colmap_views.py` renders a 3DGS PLY from COLMAP `cameras.bin/images.bin` views. It is useful for comparing caustica output against gsplat output from the same camera poses.
+### COLMAP Camera 3DGS Alignment
 
-By default, it reads:
-
-```text
-D:/ProgramCode/Python/demo_gsplat&blender/GS/gaussians.ply
-D:/ProgramCode/Python/demo_gsplat&blender/GS/sparse
-```
-
-Example:
+`gaussian_splats.py colmap` renders a 3DGS PLY from COLMAP `cameras.bin`/`images.bin` (or the `.txt` equivalents) views. It is useful for comparing caustica output against gsplat output from the same camera poses. Both `--ply` and `--colmap-dir` are required, and the subcommand needs numpy.
 
 ```powershell
-python .\examples\python\render_gs_colmap_views.py ^
+python .\examples\python\gaussian_splats.py colmap ^
+    --ply D:/path/to/gaussians.ply ^
+    --colmap-dir D:/path/to/sparse ^
     --max-views 8 ^
     --frames-per-view 8 ^
     --warmup-frames 4 ^
-    --mip-antialiasing ^
-    --out-dir "D:\ProgramCode\Python\demo_gsplat&blender\GS\caustica_rendered_intrinsics_mipaa"
+    --out-dir colmap_views_out
 ```
 
-The script passes full COLMAP pinhole intrinsics (`fx`, `fy`, `cx`, `cy`) through `Renderer.set_camera_intrinsics(...)`. This keeps off-center principal points aligned with gsplat. Use `--symmetric-fov` only when intentionally testing the older vertical-FOV-only path.
+The subcommand passes full COLMAP pinhole intrinsics (`fx`, `fy`, `cx`, `cy`) through `Renderer.set_camera_intrinsics(...)`, which keeps off-center principal points aligned with gsplat. Use `--symmetric-fov` only when intentionally testing the vertical-FOV-only path. Output resolution defaults to the COLMAP camera size; `--width` / `--height` override it and the intrinsics are rescaled to match.
 
-When `--convert-rdf-to-rub` is enabled, which is the default, both the PLY loader and the COLMAP camera pose are converted from RDF/COLMAP coordinates into caustica engine coordinates. `--mip-antialiasing` is enabled by default and can be disabled with `--no-mip-antialiasing`.
+Alongside the images it writes `cameras_used.json` recording, per view, the COLMAP intrinsics and the caustica camera actually used.
+
+When `--rdf-to-rub` is enabled, which is the default, both the PLY loader and the COLMAP camera pose are converted from RDF/COLMAP coordinates into caustica engine coordinates. Disable it with `--no-rdf-to-rub`. `--mip-antialiasing` defaults on for this subcommand and can be disabled with `--no-mip-antialiasing`.
 
 ### Load OBJ Meshes With Materials
 
@@ -758,7 +756,7 @@ scene = r"""
     {
       "name": "ScanA",
       "type": "GaussianSplat",
-      "path": "D:/ScanVideo/chuan/splats_a.ply",
+      "path": "D:/path/to/scans/splats_a.ply",
       "translation": [0.0, 0.0, 0.0],
       "scaling": 1.0,
       "convertRdfToRub": true,
@@ -767,7 +765,7 @@ scene = r"""
     {
       "name": "ScanB",
       "type": "GaussianSplat",
-      "path": "D:/ScanVideo/chuan/splats_b.ply",
+      "path": "D:/path/to/scans/splats_b.ply",
       "translation": [2.0, 0.0, 0.0],
       "scaling": 0.75
     }
@@ -1516,7 +1514,7 @@ All enums are arithmetic, so `int(enum_value)` works and enum values can be assi
 In embedded mode, scripts run inside `caustica.exe`:
 
 ```powershell
-caustica.exe --pythonScript examples/python/example_basic.py
+caustica.exe --pythonScript examples/python/embedded.py
 caustica.exe --pythonExpr "import caustica; print(caustica.app().scene_name)"
 ```
 
@@ -1557,19 +1555,23 @@ For windowed extension usage:
 
 | File | Purpose |
 | --- | --- |
-| `examples/python/_common.py` | Shared path / framing helpers. |
-| `examples/python/offline_render.py` | Headless reference render and screenshot. |
-| `examples/python/realtime_render.py` | Realtime / denoiser smoke test. |
-| `examples/python/launch_default_scene.py` | Builtin scene, mesh import, FPS / OIDN smoke. |
-| `examples/python/render_default_scene.py` | `Assets/default.json` Hybrid 3DGS + 3DGRT. |
-| `examples/python/render_default_scene_animated.py` | Animated default-scene capture via `SceneEntity` deform. |
-| `examples/python/3dgs_example.py` | 3DGS interactive / Reference+OIDN / Realtime+DLSS. |
-| `examples/python/render_gs_colmap_views.py` | COLMAP-view 3DGS with pinhole intrinsics. |
-| `examples/python/test_intrinsics_demo.py` | Off-center pinhole intrinsics demo. |
-| `examples/python/test_envmap_proc_sky.py` | Environment map / procedural sky experiment. |
-| `examples/python/example_basic.py` | Basic embedded scripting. |
-| `examples/python/example_modes_dlss_oidn.py` | Realtime/reference mode, DLSS, OIDN settings. |
-| `examples/python/example_animate_lights.py` | Per-frame light edits. |
+| `examples/python/render.py` | Reference / realtime / windowed rendering, spawning, material and camera edits, framebuffer readback. |
+| `examples/python/gaussian_splats.py` | 3DGS: `view` a standalone `.ply`, `hybrid` mesh+splat scenes, `colmap` camera reproduction. |
+| `examples/python/animation_sequence.py` | Scene animation rendered at explicit timeline samples. |
+| `examples/python/mesh_deformation.py` | Per-frame CPU vertex rewrites via `deform_mesh` with acceleration-structure rebuilds. |
+| `examples/python/camera_intrinsics.py` | Off-center pinhole intrinsics through `set_camera_intrinsics`. |
+| `examples/python/environment_lighting.py` | HDRI environment maps and procedural-sky presets. |
+| `examples/python/embedded.py` | Embedded scripting inside `caustica.exe`. |
+
+Shared helper modules, not runnable examples:
+
+| File | Purpose |
+| --- | --- |
+| `examples/python/_common.py` | Renderer construction, shared CLI flags, render-mode and denoiser selection, camera framing, output helpers. |
+| `examples/python/_gaussian.py` | 3DGS settings mapping, splat-only scene template, PLY bounds reader. |
+| `examples/python/_colmap.py` | COLMAP sparse-model reader and camera conversion. |
+
+Extension-mode examples share `--width`, `--height`, `--vulkan`, and `--adapter`. Realtime ones share `--denoiser` (`auto`, `off`, `taa`, `nrd`, `dlss`, `dlss-rr`), which falls back automatically when the device lacks DLSS support.
 
 Also see `examples/python/README.md` for embed vs extension setup.
 

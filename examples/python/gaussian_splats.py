@@ -1,271 +1,74 @@
 #!/usr/bin/env python
-"""3D Gaussian splat example: interactive preview or headless Ref/RT batch.
+"""Render 3D Gaussian splats with caustica.
 
-Modes:
-  interactive  Open a window (default)
-  reference    Headless reference accumulation + OIDN
-  realtime     Headless realtime frames (DLSS-RR when available)
-  batch        Run reference then realtime
+Three workflows share one script because they differ only in where the camera
+and the splat data come from:
 
-Usage:
-    python examples/python/gaussian_splats.py --ply path/to/splat.ply
-    python examples/python/gaussian_splats.py --mode batch --out-dir ./3dgs_out
-    python examples/python/gaussian_splats.py --mode reference --headless --out ref.png
+    view    Load a standalone .ply, frame it from its own bounds, and preview it
+            interactively or render it headless.
+    hybrid  Render a scene whose JSON already declares both meshes and 3DGS
+            nodes, using raster splats with ray-traced soft shadows and
+            emissive splat proxies.
+    colmap  Reproduce COLMAP camera poses, including off-center pinhole
+            intrinsics, and write one image per view.
+
+Examples:
+    python examples/python/gaussian_splats.py view --ply splat.ply
+    python examples/python/gaussian_splats.py view --ply splat.ply --mode batch --out-dir out
+    python examples/python/gaussian_splats.py hybrid --window
+    python examples/python/gaussian_splats.py colmap --ply splat.ply --colmap-dir sparse
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
-import struct
-import tempfile
 from pathlib import Path
 
-from _common import ASSETS_DIR, resolve_output_path, run_window_loop
+from _common import (
+    ASSETS_DIR,
+    add_device_args,
+    add_quality_args,
+    add_window_args,
+    apply_common_settings,
+    apply_realtime_mode,
+    apply_reference_mode,
+    import_caustica,
+    make_renderer,
+    normalize,
+    render_reference_to,
+    require_input_file,
+    resolve_output_path,
+    resolve_scene_arg,
+    run_window_loop,
+    save_screenshot,
+)
+from _gaussian import (
+    add_gaussian_args,
+    add_gaussian_shadow_args,
+    apply_gaussian_settings,
+    camera_from_bounds,
+    create_splat_only_scene,
+    read_ply_bounds,
+    rebuild_acceleration_structures,
+)
+
+DEFAULT_HYBRID_SCENE = ASSETS_DIR / "default.json"
+
+PLY_HINT = (
+    "Pass --ply pointing at a binary little-endian 3DGS .ply file, for example a\n"
+    "trained gsplat/Inria checkpoint."
+)
 
 
-DEFAULT_PLY = ASSETS_DIR / "Models" / "Gingy" / "splat_crop.ply"
-if not DEFAULT_PLY.exists():
-    DEFAULT_PLY = Path(r"D:/ScanVideo/Gingy/splat_crop.ply")
+# --------------------------------------------------------------------------
+# view
+# --------------------------------------------------------------------------
 
 
-def normalize(v: tuple[float, float, float] | list[float]) -> tuple[float, float, float]:
-    length = math.sqrt(sum(x * x for x in v))
-    if length <= 1e-8:
-        return (0.0, 0.0, 1.0)
-    return (v[0] / length, v[1] / length, v[2] / length)
-
-
-def parse_binary_ply_bounds(
-    ply_path: Path, convert_rdf_to_rub: bool, sample_cap: int
-) -> tuple[tuple[float, float, float], tuple[float, float, float], int]:
-    with ply_path.open("rb") as f:
-        header_lines: list[str] = []
-        while True:
-            line = f.readline()
-            if not line:
-                raise RuntimeError("Unexpected EOF in PLY header")
-            text = line.decode("ascii", errors="replace").strip()
-            header_lines.append(text)
-            if text == "end_header":
-                data_offset = f.tell()
-                break
-
-    if header_lines[0] != "ply":
-        raise RuntimeError(f"Not a PLY file: {ply_path}")
-    format_line = next((line for line in header_lines if line.startswith("format ")), "")
-    if "binary_little_endian" not in format_line:
-        raise RuntimeError(f"Only binary_little_endian PLY supported: {format_line}")
-
-    type_info = {
-        "char": ("b", 1), "int8": ("b", 1),
-        "uchar": ("B", 1), "uint8": ("B", 1), "uint8_t": ("B", 1),
-        "short": ("h", 2), "int16": ("h", 2),
-        "ushort": ("H", 2), "uint16": ("H", 2),
-        "int": ("i", 4), "int32": ("i", 4),
-        "uint": ("I", 4), "uint32": ("I", 4),
-        "float": ("f", 4), "float32": ("f", 4),
-        "double": ("d", 8), "float64": ("d", 8),
-    }
-
-    vertex_count = 0
-    properties: list[tuple[str, str, int]] = []
-    in_vertex = False
-    offset = 0
-    for line in header_lines:
-        parts = line.split()
-        if len(parts) >= 3 and parts[0] == "element":
-            in_vertex = parts[1] == "vertex"
-            if in_vertex:
-                vertex_count = int(parts[2])
-                properties.clear()
-                offset = 0
-        elif in_vertex and len(parts) >= 3 and parts[0] == "property":
-            if parts[1] == "list":
-                raise RuntimeError("List vertex properties are not supported")
-            if parts[1] not in type_info:
-                raise RuntimeError(f"Unsupported PLY property type: {parts[1]}")
-            properties.append((parts[2], parts[1], offset))
-            offset += type_info[parts[1]][1]
-
-    offsets = {name: (ptype, byte_offset) for name, ptype, byte_offset in properties}
-    for axis in ("x", "y", "z"):
-        if axis not in offsets:
-            raise RuntimeError(f"PLY is missing vertex property '{axis}'")
-
-    stride = offset
-    step = max(1, vertex_count // max(1, min(sample_cap, vertex_count)))
-    mins = [float("inf")] * 3
-    maxs = [float("-inf")] * 3
-    sampled = 0
-
-    def read_float(row: bytes, name: str) -> float:
-        ptype, byte_offset = offsets[name]
-        code, _ = type_info[ptype]
-        return float(struct.unpack_from("<" + code, row, byte_offset)[0])
-
-    with ply_path.open("rb") as f:
-        f.seek(data_offset)
-        for index in range(vertex_count):
-            row = f.read(stride)
-            if len(row) != stride:
-                raise RuntimeError(f"Unexpected EOF in PLY vertex data at row {index}")
-            if index % step != 0:
-                continue
-            x, y, z = read_float(row, "x"), read_float(row, "y"), read_float(row, "z")
-            point = [x, -y, -z] if convert_rdf_to_rub else [x, y, z]
-            for axis in range(3):
-                mins[axis] = min(mins[axis], point[axis])
-                maxs[axis] = max(maxs[axis], point[axis])
-            sampled += 1
-
-    if sampled == 0:
-        raise RuntimeError("PLY has no sampled vertices")
-    center = tuple((mins[i] + maxs[i]) * 0.5 for i in range(3))
-    extents = tuple(maxs[i] - mins[i] for i in range(3))
-    return center, extents, vertex_count  # type: ignore[return-value]
-
-
-def camera_from_bounds(
-    center: tuple[float, float, float],
-    extents: tuple[float, float, float],
-    side: str,
-    distance_scale: float,
-) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
-    offset_dirs = {
-        "front": (0.0, 0.0, -1.0),
-        "back": (0.0, 0.0, 1.0),
-        "left": (-1.0, 0.0, 0.0),
-        "right": (1.0, 0.0, 0.0),
-        "top": (0.0, 1.0, 0.0),
-    }
-    radius = max(extents) * 0.5
-    distance = max(radius * distance_scale, 0.5)
-    offset = offset_dirs[side]
-    position = tuple(center[i] + offset[i] * distance for i in range(3))
-    direction = normalize([center[i] - position[i] for i in range(3)])
-    up = (0.0, 0.0, -1.0) if side == "top" else (0.0, 1.0, 0.0)
-    return position, direction, up
-
-
-def create_splat_only_scene() -> Path:
-    """Minimal scene with a far-away dummy mesh so 3DGS can load alone."""
-    model_path = ASSETS_DIR / "Models" / "ConvergenceTest" / "ConvergenceTest.gltf"
-    if not model_path.exists():
-        # Fallback: inline builtin plane tucked away.
-        scene_path = Path(tempfile.gettempdir()) / "caustica_splat_only.scene.json"
-        scene = {
-            "models": ["builtin:plane"],
-            "graph": [
-                {
-                    "name": "HiddenDummyMesh",
-                    "model": 0,
-                    "translation": [100000.0, 100000.0, 100000.0],
-                    "scaling": 0.001,
-                },
-                {
-                    "name": "Cameras",
-                    "children": [
-                        {
-                            "name": "Default",
-                            "type": "PerspectiveCameraEx",
-                            "translation": [0.0, 0.0, -5.0],
-                            "rotation": [0.0, 0.0, 0.0, 1.0],
-                            "verticalFov": 0.785398,
-                            "zNear": 0.001,
-                            "exposureCompensation": 0.0,
-                            "enableAutoExposure": False,
-                        }
-                    ],
-                },
-            ],
-        }
-        scene_path.write_text(json.dumps(scene, indent=2), encoding="utf-8")
-        return scene_path
-
-    scene_path = Path(tempfile.gettempdir()) / "caustica_splat_only.scene.json"
-    scene = {
-        "models": [str(model_path).replace("\\", "/")],
-        "graph": [
-            {
-                "name": "HiddenDummyMesh",
-                "model": 0,
-                "translation": [100000.0, 100000.0, 100000.0],
-                "scaling": 0.001,
-            },
-            {
-                "name": "Cameras",
-                "children": [
-                    {
-                        "name": "Default",
-                        "type": "PerspectiveCameraEx",
-                        "translation": [0.0, 0.0, -5.0],
-                        "rotation": [0.0, 0.0, 0.0, 1.0],
-                        "verticalFov": 0.785398,
-                        "zNear": 0.001,
-                        "exposureCompensation": 0.0,
-                        "enableAutoExposure": False,
-                    }
-                ],
-            },
-        ],
-    }
-    scene_path.write_text(json.dumps(scene, indent=2), encoding="utf-8")
-    return scene_path
-
-
-def parse_vec3(values: list[float] | None) -> tuple[float, float, float] | None:
-    if values is None:
-        return None
-    return (float(values[0]), float(values[1]), float(values[2]))
-
-
-def configure_gaussian_splats(caustica, settings, args: argparse.Namespace) -> None:
-    settings.enable_gaussian_splats = True
-    settings.gaussian_splat_depth_test = args.depth_test
-    settings.gaussian_splat_sorting_mode = int(
-        caustica.GaussianSplatSortMode.StochasticSplats
-        if args.sorting == "stochastic"
-        else caustica.GaussianSplatSortMode.GpuSort
-    )
-    storage = {
-        "float32": caustica.GaussianSplatStorageFormat.Float32,
-        "float16": caustica.GaussianSplatStorageFormat.Float16,
-        "uint8": caustica.GaussianSplatStorageFormat.Uint8,
-    }[args.storage_format]
-    settings.gaussian_splat_sh_format = int(storage)
-    settings.gaussian_splat_rgba_format = int(storage)
-    settings.gaussian_splat_scale = args.splat_scale
-    settings.gaussian_splat_alpha_scale = args.alpha_scale
-    settings.gaussian_splat_brightness = args.brightness
-    settings.gaussian_splat_alpha_cull_threshold = args.alpha_cull
-    settings.gaussian_splat_mip_antialiasing = args.mip_antialiasing
-    settings.gaussian_splat_frustum_culling = int(
-        {
-            "disabled": caustica.GaussianSplatFrustumCulling.Disabled,
-            "distance": caustica.GaussianSplatFrustumCulling.AtDistanceStage,
-            "raster": caustica.GaussianSplatFrustumCulling.AtRasterStage,
-        }[args.frustum_culling]
-    )
-    shadow_mode = {
-        "disabled": caustica.GaussianSplatShadowMode.Disabled,
-        "hard": caustica.GaussianSplatShadowMode.Hard,
-        "soft": caustica.GaussianSplatShadowMode.Soft,
-    }[args.shadow_mode]
-    settings.gaussian_splat_shadows_mode = int(shadow_mode)
-    settings.gaussian_splat_shadows = args.shadow_mode != "disabled"
-    if args.translation is not None:
-        settings.gaussian_splat_translation = parse_vec3(args.translation)
-    if args.rotation is not None:
-        settings.gaussian_splat_rotation_euler_deg = parse_vec3(args.rotation)
-    if args.object_scale is not None:
-        settings.gaussian_splat_object_scale = parse_vec3(args.object_scale)
-
-
-def configure_camera(renderer, args: argparse.Namespace, ply_path: Path) -> None:
-    center, extents, vertex_count = parse_binary_ply_bounds(
-        ply_path, args.rdf_to_rub, args.sample_cap
+def aim_camera_at_ply(renderer, args: argparse.Namespace, ply_path: Path) -> None:
+    center, extents, vertex_count = read_ply_bounds(
+        ply_path, convert_rdf_to_rub=args.rdf_to_rub, sample_cap=args.sample_cap
     )
     cam_pos, cam_dir, cam_up = camera_from_bounds(
         center, extents, args.side, args.distance_scale
@@ -276,197 +79,367 @@ def configure_camera(renderer, args: argparse.Namespace, ply_path: Path) -> None
         cam_dir = normalize(args.cam_dir)
     if args.cam_up:
         cam_up = normalize(args.cam_up)
+
     print(f"[caustica] PLY vertices={vertex_count} center={center} extents={extents}")
     print(f"[caustica] camera pos={cam_pos} dir={cam_dir}")
     renderer.set_camera(cam_pos, cam_dir, cam_up)
     renderer.set_camera_fov(args.fov)
 
 
-def select_realtime_aa(caustica, settings, requested: str) -> tuple[int, str]:
-    dlss = bool(getattr(settings, "is_dlss_supported", False))
-    rr = bool(getattr(settings, "is_dlss_rr_supported", False))
-    if requested == "dlss-rr":
-        if rr:
-            return int(caustica.RealtimeAA.DLSS_RR), "dlss_rr"
-        if dlss:
-            print("[caustica] DLSS-RR unavailable; falling back to DLSS.")
-            return int(caustica.RealtimeAA.DLSS), "dlss"
-        print("[caustica] DLSS unavailable; falling back to TAA.")
-        return int(caustica.RealtimeAA.TAA), "taa"
-    if requested == "dlss":
-        if dlss:
-            return int(caustica.RealtimeAA.DLSS), "dlss"
-        return int(caustica.RealtimeAA.TAA), "taa"
-    if requested == "taa":
-        return int(caustica.RealtimeAA.TAA), "taa"
-    return int(caustica.RealtimeAA.Off), "off"
-
-
-def make_renderer(caustica, args, scene: str, ply_path: Path, *, realtime: bool, headless: bool):
-    renderer = caustica.Renderer(
-        width=args.width,
-        height=args.height,
-        headless=headless,
-        vulkan=args.vulkan,
-        adapter=args.adapter,
-        scene=scene,
+def open_splat_renderer(caustica, args, ply_path: Path, *, realtime: bool, headless: bool):
+    """Create a renderer on the splat-only scene and append the .ply."""
+    renderer = make_renderer(
+        caustica,
+        args,
+        scene=args.scene or create_splat_only_scene(),
         realtime=realtime,
-        accumulation_target=args.frames,
+        headless=headless,
+        accumulation_target=args.spp if not realtime else 1,
     )
     if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_rub):
         renderer.close()
-        raise RuntimeError(f"Failed to load Gaussian splat: {ply_path}")
+        raise SystemExit(f"Failed to load Gaussian splats: {ply_path}")
     return renderer
 
 
-def render_reference(caustica, args, scene: str, ply_path: Path, out_path: Path) -> None:
-    print(f"\n[caustica] Reference: {args.frames} spp + OIDN -> {out_path}")
-    with make_renderer(caustica, args, scene, ply_path, realtime=False, headless=True) as renderer:
-        app = renderer.app
-        app.set_reference_mode(
-            spp=args.frames,
-            oidn=True,
-            oidn_quality=int(caustica.OidnQuality.High),
-            oidn_passes=int(caustica.OidnPasses.AlbedoNormal),
-            oidn_prefilter=int(caustica.OidnPrefilter.Accurate),
-        )
-        s = renderer.settings
-        s.oidn_use_gpu = args.oidn_gpu
-        s.enable_tone_mapping = args.tonemap
-        s.enable_bloom = args.bloom
-        s.bounce_count = args.bounces
-        s.use_nee = True
-        s.oidn_apply()
-        configure_gaussian_splats(caustica, s, args)
-        configure_camera(renderer, args, ply_path)
-        s.reset_accumulation = True
-        frames = renderer.step_until_accumulated(max(args.frames + 128, args.frames * 4))
-        if not renderer.save_screenshot(str(out_path)):
-            raise RuntimeError(f"Failed to save: {out_path}")
-        print(f"[caustica] saved: {out_path} ({frames} frames)")
+def run_view(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
+    ply_path = require_input_file(args.ply, "3DGS PLY", hint=PLY_HINT)
+    print(f"[caustica] mode={args.mode} ply={ply_path}")
 
-
-def render_realtime(caustica, args, scene: str, ply_path: Path, out_path: Path) -> None:
-    print(f"\n[caustica] Realtime: {args.frames} frames -> {out_path}")
-    with make_renderer(caustica, args, scene, ply_path, realtime=True, headless=True) as renderer:
-        s = renderer.settings
-        aa_mode, aa_label = select_realtime_aa(caustica, s, args.realtime_aa)
-        renderer.app.set_realtime_mode(standalone_denoiser=False, realtime_aa=aa_mode)
-        s.enable_tone_mapping = args.tonemap
-        s.enable_bloom = args.bloom
-        if aa_label in {"dlss", "dlss_rr"}:
-            s.dlss_mode = int(caustica.DLSSMode.Balanced)
-        if aa_label == "dlss_rr":
-            s.dlss_rr_preset = int(caustica.DLSSRRPreset.PresetE)
-            s.disable_restirs_with_dlss_rr = True
-        configure_gaussian_splats(caustica, s, args)
-        configure_camera(renderer, args, ply_path)
-        s.reset_accumulation = True
-        renderer.step_n(args.frames)
-        # Rewrite path when AA label is known for batch mode.
-        if out_path.name.startswith("realtime"):
-            out_path = out_path.with_name(f"realtime_{aa_label}.png")
-        if not renderer.save_screenshot(str(out_path)):
-            raise RuntimeError(f"Failed to save: {out_path}")
-        print(f"[caustica] saved: {out_path} (aa={aa_label})")
-
-
-def run_interactive(caustica, args, scene: str, ply_path: Path) -> None:
-    with make_renderer(
-        caustica, args, scene, ply_path, realtime=True, headless=False
-    ) as renderer:
-        s = renderer.settings
-        renderer.app.set_realtime_mode(
-            standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.Off)
-        )
-        s.enable_tone_mapping = args.tonemap
-        s.enable_bloom = args.bloom
-        configure_gaussian_splats(caustica, s, args)
-        configure_camera(renderer, args, ply_path)
-        run_window_loop(renderer)
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="caustica 3DGS interactive / batch example.")
-    parser.add_argument("--mode", choices=["interactive", "reference", "realtime", "batch"], default="interactive")
-    parser.add_argument("--ply", type=Path, default=DEFAULT_PLY)
-    parser.add_argument("--scene", default=None)
-    parser.add_argument("--out-dir", type=Path, default=Path("gaussian_splats_out"))
-    parser.add_argument("--out", default="splat.png", help="Screenshot for single reference/realtime mode.")
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
-    parser.add_argument("--frames", type=int, default=32)
-    parser.add_argument("--bounces", type=int, default=8)
-    parser.add_argument("--vulkan", action="store_true")
-    parser.add_argument(
-        "--adapter",
-        default="auto",
-        help="GPU selector: auto, index:N, name:text, uuid:hex, or luid:hex",
-    )
-    parser.add_argument("--side", choices=["front", "back", "left", "right", "top"], default="front")
-    parser.add_argument("--distance-scale", type=float, default=3.0)
-    parser.add_argument("--fov", type=float, default=45.0)
-    parser.add_argument("--cam-pos", nargs=3, type=float)
-    parser.add_argument("--cam-dir", nargs=3, type=float)
-    parser.add_argument("--cam-up", nargs=3, type=float)
-    parser.add_argument("--sample-cap", type=int, default=200_000)
-    parser.add_argument("--sorting", choices=["gpu", "stochastic"], default="gpu")
-    parser.add_argument("--storage-format", choices=["float32", "float16", "uint8"], default="uint8")
-    parser.add_argument("--splat-scale", type=float, default=1.0)
-    parser.add_argument("--alpha-scale", type=float, default=1.0)
-    parser.add_argument("--brightness", type=float, default=1.0)
-    parser.add_argument("--alpha-cull", type=float, default=1.0 / 255.0)
-    parser.add_argument("--translation", nargs=3, type=float)
-    parser.add_argument("--rotation", nargs=3, type=float)
-    parser.add_argument("--object-scale", nargs=3, type=float)
-    parser.add_argument("--depth-test", dest="depth_test", action="store_true", default=True)
-    parser.add_argument("--no-depth-test", dest="depth_test", action="store_false")
-    parser.add_argument("--rdf-to-rub", dest="rdf_to_rub", action="store_true", default=True)
-    parser.add_argument("--no-rdf-to-rub", dest="rdf_to_rub", action="store_false")
-    parser.add_argument("--mip-antialiasing", action="store_true")
-    parser.add_argument("--frustum-culling", choices=["disabled", "distance", "raster"], default="raster")
-    parser.add_argument("--shadow-mode", choices=["disabled", "hard", "soft"], default="disabled")
-    parser.add_argument("--realtime-aa", choices=["dlss-rr", "dlss", "taa", "off"], default="dlss-rr")
-    parser.add_argument("--oidn-gpu", dest="oidn_gpu", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--tonemap", action="store_true")
-    parser.add_argument("--bloom", action="store_true")
-    # Compatibility with older test_splat_interactive.py flag name.
-    parser.add_argument("--headless", action="store_true", help="Alias: force --mode reference when interactive.")
-    return parser.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
-    mode = args.mode
-    if args.headless and mode == "interactive":
-        mode = "reference"
-
-    ply_path = args.ply.resolve()
-    if not ply_path.exists():
-        raise FileNotFoundError(
-            f"PLY not found: {ply_path}\nPass --ply <path> to a local 3DGS .ply file."
-        )
-
-    launch_cwd = Path.cwd()
-    import caustica
-
-    scene = args.scene or str(create_splat_only_scene())
-    print(f"[caustica] mode={mode} ply={ply_path}")
-    print(f"[caustica] scene={scene}")
-
-    if mode == "interactive":
-        run_interactive(caustica, args, scene, ply_path)
+    if args.mode == "interactive":
+        with open_splat_renderer(
+            caustica, args, ply_path, realtime=True, headless=False
+        ) as renderer:
+            apply_realtime_mode(renderer.app, caustica, "off")
+            apply_common_settings(renderer, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, renderer.settings, args)
+            aim_camera_at_ply(renderer, args, ply_path)
+            run_window_loop(renderer)
         return 0
 
     out_dir = resolve_output_path(args.out_dir, launch_cwd)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    if mode in {"reference", "batch"}:
-        out = out_dir / "reference_oidn.png" if mode == "batch" else resolve_output_path(args.out, launch_cwd)
-        render_reference(caustica, args, scene, ply_path, out)
-    if mode in {"realtime", "batch"}:
-        out = out_dir / "realtime.png" if mode == "batch" else resolve_output_path(args.out, launch_cwd)
-        render_realtime(caustica, args, scene, ply_path, out)
+    batch = args.mode == "batch"
+
+    if args.mode in {"reference", "batch"}:
+        with open_splat_renderer(
+            caustica, args, ply_path, realtime=False, headless=True
+        ) as renderer:
+            label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=True)
+            apply_common_settings(renderer, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, renderer.settings, args)
+            aim_camera_at_ply(renderer, args, ply_path)
+            renderer.settings.reset_accumulation = True
+            out = out_dir / "reference_oidn.png" if batch else args.out
+            render_reference_to(renderer, out, launch_cwd=launch_cwd, label=label)
+
+    if args.mode in {"realtime", "batch"}:
+        with open_splat_renderer(
+            caustica, args, ply_path, realtime=True, headless=True
+        ) as renderer:
+            label = apply_realtime_mode(renderer.app, caustica, args.denoiser)
+            apply_common_settings(renderer, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, renderer.settings, args)
+            aim_camera_at_ply(renderer, args, ply_path)
+            renderer.settings.reset_accumulation = True
+            renderer.step_n(args.frames)
+            out = out_dir / "realtime.png" if batch else args.out
+            saved = save_screenshot(renderer, out, launch_cwd=launch_cwd)
+            print(f"[caustica] Saved {saved} after {args.frames} frame(s) [{label}]")
+
     return 0
+
+
+# --------------------------------------------------------------------------
+# hybrid
+# --------------------------------------------------------------------------
+
+
+def run_hybrid(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
+    scene = resolve_scene_arg(args.scene)
+    print(f"[caustica] Scene : {scene}")
+    print(f"[caustica] Mode  : {'headless' if args.headless else 'windowed'}")
+
+    with make_renderer(
+        caustica,
+        args,
+        scene=scene,
+        realtime=not args.headless,
+        accumulation_target=args.spp,
+    ) as renderer:
+        app = renderer.app
+        print(f"[caustica] Loaded scene   : {app.scene_name}")
+        print(f"[caustica] 3DGS objects   : {app.gaussian_splat_object_count}")
+        print(f"[caustica] 3DGS splats    : {app.gaussian_splat_count}")
+        if app.gaussian_splat_object_count == 0:
+            print(
+                "[caustica] WARNING: this scene declares no GaussianSplat nodes, so the "
+                "3DGS shadow and emission settings will have no visible effect.\n"
+                "[caustica]          Point --scene at a scene containing 3DGS nodes, or use "
+                "the 'view' subcommand to render a standalone .ply."
+            )
+
+        if args.headless:
+            label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=args.oidn)
+        else:
+            label = apply_realtime_mode(app, caustica, args.denoiser)
+        apply_common_settings(renderer, caustica, bounces=args.bounces)
+        apply_gaussian_settings(caustica, renderer.settings, args)
+        renderer.settings.reset_accumulation = True
+
+        if args.shadow_mode != "disabled":
+            rebuild_acceleration_structures(renderer, args.warmup_frames)
+
+        if args.headless:
+            render_reference_to(renderer, args.out, launch_cwd=launch_cwd, label=label)
+        else:
+            run_window_loop(renderer)
+    return 0
+
+
+# --------------------------------------------------------------------------
+# colmap
+# --------------------------------------------------------------------------
+
+
+def run_colmap(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
+    import _colmap
+
+    ply_path = require_input_file(args.ply, "3DGS PLY", hint=PLY_HINT)
+    colmap_dir = Path(args.colmap_dir).expanduser().resolve()
+    if not colmap_dir.is_dir():
+        raise SystemExit(
+            f"COLMAP model directory not found: {colmap_dir}\n"
+            "Pass --colmap-dir pointing at a sparse model containing "
+            "cameras.bin/images.bin (or the .txt equivalents)."
+        )
+
+    views = _colmap.load_views(colmap_dir, args.name_prefix, args.name_contains)[args.skip :]
+    if args.max_views > 0:
+        views = views[: args.max_views]
+    if not views:
+        raise SystemExit("No views left after --skip / --max-views")
+
+    first = views[0]
+    width = args.width or first.width
+    height = args.height or first.height
+    args.width, args.height = width, height
+
+    out_dir = resolve_output_path(args.out_dir, launch_cwd)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"[caustica] ply        : {ply_path}")
+    print(f"[caustica] views      : {len(views)}")
+    print(f"[caustica] resolution : {width}x{height}")
+    print(f"[caustica] output     : {out_dir}")
+    if args.symmetric_fov:
+        print("[caustica] projection : symmetric vertical FOV (cx/cy ignored)")
+    else:
+        fx, fy, cx, cy = _colmap.scaled_intrinsics(first, width, height)
+        print(
+            f"[caustica] projection : COLMAP K scaled to output "
+            f"(fx={fx:.3f}, fy={fy:.3f}, cx={cx:.3f}, cy={cy:.3f})"
+        )
+
+    records = []
+    with open_splat_renderer(
+        caustica, args, ply_path, realtime=True, headless=not args.windowed
+    ) as renderer:
+        apply_realtime_mode(renderer.app, caustica, "off")
+        settings = renderer.settings
+        settings.enable_tone_mapping = args.tonemap
+        settings.enable_bloom = args.bloom
+        apply_gaussian_settings(caustica, settings, args)
+
+        if args.warmup_frames > 0:
+            renderer.step_n(args.warmup_frames)
+
+        for index, view in enumerate(views):
+            if view.width != first.width or view.height != first.height:
+                print(
+                    f"[warn] {view.name}: COLMAP size {view.width}x{view.height} "
+                    f"differs from render size {width}x{height}"
+                )
+
+            record = apply_colmap_view(renderer, _colmap, view, width, height, args)
+            renderer.step_n(max(1, args.frames_per_view))
+
+            out_path = out_dir / f"{index:04d}_{_colmap.safe_stem(view.name)}.png"
+            save_screenshot(renderer, out_path)
+            print(f"[caustica] saved {index + 1}/{len(views)}: {out_path.name}")
+            records.append(
+                {
+                    "output": str(out_path),
+                    "image_name": view.name,
+                    "image_id": view.image_id,
+                    "colmap_width": view.width,
+                    "colmap_height": view.height,
+                    "colmap_fx": view.fx,
+                    "colmap_fy": view.fy,
+                    "colmap_cx": view.cx,
+                    "colmap_cy": view.cy,
+                    **record,
+                }
+            )
+
+    metadata_path = out_dir / "cameras_used.json"
+    metadata_path.write_text(json.dumps(records, indent=2), encoding="utf-8")
+    print(f"[caustica] wrote metadata: {metadata_path}")
+    return 0
+
+
+def apply_colmap_view(renderer, _colmap, view, width: int, height: int, args) -> dict:
+    cam_pos, cam_dir, cam_up = _colmap.caustica_camera(view, args.rdf_to_rub)
+    renderer.set_camera(cam_pos, cam_dir, cam_up)
+    record: dict = {
+        "caustica_position": cam_pos,
+        "caustica_direction": cam_dir,
+        "caustica_up": cam_up,
+        "c2w": view.c2w.tolist(),
+    }
+
+    if args.symmetric_fov:
+        renderer.set_camera_fov(view.vertical_fov_degrees)
+        record["projection"] = "symmetric_vertical_fov"
+        record["vertical_fov_degrees"] = view.vertical_fov_degrees
+        return record
+
+    fx, fy, cx, cy = _colmap.scaled_intrinsics(view, width, height)
+    renderer.set_camera_intrinsics(fx, fy, cx, cy, float(width), float(height))
+    record.update(
+        projection="pinhole_intrinsics", fx=fx, fy=fy, cx=cx, cy=cy, width=width, height=height
+    )
+    return record
+
+
+# --------------------------------------------------------------------------
+# CLI
+# --------------------------------------------------------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # -- view ---------------------------------------------------------------
+    view = subparsers.add_parser(
+        "view", help="Preview or render a standalone 3DGS .ply file."
+    )
+    view.set_defaults(func=run_view)
+    view.add_argument("--ply", required=True, help="Binary little-endian 3DGS .ply file.")
+    view.add_argument(
+        "--mode",
+        choices=["interactive", "reference", "realtime", "batch"],
+        default="interactive",
+        help="batch renders reference and realtime back to back.",
+    )
+    view.add_argument(
+        "--scene", default=None, help="Host scene JSON. Defaults to a splat-only scene."
+    )
+    view.add_argument("--out", default="splat.png", help="Output for reference/realtime mode.")
+    view.add_argument("--out-dir", default="gaussian_splats_out", help="Output dir for batch mode.")
+    view.add_argument("--frames", type=int, default=32, help="Realtime frames to accumulate.")
+    view.add_argument("--denoiser", default="dlss-rr", help="Realtime denoiser / AA path.")
+    view.add_argument(
+        "--side", choices=["front", "back", "left", "right", "top"], default="front"
+    )
+    view.add_argument("--distance-scale", type=float, default=3.0)
+    view.add_argument("--fov", type=float, default=45.0)
+    view.add_argument("--cam-pos", nargs=3, type=float, metavar=("X", "Y", "Z"))
+    view.add_argument("--cam-dir", nargs=3, type=float, metavar=("X", "Y", "Z"))
+    view.add_argument("--cam-up", nargs=3, type=float, metavar=("X", "Y", "Z"))
+    view.add_argument(
+        "--sample-cap", type=int, default=200_000, help="Max PLY vertices sampled for bounds."
+    )
+    add_device_args(view)
+    add_quality_args(view, spp=32)
+    add_gaussian_args(view)
+    add_rdf_arg(view)
+
+    # -- hybrid -------------------------------------------------------------
+    hybrid = subparsers.add_parser(
+        "hybrid", help="Mesh + 3DGS scene with ray-traced soft shadows and emissive proxies."
+    )
+    hybrid.set_defaults(func=run_hybrid)
+    hybrid.add_argument(
+        "--scene",
+        default=str(DEFAULT_HYBRID_SCENE),
+        help="Scene JSON path or Assets-relative name. The scene must declare "
+        "GaussianSplat nodes for this mode to show anything "
+        "(default: Assets/default.json).",
+    )
+    hybrid.add_argument("--out", default="hybrid_gaussian_scene.png")
+    hybrid.add_argument("--denoiser", default="off", help="Realtime denoiser for --window.")
+    hybrid.add_argument(
+        "--oidn", action="store_true", help="Denoise the headless reference render with OIDN."
+    )
+    hybrid.add_argument(
+        "--warmup-frames",
+        type=int,
+        default=8,
+        help="Frames to run after enabling shadows so the AS rebuild completes.",
+    )
+    add_window_args(hybrid)
+    add_device_args(hybrid)
+    add_quality_args(hybrid, spp=32)
+    add_gaussian_args(hybrid)
+    add_gaussian_shadow_args(hybrid)
+    add_rdf_arg(hybrid)
+
+    # -- colmap -------------------------------------------------------------
+    colmap = subparsers.add_parser(
+        "colmap", help="Render a 3DGS .ply from COLMAP camera poses and intrinsics."
+    )
+    colmap.set_defaults(func=run_colmap)
+    colmap.add_argument("--ply", required=True, help="Binary little-endian 3DGS .ply file.")
+    colmap.add_argument(
+        "--colmap-dir",
+        required=True,
+        help="COLMAP sparse model directory containing cameras/images (.bin or .txt).",
+    )
+    colmap.add_argument("--scene", default=None, help="Host scene JSON (default: splat-only).")
+    colmap.add_argument("--out-dir", default="colmap_views_out")
+    colmap.add_argument("--max-views", type=int, default=8, help="0 renders every view.")
+    colmap.add_argument("--skip", type=int, default=0)
+    colmap.add_argument("--name-prefix", default=None)
+    colmap.add_argument("--name-contains", default=None)
+    colmap.add_argument("--frames-per-view", type=int, default=8)
+    colmap.add_argument("--warmup-frames", type=int, default=4)
+    colmap.add_argument("--windowed", action="store_true")
+    colmap.add_argument("--tonemap", action="store_true")
+    colmap.add_argument("--bloom", action="store_true")
+    colmap.add_argument(
+        "--symmetric-fov",
+        action="store_true",
+        help="Ignore cx/cy and use a symmetric vertical FOV instead of the COLMAP K.",
+    )
+    # COLMAP output size comes from the model unless overridden.
+    add_device_args(colmap, width=0, height=0)
+    add_gaussian_args(colmap)
+    add_rdf_arg(colmap)
+    # COLMAP comparisons favour unquantized splats and no depth test.
+    colmap.set_defaults(
+        spp=1, bounces=8, storage_format="float32", mip_antialiasing=True, depth_test=False
+    )
+
+    return parser
+
+
+def add_rdf_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--rdf-to-rub",
+        dest="rdf_to_rub",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Convert splat data from RDF (COLMAP/OpenCV) to RUB (caustica) axes.",
+    )
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    caustica = import_caustica()
+    return args.func(caustica, args, Path.cwd())
 
 
 if __name__ == "__main__":

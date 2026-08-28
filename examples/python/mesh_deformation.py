@@ -1,246 +1,206 @@
 #!/usr/bin/env python
-"""Animate CPU mesh vertices on top of the hybrid Gaussian scene example.
+"""Deform CPU mesh vertices from Python and rebuild the acceleration structures.
 
-Loads Assets/default.json with raster 3DGS, ray-traced soft shadows and emitter
-lighting, then animates the Antman mesh via Python vertex deformation.
+``app.deform_mesh`` hands every vertex of a mesh entity to a Python callback and
+writes the results back, optionally recomputing normals and rebuilding the ray
+tracing acceleration structures so the change is visible to reflections and
+shadows. This is the hook for driving geometry from simulation or learned
+models rather than from imported animation channels.
 
-Usage:
-    cd <repo>
-
-    # Interactive window with live deformation:
+Examples:
     python examples/python/mesh_deformation.py --window
-
-    # Headless animation sequence:
-    python examples/python/mesh_deformation.py \
-        --headless --frames 48 --out-dir default_scene_anim
-
-All options from hybrid_gaussian_scene.py are also available (hybrid mode,
-shadow/emission knobs, etc.).
+    python examples/python/mesh_deformation.py --frames 48 --out-dir deformation_out
 """
 
 from __future__ import annotations
 
 import argparse
 import math
-import sys
 import time
 from pathlib import Path
 
-EXAMPLES_DIR = Path(__file__).resolve().parent
-if str(EXAMPLES_DIR) not in sys.path:
-    sys.path.insert(0, str(EXAMPLES_DIR))
-
-from _common import resolve_output_path, resolve_scene_arg
-from hybrid_gaussian_scene import (
-    DEFAULT_SCENE,
-    apply_gaussian_settings_and_rebuild,
-    build_arg_parser,
+from _common import (
+    ASSETS_DIR,
+    add_device_args,
+    add_quality_args,
+    add_window_args,
+    apply_common_settings,
+    apply_realtime_mode,
+    import_caustica,
+    make_renderer,
+    resolve_output_path,
+    resolve_scene_arg,
+    run_window_loop,
+    save_screenshot,
 )
+
+DEFAULT_SCENE = ASSETS_DIR / "default.json"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = build_arg_parser()
-    parser.description = "Render default.json with animated mesh deformation."
-    parser.add_argument("--mesh-name", default="antman_merged",
-                        help="Target mesh name (default: antman_merged from default.json).")
-    parser.add_argument("--deform-mode", choices=["wave", "breathe", "sway"], default="wave",
-                        help="Procedural deformation preset applied each frame.")
-    parser.add_argument("--amplitude", type=float, default=0.04,
-                        help="Deformation strength in object-space units.")
-    parser.add_argument("--speed", type=float, default=1.5,
-                        help="Animation speed multiplier.")
-    parser.add_argument("--frames", type=int, default=48,
-                        help="Number of animation frames for headless sequence mode.")
-    parser.add_argument("--out-dir", type=Path, default=Path("default_scene_anim"),
-                        help="Output directory for headless frame sequence.")
-    parser.add_argument("--spp-per-frame", type=int, default=32,
-                        help="Realtime accumulation steps per animation frame.")
-    parser.add_argument("--recompute-normals", dest="recompute_normals",
-                        action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--rebuild-accel", dest="rebuild_accel",
-                        action=argparse.BooleanOptionalAction, default=True,
-                        help="Rebuild ray tracing AS after each deformation.")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--scene", default=str(DEFAULT_SCENE))
+    parser.add_argument(
+        "--mesh-name",
+        default="antman_merged",
+        help="Target mesh entity. Falls back to the first non-builtin mesh in the scene.",
+    )
+    parser.add_argument(
+        "--deform-mode",
+        choices=["wave", "breathe", "sway"],
+        default="wave",
+        help="Procedural deformation applied each frame.",
+    )
+    parser.add_argument("--amplitude", type=float, default=0.04, help="Strength in object units.")
+    parser.add_argument("--speed", type=float, default=1.5)
+    parser.add_argument("--frames", type=int, default=48, help="Frames for the headless sequence.")
+    parser.add_argument("--out-dir", default="deformation_out")
+    parser.add_argument(
+        "--spp-per-frame", type=int, default=32, help="Accumulation steps per animation frame."
+    )
+    parser.add_argument(
+        "--recompute-normals", action=argparse.BooleanOptionalAction, default=False
+    )
+    parser.add_argument(
+        "--rebuild-accel",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Rebuild ray tracing acceleration structures after each deformation.",
+    )
+    add_window_args(parser)
+    add_device_args(parser)
+    add_quality_args(parser)
     return parser.parse_args()
 
 
-def find_target_mesh_entity(app, mesh_name: str):
+def find_target_mesh(app, mesh_name: str):
     if mesh_name:
         entity = app.find_mesh_entity(mesh_name)
         if entity is not None:
             return entity
+        print(f"[caustica] Mesh {mesh_name!r} not found; picking the first non-builtin mesh.")
 
-    for entity in app.get_mesh_entities():
+    entities = app.get_mesh_entities()
+    for entity in entities:
         name = entity.name.lower()
         if name in {"plane", "builtin_plane"} or name.startswith("builtin:"):
             continue
         return entity
-
-    entities = app.get_mesh_entities()
     if entities:
         return entities[-1]
-    raise RuntimeError("No deformable mesh entity found in the loaded scene.")
+    raise SystemExit("No deformable mesh entity found in the loaded scene.")
 
 
-def compute_mesh_center(vertices: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+def mesh_center(vertices) -> tuple[float, float, float]:
     if not vertices:
         return (0.0, 0.0, 0.0)
-    sx = sy = sz = 0.0
-    for x, y, z in vertices:
-        sx += x
-        sy += y
-        sz += z
     count = float(len(vertices))
-    return (sx / count, sy / count, sz / count)
+    return tuple(sum(axis) / count for axis in zip(*vertices))  # type: ignore[return-value]
 
 
-def make_deform_callback(
-    base_vertices: list[tuple[float, float, float]],
-    center: tuple[float, float, float],
-    mode: str,
-    amplitude: float,
-    time_value: float,
-):
+def make_deform_callback(base_vertices, center, mode: str, amplitude: float, t: float):
     cx, cy, cz = center
 
-    def callback(index: int, pos: tuple[float, float, float]):
+    def wave(index: int, _pos):
         x, y, z = base_vertices[index]
-        if mode == "wave":
-            lift = amplitude * math.sin(time_value * 2.0 + x * 4.0 + z * 3.0)
-            return (x, y + lift, z)
-        if mode == "breathe":
-            scale = 1.0 + amplitude * 3.0 * math.sin(time_value)
-            return (
-                cx + (x - cx) * scale,
-                cy + (y - cy) * scale,
-                cz + (z - cz) * scale,
-            )
-        if mode == "sway":
-            angle = amplitude * 2.5 * math.sin(time_value)
-            cos_a = math.cos(angle)
-            sin_a = math.sin(angle)
-            dx = x - cx
-            dz = z - cz
-            return (cx + dx * cos_a - dz * sin_a, y, cz + dx * sin_a + dz * cos_a)
-        return None
+        return (x, y + amplitude * math.sin(t * 2.0 + x * 4.0 + z * 3.0), z)
 
-    return callback
+    def breathe(index: int, _pos):
+        x, y, z = base_vertices[index]
+        scale = 1.0 + amplitude * 3.0 * math.sin(t)
+        return (cx + (x - cx) * scale, cy + (y - cy) * scale, cz + (z - cz) * scale)
+
+    def sway(index: int, _pos):
+        x, y, z = base_vertices[index]
+        angle = amplitude * 2.5 * math.sin(t)
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        dx, dz = x - cx, z - cz
+        return (cx + dx * cos_a - dz * sin_a, y, cz + dx * sin_a + dz * cos_a)
+
+    return {"wave": wave, "breathe": breathe, "sway": sway}[mode]
 
 
-def apply_deformation(
-    app,
-    entity,
-    base_vertices: list[tuple[float, float, float]],
-    center: tuple[float, float, float],
-    args: argparse.Namespace,
-    time_value: float,
-) -> None:
-    callback = make_deform_callback(
-        base_vertices, center, args.deform_mode, args.amplitude, time_value
-    )
+def deform(app, entity, base_vertices, center, args: argparse.Namespace, t: float) -> None:
     app.deform_mesh(
         entity=entity,
-        callback=callback,
+        callback=make_deform_callback(base_vertices, center, args.deform_mode, args.amplitude, t),
         recompute_normals=args.recompute_normals,
         rebuild_acceleration_structure=args.rebuild_accel,
     )
 
 
-def configure_renderer(renderer, caustica, args: argparse.Namespace) -> tuple[object, list[tuple[float, float, float]], tuple[float, float, float]]:
-    settings = renderer.settings
-    settings.realtime_mode = True
-    settings.accumulation_target = max(args.spp_per_frame, 1)
-    settings.accumulation_prewarm_realtime_caches = False
-    settings.bounce_count = args.bounces
-    settings.use_nee = True
-    settings.enable_tone_mapping = True
-    settings.realtime_aa = int(caustica.RealtimeAA.Off)
-    settings.enable_animations = False
-    apply_gaussian_settings_and_rebuild(renderer, caustica, settings, args)
-
-    entity = find_target_mesh_entity(renderer.app, args.mesh_name)
-    base_vertices = list(renderer.app.get_mesh_vertices(entity))
-    if not base_vertices:
-        raise RuntimeError(f"Mesh entity '{entity.name}' has no readable CPU vertex cache.")
-    center = compute_mesh_center(base_vertices)
-    print(f"[caustica] Target mesh entity : {entity.name} ({len(base_vertices)} vertices)")
-    print(f"[caustica] Deform mode : {args.deform_mode}, amplitude={args.amplitude}, speed={args.speed}")
-    return entity, base_vertices, center
-
-
-def render_sequence(renderer, entity, base_vertices, center, args: argparse.Namespace, launch_cwd: Path) -> None:
+def render_sequence(renderer, entity, base_vertices, center, args, launch_cwd: Path) -> None:
     out_dir = resolve_output_path(args.out_dir, launch_cwd)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    settings = renderer.settings
-    settings.realtime_mode = True
-    settings.accumulation_target = max(args.spp_per_frame, 1)
-
+    steps = max(args.spp_per_frame, 1)
     print(f"[caustica] Rendering {args.frames} animation frames -> {out_dir}")
-    t_start = time.time()
+
+    started = time.perf_counter()
     for frame in range(args.frames):
-        time_value = (frame / max(args.frames - 1, 1)) * math.pi * 2.0 * args.speed
-        apply_deformation(renderer.app, entity, base_vertices, center, args, time_value)
-        settings.reset_accumulation = True
-        renderer.step_n(max(args.spp_per_frame, 1))
+        t = (frame / max(args.frames - 1, 1)) * math.pi * 2.0 * args.speed
+        deform(renderer.app, entity, base_vertices, center, args, t)
+        renderer.settings.reset_accumulation = True
+        renderer.step_n(steps)
+        saved = save_screenshot(renderer, out_dir / f"frame_{frame:04d}.png")
+        print(f"[caustica] Saved: {saved}")
 
-        out_path = out_dir / f"frame_{frame:04d}.png"
-        if not renderer.save_screenshot(str(out_path)):
-            raise RuntimeError(f"Failed to save screenshot: {out_path}")
-        print(f"[caustica] Saved: {out_path}")
-
-    elapsed = time.time() - t_start
-    print(f"[caustica] Animation sequence done in {elapsed:.2f}s ({args.frames} frames)")
-
-
-def run_window_loop(renderer, entity, base_vertices, center, args: argparse.Namespace) -> None:
-    print("[caustica] Ready. Animated mesh deformation running.")
-    print("[caustica]   Close window or Ctrl+C to exit.")
-    settings = renderer.settings
-    frame = 0
-    t0 = time.time()
-    try:
-        while True:
-            time_value = (time.time() - t0) * args.speed
-            apply_deformation(renderer.app, entity, base_vertices, center, args, time_value)
-            settings.reset_accumulation = True
-            if not renderer.step(-1.0):
-                break
-            frame += 1
-            time.sleep(0.001)
-    except KeyboardInterrupt:
-        print(f"\n[caustica] Interrupted after {frame} frames.")
+    print(
+        f"[caustica] Sequence done in {time.perf_counter() - started:.2f}s "
+        f"({args.frames} frames)"
+    )
 
 
 def main() -> int:
     args = parse_args()
-    if args.oidn:
-        print("[caustica] OIDN is not supported for animated sequences; ignoring --oidn.")
-        args.oidn = False
+    if args.frames <= 0:
+        raise SystemExit("--frames must be positive")
 
+    caustica = import_caustica()
     launch_cwd = Path.cwd()
-    import caustica
-
     scene = resolve_scene_arg(args.scene)
-    mode = "headless sequence" if args.headless else "windowed animation"
     print(f"[caustica] Scene : {scene}")
-    print(f"[caustica] Mode  : {mode}")
+    print(f"[caustica] Mode  : {'headless sequence' if args.headless else 'windowed animation'}")
 
-    with caustica.Renderer(
-        width=args.width,
-        height=args.height,
-        headless=args.headless,
-        vulkan=args.vulkan,
+    with make_renderer(
+        caustica,
+        args,
         scene=scene,
         realtime=True,
         accumulation_target=max(args.spp_per_frame, 1),
     ) as renderer:
-        print(f"[caustica] Loaded scene: {renderer.app.scene_name}")
-        entity, base_vertices, center = configure_renderer(renderer, caustica, args)
+        app = renderer.app
+        print(f"[caustica] Loaded scene: {app.scene_name}")
+
+        apply_realtime_mode(app, caustica, "off")
+        apply_common_settings(renderer, caustica, bounces=args.bounces)
+        settings = renderer.settings
+        settings.accumulation_target = max(args.spp_per_frame, 1)
+        settings.accumulation_prewarm_realtime_caches = False
+        # Imported animation channels would fight the per-frame vertex writes.
+        settings.enable_animations = False
+        if app.gaussian_splat_object_count > 0:
+            settings.enable_gaussian_splats = True
+
+        entity = find_target_mesh(app, args.mesh_name)
+        base_vertices = list(app.get_mesh_vertices(entity))
+        if not base_vertices:
+            raise SystemExit(f"Mesh entity {entity.name!r} has no readable CPU vertex cache.")
+        center = mesh_center(base_vertices)
+        print(f"[caustica] Target mesh : {entity.name} ({len(base_vertices)} vertices)")
+        print(
+            f"[caustica] Deformation: {args.deform_mode}, "
+            f"amplitude={args.amplitude}, speed={args.speed}"
+        )
 
         if args.headless:
             render_sequence(renderer, entity, base_vertices, center, args, launch_cwd)
         else:
-            run_window_loop(renderer, entity, base_vertices, center, args)
+            def on_frame(elapsed: float) -> None:
+                deform(app, entity, base_vertices, center, args, elapsed * args.speed)
+                renderer.settings.reset_accumulation = True
+
+            run_window_loop(renderer, on_frame)
 
     return 0
 

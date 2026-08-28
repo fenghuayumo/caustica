@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-"""Render one scene through the installed caustica Python extension.
+"""Render a scene through the installed caustica Python extension.
 
-This is the primary extension example. It covers reference, realtime, and
-interactive rendering without duplicating a separate script for every mode.
+This is the general-purpose starting point. It covers the three ways the
+renderer can be driven -- reference accumulation, fixed-count realtime frames,
+and an interactive window -- plus runtime scene edits and framebuffer readback.
 
 Examples:
-    python examples/python/render.py --scene builtin:plane_cube
+    python examples/python/render.py --scene builtin:plane_cube --out frame.png
     python examples/python/render.py --mode realtime --denoiser nrd --frames 32
     python examples/python/render.py --mode window --scene Assets/default.json
     python examples/python/render.py --spawn Assets/Models/GlassSphere/GlassSphere.gltf
@@ -14,132 +15,95 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 from pathlib import Path
 
 from _common import (
+    REALTIME_DENOISERS,
+    add_device_args,
+    add_quality_args,
+    apply_common_settings,
+    apply_realtime_mode,
+    apply_reference_mode,
     frame_bounds,
-    resolve_output_path,
-    resolve_path,
+    import_caustica,
+    make_renderer,
+    render_reference_to,
+    require_input_file,
     resolve_scene_arg,
     run_window_loop,
+    save_screenshot,
     scene_bounds_center_radius,
+    validate_positive,
 )
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scene", default="builtin:plane_cube")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--scene",
+        default="builtin:plane_cube",
+        help="Scene JSON path, Assets-relative name, or builtin: reference.",
+    )
     parser.add_argument(
         "--mode",
         choices=["reference", "realtime", "window"],
         default="reference",
         help="Reference accumulation, fixed-count realtime frames, or an interactive window.",
     )
+    parser.add_argument("--out", default="frame.png")
     parser.add_argument(
         "--denoiser",
-        choices=["auto", "none", "oidn", "taa", "nrd", "dlss-rr"],
+        choices=REALTIME_DENOISERS,
         default="auto",
-        help="auto selects OIDN for reference and NRD + TAA for realtime.",
+        help="Realtime denoiser / AA path; auto selects NRD + TAA. Unsupported "
+        "paths fall back automatically.",
     )
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
-    parser.add_argument("--spp", type=int, default=64, help="Reference samples per pixel.")
-    parser.add_argument("--frames", type=int, default=32, help="Realtime warmup/output frames.")
-    parser.add_argument("--bounces", type=int, default=8)
-    parser.add_argument("--out", default="frame.png")
-    parser.add_argument("--vulkan", action="store_true")
     parser.add_argument(
-        "--adapter",
-        default="auto",
-        help="GPU selector: auto, index:N, name:text, uuid:hex, or luid:hex.",
+        "--oidn",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Denoise the reference render with OIDN.",
     )
-    parser.add_argument("--spawn", default=None, help="Optional mesh/prefab to spawn after loading.")
-    parser.add_argument("--spawn-position", type=float, nargs=3, default=(0.0, 0.0, 0.0))
-    parser.add_argument(
+    parser.add_argument("--frames", type=int, default=32, help="Realtime frames to render.")
+
+    scene_edits = parser.add_argument_group("scene edits")
+    scene_edits.add_argument("--spawn", help="Mesh or prefab to spawn after loading the scene.")
+    scene_edits.add_argument(
+        "--spawn-position", type=float, nargs=3, default=(0.0, 0.0, 0.0), metavar=("X", "Y", "Z")
+    )
+    scene_edits.add_argument(
         "--material",
         action="append",
         nargs=4,
         metavar=("NAME", "R", "G", "B"),
         help="Override a material base color; may be repeated.",
     )
-    parser.add_argument("--camera-pos", type=float, nargs=3)
-    parser.add_argument("--camera-dir", type=float, nargs=3)
-    parser.add_argument("--camera-up", type=float, nargs=3, default=(0.0, 1.0, 0.0))
-    parser.add_argument("--fov", type=float)
+    scene_edits.add_argument("--camera-pos", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    scene_edits.add_argument("--camera-dir", type=float, nargs=3, metavar=("X", "Y", "Z"))
+    scene_edits.add_argument(
+        "--camera-up", type=float, nargs=3, default=(0.0, 1.0, 0.0), metavar=("X", "Y", "Z")
+    )
+    scene_edits.add_argument("--fov", type=float)
+
     parser.add_argument(
         "--inspect-framebuffer",
         action="store_true",
-        help="Read back and print the RGBA8 framebuffer metadata.",
+        help="Read back and print RGBA8 framebuffer metadata.",
     )
+    add_device_args(parser)
+    add_quality_args(parser)
     return parser.parse_args()
-
-
-def configure_reference(renderer, caustica, args: argparse.Namespace) -> str:
-    if args.denoiser not in {"auto", "none", "oidn"}:
-        raise ValueError("reference mode supports --denoiser auto, none, or oidn")
-    use_oidn = args.denoiser in {"auto", "oidn"}
-    renderer.app.set_reference_mode(
-        spp=args.spp,
-        oidn=use_oidn,
-        oidn_quality=int(caustica.OidnQuality.High),
-        oidn_passes=int(caustica.OidnPasses.AlbedoNormal),
-        oidn_prefilter=int(caustica.OidnPrefilter.Accurate),
-    )
-    renderer.settings.oidn_use_gpu = True
-    if use_oidn:
-        renderer.settings.oidn_apply()
-    return f"reference {args.spp} spp" + (" + OIDN" if use_oidn else "")
-
-
-def configure_realtime(renderer, caustica, requested: str) -> str:
-    denoiser = "nrd" if requested == "auto" else requested
-    if denoiser == "oidn":
-        raise ValueError("OIDN is a reference-mode denoiser; use --mode reference")
-
-    settings = renderer.settings
-    if denoiser == "dlss-rr":
-        if settings.is_dlss_rr_supported:
-            renderer.app.set_realtime_mode(
-                standalone_denoiser=False,
-                realtime_aa=int(caustica.RealtimeAA.DLSS_RR),
-            )
-            settings.dlss_mode = int(caustica.DLSSMode.Balanced)
-            settings.dlss_rr_preset = int(caustica.DLSSRRPreset.PresetE)
-            settings.disable_restirs_with_dlss_rr = True
-            return "realtime DLSS-RR"
-        print("[caustica] DLSS-RR unavailable; falling back to NRD + TAA.")
-        denoiser = "nrd"
-
-    if denoiser == "nrd":
-        renderer.app.set_realtime_mode(
-            standalone_denoiser=True,
-            realtime_aa=int(caustica.RealtimeAA.TAA),
-        )
-        return "realtime NRD + TAA"
-    if denoiser == "taa":
-        renderer.app.set_realtime_mode(
-            standalone_denoiser=False,
-            realtime_aa=int(caustica.RealtimeAA.TAA),
-        )
-        return "realtime TAA"
-
-    renderer.app.set_realtime_mode(
-        standalone_denoiser=False,
-        realtime_aa=int(caustica.RealtimeAA.Off),
-    )
-    return "realtime without denoising"
 
 
 def apply_scene_edits(renderer, args: argparse.Namespace) -> None:
     if args.spawn:
-        spawn_path = resolve_path(args.spawn)
-        if not spawn_path.exists():
-            raise FileNotFoundError(f"spawn asset not found: {spawn_path}")
+        spawn_path = require_input_file(args.spawn, "Spawn asset")
         entity = renderer.app.spawn_from_file(str(spawn_path))
         if entity is None:
-            raise RuntimeError(f"spawn_from_file failed: {spawn_path}")
+            raise SystemExit(f"spawn_from_file failed: {spawn_path}")
         entity.translation = tuple(args.spawn_position)
         renderer.step_n(1)
         print(f"[caustica] Spawned {entity.name}: {spawn_path}")
@@ -156,14 +120,12 @@ def apply_scene_edits(renderer, args: argparse.Namespace) -> None:
         material.base_color = (float(red), float(green), float(blue))
         print(f"[caustica] Updated material: {name}")
 
+    if bool(args.camera_pos) != bool(args.camera_dir):
+        raise SystemExit("--camera-pos and --camera-dir must be provided together")
     if args.camera_pos and args.camera_dir:
         renderer.set_camera(
-            tuple(args.camera_pos),
-            tuple(args.camera_dir),
-            tuple(args.camera_up),
+            tuple(args.camera_pos), tuple(args.camera_dir), tuple(args.camera_up)
         )
-    elif args.camera_pos or args.camera_dir:
-        raise ValueError("--camera-pos and --camera-dir must be provided together")
     if args.fov is not None:
         renderer.set_camera_fov(args.fov)
 
@@ -181,61 +143,53 @@ def inspect_framebuffer(renderer) -> None:
 
 def main() -> int:
     args = parse_args()
-    if min(args.width, args.height, args.spp, args.frames) <= 0:
-        raise ValueError("--width, --height, --spp and --frames must be positive")
+    validate_positive(args, "width", "height", "spp", "frames")
 
-    try:
-        import caustica
-    except ImportError as exc:
-        sys.stderr.write("Install the package first: python -m pip install .\n")
-        raise exc
-
+    caustica = import_caustica()
     launch_cwd = Path.cwd()
     is_reference = args.mode == "reference"
     is_windowed = args.mode == "window"
-    scene = resolve_scene_arg(args.scene)
 
-    with caustica.Renderer(
-        width=args.width,
-        height=args.height,
-        headless=not is_windowed,
-        vulkan=args.vulkan,
-        adapter=args.adapter,
-        scene=scene,
+    with make_renderer(
+        caustica,
+        args,
+        scene=resolve_scene_arg(args.scene),
         realtime=not is_reference,
+        headless=not is_windowed,
         accumulation_target=args.spp if is_reference else 1,
     ) as renderer:
-        settings = renderer.settings
-        settings.bounce_count = args.bounces
-        settings.use_nee = True
-        settings.enable_tone_mapping = True
+        apply_common_settings(renderer, caustica, bounces=args.bounces)
         mode_label = (
-            configure_reference(renderer, caustica, args)
+            apply_reference_mode(renderer, caustica, spp=args.spp, oidn=args.oidn)
             if is_reference
-            else configure_realtime(renderer, caustica, args.denoiser)
+            else apply_realtime_mode(renderer.app, caustica, args.denoiser)
         )
         apply_scene_edits(renderer, args)
 
         print(f"[caustica] Scene: {renderer.app.scene_name}")
         print(f"[caustica] Mode : {mode_label}")
-        started = time.perf_counter()
+
         if is_windowed:
             run_window_loop(renderer)
             return 0
-        if is_reference:
-            rendered_frames = renderer.step_until_accumulated()
-        else:
-            if not renderer.step_n(args.frames):
-                raise RuntimeError("realtime frame stepping failed")
-            rendered_frames = args.frames
 
+        if is_reference:
+            if args.inspect_framebuffer:
+                renderer.step_until_accumulated()
+                inspect_framebuffer(renderer)
+                save_screenshot(renderer, args.out, launch_cwd=launch_cwd)
+            else:
+                render_reference_to(renderer, args.out, launch_cwd=launch_cwd, label=mode_label)
+            return 0
+
+        started = time.perf_counter()
+        if not renderer.step_n(args.frames):
+            raise SystemExit("realtime frame stepping failed")
         if args.inspect_framebuffer:
             inspect_framebuffer(renderer)
-        output = resolve_output_path(args.out, launch_cwd)
-        if not renderer.save_screenshot(str(output)):
-            raise RuntimeError(f"failed to save screenshot: {output}")
+        saved = save_screenshot(renderer, args.out, launch_cwd=launch_cwd)
         print(
-            f"[caustica] Saved {output} after {rendered_frames} engine frame(s) "
+            f"[caustica] Saved {saved} after {args.frames} frame(s) "
             f"in {time.perf_counter() - started:.2f}s"
         )
     return 0

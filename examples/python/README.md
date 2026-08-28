@@ -1,8 +1,8 @@
 # caustica Python examples
 
-The examples are grouped by capability rather than by renderer mode. Start with
-`render.py`; use the specialized scripts only when you need the corresponding
-camera, animation, lighting, or Gaussian-splat workflow.
+Each script teaches one capability. Start with `render.py`, then move to the
+specialized scripts when you need that particular camera, animation, lighting,
+or Gaussian-splat workflow.
 
 Install the extension once from the repository root:
 
@@ -10,75 +10,114 @@ Install the extension once from the repository root:
 python -m pip install .
 ```
 
+All examples import `caustica` as a normally installed package. If the import
+fails, fix the install rather than patching `sys.path`.
+
 ## Start here
 
-`render.py` is the single general-purpose extension example. It replaces the
-former offline, realtime, launch, and framebuffer scripts:
+`render.py` is the general-purpose example. It covers the three ways the
+renderer can be driven, plus runtime scene edits and framebuffer readback:
 
 ```shell
-# Reference render with OIDN.
+# Reference accumulation with OIDN.
 python examples/python/render.py --scene builtin:plane_cube --out frame.png
 
-# Fixed-count realtime render with NRD + TAA.
+# Fixed-count realtime frames with NRD + TAA.
 python examples/python/render.py --mode realtime --denoiser nrd --frames 32
 
 # Interactive preview.
 python examples/python/render.py --mode window --scene Assets/default.json
 
-# Runtime asset spawn and framebuffer readback.
-python examples/python/render.py \\
-  --spawn Assets/Models/GlassSphere/GlassSphere.gltf \\
+# Runtime asset spawn plus framebuffer readback.
+python examples/python/render.py \
+  --spawn Assets/Models/GlassSphere/GlassSphere.gltf \
   --inspect-framebuffer
 ```
 
-The renderer supports `--adapter auto`, index/name selectors, and stable
-`uuid:` or `luid:` selectors. List available devices with
+## Examples
+
+| Script | Capability |
+|---|---|
+| `render.py` | Reference / realtime / windowed rendering, spawning, material and camera edits, framebuffer readback |
+| `gaussian_splats.py` | 3D Gaussian splats: standalone `.ply` viewing, hybrid mesh+splat scenes, COLMAP camera reproduction |
+| `animation_sequence.py` | Render scene animation at explicit timeline samples in reference or realtime mode |
+| `mesh_deformation.py` | Rewrite CPU mesh vertices per frame and rebuild acceleration structures |
+| `camera_intrinsics.py` | Drive the camera from a pinhole intrinsic matrix with an off-center principal point |
+| `environment_lighting.py` | HDRI environment maps and procedural-sky presets |
+| `embedded.py` | Scripting the running editor from inside `caustica.exe` |
+
+Every script supports `--help`, and shares `--width`, `--height`, `--vulkan`,
+and `--adapter`. The adapter accepts `auto`, `index:N`, `name:text`, and the
+stable `uuid:hex` / `luid:hex` selectors; list devices with
 `caustica.enumerate_adapters()`.
+
+Realtime scripts share a `--denoiser` flag accepting `auto`, `off`, `taa`,
+`nrd`, `dlss`, and `dlss-rr`. `auto` selects NRD + TAA, and any DLSS path falls
+back automatically when the device does not support it.
+
+## Gaussian splats
+
+`gaussian_splats.py` has three subcommands because the workflows differ only in
+where the camera and the splat data come from:
+
+```shell
+# Interactively preview a standalone .ply, framed from its own bounds.
+python examples/python/gaussian_splats.py view --ply splat.ply
+
+# Render the same file headless, reference and realtime back to back.
+python examples/python/gaussian_splats.py view --ply splat.ply \
+  --mode batch --out-dir splat_out
+
+# Mesh + splat scene with ray-traced soft shadows and emissive splat proxies.
+python examples/python/gaussian_splats.py hybrid --scene my_hybrid.scene.json --window
+
+# Reproduce COLMAP poses, including off-center principal points.
+python examples/python/gaussian_splats.py colmap \
+  --ply gaussians.ply --colmap-dir sparse --max-views 8
+```
+
+`--ply` and `--colmap-dir` are required; there are no machine-specific default
+paths. The `colmap` subcommand additionally needs numpy (`python -m pip install
+numpy`) and reads binary or text sparse models.
+
+The `hybrid` subcommand needs a scene that already declares `GaussianSplat`
+nodes alongside its meshes; see [3DGS nodes](../../docs/scene-json.md) for the
+scene JSON syntax. It warns and renders the meshes alone if the scene contains
+no splats.
 
 ## Embedded scripting
 
-`embedded.py` runs inside `caustica.exe` and demonstrates scene lookup,
-material/light/environment edits, camera settings, and realtime mode selection:
+`embedded.py` runs inside `caustica.exe` rather than owning a renderer:
 
 ```shell
 caustica.exe --pythonScript examples/python/embedded.py
 caustica.exe --pythonExpr "import caustica; print(caustica.app().scene_name)"
 ```
 
-The extension and embedded modes expose the same scene/settings types, but their
-lifecycle differs:
+Both modes expose the same scene and settings types, but the lifecycle differs:
 
 | Mode | Entry point | Ownership |
 |---|---|---|
 | Extension | `python script.py` | Python creates and closes `caustica.Renderer` |
 | Embedded | `caustica.exe --pythonScript ...` | The running application owns the renderer |
 
-## Specialized examples
+## Shared modules
 
-| Script | Unique capability |
+These are not executable examples:
+
+| Module | Contents |
 |---|---|
-| `animation_sequence.py` | Render scene animation at explicit timeline samples in reference or realtime mode |
-| `gaussian_splats.py` | Load a PLY, frame its bounds, and compare interactive/reference/realtime 3DGS |
-| `hybrid_gaussian_scene.py` | Raster 3DGS with ray-traced soft shadows and emissive proxies |
-| `mesh_deformation.py` | Edit CPU mesh vertices and rebuild acceleration structures per frame |
-| `colmap_views.py` | Render a 3DGS PLY from COLMAP camera poses and pinhole intrinsics |
-| `camera_intrinsics.py` | Demonstrate off-center `set_camera_intrinsics` projection |
-| `environment_lighting.py` | Exercise HDRI and procedural-sky parameters |
+| `_common.py` | Renderer construction, shared CLI flags, render-mode and denoiser selection, camera framing, output helpers |
+| `_gaussian.py` | 3DGS settings mapping, splat-only scene template, PLY bounds reader |
+| `_colmap.py` | COLMAP sparse-model reader and camera conversion |
 
-`_common.py` contains path, framing, and window-loop helpers shared by these
-scripts; it is not an executable example.
+`embedded.py` deliberately imports none of them: the embedding host does not put
+the script's directory on `sys.path`, so an embedded script must stand alone.
 
-## Why there are fewer files
+## Further reading
 
-The old layout repeated renderer creation, mode selection, frame stepping, and
-screenshot code across separate offline/realtime/default/framebuffer examples.
-Those paths now live in `render.py`. Three small embedded scripts were similarly
-combined into `embedded.py`. Specialized examples remain separate only when
-they teach a distinct API or data format.
-
-Full Python API reference: [py_caustica.md](../../py_caustica.md).
-
-Inspect the installed module directly with:
+Full Python API reference: [py_caustica.md](../../py_caustica.md). To inspect
+the installed module directly:
 
 ```python
 import caustica

@@ -6,6 +6,10 @@ Run with:
 
 The script intentionally performs one update and returns. A host-side scheduler
 can call the same functions every frame when continuous animation is required.
+
+Unlike the other examples this one does not import ``_common``: the embedding
+host does not put the script's directory on ``sys.path``, so an embedded script
+has to stand on its own.
 """
 
 from __future__ import annotations

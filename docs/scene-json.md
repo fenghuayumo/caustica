@@ -18,7 +18,7 @@
 {
   "models": [
     "builtin:plane",
-    "D:/ScanVideo/models/antman_merged.obj"
+    "D:/path/to/models/antman_merged.obj"
   ],
   "graph": [
     {
@@ -38,7 +38,7 @@
     {
       "name": "GingySplat",
       "type": "GaussianSplat",
-      "path": "D:/ScanVideo/Gingy/splat_crop.ply",
+      "path": "D:/path/to/scans/splat_crop.ply",
       "translation": [1.25, 0.0, 0.0],
       "rotation": [0.0, 0.0, 0.0, 1.0],
       "scaling": [1.0, 1.0, 1.0],
@@ -112,7 +112,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 ```
 
 ```json
-"D:/ScanVideo/models/antman_merged.obj"
+"D:/path/to/models/antman_merged.obj"
 ```
 
 ```json
@@ -138,7 +138,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 - scene 文件中的相对模型路径相对于该 scene JSON 文件所在目录解析。
 - 放在 `Assets/` 下的 scene 通常写 `Models/...`。
-- 绝对路径也可以使用，建议使用 `/`，例如 `D:/ScanVideo/models/foo.glb`。
+- 绝对路径也可以使用，建议使用 `/`，例如 `D:/path/to/models/foo.glb`。
 - 静态 `models` 与 `spawnFromFile` 支持 `.gltf`、`.glb`、`.obj`、`.urdf`、`.usd`、`.usda` 和 `.usdc`。USD 需要构建时成功启用 `CAUSTICA_WITH_OPENUSD`。静态 `models` 中的其他扩展会回退到 glTF importer；`spawnFromFile` 则会直接报告不支持的格式。
 - 如果仍然把 OBJ 转成 GLB，要按 OBJ 的 `(position, texcoord, normal)` 三元组生成顶点，不能只按 position 合并顶点；否则 UV seam 会被破坏，表现为贴图已加载但 atlas 块贴错。OBJ 的 `vt.y` 通常还需要转换为 `1 - v`，与 Caustica runtime OBJ importer 的行为保持一致。
 
@@ -344,7 +344,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 {
   "name": "ScanA",
   "type": "GaussianSplat",
-  "path": "D:/ScanVideo/chuan/splats_a.ply",
+  "path": "D:/path/to/scans/splats_a.ply",
   "translation": [0.0, 0.0, 0.0],
   "scaling": 1.0,
   "convertRdfToRub": true,

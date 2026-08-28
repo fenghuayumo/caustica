@@ -53,7 +53,7 @@ What fits embodied-AI workflows well:
 | Consistent object appearance | **OpenPBR** materials + glTF import with per-model `.material.json` overrides |
 | Multi-view / sensor rigs | Multiple scene cameras; runtime camera selection and transform control via Python/C++ |
 | Interactive + batch modes | Real-time path tracing with denoisers; reference accumulation for ground-truth frames |
-| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `examples/python/offline_render.py` |
+| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `examples/python/render.py` |
 | Automation & tuning | Python extension (`pip install .`) for offline jobs; embed mode for live parameter edits in the editor |
 | Dynamic environments | Scene graph animation, emissive/analytic lights, environment maps, 3D Gaussian splats |
 
@@ -66,7 +66,7 @@ Recommended starting points:
 * RTXCR skin transport: [docs/rtxcr-skin.md](docs/rtxcr-skin.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * RHI / render-thread contract: [docs/architecture-rhi-threading.md](docs/architecture-rhi-threading.md)
-* Python batch/headless API: [py_caustica.md](py_caustica.md), `examples/python/offline_render.py`
+* Python batch/headless API: [py_caustica.md](py_caustica.md), `examples/python/render.py`
 * Minimal C++ host (no editor): `examples/cpp/thin_client` → target `caustica_thin_client`
 
 ## Architecture
