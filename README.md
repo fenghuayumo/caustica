@@ -16,7 +16,7 @@
 
 Caustica is a modern ray tracing renderer aimed primarily at **embodied AI and robotics simulation** — generating photorealistic synthetic images, multi-view camera feeds, and ground-truth-quality references for perception, manipulation, and sim-to-real workflows.
 
-It takes **RTX Path Tracing (RTXPT)** as its functional and shading reference, but reimplements the runtime around a cleaner engine architecture that is easier to embed in simulation stacks:
+It is built around a cleaner engine architecture that is easy to embed in simulation stacks:
 
 * **Simulation-friendly runtime** — Bevy-inspired ECS (`App`, `Plugin`, `ecs::World`, `AppSchedule` systems) for scenes made of robots, objects, lights, and cameras that update every simulation step
 * **Production-style rendering** — Unreal Engine–inspired pipeline (`WorldRenderer`, render graph, pass features) for stable real-time previews and batch offline captures from the same scene description
@@ -28,7 +28,7 @@ At a high level:
 
 * **Application & simulation layer** — Bevy-inspired ECS: `App` / `EngineApp`, `Plugin`, `ecs::World`, resources, ordered `AppSchedule` systems, and default `SystemSet`s (`Simulation` → `TransformPropagate` → `Extract`).
 * **Rendering layer** — Unreal Engine–inspired pipeline: dedicated `RenderThread`, extract proxies, `WorldRenderer`, render features, pass graph (`GraphBuilder` + parallel waves), and optional `EnqueueRenderCommand` for Logic→RT work.
-* **Path tracing core** — RTXPT-derived shaders and algorithms, including **ReSTIR PT**, **ReSTIR GI**, **ReSTIR DI**, NEE-AT, path-space decomposition, denoiser guides, NRD, and **DLSS**, wired through the engine stack
+* **Path tracing core** — first-party path tracer with **ReSTIR PT**, **ReSTIR GI**, **ReSTIR DI**, NEE-AT, path-space decomposition, denoiser guides, NRD, and **DLSS**, wired through the engine stack
 
 The main mesh renderer is a pure path tracer (no rasterization in its light-transport path), while 3D Gaussian Splats use their dedicated render path. Both are available for **interactive simulation preview** and **offline / headless synthetic-data rendering**.
 
@@ -96,7 +96,7 @@ WorldRenderer (UE-like render pipeline)
 
 * **Application & simulation layer** — Bevy-inspired: `EngineApp`, `App`, `Plugin`, `AppSchedule`, `SystemSet`, scene ECS components.
 * **Rendering layer** — UE-inspired: dedicated `RenderThread`, extract proxies, `WorldRenderer`, `FrameCommandContext` / GraphBuilder waves.
-* **Path tracing core** — RTXPT-derived shaders (ReSTIR, NEE-AT, NRD, DLSS) wired through the proxy packet.
+* **Path tracing core** — first-party shaders (ReSTIR, NEE-AT, NRD, DLSS) wired through the proxy packet.
 
 Key code locations:
 
