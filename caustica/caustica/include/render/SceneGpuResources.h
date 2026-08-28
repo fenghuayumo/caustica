@@ -10,7 +10,6 @@
 using namespace caustica::math;
 
 #include <shaders/bindless.h>
-#include <shaders/material_cb.h>
 
 #include <cstdint>
 #include <array>
@@ -90,12 +89,6 @@ struct MeshGpuRecord
     }
 };
 
-struct MaterialGpuRecord
-{
-    caustica::rhi::BufferHandle constantsBuffer;
-    uint64_t uploadedContentHash = 0;
-};
-
 struct MeshGpuUploadCommand
 {
     scene::MeshRenderResourceId meshId;
@@ -122,11 +115,9 @@ struct SceneGpuFrameHandles
 // GPU-side storage derived from a CPU scene.
 struct SceneGpuResources
 {
-    std::vector<MaterialConstants> materialData;
     std::vector<GeometryData> geometryData;
     std::vector<InstanceData> instanceData;
 
-    caustica::rhi::BufferHandle materialBuffer;
     caustica::rhi::BufferHandle geometryBuffer;
     caustica::rhi::BufferHandle instanceBuffer;
 
@@ -139,11 +130,8 @@ struct SceneGpuResources
     std::unordered_map<uint32_t, SkinnedMeshGpuState> skinnedGpuByEntity;
     std::unordered_map<scene::MeshRenderResourceId, MeshGpuRecord,
         scene::MeshRenderResourceId::Hash> meshRegistry;
-    std::unordered_map<scene::MaterialRenderResourceId, MaterialGpuRecord,
-        scene::MaterialRenderResourceId::Hash> materialRegistry;
 
     bool enableBindlessResources = false;
-    bool useResourceDescriptorHeapBindless = false;
     bool rayTracingSupported = false;
 
     void enqueueMeshUpload(MeshGpuUploadCommand command)
@@ -162,15 +150,12 @@ struct SceneGpuResources
 
     void clearSceneResources()
     {
-        materialData.clear();
         geometryData.clear();
         instanceData.clear();
-        materialBuffer = nullptr;
         geometryBuffer = nullptr;
         instanceBuffer = nullptr;
         skinnedGpuByEntity.clear();
         meshRegistry.clear();
-        materialRegistry.clear();
         std::lock_guard lock(*meshUploadMutex);
         pendingMeshUploads.clear();
     }

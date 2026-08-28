@@ -212,20 +212,6 @@ MeshUploadPlan PlanMeshUpload(
     return plan;
 }
 
-caustica::rhi::BufferHandle CreateMaterialBuffer(SceneGpuResources& gpu)
-{
-    caustica::rhi::BufferDesc bufferDesc;
-    bufferDesc.byteSize = sizeof(MaterialConstants) * gpu.materialData.size();
-    bufferDesc.debugName = "BindlessMaterials";
-    bufferDesc.structStride = sizeof(MaterialConstants);
-    bufferDesc.canHaveRawViews = true;
-    bufferDesc.canHaveUAVs = true;
-    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
-    bufferDesc.keepInitialState = true;
-
-    return gpu.device->createBuffer(bufferDesc);
-}
-
 caustica::rhi::BufferHandle CreateGeometryBuffer(SceneGpuResources& gpu)
 {
     caustica::rhi::BufferDesc bufferDesc;
@@ -257,26 +243,6 @@ caustica::rhi::BufferHandle CreateInstanceBuffer(SceneGpuResources& gpu)
     return gpu.device->createBuffer(bufferDesc);
 }
 
-caustica::rhi::BufferHandle CreateMaterialConstantBuffer(SceneGpuResources& gpu, const std::string& debugName)
-{
-    caustica::rhi::BufferDesc bufferDesc;
-    bufferDesc.byteSize = sizeof(MaterialConstants);
-    bufferDesc.debugName = debugName;
-    bufferDesc.isConstantBuffer = true;
-    bufferDesc.initialState = caustica::rhi::ResourceStates::ConstantBuffer;
-    bufferDesc.keepInitialState = true;
-
-    return gpu.device->createBuffer(bufferDesc);
-}
-
-void WriteMaterialBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
-{
-    if (!gpu.materialBuffer || gpu.materialData.empty())
-        return;
-    commandList->writeBuffer(gpu.materialBuffer, gpu.materialData.data(),
-        gpu.materialData.size() * sizeof(MaterialConstants));
-}
-
 void WriteGeometryBuffer(caustica::rhi::CommandList* commandList, const SceneGpuResources& gpu)
 {
     if (!gpu.geometryBuffer || gpu.geometryData.empty())
@@ -291,32 +257,6 @@ void WriteInstanceBuffer(caustica::rhi::CommandList* commandList, const SceneGpu
         return;
     commandList->writeBuffer(gpu.instanceBuffer, gpu.instanceData.data(),
         gpu.instanceData.size() * sizeof(InstanceData));
-}
-
-uint64_t HashMaterialConstants(const MaterialConstants& constants)
-{
-    constexpr uint64_t fnvOffset = 14695981039346656037ull;
-    constexpr uint64_t fnvPrime = 1099511628211ull;
-    uint64_t hash = fnvOffset;
-    const auto bytes = std::as_bytes(std::span{ &constants, size_t(1) });
-    for (std::byte value : bytes)
-    {
-        hash ^= std::to_integer<uint8_t>(value);
-        hash *= fnvPrime;
-    }
-    return hash;
-}
-
-void UpdateMaterial(
-    SceneGpuResources& gpu,
-    const scene::MaterialRenderResourceSnapshot& material)
-{
-    if (material.materialIndex >= gpu.materialData.size())
-        return;
-
-    gpu.materialData[material.materialIndex] = gpu.useResourceDescriptorHeapBindless
-        ? material.bindlessConstants
-        : material.constants;
 }
 
 void UpdateGeometry(SceneGpuResources& gpu, const scene::MeshRenderResourceSnapshot& mesh)
@@ -899,18 +839,6 @@ void PruneRemovedGpuResources(
     std::erase_if(gpu.meshRegistry, [&liveMeshIds](const auto& entry) {
         return !liveMeshIds.contains(entry.first);
     });
-
-    std::unordered_set<scene::MaterialRenderResourceId, scene::MaterialRenderResourceId::Hash>
-        liveMaterialIds;
-    liveMaterialIds.reserve(renderData.staticData().materialSnapshots.size());
-    for (const scene::MaterialRenderResourceSnapshot& material : renderData.staticData().materialSnapshots)
-    {
-        if (material.id)
-            liveMaterialIds.insert(material.id);
-    }
-    std::erase_if(gpu.materialRegistry, [&liveMaterialIds](const auto& entry) {
-        return !liveMaterialIds.contains(entry.first);
-    });
 }
 
 bool UpdateGpuSceneBuffers(
@@ -936,7 +864,6 @@ bool UpdateGpuSceneBuffers(
         meshGpuIt->second.vertexBufferDescriptor.reset();
         meshGpuIt->second.vertexBufferRanges.fill(caustica::rhi::BufferRange{});
     }
-    bool materialsChanged = false;
 
     if (structureChanged || !meshUploads.empty())
     {
@@ -963,16 +890,6 @@ bool UpdateGpuSceneBuffers(
         arraysAllocated = true;
     }
 
-    if (renderData.staticData().materialSnapshots.size() > gpu.materialData.size())
-    {
-        gpu.materialData.resize(caustica::rhi::align<size_t>(renderData.staticData().materialSnapshots.size(), allocationGranularity));
-        if (gpu.enableBindlessResources)
-            gpu.materialBuffer = CreateMaterialBuffer(gpu);
-        if (gpu.enableBindlessResources && !gpu.materialBuffer)
-            return false;
-        arraysAllocated = true;
-    }
-
     if (renderData.meshInstanceEntities.size() > gpu.instanceData.size())
     {
         gpu.instanceData.resize(caustica::rhi::align<size_t>(renderData.meshInstanceEntities.size(), allocationGranularity));
@@ -980,44 +897,6 @@ bool UpdateGpuSceneBuffers(
         if (!gpu.instanceBuffer)
             return false;
         arraysAllocated = true;
-    }
-
-    for (const scene::MaterialRenderResourceSnapshot& material : renderData.staticData().materialSnapshots)
-    {
-        if (!material.id)
-            continue;
-
-        const MaterialConstants& selectedConstants = gpu.useResourceDescriptorHeapBindless
-            ? material.bindlessConstants
-            : material.constants;
-        const uint64_t contentHash = HashMaterialConstants(selectedConstants);
-        MaterialGpuRecord& materialGpu = gpu.materialRegistry[material.id];
-        const bool needsUpload =
-            materialGpu.uploadedContentHash != contentHash
-            || structureChanged
-            || arraysAllocated;
-
-        if (needsUpload)
-            UpdateMaterial(gpu, material);
-
-        if (!materialGpu.constantsBuffer)
-            materialGpu.constantsBuffer = CreateMaterialConstantBuffer(gpu, material.debugName);
-
-        if (!materialGpu.constantsBuffer)
-            return false;
-
-        if (needsUpload)
-        {
-            if (material.materialIndex >= gpu.materialData.size())
-                continue;
-
-            commandList->writeBuffer(materialGpu.constantsBuffer,
-                &gpu.materialData[material.materialIndex],
-                sizeof(MaterialConstants));
-
-            materialGpu.uploadedContentHash = contentHash;
-            materialsChanged = true;
-        }
     }
 
     if (!gpu.geometryData.empty())
@@ -1072,9 +951,6 @@ bool UpdateGpuSceneBuffers(
 
         WriteInstanceBuffer(commandList, gpu);
     }
-
-    if (gpu.enableBindlessResources && (materialsChanged || structureChanged || arraysAllocated))
-        WriteMaterialBuffer(commandList, gpu);
 
     DispatchSkinnedMeshUpdates(gpu, renderData, commandList, frameIndex);
     return gpu.device && gpu.device->isDeviceHealthy();

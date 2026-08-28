@@ -60,7 +60,6 @@ static const uint c_SizeOfCurveRadius = 4;
 // Define the sizes of these structures because FXC doesn't support sizeof(x)
 static const uint c_SizeOfGeometryData = 4*16;
 static const uint c_SizeOfInstanceData = 7*16;
-static const uint c_SizeOfMaterialConstants = 13*16;
 
 GeometryData LoadGeometryData(ByteAddressBuffer buffer, uint offset)
 {
@@ -107,61 +106,6 @@ InstanceData LoadInstanceData(ByteAddressBuffer buffer, uint offset)
     ret.transform = float3x4(asfloat(b), asfloat(c), asfloat(d));
     ret.prevTransform = float3x4(asfloat(e), asfloat(f), asfloat(g));
     return ret;
-}
-
-MaterialConstants LoadMaterialConstants(ByteAddressBuffer buffer, uint offset)
-{
-    uint4 a = buffer.Load4(offset + 16 * 0);
-    uint4 b = buffer.Load4(offset + 16 * 1);
-    uint4 c = buffer.Load4(offset + 16 * 2);
-    uint4 d = buffer.Load4(offset + 16 * 3);
-    uint4 e = buffer.Load4(offset + 16 * 4);
-    uint4 f = buffer.Load4(offset + 16 * 5);
-    uint4 g = buffer.Load4(offset + 16 * 6);
-    uint4 h = buffer.Load4(offset + 16 * 7);
-    uint4 i = buffer.Load4(offset + 16 * 8);
-    uint4 j = buffer.Load4(offset + 16 * 9);
-    uint4 k = buffer.Load4(offset + 16 * 10);
-    uint4 l = buffer.Load4(offset + 16 * 11);
-    uint4 m = buffer.Load4(offset + 16 * 12);
-
-    MaterialConstants ret;
-    ret.baseOrDiffuseColor = asfloat(a.xyz);
-    ret.flags = int(a.w);
-    ret.specularColor = asfloat(b.xyz);
-    ret.materialID = int(b.w);
-    ret.emissiveColor = asfloat(c.xyz);
-    ret.domain = int(c.w);
-    ret.opacity = asfloat(d.x);
-    ret.roughness = asfloat(d.y);
-    ret.metalness = asfloat(d.z);
-    ret.normalTextureScale = asfloat(d.w);
-    ret.occlusionStrength = asfloat(e.x);
-    ret.alphaCutoff = asfloat(e.y);
-    ret.transmissionFactor = asfloat(e.z);
-    ret.baseOrDiffuseTextureIndex = int(e.w);
-    ret.metalRoughOrSpecularTextureIndex = int(f.x);
-    ret.emissiveTextureIndex = int(f.y);
-    ret.normalTextureIndex = int(f.z);
-    ret.occlusionTextureIndex = int(f.w);
-    ret.transmissionTextureIndex = int(g.x);
-    ret.opacityTextureIndex = int(g.y);
-    ret.normalTextureTransformScale = asfloat(g.zw);
-    ret.padding1 = h.xyz;
-    ret.sssScale = int(h.w);
-    ret.sssTransmissionColor = asfloat(i.xyz);
-    ret.sssAnisotropy = asfloat(i.w);
-    ret.sssScatteringColor = asfloat(j.xyz);
-    ret.hairMelanin = asfloat(j.w);
-    ret.hairBaseColor = asfloat(k.xyz);
-    ret.hairMelaninRedness = asfloat(k.w);
-    ret.hairLongitudinalRoughness = asfloat(l.x);
-    ret.hairAzimuthalRoughness = asfloat(l.y);
-    ret.hairIor = asfloat(l.z);
-    ret.hairCuticleAngle = asfloat(l.w);
-    ret.hairDiffuseReflectionTint = asfloat(m.xyz);
-    ret.hairDiffuseReflectionWeight = asfloat(m.w);
-    return ret;   
 }
 
 #endif
