@@ -63,15 +63,15 @@ namespace
 }
 
 
-GameScene::GameScene(caustica::editor::SceneEditor& sample, const CommandLineOptions& cmdLine)
-    : m_sample(sample), m_cmdLine(cmdLine) // NOTE: at this point, SceneEditor is being constructed - beware of accessing incompletely constructed object
+GameScene::GameScene(caustica::editor::SceneEditor& editor, const CommandLineOptions& cmdLine)
+    : m_editor(editor), m_cmdLine(cmdLine) // NOTE: at this point, SceneEditor is being constructed - beware of accessing incompletely constructed object
 {
 }
 
 GLFWwindow* GameScene::GetGLFWWindow() const
 {
-    return m_sample.app() && m_sample.app()->getGpuDevice()
-        ? m_sample.app()->getGpuDevice()->getWindow()
+    return m_editor.app() && m_editor.app()->getGpuDevice()
+        ? m_editor.app()->getGpuDevice()->getWindow()
         : nullptr;
 }
 
@@ -354,7 +354,7 @@ bool GameScene::debugGUI(float indent)
         ImGui::EndChild();
     }
 
-#ifdef SAMPLE_GAME_DEVELOPER_SETTINGS
+#ifdef GAME_DEVELOPER_SETTINGS
     ImGui::Separator();
 
     if(!m_camRecEnabled)

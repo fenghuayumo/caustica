@@ -10,7 +10,7 @@ namespace caustica
 
 namespace demo
 {
-    // DEMO-ONLY editor SampleGame script on PropBase -- NOT an engine ECS component.
+    // DEMO-ONLY editor game script on PropBase -- NOT an engine ECS component.
     // Scene truth lives in SceneEntityWorld; scripts only Tick / drive UI over that ECS.
     // Prefer EntityWorld / SceneSpawn / SceneTransform (see thin_client).
     class PropComponentBase

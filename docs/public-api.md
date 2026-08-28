@@ -60,7 +60,7 @@ structural, ideally one-shot systems and give per-frame systems narrow parameter
 | Session guts | `SceneSession`, `SceneGaussianSplatLogic` |
 | Editor / tooling | `UserInterfaceUtils`, `Console*`, `SplashScreen`, `CaptureSequencer`, … |
 
-Editor SampleGame (`application/editor/game`, `demo::`) is **not** an embedding API.
+Editor game (`application/editor/game`, `demo::`) is **not** an embedding API.
 
 ## Coverage target (thin_client ≈ 80%)
 

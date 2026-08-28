@@ -74,7 +74,7 @@ public:
     [[nodiscard]] RenderSettingsConsoleBinding* console() const { return m_console.get(); }
     void setConsole(std::unique_ptr<RenderSettingsConsoleBinding> console);
 
-    const std::unique_ptr<::GameScene>& game() const { return m_sampleGame; }
+    const std::unique_ptr<::GameScene>& game() const { return m_game; }
 
     EditorUIData& uiData() { return m_editorUiData; }
     const EditorUIData& uiData() const { return m_editorUiData; }
@@ -242,7 +242,7 @@ private:
     PendingEditAction m_pendingEditAction = PendingEditAction::None;
     ecs::Entity m_editorAnimationEntity = ecs::NullEntity;
 
-    std::unique_ptr<::GameScene> m_sampleGame;
+    std::unique_ptr<::GameScene> m_game;
 
     std::unique_ptr<::ZoomTool> m_zoomTool;
 

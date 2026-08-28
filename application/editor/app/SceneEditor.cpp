@@ -383,7 +383,7 @@ void SceneEditor::bindCameraControllerSideEffects()
 
 void SceneEditor::onBeforeInitialSceneLoad()
 {
-    m_sampleGame = std::make_unique<::GameScene>(*this, m_cmdLine);
+    m_game = std::make_unique<::GameScene>(*this, m_cmdLine);
     m_viewState.progressLoading.Set(95);
 }
 
@@ -432,8 +432,8 @@ void SceneEditor::onSceneUnloading()
     m_editorState.sceneDocumentValid = false;
     m_editorState.loadedSceneName.clear();
 
-    if (m_sampleGame != nullptr)
-        m_sampleGame->sceneUnloading();
+    if (m_game != nullptr)
+        m_game->sceneUnloading();
 }
 
 void SceneEditor::requestUndo()
@@ -550,7 +550,7 @@ void SceneEditor::commitTransformEdit(
 
 void SceneEditor::onSceneLoadedEarly()
 {
-    if (m_sampleGame == nullptr || !m_app)
+    if (m_game == nullptr || !m_app)
         return;
 
     auto scene = caustica::activeScene(*m_app);
@@ -558,7 +558,7 @@ void SceneEditor::onSceneLoadedEarly()
         return;
 
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
-    m_sampleGame->sceneLoaded(
+    m_game->sceneLoaded(
         scene,
         caustica::currentScenePath(*m_app),
         assetsRoot);
@@ -917,21 +917,21 @@ void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
 
 void SceneEditor::onAnimateGameTick(float fElapsedTimeSeconds, bool enableAnimations)
 {
-    if (m_sampleGame)
-        m_sampleGame->Tick(fElapsedTimeSeconds, enableAnimations);
+    if (m_game)
+        m_game->Tick(fElapsedTimeSeconds, enableAnimations);
 }
 
 void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool enableAnimations, bool /*enableAnimationUpdate*/)
 {
-    if (enableAnimations && m_sampleGame && m_sampleGame->IsInitialized())
-        m_viewState.sceneTime = m_sampleGame->gameTime();
+    if (enableAnimations && m_game && m_game->IsInitialized())
+        m_viewState.sceneTime = m_game->gameTime();
 }
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
     auto* cam = m_app ? caustica::cameraController(*m_app) : nullptr;
-    if (m_sampleGame && cam)
-        m_sampleGame->TickCamera(fElapsedTimeSeconds, cam->camera());
+    if (m_game && cam)
+        m_game->TickCamera(fElapsedTimeSeconds, cam->camera());
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
@@ -965,15 +965,15 @@ void SceneEditor::updateWindowTitle()
 
 void SceneEditor::setSceneTime(double sceneTime)
 {
-    if (m_sampleGame && m_sampleGame->IsInitialized())
-        m_sampleGame->SetGameTime(sceneTime);
+    if (m_game && m_game->IsInitialized())
+        m_game->SetGameTime(sceneTime);
     m_viewState.sceneTime = sceneTime;
 }
 
 double SceneEditor::sceneTime() const
 {
-    if (m_sampleGame && m_sampleGame->IsInitialized())
-        return m_sampleGame->gameTime();
+    if (m_game && m_game->IsInitialized())
+        return m_game->gameTime();
     return m_viewState.sceneTime;
 }
 

@@ -152,20 +152,6 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
     }
 }
 
-void EditorUI::BuildSampleGamePanel(const PanelLayout& layout)
-{
-        if (m_sceneEditor.game() && m_sceneEditor.game()->IsInitialized())
-        {
-            if (ImGui::CollapsingHeader("Sample Game"/*, ImGuiTreeNodeFlags_DefaultOpen*/))
-            {
-                RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
-                m_sceneEditor.game()->debugGUI(layout.indent);
-            }
-        }
-
-
-}
-
 void EditorUI::BuildSceneWidgetsPanel(const PanelLayout& layout)
 {
     if (m_showSceneWidgets > 0.0f 

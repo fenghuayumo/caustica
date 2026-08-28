@@ -11,17 +11,17 @@
 #include "GameProps.h"
 
 #ifdef _DEBUG
-#define SAMPLE_GAME_DEVELOPER_SETTINGS
+#define GAME_DEVELOPER_SETTINGS
 #endif
 
 namespace caustica::editor { class SceneEditor; }
 
-// DEMO-ONLY editor SampleGame stage loader (not an embedding API).
+// DEMO-ONLY editor game stage loader (not an embedding API).
 // Prefer EngineApp + EntityWorld / SceneSpawn for new hosts (thin_client).
 class GameScene
 {
 public:
-    GameScene(caustica::editor::SceneEditor& sample, const CommandLineOptions& cmdLine);
+    GameScene(caustica::editor::SceneEditor& editor, const CommandLineOptions& cmdLine);
 
     void                    sceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    sceneUnloading( );
@@ -71,7 +71,7 @@ private:
     void                    ResetGame( );
 
 private:
-    caustica::editor::SceneEditor &          m_sample;
+    caustica::editor::SceneEditor &          m_editor;
     std::shared_ptr<caustica::Scene>
                             m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x

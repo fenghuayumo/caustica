@@ -1,15 +1,15 @@
-# Editor SampleGame -- DEMO ONLY
+# Editor game -- DEMO ONLY
 
 This folder is **not** an embedding API and **not** a second ECS.
 
 | Layer | Owns |
 | --- | --- |
 | Engine (`SceneEntityWorld`, `EntityWorld`, `SceneSpawn`) | Hierarchy, meshes, lights, transforms |
-| `demo::*` in this folder | Editor SampleGame scripts that Tick / drive UI over that ECS |
+| `demo::*` in this folder | Editor game scripts that Tick / drive UI over that ECS |
 
 Contents (editor-linked only; **not** in `causScene` / thin_client):
 
-- `GameScene` -- SampleGame stage loader (`GameSettings` + `SampleGame/` media)
+- `GameScene` -- editor game stage loader (`GameSettings` + `game/` media)
 - `PropBase` / `PropComponentBase` -- OO script objects (`PoliceLightingOnRX6`, `BasicInteractableUI`)
 - `GameModel` / `GameTypes` -- model instance + `LightController` sidecars
 

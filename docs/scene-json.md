@@ -142,7 +142,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `PerspectiveCamera` / `PerspectiveCameraEx` | 透视相机。 |
 | `OrthographicCamera` | 正交相机。 |
 | `GaussianSplat` | 3DGS PLY。 |
-| `GameSettings` | SampleGame 原始 JSON。 |
+| `GameSettings` | 编辑器 `game/` 层原始 JSON。 |
 
 ## 灯光参数
 
@@ -357,7 +357,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 ## `GameSettings`
 
-`GameSettings` 会保存整段 JSON 给 SampleGame 层使用。核心 scene loader 不解析其内部字段。
+`GameSettings` 会保存整段 JSON 给编辑器 `game/` 层使用。核心 scene loader 不解析其内部字段。
 
 ```json
 {

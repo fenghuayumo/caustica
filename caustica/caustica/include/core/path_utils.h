@@ -95,7 +95,7 @@ inline constexpr const char* c_EnvMapSubFolderLegacy    = "EnvironmentMaps";
 inline constexpr const char* c_MaterialsSubFolder       = "materials";
 inline constexpr const char* c_MaterialsSubFolderLegacy = "Materials";
 inline constexpr const char* c_MaterialsExtension       = ".material.json";
-inline constexpr const char* c_GameDataSubFolder        = "SampleGame";
+inline constexpr const char* c_GameDataSubFolder        = "game";
 inline constexpr const char* c_AssetsEnvVar             = "CAUSTICA_ASSETS_DIR";
 
 // --- Environment map sentinel strings ---

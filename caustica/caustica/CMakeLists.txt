@@ -403,7 +403,7 @@ endif()
 
 file(GLOB caus_scene_headers include/scene/*.h)
 file(GLOB caus_scene_sources src/scene/*.cpp)
-# SampleGame OO (GameModel / GameTypes) lives under application/editor/game only.
+# Editor game OO (GameModel / GameTypes) lives under application/editor/game only.
 file(GLOB_RECURSE caus_scene_sub_headers
     include/scene/camera/*.h
     include/scene/loader/*.h

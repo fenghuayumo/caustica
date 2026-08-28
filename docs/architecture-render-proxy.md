@@ -128,7 +128,7 @@ Applications must not dig `worldRenderer()` — use `RenderSessionApi` / `Camera
 `SceneLifecycle`. `WorldRenderer` access is `engine/internal/WorldRendererAccess.h`.
 
 `Scene` owns `SceneEntityWorld` + `SceneRenderSnapshot` + `SceneStructureGpuSync` (async AS
-handoff). Editor SampleGame (`application/editor/game`, `demo::`) is demo-only and editor-linked.
+handoff). Editor game (`application/editor/game`, `demo::`) is demo-only and editor-linked.
 
 Occasional render-thread work from Logic: `EnqueueRenderCommand` / `EnqueueRenderCommandAndWait`
 (`EnqueueRenderCommand.h`) — thin wrappers over the existing RT dispatch (non-blocking by default).

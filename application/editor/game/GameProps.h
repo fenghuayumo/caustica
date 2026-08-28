@@ -11,7 +11,7 @@ namespace demo
 {
     class PropComponentBase;
 
-    // DEMO-ONLY SampleGame OO prop -- not an engine ECS component.
+    // DEMO-ONLY editor game OO prop -- not an engine ECS component.
     class PropBase
     {
     public:

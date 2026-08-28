@@ -311,7 +311,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         ImGui::Text("Camera ATTACHED!"); ImGui::SameLine(); 
         if (ImGui::Button("Detach")) 
             gameCameraAttached = false;
-#ifdef SAMPLE_GAME_DEVELOPER_SETTINGS
+#ifdef GAME_DEVELOPER_SETTINGS
         ImGui::Text("Camera pose: "); ImGui::SameLine();
         if (ImGui::Button("Save"))
         {
@@ -330,7 +330,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         ImGui::Text("Camera not attached"); ImGui::SameLine();
         if (ImGui::Button("Attach"))
             gameCameraAttached = true;
-#ifdef SAMPLE_GAME_DEVELOPER_SETTINGS
+#ifdef GAME_DEVELOPER_SETTINGS
         if (ImGui::Button("Move prop to camera pose"))
         {
             auto& pose = m_gameScene.GetLastRenderCameraPose();
@@ -338,7 +338,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
         }
 #endif
     }
-#ifdef SAMPLE_GAME_DEVELOPER_SETTINGS
+#ifdef GAME_DEVELOPER_SETTINGS
     if (ImGui::Button("Save current as start pose"))
     {
         auto* ew = EntityWorld();

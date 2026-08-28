@@ -1,6 +1,6 @@
 #pragma once
 
-// DEMO-ONLY — editor SampleGame scripts. Not engine ECS. Not an embedding API.
+// DEMO-ONLY — editor game scripts. Not engine ECS. Not an embedding API.
 // Canonical host sample: examples/cpp/thin_client (EntityWorld / SceneSpawn).
 
 #include <math/math.h>

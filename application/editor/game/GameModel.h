@@ -1,6 +1,6 @@
 #pragma once
 
-// DEMO-ONLY editor SampleGame. Not part of the engine ECS authoring surface.
+// DEMO-ONLY editor game. Not part of the engine ECS authoring surface.
 // Prefer SceneSpawn / SceneTransform / EntityWorld::spawn for new applications.
 
 #include "GameTypes.h"

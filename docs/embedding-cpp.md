@@ -12,7 +12,7 @@ allowlist in [public-api.md](public-api.md). The complete in-tree example is
 (`caustica_thin_client`). The allowlist is a convention, not build-enforced.
 
 Do **not** copy `application/editor/game` (`demo::Prop*`, `GameModel`, `LightController`) —
-that folder is an editor SampleGame script layer, not an embedding API.
+that folder is an editor game script layer, not an embedding API.
 
 ## Lifecycle
 
