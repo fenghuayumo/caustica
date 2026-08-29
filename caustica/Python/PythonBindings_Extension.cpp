@@ -9,6 +9,8 @@
 #include "PythonBindingsCore.h"
 #include "RenderSession.h"
 
+#include <caustica/version.h>
+
 #include <engine/EntryPoint.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -228,6 +230,7 @@ private:
 NB_MODULE(caustica, m)
 {
     m.doc() = "caustica Python extension - drive the path-tracer for offline rendering.";
+    m.attr("__version__") = CAUSTICA_VERSION_STRING;
 
     caustica_py::RegisterCoreBindings(m);
 

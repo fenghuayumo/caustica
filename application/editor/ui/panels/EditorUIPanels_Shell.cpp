@@ -7,6 +7,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneQuery.h>
 #include <render/AppDiagnostics.h>
+#include <caustica/version.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -60,6 +61,9 @@ void EditorUI::BuildMainMenuBar()
 {
     if (!ImGui::BeginMainMenuBar())
         return;
+
+    ImGui::TextDisabled("caustica %s", caustica::kVersionString);
+    ImGui::SameLine();
 
     if (ImGui::BeginMenu("File"))
     {

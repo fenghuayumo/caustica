@@ -12,6 +12,7 @@
 #include "SceneEditor.h"
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <caustica/version.h>
 
 #include <stdexcept>
 
@@ -41,6 +42,7 @@ namespace
 NB_MODULE(caustica, m)
 {
     m.doc() = "caustica embedded Python bindings (in-process scripting host).";
+    m.attr("__version__") = CAUSTICA_VERSION_STRING;
 
     caustica_py::RegisterCoreBindings(m);
 

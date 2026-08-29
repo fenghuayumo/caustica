@@ -375,6 +375,7 @@ if (CAUSTICA_WITH_AUDIO)
     target_link_libraries(causticaApp PUBLIC causAudio)
 endif()
 target_include_directories(causticaApp PUBLIC
+    "${CAUSTICA_GENERATED_INCLUDE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/application/editor"
     "${CMAKE_SOURCE_DIR}/application/editor/app"

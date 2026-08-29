@@ -12,10 +12,13 @@ if hasattr(os, "add_dll_directory"):
     _DLL_DIRECTORY_COOKIE = os.add_dll_directory(str(_PACKAGE_DIR))
 
 try:
+    from . import caustica as _native
     from .caustica import *  # noqa: F401,F403
 except ImportError as exc:
     raise ImportError(
         "Failed to import the caustica native extension. "
         "Make sure the wheel was built with the caustica .pyd/.so and runtime DLLs."
     ) from exc
+
+__version__ = _native.__version__
 

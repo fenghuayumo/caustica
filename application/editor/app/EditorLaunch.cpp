@@ -13,8 +13,10 @@
 #include <events/event.h>
 #include <platform/window.h>
 #include <render/passes/debug/Korgi.h>
+#include <caustica/version.h>
 
 #include <memory>
+#include <string>
 
 extern const char* g_windowTitle;
 
@@ -159,7 +161,8 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     desc.fullscreen = editor.cmdLine().fullscreen;
     desc.maximized = createDesc.startMaximized;
     desc.scene = preferredScene;
-    desc.windowTitle = g_windowTitle ? g_windowTitle : "caustica";
+    desc.windowTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
+        + " " + caustica::kVersionString;
     desc.viewState = &editor.viewState();
     desc.diagnostics = &editor.diagnostics();
     desc.renderState = &editor.uiData().render;

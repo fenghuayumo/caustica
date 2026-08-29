@@ -37,6 +37,7 @@
 #include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
+#include <caustica/version.h>
 
 #include "game/GameScene.h"
 
@@ -960,7 +961,9 @@ void SceneEditor::updateWindowTitle()
 #endif
         + ")";
 
-    device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
+        + " " + caustica::kVersionString;
+    device->setInformativeWindowTitle(versionedTitle.c_str(), false, extraInfo.c_str());
 }
 
 void SceneEditor::setSceneTime(double sceneTime)

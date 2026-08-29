@@ -13,7 +13,21 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0175 OLD) # streamline error
 
-project(caustica)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" CAUSTICA_VERSION)
+string(STRIP "${CAUSTICA_VERSION}" CAUSTICA_VERSION)
+if (NOT CAUSTICA_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION must contain a semantic version such as 1.0.0 (got '${CAUSTICA_VERSION}')")
+endif()
+
+project(caustica VERSION ${CAUSTICA_VERSION})
+
+set(CAUSTICA_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/caustica_version.h.in"
+    "${CAUSTICA_GENERATED_INCLUDE_DIR}/caustica/version.h"
+    @ONLY
+)
+message(STATUS "Configuring caustica ${PROJECT_VERSION}")
 
 include(CTest)
 

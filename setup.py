@@ -16,6 +16,7 @@ sys.path.insert(0, str(SUPPORT_PYTHON))
 
 from build_wheel import (  # noqa: E402
     BIN_DIR,
+    PROJECT_VERSION,
     PYTHON_PACKAGE_DIR,
     copy_runtime_files,
     directory_size,
@@ -141,7 +142,7 @@ class BuildPyWithRuntime(_build_py):
 
 setup(
     name="caustica",
-    version=os.environ.get("CAUSTICA_WHEEL_VERSION", os.environ.get("CAUSTICA_WHEEL_VERSION", "0.6.0")),
+    version=PROJECT_VERSION,
     description="Python bindings for caustica",
     long_description=(ROOT / "py_caustica.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",

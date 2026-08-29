@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BIN_DIR = ROOT / "bin"
 PYTHON_PACKAGE_DIR = ROOT / "python" / "caustica"
 DIST_DIR = ROOT / "dist"
+PROJECT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 SHADER_PACK_MAGIC = b"CAUSSHD1"
 SHADER_PACK_VERSION = 1
@@ -293,8 +294,6 @@ def _apply_env_from_args(args: argparse.Namespace) -> None:
     os.environ["CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE"] = "true" if args.precompile_pt_force else "false"
     os.environ["CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET"] = args.precompile_pt_global_preset
     os.environ["CAUSTICA_WHEEL_VERIFY_PT_SHADERS"] = "true" if args.verify_pt_shaders else "false"
-    if args.version:
-        os.environ["CAUSTICA_WHEEL_VERSION"] = args.version
 
 
 def parse_args() -> argparse.Namespace:
@@ -310,7 +309,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--precompile-pt-global-preset", default="coverage")
     parser.add_argument("--verify-pt-shaders", dest="verify_pt_shaders", action="store_true", default=True)
     parser.add_argument("--no-verify-pt-shaders", dest="verify_pt_shaders", action="store_false")
-    parser.add_argument("--version", default=os.environ.get("CAUSTICA_WHEEL_VERSION", "0.6.0"))
     parser.add_argument("--output-dir", type=Path, default=DIST_DIR)
     return parser.parse_args()
 

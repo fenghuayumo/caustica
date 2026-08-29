@@ -1,0 +1,14 @@
+#pragma once
+
+#define CAUSTICA_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define CAUSTICA_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define CAUSTICA_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define CAUSTICA_VERSION_STRING "@PROJECT_VERSION@"
+
+namespace caustica
+{
+inline constexpr int kVersionMajor = CAUSTICA_VERSION_MAJOR;
+inline constexpr int kVersionMinor = CAUSTICA_VERSION_MINOR;
+inline constexpr int kVersionPatch = CAUSTICA_VERSION_PATCH;
+inline constexpr const char* kVersionString = CAUSTICA_VERSION_STRING;
+} // namespace caustica
