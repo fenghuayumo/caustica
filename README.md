@@ -297,6 +297,23 @@ python support/python/build_wheel.py
 python -m pip install dist/caustica-*.whl
 ```
 
+### Portable Windows executable package
+
+The CMake build copies the runtime DLLs required by `caustica.exe` into `bin/`.
+To assemble those DLLs, shader payloads, and the minimal built-in asset pack into
+a portable directory and ZIP archive, run:
+
+```powershell
+python support/python/package_executable.py --assets minimal --shader-api d3d12
+```
+
+This writes `dist/caustica-1.0.0-windows-x64/` and
+`dist/caustica-1.0.0-windows-x64.zip`. Use `--assets full` to include the complete
+`Assets/` submodule (including `statue.ply`), or `--assets none` when the asset
+pack will be supplied separately. For a release build, configure a separate
+build directory with `-DCAUSTICA_DISTRIBUTION_BUILD=ON` before running the
+packaging script.
+
 ### Official shader cook (required for release / load-only)
 
 UE-style two-layer model:
