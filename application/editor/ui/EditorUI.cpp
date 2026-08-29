@@ -196,6 +196,7 @@ void EditorUI::buildUI(void)
 
     BuildMainMenuBar();
     BuildDockSpace();
+    BuildAboutPanel();
 
     if (!m_editorUI.ShowUI)
     {

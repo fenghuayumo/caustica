@@ -58,6 +58,7 @@ struct EditorWindowState
     bool ShowTimeline = true;
     bool ShowPostProcess = true;
     bool ShowPreferences = false;
+    bool ShowAbout = false;
     // Basic is deliberately the default; raw developer controls live in the console.
     bool ShowAdvancedRenderSettings = false;
     // Set when a toggle enables the panel; consumed after Begin() to select its dock tab.

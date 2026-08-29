@@ -150,6 +150,13 @@ void EditorUI::BuildMainMenuBar()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Help"))
+    {
+        if (ImGui::MenuItem("About"))
+            m_editorUI.ShowAbout = true;
+        ImGui::EndMenu();
+    }
+
     ImGui::EndMainMenuBar();
 }
 

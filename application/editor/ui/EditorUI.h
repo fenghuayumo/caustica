@@ -110,6 +110,7 @@ private:
     void BuildGameStandalonePanel(const PanelLayout& layout);
     void BuildTimelinePanel(const PanelLayout& layout);
     void BuildMainMenuBar();
+    void BuildAboutPanel();
     void BuildStatusBar();
     void BuildDockSpace();
     void BuildViewportPanel(const PanelLayout& layout);
