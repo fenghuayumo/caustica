@@ -69,6 +69,19 @@ bool gizmoCapturesInput(const SceneEditor& sceneEditor)
     return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
+void activateFreeCameraForInput(CameraController& camera)
+{
+    if (camera.selectedCameraIndex() == 0)
+        return;
+
+    // Scene cameras are authoritative and are refreshed from ECS every frame.
+    // Switch to the already-synced controller pose before applying viewport
+    // input, so the first interaction preserves the reference view and then
+    // remains freely editable.
+    camera.setSelectedCameraIndex(0);
+    camera.markCameraChanged();
+}
+
 void requestMaterialPick(SceneEditor& sceneEditor)
 {
     // Pick the hit geometry's material (per sub-mesh), not the whole instance.
@@ -221,7 +234,10 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (!(game && game->CameraActive()))
     {
         if (!isCameraFlyKey(key) || isRightMouseDown(sceneEditor))
+        {
+            activateFreeCameraForInput(*camera);
             camera->camera().keyboardUpdate(key, e.getScancode(), action, mods);
+        }
     }
 
     if (game && game->keyboardUpdate(key, e.getScancode(), action, mods))
@@ -363,8 +379,12 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
 
     // LMB rotates the editor camera. RMB is deliberately not forwarded: it no
     // longer rotates and no longer doubles as a material-pick gesture.
-    if (!(game && game->CameraActive()) && button != ToGlfwMouse(caustica::Mouse::Right))
-        camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
+    if (!(game && game->CameraActive()))
+    {
+        activateFreeCameraForInput(*camera);
+        if (button != ToGlfwMouse(caustica::Mouse::Right))
+            camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
+    }
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
     if (button == ToGlfwMouse(caustica::Mouse::Left))
@@ -430,6 +450,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     }
     else
     {
+        activateFreeCameraForInput(*camera);
         camera->camera().mouseScrollUpdate(e.getXOffset(), e.getYOffset());
     }
     return true;
