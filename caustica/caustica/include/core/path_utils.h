@@ -43,16 +43,6 @@ std::filesystem::path discoverAssetPackRoot(
 // True when dir looks like a caustica asset pack (pack.json or known folders).
 bool isAssetPackDirectory(const std::filesystem::path& dir);
 
-// Prefer the canonical pack subfolder, fall back to the Donut/RTXPT name.
-std::filesystem::path existingAssetSubfolder(
-    const std::filesystem::path& packRoot,
-    const char* canonicalName,
-    const char* legacyName);
-
-// Models/ -> models/, EnvironmentMaps/ -> env/, Materials/ -> materials/.
-std::filesystem::path canonicalAssetRelativePath(const std::filesystem::path& relativePath);
-std::filesystem::path legacyAssetRelativePath(const std::filesystem::path& relativePath);
-
 // --- Directory search ---
 
 // Searches upward from 'startPath' for a directory 'dirname'.
@@ -91,11 +81,8 @@ inline constexpr const char* c_BuiltinAssetsFolder      = "assets-builtin";
 inline constexpr const char* c_AssetPackManifest        = "pack.json";
 inline constexpr const char* c_ScenesSubFolder          = "scenes";
 inline constexpr const char* c_ModelsSubFolder          = "models";
-inline constexpr const char* c_ModelsSubFolderLegacy    = "Models";
 inline constexpr const char* c_EnvMapSubFolder          = "env";
-inline constexpr const char* c_EnvMapSubFolderLegacy    = "EnvironmentMaps";
 inline constexpr const char* c_MaterialsSubFolder       = "materials";
-inline constexpr const char* c_MaterialsSubFolderLegacy = "Materials";
 inline constexpr const char* c_MaterialsExtension       = ".material.json";
 inline constexpr const char* c_MaterialsExtensionAlt    = ".mat.json";
 inline constexpr const char* c_PrefabsSubFolder         = "prefabs";

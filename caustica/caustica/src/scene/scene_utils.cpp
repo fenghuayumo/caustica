@@ -120,9 +120,10 @@ void refreshEnvironmentMapMediaList(
 
     const std::filesystem::path sceneEnvFolder = sceneDirectory.empty()
         ? std::filesystem::path()
-        : existingAssetSubfolder(sceneDirectory, c_EnvMapSubFolder, c_EnvMapSubFolderLegacy);
-    const std::filesystem::path assetsEnvFolder =
-        existingAssetSubfolder(assetsPath, c_EnvMapSubFolder, c_EnvMapSubFolderLegacy);
+        : sceneDirectory / c_EnvMapSubFolder;
+    const std::filesystem::path assetsEnvFolder = assetsPath.empty()
+        ? std::filesystem::path()
+        : assetsPath / c_EnvMapSubFolder;
 
     AppendEnvironmentMapsFromFolder(assetsEnvFolder, outMediaList);
     AppendEnvironmentMapsFromFolder(sceneEnvFolder, outMediaList);

@@ -176,8 +176,7 @@ actual DXR 1.2 and Shader Model 6.9 support still depends on the GPU and driver.
 
 Scene files live under `Assets/scenes/`. `--scene kitchen.scene.json` still
 resolves by filename. Media paths in scene JSON are pack-relative
-(`models/...`, `env/...`); the older `Models/` and `EnvironmentMaps/` prefixes
-are still accepted.
+(`models/...`, `env/...`).
 
 For a copied binary distribution, keep the generated shader directories and
 runtime libraries with the executable, and put the asset pack either in

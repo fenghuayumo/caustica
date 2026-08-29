@@ -1,11 +1,9 @@
 #include "core/path_utils.h"
 #include "core/vfs/VFS.h"
 
-#include <cctype>
 #include <cstdlib>
 #include <mutex>
 #include <string>
-#include <vector>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -105,65 +103,6 @@ namespace
         return path.lexically_normal();
     }
 
-    std::string FirstPathComponent(const std::filesystem::path& relativePath)
-    {
-        auto it = relativePath.begin();
-        if (it == relativePath.end())
-            return {};
-        return it->string();
-    }
-
-    std::filesystem::path ReplaceFirstPathComponent(
-        const std::filesystem::path& relativePath,
-        const std::string& replacement)
-    {
-        std::filesystem::path out = replacement;
-        bool first = true;
-        for (const auto& part : relativePath)
-        {
-            if (first)
-            {
-                first = false;
-                continue;
-            }
-            out /= part;
-        }
-        return out;
-    }
-
-    bool EqualsIgnoreCase(const std::string& a, const std::string& b)
-    {
-        if (a.size() != b.size())
-            return false;
-        for (size_t i = 0; i < a.size(); ++i)
-        {
-            const unsigned char ca = static_cast<unsigned char>(a[i]);
-            const unsigned char cb = static_cast<unsigned char>(b[i]);
-            if (std::tolower(ca) != std::tolower(cb))
-                return false;
-        }
-        return true;
-    }
-
-    std::vector<std::filesystem::path> RelativePathAliases(const std::filesystem::path& relativePath)
-    {
-        std::vector<std::filesystem::path> aliases;
-        auto pushUnique = [&](const std::filesystem::path& candidate) {
-            if (candidate.empty())
-                return;
-            for (const auto& existing : aliases)
-            {
-                if (existing == candidate)
-                    return;
-            }
-            aliases.push_back(candidate);
-        };
-
-        pushUnique(relativePath);
-        pushUnique(canonicalAssetRelativePath(relativePath));
-        pushUnique(legacyAssetRelativePath(relativePath));
-        return aliases;
-    }
 }
 
 bool isAssetPackDirectory(const std::filesystem::path& dir)
@@ -179,72 +118,13 @@ bool isAssetPackDirectory(const std::filesystem::path& dir)
         return true;
     if (std::filesystem::is_directory(dir / c_ModelsSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_ModelsSubFolderLegacy, ec))
-        return true;
     if (std::filesystem::is_directory(dir / c_MaterialsSubFolder, ec))
-        return true;
-    if (std::filesystem::is_directory(dir / c_MaterialsSubFolderLegacy, ec))
         return true;
     if (std::filesystem::is_directory(dir / c_EnvMapSubFolder, ec))
         return true;
     if (std::filesystem::is_directory(dir / c_PrefabsSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_EnvMapSubFolderLegacy, ec))
-        return true;
     return false;
-}
-
-std::filesystem::path existingAssetSubfolder(
-    const std::filesystem::path& packRoot,
-    const char* canonicalName,
-    const char* legacyName)
-{
-    if (packRoot.empty() || canonicalName == nullptr || canonicalName[0] == '\0')
-        return {};
-
-    const std::filesystem::path canonical = packRoot / canonicalName;
-    std::error_code ec;
-    if (std::filesystem::is_directory(canonical, ec) && !ec)
-        return canonical;
-
-    if (legacyName != nullptr && legacyName[0] != '\0')
-    {
-        const std::filesystem::path legacy = packRoot / legacyName;
-        if (std::filesystem::is_directory(legacy, ec) && !ec)
-            return legacy;
-    }
-
-    return canonical;
-}
-
-std::filesystem::path canonicalAssetRelativePath(const std::filesystem::path& relativePath)
-{
-    if (relativePath.empty() || relativePath.is_absolute())
-        return relativePath;
-
-    const std::string first = FirstPathComponent(relativePath);
-    if (EqualsIgnoreCase(first, c_ModelsSubFolderLegacy) || EqualsIgnoreCase(first, c_ModelsSubFolder))
-        return ReplaceFirstPathComponent(relativePath, c_ModelsSubFolder);
-    if (EqualsIgnoreCase(first, c_MaterialsSubFolderLegacy) || EqualsIgnoreCase(first, c_MaterialsSubFolder))
-        return ReplaceFirstPathComponent(relativePath, c_MaterialsSubFolder);
-    if (EqualsIgnoreCase(first, c_EnvMapSubFolderLegacy) || EqualsIgnoreCase(first, c_EnvMapSubFolder))
-        return ReplaceFirstPathComponent(relativePath, c_EnvMapSubFolder);
-    return relativePath;
-}
-
-std::filesystem::path legacyAssetRelativePath(const std::filesystem::path& relativePath)
-{
-    if (relativePath.empty() || relativePath.is_absolute())
-        return relativePath;
-
-    const std::string first = FirstPathComponent(relativePath);
-    if (EqualsIgnoreCase(first, c_ModelsSubFolder) || EqualsIgnoreCase(first, c_ModelsSubFolderLegacy))
-        return ReplaceFirstPathComponent(relativePath, c_ModelsSubFolderLegacy);
-    if (EqualsIgnoreCase(first, c_MaterialsSubFolder) || EqualsIgnoreCase(first, c_MaterialsSubFolderLegacy))
-        return ReplaceFirstPathComponent(relativePath, c_MaterialsSubFolderLegacy);
-    if (EqualsIgnoreCase(first, c_EnvMapSubFolder) || EqualsIgnoreCase(first, c_EnvMapSubFolderLegacy))
-        return ReplaceFirstPathComponent(relativePath, c_EnvMapSubFolderLegacy);
-    return relativePath;
 }
 
 std::filesystem::path discoverAssetPackRoot(
@@ -363,34 +243,25 @@ std::filesystem::path resolveMediaRelativePath(
     if (localPath.is_absolute())
         return std::filesystem::absolute(localPath);
 
-    const std::vector<std::filesystem::path> aliases = RelativePathAliases(localPath);
-
-    for (const std::filesystem::path& alias : aliases)
-    {
-        if (std::filesystem::exists(alias))
-            return std::filesystem::absolute(alias);
-    }
+    if (std::filesystem::exists(localPath))
+        return std::filesystem::absolute(localPath);
 
     for (const std::filesystem::path& root : searchRoots)
     {
         if (root.empty())
             continue;
-        for (const std::filesystem::path& alias : aliases)
-        {
-            const std::filesystem::path candidate = root / alias;
-            if (std::filesystem::exists(candidate))
-                return std::filesystem::absolute(candidate);
-        }
+        const std::filesystem::path candidate = root / localPath;
+        if (std::filesystem::exists(candidate))
+            return std::filesystem::absolute(candidate);
     }
 
-    const std::filesystem::path preferred = canonicalAssetRelativePath(localPath);
     for (const std::filesystem::path& root : searchRoots)
     {
         if (!root.empty())
-            return std::filesystem::absolute(root / preferred);
+            return std::filesystem::absolute(root / localPath);
     }
 
-    return std::filesystem::absolute(preferred);
+    return std::filesystem::absolute(localPath);
 }
 
 std::filesystem::path resolveSceneMediaPath(

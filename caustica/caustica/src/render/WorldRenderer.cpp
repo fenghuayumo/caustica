@@ -735,7 +735,7 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
             scene->hasSceneLightsChanged(renderPhaseFrameIndex);
         if (frameSceneLightsChanged && !m_frameSettingsSnapshot.RealtimeMode)
         {
-            // Dynamic lights are updated every frame in realtime scenes. RTXPT keeps
+            // Dynamic lights are updated every frame in realtime scenes. Caustica keeps
             // NRD/TAA history alive and lets disocclusion/history clamping adapt to
             // the lighting change; treating a light-proxy refresh as a cache reset
             // makes animated-light scenes restart temporal filtering every frame.

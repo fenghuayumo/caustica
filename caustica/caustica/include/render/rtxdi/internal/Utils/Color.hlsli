@@ -13,7 +13,7 @@
 #ifndef RTXDI_COLOR_HLSLI
 #define RTXDI_COLOR_HLSLI
 
-// RTXPT's RTXDI baseline keeps the color helpers in Math.hlsli. The ReSTIR PT
+// The RTXDI baseline keeps the color helpers in Math.hlsli. The ReSTIR PT
 // files copied from newer RTXDI include Color.hlsli directly, so route them to
 // the existing definitions instead of redefining the same functions.
 #include "render/rtxdi/internal/Utils/Math.hlsli"

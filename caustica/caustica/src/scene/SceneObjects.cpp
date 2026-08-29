@@ -13,8 +13,6 @@ void GaussianSplat::load(const Json::Value& node)
     if (path.empty()) node["file"]     >> path;
     if (path.empty()) node["fileName"] >> path;
     node["convertRdfToRub"] >> convertRdfToRub;
-    if (!node.isMember("convertRdfToRub") && node.isMember("convertRdfToDonut"))
-        node["convertRdfToDonut"] >> convertRdfToRub;
     node["enabled"] >> enabled;
 }
 

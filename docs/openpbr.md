@@ -12,7 +12,7 @@ The JSON reader accepts OpenPBR snake_case fields inside an `OpenPBR` object or
 at the material root. If both legacy/PascalCase fields and an `OpenPBR` object
 are present, the OpenPBR object is read after the legacy fields and therefore
 wins for mapped values. A material without an explicit model defaults to
-OpenPBR unless it requests the legacy specular-gloss workflow.
+OpenPBR.
 
 Authoritative implementation paths:
 

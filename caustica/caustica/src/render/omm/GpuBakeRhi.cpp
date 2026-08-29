@@ -124,7 +124,7 @@ namespace
 		}
 	}
 
-	/// -- BINDING CACHE FROM DONUT -- 
+	/// Binding cache for OMM baking.
 
 	/*
 	BindingCache maintains a dictionary that maps binding set descriptors

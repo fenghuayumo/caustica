@@ -710,7 +710,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     BridgeGeometrySample bridgeGS = getGeometryFromHit( instanceIndex, geometryIndex, triangleIndex, barycentrics, 
         attributes, t_InstanceData, t_GeometryData, t_GeometryDebugData, rayDir, debug );
 
-    // Convert engine scene data to RTXPT data! 
+    // Convert engine scene data to path-tracer data.
 
     // World pos and prev world pos
     float3 posW     = mul(bridgeGS.instance.transform, float4(bridgeGS.objectSpacePosition, 1.0)).xyz;
@@ -787,7 +787,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
         ptShadingData.B = normalize(cross(ptShadingData.N, ptShadingData.T));
     }
 
-    // Engine -> RTXPT
+    // Engine -> path tracer
     const bool bridgeMaterialThinSurface = (bridgeMaterial.flags & StandardMaterialFlags_ThinSurface) != 0;
     ptShadingData.materialID = materialIndex;
     ptShadingData.mtl = MaterialHeader::make();

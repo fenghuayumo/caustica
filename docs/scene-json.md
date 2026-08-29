@@ -353,7 +353,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `path` | string | 3DGS `.ply` 文件路径。 |
 | `file` | string | `path` 的别名。 |
 | `fileName` | string | `path` 的别名。 |
-| `convertRdfToRub` | bool | 是否把原始 3DGS right/down/front 坐标转换到 RTXPT 引擎坐标约定。默认 `true`。旧字段 `convertRdfToDonut` 仍可读。 |
+| `convertRdfToRub` | bool | 是否把原始 3DGS right/down/front 坐标转换到 Caustica 的 right/up/back 坐标约定。默认 `true`。 |
 | `enabled` | bool | 是否启用该 splat 节点。默认 `true`。 |
 
 路径规则：
@@ -465,7 +465,7 @@ Keyframe 字段：
 
 ## 材质覆盖
 
-材质文件在 `materials/`（旧名 `Materials/` 仍能解析），扩展名 `.material.json` 或 `.mat.json`。场景里用 `PrefabInstance.materials` 或 `MaterialOverride` **显式引用** pack 相对路径。
+材质文件在 `materials/`，扩展名 `.material.json` 或 `.mat.json`。场景里用 `PrefabInstance.materials` 或 `MaterialOverride` **显式引用** pack 相对路径。
 
 按「模型名.材质名」扫目录的旧查找仍然能加载未迁移文件，但已经 deprecated。
 
@@ -559,7 +559,7 @@ materials/kitchen.Mushroom_Sliced_MDL.material.json
 | `ShadowNoLFadeout` | number | 低细分阴影/法线不一致缓解参数。 |
 | `EnableAsAnalyticLightProxy` | bool | 是否把该材质几何作为 analytic light proxy。 |
 | `IgnoreMeshTangentSpace` | bool | 是否忽略 mesh tangent space。 |
-| `UseEngineEmissiveIntensity` | bool | 是否使用引擎材质的 emissive intensity，便于动画驱动。旧字段 `UseDonutEmissiveIntensity` 仍可读。 |
+| `UseEngineEmissiveIntensity` | bool | 是否使用引擎材质的 emissive intensity，便于动画驱动。 |
 | `SkipRender` | bool | 是否跳过该材质几何的渲染。 |
 
 贴图字段格式：
@@ -591,4 +591,4 @@ materials/kitchen.Mushroom_Sliced_MDL.material.json
 - `PrefabInstance.source` 支持 `.gltf`、`.glb`、`.obj`、`.urdf`、可选 OpenUSD，以及 `prefabs/*.prefab.json` 和 `builtin:*`。新增网格格式应扩展 importer，而不是把所有格式强制转成 glTF。
 - `rotation` 是四元数 XYZW；`verticalFov` 和 `euler` 是弧度；灯光的 `angularSize`、`innerAngle`、`outerAngle` 是度。
 - 3DGS 的外观、排序、阴影等渲染选项目前是全局设置，不是每个 3DGS 节点的独立 scene JSON 字段。
-- scene-specific material 目录名来自文件 stem。`foo.scene.json` 对应 `Assets/materials/foo.scene/`，不是 `foo/`。旧名 `Assets/Materials/` 仍然能解析。
+- scene-specific material 目录名来自文件 stem。`foo.scene.json` 对应 `Assets/materials/foo.scene/`，不是 `foo/`。

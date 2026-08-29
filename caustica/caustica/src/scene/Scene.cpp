@@ -844,8 +844,7 @@ void Scene::applyMaterialSlots(
                 it = slots.find("*");
             if (it != slots.end())
             {
-                geometry->material->overrideSource =
-                    canonicalAssetRelativePath(it->second).generic_string();
+                geometry->material->overrideSource = it->second;
             }
         }
     };

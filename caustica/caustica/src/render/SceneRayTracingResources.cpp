@@ -137,7 +137,7 @@ void SceneRayTracingResources::createRTPipelines(const PathTracerSettings& setti
     // Publish the stable variant objects before the frame graph is registered.
     // This does not create a state object: buildPreset() still waits until
     // PathTracingShaderCompiler::update() has produced the hit-group exports.
-    // The PSO and SBT are filled into these same objects later, matching RTXPT's
+    // The PSO and SBT are filled into these same objects later, matching the
     // persistent pipeline-handle model.
     if (!bindFeaturePreset(active))
     {

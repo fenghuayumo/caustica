@@ -104,7 +104,7 @@ struct SphereLight
         // ignoring special case for when viewing inside the light (which should just use normal spherical area sampling)
         // for performance. Similarly condition ignored in PDF calculation as well.
 
-        // Note 2: In RTXPT we only emit light from the surface of the sphere - this makes it consistent the way emissive 
+        // Note 2: We only emit light from the surface of the sphere - this makes it consistent the way emissive
         // triangles work (they are single sided), and when using analytic light proxies
 #if 1
         if (lightDistance2 < radius2)

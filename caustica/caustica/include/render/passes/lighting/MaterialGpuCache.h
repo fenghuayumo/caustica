@@ -157,7 +157,7 @@ struct StandardMaterial : public StandardMaterialBase
     dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
     dm::float3              emissiveColor                       = 0.f;
     
-    std::string             materialModel                       = "OpenPBR"; // Built-in material model. "RTXPT" keeps legacy naming only.
+    std::string             materialModel                       = "OpenPBR"; // Built-in material model.
     float                   baseWeight                          = 1.f;
     float                   baseDiffuseRoughness                = 0.f;
     float                   specularWeight                      = 1.f;
@@ -228,7 +228,7 @@ struct StandardMaterial : public StandardMaterialBase
     // Useful when metalness and roughness are packed into a 2-channel texture for BC5 encoding.
     bool                    metalnessInRedChannel               = false;
 
-    // As per Falcor/RTXPT convention, ray hitting a material with the thin surface is assumed to enter and leave surface in the same bounce and it makes most sense when used with doubleSided; it skips all volume logic.
+    // A thin surface is assumed to enter and leave in the same bounce; this skips volume logic.
     bool                    thinSurface                         = false;
 
     // The mesh will not be part of NEE.

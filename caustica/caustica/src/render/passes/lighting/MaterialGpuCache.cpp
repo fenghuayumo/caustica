@@ -360,15 +360,9 @@ bool StandardMaterial::read(
     const bool hasMaterialModelField = input.isMember("materialModel") || input.isMember("MaterialModel");
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
-    const bool hasExplicitBaseDiffuseRoughness =
-        input.isMember("baseDiffuseRoughness")
-        || input.isMember("BaseDiffuseRoughness")
-        || input.isMember("base_diffuse_roughness")
-        || (hasOpenPBRBlock && input["OpenPBR"].isObject()
-            && input["OpenPBR"].isMember("base_diffuse_roughness"));
 
     // OpenPBR stores the coat normal in its material block. Mirror it into the
-    // legacy texture field so both schemas use the same loading path.
+    // texture field so both supported forms use the same loading path.
     if (!input.isMember("coatNormalTexture") && input.isMember("OpenPBR")
         && input["OpenPBR"].isObject() && input["OpenPBR"].isMember("coat_normal"))
     {
@@ -500,7 +494,6 @@ bool StandardMaterial::read(
         ReadJsonMember(hairJ, "diffuse_reflection_tint", hair.diffuseReflectionTint);
     }
 
-    LOAD_FIELD_EITHER(useSpecularGlossModel, "UseSpecularGlossModel");
     LOAD_FIELD_EITHER(enableBaseTexture, "EnableBaseTexture");
     LOAD_FIELD_EITHER(enableOcclusionRoughnessMetallicTexture, "EnableOcclusionRoughnessMetallicTexture");
     LOAD_FIELD_EITHER(enableNormalTexture, "EnableNormalTexture");
@@ -535,9 +528,6 @@ bool StandardMaterial::read(
         input["useEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
     else if (input.isMember("UseEngineEmissiveIntensity"))
         input["UseEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
-    else if (input.isMember("UseDonutEmissiveIntensity"))
-        input["UseDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
-
     LOAD_FIELD_EITHER(skipRender, "SkipRender");
 
     auto readOpenPBR = [this](const Json::Value& openPBR)
@@ -620,24 +610,12 @@ bool StandardMaterial::read(
         readOpenPBR(input["OpenPBR"]);
     else if ((hasMaterialModelField && IsOpenPBRMaterialModel(materialModel)) || hasTopLevelOpenPBRFields)
         readOpenPBR(input);
-    else if (!hasMaterialModelField && !useSpecularGlossModel)
+    else
     {
+        // Caustica material assets use OpenPBR as their only authoring model.
         materialModel = "OpenPBR";
+        useSpecularGlossModel = false;
     }
-    else if (!hasMaterialModelField && useSpecularGlossModel)
-        materialModel = "RTXPT";
-
-    // readOpenPBR supplies the standard neutral tint when explicit OpenPBR
-    // authoring omits specular_color. Legacy engine/RTXPT material files are
-    // not explicit OpenPBR and retain their stored value instead.
-    const bool explicitlyAuthoredOpenPBR = hasOpenPBRBlock || hasTopLevelOpenPBRFields
-        || (hasMaterialModelField && IsOpenPBRMaterialModel(materialModel));
-
-    // RTXPT used specular roughness for Frostbite diffuse as well. Only new,
-    // explicitly authored OpenPBR materials should default the independent
-    // base_diffuse_roughness to zero.
-    if (!hasExplicitBaseDiffuseRoughness && !explicitlyAuthoredOpenPBR)
-        baseDiffuseRoughness = roughness;
 
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
     baseDiffuseRoughness = std::clamp(baseDiffuseRoughness, 0.0f, 1.0f);
@@ -825,7 +803,7 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
             "The more closely the object's mesh resembles the analytic light, the more physically correct results will be.\n");
 
         update |= ImGui::Checkbox("Emissive intensity from engine material", &useEngineEmissiveIntensity);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Engine materials can have emissive intensity animation attached; this allows RTXPT to use it\n");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Engine materials can have emissive intensity animation attached.\n");
 
         update |= ImGui::Checkbox("Ignore mesh tangent space", &ignoreMeshTangentSpace);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("This will ignore tangent space loaded from the mesh and generate new one - can help issues with normals.");
@@ -1674,11 +1652,11 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
         }
     };
 
-    // Scene-local Materials/ (e.g. <scene-dir>/Materials/ when scene lives next to project assets).
+    // Scene-local materials/ (e.g. <scene-dir>/materials/ when scene lives next to project assets).
     appendCandidates(m_sceneMaterialsSceneSpecializedPath, false);
     appendCandidates(m_sceneMaterialsPath, true);
 
-    // Runtime Assets root (e.g. pip site-packages/rtxpt/Assets or ../Assets next to bin).
+    // Runtime Assets root (e.g. pip site-packages/Assets or ../Assets next to bin).
     appendCandidates(m_materialsSceneSpecializedPath, false);
     appendCandidates(m_materialsPath, true);
 
@@ -1732,8 +1710,7 @@ void MaterialGpuCache::applyScenePaths(
         m_sceneDirectory = std::filesystem::path();
     if (!m_sceneDirectory.empty())
     {
-        m_sceneMaterialsPath = existingAssetSubfolder(
-            m_sceneDirectory, c_MaterialsSubFolder, c_MaterialsSubFolderLegacy);
+        m_sceneMaterialsPath = m_sceneDirectory / c_MaterialsSubFolder;
         std::filesystem::path justName = sceneFilePath.filename().stem();
         if (!justName.empty())
             m_sceneMaterialsSceneSpecializedPath = m_sceneMaterialsPath / justName;
@@ -1744,8 +1721,9 @@ void MaterialGpuCache::applyScenePaths(
         m_sceneMaterialsSceneSpecializedPath.clear();
     }
 
-    m_materialsPath = existingAssetSubfolder(
-        mediaPath, c_MaterialsSubFolder, c_MaterialsSubFolderLegacy);
+    m_materialsPath = mediaPath.empty()
+        ? std::filesystem::path()
+        : mediaPath / c_MaterialsSubFolder;
     std::filesystem::path justName = sceneFilePath.filename().stem();
     m_materialsSceneSpecializedPath = m_materialsPath / justName;
 }
@@ -2336,42 +2314,6 @@ void MaterialGpuCache::update(caustica::rhi::CommandList* commandList,
     }
 }
 
-/*
-void MaterialGpuCache::loadAll(std::unordered_map<std::string, std::shared_ptr<StandardMaterial>>& container)
-{
-    std::ifstream inFile(m_sceneMaterialsFilePath);
-
-    if (!inFile.is_open())
-        { caustica::warning("No material definition file found at '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
-
-    Json::Value rootJ;
-    inFile >> rootJ;
-
-    int version = -1;
-    rootJ["RTXPTMaterials"]["version"] >> version;
-    if (version != 1)
-        { caustica::warning("Malformed or unsupported material definition file version '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
-
-    Json::Value materialsJ;
-
-    materialsJ = rootJ["materials"];
-    if (materialsJ.empty() || !materialsJ.isArray())
-        { caustica::warning("Malformed or empty material definition file '%s' - consider doing Scene->Materials->Advanced->Save", m_sceneMaterialsFilePath.string().c_str()); return; }
-
-    for ( Json::Value materialJ : materialsJ )
-    {
-        std::shared_ptr<StandardMaterial> standardMaterial = StandardMaterial::fromJson(materialJ, m_mediaPath, m_textureCache);
-        if (standardMaterial == nullptr)
-            { caustica::warning("Error while reading material in material definition file '%s'", m_sceneMaterialsFilePath.string().c_str()); continue; }
-        
-        auto existing = container.find(standardMaterial->name);
-        if (existing != container.end())
-            { caustica::warning("Duplicated materials with name '%s' found in material definition file '%s' - subsequent instances ignored.", standardMaterial->name.c_str(), m_sceneMaterialsFilePath.string().c_str()); assert( false ); continue; }
-        else
-            container.insert( make_pair(standardMaterial->name, standardMaterial) );
-    }
-}*/
-
 bool MaterialGpuCache::loadSingle(StandardMaterialBase & material)
 {
     std::filesystem::path inPath = getMaterialStoragePath(material);
@@ -2400,7 +2342,6 @@ bool MaterialGpuCache::saveSingle(StandardMaterialBase & material)
     outPath = getMaterialStoragePath(material);
 
     Json::Value rootJ;
-    //rootJ["RTXPTMaterialVersion"] = 1;
 
     material.write(rootJ);
 
@@ -2423,31 +2364,8 @@ bool MaterialGpuCache::saveSingle(StandardMaterialBase & material)
 
 void MaterialGpuCache::saveAll()
 {
-#if 0
-    Json::Value rootJ;
-
-    rootJ["RTXPTMaterials"]["version"] = 1;
-    Json::Value materialsJ;
-    for (auto& standardMaterial : m_materials)
-    {
-        Json::Value materialJ;
-        standardMaterial->write(materialJ, m_mediaPath);
-        materialsJ.append(materialJ);
-    }
-
-    rootJ["materials"] = materialsJ;
-
-    std::ofstream outFile(m_sceneMaterialsFilePath, std::ios::trunc);
-
-    Json::StreamWriterBuilder builder;
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    
-    writer->write(rootJ, &outFile);
-    outFile.close();
-#else
     for (auto& standardMaterial : m_materials)
         saveSingle(*standardMaterial);
-#endif
 }
 
 bool MaterialGpuCache::debugGui(float indent)

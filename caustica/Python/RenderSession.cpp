@@ -332,7 +332,7 @@ namespace
             caustica::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
         return caustica::rhi::GraphicsAPI::D3D12;
 #else
-        static_assert(CAUSTICA_WITH_DX12 || CAUSTICA_WITH_VULKAN, "RTXPT requires at least one graphics backend");
+        static_assert(CAUSTICA_WITH_DX12 || CAUSTICA_WITH_VULKAN, "Caustica requires at least one graphics backend");
 #endif
     }
 }

@@ -279,7 +279,7 @@ struct RAB_LightSample
 };
 
 typedef PolymorphicLightInfoFull RAB_LightInfo;
-// Using the RTXPT Sample Generator
+// Using the sample generator
 typedef SampleGenerator RAB_RandomSamplerState;
 
 struct RAB_PathTracerUserData
@@ -782,7 +782,7 @@ bool GetConservativeVisibility(RaytracingAccelerationStructure accelStruct, RayD
 // Traces an expensive visibility ray that considers all alpha tested and transparent geometry along the way.
 // Only used in FinalSampling so only supports USE_RAY_QUERY=1
 // Not a required bridge function.
-// Uses the RTXPT Bridge alpha test
+// Uses the path-tracer bridge alpha test
 bool GetFinalVisibility(RaytracingAccelerationStructure accelStruct, RayDesc ray)
 {
     const RayHitInfo res = TraceVisibilityRay(accelStruct, ray, true);
