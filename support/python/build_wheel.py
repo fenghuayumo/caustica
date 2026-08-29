@@ -1,587 +1,338 @@
 from __future__ import annotations
 
+"""Helpers for assembling a local caustica binary wheel from bin/.
+
+Also provides write_shader_pack() for cook_shaders.py / package_shaders.py.
+"""
+
 import argparse
 import os
 import shutil
 import struct
 import subprocess
 import sys
-import sysconfig
 from pathlib import Path
+from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[2]
 BIN_DIR = ROOT / "bin"
 PYTHON_PACKAGE_DIR = ROOT / "python" / "caustica"
-BUILD_DIR = ROOT / "build" / "python-wheel"
-STAGING_DIR = BUILD_DIR / "staging"
 DIST_DIR = ROOT / "dist"
 
-BASE_MINIMAL_ASSET_FILES = [
-    "ArtLicenses.txt",
-    "README.md",
-    "pack.json",
-    "scenes/default/default.scene.json",
-    "loading_splash.png",
-]
+SHADER_PACK_MAGIC = b"CAUSSHD1"
+SHADER_PACK_VERSION = 1
+FNV_OFFSET = 14695981039346656037
+FNV_PRIME = 1099511628211
+PACK_SEED0 = 0x243F6A8885A308D3
+PACK_SEED1 = 0x13198A2E03707344
+PACK_XOR_CONST = 0xA5A5A5A55A5A5A5A
+XORSHIFT_MULT = 2685821657736338717
 
-MINIMAL_ASSET_FILES = BASE_MINIMAL_ASSET_FILES
-
-
-def copy_file(src: Path, dst: Path) -> None:
-    if not src.exists():
-        raise FileNotFoundError(src)
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
-
-
-def copy_optional_file(src: Path, dst: Path) -> None:
-    if not src.exists():
-        print(f"WARNING: optional runtime asset not found, skipping: {src}")
-        return
-    copy_file(src, dst)
-
-
-def copy_tree(
-    src: Path,
-    dst: Path,
-    suffixes: set[str] | None = None,
-    path_filter: set[str] | None = None,
-) -> None:
-    if not src.exists():
-        raise FileNotFoundError(src)
-
-    for item in src.rglob("*"):
-        if not item.is_file():
-            continue
-        if suffixes is not None and item.suffix.lower() not in suffixes:
-            continue
-        if path_filter is not None and not set(item.relative_to(src).parts) & path_filter:
-            continue
-        copy_file(item, dst / item.relative_to(src))
+RUNTIME_FILE_SUFFIXES = {".dll", ".pyd", ".so", ".dylib"}
+RUNTIME_DIR_NAMES = {"D3D12", "usd"}
+SKIP_BIN_NAMES = {
+    "caustica.exe",
+    "causticaD.exe",
+    "caustica_thin_client.exe",
+    "caustica_thin_clientD.exe",
+}
 
 
 def directory_size(path: Path) -> int:
+    if not path.exists():
+        return 0
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
-PACK_MAGIC = b"CAUSSHD1"
-PACK_VERSION = 1
-PACK_HEADER = struct.Struct("<8sII")
-PACK_ENTRY = struct.Struct("<QQQQ")
-FNV_MASK = (1 << 64) - 1
-FNV_PRIME = 1099511628211
-FNV_OFFSET = 14695981039346656037
-HEX_CHARS = set("0123456789abcdefABCDEF")
+def shader_types_for_api(shader_api: str) -> list[str]:
+    if shader_api == "d3d12":
+        return ["dxil"]
+    if shader_api == "vulkan":
+        return ["spirv"]
+    if shader_api == "both":
+        return ["dxil", "spirv"]
+    raise ValueError(f"Unsupported shader API: {shader_api}")
 
 
 def fnv1a64(value: str, seed: int) -> int:
-    h = (FNV_OFFSET ^ seed) & FNV_MASK
+    digest = (FNV_OFFSET ^ seed) & 0xFFFFFFFFFFFFFFFF
     for byte in value.encode("utf-8"):
-        h ^= byte
-        h = (h * FNV_PRIME) & FNV_MASK
-    return h
-
-
-def shader_pack_key(logical_path: str) -> tuple[int, int]:
-    # Keep pack lookup stable when ShaderMake preserves source-directory casing
-    # differently from runtime VFS requests.
-    logical_path = logical_path.replace("\\", "/").lower()
-    return (
-        fnv1a64(logical_path, 0x243F6A8885A308D3),
-        fnv1a64(logical_path, 0x13198A2E03707344),
-    )
+        digest ^= byte
+        digest = (digest * FNV_PRIME) & 0xFFFFFFFFFFFFFFFF
+    return digest
 
 
 def rotl64(value: int, shift: int) -> int:
-    return ((value << shift) | (value >> (64 - shift))) & FNV_MASK
+    value &= 0xFFFFFFFFFFFFFFFF
+    return ((value << shift) | (value >> (64 - shift))) & 0xFFFFFFFFFFFFFFFF
 
 
-def xorshift64star(state: int) -> tuple[int, int]:
-    state ^= state >> 12
-    state ^= (state << 25) & FNV_MASK
-    state ^= state >> 27
-    state &= FNV_MASK
-    return state, (state * 2685821657736338717) & FNV_MASK
+def xorshift64star(state: int) -> int:
+    state ^= (state >> 12) & 0xFFFFFFFFFFFFFFFF
+    state ^= (state << 25) & 0xFFFFFFFFFFFFFFFF
+    state ^= (state >> 27) & 0xFFFFFFFFFFFFFFFF
+    state = (state * XORSHIFT_MULT) & 0xFFFFFFFFFFFFFFFF
+    return state
 
 
-def encode_shader_payload(data: bytes, key: tuple[int, int]) -> bytes:
-    state = (key[0] ^ rotl64(key[1], 1) ^ 0xA5A5A5A55A5A5A5A) & FNV_MASK
-    out = bytearray(data)
+def normalize_pack_path(logical_path: str) -> str:
+    normalized = logical_path.replace("\\", "/")
+    while normalized.startswith("/"):
+        normalized = normalized[1:]
+    return normalized.lower()
+
+
+def pack_key(logical_path: str) -> tuple[int, int]:
+    normalized = normalize_pack_path(logical_path)
+    return fnv1a64(normalized, PACK_SEED0), fnv1a64(normalized, PACK_SEED1)
+
+
+def encode_payload(data: bytes, key: tuple[int, int]) -> bytes:
+    h0, h1 = key
+    state = (h0 ^ rotl64(h1, 1) ^ PACK_XOR_CONST) & 0xFFFFFFFFFFFFFFFF
+    encoded = bytearray(data)
     stream_word = 0
     stream_bytes_left = 0
-    for index in range(len(out)):
+    for index in range(len(encoded)):
         if stream_bytes_left == 0:
-            state, stream_word = xorshift64star(state)
+            state = xorshift64star(state)
+            stream_word = state
             stream_bytes_left = 8
-        out[index] ^= stream_word & 0xFF
+        encoded[index] ^= stream_word & 0xFF
         stream_word >>= 8
         stream_bytes_left -= 1
-    return bytes(out)
-
-
-def is_hash_hex(value: str) -> bool:
-    return len(value) == 64 and all(ch in HEX_CHARS for ch in value)
-
-
-def normalized_dynamic_shader_rel(path: Path) -> Path:
-    stem = path.stem
-    parent = path.parent.name
-    is_split_hash = (
-        len(parent) == 2
-        and all(ch in HEX_CHARS for ch in parent)
-        and len(stem) == 62
-        and all(ch in HEX_CHARS for ch in stem)
-    )
-    if is_split_hash:
-        shader_hash = (parent + stem).lower()
-    elif is_hash_hex(stem):
-        shader_hash = stem.lower()
-    else:
-        maybe_hash = stem.rsplit("_", 1)[-1].lower()
-        if not is_hash_hex(maybe_hash):
-            return path
-        shader_hash = maybe_hash
-    return Path(shader_hash[:2]) / f"{shader_hash[2:]}.bin"
-
-
-def add_shader_pack_tree(
-    entries: dict[str, Path],
-    src_root: Path,
-    logical_root: str,
-    *,
-    normalize_dynamic_names: bool = False,
-) -> None:
-    if not src_root.exists():
-        return
-
-    for item in src_root.rglob("*.bin"):
-        if not item.is_file():
-            continue
-        rel = item.relative_to(src_root)
-        if normalize_dynamic_names:
-            rel = normalized_dynamic_shader_rel(rel)
-        logical_path = f"{logical_root}/{rel.as_posix()}"
-        entries.setdefault(logical_path, item)
-
-
-def collect_shader_pack_entries(shader_type: str, dynamic_shaders: str) -> dict[str, Path]:
-    entries: dict[str, Path] = {}
-    shader_bin_root = BIN_DIR / "ShaderBin" / shader_type
-    if shader_bin_root.exists():
-        for item in shader_bin_root.rglob("*.bin"):
-            if item.is_file():
-                logical_path = f"ShaderBin/{item.relative_to(shader_bin_root).as_posix()}"
-                entries.setdefault(logical_path, item)
-
-    return entries
+    return bytes(encoded)
 
 
 def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) -> Path:
-    entries = collect_shader_pack_entries(shader_type, dynamic_shaders)
-    if not entries:
-        raise FileNotFoundError(f"No shader binaries found for {shader_type} in {BIN_DIR}")
+    source_root = BIN_DIR / "ShaderBin" / shader_type
+    if not source_root.is_dir():
+        raise FileNotFoundError(f"{source_root} does not exist. Build ShaderBinManifest first.")
 
+    files: list[tuple[str, Path]] = []
+    for path in source_root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(source_root).as_posix()
+        files.append((f"ShaderBin/{rel}", path))
+    if dynamic_shaders == "none":
+        files = [item for item in files if Path(item[0]).name in {"manifest.bin", "deps.manifest"}]
+    if not files:
+        raise FileNotFoundError(f"No shader files to pack under {source_root}")
+
+    files.sort(key=lambda item: item[0].lower())
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     pack_path = output_dir / f"caustica.shaders.{shader_type}.pack"
-    sorted_entries = sorted(entries.items())
-    table_size = PACK_ENTRY.size * len(sorted_entries)
-    data_offset = PACK_HEADER.size + table_size
 
-    packed_entries: list[tuple[int, int, int, int, bytes]] = []
-    cursor = data_offset
-    for logical_path, source_path in sorted_entries:
-        key = shader_pack_key(logical_path)
-        encoded = encode_shader_payload(source_path.read_bytes(), key)
-        packed_entries.append((key[0], key[1], cursor, len(encoded), encoded))
-        cursor += len(encoded)
+    encoded_entries: list[tuple[int, int, bytes]] = []
+    for logical, path in files:
+        key = pack_key(logical)
+        encoded_entries.append((key[0], key[1], encode_payload(path.read_bytes(), key)))
 
-    with pack_path.open("wb") as f:
-        f.write(PACK_HEADER.pack(PACK_MAGIC, PACK_VERSION, len(packed_entries)))
-        for hash0, hash1, offset, size, _ in packed_entries:
-            f.write(PACK_ENTRY.pack(hash0, hash1, offset, size))
-        for *_, encoded in packed_entries:
-            f.write(encoded)
+    header_size = 16
+    table_size = 32 * len(encoded_entries)
+    cursor = header_size + table_size
+    table = bytearray()
+    payload = bytearray()
+    for hash0, hash1, blob in encoded_entries:
+        table.extend(struct.pack("<QQQQ", hash0, hash1, cursor, len(blob)))
+        payload.extend(blob)
+        cursor += len(blob)
 
-    print(f"Built shader pack: {pack_path} ({len(packed_entries)} entries)")
+    pack_path.write_bytes(
+        SHADER_PACK_MAGIC
+        + struct.pack("<II", SHADER_PACK_VERSION, len(encoded_entries))
+        + table
+        + payload
+    )
+    print(f"[caustica] wrote {pack_path} ({len(encoded_entries)} entries, {pack_path.stat().st_size} bytes)")
     return pack_path
 
 
-def find_native_extension() -> Path:
-    ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
-    if ext_suffix:
-        exact = BIN_DIR / f"caustica{ext_suffix}"
-        if exact.exists():
-            return exact
+def _copy_file(src: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
 
-    candidates = sorted(
-        BIN_DIR.glob("caustica*.pyd" if os.name == "nt" else "caustica*.so")
-    )
-    if candidates:
-        return candidates[-1]
 
-    raise FileNotFoundError(
-        f"No caustica Python extension found in {BIN_DIR}. Build target 'caustica_py' first."
-    )
+def _copy_tree(src: Path, dest: Path, *, ignore_names: Iterable[str] = ()) -> None:
+    ignore = set(ignore_names)
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    for path in src.rglob("*"):
+        if any(part in ignore for part in path.relative_to(src).parts):
+            continue
+        if path.is_dir():
+            continue
+        _copy_file(path, dest / path.relative_to(src))
+
+
+def _is_runtime_shared_lib(path: Path) -> bool:
+    if path.name in SKIP_BIN_NAMES:
+        return False
+    suffix = path.suffix.lower()
+    if suffix in RUNTIME_FILE_SUFFIXES:
+        return True
+    if suffix.startswith(".so"):
+        return True
+    name = path.name.lower()
+    return name.startswith("sl.") and suffix == ".json"
 
 
 def copy_runtime_files(
     package_dir: Path,
-    dynamic_shaders: str,
-    shader_api: str,
-    assets: str,
+    *,
+    dynamic_shaders: str = "bin",
+    shader_api: str = "d3d12",
+    assets: str = "minimal",
     shader_pack: bool = True,
 ) -> None:
-    native_extension = find_native_extension()
-    copy_file(native_extension, package_dir / native_extension.name)
+    if not BIN_DIR.exists():
+        raise FileNotFoundError(f"{BIN_DIR} does not exist. Build caustica first.")
+    package_dir.mkdir(parents=True, exist_ok=True)
 
-    if os.name == "nt":
-        for item in BIN_DIR.iterdir():
-            if item.is_file() and item.suffix.lower() in {".dll", ".json"}:
-                copy_file(item, package_dir / item.name)
-        if (BIN_DIR / "D3D12").exists():
-            copy_tree(BIN_DIR / "D3D12", package_dir / "D3D12")
-    else:
-        for item in BIN_DIR.iterdir():
-            if item.is_file() and (item.suffix == ".so" or ".so." in item.name):
-                copy_file(item, package_dir / item.name)
+    copied_extension = False
+    for path in BIN_DIR.iterdir():
+        if not path.is_file():
+            continue
+        if path.name.startswith("caustica") and path.suffix.lower() in {".pyd", ".so"}:
+            _copy_file(path, package_dir / path.name)
+            copied_extension = True
+            continue
+        if _is_runtime_shared_lib(path):
+            _copy_file(path, package_dir / path.name)
 
-    shader_filter = None
-    tool_filter = None
-    if shader_api == "d3d12":
-        shader_filter = {"dxil"}
-        tool_filter = {"d3d12"}
-    elif shader_api == "vulkan":
-        shader_filter = {"spirv"}
-        tool_filter = {"vk"}
-    elif shader_api != "both":
-        raise ValueError(f"Unknown shader API: {shader_api}")
-
-    shader_types = ["dxil"] if shader_api == "d3d12" else ["spirv"] if shader_api == "vulkan" else ["dxil", "spirv"]
-
-    if shader_pack:
-        for shader_type in shader_types:
-            write_shader_pack(shader_type, dynamic_shaders, package_dir)
-    else:
-        copy_tree(
-            BIN_DIR / "ShaderBin",
-            package_dir / "ShaderBin",
-            suffixes={".bin"},
-            path_filter=shader_filter,
+    if not copied_extension:
+        raise FileNotFoundError(
+            f"No caustica Python extension found in {BIN_DIR}. Build target caustica_py first."
         )
 
-    if dynamic_shaders == "full":
-        if (BIN_DIR / "ShaderDev" / "Source").exists():
-            copy_tree(
-                BIN_DIR / "ShaderDev" / "Source",
-                package_dir / "ShaderDev" / "Source",
-            )
-        if (BIN_DIR / "ShaderDev" / "Tools").exists():
-            copy_tree(
-                BIN_DIR / "ShaderDev" / "Tools",
-                package_dir / "ShaderDev" / "Tools",
-                suffixes={"", ".exe", ".json", ".marker", ".dll", ".so"},
-                path_filter=tool_filter,
-            )
+    for dir_name in RUNTIME_DIR_NAMES:
+        src = BIN_DIR / dir_name
+        if src.is_dir():
+            _copy_tree(src, package_dir / dir_name)
 
-    if assets == "minimal":
-        for relative in MINIMAL_ASSET_FILES:
-            copy_file(
-                ROOT / "Assets" / relative,
-                package_dir / "Assets" / relative,
-            )
-        copy_tree(ROOT / "Assets" / "Fonts", package_dir / "Assets" / "Fonts")
-        return
+    types = shader_types_for_api(shader_api)
+    if shader_pack:
+        for shader_type in types:
+            pack_src = BIN_DIR / f"caustica.shaders.{shader_type}.pack"
+            if not pack_src.is_file():
+                pack_src = write_shader_pack(shader_type, "bin", BIN_DIR)
+            _copy_file(pack_src, package_dir / pack_src.name)
 
-    if assets == "full":
-        copy_tree(ROOT / "Assets", package_dir / "Assets")
-        return
+    if dynamic_shaders != "none":
+        for shader_type in types:
+            src = BIN_DIR / "ShaderBin" / shader_type
+            if src.is_dir():
+                _copy_tree(src, package_dir / "ShaderBin" / shader_type)
+        if dynamic_shaders == "full":
+            for extra in ("ShaderDev", "ShaderBin"):
+                src = BIN_DIR / extra
+                if extra == "ShaderBin":
+                    continue
+                if src.is_dir():
+                    _copy_tree(src, package_dir / extra)
 
     if assets == "none":
-        keep = package_dir / "Assets" / ".caustica-wheel-runtime"
-        keep.parent.mkdir(parents=True, exist_ok=True)
-        keep.write_text("Runtime asset root placeholder for caustica wheels.\n", encoding="utf-8")
         return
 
-    raise ValueError(f"Unknown assets mode: {assets}")
+    builtin = ROOT / "assets-builtin"
+    full_assets = ROOT / "Assets"
+    if assets == "full" and (full_assets / "pack.json").is_file():
+        _copy_tree(full_assets, package_dir / "Assets")
+    elif builtin.is_dir():
+        _copy_tree(builtin, package_dir / "Assets")
+        _copy_tree(builtin, package_dir / "assets-builtin")
+    elif (full_assets / "pack.json").is_file():
+        _copy_tree(full_assets, package_dir / "Assets")
 
 
-def write_build_project(version: str) -> None:
-    (STAGING_DIR / "pyproject.toml").write_text(
-        '[build-system]\n'
-        'requires = ["setuptools>=68", "wheel"]\n'
-        'build-backend = "setuptools.build_meta"\n',
-        encoding="utf-8",
+def run_pt_shader_precompile(args) -> None:
+    from precompile_pt_shader_bins import run_pt_shader_precompile as cook
+
+    force = bool(getattr(args, "precompile_pt_force", False) or getattr(args, "force", False))
+    preset = (
+        getattr(args, "precompile_pt_global_preset", None)
+        or getattr(args, "global_preset", None)
+        or "coverage"
     )
-    (STAGING_DIR / "MANIFEST.in").write_text(
-        "recursive-include caustica *\n",
-        encoding="utf-8",
-    )
-    (STAGING_DIR / "README.md").write_text(
-        "# caustica Python Wheel\n\n"
-        "Local binary wheel assembled from the current caustica build output.\n",
-        encoding="utf-8",
-    )
-    (STAGING_DIR / "setup.py").write_text(
-        'from setuptools import Distribution, setup\n\n\n'
-        "class BinaryDistribution(Distribution):\n"
-        "    def has_ext_modules(self):\n"
-        "        return True\n\n\n"
-        "setup(\n"
-        '    name="caustica",\n'
-        f'    version={version!r},\n'
-        '    description="Python bindings for caustica",\n'
-        '    long_description=open("README.md", encoding="utf-8").read(),\n'
-        '    long_description_content_type="text/markdown",\n'
-        '    packages=["caustica"],\n'
-        "    include_package_data=True,\n"
-        "    distclass=BinaryDistribution,\n"
-        '    python_requires=">=3.8",\n'
-        ")\n",
-        encoding="utf-8",
-    )
+    cook(args.shader_api, force=force, global_preset=preset)
 
 
-def build_wheel() -> Path:
-    DIST_DIR.mkdir(parents=True, exist_ok=True)
-    before = set(DIST_DIR.glob("caustica-*.whl"))
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "wheel",
-            "--no-deps",
-            "--no-build-isolation",
-            "--wheel-dir",
-            str(DIST_DIR),
-            str(STAGING_DIR),
-        ],
-        check=True,
-        cwd=ROOT,
-    )
-    after = set(DIST_DIR.glob("caustica-*.whl"))
-    created = sorted(after - before, key=lambda path: path.stat().st_mtime)
-    if created:
-        return created[-1]
-    existing = sorted(after, key=lambda path: path.stat().st_mtime)
-    if existing:
-        return existing[-1]
-    raise RuntimeError("pip did not produce a caustica wheel")
+def run_dynamic_shader_precompile(args) -> None:
+    from precompile_dynamic_shaders import precompile, split_csv, DEFAULT_MODES, DEFAULT_SCENES
+
+    modes = getattr(args, "precompile_modes", None)
+    if isinstance(modes, str):
+        mode_list = split_csv(modes, DEFAULT_MODES)
+    elif modes:
+        mode_list = list(modes)
+    else:
+        mode_list = list(DEFAULT_MODES)
+
+    scenes = getattr(args, "precompile_scene", None) or getattr(args, "scenes", None)
+    if isinstance(scenes, str):
+        scene_list = split_csv(scenes, DEFAULT_SCENES)
+    elif scenes:
+        scene_list = list(scenes)
+    else:
+        scene_list = list(DEFAULT_SCENES)
+
+    frames = int(getattr(args, "precompile_frames", 1) or 1)
+    precompile(args.shader_api, scene_list, mode_list, frames)
 
 
-def run_dynamic_shader_precompile(args: argparse.Namespace) -> None:
-    shader_apis = ["d3d12", "vulkan"] if args.shader_api == "both" else [args.shader_api]
-    for shader_api in shader_apis:
-        command = [
-            sys.executable,
-            str(ROOT / "support" / "python" / "precompile_dynamic_shaders.py"),
-            "--shader-api",
-            shader_api,
-            "--modes",
-            args.precompile_modes,
-            "--frames",
-            str(args.precompile_frames),
-            "--global-variant-preset",
-            args.precompile_global_preset,
-        ]
-        for scene in args.precompile_scene or []:
-            command.extend(["--scene", scene])
-        for variant in args.precompile_global_variant or []:
-            command.extend(["--global-variant", variant])
-        subprocess.run(command, check=True, cwd=ROOT)
-
-
-def run_pt_shader_precompile(args: argparse.Namespace) -> None:
-    from precompile_pt_shader_bins import run_pt_shader_precompile as precompile_pt
-
-    precompile_pt(
-        args.shader_api,
-        force=args.precompile_pt_force,
-        global_preset=args.precompile_pt_global_preset,
-    )
+def _apply_env_from_args(args: argparse.Namespace) -> None:
+    os.environ["CAUSTICA_WHEEL_ASSETS"] = args.assets
+    os.environ["CAUSTICA_WHEEL_DYNAMIC_SHADERS"] = args.dynamic_shaders
+    os.environ["CAUSTICA_WHEEL_SHADER_API"] = args.shader_api
+    os.environ["CAUSTICA_WHEEL_SHADER_PACK"] = "true" if args.shader_pack else "false"
+    os.environ["CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS"] = "true" if args.precompile_pt_shaders else "false"
+    os.environ["CAUSTICA_WHEEL_PRECOMPILE_PT_FORCE"] = "true" if args.precompile_pt_force else "false"
+    os.environ["CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET"] = args.precompile_pt_global_preset
+    os.environ["CAUSTICA_WHEEL_VERIFY_PT_SHADERS"] = "true" if args.verify_pt_shaders else "false"
+    if args.version:
+        os.environ["CAUSTICA_WHEEL_VERSION"] = args.version
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a local caustica Python wheel from bin/.")
-    parser.add_argument("--version", default="0.6.0", help="Wheel package version.")
-    parser.add_argument(
-        "--assets",
-        choices=["minimal", "full", "none"],
-        default="minimal",
-        help="Asset payload to include. 'full' is very large.",
-    )
-    parser.add_argument(
-        "--dynamic-shaders",
-        choices=["full", "bin", "none"],
-        default="bin",
-        help=(
-            "Shader development payload. 'bin' includes ShaderBin only; "
-            "'full' also includes Source and Tools for runtime compilation; "
-            "'none' omits optional shader development assets."
-        ),
-    )
-    parser.add_argument(
-        "--shader-api",
-        choices=["d3d12", "vulkan", "both"],
-        default="d3d12" if os.name == "nt" else "vulkan",
-        help="Shader backend payload to include. Windows wheels default to D3D12 only.",
-    )
-    parser.add_argument(
-        "--shader-pack",
-        dest="shader_pack",
-        action="store_true",
-        default=True,
-        help="Package shader binaries into caustica.shaders.<api>.pack instead of copying shader directories.",
-    )
-    parser.add_argument(
-        "--no-shader-pack",
-        dest="shader_pack",
-        action="store_false",
-        help="Copy shader directories in the legacy layout.",
-    )
-    parser.add_argument(
-        "--no-dynamic-shader-bin",
-        action="store_true",
-        default=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        "--precompile-dynamic-shaders",
-        action="store_true",
-        help=(
-            "Before staging the wheel, launch the local caustica extension headlessly to "
-            "generate ShaderBin entries for selected scenes."
-        ),
-    )
-    parser.add_argument(
-        "--precompile-scene",
-        action="append",
-        help=(
-            "Scene used by --precompile-dynamic-shaders. Repeat for multiple scenes. "
-            "Defaults to builtin:plane_cube."
-        ),
-    )
-    parser.add_argument(
-        "--precompile-modes",
-        default="reference,realtime",
-        help="Comma/semicolon separated modes for shader precompile: reference,realtime.",
-    )
-    parser.add_argument(
-        "--precompile-frames",
-        type=int,
-        default=1,
-        help="Frames to render per precompile scene/mode.",
-    )
-    parser.add_argument(
-        "--precompile-global-preset",
-        choices=["default", "coverage"],
-        default="default",
-        help=(
-            "Global macro coverage preset passed to precompile_dynamic_shaders.py. "
-            "'coverage' warms common wheel compatibility and quality toggles."
-        ),
-    )
-    parser.add_argument(
-        "--precompile-global-variant",
-        action="append",
-        help=(
-            "Additional Settings overrides for one shader warmup pass, for example "
-            "'use_nee=0,nee_candidate_samples=8'. Repeat for multiple passes."
-        ),
-    )
-    parser.add_argument(
-        "--precompile-pt-shaders",
-        dest="precompile_pt_shaders",
-        action="store_true",
-        default=True,
-        help="Precompile path-tracing shader libraries into ShaderBin before staging.",
-    )
-    parser.add_argument(
-        "--no-precompile-pt-shaders",
-        dest="precompile_pt_shaders",
-        action="store_false",
-        help="Skip offline path-tracing shader precompile.",
-    )
-    parser.add_argument(
-        "--precompile-pt-global-preset",
-        choices=["default", "coverage"],
-        default="coverage",
-        help="Global macro preset for path-tracing offline precompile.",
-    )
-    parser.add_argument(
-        "--precompile-pt-force",
-        action="store_true",
-        help="Force recompilation of all path-tracing shader bins.",
-    )
+    parser = argparse.ArgumentParser(description="Build a local caustica binary wheel from bin/.")
+    parser.add_argument("--shader-api", choices=["d3d12", "vulkan", "both"], default="d3d12" if os.name == "nt" else "vulkan")
+    parser.add_argument("--assets", choices=["minimal", "full", "none"], default="minimal")
+    parser.add_argument("--dynamic-shaders", choices=["bin", "full", "none"], default="bin")
+    parser.add_argument("--shader-pack", dest="shader_pack", action="store_true", default=True)
+    parser.add_argument("--no-shader-pack", dest="shader_pack", action="store_false")
+    parser.add_argument("--precompile-pt-shaders", dest="precompile_pt_shaders", action="store_true", default=True)
+    parser.add_argument("--no-precompile-pt-shaders", dest="precompile_pt_shaders", action="store_false")
+    parser.add_argument("--precompile-pt-force", action="store_true")
+    parser.add_argument("--precompile-pt-global-preset", default="coverage")
+    parser.add_argument("--verify-pt-shaders", dest="verify_pt_shaders", action="store_true", default=True)
+    parser.add_argument("--no-verify-pt-shaders", dest="verify_pt_shaders", action="store_false")
+    parser.add_argument("--version", default=os.environ.get("CAUSTICA_WHEEL_VERSION", "0.6.0"))
+    parser.add_argument("--output-dir", type=Path, default=DIST_DIR)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-
-    if os.name != "nt" and args.shader_api == "d3d12":
-        raise ValueError(
-            "D3D12 shader payload is only valid for Windows wheels. "
-            "Use --shader-api vulkan on Linux."
-        )
-
     if not BIN_DIR.exists():
-        raise FileNotFoundError(f"{BIN_DIR} does not exist. Build caustica first.")
-    if not PYTHON_PACKAGE_DIR.exists():
-        raise FileNotFoundError(f"{PYTHON_PACKAGE_DIR} does not exist.")
-    shader_types = ["dxil"] if args.shader_api == "d3d12" else ["spirv"] if args.shader_api == "vulkan" else ["dxil", "spirv"]
-    for shader_type in shader_types:
-        manifest = BIN_DIR / "ShaderBin" / shader_type / "manifest.bin"
-        if not manifest.exists():
-            raise FileNotFoundError(
-                f"{manifest} does not exist. Build target ShaderBinManifest before packaging."
-            )
-
-    if STAGING_DIR.exists():
-        shutil.rmtree(STAGING_DIR)
-    STAGING_DIR.mkdir(parents=True)
-
-    package_dir = STAGING_DIR / "caustica"
-    shutil.copytree(PYTHON_PACKAGE_DIR, package_dir)
-
-    dynamic_shaders = "none" if getattr(args, "no_dynamic_shader_bin", False) else args.dynamic_shaders
-
-    if args.precompile_pt_shaders:
-        if dynamic_shaders == "none":
-            print(
-                "WARNING: --precompile-pt-shaders used while dynamic shader bins are omitted."
-            )
-        sys.path.insert(0, str(ROOT / "support" / "python"))
-        run_pt_shader_precompile(args)
-        from verify_pt_shader_bins import verify_apis
-
-        if verify_apis(args.shader_api, args.precompile_pt_global_preset) != 0:
-            raise RuntimeError(
-                "PT shader coverage verify failed. "
-                "Run: python support/python/cook_shaders.py --global-preset coverage"
-            )
-
-    if args.precompile_dynamic_shaders:
-        if dynamic_shaders == "none":
-            print(
-                "WARNING: --precompile-dynamic-shaders used while dynamic shader bins are omitted."
-            )
-        run_dynamic_shader_precompile(args)
-
-    copy_runtime_files(
-        package_dir,
-        dynamic_shaders,
-        args.shader_api,
-        args.assets,
-        shader_pack=args.shader_pack,
-    )
-    write_build_project(args.version)
-
-    print(f"Staged package size: {directory_size(package_dir) / (1024 * 1024):.1f} MiB")
-    wheel = build_wheel()
-    print(f"Built wheel: {wheel}")
-    print(f"Wheel size: {wheel.stat().st_size / (1024 * 1024):.1f} MiB")
-    return 0
+        raise FileNotFoundError(f"{BIN_DIR} does not exist. Build caustica and caustica_py first.")
+    _apply_env_from_args(args)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "wheel",
+        str(ROOT),
+        "-w",
+        str(args.output_dir),
+        "--no-deps",
+    ]
+    print("[caustica] " + " ".join(cmd))
+    return subprocess.call(cmd, cwd=str(ROOT))
 
 
 if __name__ == "__main__":
