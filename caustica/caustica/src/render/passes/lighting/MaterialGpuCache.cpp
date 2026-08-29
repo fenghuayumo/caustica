@@ -1516,10 +1516,14 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     standardMaterial->enableTransmissionTexture = material.enableTransmissionTexture;
 
     standardMaterial->baseOrDiffuseColor = material.baseOrDiffuseColor;
-    // This value is the OpenPBR edge tint. Dielectric F0 is computed
-    // independently from IOR, so the legacy zero means "no edge tint" and
-    // must not be migrated to white.
-    standardMaterial->specularColor = material.specularColor;
+    // SceneTypes::specularColor belongs to the legacy specular-glossiness
+    // workflow and therefore defaults to zero. In the metal-rough/OpenPBR
+    // workflow this field is the dielectric edge tint, whose neutral default
+    // is white. Passing the legacy zero through would multiply the IOR-derived
+    // dielectric F0 by zero and remove skin, cornea, and lens Fresnel entirely.
+    standardMaterial->specularColor = material.useSpecularGlossModel
+        ? material.specularColor
+        : dm::float3(1.0f);
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
