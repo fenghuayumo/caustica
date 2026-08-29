@@ -10,6 +10,7 @@
 
 #include <backend/GpuDevice.h>
 #include <scene/Scene.h>
+#include <caustica/version.h>
 
 #include <string>
 
@@ -20,24 +21,13 @@ namespace caustica
 
 void updateWindowTitle(App& app)
 {
-    auto* vs = app.tryResource<SceneViewState>();
     GpuDevice* device = app.getGpuDevice();
-    const std::shared_ptr<Scene> scene = activeScene(app);
-    if (!vs || !device || !scene)
+    if (!device)
         return;
 
-    std::string extraInfo = ", " + vs->fpsInfo + ", " + currentSceneName(app) + ", "
-        + resolutionInfo(app) + ", (L: " + std::to_string(scene->getLightEntities().size())
-        + ", MAT: " + std::to_string(scene->getMaterials().size())
-        + ", MESH: " + std::to_string(scene->getMeshes().size())
-        + ", I: " + std::to_string(scene->getMeshInstances().size())
-        + ", SI: " + std::to_string(scene->getSkinnedMeshInstances().size())
-#if ENABLE_DEBUG_VIZUALISATIONS
-        + ", ENABLE_DEBUG_VIZUALISATIONS: 1"
-#endif
-        + ")";
-
-    device->setInformativeWindowTitle(g_windowTitle, false, extraInfo.c_str());
+    const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
+        + " " + caustica::kVersionString;
+    device->setInformativeWindowTitle(versionedTitle.c_str(), false);
 }
 
 void WindowTitlePlugin::configureSchedules(App& app)

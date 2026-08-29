@@ -77,6 +77,7 @@ endif()
 # ═══════════════════════════════════════════════════════════════════════════
 
 set(CAUSTICA_COMMON_INCLUDE_PUBLIC
+    "${CAUSTICA_GENERATED_INCLUDE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
