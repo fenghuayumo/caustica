@@ -612,9 +612,15 @@ bool StandardMaterial::read(
         readOpenPBR(input);
     else
     {
-        // Caustica material assets use OpenPBR as their only authoring model.
+        // Older serialized engine materials do not carry an OpenPBR block or
+        // model field. They use zero as the legacy specular-color default,
+        // while OpenPBR interprets this field as the dielectric edge tint.
+        // Preserve the old metal-rough/glTF behavior when those assets are
+        // promoted to OpenPBR: a neutral dielectric tint is white, not zero.
         materialModel = "OpenPBR";
         useSpecularGlossModel = false;
+        if (all(specularColor == 0.0f))
+            specularColor = dm::float3(1.0f);
     }
 
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
