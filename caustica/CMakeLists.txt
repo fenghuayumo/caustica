@@ -421,9 +421,10 @@ if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
     file(GLOB caustica_python_examples "${CMAKE_SOURCE_DIR}/examples/python/*.py")
     if (caustica_python_examples)
         add_custom_target(causticaPythonExamples ALL
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different ${caustica_python_examples} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/PythonExamples"
-            COMMENT "Copying caustica Python example scripts"
+            COMMENT "Refreshing caustica Python example scripts"
         )
         add_dependencies(causticaApp causticaPythonExamples)
         set_target_properties(causticaPythonExamples PROPERTIES FOLDER ${folder})

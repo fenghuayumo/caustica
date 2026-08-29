@@ -86,8 +86,13 @@ def assemble_package(
         if suffix in RUNTIME_DLL_SUFFIXES or (path.name.lower().startswith("sl.") and suffix == ".json"):
             _copy_file(path, stage_dir / path.name)
 
-    for directory_name in (*RUNTIME_DIR_NAMES, "PythonExamples"):
+    for directory_name in RUNTIME_DIR_NAMES:
         _copy_tree(BIN_DIR / directory_name, stage_dir / directory_name)
+
+    # Copy the checked-in examples directly instead of relying on the generated
+    # bin/PythonExamples directory, which may contain stale scripts from older
+    # builds.
+    _copy_tree(ROOT / "examples" / "python", stage_dir / "PythonExamples")
 
     for shader_type in shader_types_for_api(shader_api):
         if shader_pack:
