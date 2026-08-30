@@ -993,6 +993,9 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
     }
     m_frameCommands->endFrame();
 
+    if (m_toneMappingPass != nullptr)
+        m_toneMappingPass->onFrameSubmitted();
+
     if (ctx.needNewPasses)
     {
         if (!waitGraphicsQueueFence("needNewPasses final", /*runGc=*/false))

@@ -132,9 +132,7 @@ float4 applyToneMapping(float2 texC)
     finalColor *= (kExposureKey / avgLuminance);
 #endif
 */
-    // Disabling tone mapping must also bypass exposure. This makes the UI's master
-    // switch deterministic even if a stale Auto Exposure checkbox remains enabled.
-    if(gParams.enabled && gParams.autoExposure)
+    if(gParams.autoExposure)
     {
         // apply auto exposure
 
@@ -162,12 +160,14 @@ float4 applyToneMapping(float2 texC)
             finalColor = saturate(finalColor);
     }
 
-    // Alpha carries coverage through the same temporal/upscaling path as RGB,
-    // avoiding a separately reconstructed mask at sub-pixel mesh edges.
-    const float bypassWeight = saturate(color.a);
-    finalColor = lerp(finalColor, color.rgb, bypassWeight);
+    // Alpha carries foreground coverage through the temporal/upscaling path.
+    // Preserve the independently resolved/display-referred background while
+    // applying exposure and tone mapping to opaque geometry. The previous
+    // blend direction did the opposite and bypassed tone mapping on foregrounds.
+    const float foregroundCoverage = saturate(color.a);
+    finalColor = lerp(color.rgb, finalColor, foregroundCoverage);
 
-    return float4(finalColor, 1.0);
+    return float4(finalColor, color.a);
 }
 
 #endif //__TONE_MAPPING_PS_HLSLI__

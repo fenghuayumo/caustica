@@ -56,8 +56,10 @@ private:
         static constexpr int cReadbackLag = 3;  // swapchain count + 1 so map never blocks
         caustica::rhi::BufferHandle avgLuminanceBufferGPU;
         caustica::rhi::BufferHandle avgLuminanceBufferReadback[cReadbackLag];
-        int                 avgLuminanceLastWritten     = -1;
-        int                 avgLuminanceFramesWritten   = 0;
+        caustica::rhi::EventQueryHandle avgLuminanceReadbackQuery[cReadbackLag];
+        bool                avgLuminanceReadbackPending[cReadbackLag]{};
+        int                 avgLuminanceNextWrite       = 0;
+        int                 avgLuminanceRecordedThisFrame = -1;
         // Seed until the ring is warm — avoids mid-pass waitForIdle on first AE frame.
         // Matches TONEMAPPING_EXPOSURE_KEY in ToneMapping_cb.h.
         float               avgLuminanceLastCaptured    = 0.042f;
@@ -158,6 +160,11 @@ public:
 #endif
 
     void advanceFrame(float frameTime);
+
+    // Called after the graphics command list containing the luminance copy has
+    // been submitted. Associates each readback slot with the actual queue fence
+    // and consumes only slots whose fence has completed.
+    void onFrameSubmitted();
 
     caustica::rhi::TextureHandle getLuminanceTexture(uint viewIndex)    { return m_PerView[viewIndex].luminanceTexture; }
 };

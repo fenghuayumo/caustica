@@ -107,7 +107,10 @@ ToneMappingPass::ToneMappingPass(
                 bufferDesc.cpuAccess = caustica::rhi::CpuAccessMode::Read;
                 bufferDesc.debugName = "AvgLuminanceReadbackBuffer";
                 for (int i = 0; i < PerViewData::cReadbackLag; i++)
+                {
                     perViewData.avgLuminanceBufferReadback[i] = device->createBuffer(bufferDesc);
+                    perViewData.avgLuminanceReadbackQuery[i] = device->createEventQuery();
+                }
             }
 #endif
 
@@ -261,30 +264,29 @@ bool ToneMappingPass::render(
                 commandList->setComputeState(cstate);
                 commandList->dispatch(1, 1);
 
-                // ADR 0002 S1: lagged ring readback — no mid-pass close/execute/waitForIdle.
-                // First cReadbackLag frames keep the seeded exposure until GPU copies retire.
-                viewData.avgLuminanceLastWritten =
-                    (viewData.avgLuminanceLastWritten + 1) % PerViewData::cReadbackLag;
-                commandList->copyBuffer(
-                    viewData.avgLuminanceBufferReadback[viewData.avgLuminanceLastWritten],
-                    0,
-                    viewData.avgLuminanceBufferGPU,
-                    0,
-                    viewData.avgLuminanceBufferReadback[viewData.avgLuminanceLastWritten]->getDesc().byteSize);
-                if (viewData.avgLuminanceFramesWritten < PerViewData::cReadbackLag)
+                // Record into a free slot. The queue fence is attached only
+                // after this frame is submitted; an in-flight slot is never
+                // mapped or overwritten.
+                if (viewData.avgLuminanceRecordedThisFrame < 0)
                 {
-                    ++viewData.avgLuminanceFramesWritten;
-                }
-                else
-                {
-                    const int toReadIndex =
-                        (viewData.avgLuminanceLastWritten + 1) % PerViewData::cReadbackLag;
-                    void* pData = m_device->mapBuffer(
-                        viewData.avgLuminanceBufferReadback[toReadIndex],
-                        caustica::rhi::CpuAccessMode::Read);
-                    assert(pData);
-                    viewData.avgLuminanceLastCaptured = std::exp2f(*static_cast<float*>(pData));
-                    m_device->unmapBuffer(viewData.avgLuminanceBufferReadback[toReadIndex]);
+                    for (int offset = 0; offset < PerViewData::cReadbackLag; ++offset)
+                    {
+                        const int slot =
+                            (viewData.avgLuminanceNextWrite + offset) % PerViewData::cReadbackLag;
+                        if (viewData.avgLuminanceReadbackPending[slot]
+                            || !viewData.avgLuminanceReadbackQuery[slot])
+                            continue;
+
+                        commandList->copyBuffer(
+                            viewData.avgLuminanceBufferReadback[slot],
+                            0,
+                            viewData.avgLuminanceBufferGPU,
+                            0,
+                            viewData.avgLuminanceBufferReadback[slot]->getDesc().byteSize);
+                        viewData.avgLuminanceRecordedThisFrame = slot;
+                        viewData.avgLuminanceNextWrite = (slot + 1) % PerViewData::cReadbackLag;
+                        break;
+                    }
                 }
             }
 #endif
@@ -401,6 +403,50 @@ void ToneMappingPass::advanceFrame(float frameTime)
 {
     m_FrameTime = frameTime;
     m_FrameParamsSet = false;
+}
+
+void ToneMappingPass::onFrameSubmitted()
+{
+#if TONEMAPPING_AUTOEXPOSURE_CPU
+    for (PerViewData& viewData : m_PerView)
+    {
+        // Consume completed older samples before fencing the copy submitted by
+        // this frame. This keeps AE asynchronous while making CPU reads valid.
+        for (int slot = 0; slot < PerViewData::cReadbackLag; ++slot)
+        {
+            if (!viewData.avgLuminanceReadbackPending[slot])
+                continue;
+
+            caustica::rhi::EventQuery* query = viewData.avgLuminanceReadbackQuery[slot];
+            if (!query || !m_device->pollEventQuery(query))
+                continue;
+
+            void* pData = m_device->mapBuffer(
+                viewData.avgLuminanceBufferReadback[slot],
+                caustica::rhi::CpuAccessMode::Read);
+            assert(pData);
+            const float capturedLogLuminance = *static_cast<float*>(pData);
+            viewData.avgLuminanceLastCaptured = std::exp2f(capturedLogLuminance);
+            m_device->unmapBuffer(viewData.avgLuminanceBufferReadback[slot]);
+            m_device->resetEventQuery(query);
+            viewData.avgLuminanceReadbackPending[slot] = false;
+        }
+
+        const int submittedSlot = viewData.avgLuminanceRecordedThisFrame;
+        if (submittedSlot < 0)
+            continue;
+
+        caustica::rhi::EventQuery* query =
+            viewData.avgLuminanceReadbackQuery[submittedSlot];
+        if (query)
+        {
+            m_device->resetEventQuery(query);
+            m_device->setEventQuery(query, caustica::rhi::CommandQueue::Graphics);
+            viewData.avgLuminanceReadbackPending[submittedSlot] = true;
+        }
+        viewData.avgLuminanceRecordedThisFrame = -1;
+    }
+#endif
 }
 
 

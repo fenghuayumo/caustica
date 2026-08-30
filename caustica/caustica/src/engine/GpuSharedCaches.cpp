@@ -36,6 +36,13 @@ std::shared_ptr<ShaderFactory> CreateShaderFactory(GpuDevice& gpuDevice)
     const std::filesystem::path shaderPackPath = appDirectory / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, "ShaderBin");
     const bool shaderPackHasCurrentLayout = shaderPackFS->hasShaderBinLayout();
+    const std::filesystem::path looseManifestPath = shaderBinPath / "manifest.bin";
+    std::error_code looseTimeError;
+    std::error_code packTimeError;
+    const auto looseManifestTime = std::filesystem::last_write_time(looseManifestPath, looseTimeError);
+    const auto shaderPackTime = std::filesystem::last_write_time(shaderPackPath, packTimeError);
+    const bool looseShadersAreNewer = !looseTimeError
+        && (packTimeError || looseManifestTime > shaderPackTime);
 
     if (shaderPackFS->isOpen() && !shaderPackHasCurrentLayout)
     {
@@ -43,12 +50,17 @@ std::shared_ptr<ShaderFactory> CreateShaderFactory(GpuDevice& gpuDevice)
             shaderPackPath.string().c_str());
     }
 
-    if (shaderPackHasCurrentLayout)
+    if (shaderPackHasCurrentLayout && !looseShadersAreNewer)
     {
         rootFS->mount("/ShaderBin", shaderPackFS);
     }
     else
     {
+        if (shaderPackHasCurrentLayout && looseShadersAreNewer)
+        {
+            info("Loose ShaderBin manifest is newer than '%s'; using loose shaders",
+                shaderPackPath.string().c_str());
+        }
         rootFS->mount("/ShaderBin", shaderBinPath);
     }
 

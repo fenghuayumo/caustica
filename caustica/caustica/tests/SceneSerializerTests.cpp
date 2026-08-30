@@ -3,6 +3,7 @@
 #include <core/json.h>
 #include <core/path_utils.h>
 
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -85,6 +86,15 @@ int main()
         passed &= expect(local && local->translation.y == 0.5, "translation.y mismatch");
         passed &= expect(local && local->scaling.x == 2.0 && local->scaling.y == 2.0,
             "scalar scale did not expand to xyz");
+
+        Json::Value xyzRotation = parse(
+            R"({"rotation":[-0.7071068, 0.0, 0.7071068]})");
+        caustica::scene::applyAuthoringTransform(world, cube, xyzRotation);
+        const auto* rotated = world.world().tryGet<caustica::scene::LocalTransformComponent>(cube);
+        passed &= expect(rotated && rotated->hasLocalTransform, "xyz rotation was not applied");
+        passed &= expect(
+            rotated && std::abs(rotated->rotation.w - 1.0) < 1e-6,
+            "3-element rotation should default w to 1 like Donut");
 
         Json::Value entities = parse(R"([{"id":"cube","name":"Cube","components":{}}])");
         caustica::scene::patchEntityTransforms(entities, world);

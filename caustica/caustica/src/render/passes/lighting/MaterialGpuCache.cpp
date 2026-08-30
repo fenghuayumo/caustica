@@ -360,6 +360,12 @@ bool StandardMaterial::read(
     const bool hasMaterialModelField = input.isMember("materialModel") || input.isMember("MaterialModel");
     const bool hasOpenPBRBlock = input.isMember("OpenPBR");
     const bool hasTopLevelOpenPBRFields = HasOpenPBRFields(input);
+    const bool hasExplicitBaseDiffuseRoughness =
+        input.isMember("baseDiffuseRoughness")
+        || input.isMember("BaseDiffuseRoughness")
+        || input.isMember("base_diffuse_roughness")
+        || (hasOpenPBRBlock && input["OpenPBR"].isObject()
+            && input["OpenPBR"].isMember("base_diffuse_roughness"));
 
     // OpenPBR stores the coat normal in its material block. Mirror it into the
     // texture field so both supported forms use the same loading path.
@@ -528,6 +534,10 @@ bool StandardMaterial::read(
         input["useEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
     else if (input.isMember("UseEngineEmissiveIntensity"))
         input["UseEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
+    else if (input.isMember("useDonutEmissiveIntensity"))
+        input["useDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
+    else if (input.isMember("UseDonutEmissiveIntensity"))
+        input["UseDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
     LOAD_FIELD_EITHER(skipRender, "SkipRender");
 
     auto readOpenPBR = [this](const Json::Value& openPBR)
@@ -610,18 +620,24 @@ bool StandardMaterial::read(
         readOpenPBR(input["OpenPBR"]);
     else if ((hasMaterialModelField && IsOpenPBRMaterialModel(materialModel)) || hasTopLevelOpenPBRFields)
         readOpenPBR(input);
-    else
+    else if (!hasMaterialModelField && !useSpecularGlossModel)
     {
-        // Older serialized engine materials do not carry an OpenPBR block or
-        // model field. They use zero as the legacy specular-color default,
-        // while OpenPBR interprets this field as the dielectric edge tint.
-        // Preserve the old metal-rough/glTF behavior when those assets are
-        // promoted to OpenPBR: a neutral dielectric tint is white, not zero.
+        // RTXPT-era metal-rough files have no material model field. OpenPBR
+        // treats specularColor as the dielectric edge tint, whose neutral
+        // default is white rather than the legacy zero.
         materialModel = "OpenPBR";
-        useSpecularGlossModel = false;
-        if (all(specularColor == 0.0f))
-            specularColor = dm::float3(1.0f);
+        specularColor = dm::float3(1.f);
     }
+    else if (!hasMaterialModelField && useSpecularGlossModel)
+        materialModel = "RTXPT";
+
+    // RTXPT used its legacy roughness for Frostbite diffuse as well. Keep
+    // that behavior for old/unmigrated files, while leaving explicitly
+    // authored OpenPBR materials free to use an independent diffuse value.
+    const bool explicitlyAuthoredOpenPBR = hasOpenPBRBlock || hasTopLevelOpenPBRFields
+        || (hasMaterialModelField && IsOpenPBRMaterialModel(materialModel));
+    if (!hasExplicitBaseDiffuseRoughness && !explicitlyAuthoredOpenPBR)
+        baseDiffuseRoughness = roughness;
 
     baseWeight = std::clamp(baseWeight, 0.0f, 1.0f);
     baseDiffuseRoughness = std::clamp(baseDiffuseRoughness, 0.0f, 1.0f);
@@ -837,22 +853,24 @@ bool StandardMaterial::editorGui(MaterialGpuCache & cache)
         }
     };
 
-    bool normalizedToOpenPBR = false;
-    if (!IsOpenPBRMaterialModel(materialModel))
+    bool useOpenPBR = IsOpenPBRMaterialModel(materialModel);
+    int materialModelIndex = useOpenPBR ? 0 : 1;
+    if (ImGui::Combo("Material Model", &materialModelIndex, "OpenPBR\0RTXPT legacy\0\0"))
     {
-        materialModel = "OpenPBR";
-        normalizedToOpenPBR = true;
+        useOpenPBR = (materialModelIndex == 0);
+        materialModel = useOpenPBR ? "OpenPBR" : "RTXPT";
+        if (useOpenPBR)
+        {
+            useSpecularGlossModel = false;
+            const float* specColor = specularColor.data();
+            if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
+                specularColor = dm::float3(1.f);
+        }
+        update = true;
     }
-    if (useSpecularGlossModel)
+    if (useOpenPBR && useSpecularGlossModel)
     {
         useSpecularGlossModel = false;
-        normalizedToOpenPBR = true;
-    }
-    if (normalizedToOpenPBR)
-    {
-        const float* specColor = specularColor.data();
-        if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
-            specularColor = dm::float3(1.f);
         update = true;
     }
 

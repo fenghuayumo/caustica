@@ -207,10 +207,18 @@ void applyAuthoringTransform(
     }
 
     const Json::Value& rotation = transform["rotation"];
-    if (rotation.isArray() && rotation.size() >= 4)
+    if (rotation.isArray() && rotation.size() >= 3)
     {
+        // Donut accepted a 3-element rotation as xyz with w defaulting to 1.
         dm::double4 value = dm::double4(0.0, 0.0, 0.0, 1.0);
-        rotation >> value;
+        if (rotation.size() >= 4)
+            rotation >> value;
+        else
+        {
+            value.x = rotation[0].asDouble();
+            value.y = rotation[1].asDouble();
+            value.z = rotation[2].asDouble();
+        }
         world.setRotation(entity, dm::dquat::fromXYZW(value));
     }
     else if (!transform["euler"].isNull())

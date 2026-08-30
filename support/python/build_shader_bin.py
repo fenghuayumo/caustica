@@ -112,11 +112,17 @@ def candidate_bin_names(source: str, entry: str) -> list[str]:
     if stem.lower().endswith(".hlsl"):
         stem = stem[: -len(".hlsl")]
     stem = stem.replace("\\", "/").lstrip("/")
-    names = [f"{stem}.bin"]
     if entry and entry != "main":
-        names.append(f"{stem}_{entry}.bin")
-        names.append(f"{Path(stem).parent.as_posix()}/{Path(stem).name}_{entry}.bin")
-    return names
+        # ShaderMake emits a generic <stem>.bin for the `main` entry and an
+        # entry-suffixed blob for other entry points. Prefer the suffixed blob:
+        # selecting the generic file here can silently bind another entry's
+        # permutation set (for example ShaderDebug's BLEND_DEBUG_BUFFER blob).
+        return [
+            f"{stem}_{entry}.bin",
+            f"{Path(stem).parent.as_posix()}/{Path(stem).name}_{entry}.bin",
+            f"{stem}.bin",
+        ]
+    return [f"{stem}.bin"]
 
 
 def module_logical_name(module: str, staging_rel: str, entry: str) -> str:
