@@ -20,7 +20,7 @@ This document describes how to use the current `caustica` Python bindings. The A
 - [Module-Level API](#module-level-api)
 - [Renderer](#renderer) — extension-mode standalone renderer
 - [GPU selection](#gpu-selection) — enumeration, automatic choice, and stable selectors
-- [Sample & Scene](#sample--scene) — `app()`, scene, camera, accumulation
+- [App & Scene](#app--scene) — `app()`, scene, camera, accumulation
 - [Spawn / Despawn](#spawn--despawn) — prefab load/spawn and entity removal
 - [Model](#model) — `SceneEntity`, `MeshHandle`, deformation, bounds
 - [Material](#material) — `Material` class and scene lookup
@@ -273,7 +273,7 @@ When `--rdf-to-rub` is enabled, which is the default, both the PLY loader and th
 
 ### Load OBJ Meshes With Materials
 
-`Renderer.load_mesh_file(...)` / `Sample.spawn_from_file(...)` append mesh/prefab files to the current scene (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`). For OBJ specifically, the loader parses `mtllib` directives and resolves `.mtl` and texture paths relative to the OBJ/MTL directory by default.
+`Renderer.load_mesh_file(...)` / `app.spawn_from_file(...)` append mesh/prefab files to the current scene (`.gltf` / `.glb` / `.obj` / `.urdf` / `.usd*`). For OBJ specifically, the loader parses `mtllib` directives and resolves `.mtl` and texture paths relative to the OBJ/MTL directory by default.
 
 The current OBJ/MTL importer recognizes these common material fields:
 
@@ -454,7 +454,7 @@ r.close()
 
 ### Spawn / Despawn Assets
 
-`Sample.load` / `spawn` / `spawn_from_file` / `despawn` mirror the C++ `SceneSpawn` API.
+`app.load` / `app.spawn` / `app.spawn_from_file` / `app.despawn` mirror the C++ `SceneSpawn` API.
 Supported mesh/prefab extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`.
 
 ```python
@@ -553,7 +553,7 @@ The sections below are grouped by topic so you can jump directly to the API you 
 | --- | --- |
 | Renderer | [Renderer](#renderer) |
 | GPU selection | [GPU selection](#gpu-selection) |
-| Scene / app | [Sample & Scene](#sample--scene) |
+| Scene / app | [App & Scene](#app--scene) |
 | Spawn / despawn | [Spawn / Despawn](#spawn--despawn) |
 | Mesh / entities | [Model](#model) |
 | Materials | [Material](#material) |
@@ -569,7 +569,7 @@ These functions exist in both embed and extension mode unless noted.
 | API | Return | Notes |
 | --- | --- | --- |
 | `caustica.MODE` | `str` | `"embed"` or `"extension"`. |
-| `caustica.app()` | `Sample` | Current renderer. In extension mode, returns the most recently created `Renderer`'s `Sample`. |
+| `caustica.app()` | application handle | Current application handle. In extension mode, returns the most recently created `Renderer`'s application handle. |
 | `caustica.settings()` | `Settings` | Shortcut to global live UI/settings state. Same object as `caustica.app().settings`. |
 | `caustica.log_info(message)` | `None` | Writes to caustica log at info level. |
 | `caustica.log_warning(message)` | `None` | Writes to caustica log at warning level. |
@@ -631,7 +631,7 @@ caustica.Renderer(
 | `set_camera(position, direction, up=(0, 1, 0))` | `bool` | Triples can be lists/tuples of 3 floats. |
 | `set_camera_fov(vertical_fov_degrees)` | `None` | Set vertical FOV in degrees. |
 | `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` or `clear_camera_intrinsics()` is used. |
-| `app` | `Sample` | Underlying renderer instance (`EngineApp::app()` in extension mode). |
+| `app` | application handle | Underlying application handle (`EngineApp::app()` in extension mode). |
 | `settings` | `Settings` | Live UI/settings state. |
 | `selected_adapter` | `AdapterInfo` | Adapter actually selected during device creation. |
 
@@ -791,9 +791,9 @@ r = caustica.Renderer(headless=False, realtime=True, scene=scene)
 
 For scene files, relative 3DGS paths are resolved relative to the scene JSON file. `path`, `file`, and `fileName` are accepted aliases.
 
-## Sample & Scene
+## App & Scene
 
-Top-level renderer instance. Python exposes the C++ `App` (from `EngineApp::app()` / the editor host) as `caustica.Sample` for historical reasons. In extension mode, access it through `renderer.app`; in embed mode, use `caustica.app()`. Scene graph access goes through `app.scene`.
+The application handle gives access to the scene, camera, and runtime operations. In extension mode, obtain it from `renderer.app`; in embed mode, use `caustica.app()`. Scene graph access goes through `app.scene`.
 
 ### Read-Only Properties
 
@@ -862,11 +862,11 @@ Use `Renderer.set_camera()` when working in extension mode; it is simpler than b
 
 ## Spawn / Despawn
 
-Runtime attach/detach of mesh/prefab assets through `Sample` (same path as C++ `SceneSpawn`). Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously.
+Runtime attach/detach of mesh/prefab assets through `app` (same path as C++ `SceneSpawn`). Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously.
 
 ### `ScenePrefab`
 
-Returned by `Sample.load(path)`.
+Returned by `app.load(path)`.
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -879,11 +879,11 @@ Returned by `Sample.load(path)`.
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `sample.load(path)` | `ScenePrefab` | Import a mesh/prefab file into a CPU-side handle (does not spawn). |
-| `sample.spawn(prefab)` | `SceneEntity | None` | Spawn a previously loaded `ScenePrefab` into the active scene. Returns the root entity. |
-| `sample.spawn_from_file(path)` | `SceneEntity | None` | `load` + `spawn` in one call. |
-| `sample.despawn(entity)` | `bool` | Remove a scene entity and its children. |
-| `sample.load_mesh_file(path)` | `bool` | True when `spawn_from_file` succeeds. |
+| `app.load(path)` | `ScenePrefab` | Import a mesh/prefab file into a CPU-side handle (does not spawn). |
+| `app.spawn(prefab)` | `SceneEntity | None` | Spawn a previously loaded `ScenePrefab` into the active scene. Returns the root entity. |
+| `app.spawn_from_file(path)` | `SceneEntity | None` | `load` + `spawn` in one call. |
+| `app.despawn(entity)` | `bool` | Remove a scene entity and its children. |
+| `app.load_mesh_file(path)` | `bool` | Convenience boolean wrapper for `spawn_from_file(path)`. |
 
 Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd`, `.usda`, `.usdc`.
 
@@ -922,23 +922,20 @@ mesh APIs. Engine CPU mesh records stay internal.
 | `scene.get_mesh_entities()` | `list[SceneEntity]` | All mesh-instance entities in the current scene. |
 | `scene.find_mesh_entity(name)` | `SceneEntity | None` | Match by mesh asset name or entity name. |
 | `scene.find_entity(path)` | `SceneEntity | None` | Find an entity by name or path. |
-| `sample.get_mesh_entities()` | `list[SceneEntity]` | Compatibility alias for `scene.get_mesh_entities()`. |
-| `sample.find_mesh_entity(name)` | `SceneEntity | None` | Compatibility alias for `scene.find_mesh_entity(name)`. |
-| `sample.find_entity(path)` | `SceneEntity | None` | Compatibility alias for `scene.find_entity(path)`. |
 | `Renderer.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (extension mode). |
-| `Sample.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (embed or extension). |
-| `Sample.spawn_from_file(path)` | `SceneEntity | None` | Preferred spawn path; returns the root entity. |
+| `app.load_mesh_file(file_name)` | `bool` | Append a mesh/prefab (embed or extension). |
+| `app.spawn_from_file(path)` | `SceneEntity | None` | Preferred spawn path; returns the root entity. |
 
 ### Vertex Deformation
 
 | API | Return | Notes |
 | --- | --- | --- |
-| `sample.get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space `(x, y, z)` positions for the entity's mesh. |
-| `sample.set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace unique positions. Length must match `len(get_mesh_vertices(entity))`. |
-| `sample.deform_mesh(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | Calls `callback(index, (x, y, z))` for each unique position. Return a new triple or `None`; returns the processed vertex count. |
-| `sample.get_mesh_vertices_world(entity)` | `list[tuple]` | Unique world-space positions using that entity's transform. |
-| `sample.set_mesh_vertices_world(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace positions from world-space coordinates. |
-| `sample.deform_mesh_world(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | World-space deform callback; return a world triple or `None`. |
+| `app.get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space `(x, y, z)` positions for the entity's mesh. |
+| `app.set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace unique positions. Length must match `len(get_mesh_vertices(entity))`. |
+| `app.deform_mesh(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | Calls `callback(index, (x, y, z))` for each unique position. Return a new triple or `None`; returns the processed vertex count. |
+| `app.get_mesh_vertices_world(entity)` | `list[tuple]` | Unique world-space positions using that entity's transform. |
+| `app.set_mesh_vertices_world(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `None` | Replace positions from world-space coordinates. |
+| `app.deform_mesh_world(entity, callback, recompute_normals=True, rebuild_acceleration_structure=True)` | `int` | World-space deform callback; return a world triple or `None`. |
 
 `set_mesh_vertices(...)` updates object-space mesh bounds, optionally recomputes normals,
 refreshes GPU vertex data, resets accumulation, and requests acceleration structure rebuild
@@ -1010,8 +1007,6 @@ Scene material lookup and the `Material` class for runtime edits and texture rep
 | `scene.find_material_by_id(material_id)` | `Material | None` | Lookup by material ID. |
 | `scene.material_count` | `int` | Number of PT materials in the current scene. |
 
-`Sample.get_materials()`, `Sample.find_material()`, and `Sample.find_material_by_id()` remain available as compatibility aliases.
-
 ### `Material` Class
 
 Returned by `Scene.get_materials()`, `Scene.find_material()`, and `Scene.find_material_by_id()`.
@@ -1076,6 +1071,9 @@ Editable properties automatically mark GPU data dirty:
 | `thin_surface` | `bool` |
 | `geometry_thin_walled` | `bool` |
 | `exclude_from_nee` | `bool` |
+| `unlit_receive_shadows` | `bool` |
+| `unlit_shadow_strength` | `float` (`0..1`) |
+| `unlit_bypass_tone_mapping` | `bool` |
 | `enable_as_analytic_light_proxy` | `bool` |
 | `skip_render` | `bool` |
 | `metalness_in_red_channel` | `bool` |
@@ -1090,6 +1088,25 @@ Editable properties automatically mark GPU data dirty:
 | `enable_emission_color_texture` | `bool` |
 | `enable_transmission_texture` | `bool` |
 | `enable_transmission_weight_texture` | `bool` |
+
+#### Unlit Shadow Flags
+
+These flags are for flat-color receivers such as stylized objects, compositing cards, or diagnostic geometry. They are not a physically based material mode.
+
+| Property | Effect | When to use it |
+| --- | --- | --- |
+| `unlit_receive_shadows` | Displays the material's base color without BRDF, direct-light, or indirect-light shading, then darkens it with the visibility of sampled lights. | Enable when the color should stay constant but still show scene shadows. It also prevents the material from being treated as emissive. |
+| `unlit_shadow_strength` | Controls how much that shadow mask darkens the unlit color. `0.0` keeps the color fully visible; `1.0` applies the full sampled-light shadow. | Use a value between `0.0` and `1.0` for artistic shadow softness/contrast. It matters only when `unlit_receive_shadows=True`. |
+| `unlit_bypass_tone_mapping` | Keeps the reconstructed unlit/shadowed color unchanged by the tone mapper. Bloom and other rendering/post-processing stages still run. | Enable only when the flat color must not change with exposure or the selected tone-map curve. This flag has no effect unless `unlit_receive_shadows=True`. |
+
+For example, this makes a flat green object receive half-strength shadows while preserving that green through tone mapping:
+
+```python
+mat.unlit_receive_shadows = True
+mat.unlit_shadow_strength = 0.5
+mat.unlit_bypass_tone_mapping = True
+app.reset_accumulation()
+```
 
 #### Texture Paths (read-only)
 
@@ -1120,7 +1137,7 @@ Editable properties automatically mark GPU data dirty:
 #### Runtime Update Rules
 
 - Property setters already mark `GPUDataDirty`; the edited material is uploaded on the next rendered frame.
-- In reference/accumulation mode, call `Sample.reset_accumulation()` or set `settings.reset_accumulation = True` after visible edits, otherwise previous samples remain blended with the old material.
+- In reference/accumulation mode, call `app.reset_accumulation()` or set `settings.reset_accumulation = True` after visible edits, otherwise previous samples remain blended with the old material.
 - Color values are linear RGB. The Python setter does not clamp inputs, so keep factors in the physically meaningful range unless deliberately testing extremes.
 - If a texture slot is enabled, scalar/color parameters multiply the texture sample. In metal-rough mode, effective base color is `base_color * base_texture.rgb`, roughness is `roughness * ORM.g`, and metalness is `metalness * ORM.b` unless `metalness_in_red_channel=True`.
 - Set `material_model = "OpenPBR"` to use OpenPBR naming. Python exposes the same OpenPBR aliases as the material UI, including `base_metalness`, `specular_roughness`, `specular_roughness_anisotropy`, `specular_ior`, `transmission_weight`, `transmission_diffuse_weight`, `geometry_opacity`, `geometry_thin_walled`, `emission_color`, `emission_luminance`, `fuzz_*`, `coat_*`, `subsurface_*`, `thin_film_*`, `transmission_color`, `transmission_depth`, `transmission_scatter*`, and `transmission_dispersion_*`. Legacy aliases such as `metalness`, `roughness`, `opacity`, and `transmission_factor` remain valid.
@@ -1173,9 +1190,7 @@ Lights are ECS components on `SceneEntity`. Lookup returns `SceneEntity` handles
 | `scene.light_count` | `int` | Number of lights in the current scene. |
 | `scene.camera_count` | `int` | Number of camera entities in the current scene. |
 | `scene.get_cameras()` | `list[SceneEntity]` | All camera entities as `SceneEntity`. |
-| `Sample.get_lights()` | `list[SceneEntity]` | Compatibility alias for `scene.get_lights()`. |
-| `Sample.find_light(name)` | `SceneEntity | None` | Compatibility alias for `scene.find_light(name)`. |
-| `Sample.set_environment_map(path)` | `None` | Override scene environment map source. |
+| `app.set_environment_map(path)` | `None` | Override scene environment map source. |
 
 ### Create Lights
 
@@ -1203,7 +1218,7 @@ Empty `name` auto-generates a unique name (`DirectionalLight`, `PointLight`, …
 | `inner_angle` / `outer_angle` | `float` | Spot. |
 | `environment_path` | `str` | Environment light HDRI path. |
 
-For common environment tweaks, prefer `settings.environment_map` (see [Settings](#settings)) and `Sample.set_environment_map(path)`.
+For common environment tweaks, prefer `settings.environment_map` (see [Settings](#settings)) and `app.set_environment_map(path)`.
 
 ## 3DGS
 
@@ -1214,10 +1229,10 @@ For common environment tweaks, prefer `settings.environment_map` (see [Settings]
 | API | Return | Notes |
 | --- | --- | --- |
 | `Renderer.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` 3DGS scene object (extension mode). |
-| `Sample.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` object to the current scene. |
+| `app.load_gaussian_splats(file_name, convert_rdf_to_rub=True)` | `bool` | Append a 3DGS `.ply` object to the current scene. |
 | Scene JSON `GaussianSplat` node | — | Declare splats in inline or file-based scene JSON. See [Renderer → Inline / Builtin Scenes](#inline--builtin-scenes). |
 
-Read-only status on `Sample` / `Renderer.settings`:
+Read-only status on `app` / `Renderer.settings`:
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -1547,7 +1562,7 @@ app.reset_accumulation()
 
 Do not create `caustica.Renderer` in embed mode; the running app already owns the renderer.
 
-`EditorSample` is a compatibility wrapper for older embed scripts that already hold an editor host. Prefer `Sample.*` APIs (`spawn_from_file`, `deform_mesh`, …) for new code.
+The application handle returned by `caustica.app()` is the supported entry point for new embed scripts. Use its `spawn_from_file`, `deform_mesh`, and other runtime methods directly.
 
 ## Extension Mode Notes
 
@@ -1597,7 +1612,6 @@ The binding also exposes docstrings through nanobind:
 import caustica
 help(caustica)
 help(caustica.Renderer)
-help(caustica.Sample)
 help(caustica.SceneEntity)
 help(caustica.Settings)
 ```
