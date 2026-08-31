@@ -1,16 +1,16 @@
 # Caustica
 
 <p align="center">
-  <img src="docs/teaser.png" alt="Caustica path tracing teaser — transmission, caustics, and OpenPBR materials" width="900"/>
+  <img src="docs/barbershop_preview.png" alt="Caustica path tracing teaser — transmission, caustics, and OpenPBR materials" width="100%"/>
 </p>
+
+<p align="center"><img src="docs/bistro.png" alt="Bistro exterior — ReSTIR GI and environment lighting" width="50%"/><img src="docs/kitchen.png" alt="Kitchen interior — embodied-AI simulation scene" width="50%"/></p>
 
 <p align="center">
-  <img src="docs/bistro.png" alt="Bistro exterior — ReSTIR GI and environment lighting" width="440"/>
-  &nbsp;
-  <img src="docs/kitchen.png" alt="Kitchen interior — embodied-AI simulation scene" width="440"/>
+  <img src="docs/attic_gui.png" alt="Caustica desktop editor — attic scene with hierarchy, inspector, and path-traced viewport" width="100%"/>
 </p>
 
-<p align="center"><i>Path-traced synthetic imagery for embodied-AI simulation: material showcase (top), outdoor bistro and indoor kitchen environments (bottom).</i></p>
+<p align="center"><i>Path-traced synthetic imagery for embodied-AI simulation: material showcase (top), outdoor bistro and indoor kitchen (middle), desktop editor UI (bottom).</i></p>
 
 ## Overview
 
