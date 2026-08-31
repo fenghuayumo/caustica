@@ -332,7 +332,7 @@ The pip build assembles a local binary wheel from `bin/`, including the native e
 | --- | --- | --- |
 | `VERSION` | `1.0.1` | Canonical Caustica version shared by the executable and wheel |
 | `CAUSTICA_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
-| `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
+| `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `none` when a shader pack is built, else `bin` | `bin`, `full`, `none` |
 | `CAUSTICA_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 

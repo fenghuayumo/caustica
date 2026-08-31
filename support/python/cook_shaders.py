@@ -57,6 +57,15 @@ def parse_args() -> argparse.Namespace:
         help="Force recompilation even when bins already exist.",
     )
     parser.add_argument(
+        "--debug-info",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Emit -Zi in the PT cook. Default off for vulkan (Linux release) "
+            "and on for d3d12."
+        ),
+    )
+    parser.add_argument(
         "--skip-precompile",
         action="store_true",
         help="Skip DXC precompile (verify + pack only).",
@@ -111,6 +120,7 @@ def main() -> int:
             args.shader_api,
             force=args.force,
             global_preset=args.global_preset,
+            debug_info=args.debug_info,
         )
     else:
         print(f"[caustica] Cook step {step}/{total_steps}: precompile skipped")
@@ -118,7 +128,7 @@ def main() -> int:
 
     if not args.skip_verify:
         print(f"[caustica] Cook step {step}/{total_steps}: verify libraries ({args.global_preset})")
-        rc = verify_apis(args.shader_api, args.global_preset)
+        rc = verify_apis(args.shader_api, args.global_preset, debug_info=args.debug_info)
         if rc != 0:
             return rc
     else:

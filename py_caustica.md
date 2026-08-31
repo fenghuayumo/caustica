@@ -92,7 +92,7 @@ Packaging options can be controlled with environment variables:
 | --- | --- | --- |
 | `caustica_WHEEL_VERSION` | `0.2.0` | Any PEP 440 version string |
 | `caustica_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
-| `caustica_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
+| `caustica_WHEEL_DYNAMIC_SHADERS` | `none` when a shader pack is built, else `bin` | `bin`, `full`, `none` |
 | `caustica_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 

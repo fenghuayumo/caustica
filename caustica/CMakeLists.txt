@@ -137,6 +137,9 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
                 --shader-api ${caustica_pt_precompile_api}
                 --global-preset coverage
         )
+        if (NOT WIN32)
+            list(APPEND caustica_pt_precompile_cmds --no-debug-info)
+        endif()
         if (CAUSTICA_VERIFY_PT_SHADERS)
             list(APPEND caustica_pt_precompile_cmds
                 COMMAND ${Python3_EXECUTABLE}

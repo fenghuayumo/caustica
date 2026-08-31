@@ -14,12 +14,23 @@ from precompile_pt_shader_bins import (
 )
 
 
-def verify(compile_api: str, global_preset: str = "coverage") -> tuple[int, list[str]]:
+def verify(
+    compile_api: str,
+    global_preset: str = "coverage",
+    *,
+    debug_info: bool | None = None,
+) -> tuple[int, list[str]]:
+    from precompile_pt_shader_bins import default_debug_info
+
+    if debug_info is None:
+        debug_info = default_debug_info(compile_api)
     missing: list[str] = []
     checked = 0
     folder = runtime_bin_folder(compile_api)
     for job in build_jobs(global_preset):
-        digest = hash_hex(build_hash_command(job["logical"], job["macros"], api=compile_api))
+        digest = hash_hex(
+            build_hash_command(job["logical"], job["macros"], api=compile_api, debug_info=debug_info)
+        )
         out_path, rel = cache_paths(compile_api, digest)
         checked += 1
         if not out_path.exists():
@@ -27,7 +38,12 @@ def verify(compile_api: str, global_preset: str = "coverage") -> tuple[int, list
     return checked, missing
 
 
-def verify_apis(shader_api: str, global_preset: str = "coverage") -> int:
+def verify_apis(
+    shader_api: str,
+    global_preset: str = "coverage",
+    *,
+    debug_info: bool | None = None,
+) -> int:
     apis = (
         ["d3d12"]
         if shader_api == "d3d12"
@@ -38,7 +54,7 @@ def verify_apis(shader_api: str, global_preset: str = "coverage") -> int:
     total_missing: list[str] = []
     total_checked = 0
     for api in apis:
-        checked, missing = verify(api, global_preset)
+        checked, missing = verify(api, global_preset, debug_info=debug_info)
         total_checked += checked
         folder = runtime_bin_folder(api)
         total_missing.extend(f"[{folder}] {item}" for item in missing)
@@ -83,12 +99,18 @@ def parse_args() -> argparse.Namespace:
         choices=["default", "coverage"],
         default="coverage",
     )
+    parser.add_argument(
+        "--debug-info",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Match the cook's -Zi setting. Default off for vulkan, on for d3d12.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    return verify_apis(args.shader_api, args.global_preset)
+    return verify_apis(args.shader_api, args.global_preset, debug_info=args.debug_info)
 
 
 if __name__ == "__main__":

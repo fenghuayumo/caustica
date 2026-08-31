@@ -51,12 +51,17 @@ namespace
         return (value << shift) | (value >> (64u - shift));
     }
 
+    // Must match support/python/build_wheel.py:xorshift64star. The multiplied
+    // value is written back into `state`; classic xorshift64* only returns it.
+    // Leaving the unmultiplied value here decrypts only the first 8 bytes
+    // (e.g. the CAUSSMF1 magic) and then reports the shader manifest truncated.
     static uint64_t XorShift64Star(uint64_t& state)
     {
         state ^= state >> 12;
         state ^= state << 25;
         state ^= state >> 27;
-        return state * 2685821657736338717ull;
+        state *= 2685821657736338717ull;
+        return state;
     }
 }
 

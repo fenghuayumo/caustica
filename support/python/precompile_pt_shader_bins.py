@@ -809,11 +809,17 @@ def precompile(
     return cook([api], force=force, global_preset=global_preset, debug_info=debug_info)
 
 
+def default_debug_info(shader_api: str) -> bool:
+    """Vulkan SPIR-V cannot emit external PDBs; -Zi bloats shipped bins. DXIL can."""
+    return shader_api == "d3d12"
+
+
 def run_pt_shader_precompile(
     shader_api: str,
     *,
     force: bool = False,
     global_preset: str = "coverage",
+    debug_info: bool | None = None,
 ) -> None:
     compile_apis = (
         ["d3d12"]
@@ -822,7 +828,9 @@ def run_pt_shader_precompile(
         if shader_api == "vulkan"
         else ["d3d12", "vulkan"]
     )
-    cook(compile_apis, force=force, global_preset=global_preset)
+    if debug_info is None:
+        debug_info = default_debug_info(shader_api)
+    cook(compile_apis, force=force, global_preset=global_preset, debug_info=debug_info)
 
 
 def parse_args() -> argparse.Namespace:
@@ -849,12 +857,12 @@ def parse_args() -> argparse.Namespace:
         help="Recompile every variant, ignoring the content-addressed compile cache.",
     )
     parser.add_argument(
-        "--no-debug-info",
-        action="store_true",
+        "--debug-info",
+        action=argparse.BooleanOptionalAction,
+        default=None,
         help=(
-            "Drop -Zi entirely: ~30%% faster per compile and no PDBs, at the cost of "
-            "shader debugging. Changes the L1 hash, so these bins are not "
-            "interchangeable with a debug cook."
+            "Emit -Zi. Default on for d3d12 (external PDBs) and off for vulkan "
+            "(SPIR-V embeds debug inline). --no-debug-info changes the L1 hash."
         ),
     )
     return parser.parse_args()
@@ -869,11 +877,14 @@ def main() -> int:
         if args.shader_api == "vulkan"
         else ["d3d12", "vulkan"]
     )
+    debug_info = (
+        default_debug_info(args.shader_api) if args.debug_info is None else args.debug_info
+    )
     return cook(
         apis,
         force=args.force,
         global_preset=args.global_preset,
-        debug_info=not args.no_debug_info,
+        debug_info=debug_info,
     )
 
 

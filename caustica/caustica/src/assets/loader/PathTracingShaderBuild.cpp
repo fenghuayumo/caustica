@@ -12,7 +12,8 @@ PathTracingShaderBuildResult buildPathTracingLibraryShader(
     options.SourceFilePath = input.absoluteSourcePath;
     options.LogicalSourceFileName = input.logicalSourcePath;
     options.Profile = ShaderCompilerUtils::ShaderProfile::Library_6_6;
-    options.EnableDebugInfo = true;
+    // SPIR-V embeds -Zi inline (~70% of each library). DXIL writes external PDBs.
+    options.EnableDebugInfo = config.GraphicsAPI != caustica::rhi::GraphicsAPI::VULKAN;
     options.EmbedPdb = input.embedPdbs;
     options.UseOptimizations = input.useOptimizations;
     options.Enable16BitTypes = true;
