@@ -282,7 +282,7 @@ The pip build assembles a local binary wheel from `bin/`, including the native e
 
 | Variable | Default | Values |
 | --- | --- | --- |
-| `VERSION` | `1.0.0` | Canonical Caustica version shared by the executable and wheel |
+| `VERSION` | `1.0.1` | Canonical Caustica version shared by the executable and wheel |
 | `CAUSTICA_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
 | `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
 | `CAUSTICA_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
@@ -307,8 +307,8 @@ a portable directory and ZIP archive, run:
 python support/python/package_executable.py --assets minimal --shader-api d3d12
 ```
 
-This writes `dist/caustica-1.0.0-windows-x64/` and
-`dist/caustica-1.0.0-windows-x64.zip`. Use `--assets full` to include the complete
+This writes `dist/caustica-1.0.1-windows-x64/` and
+`dist/caustica-1.0.1-windows-x64.zip`. Use `--assets full` to include the complete
 `Assets/` submodule (including `statue.ply`), or `--assets none` when the asset
 pack will be supplied separately. For a release build, configure a separate
 build directory with `-DCAUSTICA_DISTRIBUTION_BUILD=ON` before running the
