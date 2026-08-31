@@ -138,6 +138,98 @@ void DrawHierarchyTypeIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, HierarchyType
     }
 }
 
+void DrawEditorGlyphIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, EditorGlyphIcon kind, ImU32 col)
+{
+    const float w = max.x - min.x;
+    const float h = max.y - min.y;
+    const float s = std::min(w, h);
+    const ImVec2 c((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    const float t = std::max(1.35f, s * 0.085f);
+
+    switch (kind)
+    {
+    case EditorGlyphIcon::Cube:
+        DrawHierarchyTypeIcon(dl, min, max, HierarchyTypeIcon::Mesh, col);
+        break;
+    case EditorGlyphIcon::Sphere:
+        dl->AddCircle(c, s * 0.34f, col, 20, t);
+        dl->AddBezierQuadratic(
+            ImVec2(c.x - s * 0.28f, c.y),
+            c,
+            ImVec2(c.x + s * 0.28f, c.y),
+            col,
+            t,
+            12);
+        break;
+    case EditorGlyphIcon::Plane:
+    {
+        const ImVec2 a(c.x - s * 0.34f, c.y + s * 0.04f);
+        const ImVec2 b(c.x - s * 0.08f, c.y - s * 0.22f);
+        const ImVec2 d(c.x + s * 0.34f, c.y - s * 0.04f);
+        const ImVec2 e(c.x + s * 0.08f, c.y + s * 0.22f);
+        dl->AddLine(a, b, col, t);
+        dl->AddLine(b, d, col, t);
+        dl->AddLine(d, e, col, t);
+        dl->AddLine(e, a, col, t);
+        dl->AddLine(b, e, col, std::max(1.0f, t * 0.75f));
+        break;
+    }
+    case EditorGlyphIcon::Cylinder:
+    {
+        const float rx = s * 0.28f;
+        const float ry = s * 0.10f;
+        const float topY = c.y - s * 0.22f;
+        const float botY = c.y + s * 0.22f;
+        dl->AddEllipse(ImVec2(c.x, topY), ImVec2(rx, ry), col, 0.f, 20, t);
+        dl->AddEllipse(ImVec2(c.x, botY), ImVec2(rx, ry), col, 0.f, 20, t);
+        dl->AddLine(ImVec2(c.x - rx, topY), ImVec2(c.x - rx, botY), col, t);
+        dl->AddLine(ImVec2(c.x + rx, topY), ImVec2(c.x + rx, botY), col, t);
+        break;
+    }
+    case EditorGlyphIcon::DirectionalLight:
+        DrawHierarchyTypeIcon(dl, min, max, HierarchyTypeIcon::Light, col);
+        break;
+    case EditorGlyphIcon::PointLight:
+        dl->AddCircleFilled(c, s * 0.14f, col, 12);
+        for (int i = 0; i < 6; ++i)
+        {
+            const float a = (IM_PI * 2.f * float(i)) / 6.f + IM_PI / 6.f;
+            dl->AddLine(
+                ImVec2(c.x + cosf(a) * s * 0.24f, c.y + sinf(a) * s * 0.24f),
+                ImVec2(c.x + cosf(a) * s * 0.38f, c.y + sinf(a) * s * 0.38f),
+                col,
+                t);
+        }
+        break;
+    case EditorGlyphIcon::SpotLight:
+    {
+        dl->AddCircleFilled(ImVec2(c.x, c.y - s * 0.22f), s * 0.08f, col, 10);
+        dl->AddLine(ImVec2(c.x, c.y - s * 0.14f), ImVec2(c.x - s * 0.28f, c.y + s * 0.30f), col, t);
+        dl->AddLine(ImVec2(c.x, c.y - s * 0.14f), ImVec2(c.x + s * 0.28f, c.y + s * 0.30f), col, t);
+        dl->AddLine(
+            ImVec2(c.x - s * 0.28f, c.y + s * 0.30f),
+            ImVec2(c.x + s * 0.28f, c.y + s * 0.30f),
+            col,
+            t);
+        break;
+    }
+    case EditorGlyphIcon::RectLight:
+        dl->AddRect(
+            ImVec2(c.x - s * 0.30f, c.y - s * 0.20f),
+            ImVec2(c.x + s * 0.30f, c.y + s * 0.20f),
+            col,
+            s * 0.06f,
+            0,
+            t);
+        dl->AddLine(ImVec2(c.x - s * 0.12f, c.y), ImVec2(c.x + s * 0.12f, c.y), col, t);
+        dl->AddLine(ImVec2(c.x, c.y - s * 0.08f), ImVec2(c.x, c.y + s * 0.08f), col, t);
+        break;
+    case EditorGlyphIcon::EnvironmentLight:
+        DrawHierarchyTypeIcon(dl, min, max, HierarchyTypeIcon::EnvironmentLight, col);
+        break;
+    }
+}
+
 bool IconButton(const char* id, ImWchar codepoint, bool active, const char* tip)
 {
     const float size = ImGui::GetFrameHeight();

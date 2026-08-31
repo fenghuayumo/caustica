@@ -7,6 +7,7 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
 #include "common/ImGuiManager.h"
+#include "common/IconsMaterialSymbols.h"
 
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
@@ -165,12 +166,18 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         {
             bool deleteSelectedEntity = false;
 
-            ImGui::SetNextItemWidth(-1.f);
+            const float addBtn = ImGui::GetFrameHeight();
+            ImGui::SetNextItemWidth(std::max(40.f, ImGui::GetContentRegionAvail().x - addBtn - 6.f));
             ImGui::InputTextWithHint(
                 "##HierarchySearch",
                 "Search entities...",
                 m_editorUI.Viewport.HierarchyFilter,
                 IM_ARRAYSIZE(m_editorUI.Viewport.HierarchyFilter));
+            ImGui::SameLine(0.f, 6.f);
+            if (ImGui::Button(ICON_MS_ADD "##HierarchyAdd", ImVec2(addBtn, addBtn)))
+                ImGui::OpenPopup("##HierarchyCreateMenu");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Add mesh or light");
             ImGui::Spacing();
 
             // Entity ids are reused by each imported ECS world. Namespace the
@@ -179,7 +186,11 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
             const std::string hierarchySceneId =
                 caustica::currentScenePath(*m_sceneEditor.app()).generic_string();
             ImGui::PushID(hierarchySceneId.c_str());
-            if (ImGui::TreeNodeEx("Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth))
+            const bool sceneOpen = ImGui::TreeNodeEx(
+                "Scene", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                m_editorUI.OpenSceneCreatePopup = true;
+            if (sceneOpen)
             {
                 BuildHierarchyNodeUI(m_ui, *scene, ew->root(), m_editorUI.Viewport.HierarchyFilter);
                 ImGui::TreePop();
@@ -210,6 +221,20 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
                 m_editorUI.InspectorRotationEulerValid = false;
                 m_editorUI.SelectedGaussianSplat = false;
             }
+
+            if (m_editorUI.OpenSceneCreatePopup)
+            {
+                ImGui::OpenPopup("##HierarchyCreateMenu");
+                m_editorUI.OpenSceneCreatePopup = false;
+            }
+            else
+            {
+                TryOpenSceneCreatePopupOnRightClick(
+                    "##HierarchyCreateMenu",
+                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)
+                        && !ImGui::IsAnyItemHovered());
+            }
+            BuildSceneCreatePopup(m_sceneEditor, m_ui, "##HierarchyCreateMenu");
         }
         else
         {

@@ -3,6 +3,7 @@
 #include <math/math.h>
 #include <scene/Scene.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -106,6 +107,23 @@ struct EditorSelectionState
     bool MaterialPickerActive = false;
     // Updated each UI frame; input router uses this to avoid stealing gizmo clicks.
     bool GizmoCapturingInput = false;
+
+    // Queued from Hierarchy / Viewport context menus; applied on the logic thread.
+    enum class PendingSceneCreate : uint8_t
+    {
+        None = 0,
+        Plane,
+        Cube,
+        Sphere,
+        Cylinder,
+        DirectionalLight,
+        PointLight,
+        SpotLight,
+        RectLight,
+        EnvironmentLight,
+    };
+    PendingSceneCreate PendingCreate = PendingSceneCreate::None;
+    bool OpenSceneCreatePopup = false;
 };
 
 struct EditorFileDropState

@@ -442,6 +442,16 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
         }
     }
 
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+    {
+        if (isSelectable)
+        {
+            ui.editor.SelectedEntity = entity;
+            ui.editor.SelectedGaussianSplat = isGaussianSplatEntity;
+        }
+        ui.editor.OpenSceneCreatePopup = true;
+    }
+
     if (isSelectable && treeClicked && !eyeClicked)
     {
         ui.editor.SelectedEntity = entity;

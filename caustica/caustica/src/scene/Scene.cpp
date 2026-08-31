@@ -197,6 +197,80 @@ namespace
         return mesh;
     }
 
+    BuiltinMeshData MakeCylinderMesh()
+    {
+        constexpr float pi = 3.14159265358979323846f;
+        constexpr int segments = 32;
+        constexpr float radius = 0.5f;
+        constexpr float height = 1.0f;
+
+        BuiltinMeshData mesh;
+        mesh.name = "BuiltinCylinder";
+        mesh.materialName = "Mat_BuiltinCylinder";
+        mesh.baseColor = float3(0.22f, 0.72f, 0.48f);
+
+        auto ringPos = [&](int segment, float y) {
+            const float a = (float(segment) / float(segments)) * 2.0f * pi;
+            return float3(std::cos(a) * radius, y, std::sin(a) * radius);
+        };
+        auto ringNormal = [&](int segment) {
+            const float a = (float(segment) / float(segments)) * 2.0f * pi;
+            return float3(std::cos(a), 0.0f, std::sin(a));
+        };
+        auto ringTangent = [&](int segment) {
+            const float a = (float(segment) / float(segments)) * 2.0f * pi;
+            return float4(-std::sin(a), 0.0f, std::cos(a), 1.0f);
+        };
+
+        for (int i = 0; i < segments; ++i)
+        {
+            const int i1 = (i + 1) % segments;
+            const float u0 = float(i) / float(segments);
+            const float u1 = float(i + 1) / float(segments);
+            const uint32_t base = uint32_t(mesh.vertices.size());
+            AddVertex(mesh, ringPos(i, 0.0f), ringNormal(i), ringTangent(i), float2(u0, 1.0f));
+            AddVertex(mesh, ringPos(i, height), ringNormal(i), ringTangent(i), float2(u0, 0.0f));
+            AddVertex(mesh, ringPos(i1, height), ringNormal(i1), ringTangent(i1), float2(u1, 0.0f));
+            AddVertex(mesh, ringPos(i1, 0.0f), ringNormal(i1), ringTangent(i1), float2(u1, 1.0f));
+            mesh.indices.insert(mesh.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+        }
+
+        const float3 up(0.0f, 1.0f, 0.0f);
+        const float4 topTangent(1.0f, 0.0f, 0.0f, 1.0f);
+        const uint32_t topCenter = uint32_t(mesh.vertices.size());
+        AddVertex(mesh, float3(0.0f, height, 0.0f), up, topTangent, float2(0.5f, 0.5f));
+        for (int i = 0; i < segments; ++i)
+        {
+            const float a = (float(i) / float(segments)) * 2.0f * pi;
+            AddVertex(mesh, ringPos(i, height), up, topTangent,
+                float2(0.5f + 0.5f * std::cos(a), 0.5f + 0.5f * std::sin(a)));
+        }
+        for (int i = 0; i < segments; ++i)
+        {
+            const uint32_t a = topCenter + 1 + uint32_t(i);
+            const uint32_t b = topCenter + 1 + uint32_t((i + 1) % segments);
+            mesh.indices.insert(mesh.indices.end(), { topCenter, a, b });
+        }
+
+        const float3 down(0.0f, -1.0f, 0.0f);
+        const uint32_t botCenter = uint32_t(mesh.vertices.size());
+        AddVertex(mesh, float3(0.0f, 0.0f, 0.0f), down, topTangent, float2(0.5f, 0.5f));
+        for (int i = 0; i < segments; ++i)
+        {
+            const float a = (float(i) / float(segments)) * 2.0f * pi;
+            AddVertex(mesh, ringPos(i, 0.0f), down, topTangent,
+                float2(0.5f + 0.5f * std::cos(a), 0.5f - 0.5f * std::sin(a)));
+        }
+        for (int i = 0; i < segments; ++i)
+        {
+            const uint32_t a = botCenter + 1 + uint32_t(i);
+            const uint32_t b = botCenter + 1 + uint32_t((i + 1) % segments);
+            mesh.indices.insert(mesh.indices.end(), { botCenter, b, a });
+        }
+
+        return mesh;
+    }
+
     std::vector<BuiltinMeshData> MakeBuiltinMeshes(const std::string& builtinName)
     {
         const std::string name = NormalizeBuiltinModelName(builtinName);
@@ -206,6 +280,8 @@ namespace
             return { MakeCubeMesh() };
         if (name == "sphere")
             return { MakeSphereMesh() };
+        if (name == "cylinder")
+            return { MakeCylinderMesh() };
         if (name == "plane_cube" || name == "default" || name == "default_scene")
             return { MakePlaneMesh(), MakeCubeMesh() };
 

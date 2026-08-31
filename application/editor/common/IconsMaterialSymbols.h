@@ -28,6 +28,8 @@
 #define ICON_MS_DIAMOND               "\xee\xab\x95" // U+ead5
 #define ICON_MS_VIEW_IN_AR            "\xee\xbf\x89" // U+efc9
 #define ICON_MS_ADD_DIAMOND           "\xef\x92\x9c" // U+f49c
+#define ICON_MS_ADD                   "\xee\x85\x85" // U+e145
+#define ICON_MS_SAVE                  "\xee\x85\xa1" // U+e161
 #define ICON_MS_ARROW_SELECTOR_TOOL   "\xef\xa0\xaf" // U+f82f
 
 // Console Log / Output Log toolbar

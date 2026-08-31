@@ -37,6 +37,8 @@ bool GaussianSplatFormatCombo(const char* label, int* value);
 bool GaussianSplatShadowKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatShadowParticleFormatCombo(EditorUIData& ui);
 void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter);
+void BuildSceneCreatePopup(SceneEditor& sceneEditor, EditorUIData& ui, const char* popupId);
+void TryOpenSceneCreatePopupOnRightClick(const char* popupId, bool areaHovered);
 dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation);
 bool SameRotation(const dm::dquat& a, const dm::dquat& b);
 

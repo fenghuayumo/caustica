@@ -6,15 +6,22 @@
 #include <EditorUI.h>
 
 #include <core/log.h>
+#include <core/path_utils.h>
 #include <engine/App.h>
+#include <engine/CameraApi.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
+#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneSerializer.h>
+#include <json/json.h>
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 
 namespace caustica::editor
 {
@@ -40,6 +47,48 @@ namespace
                     ++removedEnvironmentLightCount;
             });
         return environmentLightCount > 0 && removedEnvironmentLightCount == environmentLightCount;
+    }
+
+    const char* BuiltinSource(BuiltinPrimitiveKind kind)
+    {
+        switch (kind)
+        {
+        case BuiltinPrimitiveKind::Plane: return "builtin:plane";
+        case BuiltinPrimitiveKind::Cube: return "builtin:cube";
+        case BuiltinPrimitiveKind::Sphere: return "builtin:sphere";
+        case BuiltinPrimitiveKind::Cylinder: return "builtin:cylinder";
+        }
+        return "builtin:cube";
+    }
+
+    const char* BuiltinDisplayName(BuiltinPrimitiveKind kind)
+    {
+        switch (kind)
+        {
+        case BuiltinPrimitiveKind::Plane: return "Plane";
+        case BuiltinPrimitiveKind::Cube: return "Cube";
+        case BuiltinPrimitiveKind::Sphere: return "Sphere";
+        case BuiltinPrimitiveKind::Cylinder: return "Cylinder";
+        }
+        return "Mesh";
+    }
+
+    const char* LightDisplayName(EditorLightKind kind)
+    {
+        switch (kind)
+        {
+        case EditorLightKind::Directional: return "DirectionalLight";
+        case EditorLightKind::Point: return "PointLight";
+        case EditorLightKind::Spot: return "SpotLight";
+        case EditorLightKind::Rect: return "RectLight";
+        case EditorLightKind::Environment: return "EnvironmentLight";
+        }
+        return "Light";
+    }
+
+    dm::dquat DefaultSunRotation()
+    {
+        return dm::dquat::fromXYZW(dm::double4(-0.23053891, -0.15879166, -0.68904659, 0.66846975));
     }
 }
 
@@ -129,8 +178,15 @@ bool SceneContentEditor::deleteEntity(caustica::ecs::Entity entity)
     if (!ew || WouldRemoveLastEnvironmentLight(*ew, entity))
         return false;
 
+    std::string authoringId;
+    if (const auto* authoring = ew->world().tryGet<caustica::scene::SceneAuthoringIdComponent>(entity))
+        authoringId = authoring->id;
+
     if (!caustica::despawn(*app, entity))
         return false;
+
+    if (!authoringId.empty())
+        caustica::scene::removeAuthoredEntityNode(m_sceneEditor.editorState().sceneDocument, authoringId);
 
     auto& editor = m_sceneEditor.editorUIState();
     if (ew && editor.TogglableNodes != nullptr)
@@ -140,6 +196,227 @@ bool SceneContentEditor::deleteEntity(caustica::ecs::Entity entity)
     }
 
     return true;
+}
+
+std::string SceneContentEditor::makeUniqueAuthoringId(const std::string& baseName) const
+{
+    auto* app = m_sceneEditor.app();
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    const Json::Value* document = m_sceneEditor.editorState().sceneDocumentValid
+        ? &m_sceneEditor.editorState().sceneDocument
+        : nullptr;
+
+    auto taken = [&](const std::string& id) {
+        if (!ew)
+            return false;
+        bool used = false;
+        ew->world().each<caustica::scene::SceneAuthoringIdComponent>(
+            [&](caustica::ecs::Entity, const caustica::scene::SceneAuthoringIdComponent& authoring) {
+                if (authoring.id == id)
+                    used = true;
+            });
+        ew->world().each<caustica::scene::NameComponent>(
+            [&](caustica::ecs::Entity entity, const caustica::scene::NameComponent& name) {
+                if (entity != ew->root() && name.value == id)
+                    used = true;
+            });
+        if (document && (*document)["entities"].isArray())
+        {
+            for (const Json::Value& node : (*document)["entities"])
+            {
+                if (node["id"].isString() && node["id"].asString() == id)
+                    used = true;
+                if (node["name"].isString() && node["name"].asString() == id)
+                    used = true;
+            }
+        }
+        return used;
+    };
+
+    if (!taken(baseName))
+        return baseName;
+    for (int i = 2; i < 10000; ++i)
+    {
+        const std::string candidate = baseName + "_" + std::to_string(i);
+        if (!taken(candidate))
+            return candidate;
+    }
+    return baseName + "_x";
+}
+
+void SceneContentEditor::registerAuthoredEntity(caustica::ecs::Entity entity)
+{
+    auto* app = m_sceneEditor.app();
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    if (!ew || !ecs::isValid(entity))
+        return;
+
+    auto& editorState = m_sceneEditor.editorState();
+    if (!editorState.sceneDocumentValid)
+    {
+        editorState.sceneDocument = Json::Value(Json::objectValue);
+        editorState.sceneDocument["format"] = "caustica.scene";
+        editorState.sceneDocument["version"] = 2;
+        const std::string sceneName = editorState.loadedSceneName.empty()
+            ? "untitled"
+            : editorState.loadedSceneName;
+        editorState.sceneDocument["name"] = sceneName;
+        editorState.sceneDocument["entities"] = Json::Value(Json::arrayValue);
+        editorState.sceneDocumentValid = true;
+    }
+
+    caustica::scene::upsertAuthoredEntityNode(editorState.sceneDocument, *ew, entity);
+}
+
+void SceneContentEditor::placeInFrontOfCamera(caustica::ecs::Entity entity, bool snapToGround)
+{
+    auto* app = m_sceneEditor.app();
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    if (!app || !ew || !ecs::isValid(entity))
+        return;
+
+    dm::double3 translation(0.0, snapToGround ? 0.0 : 1.2, 0.0);
+    const caustica::FirstPersonCamera& camera = caustica::currentCamera(*app);
+    const dm::float3 pos = camera.getPosition() + camera.getDir() * 4.0f;
+    translation = dm::double3(double(pos.x), double(pos.y), double(pos.z));
+    if (snapToGround)
+        translation.y = 0.0;
+
+    ew->setTranslation(entity, translation);
+    ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
+}
+
+void SceneContentEditor::selectCreatedEntity(caustica::ecs::Entity entity, bool isLight)
+{
+    auto& editor = m_sceneEditor.editorUIState();
+    editor.SelectedEntity = entity;
+    editor.SelectedGaussianSplat = false;
+    editor.SelectedMaterial = nullptr;
+    editor.InspectorRotationEntity = caustica::ecs::NullEntity;
+    editor.InspectorRotationEulerValid = false;
+    editor.ShowInspector = true;
+    editor.RequestFocusInspector = true;
+
+    auto& settings = m_sceneEditor.pathTracerSettings();
+    settings.ResetAccumulation = true;
+    if (isLight)
+        settings.ResetRealtimeCaches = true;
+}
+
+caustica::ecs::Entity SceneContentEditor::createBuiltinMesh(BuiltinPrimitiveKind kind)
+{
+    auto* app = m_sceneEditor.app();
+    if (!app || !caustica::isSceneLoaded(*app) || caustica::isSceneStructureBusy(*app))
+        return caustica::ecs::NullEntity;
+
+    const std::string id = makeUniqueAuthoringId(BuiltinDisplayName(kind));
+    const ecs::Entity root = caustica::spawnFromSource(*app, BuiltinSource(kind), makeApplyCallbacks());
+    if (!ecs::isValid(root))
+    {
+        caustica::error("Failed to create builtin mesh '%s'", id.c_str());
+        return caustica::ecs::NullEntity;
+    }
+
+    auto* ew = caustica::entityWorld(*app);
+    if (!ew)
+        return caustica::ecs::NullEntity;
+
+    ew->world().emplace<caustica::scene::NameComponent>(root, caustica::scene::NameComponent{ id });
+    ew->world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+        root, caustica::scene::SceneAuthoringIdComponent{ id });
+    ew->world().emplace<caustica::scene::PrefabInstanceComponent>(
+        root, caustica::scene::PrefabInstanceComponent{ BuiltinSource(kind), {} });
+    ew->rebuildPathsFromRoot();
+    placeInFrontOfCamera(root, true);
+    registerAuthoredEntity(root);
+    selectCreatedEntity(root, false);
+    caustica::info("Created %s", id.c_str());
+    return root;
+}
+
+caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
+{
+    auto* app = m_sceneEditor.app();
+    auto scene = app ? caustica::activeScene(*app) : nullptr;
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    if (!app || !scene || !ew || !caustica::isSceneLoaded(*app))
+        return caustica::ecs::NullEntity;
+
+    const std::string id = makeUniqueAuthoringId(LightDisplayName(kind));
+    ecs::Entity entity = caustica::ecs::NullEntity;
+
+    switch (kind)
+    {
+    case EditorLightKind::Directional:
+    {
+        caustica::scene::DirectionalLightComponent light;
+        light.color = dm::float3(1.0f, 0.96f, 0.9f);
+        light.irradiance = 4.0f;
+        light.angularSize = 1.5f;
+        entity = scene->attachDirectionalLightToRoot(std::move(light), id);
+        if (ecs::isValid(entity))
+            ew->setRotation(entity, DefaultSunRotation());
+        break;
+    }
+    case EditorLightKind::Point:
+    {
+        caustica::scene::PointLightComponent light;
+        light.color = dm::float3(1.0f, 0.92f, 0.78f);
+        light.intensity = 40.0f;
+        light.radius = 0.05f;
+        light.range = 12.0f;
+        entity = scene->attachPointLightToRoot(std::move(light), id);
+        break;
+    }
+    case EditorLightKind::Spot:
+    {
+        caustica::scene::SpotLightComponent light;
+        light.color = dm::float3(1.0f, 0.94f, 0.82f);
+        light.intensity = 55.0f;
+        light.radius = 0.04f;
+        light.range = 14.0f;
+        light.innerAngle = 18.0f;
+        light.outerAngle = 32.0f;
+        entity = scene->attachSpotLightToRoot(std::move(light), id);
+        break;
+    }
+    case EditorLightKind::Rect:
+    {
+        caustica::scene::RectLightComponent light;
+        light.color = dm::float3(0.95f, 0.97f, 1.0f);
+        light.intensity = 20.0f;
+        light.width = 0.6f;
+        light.height = 0.4f;
+        entity = scene->attachRectLightToRoot(std::move(light), id);
+        break;
+    }
+    case EditorLightKind::Environment:
+    {
+        caustica::scene::EnvironmentLightComponent light;
+        light.radianceScale = dm::float3(1.0f);
+        light.path = c_EnvMapProcSky;
+        entity = scene->attachEnvironmentLightToRoot(std::move(light), id);
+        break;
+    }
+    }
+
+    if (!ecs::isValid(entity))
+    {
+        caustica::error("Failed to create light '%s'", id.c_str());
+        return caustica::ecs::NullEntity;
+    }
+
+    ew->world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+        entity, caustica::scene::SceneAuthoringIdComponent{ id });
+    if (kind != EditorLightKind::Directional && kind != EditorLightKind::Environment)
+        placeInFrontOfCamera(entity, false);
+    else
+        ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
+
+    registerAuthoredEntity(entity);
+    selectCreatedEntity(entity, true);
+    caustica::info("Created %s", id.c_str());
+    return entity;
 }
 
 void SceneContentEditor::requestFullRebuild()

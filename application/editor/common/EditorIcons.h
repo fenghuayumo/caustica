@@ -26,6 +26,19 @@ enum class HierarchyTypeIcon : int
     EnvironmentLight,
 };
 
+enum class EditorGlyphIcon : int
+{
+    Cube = 0,
+    Sphere,
+    Plane,
+    Cylinder,
+    DirectionalLight,
+    PointLight,
+    SpotLight,
+    RectLight,
+    EnvironmentLight,
+};
+
 // UTF-8 buffer for a single PUA glyph (ImGui text APIs).
 struct IconUtf8
 {
@@ -39,6 +52,9 @@ void DrawIconGlyph(ImDrawList* dl, ImVec2 min, ImVec2 max, ImWchar codepoint, Im
 
 // Hierarchy row type marks — stroke icons tuned for ~14–16px (Fluent Package looks wrong here).
 void DrawHierarchyTypeIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, HierarchyTypeIcon kind, ImU32 col);
+
+// Create-menu primitive / light glyphs (slightly larger, still stroke-based).
+void DrawEditorGlyphIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, EditorGlyphIcon kind, ImU32 col);
 
 // InvisibleButton + centered Fluent glyph. Returns true when clicked.
 bool IconButton(const char* id, ImWchar codepoint, bool active, const char* tip);

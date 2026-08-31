@@ -97,6 +97,11 @@ public:
     bool loadObjMeshFile(const std::filesystem::path& filePath);
     bool deleteEntity(caustica::ecs::Entity entity);
     void processPendingSceneDeletes();
+    void processPendingSceneCreates();
+    [[nodiscard]] caustica::ecs::Entity createBuiltinMesh(BuiltinPrimitiveKind kind);
+    [[nodiscard]] caustica::ecs::Entity createLight(EditorLightKind kind);
+    void requestCreateBuiltinMesh(BuiltinPrimitiveKind kind);
+    void requestCreateLight(EditorLightKind kind);
     void requestFullRebuild();
     std::vector<dm::float3> getMeshVertices(caustica::ecs::Entity entity) const;
     void setMeshVertices(caustica::ecs::Entity entity,

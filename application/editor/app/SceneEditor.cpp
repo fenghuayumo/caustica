@@ -881,6 +881,7 @@ bool SaveSceneDocumentToPath(
         return false;
 
     ew->rebuildPathsFromRoot();
+    caustica::scene::syncAuthoredEntitiesToDocument(editorState.sceneDocument, *ew);
     if (editorState.sceneDocument.isMember("entities"))
         caustica::scene::patchEntityTransforms(editorState.sceneDocument["entities"], *ew);
     caustica::scene::patchEntityOverrides(editorState.sceneDocument, *ew);
@@ -1415,6 +1416,86 @@ void SceneEditor::processPendingSceneDeletes()
         return;
 
     deleteEntity(entity);
+}
+
+void SceneEditor::processPendingSceneCreates()
+{
+    if (m_editor.PendingCreate == EditorSelectionState::PendingSceneCreate::None || !m_app)
+        return;
+
+    if (caustica::isSceneStructureBusy(*m_app) || !caustica::isSceneLoaded(*m_app))
+        return;
+
+    const auto kind = m_editor.PendingCreate;
+    m_editor.PendingCreate = EditorSelectionState::PendingSceneCreate::None;
+
+    switch (kind)
+    {
+    case EditorSelectionState::PendingSceneCreate::Plane:
+        (void)createBuiltinMesh(BuiltinPrimitiveKind::Plane);
+        break;
+    case EditorSelectionState::PendingSceneCreate::Cube:
+        (void)createBuiltinMesh(BuiltinPrimitiveKind::Cube);
+        break;
+    case EditorSelectionState::PendingSceneCreate::Sphere:
+        (void)createBuiltinMesh(BuiltinPrimitiveKind::Sphere);
+        break;
+    case EditorSelectionState::PendingSceneCreate::Cylinder:
+        (void)createBuiltinMesh(BuiltinPrimitiveKind::Cylinder);
+        break;
+    case EditorSelectionState::PendingSceneCreate::DirectionalLight:
+        (void)createLight(EditorLightKind::Directional);
+        break;
+    case EditorSelectionState::PendingSceneCreate::PointLight:
+        (void)createLight(EditorLightKind::Point);
+        break;
+    case EditorSelectionState::PendingSceneCreate::SpotLight:
+        (void)createLight(EditorLightKind::Spot);
+        break;
+    case EditorSelectionState::PendingSceneCreate::RectLight:
+        (void)createLight(EditorLightKind::Rect);
+        break;
+    case EditorSelectionState::PendingSceneCreate::EnvironmentLight:
+        (void)createLight(EditorLightKind::Environment);
+        break;
+    case EditorSelectionState::PendingSceneCreate::None:
+        break;
+    }
+}
+
+caustica::ecs::Entity SceneEditor::createBuiltinMesh(BuiltinPrimitiveKind kind)
+{
+    return m_contentEditor.createBuiltinMesh(kind);
+}
+
+caustica::ecs::Entity SceneEditor::createLight(EditorLightKind kind)
+{
+    return m_contentEditor.createLight(kind);
+}
+
+void SceneEditor::requestCreateBuiltinMesh(BuiltinPrimitiveKind kind)
+{
+    using Kind = EditorSelectionState::PendingSceneCreate;
+    switch (kind)
+    {
+    case BuiltinPrimitiveKind::Plane: m_editor.PendingCreate = Kind::Plane; break;
+    case BuiltinPrimitiveKind::Cube: m_editor.PendingCreate = Kind::Cube; break;
+    case BuiltinPrimitiveKind::Sphere: m_editor.PendingCreate = Kind::Sphere; break;
+    case BuiltinPrimitiveKind::Cylinder: m_editor.PendingCreate = Kind::Cylinder; break;
+    }
+}
+
+void SceneEditor::requestCreateLight(EditorLightKind kind)
+{
+    using Kind = EditorSelectionState::PendingSceneCreate;
+    switch (kind)
+    {
+    case EditorLightKind::Directional: m_editor.PendingCreate = Kind::DirectionalLight; break;
+    case EditorLightKind::Point: m_editor.PendingCreate = Kind::PointLight; break;
+    case EditorLightKind::Spot: m_editor.PendingCreate = Kind::SpotLight; break;
+    case EditorLightKind::Rect: m_editor.PendingCreate = Kind::RectLight; break;
+    case EditorLightKind::Environment: m_editor.PendingCreate = Kind::EnvironmentLight; break;
+    }
 }
 
 void SceneEditor::requestFullRebuild()

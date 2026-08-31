@@ -111,6 +111,42 @@ void EditorUI::BuildMainMenuBar()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Create"))
+    {
+        const bool sceneReady = m_sceneEditor.app()
+            && caustica::isSceneLoaded(*m_sceneEditor.app())
+            && !caustica::isSceneStructureBusy(*m_sceneEditor.app());
+        ImGui::BeginDisabled(!sceneReady);
+        if (ImGui::BeginMenu("Mesh"))
+        {
+            if (ImGui::MenuItem("Cube"))
+                m_sceneEditor.requestCreateBuiltinMesh(BuiltinPrimitiveKind::Cube);
+            if (ImGui::MenuItem("Sphere"))
+                m_sceneEditor.requestCreateBuiltinMesh(BuiltinPrimitiveKind::Sphere);
+            if (ImGui::MenuItem("Plane"))
+                m_sceneEditor.requestCreateBuiltinMesh(BuiltinPrimitiveKind::Plane);
+            if (ImGui::MenuItem("Cylinder"))
+                m_sceneEditor.requestCreateBuiltinMesh(BuiltinPrimitiveKind::Cylinder);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Light"))
+        {
+            if (ImGui::MenuItem("Directional Light"))
+                m_sceneEditor.requestCreateLight(EditorLightKind::Directional);
+            if (ImGui::MenuItem("Point Light"))
+                m_sceneEditor.requestCreateLight(EditorLightKind::Point);
+            if (ImGui::MenuItem("Spot Light"))
+                m_sceneEditor.requestCreateLight(EditorLightKind::Spot);
+            if (ImGui::MenuItem("Area Light"))
+                m_sceneEditor.requestCreateLight(EditorLightKind::Rect);
+            if (ImGui::MenuItem("Environment Light"))
+                m_sceneEditor.requestCreateLight(EditorLightKind::Environment);
+            ImGui::EndMenu();
+        }
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
+
     if (ImGui::BeginMenu("View"))
     {
         ImGui::MenuItem("Viewport", nullptr, &m_editorUI.Viewport.ShowViewport);
@@ -362,6 +398,13 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
         if (ImGui::IsItemHovered())
             vp.Hovered = false;
     }
+
+    TryOpenSceneCreatePopupOnRightClick(
+        "##ViewportCreateMenu",
+        vp.Hovered && !m_editorUI.GizmoCapturingInput && !m_editorUI.MaterialPickerActive);
+    BuildSceneCreatePopup(m_sceneEditor, m_ui, "##ViewportCreateMenu");
+    if (ImGui::IsPopupOpen("##ViewportCreateMenu"))
+        vp.Hovered = false;
 
     ImGui::End();
 }

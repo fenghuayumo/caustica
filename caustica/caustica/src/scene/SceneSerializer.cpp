@@ -536,6 +536,109 @@ void patchEntityOverrides(
         document["entityOverrides"] = std::move(overrides);
 }
 
+void upsertAuthoredEntityNode(
+    Json::Value& document,
+    SceneEntityWorld& world,
+    ecs::Entity entity)
+{
+    if (!ecs::isValid(entity) || entity == world.root())
+        return;
+
+    const auto* authoring = world.world().tryGet<SceneAuthoringIdComponent>(entity);
+    if (!authoring || authoring->id.empty())
+        return;
+
+    if (!document.isObject())
+        document = Json::Value(Json::objectValue);
+    if (!document["entities"].isArray())
+        document["entities"] = Json::Value(Json::arrayValue);
+
+    Json::Value* existing = FindEntityById(document["entities"], authoring->id);
+    Json::Value created(Json::objectValue);
+    Json::Value& entityNode = existing ? *existing : created;
+
+    entityNode["id"] = authoring->id;
+    const std::string name = world.getEntityName(entity);
+    entityNode["name"] = name.empty() ? authoring->id : name;
+
+    bool wroteParent = false;
+    if (const auto* parent = world.world().tryGet<ParentComponent>(entity))
+    {
+        if (ecs::isValid(parent->parent) && parent->parent != world.root())
+        {
+            if (const auto* parentAuth = world.world().tryGet<SceneAuthoringIdComponent>(parent->parent))
+            {
+                entityNode["parent"] = parentAuth->id;
+                wroteParent = true;
+            }
+        }
+    }
+    if (!wroteParent)
+        entityNode.removeMember("parent");
+
+    if (!entityNode["components"].isObject())
+        entityNode["components"] = Json::Value(Json::objectValue);
+
+    if (const auto* local = world.world().tryGet<LocalTransformComponent>(entity))
+    {
+        if (local->hasLocalTransform)
+            WriteTransformComponent(entityNode["components"]["Transform"], *local);
+    }
+
+    if (const auto* prefab = world.world().tryGet<PrefabInstanceComponent>(entity))
+    {
+        Json::Value& prefabNode = EnsureObject(entityNode["components"]["PrefabInstance"]);
+        prefabNode["source"] = prefab->source;
+        if (prefab->materials.empty())
+            prefabNode.removeMember("materials");
+        else
+        {
+            Json::Value materials(Json::objectValue);
+            for (const auto& [slot, path] : prefab->materials)
+                materials[slot] = path;
+            prefabNode["materials"] = std::move(materials);
+        }
+    }
+
+    if (const EnvironmentLightComponent* light = tryGetEnvironmentLight(world.world(), entity))
+        WriteEnvironmentLight(EnsureComponent(entityNode, "EnvironmentLight"), *light, true);
+    WriteInspectorComponents(entityNode, world, entity);
+
+    if (!existing)
+        document["entities"].append(std::move(created));
+}
+
+void removeAuthoredEntityNode(Json::Value& document, const std::string& id)
+{
+    if (id.empty() || !document["entities"].isArray())
+        return;
+
+    Json::Value kept(Json::arrayValue);
+    for (const Json::Value& entity : document["entities"])
+    {
+        if (!entity.isObject())
+            continue;
+        std::string entityId;
+        if (entity["id"].isString())
+            entityId = entity["id"].asString();
+        else if (entity["name"].isString())
+            entityId = entity["name"].asString();
+        if (entityId == id)
+            continue;
+        kept.append(entity);
+    }
+    document["entities"] = std::move(kept);
+}
+
+void syncAuthoredEntitiesToDocument(Json::Value& document, SceneEntityWorld& world)
+{
+    world.world().each<SceneAuthoringIdComponent>(
+        [&](ecs::Entity entity, const SceneAuthoringIdComponent&)
+        {
+            upsertAuthoredEntityNode(document, world, entity);
+        });
+}
+
 void applyEntityOverrides(
     SceneEntityWorld& world,
     const Json::Value& overrides)

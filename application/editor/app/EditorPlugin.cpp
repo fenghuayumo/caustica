@@ -154,9 +154,10 @@ void EditorPlugin::configureLateSchedules(App& app)
                 return;
 
             uiSubsystem->animateScheduled(ctx.deltaTimeSeconds, ctx.windowFocused);
-            // Hierarchy queues Delete while building. Apply it after all panels
-            // finish, but before Extract publishes the frame snapshot.
+            // Hierarchy queues Delete / Create while building. Apply after all
+            // panels finish, but before Extract publishes the frame snapshot.
             m_sceneEditor.processPendingSceneDeletes();
+            m_sceneEditor.processPendingSceneCreates();
         });
 
     // Undo/Redo must run after gizmo/inspector commit so same-frame Ctrl+Z undoes

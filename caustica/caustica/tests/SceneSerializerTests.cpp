@@ -368,5 +368,34 @@ int main()
             "entityOverrides did not apply DirectionalLight.irradiance");
     }
 
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity cube = world.createEntity("Cube", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cube, caustica::scene::SceneAuthoringIdComponent{ "Cube" });
+        world.world().emplace<caustica::scene::PrefabInstanceComponent>(
+            cube, caustica::scene::PrefabInstanceComponent{ "builtin:cube", {} });
+        world.setTranslation(cube, dm::double3(1.0, 0.5, 2.0));
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::upsertAuthoredEntityNode(document, world, cube);
+        passed &= expect(
+            document["entities"].isArray() && document["entities"].size() == 1,
+            "upsert did not append an authored entity");
+        passed &= expect(
+            document["entities"][0]["components"]["PrefabInstance"]["source"].asString() == "builtin:cube",
+            "upsert did not write PrefabInstance.source");
+
+        world.setTranslation(cube, dm::double3(3.0, 0.5, 2.0));
+        caustica::scene::syncAuthoredEntitiesToDocument(document, world);
+        passed &= expect(document["entities"].size() == 1, "sync duplicated the authored entity");
+
+        caustica::scene::removeAuthoredEntityNode(document, "Cube");
+        passed &= expect(
+            document["entities"].empty(),
+            "removeAuthoredEntityNode did not drop the entity");
+    }
+
     return passed ? 0 : 1;
 }

@@ -295,6 +295,50 @@ ecs::Entity spawnFromFile(
     return spawn(app, load(app, path), callbacks);
 }
 
+ecs::Entity spawnFromSource(
+    App& app,
+    const std::string& source,
+    const SceneApplyCallbacks& callbacks)
+{
+    if (source.empty())
+        return ecs::NullEntity;
+
+    ::SceneManager* manager = detail::sessionManager(app);
+    auto scenePtr = activeScene(app);
+    if (!manager || !scenePtr)
+        return ecs::NullEntity;
+
+    SceneImportResult imported = scenePtr->loadOrGetPrefab(source, /*asyncTextures=*/true);
+    if (!imported.entityWorld || !ecs::isValid(imported.rootEntity))
+        return ecs::NullEntity;
+
+    if (!manager->tryBeginStructureEdit())
+        return ecs::NullEntity;
+
+    struct StructureEditGuard
+    {
+        ::SceneManager* manager = nullptr;
+        ~StructureEditGuard()
+        {
+            if (manager)
+                manager->endStructureEdit();
+        }
+    } guard{ manager };
+
+    const ecs::Entity root = attachImportedScene(scenePtr, imported, callbacks);
+    if (!ecs::isValid(root))
+        return ecs::NullEntity;
+
+    if (auto* ew = scenePtr->getEntityWorld())
+    {
+        if (!ew->world().tryGet<scene::PrefabInstanceComponent>(root))
+            ew->world().emplace<scene::PrefabInstanceComponent>(
+                root, scene::PrefabInstanceComponent{ source, {} });
+    }
+
+    return root;
+}
+
 bool despawn(App& app, ecs::Entity entity)
 {
     ::SceneManager* manager = detail::sessionManager(app);
