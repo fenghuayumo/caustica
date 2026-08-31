@@ -105,7 +105,6 @@ private:
     void BuildInspectorPanel(const PanelLayout& layout);
     void BuildMaterialEditorPanel(const PanelLayout& layout);
     void BuildDeltaTreeExplorerPanel(const PanelLayout& layout);
-    void BuildSceneWidgetsPanel(const PanelLayout& layout);
     void BuildHierarchyPanel(const PanelLayout& layout);
     void BuildGameStandalonePanel(const PanelLayout& layout);
     void BuildTimelinePanel(const PanelLayout& layout);
@@ -131,7 +130,6 @@ private:
     std::string                 m_pythonInlineCode;     // Editable inline expression
     std::string                 m_pythonOutputLog;      // Captured stdout/stderr from scripts
 
-    float                       m_showSceneWidgets = 0.0f;
     caustica::rhi::Texture*            m_viewportColor = nullptr;
     bool                        m_materialPickerCursorVisible = false;
 

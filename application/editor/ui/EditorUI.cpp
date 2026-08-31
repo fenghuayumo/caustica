@@ -148,12 +148,6 @@ void EditorUI::displayScaleChanged(float scaleX, float scaleY)
 void EditorUI::animate(float elapsedTimeSeconds)
 {
     caustica::ImGui_Renderer::animate(elapsedTimeSeconds);
-
-    int w, h;
-    getGpuDevice()->getWindowDimensions(w, h);
-    ImGuiIO& io = ImGui::GetIO();
-
-    m_showSceneWidgets = dm::clamp(m_showSceneWidgets + elapsedTimeSeconds * 8.0f * ((io.MousePos.y >= 0 && io.MousePos.y < h * 0.1f) ? (1) : (-1)), 0.0f, 1.0f);
 }
 
 
@@ -296,7 +290,6 @@ void EditorUI::buildUI(void)
     BuildMaterialEditorPanel(layout);
     BuildPostProcessPanel(layout);
     BuildDeltaTreeExplorerPanel(layout);
-    BuildSceneWidgetsPanel(layout);
     if (m_editorUI.Viewport.ShowHierarchy)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
