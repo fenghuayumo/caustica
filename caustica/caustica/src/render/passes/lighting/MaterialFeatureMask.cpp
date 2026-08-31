@@ -1,4 +1,4 @@
-#include <render/passes/lighting/materialFeatureMask.h>
+#include <render/passes/lighting/MaterialFeatureMask.h>
 
 #include <render/passes/lighting/MaterialGpuCache.h>
 

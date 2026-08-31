@@ -484,6 +484,9 @@ macro(add_caustica_sample TARGET_NAME MAIN_SOURCE)
     endif()
     target_link_libraries(${TARGET_NAME} PRIVATE causticaApp caustica_rhi)
     add_dependencies(${TARGET_NAME} caustica_shaders nrd_shaders omm_shaders causticaEngineShaders causticaPathTracerShaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
+    if (TARGET CausticaNativeDLSSRuntime)
+        add_dependencies(${TARGET_NAME} CausticaNativeDLSSRuntime)
+    endif()
     if (CAUSTICA_PACKAGE_SHADER_PACK)
         add_dependencies(${TARGET_NAME} causticaShaderPack)
     endif()
@@ -615,12 +618,34 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
     )
 
     target_link_libraries(caustica_py PRIVATE causticaApp)
+    if (UNIX AND NOT APPLE)
+        # The extension is a shared module. GNU ld scans each static archive
+        # once and, unlike an executable, allows leftover undefined symbols.
+        # causImgui (after causRender) needs renderContext::getDevice, so
+        # re-list the cycle participants and fail the link if anything remains.
+        target_link_libraries(caustica_py PRIVATE causRender causImgui causticaApp)
+        target_link_options(caustica_py PRIVATE "LINKER:--no-undefined")
+        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(caustica_py PRIVATE
+                -Wno-error=deprecated-declarations
+                -Wno-error=changes-meaning
+                -Wno-error=attributes
+                -Wno-error=format-security
+                -Wno-error=format-zero-length
+                $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
+                $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
+            )
+        endif()
+    endif()
     target_compile_definitions(caustica_py PRIVATE CAUSTICA_BUILDING_EXTENSION=1)
     if (MSVC)
         target_compile_options(caustica_py PRIVATE /utf-8)
     endif()
 
     add_dependencies(caustica_py caustica_shaders nrd_shaders omm_shaders ShaderRuntimeAssets ShaderRuntimeAssets_CopyAlways)
+    if (TARGET CausticaNativeDLSSRuntime)
+        add_dependencies(caustica_py CausticaNativeDLSSRuntime)
+    endif()
 
     if (CAUSTICA_WITH_OIDN)
         add_custom_command(

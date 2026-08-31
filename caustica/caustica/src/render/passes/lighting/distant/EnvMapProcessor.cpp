@@ -14,7 +14,7 @@
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
 
-#include <render/core/bindingCache.h>
+#include <render/core/BindingCache.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/FramebufferFactory.h>
 #include <render/core/RenderPassConstants.h>

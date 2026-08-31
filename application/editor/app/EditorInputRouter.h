@@ -1,6 +1,6 @@
 #pragma once
 
-#include <events/Event.h>
+#include <events/event.h>
 
 namespace caustica::editor
 {

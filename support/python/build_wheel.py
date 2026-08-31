@@ -37,6 +37,11 @@ SKIP_BIN_NAMES = {
     "causticaD.exe",
     "caustica_thin_client.exe",
     "caustica_thin_clientD.exe",
+    "caustica",
+    "causticaD",
+    "caustica_thin_client",
+    "caustica_thin_clientD",
+    "ShaderMake",
 }
 
 
@@ -152,9 +157,28 @@ def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) 
     return pack_path
 
 
+def _set_linux_origin_rpath(path: Path) -> None:
+    """Make a shared object look next to itself so a site-packages wheel works."""
+    if os.name == "nt":
+        return
+    name = path.name
+    if not (name.endswith(".so") or ".so." in name):
+        return
+    patchelf = shutil.which("patchelf")
+    if not patchelf:
+        return
+    subprocess.run(
+        [patchelf, "--set-rpath", "$ORIGIN", str(path)],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def _copy_file(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
+    _set_linux_origin_rpath(dest)
 
 
 def _copy_tree(src: Path, dest: Path, *, ignore_names: Iterable[str] = ()) -> None:
@@ -173,12 +197,13 @@ def _copy_tree(src: Path, dest: Path, *, ignore_names: Iterable[str] = ()) -> No
 def _is_runtime_shared_lib(path: Path) -> bool:
     if path.name in SKIP_BIN_NAMES:
         return False
+    name = path.name
     suffix = path.suffix.lower()
     if suffix in RUNTIME_FILE_SUFFIXES:
         return True
-    if suffix.startswith(".so"):
+    # Versioned SONAMEs: libfoo.so.2, libnvidia-ngx-dlss.so.310.3.0
+    if ".so." in name or name.endswith(".so"):
         return True
-    name = path.name.lower()
     return name.startswith("sl.") and suffix == ".json"
 
 
@@ -328,6 +353,9 @@ def main() -> int:
         "-w",
         str(args.output_dir),
         "--no-deps",
+        # Assemble from the live bin/ + .shadercache; isolation would recook
+        # shaders in a copy that does not include gitignored runtime files.
+        "--no-build-isolation",
     ]
     print("[caustica] " + " ".join(cmd))
     return subprocess.call(cmd, cwd=str(ROOT))

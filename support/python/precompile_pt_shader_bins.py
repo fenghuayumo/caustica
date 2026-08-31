@@ -443,9 +443,11 @@ def find_dxc(api: str) -> Path:
         ]
     else:
         candidates = [
+            BIN_DIR / "ShaderDev" / "Tools" / "vk" / "x64" / "dxc",
             BIN_DIR / "ShaderDev" / "Tools" / "vk" / "x64" / "dxc.exe",
             os.environ.get("SHADERMAKE_DXC_VK_PATH", ""),
             os.environ.get("DXC_SPIRV_PATH", ""),
+            os.environ.get("VULKAN_SDK", "") and str(Path(os.environ["VULKAN_SDK"]) / "bin" / "dxc"),
         ]
     for candidate in candidates:
         if not candidate:

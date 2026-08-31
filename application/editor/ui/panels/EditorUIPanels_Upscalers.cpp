@@ -134,7 +134,7 @@ void EditorUI::BuildDLSSReflexPanel(const PanelLayout& layout)
                     if (m_settings.ReflexShowStats)
                     {
                         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
-                        ImGui::Text(m_settings.ReflexStats.c_str());
+                        ImGui::Text("%s", m_settings.ReflexStats.c_str());
                     }
 
                     if (!m_settings.RealtimeMode)

@@ -183,7 +183,9 @@ class hash256_one_by_one {
         byte_t temp[64];
         std::fill(temp, temp + 64, byte_t(0));
         std::size_t remains = buffer_.size();
-        std::copy(buffer_.begin(), buffer_.end(), temp);
+        if (remains >= 64)
+            remains = 0;
+        std::copy(buffer_.begin(), buffer_.begin() + static_cast<std::ptrdiff_t>(remains), temp);
         temp[remains] = 0x80;
 
         if (remains > 55) {

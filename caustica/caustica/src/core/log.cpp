@@ -73,10 +73,7 @@ namespace caustica
             // are most useful exactly while you are waiting on startup.
             return _fsopen(path, "w", _SH_DENYWR);
 #else
-            FILE* file = nullptr;
-            if (fopen_s(&file, path, "w") != 0)
-                return nullptr;
-            return file;
+            return fopen(path, "w");
 #endif
         }();
         return sink;

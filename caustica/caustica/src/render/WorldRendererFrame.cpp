@@ -798,7 +798,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
                 .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero).setDestBlendAlpha(caustica::rhi::BlendFactor::One);
 
-            m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
+            m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer->getFramebufferInfo());
         }
         m_context->diagnostics.progressInitializingRenderer.stop();
     }

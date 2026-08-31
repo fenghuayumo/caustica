@@ -75,7 +75,7 @@ Frequently used fields:
 | `dedicatedRenderThread` | `true` | Pipeline render work on a dedicated thread; ignored in headless mode. |
 | `debugDevice` | `false` | Enable backend debug support. |
 | `adapter` | `AdapterSelector::automatic()` | GPU selector. Automatic mode chooses the highest-scoring suitable hardware adapter; explicit modes support index, name, UUID, and LUID. |
-| `useVulkan` | `false` | Select Vulkan when both Vulkan and DirectX 12 were compiled. |
+| `useVulkan` | `false` | Select Vulkan when both Vulkan and DirectX 12 were compiled. Linux builds are Vulkan-only; a `false` value still uses Vulkan. |
 | `fullscreen` | `false` | Start the owned window fullscreen. |
 | `scene` | `default.scene.json` | Initial scene. |
 | `runtimeDirectory` | auto | Directory containing cooked shaders and runtime libraries. |

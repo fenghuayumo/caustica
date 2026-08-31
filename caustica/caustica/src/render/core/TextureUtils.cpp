@@ -3,6 +3,7 @@
 #include <core/log.h>
 #include <scene/SceneTypes.h> // for ImageAsset
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -10,7 +11,15 @@
 bool compressTextures(
     std::map<caustica::Handle<caustica::ImageAsset>, TextureCompressionType>& uncompressedTextures)
 {
-    std::string batchFileName = std::string(getenv("localappdata")) +
+#if defined(_WIN32)
+    const char* localAppData = std::getenv("localappdata");
+    if (localAppData == nullptr || localAppData[0] == '\0')
+    {
+        caustica::message(caustica::Severity::Error, "Unable to resolve %%localappdata%% for texture compression");
+        return false;
+    }
+
+    std::string batchFileName = std::string(localAppData) +
         "\\temp\\caustica_compressor.bat";
     std::ofstream batchFile(batchFileName, std::ios_base::trunc);
     if (!batchFile.is_open())
@@ -53,4 +62,10 @@ bool compressTextures(
     std::string startCmd = " \"\" " + batchFileName;
     std::system(startCmd.c_str());
     return true;
+#else
+    (void)uncompressedTextures;
+    caustica::message(caustica::Severity::Error,
+        "Batch texture compression with nvtt_export is only available on Windows");
+    return false;
+#endif
 }

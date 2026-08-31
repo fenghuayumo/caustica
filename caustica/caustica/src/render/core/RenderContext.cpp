@@ -1,4 +1,4 @@
-#include <backend/renderContext.h>
+#include <backend/RenderContext.h>
 #include <backend/GpuDevice.h>
 
 namespace caustica

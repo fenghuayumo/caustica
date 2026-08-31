@@ -646,7 +646,7 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
         pipelineDesc.renderState.depthStencilState.depthWriteEnable = false;
         return m_device->createGraphicsPipeline(
             pipelineDesc,
-            framebuffer->getFramebuffer(caustica::rhi::AllSubresources));
+            framebuffer->getFramebuffer(caustica::rhi::AllSubresources)->getFramebufferInfo());
     };
 
     m_rasterRenderPipeline = createAlphaPipeline(renderTargets.processedOutputFramebuffer, m_rasterRenderBindingLayout, m_rasterVertexShader, m_rasterPixelShader);
@@ -673,7 +673,7 @@ void GaussianSplatPass::createPipeline(const RenderTargets& renderTargets)
         pipelineDesc.PS = ps;
         return m_device->createGraphicsPipeline(
             pipelineDesc,
-            fb->getFramebuffer(caustica::rhi::AllSubresources));
+            fb->getFramebuffer(caustica::rhi::AllSubresources)->getFramebufferInfo());
     };
 
     if (m_stochasticFramebuffer)

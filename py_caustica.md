@@ -60,7 +60,8 @@ In embed mode there is no `Renderer` class; use `caustica.app()` to access the r
 After building the `caustica_py` target, the Python extension is emitted under `bin/`:
 
 ```text
-bin/caustica.cp311-win_amd64.pyd
+bin/caustica.cp311-win_amd64.pyd                 # Windows
+bin/caustica.cpython-313-x86_64-linux-gnu.so     # Linux (CPython tag varies)
 ```
 
 The recommended install path is to run from the repository root:
@@ -69,6 +70,14 @@ The recommended install path is to run from the repository root:
 python -m pip install .
 python -c "import caustica; print(caustica.MODE)"
 ```
+
+On Linux you can import without pip:
+
+```bash
+PYTHONPATH="$PWD/bin" python3 -c "import caustica; print(caustica.MODE)"
+```
+
+Linux builds are Vulkan-only. `Renderer(vulkan=False)` falls back to Vulkan with a warning; prefer `vulkan=True`. Use the same Python interpreter CMake found at configure time (conda/venv included).
 
 This assembles a local binary wheel from the native extension, runtime DLLs/shared libraries, shaders, and required assets in `bin/`, then installs it into the active Python environment. You can also build the wheel explicitly first:
 
