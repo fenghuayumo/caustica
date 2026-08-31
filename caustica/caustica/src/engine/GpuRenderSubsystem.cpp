@@ -14,8 +14,10 @@
 #include <render/core/SceneGpuUpdater.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/WorldRenderer.h>
+#include <render/SceneLightingPasses.h>
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneObjects.h>
 #include <scene/SceneRenderData.h>
 
 namespace caustica
@@ -26,6 +28,56 @@ namespace
 ::SceneManager* sessionManager(const SceneSession* session)
 {
     return session ? session->manager.get() : nullptr;
+}
+
+void applySceneLookAfterLightingReset(
+    PathTracerSettings& settings,
+    render::SceneLightingPasses& lighting,
+    const Scene& scene)
+{
+    const SceneSettings* sceneSettings = scene.getSceneSettings();
+    if (!sceneSettings)
+        return;
+
+    if (sceneSettings->environment)
+    {
+        const EnvironmentLookSettings& env = *sceneSettings->environment;
+        if (env.tintColor)
+            settings.EnvironmentMapParams.TintColor = *env.tintColor;
+        if (env.intensity)
+            settings.EnvironmentMapParams.Intensity = *env.intensity;
+        if (env.rotationXYZ)
+            settings.EnvironmentMapParams.RotationXYZ = *env.rotationXYZ;
+        if (env.visibleToCamera)
+            settings.EnvironmentMapParams.VisibleToCamera = *env.visibleToCamera;
+        if (env.enabled)
+            settings.EnvironmentMapParams.enabled = *env.enabled;
+        if (env.overrideSource && !env.overrideSource->empty())
+            lighting.setEnvMapOverrideSource(*env.overrideSource);
+    }
+
+    if (sceneSettings->gaussianSplat)
+    {
+        const GaussianSplatLookSettings& splat = *sceneSettings->gaussianSplat;
+        if (splat.footprintScale)
+            settings.GaussianSplatScale = *splat.footprintScale;
+        if (splat.alphaScale)
+            settings.GaussianSplatAlphaScale = *splat.alphaScale;
+        if (splat.brightness)
+            settings.GaussianSplatBrightness = *splat.brightness;
+        if (splat.tintColor)
+            settings.GaussianSplatTintColor = *splat.tintColor;
+        if (splat.applyToneMapping)
+            settings.GaussianSplatApplyToneMapping = *splat.applyToneMapping;
+        if (splat.asEmitter)
+            settings.GaussianSplatAsEmitter = *splat.asEmitter;
+        if (splat.emissionIntensity)
+            settings.GaussianSplatEmissionIntensity = *splat.emissionIntensity;
+        if (splat.alphaCullThreshold)
+            settings.GaussianSplatAlphaCullThreshold = *splat.alphaCullThreshold;
+        if (splat.shadowStrength)
+            settings.GaussianSplatShadowStrength = *splat.shadowStrength;
+    }
 }
 
 } // namespace
@@ -163,6 +215,9 @@ bool GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
     SceneGaussianSplatLogic::onSceneLoaded(
         m_worldRenderer->gaussianSplatPasses(), *m_settings);
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
+    // Lighting reset wipes EnvironmentMapParams / env override. Re-apply only
+    // fields that were actually present in the scene JSON.
+    applySceneLookAfterLightingReset(*m_settings, m_worldRenderer->lightingPasses(), *scene);
     // Animations / prep only — AS comes from StructureGpu AccelOnly (ADR 0001 P3),
     // not the sync-frame AccelerationStructRebuildRequested path.
     bool unusedAccelFlag = false;

@@ -363,7 +363,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 
 注意：
 
-- `gaussian_splat_scale`、`gaussian_splat_alpha_scale`、`gaussian_splat_brightness`、排序模式、阴影模式等是当前渲染设置，不是每个 scene JSON 节点独立字段。请通过 UI、CLI 或 Python settings 设置。
+- `gaussian_splat_scale`、`gaussian_splat_alpha_scale`、`gaussian_splat_brightness` 等会话级外观现在可以写入顶层 `settings.gaussianSplat`，Save Scene 会把 Inspector 里的 Footprint / Alpha / Brightness 等存回去。
 - 节点 Transform 控制对象整体位置、旋转、缩放。
 - 当前 RTX/path-tracing splat shadow 资源槽仍以第一个启用的 3DGS 对象为主要 shadow source。
 
@@ -380,7 +380,20 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
     "realtimeFireflyFilter": 0.15,
     "maxBounces": 8,
     "maxDiffuseBounces": 4,
-    "textureMIPBias": 0.0
+    "textureMIPBias": 0.0,
+    "environment": {
+      "tintColor": [1.0, 1.0, 1.0],
+      "intensity": 1.0,
+      "rotation": [0.0, 0.0, 0.0],
+      "visibleToCamera": true,
+      "enabled": true,
+      "override": "==SCENE_DEFAULT=="
+    },
+    "gaussianSplat": {
+      "footprintScale": 1.0,
+      "alphaScale": 1.0,
+      "brightness": 1.0
+    }
   }
 }
 ```
@@ -395,6 +408,11 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `maxBounces` | integer | 最大反弹次数。 |
 | `maxDiffuseBounces` | integer | 最大 diffuse 反弹次数。 |
 | `textureMIPBias` | number | 纹理 MIP bias。 |
+| `environment` | object | 可选。Inspector 环境光 Tint / Intensity / Rotation / Visible to Camera / Enabled / Override。缺少该键时不改会话环境参数。 |
+| `gaussianSplat` | object | 可选。Inspector 3DGS Footprint / Alpha / Brightness 等会话外观。缺少该键时不改。 |
+| `hiddenEntities` | string[] | 可选。要隐藏的 mesh / 3DGS / light 的场景路径。只关掉列出的实体，不会隐藏其余物体。 |
+
+Save Scene 还会把已有实体上的灯光 Color / Intensity / Irradiance / Radius / Angle、相机 FOV / Near / Far、3DGS `enabled` 写回对应组件。Prefab 内部的灯光/相机写在顶层 `entityOverrides`（按 `path` 匹配，路径找不到就跳过）。
 
 ## `GameSettings`
 

@@ -7,6 +7,7 @@
 #include "ui/RenderSettingsConsole.h"
 
 #include <render/WorldRenderer.h>
+#include <render/core/PathTracerSettings.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -33,6 +34,7 @@
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneManager.h>
+#include <scene/SceneObjects.h>
 #include <scene/scene_utils.h>
 #include <scene/View.h>
 #include <EditorUI.h>
@@ -792,6 +794,75 @@ void PatchEditorAnimations(
         document["animations"] = std::move(animations);
 }
 
+SceneSettings BuildSceneLookSettings(
+    const PathTracerSettings& cfg,
+    const std::string& envOverride,
+    scene::SceneEntityWorld& world)
+{
+    SceneSettings look;
+
+    EnvironmentLookSettings env;
+    env.tintColor = cfg.EnvironmentMapParams.TintColor;
+    env.intensity = cfg.EnvironmentMapParams.Intensity;
+    env.rotationXYZ = cfg.EnvironmentMapParams.RotationXYZ;
+    env.visibleToCamera = cfg.EnvironmentMapParams.VisibleToCamera;
+    env.enabled = cfg.EnvironmentMapParams.enabled;
+    env.overrideSource = envOverride;
+    look.environment = std::move(env);
+
+    GaussianSplatLookSettings splat;
+    splat.footprintScale = cfg.GaussianSplatScale;
+    splat.alphaScale = cfg.GaussianSplatAlphaScale;
+    splat.brightness = cfg.GaussianSplatBrightness;
+    splat.tintColor = cfg.GaussianSplatTintColor;
+    splat.applyToneMapping = cfg.GaussianSplatApplyToneMapping;
+    splat.asEmitter = cfg.GaussianSplatAsEmitter;
+    splat.emissionIntensity = cfg.GaussianSplatEmissionIntensity;
+    splat.alphaCullThreshold = cfg.GaussianSplatAlphaCullThreshold;
+    splat.shadowStrength = cfg.GaussianSplatShadowStrength;
+    look.gaussianSplat = std::move(splat);
+
+    auto addHidden = [&](ecs::Entity entity, bool enabled)
+    {
+        if (enabled)
+            return;
+        const std::string path = world.getEntityPath(entity).generic_string();
+        if (!path.empty())
+            look.hiddenEntities.push_back(path);
+    };
+    world.world().each<scene::MeshInstanceComponent>(
+        [&](ecs::Entity entity, scene::MeshInstanceComponent& mesh)
+        {
+            addHidden(entity, mesh.enabled);
+        });
+    world.world().each<scene::GaussianSplatComponent>(
+        [&](ecs::Entity entity, scene::GaussianSplatComponent& splatComp)
+        {
+            addHidden(entity, splatComp.splat.enabled);
+        });
+    world.world().each<scene::DirectionalLightComponent>(
+        [&](ecs::Entity entity, scene::DirectionalLightComponent& light)
+        {
+            addHidden(entity, light.enabled);
+        });
+    world.world().each<scene::PointLightComponent>(
+        [&](ecs::Entity entity, scene::PointLightComponent& light)
+        {
+            addHidden(entity, light.enabled);
+        });
+    world.world().each<scene::SpotLightComponent>(
+        [&](ecs::Entity entity, scene::SpotLightComponent& light)
+        {
+            addHidden(entity, light.enabled);
+        });
+    world.world().each<scene::EnvironmentLightComponent>(
+        [&](ecs::Entity entity, scene::EnvironmentLightComponent& light)
+        {
+            addHidden(entity, light.enabled);
+        });
+    return look;
+}
+
 bool SaveSceneDocumentToPath(
     App& app,
     EditorState& editorState,
@@ -804,9 +875,18 @@ bool SaveSceneDocumentToPath(
     if (!ew || !ecs::isValid(ew->root()))
         return false;
 
+    ew->rebuildPathsFromRoot();
     if (editorState.sceneDocument.isMember("entities"))
         caustica::scene::patchEntityTransforms(editorState.sceneDocument["entities"], *ew);
+    caustica::scene::patchEntityOverrides(editorState.sceneDocument, *ew);
     PatchEditorAnimations(editorState.sceneDocument, *ew);
+
+    if (const PathTracerSettings* cfg = caustica::settings(app))
+    {
+        const SceneSettings look = BuildSceneLookSettings(
+            *cfg, caustica::envMapOverrideSource(app), *ew);
+        look.writeLook(editorState.sceneDocument["settings"]);
+    }
 
     if (!caustica::json::saveToFile(path, editorState.sceneDocument))
         return false;

@@ -1,8 +1,10 @@
 #include <scene/SceneSerializer.h>
 
 #include <scene/Scene.h>
+#include <scene/SceneCameraAccess.h>
 #include <scene/SceneComponentBuilders.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneObjects.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -13,8 +15,10 @@
 #include <algorithm>
 #include <cctype>
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 using namespace caustica::math;
 
@@ -98,6 +102,174 @@ void WriteTransformComponent(Json::Value& transform, const LocalTransformCompone
     }
     WriteDouble3(transform["scale"], local.scaling);
     transform.removeMember("euler");
+}
+
+Json::Value& EnsureObject(Json::Value& node)
+{
+    if (!node.isObject())
+        node = Json::Value(Json::objectValue);
+    return node;
+}
+
+Json::Value& EnsureComponent(Json::Value& entityNode, const char* name)
+{
+    return EnsureObject(EnsureObject(entityNode["components"])[name]);
+}
+
+bool HasAuthoringId(const SceneEntityWorld& world, ecs::Entity entity)
+{
+    return world.world().tryGet<SceneAuthoringIdComponent>(entity) != nullptr;
+}
+
+void WriteDirectionalLight(Json::Value& node, const DirectionalLightComponent& light)
+{
+    node["enabled"] << light.enabled;
+    node["color"] << light.color;
+    node["irradiance"] << light.irradiance;
+    node["angularSize"] << light.angularSize;
+}
+
+void WritePointLight(Json::Value& node, const PointLightComponent& light)
+{
+    node["enabled"] << light.enabled;
+    node["color"] << light.color;
+    node["intensity"] << light.intensity;
+    node["radius"] << light.radius;
+    node["range"] << light.range;
+}
+
+void WriteSpotLight(Json::Value& node, const SpotLightComponent& light)
+{
+    node["enabled"] << light.enabled;
+    node["color"] << light.color;
+    node["intensity"] << light.intensity;
+    node["radius"] << light.radius;
+    node["range"] << light.range;
+    node["innerAngle"] << light.innerAngle;
+    node["outerAngle"] << light.outerAngle;
+}
+
+void WriteEnvironmentLight(Json::Value& node, const EnvironmentLightComponent& light, bool full)
+{
+    node["enabled"] << light.enabled;
+    if (!full)
+        return;
+    node["radianceScale"] << light.radianceScale;
+    node["rotation"] << light.rotation;
+    if (!light.path.empty())
+        node["source"] << light.path;
+}
+
+void WriteCameraIntoComponents(Json::Value& components, const CameraComponent& camera)
+{
+    EnsureObject(components);
+    if (const PerspectiveCameraData* pers = tryGetPerspectiveCameraData(camera))
+    {
+        const char* key = "PerspectiveCameraEx";
+        if (components.isMember("PerspectiveCamera") && !components.isMember("PerspectiveCameraEx"))
+            key = "PerspectiveCamera";
+        Json::Value& cam = EnsureObject(components[key]);
+        cam["verticalFov"] << pers->verticalFov;
+        cam["zNear"] << pers->zNear;
+        if (pers->zFar)
+            cam["zFar"] << *pers->zFar;
+        if (pers->aspectRatio)
+            cam["aspectRatio"] << *pers->aspectRatio;
+        return;
+    }
+
+    if (const OrthographicCameraData* ortho = tryGetOrthographicCameraData(camera))
+    {
+        Json::Value& cam = EnsureObject(components["OrthographicCamera"]);
+        cam["xMag"] << ortho->xMag;
+        cam["yMag"] << ortho->yMag;
+        cam["zNear"] << ortho->zNear;
+        cam["zFar"] << ortho->zFar;
+    }
+}
+
+void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, ecs::Entity entity)
+{
+    if (const DirectionalLightComponent* light = tryGetDirectionalLight(world.world(), entity))
+        WriteDirectionalLight(EnsureComponent(entityNode, "DirectionalLight"), *light);
+    if (const PointLightComponent* light = tryGetPointLight(world.world(), entity))
+        WritePointLight(EnsureComponent(entityNode, "PointLight"), *light);
+    if (const SpotLightComponent* light = tryGetSpotLight(world.world(), entity))
+        WriteSpotLight(EnsureComponent(entityNode, "SpotLight"), *light);
+    if (const EnvironmentLightComponent* light = tryGetEnvironmentLight(world.world(), entity))
+        WriteEnvironmentLight(EnsureComponent(entityNode, "EnvironmentLight"), *light, false);
+    if (const CameraComponent* camera = tryGetCamera(world.world(), entity))
+        WriteCameraIntoComponents(EnsureObject(entityNode["components"]), *camera);
+    if (const GaussianSplatComponent* splat = world.world().tryGet<GaussianSplatComponent>(entity))
+        EnsureComponent(entityNode, "GaussianSplat")["enabled"] << splat->splat.enabled;
+}
+
+bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
+{
+    return tryGetDirectionalLight(world.world(), entity)
+        || tryGetPointLight(world.world(), entity)
+        || tryGetSpotLight(world.world(), entity)
+        || tryGetEnvironmentLight(world.world(), entity)
+        || tryGetCamera(world.world(), entity)
+        || world.world().tryGet<GaussianSplatComponent>(entity);
+}
+
+std::string EntityPathString(SceneEntityWorld& world, ecs::Entity entity)
+{
+    return world.getEntityPath(entity).generic_string();
+}
+
+template<typename WriteFn>
+void AppendOverrideIfUnauthored(
+    Json::Value& overrides,
+    SceneEntityWorld& world,
+    ecs::Entity entity,
+    const char* componentName,
+    WriteFn&& write)
+{
+    if (HasAuthoringId(world, entity))
+        return;
+    const std::string path = EntityPathString(world, entity);
+    if (path.empty())
+        return;
+    Json::Value patch(Json::objectValue);
+    patch["path"] = path;
+    write(EnsureObject(patch[componentName]));
+    overrides.append(std::move(patch));
+}
+
+void DisableEntityVisibility(SceneEntityWorld& world, ecs::Entity entity)
+{
+    if (MeshInstanceComponent* mesh = world.world().tryGet<MeshInstanceComponent>(entity))
+    {
+        mesh->enabled = false;
+        world.world().notifyComponentChanged<MeshInstanceComponent>(entity);
+    }
+    if (GaussianSplatComponent* splat = world.world().tryGet<GaussianSplatComponent>(entity))
+    {
+        splat->splat.enabled = false;
+        world.world().notifyComponentChanged<GaussianSplatComponent>(entity);
+    }
+    if (DirectionalLightComponent* light = tryGetDirectionalLight(world.world(), entity))
+    {
+        light->enabled = false;
+        world.world().notifyComponentChanged<DirectionalLightComponent>(entity);
+    }
+    if (PointLightComponent* light = tryGetPointLight(world.world(), entity))
+    {
+        light->enabled = false;
+        world.world().notifyComponentChanged<PointLightComponent>(entity);
+    }
+    if (SpotLightComponent* light = tryGetSpotLight(world.world(), entity))
+    {
+        light->enabled = false;
+        world.world().notifyComponentChanged<SpotLightComponent>(entity);
+    }
+    if (EnvironmentLightComponent* light = tryGetEnvironmentLight(world.world(), entity))
+    {
+        light->enabled = false;
+        world.world().notifyComponentChanged<EnvironmentLightComponent>(entity);
+    }
 }
 
 } // namespace
@@ -260,7 +432,8 @@ void patchEntityTransforms(
 
         const auto* local = world.world().tryGet<LocalTransformComponent>(entity);
         const auto* prefab = world.world().tryGet<PrefabInstanceComponent>(entity);
-        if ((!local || !local->hasLocalTransform) && prefab == nullptr)
+        const bool hasLook = HasInspectorComponents(world, entity);
+        if ((!local || !local->hasLocalTransform) && prefab == nullptr && !hasLook)
             continue;
 
         if (!entityNode["components"].isObject())
@@ -285,6 +458,151 @@ void patchEntityTransforms(
                 prefabNode["materials"] = std::move(materials);
             }
         }
+
+        WriteInspectorComponents(entityNode, world, entity);
+    }
+}
+
+void patchEntityOverrides(
+    Json::Value& document,
+    SceneEntityWorld& world)
+{
+    Json::Value overrides(Json::arrayValue);
+
+    world.world().each<DirectionalLightComponent>(
+        [&](ecs::Entity entity, const DirectionalLightComponent& light)
+        {
+            AppendOverrideIfUnauthored(overrides, world, entity, "DirectionalLight",
+                [&](Json::Value& node) { WriteDirectionalLight(node, light); });
+        });
+    world.world().each<PointLightComponent>(
+        [&](ecs::Entity entity, const PointLightComponent& light)
+        {
+            AppendOverrideIfUnauthored(overrides, world, entity, "PointLight",
+                [&](Json::Value& node) { WritePointLight(node, light); });
+        });
+    world.world().each<SpotLightComponent>(
+        [&](ecs::Entity entity, const SpotLightComponent& light)
+        {
+            AppendOverrideIfUnauthored(overrides, world, entity, "SpotLight",
+                [&](Json::Value& node) { WriteSpotLight(node, light); });
+        });
+    world.world().each<EnvironmentLightComponent>(
+        [&](ecs::Entity entity, const EnvironmentLightComponent& light)
+        {
+            AppendOverrideIfUnauthored(overrides, world, entity, "EnvironmentLight",
+                [&](Json::Value& node) { WriteEnvironmentLight(node, light, true); });
+        });
+    world.world().each<CameraComponent>(
+        [&](ecs::Entity entity, const CameraComponent& camera)
+        {
+            if (HasAuthoringId(world, entity))
+                return;
+            const std::string path = EntityPathString(world, entity);
+            if (path.empty())
+                return;
+            Json::Value patch(Json::objectValue);
+            patch["path"] = path;
+            WriteCameraIntoComponents(EnsureObject(patch), camera);
+            overrides.append(std::move(patch));
+        });
+
+    if (overrides.empty())
+        document.removeMember("entityOverrides");
+    else
+        document["entityOverrides"] = std::move(overrides);
+}
+
+void applyEntityOverrides(
+    SceneEntityWorld& world,
+    const Json::Value& overrides)
+{
+    if (!overrides.isArray())
+        return;
+
+    for (const Json::Value& patch : overrides)
+    {
+        if (!patch.isObject() || !patch["path"].isString())
+            continue;
+
+        const ecs::Entity entity = world.entityForPath(patch["path"].asString());
+        if (!ecs::isValid(entity))
+        {
+            caustica::warning("entityOverrides path '%s' not found, skipping.",
+                patch["path"].asCString());
+            continue;
+        }
+
+        auto applyLight = [&](const char* type)
+        {
+            if (!patch.isMember(type) || !patch[type].isObject())
+                return;
+            auto component = makeLightComponentFromJson(type, patch[type]);
+            if (!component)
+                return;
+            std::visit(
+                [&](auto&& light)
+                {
+                    using T = std::decay_t<decltype(light)>;
+                    if constexpr (std::is_same_v<T, DirectionalLightComponent>)
+                    {
+                        if (tryGetDirectionalLight(world.world(), entity))
+                            world.setDirectionalLight(entity, std::move(light));
+                    }
+                    else if constexpr (std::is_same_v<T, PointLightComponent>)
+                    {
+                        if (tryGetPointLight(world.world(), entity))
+                            world.setPointLight(entity, std::move(light));
+                    }
+                    else if constexpr (std::is_same_v<T, SpotLightComponent>)
+                    {
+                        if (tryGetSpotLight(world.world(), entity))
+                            world.setSpotLight(entity, std::move(light));
+                    }
+                    else if constexpr (std::is_same_v<T, EnvironmentLightComponent>)
+                    {
+                        if (tryGetEnvironmentLight(world.world(), entity))
+                            world.setEnvironmentLight(entity, std::move(light));
+                    }
+                },
+                std::move(*component));
+        };
+
+        applyLight("DirectionalLight");
+        applyLight("PointLight");
+        applyLight("SpotLight");
+        applyLight("EnvironmentLight");
+
+        const char* cameraType = nullptr;
+        if (patch.isMember("PerspectiveCameraEx") && patch["PerspectiveCameraEx"].isObject())
+            cameraType = "PerspectiveCameraEx";
+        else if (patch.isMember("PerspectiveCamera") && patch["PerspectiveCamera"].isObject())
+            cameraType = "PerspectiveCamera";
+        else if (patch.isMember("OrthographicCamera") && patch["OrthographicCamera"].isObject())
+            cameraType = "OrthographicCamera";
+        if (cameraType && tryGetCamera(world.world(), entity))
+        {
+            if (auto component = makeCameraComponentFromJson(cameraType, patch[cameraType]))
+                world.setCamera(entity, std::move(*component));
+        }
+    }
+}
+
+void applyHiddenEntities(
+    SceneEntityWorld& world,
+    const std::vector<std::string>& paths)
+{
+    for (const std::string& path : paths)
+    {
+        if (path.empty())
+            continue;
+        const ecs::Entity entity = world.entityForPath(path);
+        if (!ecs::isValid(entity))
+        {
+            caustica::warning("hiddenEntities path '%s' not found, skipping.", path.c_str());
+            continue;
+        }
+        DisableEntityVisibility(world, entity);
     }
 }
 
@@ -561,6 +879,13 @@ bool Scene::loadEntities(
 
     loadAnimations(documentRoot["animations"]);
     m_EntityWorld->rebuildPathsFromRoot();
+    scene::applyEntityOverrides(*m_EntityWorld, documentRoot["entityOverrides"]);
+    if (documentRoot.isMember("settings") && documentRoot["settings"].isObject())
+    {
+        SceneSettings look;
+        look.load(documentRoot["settings"]);
+        scene::applyHiddenEntities(*m_EntityWorld, look.hiddenEntities);
+    }
     return true;
 }
 

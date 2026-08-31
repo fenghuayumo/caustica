@@ -4,6 +4,7 @@
 #include <json/json.h>
 
 #include <string>
+#include <vector>
 
 namespace Json
 {
@@ -28,5 +29,19 @@ void applyAuthoringTransform(
 void patchEntityTransforms(
     Json::Value& entities,
     SceneEntityWorld& world);
+
+// Prefab-internal lights/cameras (no SceneAuthoringId) written by path.
+void patchEntityOverrides(
+    Json::Value& document,
+    SceneEntityWorld& world);
+
+void applyEntityOverrides(
+    SceneEntityWorld& world,
+    const Json::Value& overrides);
+
+// Disable only the listed paths. Unknown paths are skipped. Never hides unlisted entities.
+void applyHiddenEntities(
+    SceneEntityWorld& world,
+    const std::vector<std::string>& paths);
 
 } // namespace caustica::scene

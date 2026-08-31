@@ -39,6 +39,32 @@ namespace caustica
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
     };
 
+    // Inspector environment look (PathTracerSettings.EnvironmentMapParams + env override).
+    // Each field is optional so load applies only keys that were actually authored.
+    struct EnvironmentLookSettings
+    {
+        std::optional<dm::float3> tintColor;
+        std::optional<float> intensity;
+        std::optional<dm::float3> rotationXYZ;
+        std::optional<bool> visibleToCamera;
+        std::optional<bool> enabled;
+        std::optional<std::string> overrideSource;
+    };
+
+    // Inspector 3DGS look (PathTracerSettings GaussianSplat* session fields).
+    struct GaussianSplatLookSettings
+    {
+        std::optional<float> footprintScale;
+        std::optional<float> alphaScale;
+        std::optional<float> brightness;
+        std::optional<dm::float3> tintColor;
+        std::optional<bool> applyToneMapping;
+        std::optional<bool> asEmitter;
+        std::optional<float> emissionIntensity;
+        std::optional<float> alphaCullThreshold;
+        std::optional<float> shadowStrength;
+    };
+
     struct SceneSettings
     {
         std::string name;
@@ -51,8 +77,14 @@ namespace caustica
         std::optional<int>   maxBounces;
         std::optional<int>   maxDiffuseBounces;
         std::optional<float> textureMIPBias;
+        std::optional<EnvironmentLookSettings> environment;
+        std::optional<GaussianSplatLookSettings> gaussianSplat;
+        // Paths of currently hidden mesh / splat / light entities. Absent or empty
+        // means "do not change visibility" — never hide the rest of the scene.
+        std::vector<std::string> hiddenEntities;
 
         void load(const Json::Value& node);
+        void writeLook(Json::Value& settingsNode) const;
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::None; }
     };
 

@@ -1,5 +1,6 @@
 #include <scene/SceneSerializer.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneObjects.h>
 #include <core/json.h>
 #include <core/path_utils.h>
 
@@ -216,6 +217,137 @@ int main()
             merged["entities"][0]["components"]["MaterialOverride"]["slots"]["Floor_MDL"].asString()
                 == "materials/kitchen.Floor_MDL.material.json",
             "MaterialOverride overlay did not add the new slot");
+    }
+
+    {
+        caustica::SceneSettings settings;
+        settings.load(parse(R"({"realtimeMode": true})"));
+        passed &= expect(settings.realtimeMode && *settings.realtimeMode, "realtimeMode not loaded");
+        passed &= expect(!settings.environment.has_value(), "missing environment key should not invent look settings");
+        passed &= expect(!settings.gaussianSplat.has_value(), "missing gaussianSplat key should not invent look settings");
+        passed &= expect(settings.hiddenEntities.empty(), "missing hiddenEntities should stay empty");
+
+        settings.load(parse(R"({
+            "environment": { "intensity": 2.5 },
+            "gaussianSplat": { "brightness": 1.5 },
+            "hiddenEntities": ["/Root/Hidden"]
+        })"));
+        passed &= expect(
+            settings.environment && settings.environment->intensity
+                && std::abs(*settings.environment->intensity - 2.5f) < 1e-5f,
+            "environment.intensity not loaded");
+        passed &= expect(
+            settings.environment && !settings.environment->tintColor.has_value(),
+            "environment load applied a field that was not in JSON");
+        passed &= expect(
+            settings.gaussianSplat && settings.gaussianSplat->brightness
+                && std::abs(*settings.gaussianSplat->brightness - 1.5f) < 1e-5f,
+            "gaussianSplat.brightness not loaded");
+        passed &= expect(
+            settings.hiddenEntities.size() == 1 && settings.hiddenEntities[0] == "/Root/Hidden",
+            "hiddenEntities not loaded");
+
+        Json::Value node(Json::objectValue);
+        node["realtimeMode"] = true;
+        settings.writeLook(node);
+        passed &= expect(node["realtimeMode"].asBool(), "writeLook replaced unrelated settings");
+        passed &= expect(node["environment"]["intensity"].asFloat() > 2.f, "writeLook dropped intensity");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity sun = world.createEntity("Sun", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            sun, caustica::scene::SceneAuthoringIdComponent{ "sun" });
+        caustica::scene::DirectionalLightComponent light;
+        light.color = dm::float3(1.f, 0.5f, 0.25f);
+        light.irradiance = 4.f;
+        light.angularSize = 1.5f;
+        world.world().emplace<caustica::scene::DirectionalLightComponent>(sun, light);
+
+        caustica::scene::CameraComponent camera;
+        caustica::scene::PerspectiveCameraData pers;
+        pers.verticalFov = 0.9f;
+        pers.zNear = 0.05f;
+        pers.zFar = 500.f;
+        camera.data = pers;
+        const caustica::ecs::Entity cam = world.createEntity("Camera", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cam, caustica::scene::SceneAuthoringIdComponent{ "cam" });
+        world.world().emplace<caustica::scene::CameraComponent>(cam, camera);
+
+        Json::Value entities = parse(R"([
+            {"id":"sun","name":"Sun","components":{"DirectionalLight":{"irradiance":1.0}}},
+            {"id":"cam","name":"Camera","components":{"PerspectiveCameraEx":{"verticalFov":0.7}}}
+        ])");
+        caustica::scene::patchEntityTransforms(entities, world);
+        passed &= expect(
+            std::abs(entities[0]["components"]["DirectionalLight"]["irradiance"].asFloat() - 4.f) < 1e-5f,
+            "save patch did not write DirectionalLight.irradiance");
+        passed &= expect(
+            entities[0]["components"]["DirectionalLight"]["color"].isArray(),
+            "save patch did not write DirectionalLight.color");
+        passed &= expect(
+            std::abs(entities[1]["components"]["PerspectiveCameraEx"]["verticalFov"].asFloat() - 0.9f) < 1e-5f,
+            "save patch did not write PerspectiveCameraEx.verticalFov");
+        passed &= expect(
+            std::abs(entities[1]["components"]["PerspectiveCameraEx"]["zNear"].asFloat() - 0.05f) < 1e-5f,
+            "save patch did not write PerspectiveCameraEx.zNear");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity visible = world.createEntity("VisibleMesh", root);
+        const caustica::ecs::Entity hidden = world.createEntity("HiddenMesh", root);
+        world.world().emplace<caustica::scene::MeshInstanceComponent>(
+            visible, caustica::scene::MeshInstanceComponent{});
+        world.world().emplace<caustica::scene::MeshInstanceComponent>(
+            hidden, caustica::scene::MeshInstanceComponent{});
+        world.rebuildPathsFromRoot();
+
+        const std::string hiddenPath = world.getEntityPath(hidden).generic_string();
+        passed &= expect(
+            caustica::ecs::isValid(world.entityForPath(hiddenPath)),
+            "entityForPath could not resolve a rebuilt hidden mesh path");
+
+        caustica::scene::applyHiddenEntities(world, { hiddenPath });
+        const auto* visibleMesh = world.world().tryGet<caustica::scene::MeshInstanceComponent>(visible);
+        const auto* hiddenMesh = world.world().tryGet<caustica::scene::MeshInstanceComponent>(hidden);
+        passed &= expect(visibleMesh && visibleMesh->enabled,
+            "hiddenEntities hid a mesh that was not listed");
+        passed &= expect(hiddenMesh && !hiddenMesh->enabled,
+            "hiddenEntities did not hide the listed mesh");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity sun = world.createEntity("Sun", root);
+        caustica::scene::DirectionalLightComponent light;
+        light.irradiance = 7.f;
+        light.color = dm::float3(0.1f, 0.2f, 0.3f);
+        world.world().emplace<caustica::scene::DirectionalLightComponent>(sun, light);
+        world.rebuildPathsFromRoot();
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::patchEntityOverrides(document, world);
+        passed &= expect(
+            document["entityOverrides"].isArray() && document["entityOverrides"].size() == 1,
+            "unauthored light was not written to entityOverrides");
+
+        caustica::scene::SceneEntityWorld loaded;
+        const caustica::ecs::Entity loadedRoot = loaded.createEntity("Root");
+        const caustica::ecs::Entity loadedSun = loaded.createEntity("Sun", loadedRoot);
+        loaded.world().emplace<caustica::scene::DirectionalLightComponent>(
+            loadedSun, caustica::scene::DirectionalLightComponent{});
+        loaded.rebuildPathsFromRoot();
+        caustica::scene::applyEntityOverrides(loaded, document["entityOverrides"]);
+        const auto* loadedLight = loaded.world().tryGet<caustica::scene::DirectionalLightComponent>(loadedSun);
+        passed &= expect(
+            loadedLight && std::abs(loadedLight->irradiance - 7.f) < 1e-5f,
+            "entityOverrides did not apply DirectionalLight.irradiance");
     }
 
     return passed ? 0 : 1;
