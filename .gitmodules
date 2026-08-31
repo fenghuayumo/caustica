@@ -9,6 +9,7 @@
 [submodule "Assets"]
 	path = Assets
 	url = https://github.com/fenghuayumo/caustica-assets.git
+	branch = main
 	shallow = true
 [submodule "External/cgltf"]
 	path = External/cgltf
