@@ -540,13 +540,29 @@ void onSceneLoaded(App& app)
 
     detail::sceneSwitchTrace("onSceneLoaded: logic setup");
     applyLogicThreadSceneLoadSetup(app, *manager, *cmd);
+    // Pose the logic camera before the GPU-setup extract. The exclusive load
+    // publishes this snapshot into the triple-buffer; a first-present frame that
+    // races Extract would otherwise serve a packet with camera.valid=false while
+    // the editor grid uses the synced controller — black path-trace, visible grid.
+    syncCameraFromScene(app);
 
     std::shared_ptr<const scene::SceneRenderData> renderData;
     if (const std::shared_ptr<Scene> scenePtr = activeScene(app))
     {
         if (GpuDevice* device = gpuDevice(app))
+        {
+            scene::FrameExtractInputs gpuSetupInputs;
+            scene::ActiveCameraRenderProxy gpuSetupCamera;
+            if (CameraController* cam = cameraController(app))
+            {
+                scene::fillActiveCameraFromFreeController(*cam, gpuSetupCamera);
+                gpuSetupInputs.activeCamera = &gpuSetupCamera;
+            }
+            // Camera only. extractFrameRenderState consumes one-shot settings flags.
+            gpuSetupInputs.sceneTime = vs->sceneTime;
             renderData = std::make_shared<const scene::SceneRenderData>(
-                scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex(), nullptr));
+                scenePtr->extractAndPublishForGpuSetup(device->getFrameIndex(), &gpuSetupInputs));
+        }
     }
     if (!renderData)
     {
@@ -556,7 +572,6 @@ void onSceneLoaded(App& app)
     }
 
     registerLoadedSceneAssets(app, *manager);
-    syncCameraFromScene(app);
     gr->beginSceneGpuLoad();
 
     // Keep path tracing/present suspended while texture and mesh allocations are

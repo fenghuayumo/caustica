@@ -123,7 +123,7 @@ void ShaderDebug::createRenderPasses( caustica::rhi::Framebuffer * frameBuffer, 
             .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha)
             .setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero)
             .setDestBlendAlpha(caustica::rhi::BlendFactor::One);
-        m_blendDebugVizPSO = m_device->createGraphicsPipeline(pipelineDesc, frameBuffer);
+        m_blendDebugVizPSO = m_device->createGraphicsPipeline(pipelineDesc, frameBuffer->getFramebufferInfo());
     }
 
     // debug triangles and lines...
@@ -156,13 +156,13 @@ void ShaderDebug::createRenderPasses( caustica::rhi::Framebuffer * frameBuffer, 
     psoDesc.renderState.rasterState.cullMode = caustica::rhi::RasterCullMode::None;
     psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
         .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero).setDestBlendAlpha(caustica::rhi::BlendFactor::One);
-    m_trianglesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
+    m_trianglesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer->getFramebufferInfo());
 
     psoDesc.VS = m_linesVertexShader;
     psoDesc.PS = m_linesPixelShader;
     psoDesc.bindingLayouts = { m_geometryBindingLayout };
     psoDesc.primType = caustica::rhi::PrimitiveType::LineList;
-    m_linesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer);
+    m_linesPipeline = m_device->createGraphicsPipeline(psoDesc, frameBuffer->getFramebufferInfo());
 }
 
 void ShaderDebug::beginFrame( caustica::rhi::CommandList* commandList, const float4x4& matWorldToClip )

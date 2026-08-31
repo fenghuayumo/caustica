@@ -1,5 +1,5 @@
 #include <render/passes/lighting/MaterialGpuCache.h>
-#include <render/passes/lighting/materialFeatureMask.h>
+#include <render/passes/lighting/MaterialFeatureMask.h>
 
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/ShaderBackend.h>

@@ -27,6 +27,7 @@ namespace caustica
 {
 class App;
 class Event;
+class GpuDevice;
 } // namespace caustica
 
 class ZoomTool;

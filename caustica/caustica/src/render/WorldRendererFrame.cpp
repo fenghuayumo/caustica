@@ -470,6 +470,16 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         ctx.forcePathTracingShaderReload = true;
     }
 
+    // Scene unload drops environment / light-sampling. If ShaderReload was
+    // consumed on a frame that aborted before createRenderPasses, later frames
+    // would never recreate them and the viewport stays black after LoadSession.
+    if (m_context->scenePasses.lighting.environment() == nullptr
+        || m_context->scenePasses.lighting.lightSampling() == nullptr)
+    {
+        ctx.needNewPasses = true;
+        ctx.forcePathTracingShaderReload = true;
+    }
+
     if (m_context->activeSettings().NRDModeChanged)
     {
         ctx.needNewPasses = true;
@@ -773,8 +783,12 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         recreateBindingSet(m_context->frameScene);
         if (!m_sceneBindings.ready())
         {
-            caustica::error("WorldRenderer: scene binding resources are not ready; aborting frame safely");
-            ctx.aborted = true;
+            // Exclusive scene load defers SBT/bindings to this first present frame.
+            // Env-map / light-sampling GPU work later in the same frame is what
+            // makes the next recreate succeed. Aborting the command list discards
+            // that work and can leave the editor viewport black after LoadSession.
+            caustica::warning(
+                "WorldRenderer: scene bindings not ready yet; skipping path trace this frame");
             return;
         }
 
@@ -798,7 +812,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
             psoDesc.renderState.blendState.targets[0].enableBlend().setSrcBlend(caustica::rhi::BlendFactor::SrcAlpha)
                 .setDestBlend(caustica::rhi::BlendFactor::InvSrcAlpha).setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero).setDestBlendAlpha(caustica::rhi::BlendFactor::One);
 
-            m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer);
+            m_linesPipeline = device()->createGraphicsPipeline(psoDesc, framebuffer->getFramebufferInfo());
         }
         m_context->diagnostics.progressInitializingRenderer.stop();
     }
@@ -860,6 +874,11 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     if (!m_context->hasFrameScene())
         return;
 
+    const auto& lighting = m_context->scenePasses.lighting;
+    if (!lighting.materials() || !lighting.environment()
+        || !lighting.environment()->getImportanceSampling())
+        return;
+
     if (m_toneMappingPass != nullptr && m_context->activeSettings().EnableToneMapping)
         m_toneMappingPass->preRender(m_context->activeSettings().ToneMappingParams);
 
@@ -875,7 +894,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         fillParams.frameIndex = m_frameIndex;
         m_pathTracePass->fillConstants(constants.ptConsts, ctx.cameraData, fillParams);
     }
-    constants.MaterialCount = m_context->scenePasses.lighting.materials()->getMaterialDataCount();
+    constants.MaterialCount = lighting.materials()->getMaterialDataCount();
     fillGaussianSplatShadowConstants(
         constants,
         m_context->activeSettings(),
@@ -885,8 +904,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         uint32_t(m_frameIndex & 0xffffffffu),
         resolveGaussianSplatShadowDirection(m_context->frameLights()));
 
-    constants.envMapSceneParams = m_context->scenePasses.lighting.envMapSceneParams();
-    constants.envMapImportanceSamplingParams = m_context->scenePasses.lighting.environment()->getImportanceSampling()->getShaderParams();
+    constants.envMapSceneParams = lighting.envMapSceneParams();
+    constants.envMapImportanceSamplingParams =
+        lighting.environment()->getImportanceSampling()->getShaderParams();
 
     PlanarViewConstants view;
     m_context->camera.view()->fillPlanarViewConstants(view);

@@ -94,6 +94,8 @@ set(CAUSTICA_COMMON_COMPILE_DEFS
     CAUSTICA_WITH_AFTERMATH=$<BOOL:${CAUSTICA_WITH_AFTERMATH}>
     CAUSTICA_WITH_STREAMLINE=$<BOOL:${CAUSTICA_WITH_STREAMLINE}>
     CAUSTICA_WITH_DLSS=$<BOOL:${CAUSTICA_WITH_DLSS}>
+    CAUSTICA_WITH_NATIVE_DLSS=$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>
+    CAUSTICA_WITH_ANY_DLSS=$<OR:$<BOOL:${CAUSTICA_WITH_STREAMLINE}>,$<BOOL:${CAUSTICA_WITH_NATIVE_DLSS}>>
     CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION=$<BOOL:${CAUSTICA_WITH_RUNTIME_SHADER_COMPILATION}>
 )
 
@@ -258,6 +260,9 @@ target_link_libraries(causPlatform
     PUBLIC causCore causEvents
     PUBLIC glfw
 )
+if (NOT WIN32)
+    target_link_libraries(causPlatform PUBLIC dl)
+endif()
 
 # ── causBackend ───────────────────────────────────────────────────────────
 # GPU device wrappers (DX11/DX12/Vulkan) + RHI integration.
@@ -415,6 +420,7 @@ file(GLOB_RECURSE caus_scene_sub_sources
 )
 list(APPEND caus_scene_headers ${caus_scene_sub_headers})
 list(APPEND caus_scene_sources ${caus_scene_sub_sources})
+list(APPEND caus_scene_sources src/engine/Material.cpp)
 
 add_library(causScene STATIC ${caus_scene_headers} ${caus_scene_sources})
 caus_configure_static(causScene)
@@ -594,6 +600,10 @@ file(GLOB caus_engine_headers include/engine/*.h)
 file(GLOB caus_engine_internal_headers include/engine/internal/*.h)
 list(APPEND caus_engine_headers ${caus_engine_internal_headers})
 file(GLOB caus_engine_sources src/engine/*.cpp src/engine/*.c)
+if (NOT WIN32)
+    list(FILTER caus_engine_sources EXCLUDE REGEX "SplashScreen\\.cpp$")
+endif()
+list(FILTER caus_engine_sources EXCLUDE REGEX "Material\\.cpp$")
 
 # Conditional: Aftermath GPU crash dump
 if (CAUSTICA_WITH_AFTERMATH)

@@ -293,6 +293,7 @@ if (CAUSTICA_RHI_WITH_VULKAN)
             ${src_vk})
         set_target_properties(${caustica_rhi_vk_target} PROPERTIES FOLDER "caustica/backend")
         target_include_directories(${caustica_rhi_vk_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
+        target_link_libraries(${caustica_rhi_vk_target} PUBLIC caustica_rhi)
     endif()
 
     if(WIN32)

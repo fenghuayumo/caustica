@@ -39,7 +39,7 @@ if (WIN32)
 	set(DLSS_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_win}/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlss.dll" PARENT_SCOPE)
 
 elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-	add_library(DLSS STATIC IMPORTED)
+	add_library(DLSS STATIC IMPORTED GLOBAL)
 
 
 	# Search for the DLSS library files, because the version number is included in the filename,
@@ -64,7 +64,8 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 		IMPORTED_LOCATION "${dlss_sdk}/lib/${dlss_platform_lin}/libnvsdk_ngx.a"
 	)
 
-	set(DLSS_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_lin}/$<IF:$<CONFIG:Debug>,dev,rel>/${dlss_lib}" PARENT_SCOPE)
+	set(DLSS_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_lin}/$<IF:$<CONFIG:Debug>,dev,rel>/${dlss_lib}")
+	set(DLSS_SHARED_LIBRARY_PATH "${DLSS_SHARED_LIBRARY_PATH}" PARENT_SCOPE)
 
 else()
 	message("DLSS is not supported on the target platform.")
@@ -89,7 +90,7 @@ if (WIN32)
 	set(DLSS_RR_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_win}/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssd.dll" PARENT_SCOPE)
 
 elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-	add_library(DLSS_RR STATIC IMPORTED)
+	add_library(DLSS_RR STATIC IMPORTED GLOBAL)
 
 	# Search for the DLSS_RR library files, because the version number is included in the filename,
 	# and we don't know which version was pulled - that's controlled by CAUSTICA_DLSS_FETCH_TAG.
@@ -113,7 +114,8 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 		IMPORTED_LOCATION "${dlss_sdk}/lib/${dlss_platform_lin}/libnvsdk_ngx.a"
 	)
 
-	set(DLSS_RR_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_lin}/$<IF:$<CONFIG:Debug>,dev,rel>/${dlss_lib}" PARENT_SCOPE)
+	set(DLSS_RR_SHARED_LIBRARY_PATH "${dlss_sdk}/lib/${dlss_platform_lin}/$<IF:$<CONFIG:Debug>,dev,rel>/${dlss_lib}")
+	set(DLSS_RR_SHARED_LIBRARY_PATH "${DLSS_RR_SHARED_LIBRARY_PATH}" PARENT_SCOPE)
 
 else()
 	message("DLSS RR is not supported on the target platform.")

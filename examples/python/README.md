@@ -10,8 +10,17 @@ Install the extension once from the repository root:
 python -m pip install .
 ```
 
-All examples import `caustica` as a normally installed package. If the import
-fails, fix the install rather than patching `sys.path`.
+On Linux, after `cmake --build build-linux --target caustica_py`, you can also
+import from the build output without pip:
+
+```shell
+PYTHONPATH="$PWD/bin" python3 examples/python/render.py --vulkan \
+  --scene builtin:plane_cube --out frame.png
+```
+
+Linux has no DirectX 12 backend; `--vulkan` is the native choice (DX12 requests
+fall back to Vulkan). All examples import `caustica` as a normally installed
+package. If the import fails, fix the install rather than patching `sys.path`.
 
 ## Start here
 

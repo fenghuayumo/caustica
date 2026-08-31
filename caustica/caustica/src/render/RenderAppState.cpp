@@ -5,7 +5,6 @@
 
 #if CAUSTICA_WITH_ANY_DLSS
 #include <backend/StreamlineInterface.h>
-using SI = caustica::StreamlineInterface;
 #endif
 
 namespace caustica::render

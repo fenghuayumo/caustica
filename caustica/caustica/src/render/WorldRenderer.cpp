@@ -286,7 +286,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
     m_frameGraph.setRenderBufferPool(&m_renderBufferPool);
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    m_nativeDLSS = caustica::render::DLSS::create(device, m_context->shaderFactory, caustica::getDirectoryWithExecutable().string());
+    m_nativeDLSS = caustica::render::DLSS::create(device, *m_context->shaderFactory, caustica::getDirectoryWithExecutable().string());
     if (m_nativeDLSS)
     {
         m_context->activeSettings().IsDLSSSuported = m_nativeDLSS->isDlssSupported();

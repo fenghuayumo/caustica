@@ -68,8 +68,8 @@ public:
 
     virtual void tagResourcesDLSSFG(
         caustica::rhi::CommandList* commandList,
-        bool validViewportExtent = false,
-        const Extent &backBufferExtent = {}) override;
+        bool validViewportExtent,
+        const Extent& backBufferExtent) override;
 
     virtual void tagResourcesDeepDVC(
         caustica::rhi::CommandList* commandList,

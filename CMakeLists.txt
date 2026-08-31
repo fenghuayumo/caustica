@@ -21,6 +21,15 @@ endif()
 
 project(caustica VERSION ${CAUSTICA_VERSION})
 
+# Ninja / Makefiles are single-config. Default to Release so a Linux
+# configure without -DCMAKE_BUILD_TYPE does not produce an unoptimized binary.
+get_property(_caustica_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if (NOT _caustica_multi_config AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+    message(STATUS "CMAKE_BUILD_TYPE not set; defaulting to Release")
+endif()
+
 set(CAUSTICA_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/caustica_version.h.in"
@@ -62,6 +71,12 @@ if (MSVC)
         set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi" CACHE STRING "" FORCE)
         set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG" CACHE STRING "" FORCE)
         set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG" CACHE STRING "" FORCE)
+    endif()
+endif()
+
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64")
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-mf16c)
     endif()
 endif()
 
@@ -122,7 +137,12 @@ endfunction()
 #----------------------------------------------------------------------------------------------------------------------
 # Streamline config
 #set(FETCHCONTENT_QUIET OFF) <- use for a lot more detailed info from FetchContent
-set(CAUSTICA_DEFAULT_WITH_STREAMLINE ON)
+if (WIN32)
+    set(CAUSTICA_DEFAULT_WITH_STREAMLINE ON)
+else()
+    # Streamline is Windows-only in this tree; default off on Linux/WSL.
+    set(CAUSTICA_DEFAULT_WITH_STREAMLINE OFF)
+endif()
 option(CAUSTICA_WITH_STREAMLINE "Enable streamline, separate package required" ${CAUSTICA_DEFAULT_WITH_STREAMLINE})
 if (CAUSTICA_WITH_STREAMLINE AND NOT WIN32)
     message(WARNING "Streamline integration is currently Windows-only in this codebase; disabling CAUSTICA_WITH_STREAMLINE for this platform.")
@@ -182,11 +202,18 @@ else()
             HINTS
                 "$ENV{VULKAN_SDK}/bin"
                 "$ENV{VULKAN_SDK}/x86_64/bin"
+            PATHS
+                /usr/bin
+                /usr/local/bin
         )
     endif()
     if (NOT CAUSTICA_DXC_SPIRV_EXECUTABLE)
-        message(FATAL_ERROR "DXC for SPIR-V was not found. Install the Linux Vulkan SDK in WSL, or set DXC_SPIRV_PATH/SHADERMAKE_DXC_VK_PATH to the dxc executable.")
+        message(FATAL_ERROR
+            "DXC for SPIR-V was not found. Install the LunarG Vulkan SDK (it ships a SPIR-V-capable dxc), "
+            "or configure with -DDXC_SPIRV_PATH=/path/to/dxc. "
+            "SHADERMAKE_DXC_VK_PATH is also accepted.")
     endif()
+    message(STATUS "Linux SPIR-V DXC: ${CAUSTICA_DXC_SPIRV_EXECUTABLE}")
     set(DXC_CUSTOM_PATH "" CACHE STRING "Path to embedded dxc")
 endif()
 #----------------------------------------------------------------------------------------------------------------------
@@ -214,12 +241,22 @@ if (CAUSTICA_WITH_PYTHON)
         )
         FetchContent_MakeAvailable(nanobind)
     endif()
+    # The Python extension is a shared module, so every static library it
+    # links (engine, RHI, glfw, imgui, …) must be built with -fPIC.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 #----------------------------------------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------------------------------------
 # Native OpenUSD C++ import (.usd/.usda/.usdc)
-option(CAUSTICA_WITH_OPENUSD "Enable native OpenUSD C++ stage loading" ON)
+# The bundled cache paths below are a Windows SDK layout; Linux needs an
+# explicit CAUSTICA_USD_ROOT, so default off outside Windows.
+if (WIN32)
+    set(CAUSTICA_DEFAULT_WITH_OPENUSD ON)
+else()
+    set(CAUSTICA_DEFAULT_WITH_OPENUSD OFF)
+endif()
+option(CAUSTICA_WITH_OPENUSD "Enable native OpenUSD C++ stage loading" ${CAUSTICA_DEFAULT_WITH_OPENUSD})
 set(CAUSTICA_USD_ROOT "D:/ProgramTool/OpenUSD" CACHE PATH "OpenUSD SDK root (include/, lib/, plugin/)")
 set(CAUSTICA_USD_PYTHON_DIR "D:/ProgramTool/Pyton3" CACHE PATH "Python 3.11 dir providing python311.dll for NVIDIA OpenUSD")
 
@@ -394,6 +431,16 @@ if (NOT EXISTS "${CAUSTICA_ASSETS_DIR}/pack.json")
         "Clone the Assets submodule (git submodule update --init Assets), "
         "or set CAUSTICA_ASSETS_DIR / the CAUSTICA_ASSETS_DIR env var. "
         "The engine can fall back to assets-builtin/ for a minimal default scene.")
+endif()
+
+if (NOT WIN32)
+    message(STATUS "Linux/Unix configure: "
+        "Vulkan=${CAUSTICA_WITH_VULKAN} "
+        "native DLSS=${CAUSTICA_WITH_NATIVE_DLSS} "
+        "Python=${CAUSTICA_WITH_PYTHON} "
+        "OIDN=${CAUSTICA_WITH_OIDN} "
+        "OpenUSD=${CAUSTICA_WITH_OPENUSD} "
+        "DXC=${CAUSTICA_DXC_SPIRV_EXECUTABLE}")
 endif()
 
 #----------------------------------------------------------------------------------------------------------------------

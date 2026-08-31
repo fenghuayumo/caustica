@@ -1,7 +1,7 @@
 #pragma once
 
 #include <backend/GpuDevice.h>
-#include <backend/renderContext.h>
+#include <backend/RenderContext.h>
 #include <imgui/imgui_rhi.h>
 
 #include <filesystem>

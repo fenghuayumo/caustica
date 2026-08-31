@@ -135,7 +135,7 @@ ToneMappingPass::ToneMappingPass(
 		pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
 		pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 
-		m_LuminancePso = m_device->createGraphicsPipeline(pipelineDesc, m_PerView[0].luminanceFrameBuffer);
+		m_LuminancePso = m_device->createGraphicsPipeline(pipelineDesc, m_PerView[0].luminanceFrameBuffer->getFramebufferInfo());
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
         layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
@@ -174,7 +174,7 @@ ToneMappingPass::ToneMappingPass(
         pipelineDesc.renderState.depthStencilState.depthTestEnable = false;
         pipelineDesc.renderState.depthStencilState.stencilEnable = false;
 
-        m_ToneMapPso = m_device->createGraphicsPipeline(pipelineDesc, colorSampleFramebuffer);
+        m_ToneMapPso = m_device->createGraphicsPipeline(pipelineDesc, colorSampleFramebuffer->getFramebufferInfo());
     }
 }
 

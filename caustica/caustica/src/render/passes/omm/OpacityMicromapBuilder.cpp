@@ -552,7 +552,7 @@ bool OpacityMicromapBuilder::debugGUI(
             std::stringstream ss;
             ss << m_uiData.BuildsQueued << " active OMMs";
             std::string str = ss.str();
-            ImGui::Text(str.c_str());
+            ImGui::Text("%s", str.c_str());
 
             if (ImGui::CollapsingHeader("Bake Stats"))
             {
@@ -580,7 +580,7 @@ bool OpacityMicromapBuilder::debugGUI(
                     if (!meshHasOmms)
                         continue;
 
-                    ImGui::Text(mesh.debugName.c_str());
+                    ImGui::Text("%s", mesh.debugName.c_str());
 
                     {
                         UI_SCOPED_INDENT(indent);
@@ -599,7 +599,7 @@ bool OpacityMicromapBuilder::debugGUI(
                             ss << ratio << "%% (" << known << " known, " << unknown << " unknown" << ")";
 
                             std::string str = ss.str();
-                            ImGui::Text(str.c_str());
+                            ImGui::Text("%s", str.c_str());
                         }
                     }
                 }

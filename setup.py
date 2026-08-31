@@ -72,9 +72,10 @@ class BuildPyWithRuntime(_build_py):
         super().run()
 
         assets = env_choice("CAUSTICA_WHEEL_ASSETS", "minimal", {"minimal", "full", "none"}, "CAUSTICA_WHEEL_ASSETS")
+        shader_pack = env_bool("CAUSTICA_WHEEL_SHADER_PACK", True, "CAUSTICA_WHEEL_SHADER_PACK")
         dynamic_shaders = env_choice(
             "CAUSTICA_WHEEL_DYNAMIC_SHADERS",
-            "bin",
+            "none" if shader_pack else "bin",
             {"full", "bin", "none"},
             "CAUSTICA_WHEEL_DYNAMIC_SHADERS",
         )
@@ -84,7 +85,6 @@ class BuildPyWithRuntime(_build_py):
             {"d3d12", "vulkan", "both"},
             "CAUSTICA_WHEEL_SHADER_API",
         )
-        shader_pack = env_bool("CAUSTICA_WHEEL_SHADER_PACK", True, "CAUSTICA_WHEEL_SHADER_PACK")
         if os.name != "nt" and shader_api == "d3d12":
             raise RuntimeError(
                 "CAUSTICA_WHEEL_SHADER_API=d3d12 is only valid on Windows. "
@@ -92,7 +92,7 @@ class BuildPyWithRuntime(_build_py):
             )
 
         if env_bool("CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS", True, "CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS"):
-            if dynamic_shaders == "none":
+            if dynamic_shaders == "none" and not shader_pack:
                 print("WARNING: CAUSTICA_WHEEL_PRECOMPILE_PT_SHADERS is set while dynamic shader bins are omitted.")
             pt_preset = os.environ.get(
                 "CAUSTICA_WHEEL_PRECOMPILE_PT_GLOBAL_PRESET",

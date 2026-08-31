@@ -37,7 +37,24 @@ SKIP_BIN_NAMES = {
     "causticaD.exe",
     "caustica_thin_client.exe",
     "caustica_thin_clientD.exe",
+    "caustica",
+    "causticaD",
+    "caustica_thin_client",
+    "caustica_thin_clientD",
+    "ShaderMake",
 }
+
+# OIDN's Linux tarball ships HIP/SYCL/Level Zero stacks that this Vulkan
+# runtime never loads. Keep CPU + CUDA devices, core, and TBB.
+UNUSED_RUNTIME_LIB_MARKERS = (
+    "device_hip",
+    "device_sycl",
+    "libsycl",
+    "libtbbbind",
+    "libumf.so",
+    "libur_adapter",
+    "libur_loader",
+)
 
 
 def directory_size(path: Path) -> int:
@@ -70,6 +87,8 @@ def rotl64(value: int, shift: int) -> int:
 
 
 def xorshift64star(state: int) -> int:
+    # Must match ShaderPackFileSystem.cpp::XorShift64Star: the multiplied value
+    # is stored back into state (unlike classic xorshift64*).
     state ^= (state >> 12) & 0xFFFFFFFFFFFFFFFF
     state ^= (state << 25) & 0xFFFFFFFFFFFFFFFF
     state ^= (state >> 27) & 0xFFFFFFFFFFFFFFFF
@@ -152,9 +171,28 @@ def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) 
     return pack_path
 
 
+def _set_linux_origin_rpath(path: Path) -> None:
+    """Make a shared object look next to itself so a site-packages wheel works."""
+    if os.name == "nt":
+        return
+    name = path.name
+    if not (name.endswith(".so") or ".so." in name):
+        return
+    patchelf = shutil.which("patchelf")
+    if not patchelf:
+        return
+    subprocess.run(
+        [patchelf, "--set-rpath", "$ORIGIN", str(path)],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def _copy_file(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
+    _set_linux_origin_rpath(dest)
 
 
 def _copy_tree(src: Path, dest: Path, *, ignore_names: Iterable[str] = ()) -> None:
@@ -173,19 +211,38 @@ def _copy_tree(src: Path, dest: Path, *, ignore_names: Iterable[str] = ()) -> No
 def _is_runtime_shared_lib(path: Path) -> bool:
     if path.name in SKIP_BIN_NAMES:
         return False
+    name = path.name
     suffix = path.suffix.lower()
     if suffix in RUNTIME_FILE_SUFFIXES:
         return True
-    if suffix.startswith(".so"):
+    # Versioned SONAMEs: libfoo.so.2, libnvidia-ngx-dlss.so.310.3.0
+    if ".so." in name or name.endswith(".so"):
         return True
-    name = path.name.lower()
     return name.startswith("sl.") and suffix == ".json"
+
+
+def _is_unused_runtime_lib(path: Path) -> bool:
+    name = path.name
+    return any(marker in name for marker in UNUSED_RUNTIME_LIB_MARKERS)
+
+
+def _runtime_libs_to_copy() -> list[Path]:
+    selected: list[Path] = []
+    for path in BIN_DIR.iterdir():
+        if not path.is_file():
+            continue
+        if path.name.startswith("caustica") and path.suffix.lower() in {".pyd", ".so"}:
+            continue
+        if not _is_runtime_shared_lib(path) or _is_unused_runtime_lib(path):
+            continue
+        selected.append(path)
+    return selected
 
 
 def copy_runtime_files(
     package_dir: Path,
     *,
-    dynamic_shaders: str = "bin",
+    dynamic_shaders: str = "none",
     shader_api: str = "d3d12",
     assets: str = "minimal",
     shader_pack: bool = True,
@@ -201,9 +258,9 @@ def copy_runtime_files(
         if path.name.startswith("caustica") and path.suffix.lower() in {".pyd", ".so"}:
             _copy_file(path, package_dir / path.name)
             copied_extension = True
-            continue
-        if _is_runtime_shared_lib(path):
-            _copy_file(path, package_dir / path.name)
+
+    for path in _runtime_libs_to_copy():
+        _copy_file(path, package_dir / path.name)
 
     if not copied_extension:
         raise FileNotFoundError(
@@ -259,7 +316,12 @@ def run_pt_shader_precompile(args) -> None:
         or getattr(args, "global_preset", None)
         or "coverage"
     )
-    cook(args.shader_api, force=force, global_preset=preset)
+    cook(
+        args.shader_api,
+        force=force,
+        global_preset=preset,
+        debug_info=getattr(args, "debug_info", None),
+    )
 
 
 def run_dynamic_shader_precompile(args) -> None:
@@ -300,7 +362,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a local caustica binary wheel from bin/.")
     parser.add_argument("--shader-api", choices=["d3d12", "vulkan", "both"], default="d3d12" if os.name == "nt" else "vulkan")
     parser.add_argument("--assets", choices=["minimal", "full", "none"], default="minimal")
-    parser.add_argument("--dynamic-shaders", choices=["bin", "full", "none"], default="bin")
+    parser.add_argument("--dynamic-shaders", choices=["bin", "full", "none"], default="none")
     parser.add_argument("--shader-pack", dest="shader_pack", action="store_true", default=True)
     parser.add_argument("--no-shader-pack", dest="shader_pack", action="store_false")
     parser.add_argument("--precompile-pt-shaders", dest="precompile_pt_shaders", action="store_true", default=True)
@@ -328,6 +390,9 @@ def main() -> int:
         "-w",
         str(args.output_dir),
         "--no-deps",
+        # Assemble from the live bin/ + .shadercache; isolation would recook
+        # shaders in a copy that does not include gitignored runtime files.
+        "--no-build-isolation",
     ]
     print("[caustica] " + " ".join(cmd))
     return subprocess.call(cmd, cwd=str(ROOT))

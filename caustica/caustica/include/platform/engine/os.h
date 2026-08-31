@@ -46,6 +46,17 @@ public:
 private:
     void* m_HInstance;
 };
+#else
+class UnixOS : public OS
+{
+public:
+    UnixOS() = default;
+
+    std::filesystem::path getExecutablePath() const override;
+    void* loadLibrary(const std::string& path) const override;
+    void  unloadLibrary(void* handle) const override;
+    void* getLibrarySymbol(void* handle, const std::string& name) const override;
+};
 #endif
 
 } // namespace caustica

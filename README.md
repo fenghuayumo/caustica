@@ -205,8 +205,9 @@ Full field reference: [OpenPBR materials](docs/openpbr.md)
 - Ray-tracing-capable GPU and a recent vendor driver
 - DirectX 12 on Windows, or Vulkan on Windows/Linux/WSL
 - Visual Studio 2022 with x64 build tools for the primary Windows configuration
+- Linux: GCC 13+ or Clang 16+, Ninja, X11/Wayland development packages, and a SPIR-V-capable `dxc` (LunarG Vulkan SDK)
 - Python 3.8+ development files when `CAUSTICA_WITH_PYTHON=ON` (default)
-- Recursive Git submodules, including the separate `Assets` repository
+- Recursive Git submodules, including the separate `Assets` repository (Git LFS)
 
 See [Building and running Caustica](docs/build-and-run.md) for backend-specific prerequisites and optional SDKs.
 
@@ -243,6 +244,8 @@ See [Building and running Caustica](docs/build-and-run.md) for backend-specific 
 
 Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the complete option matrix, optional SDK setup, runtime file layout, and troubleshooting, read [Building and running Caustica](docs/build-and-run.md).
 
+### Windows
+
 1. Clone the repository **with all submodules recursively**:
 
    ```powershell
@@ -265,6 +268,44 @@ Windows is the primary supported platform. Linux/WSL builds use Vulkan. For the 
    .\bin\caustica.exe --scene kitchen.scene.json
    ```
 
+### Linux / WSL
+
+Vulkan is the only backend. Streamline, DX12, NVAPI, and the Agility SDK are off. Native NGX DLSS (SR/RR) and OIDN default on.
+
+1. Install packages and a SPIR-V `dxc` (LunarG Vulkan SDK is the usual source):
+
+   ```bash
+   sudo apt install -y build-essential cmake ninja-build git git-lfs python3-dev \
+     pkg-config xorg-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+     libvulkan-dev vulkan-tools
+   git clone --recursive https://github.com/fenghuayumo/caustica/
+   cd caustica
+   git lfs install
+   git submodule update --init --recursive
+   ```
+
+2. Configure a Ninja Release build. CMake must see a SPIR-V-capable `dxc`
+   (`$VULKAN_SDK/bin/dxc`, or pass `-DDXC_SPIRV_PATH`):
+
+   ```bash
+   cmake -S . -B build-linux -G Ninja \
+     -DCMAKE_BUILD_TYPE=Release \
+     -DCAUSTICA_WITH_VULKAN=ON \
+     -DCAUSTICA_WITH_NATIVE_DLSS=ON \
+     -DDXC_SPIRV_PATH="$VULKAN_SDK/bin/dxc"
+   ```
+
+3. Build the editor and, optionally, the Python extension:
+
+   ```bash
+   cmake --build build-linux --target caustica
+   cmake --build build-linux --target caustica_py
+   ./bin/caustica --scene kitchen.scene.json
+   PYTHONPATH="$PWD/bin" python3 -c "import caustica; print(caustica.MODE)"
+   ```
+
+Use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` for a build that does not fetch or deploy NGX. See [the Linux section of the build guide](docs/build-and-run.md#linux-and-wsl) for packages, DXC, conda Python, and troubleshooting.
+
 Optional application targets are `caustica_thin_client` (minimal C++ host) and `caustica_py` (Python extension). Binaries and cooked shaders land under `bin/`; the asset pack is the `Assets/` submodule (or `CAUSTICA_ASSETS_DIR` / `--assets`). A minimal `assets-builtin/` pack is used if the submodule is missing.
 
 To build a new C++ host, start with the [C++ embedding guide](docs/embedding-cpp.md) and `examples/cpp/thin_client`.
@@ -278,13 +319,20 @@ python -m pip install .
 python -c "import caustica; print(caustica.MODE)"
 ```
 
+On Linux you can also import the module from `bin/` without pip:
+
+```bash
+cmake --build build-linux --target caustica_py
+PYTHONPATH="$PWD/bin" python3 -c "import caustica; print(caustica.MODE)"
+```
+
 The pip build assembles a local binary wheel from `bin/`, including the native extension, runtime DLLs/so files, shaders, and a minimal asset payload. The payload can be adjusted with environment variables:
 
 | Variable | Default | Values |
 | --- | --- | --- |
 | `VERSION` | `1.0.1` | Canonical Caustica version shared by the executable and wheel |
 | `CAUSTICA_WHEEL_ASSETS` | `minimal` | `minimal`, `full`, `none` |
-| `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `bin` | `bin`, `full`, `none` |
+| `CAUSTICA_WHEEL_DYNAMIC_SHADERS` | `none` when a shader pack is built, else `bin` | `bin`, `full`, `none` |
 | `CAUSTICA_WHEEL_SHADER_API` | `d3d12` on Windows, `vulkan` elsewhere | `d3d12`, `vulkan`, `both` |
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
@@ -296,6 +344,10 @@ You can also build a wheel explicitly:
 python support/python/build_wheel.py
 python -m pip install dist/caustica-*.whl
 ```
+
+On Linux the script defaults to `--shader-api vulkan` and writes
+`dist/caustica-<version>-cpXXX-cpXXX-linux_x86_64.whl`. Point `DXC_SPIRV_PATH`
+at a SPIR-V `dxc` if shader cooking is still enabled (the default).
 
 ### Portable Windows executable package
 
@@ -323,7 +375,8 @@ UE-style two-layer model:
 
 ```
 # Official library cook: coverage precompile + verify + shader pack
-python support/python/cook_shaders.py --shader-api d3d12
+python support/python/cook_shaders.py --shader-api d3d12     # Windows
+python support/python/cook_shaders.py --shader-api vulkan    # Linux / WSL
 
 # Optional: GPU-validate CreateStateObject for every preset on the cook machine
 python support/python/cook_shaders.py --shader-api d3d12 --precache-rt-psos
@@ -350,7 +403,7 @@ renderer.precache_rt_feature_presets()
 
 ## Building Vulkan
 
-Vulkan is off by default on Windows and on by default elsewhere. On Windows:
+Vulkan defaults on in CMake (it is required on Linux/WSL). On Windows, DirectX 12 remains the runtime default when both backends are compiled. To force a Windows Vulkan-only configure:
 
 ```powershell
 cmake -S . -B build-vk -G "Visual Studio 17 2022" -A x64 `
@@ -359,20 +412,7 @@ cmake --build build-vk --config Release --target caustica
 .\bin\caustica.exe --backend vulkan
 ```
 
-Install the Vulkan SDK first and set `DXC_SPIRV_PATH` if CMake cannot locate its SPIR-V-capable `dxc`. The root option is `CAUSTICA_WITH_VULKAN`; internal `CAUSTICA_RHI_WITH_VULKAN` is derived automatically.
-
-## Building Linux / WSL
-
-Linux and WSL default to Vulkan and disable DirectX 12 Agility SDK, NVAPI, and Streamline. After installing the compiler, window-system development packages, and Linux Vulkan SDK:
-
-```bash
-cmake -S . -B build-linux -G Ninja \
-  -DCAUSTICA_WITH_VULKAN=ON \
-  -DDXC_SPIRV_PATH="$VULKAN_SDK/bin/dxc"
-cmake --build build-linux --config Release --target caustica
-```
-
-Native NGX DLSS defaults on with Vulkan; use `-DCAUSTICA_WITH_NATIVE_DLSS=OFF` for a build without NGX. OIDN defaults on for x86-64 Linux. See [the full build guide](docs/build-and-run.md#linux-and-wsl) for packages and optional configurations.
+Install the Vulkan SDK first and set `DXC_SPIRV_PATH` if CMake cannot locate its SPIR-V-capable `dxc`. The root option is `CAUSTICA_WITH_VULKAN`; internal `CAUSTICA_RHI_WITH_VULKAN` is derived automatically. Linux steps are under [Build → Linux / WSL](#linux--wsl) and [the full build guide](docs/build-and-run.md#linux-and-wsl).
 
 ## DirectX 12 Agility SDK
 
@@ -430,7 +470,7 @@ adapter fields and stable-selector examples.
 
 ## Command Line
 
-Run `caustica.exe --help` for the parser-generated complete list.
+Run `caustica --help` / `caustica.exe --help` for the parser-generated complete list.
 
 - `--scene <file>` selects a scene.
 - `--width <px> --height <px>` and `--fullscreen` configure the window.
