@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 import addon_utils
@@ -49,14 +50,13 @@ def _parse_args(argv: list[str]) -> dict:
     return {"out": out, "sidecar": sidecar}
 
 
-def _unpack_packed_images(out_dir: Path) -> int:
+def _unpack_packed_images(tex_dir: Path) -> int:
     unpacked = 0
-    tex_dir = out_dir / "unpacked"
+    tex_dir.mkdir(parents=True, exist_ok=True)
     for img in bpy.data.images:
         if not getattr(img, "packed_file", None):
             continue
         try:
-            tex_dir.mkdir(parents=True, exist_ok=True)
             dest = tex_dir / Path(img.name).name
             if dest.suffix == "":
                 dest = dest.with_suffix(".png")
@@ -722,14 +722,15 @@ def main() -> None:
     _enable_gltf_addon()
     args = _parse_args(_argv_after_dash())
     print("Opened", bpy.data.filepath, "scene", bpy.context.scene.name)
-    _unpack_packed_images(args["out"].parent)
-    image_report = _remap_tx_images()
-    missing = [row for row in image_report if row.get("reload") == "missing-png"]
-    print(f"Images remapped: {len(image_report)} missing-png={len(missing)}")
-    _upgrade_legacy_to_principled()
-    _prepare_visibility()
-    _dump_sidecar(args["sidecar"], image_report)
-    _export_gltf(args["out"])
+    with tempfile.TemporaryDirectory(prefix="caustica-unpack-") as unpack_tmp:
+        _unpack_packed_images(Path(unpack_tmp))
+        image_report = _remap_tx_images()
+        missing = [row for row in image_report if row.get("reload") == "missing-png"]
+        print(f"Images remapped: {len(image_report)} missing-png={len(missing)}")
+        _upgrade_legacy_to_principled()
+        _prepare_visibility()
+        _dump_sidecar(args["sidecar"], image_report)
+        _export_gltf(args["out"])
     print("Export complete", args["out"])
 
 
