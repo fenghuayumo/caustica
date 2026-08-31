@@ -20,6 +20,7 @@ struct LightRenderProxy;
 [[nodiscard]] int getLightType(const DirectionalLightComponent&);
 [[nodiscard]] int getLightType(const SpotLightComponent&);
 [[nodiscard]] int getLightType(const PointLightComponent&);
+[[nodiscard]] int getLightType(const RectLightComponent&);
 [[nodiscard]] int getLightType(const EnvironmentLightComponent&);
 [[nodiscard]] SceneContentFlags getLightContentFlags();
 
@@ -33,6 +34,7 @@ void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const d
 [[nodiscard]] LightData toLightData(const DirectionalLightComponent& component);
 [[nodiscard]] LightData toLightData(const SpotLightComponent& component);
 [[nodiscard]] LightData toLightData(const PointLightComponent& component);
+[[nodiscard]] LightData toLightData(const RectLightComponent& component);
 [[nodiscard]] LightData toLightData(const EnvironmentLightComponent& component);
 
 void fillLightConstants(
@@ -48,21 +50,25 @@ void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightCons
 [[nodiscard]] DirectionalLightComponent* tryGetDirectionalLight(ecs::World& world, ecs::Entity entity);
 [[nodiscard]] SpotLightComponent* tryGetSpotLight(ecs::World& world, ecs::Entity entity);
 [[nodiscard]] PointLightComponent* tryGetPointLight(ecs::World& world, ecs::Entity entity);
+[[nodiscard]] RectLightComponent* tryGetRectLight(ecs::World& world, ecs::Entity entity);
 [[nodiscard]] EnvironmentLightComponent* tryGetEnvironmentLight(ecs::World& world, ecs::Entity entity);
 
 [[nodiscard]] const DirectionalLightComponent* tryGetDirectionalLight(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] const SpotLightComponent* tryGetSpotLight(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] const PointLightComponent* tryGetPointLight(const ecs::World& world, ecs::Entity entity);
+[[nodiscard]] const RectLightComponent* tryGetRectLight(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] const EnvironmentLightComponent* tryGetEnvironmentLight(const ecs::World& world, ecs::Entity entity);
 
 [[nodiscard]] DirectionalLightData* tryGetDirectionalLightData(LightData& data);
 [[nodiscard]] SpotLightData* tryGetSpotLightData(LightData& data);
 [[nodiscard]] PointLightData* tryGetPointLightData(LightData& data);
+[[nodiscard]] RectLightData* tryGetRectLightData(LightData& data);
 [[nodiscard]] EnvironmentLightData* tryGetEnvironmentLightData(LightData& data);
 
 [[nodiscard]] const DirectionalLightData* tryGetDirectionalLightData(const LightData& data);
 [[nodiscard]] const SpotLightData* tryGetSpotLightData(const LightData& data);
 [[nodiscard]] const PointLightData* tryGetPointLightData(const LightData& data);
+[[nodiscard]] const RectLightData* tryGetRectLightData(const LightData& data);
 [[nodiscard]] const EnvironmentLightData* tryGetEnvironmentLightData(const LightData& data);
 
 [[nodiscard]] ecs::Entity findEnvironmentLightEntity(const ecs::World& world, const std::vector<ecs::Entity>& lightEntities);

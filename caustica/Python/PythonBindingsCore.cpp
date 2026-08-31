@@ -90,6 +90,7 @@ namespace py_enums
         Directional = LightType_Directional,
         Spot = LightType_Spot,
         Point = LightType_Point,
+        Rect = LightType_Rect,
         Environment = LightType_Environment,
     };
 }
@@ -227,6 +228,8 @@ namespace
             return LightType_Spot;
         if (world.has<scene::PointLightComponent>(self.entity))
             return LightType_Point;
+        if (world.has<scene::RectLightComponent>(self.entity))
+            return LightType_Rect;
         if (world.has<scene::EnvironmentLightComponent>(self.entity))
             return LightType_Environment;
         return LightType_None;
@@ -244,6 +247,8 @@ namespace
             return &spot->color;
         if (auto* point = scene::tryGetPointLight(world, self.entity))
             return &point->color;
+        if (auto* rect = scene::tryGetRectLight(world, self.entity))
+            return &rect->color;
         if (auto* environment = scene::tryGetEnvironmentLight(world, self.entity))
             return &environment->color;
         return nullptr;
@@ -259,6 +264,8 @@ namespace
             return &spot->intensity;
         if (auto* point = scene::tryGetPointLight(world, self.entity))
             return &point->intensity;
+        if (auto* rect = scene::tryGetRectLight(world, self.entity))
+            return &rect->intensity;
         return nullptr;
     }
 
@@ -329,21 +336,45 @@ namespace
         return result;
     }
 
+    void WalkLightsByName(
+        const scene::SceneEntityWorld& entityWorld,
+        ecs::Entity entity,
+        const std::string& name,
+        ecs::Entity& outEntity)
+    {
+        if (!ecs::isValid(entity) || ecs::isValid(outEntity))
+            return;
+
+        const ecs::World& world = entityWorld.world();
+        const bool isLight = scene::tryGetDirectionalLight(world, entity)
+            || scene::tryGetSpotLight(world, entity)
+            || scene::tryGetPointLight(world, entity)
+            || scene::tryGetRectLight(world, entity)
+            || scene::tryGetEnvironmentLight(world, entity);
+        if (isLight && entityWorld.getEntityName(entity) == name)
+        {
+            outEntity = entity;
+            return;
+        }
+
+        for (ecs::Entity child : entityWorld.getEntityChildren(entity))
+            WalkLightsByName(entityWorld, child, name, outEntity);
+    }
+
     std::shared_ptr<PySceneEntity> FindSceneLight(Scene* scene, const std::string& name)
     {
-        if (!scene)
+        if (!scene || name.empty())
             return nullptr;
 
-        const scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
+        scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
         if (!entityWorld)
             return nullptr;
 
-        for (ecs::Entity entity : scene->getLightEntities())
-        {
-            if (entityWorld->getEntityName(entity) == name)
-                return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
-        }
-        return nullptr;
+        ecs::Entity entity = ecs::NullEntity;
+        WalkLightsByName(*entityWorld, entityWorld->root(), name, entity);
+        if (!ecs::isValid(entity))
+            return nullptr;
+        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
     }
 
     std::string MakeUniqueLightName(Scene* scene, const std::string& requested, const char* prefix)
@@ -719,6 +750,7 @@ void RegisterCoreBindings(nb::module_& m)
         .value("Directional", LightType::Directional)
         .value("Spot", LightType::Spot)
         .value("Point", LightType::Point)
+        .value("Rect", LightType::Rect)
         .value("Environment", LightType::Environment);
 
     nb::class_<Handle<ScenePrefabAsset>>(m, "ScenePrefab",
@@ -1144,7 +1176,29 @@ void RegisterCoreBindings(nb::module_& m)
                 if (float* intensity = TryMutableLightIntensity(self))
                     *intensity = nb::cast<float>(v);
             },
-            "Point/spot luminous intensity.")
+            "Point/spot intensity, or emitted radiance multiplier for a rectangular light.")
+        .def_prop_rw("width",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* rect = entityWorld ? scene::tryGetRectLight(entityWorld->world(), self.entity) : nullptr;
+                return rect ? rect->width : 0.f;
+            },
+            [](PySceneEntity& self, float value) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    if (auto* rect = scene::tryGetRectLight(entityWorld->world(), self.entity))
+                        rect->width = value;
+            }, "RectLight width in local X.")
+        .def_prop_rw("height",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const auto* rect = entityWorld ? scene::tryGetRectLight(entityWorld->world(), self.entity) : nullptr;
+                return rect ? rect->height : 0.f;
+            },
+            [](PySceneEntity& self, float value) {
+                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
+                    if (auto* rect = scene::tryGetRectLight(entityWorld->world(), self.entity))
+                        rect->height = value;
+            }, "RectLight height in local Y.")
         .def_prop_rw("irradiance",
             [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -1391,8 +1445,8 @@ void RegisterCoreBindings(nb::module_& m)
                 component.color = ToFloat3(color);
                 component.irradiance = irradiance;
                 component.angularSize = angularSize;
-                self.attachDirectionalLightToRoot(std::move(component), lightName);
-                return FindSceneLight(&self, lightName);
+                return PyEntityFromEntity(&self,
+                    self.attachDirectionalLightToRoot(std::move(component), lightName));
             },
             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
             nb::arg("irradiance") = 1.f,
@@ -1407,8 +1461,8 @@ void RegisterCoreBindings(nb::module_& m)
                 component.intensity = intensity;
                 component.radius = radius;
                 component.range = range;
-                self.attachPointLightToRoot(std::move(component), lightName);
-                return FindSceneLight(&self, lightName);
+                return PyEntityFromEntity(&self,
+                    self.attachPointLightToRoot(std::move(component), lightName));
             },
             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
             nb::arg("intensity") = 1.f,
@@ -1427,8 +1481,8 @@ void RegisterCoreBindings(nb::module_& m)
                 component.range = range;
                 component.innerAngle = innerAngle;
                 component.outerAngle = outerAngle;
-                self.attachSpotLightToRoot(std::move(component), lightName);
-                return FindSceneLight(&self, lightName);
+                return PyEntityFromEntity(&self,
+                    self.attachSpotLightToRoot(std::move(component), lightName));
             },
             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
             nb::arg("intensity") = 1.f,
@@ -1438,6 +1492,23 @@ void RegisterCoreBindings(nb::module_& m)
             nb::arg("outer_angle") = 180.f,
             nb::arg("name") = std::string(),
             "Create a spot light under the scene root and return its SceneEntity.")
+        .def("create_rect_light",
+            [](Scene& self, nb::object color, float intensity, float width, float height, const std::string& name) {
+                const std::string lightName = MakeUniqueLightName(&self, name, "RectLight");
+                scene::RectLightComponent component;
+                component.color = ToFloat3(color);
+                component.intensity = intensity;
+                component.width = width;
+                component.height = height;
+                return PyEntityFromEntity(&self,
+                    self.attachRectLightToRoot(std::move(component), lightName));
+            },
+            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+            nb::arg("intensity") = 1.f,
+            nb::arg("width") = 1.f,
+            nb::arg("height") = 1.f,
+            nb::arg("name") = std::string(),
+            "Create a one-sided rectangular area light under the scene root and return its SceneEntity.")
         .def("create_environment_light",
             [](Scene& self, nb::object color, const std::string& path, float rotation, const std::string& name) {
                 const std::string lightName = MakeUniqueLightName(&self, name, "EnvironmentLight");
@@ -1445,8 +1516,8 @@ void RegisterCoreBindings(nb::module_& m)
                 component.color = ToFloat3(color);
                 component.path = path;
                 component.rotation = rotation;
-                self.attachEnvironmentLightToRoot(std::move(component), lightName);
-                return FindSceneLight(&self, lightName);
+                return PyEntityFromEntity(&self,
+                    self.attachEnvironmentLightToRoot(std::move(component), lightName));
             },
             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
             nb::arg("path") = std::string(),

@@ -235,6 +235,8 @@ void CopyEntityComponents(
         dstWorld.emplace<SpotLightComponent>(dstEntity, *spot);
     if (const auto* point = srcWorld.get<PointLightComponent>(srcEntity))
         dstWorld.emplace<PointLightComponent>(dstEntity, *point);
+    if (const auto* rect = srcWorld.get<RectLightComponent>(srcEntity))
+        dstWorld.emplace<RectLightComponent>(dstEntity, *rect);
     if (const auto* environment = srcWorld.get<EnvironmentLightComponent>(srcEntity))
         dstWorld.emplace<EnvironmentLightComponent>(dstEntity, *environment);
     if (const auto* camera = srcWorld.get<CameraComponent>(srcEntity))
@@ -433,11 +435,13 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
             DirectionalLightComponent,
             SpotLightComponent,
             PointLightComponent,
+            RectLightComponent,
             EnvironmentLightComponent>(registry)
         || changeDetection->anyOfAddedThisFrame<
             DirectionalLightComponent,
             SpotLightComponent,
             PointLightComponent,
+            RectLightComponent,
             EnvironmentLightComponent>(registry);
     if (worldStructureChanged || lightComponentsChanged)
     {
@@ -501,6 +505,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             DirectionalLightComponent,
             SpotLightComponent,
             PointLightComponent,
+            RectLightComponent,
             EnvironmentLightComponent,
             AnimationComponent,
             GaussianSplatComponent,
@@ -509,6 +514,7 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             DirectionalLightComponent,
             SpotLightComponent,
             PointLightComponent,
+            RectLightComponent,
             EnvironmentLightComponent,
             AnimationComponent,
             GaussianSplatComponent,
@@ -616,6 +622,11 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
         m_world->each<PointLightComponent>([&](ecs::Entity entity, PointLightComponent&) {
             if (changeDetection->isAddedThisFrame<PointLightComponent>(entity, registry)
                 || changeDetection->isChangedThisFrame<PointLightComponent>(entity, registry))
+                updateIfTouched(entity);
+        });
+        m_world->each<RectLightComponent>([&](ecs::Entity entity, RectLightComponent&) {
+            if (changeDetection->isAddedThisFrame<RectLightComponent>(entity, registry)
+                || changeDetection->isChangedThisFrame<RectLightComponent>(entity, registry))
                 updateIfTouched(entity);
         });
         m_world->each<EnvironmentLightComponent>([&](ecs::Entity entity, EnvironmentLightComponent&) {
@@ -1170,6 +1181,12 @@ void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, PointLightCompon
     m_world->emplace<PointLightComponent>(entity, std::move(component));
 }
 
+void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, RectLightComponent component)
+{
+    reconcileLightExclusivity(entity);
+    m_world->emplace<RectLightComponent>(entity, std::move(component));
+}
+
 void SceneEntityWorld::insertSpawnComponent(ecs::Entity entity, EnvironmentLightComponent component)
 {
     reconcileLightExclusivity(entity);
@@ -1217,6 +1234,7 @@ void SceneEntityWorld::reconcileLightExclusivity(ecs::Entity entity)
     m_world->remove<DirectionalLightComponent>(entity);
     m_world->remove<SpotLightComponent>(entity);
     m_world->remove<PointLightComponent>(entity);
+    m_world->remove<RectLightComponent>(entity);
     m_world->remove<EnvironmentLightComponent>(entity);
 }
 
@@ -1236,6 +1254,12 @@ void SceneEntityWorld::setPointLight(ecs::Entity entity, PointLightComponent com
 {
     reconcileLightExclusivity(entity);
     m_world->emplace<PointLightComponent>(entity, std::move(component));
+}
+
+void SceneEntityWorld::setRectLight(ecs::Entity entity, RectLightComponent component)
+{
+    reconcileLightExclusivity(entity);
+    m_world->emplace<RectLightComponent>(entity, std::move(component));
 }
 
 void SceneEntityWorld::setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component)

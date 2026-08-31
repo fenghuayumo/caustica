@@ -18,6 +18,7 @@ using AnyLightComponent = std::variant<
     DirectionalLightComponent,
     SpotLightComponent,
     PointLightComponent,
+    RectLightComponent,
     EnvironmentLightComponent>;
 
 [[nodiscard]] bool isJsonLightLeafType(const std::string& type);

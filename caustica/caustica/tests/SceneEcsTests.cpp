@@ -1,4 +1,5 @@
 #include <scene/SceneEcs.h>
+#include <scene/SceneLightAccess.h>
 #include <scene/SceneRenderSnapshot.h>
 
 #include <cstdio>
@@ -17,6 +18,27 @@ bool expect(bool condition, const char* message)
 int main()
 {
     bool passed = true;
+
+    {
+        caustica::scene::SceneEntityWorld entityWorld;
+        const caustica::ecs::Entity root = entityWorld.createEntity("Root");
+        const caustica::ecs::Entity light = entityWorld.createEntity("Panel", root);
+        caustica::scene::RectLightComponent rect;
+        rect.intensity = 12.f;
+        rect.width = 2.f;
+        rect.height = 3.f;
+        entityWorld.setRectLight(light, rect);
+
+        const auto* stored = caustica::scene::tryGetRectLight(entityWorld.world(), light);
+        passed &= expect(stored && stored->width == 2.f && stored->height == 3.f,
+            "setRectLight did not preserve rectangle dimensions");
+        passed &= expect(caustica::scene::getLightType(*stored) == LightType_Rect,
+            "RectLight component did not map to LightType_Rect");
+
+        entityWorld.setPointLight(light, caustica::scene::PointLightComponent{});
+        passed &= expect(!caustica::scene::tryGetRectLight(entityWorld.world(), light),
+            "light type exclusivity did not remove RectLight");
+    }
 
     {
         caustica::scene::SceneEntityWorld entityWorld;

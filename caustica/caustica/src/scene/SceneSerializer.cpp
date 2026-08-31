@@ -149,6 +149,15 @@ void WriteSpotLight(Json::Value& node, const SpotLightComponent& light)
     node["outerAngle"] << light.outerAngle;
 }
 
+void WriteRectLight(Json::Value& node, const RectLightComponent& light)
+{
+    node["enabled"] << light.enabled;
+    node["color"] << light.color;
+    node["intensity"] << light.intensity;
+    node["width"] << light.width;
+    node["height"] << light.height;
+}
+
 void WriteEnvironmentLight(Json::Value& node, const EnvironmentLightComponent& light, bool full)
 {
     node["enabled"] << light.enabled;
@@ -196,6 +205,8 @@ void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, 
         WritePointLight(EnsureComponent(entityNode, "PointLight"), *light);
     if (const SpotLightComponent* light = tryGetSpotLight(world.world(), entity))
         WriteSpotLight(EnsureComponent(entityNode, "SpotLight"), *light);
+    if (const RectLightComponent* light = tryGetRectLight(world.world(), entity))
+        WriteRectLight(EnsureComponent(entityNode, "RectLight"), *light);
     if (const EnvironmentLightComponent* light = tryGetEnvironmentLight(world.world(), entity))
         WriteEnvironmentLight(EnsureComponent(entityNode, "EnvironmentLight"), *light, false);
     if (const CameraComponent* camera = tryGetCamera(world.world(), entity))
@@ -209,6 +220,7 @@ bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
     return tryGetDirectionalLight(world.world(), entity)
         || tryGetPointLight(world.world(), entity)
         || tryGetSpotLight(world.world(), entity)
+        || tryGetRectLight(world.world(), entity)
         || tryGetEnvironmentLight(world.world(), entity)
         || tryGetCamera(world.world(), entity)
         || world.world().tryGet<GaussianSplatComponent>(entity);
@@ -264,6 +276,11 @@ void DisableEntityVisibility(SceneEntityWorld& world, ecs::Entity entity)
     {
         light->enabled = false;
         world.world().notifyComponentChanged<SpotLightComponent>(entity);
+    }
+    if (RectLightComponent* light = tryGetRectLight(world.world(), entity))
+    {
+        light->enabled = false;
+        world.world().notifyComponentChanged<RectLightComponent>(entity);
     }
     if (EnvironmentLightComponent* light = tryGetEnvironmentLight(world.world(), entity))
     {
@@ -487,6 +504,12 @@ void patchEntityOverrides(
             AppendOverrideIfUnauthored(overrides, world, entity, "SpotLight",
                 [&](Json::Value& node) { WriteSpotLight(node, light); });
         });
+    world.world().each<RectLightComponent>(
+        [&](ecs::Entity entity, const RectLightComponent& light)
+        {
+            AppendOverrideIfUnauthored(overrides, world, entity, "RectLight",
+                [&](Json::Value& node) { WriteRectLight(node, light); });
+        });
     world.world().each<EnvironmentLightComponent>(
         [&](ecs::Entity entity, const EnvironmentLightComponent& light)
         {
@@ -559,6 +582,11 @@ void applyEntityOverrides(
                         if (tryGetSpotLight(world.world(), entity))
                             world.setSpotLight(entity, std::move(light));
                     }
+                    else if constexpr (std::is_same_v<T, RectLightComponent>)
+                    {
+                        if (tryGetRectLight(world.world(), entity))
+                            world.setRectLight(entity, std::move(light));
+                    }
                     else if constexpr (std::is_same_v<T, EnvironmentLightComponent>)
                     {
                         if (tryGetEnvironmentLight(world.world(), entity))
@@ -571,6 +599,7 @@ void applyEntityOverrides(
         applyLight("DirectionalLight");
         applyLight("PointLight");
         applyLight("SpotLight");
+        applyLight("RectLight");
         applyLight("EnvironmentLight");
 
         const char* cameraType = nullptr;

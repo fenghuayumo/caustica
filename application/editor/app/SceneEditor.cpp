@@ -855,6 +855,11 @@ SceneSettings BuildSceneLookSettings(
         {
             addHidden(entity, light.enabled);
         });
+    world.world().each<scene::RectLightComponent>(
+        [&](ecs::Entity entity, scene::RectLightComponent& light)
+        {
+            addHidden(entity, light.enabled);
+        });
     world.world().each<scene::EnvironmentLightComponent>(
         [&](ecs::Entity entity, scene::EnvironmentLightComponent& light)
         {

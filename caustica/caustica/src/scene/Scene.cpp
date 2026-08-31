@@ -425,6 +425,10 @@ const std::vector<ecs::Entity>& Scene::getLightEntities() const
             [&](ecs::Entity entity, scene::PointLightComponent&, scene::GlobalTransformComponent&) {
                 m_LogicQueryLightEntities.push_back(entity);
             });
+        world.each<scene::RectLightComponent, scene::GlobalTransformComponent>(
+            [&](ecs::Entity entity, scene::RectLightComponent&, scene::GlobalTransformComponent&) {
+                m_LogicQueryLightEntities.push_back(entity);
+            });
         world.each<scene::EnvironmentLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::EnvironmentLightComponent&, scene::GlobalTransformComponent&) {
                 m_LogicQueryLightEntities.push_back(entity);
@@ -535,44 +539,59 @@ void Scene::finishStructureGpuBuild(
     m_structureGpu.finishStructureGpuBuild(std::move(built));
 }
 
-void Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
+ecs::Entity Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
-        return;
+        return ecs::NullEntity;
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setDirectionalLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    return entity;
 }
 
-void Scene::attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name)
+ecs::Entity Scene::attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
-        return;
+        return ecs::NullEntity;
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setSpotLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    return entity;
 }
 
-void Scene::attachPointLightToRoot(scene::PointLightComponent component, const std::string& name)
+ecs::Entity Scene::attachPointLightToRoot(scene::PointLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
-        return;
+        return ecs::NullEntity;
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setPointLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    return entity;
 }
 
-void Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name)
+ecs::Entity Scene::attachRectLightToRoot(scene::RectLightComponent component, const std::string& name)
 {
     if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
-        return;
+        return ecs::NullEntity;
+
+    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
+    m_EntityWorld->setRectLight(entity, std::move(component));
+    m_EntityWorld->rebuildPathsFromRoot();
+    return entity;
+}
+
+ecs::Entity Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name)
+{
+    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+        return ecs::NullEntity;
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setEnvironmentLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    return entity;
 }
 
 Scene::Scene(
@@ -945,6 +964,8 @@ void Scene::attachLeafFromJson(
                         world.setSpotLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::PointLightComponent>)
                         world.setPointLight(entity, std::move(light));
+                    else if constexpr (std::is_same_v<T, scene::RectLightComponent>)
+                        world.setRectLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::EnvironmentLightComponent>)
                         world.setEnvironmentLight(entity, std::move(light));
                 },

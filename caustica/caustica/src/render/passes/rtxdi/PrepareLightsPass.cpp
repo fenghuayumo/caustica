@@ -254,6 +254,39 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
+static PolymorphicLightInfoFull ConvertRectLightTriangle(
+    const caustica::scene::LightRenderProxy& proxy, uint32_t triangleIndex)
+{
+    const auto& rect = std::get<caustica::scene::RectLightData>(proxy.data);
+    const double halfWidth = std::max(0.f, rect.width) * 0.5;
+    const double halfHeight = std::max(0.f, rect.height) * 0.5;
+    const dm::double3 localCorners[4] = {
+        { -halfWidth, -halfHeight, 0.0 },
+        { -halfWidth,  halfHeight, 0.0 },
+        {  halfWidth,  halfHeight, 0.0 },
+        {  halfWidth, -halfHeight, 0.0 },
+    };
+    const uint32_t indices[2][3] = { { 0, 1, 2 }, { 0, 2, 3 } };
+    const uint32_t* tri = indices[triangleIndex];
+    const float3 base = float3(proxy.transform.transformPoint(localCorners[tri[0]]));
+    float3 edge1 = float3(proxy.transform.transformPoint(localCorners[tri[1]])) - base;
+    float3 edge2 = float3(proxy.transform.transformPoint(localCorners[tri[2]])) - base;
+    if (dot(cross(edge1, edge2), float3(caustica::scene::getLightDirection(proxy.transform))) < 0.f)
+        std::swap(edge1, edge2);
+
+    PolymorphicLightInfoFull result = {};
+    result.Base.Center = base + (edge1 + edge2) / 3.f;
+    result.Base.ColorTypeAndFlags =
+        (uint32_t(PolymorphicLightType::kTriangle) << kPolymorphicLightTypeShift)
+        | kPolymorphicLightNotSampleableByBSDFBit;
+    packLightColor(proxy.color * std::max(0.f, rect.intensity), result);
+    result.Base.Direction1 = fp32ToFp16(edge1.x) | (uint32_t(fp32ToFp16(edge2.x)) << 16);
+    result.Base.Direction2 = fp32ToFp16(edge1.y) | (uint32_t(fp32ToFp16(edge2.y)) << 16);
+    result.Base.Scalars = fp32ToFp16(edge1.z) | (uint32_t(fp32ToFp16(edge2.z)) << 16);
+    result.Extended = PolymorphicLightInfoEx::empty();
+    return result;
+}
+
 static bool ConvertLightProxy(
     const caustica::scene::LightRenderProxy& proxy,
     PolymorphicLightInfoFull& polymorphic,
@@ -524,6 +557,32 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandLis
 
     for (const scene::LightRenderProxy* lightProxy : sortedLights)
     {
+        if (scene::getLightType(*lightProxy) == LightType_Rect)
+        {
+            if (lightBufferOffset + 2 > m_MaxLightsInBuffer)
+                break;
+
+            auto pOffset = m_PrimitiveLightBufferOffsets.find(lightProxy->entity);
+            const int previousBase = pOffset != m_PrimitiveLightBufferOffsets.end() ? pOffset->second : -1;
+            m_PrimitiveLightBufferOffsets[lightProxy->entity] = lightBufferOffset;
+
+            for (uint32_t triangleIndex = 0; triangleIndex < 2; ++triangleIndex)
+            {
+                PrepareLightsTask task;
+                task.instanceAndGeometryIndex = TASK_PRIMITIVE_LIGHT_BIT | uint32_t(primitiveLightInfos.size());
+                task.lightBufferOffset = lightBufferOffset++;
+                task.triangleCount = 1;
+                task.previousLightBufferOffset = previousBase >= 0 ? previousBase + int(triangleIndex) : -1;
+                tasks.push_back(task);
+
+                PolymorphicLightInfoFull triangle = ConvertRectLightTriangle(*lightProxy, triangleIndex);
+                triangle.Extended.UniqueID = GaussianProxyHash32Combine(uint32_t(lightProxy->entity), triangleIndex);
+                primitiveLightInfos.push_back(triangle);
+                numFinitePrimLights++;
+            }
+            continue;
+        }
+
         PolymorphicLightInfoFull polymorphicLight = {};
         if (!ConvertLightProxy(*lightProxy, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap))
             continue;

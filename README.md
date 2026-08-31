@@ -134,7 +134,7 @@ Key code locations:
 * Reference and real-time modes
 * Simple BSDF model that is easy(ish) to extend
 * Volumes and nested dielectrics with priority
-* Analytic lights (directional, spot, point), emissive triangles, and environment map lighting
+* Analytic lights (directional, spot, point, rectangular area), emissive triangles, and environment map lighting
 * NEE with feedback-based, temporally adaptive guided importance sampling (NEE-AT)
 * Low-discrepancy sampling ([Practical Hash-based Owen Scrambling](https://jcgt.org/published/0009/04/01/paper.pdf)), RayCones for texture MIP selection, RR early termination, firefly filter
 

@@ -187,13 +187,16 @@ void ModelInstance::updateLightFromControllers(double gameTime)
 
         auto* spot = scene::tryGetSpotLight(ecsWorld, controller->Entity);
         auto* point = scene::tryGetPointLight(ecsWorld, controller->Entity);
-        if (!spot && !point)
+        auto* rect = scene::tryGetRectLight(ecsWorld, controller->Entity);
+        if (!spot && !point && !rect)
             continue;
 
         if (spot)
             spot->color = controller->Color;
         if (point)
             point->color = controller->Color;
+        if (rect)
+            rect->color = controller->Color;
 
         bool enabled = controller->enabled;
 
@@ -223,6 +226,8 @@ void ModelInstance::updateLightFromControllers(double gameTime)
             point->radius = reallyAverageScale;
             point->intensity = intensity;
         }
+        if (rect != nullptr)
+            rect->intensity = intensity;
     }
 }
 

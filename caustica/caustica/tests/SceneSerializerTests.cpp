@@ -1,5 +1,6 @@
 #include <scene/SceneSerializer.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneComponentBuilders.h>
 #include <scene/SceneObjects.h>
 #include <core/json.h>
 #include <core/path_utils.h>
@@ -71,6 +72,23 @@ int main()
         passed &= expect(
             merged["entities"][0]["components"]["EnvironmentLight"]["radianceScale"].isArray(),
             "overlay replaced the whole EnvironmentLight instead of patching source");
+    }
+
+    {
+        const Json::Value node = parse(R"({
+            "enabled": true,
+            "color": [0.8, 0.6, 0.4],
+            "intensity": 15.0,
+            "width": 2.5,
+            "height": 1.25
+        })");
+        auto component = caustica::scene::makeLightComponentFromJson("RectLight", node);
+        const auto* rect = component ? std::get_if<caustica::scene::RectLightComponent>(&*component) : nullptr;
+        passed &= expect(rect && std::abs(rect->intensity - 15.f) < 1e-5f,
+            "RectLight intensity was not parsed");
+        passed &= expect(rect && std::abs(rect->width - 2.5f) < 1e-5f
+                && std::abs(rect->height - 1.25f) < 1e-5f,
+            "RectLight dimensions were not parsed");
     }
 
     {

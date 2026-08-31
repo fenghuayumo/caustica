@@ -1208,6 +1208,7 @@ Lights are ECS components on `SceneEntity`. Lookup returns `SceneEntity` handles
 | `scene.create_directional_light(color=(1,1,1), irradiance=1.0, angular_size=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
 | `scene.create_point_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
 | `scene.create_spot_light(color=(1,1,1), intensity=1.0, radius=0.0, range=0.0, inner_angle=180.0, outer_angle=180.0, name="")` | Attach under scene root; returns `SceneEntity`. |
+| `scene.create_rect_light(color=(1,1,1), intensity=1.0, width=1.0, height=1.0, name="")` | Create a one-sided rectangular area light facing local -Z; returns `SceneEntity`. |
 | `scene.create_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | Attach under scene root; returns `SceneEntity`. |
 
 Empty `name` auto-generates a unique name (`DirectionalLight`, `PointLight`, …).
@@ -1217,13 +1218,14 @@ Empty `name` auto-generates a unique name (`DirectionalLight`, `PointLight`, …
 | Property | Type | Notes |
 | --- | --- | --- |
 | `is_light` | `bool` | True when the entity has a typed light component. |
-| `light_type` | `int` / `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Environment`. |
+| `light_type` | `int` / `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment`. |
 | `name` | `str` | Entity name. Read-only. |
 | `color` | `(r, g, b)` | Writable. |
 | `position` | `(x, y, z)` | World-space; updates local translation. |
 | `direction` | `(x, y, z)` | World-space; updates local rotation. |
 | `irradiance` / `angular_size` | `float` | Directional. |
-| `intensity` / `radius` / `range` | `float` | Point / Spot. |
+| `intensity` / `radius` / `range` | `float` | Point / Spot; `intensity` also controls Rect emitted radiance. |
+| `width` / `height` | `float` | Rect dimensions in local X/Y. |
 | `inner_angle` / `outer_angle` | `float` | Spot. |
 | `environment_path` | `str` | Environment light HDRI path. |
 
@@ -1543,6 +1545,7 @@ All enums are arithmetic, so `int(enum_value)` works and enum values can be assi
 | `Directional` | Directional / sun light. |
 | `Spot` | Spot light. |
 | `Point` | Point light. |
+| `Rect` | One-sided rectangular area light. |
 | `Environment` | Environment / HDRI light. |
 
 `SceneEntity.light_type` stores the same integer values; compare with `int(caustica.LightType.Point)` or the enum directly.

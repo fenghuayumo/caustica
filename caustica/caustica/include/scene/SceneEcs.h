@@ -192,6 +192,15 @@ struct PointLightData
     float range = 0.f;
 };
 
+// A one-sided rectangular emitter in the local XY plane, facing local -Z.
+// Intensity is emitted radiance, matching an emissive rectangle material.
+struct RectLightData
+{
+    float intensity = 1.f;
+    float width = 1.f;
+    float height = 1.f;
+};
+
 struct EnvironmentLightData
 {
     dm::float3 radianceScale = dm::float3(1.f);
@@ -200,7 +209,7 @@ struct EnvironmentLightData
     std::string path;
 };
 
-using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightData, EnvironmentLightData>;
+using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightData, RectLightData, EnvironmentLightData>;
 
 // UE-style typed light components (mutually exclusive on an entity).
 struct DirectionalLightComponent
@@ -231,6 +240,15 @@ struct PointLightComponent
     float intensity = 1.f;
     float radius = 0.f;
     float range = 0.f;
+};
+
+struct RectLightComponent
+{
+    bool enabled = true;
+    dm::float3 color = dm::colors::white;
+    float intensity = 1.f;
+    float width = 1.f;
+    float height = 1.f;
 };
 
 struct EnvironmentLightComponent
@@ -411,6 +429,7 @@ public:
     void setDirectionalLight(ecs::Entity entity, DirectionalLightComponent component);
     void setSpotLight(ecs::Entity entity, SpotLightComponent component);
     void setPointLight(ecs::Entity entity, PointLightComponent component);
+    void setRectLight(ecs::Entity entity, RectLightComponent component);
     void setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component);
     void setCamera(ecs::Entity entity, CameraComponent component);
     void setAnimation(ecs::Entity entity, AnimationComponent component);
@@ -486,6 +505,7 @@ private:
     void insertSpawnComponent(ecs::Entity entity, DirectionalLightComponent component);
     void insertSpawnComponent(ecs::Entity entity, SpotLightComponent component);
     void insertSpawnComponent(ecs::Entity entity, PointLightComponent component);
+    void insertSpawnComponent(ecs::Entity entity, RectLightComponent component);
     void insertSpawnComponent(ecs::Entity entity, EnvironmentLightComponent component);
     void insertSpawnComponent(ecs::Entity entity, CameraComponent component);
     void insertSpawnComponent(ecs::Entity entity, AnimationComponent component);

@@ -247,10 +247,11 @@ namespace caustica
         // Explicit framed published slot (GPU setup / editor). No latest/slot-0 fallback.
         [[nodiscard]] const scene::SceneRenderData& getRenderDataForFrame(uint32_t frameIndex) const;
 
-        void attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name = {});
-        void attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});
-        void attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
-        void attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
+        [[nodiscard]] ecs::Entity attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name = {});
+        [[nodiscard]] ecs::Entity attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name = {});
+        [[nodiscard]] ecs::Entity attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
+        [[nodiscard]] ecs::Entity attachRectLightToRoot(scene::RectLightComponent component, const std::string& name = {});
+        [[nodiscard]] ecs::Entity attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
         void processNodesRecursive();
 
         [[nodiscard]] const SceneSettings* getSceneSettings() const

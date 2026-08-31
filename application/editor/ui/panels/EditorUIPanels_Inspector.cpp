@@ -87,7 +87,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     auto* dirLightComp = caustica::scene::tryGetDirectionalLight(ew->world(), entity);
     auto* spotLightComp = caustica::scene::tryGetSpotLight(ew->world(), entity);
     auto* pointLightComp = caustica::scene::tryGetPointLight(ew->world(), entity);
-    const bool isLight = envLightComp || dirLightComp || spotLightComp || pointLightComp;
+    auto* rectLightComp = caustica::scene::tryGetRectLight(ew->world(), entity);
+    const bool isLight = envLightComp || dirLightComp || spotLightComp || pointLightComp || rectLightComp;
     auto markLightingEdited = [&](bool changed) {
         if (changed)
         {
@@ -116,6 +117,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         ImGui::TextUnformatted("Light · Spot");
     else if (pointLightComp)
         ImGui::TextUnformatted("Light · Point");
+    else if (rectLightComp)
+        ImGui::TextUnformatted("Light · Rect");
     else
         ImGui::TextUnformatted("Group");
     ImGui::PopStyleColor();
@@ -467,7 +470,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         }
     }
 
-    if (dirLightComp || spotLightComp || pointLightComp)
+    if (dirLightComp || spotLightComp || pointLightComp || rectLightComp)
     {
         ImGui::Spacing();
         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
@@ -503,6 +506,16 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 changed |= InspectorDragFloat("Range", &pointLightComp->range, 0.1f, 0.f, 1e6f, "%.2f");
                 if (markLightingEdited(changed))
                     ew->world().notifyComponentChanged<caustica::scene::PointLightComponent>(entity);
+            }
+            else if (rectLightComp)
+            {
+                bool changed = false;
+                changed |= InspectorColorEdit3("Color", &rectLightComp->color.x);
+                changed |= InspectorDragFloat("Intensity", &rectLightComp->intensity, 0.01f, 0.f, 1e6f, "%.3f");
+                changed |= InspectorDragFloat("Width", &rectLightComp->width, 0.01f, 0.f, 1e6f, "%.3f");
+                changed |= InspectorDragFloat("Height", &rectLightComp->height, 0.01f, 0.f, 1e6f, "%.3f");
+                if (markLightingEdited(changed))
+                    ew->world().notifyComponentChanged<caustica::scene::RectLightComponent>(entity);
             }
         }
     }

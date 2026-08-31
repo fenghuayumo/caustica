@@ -394,6 +394,7 @@ struct TriangleLight
     float3 radiance;
     float3 normal;
     float surfaceArea;
+    bool sampleableByBSDF;
     
     // Interface methods
     PolymorphicLightSample CalcSample(in const float2 random, in const float3 viewerPosition)
@@ -420,7 +421,7 @@ struct TriangleLight
         const float areaPdf = max(FLT_EPSILON_MINI, 1.0 / surfaceArea);
         result.SolidAnglePdf = min( MAX_SOLID_ANGLE_PDF, pdfAtoW(areaPdf, distance, cosTheta) );
         result.Radiance = radiance;
-        result.LightSampleableByBSDF = true;
+        result.LightSampleableByBSDF = sampleableByBSDF;
 
         #if 0 && defined(DEBUG_PRINT_DEFINED)
         float solidAnglePdfTest = CalcSolidAnglePdfForMIS(viewerPosition, result.Position);
@@ -473,6 +474,8 @@ struct TriangleLight
         triLight.edge2 = f16tof32(uint3(lightInfo.Base.Direction1, lightInfo.Base.Direction2, lightInfo.Base.Scalars) >> 16);
         triLight.base = lightInfo.Base.Center - ((triLight.edge1 + triLight.edge2) / 3.0);
         triLight.radiance = PolymorphicLight::UnpackColor(lightInfo.Base);
+        triLight.sampleableByBSDF =
+            (lightInfo.Base.ColorTypeAndFlags & kPolymorphicLightNotSampleableByBSDFBit) == 0;
 
         float3 lightNormal = cross(triLight.edge1, triLight.edge2);
         float lightNormalLength = length(lightNormal);

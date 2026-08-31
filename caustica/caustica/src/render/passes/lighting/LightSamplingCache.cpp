@@ -25,6 +25,7 @@
 #include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 
+#include <algorithm>
 #include <cmath>
 
 #include <shaders/render/lighting/LightSamplingCache.hlsl>
@@ -459,6 +460,39 @@ static uint16_t fp32ToFp16(float v)
     return (uint16_t)(sign >> 16 | body >> 13) & 0xFFFF;
 }
 
+static PolymorphicLightInfoFull ConvertRectLightTriangle(
+    const caustica::scene::LightRenderProxy& proxy, uint32_t triangleIndex)
+{
+    const auto& rect = std::get<caustica::scene::RectLightData>(proxy.data);
+    const double halfWidth = std::max(0.f, rect.width) * 0.5;
+    const double halfHeight = std::max(0.f, rect.height) * 0.5;
+    const dm::double3 localCorners[4] = {
+        { -halfWidth, -halfHeight, 0.0 },
+        { -halfWidth,  halfHeight, 0.0 },
+        {  halfWidth,  halfHeight, 0.0 },
+        {  halfWidth, -halfHeight, 0.0 },
+    };
+    const uint32_t indices[2][3] = { { 0, 1, 2 }, { 0, 2, 3 } };
+    const uint32_t* tri = indices[triangleIndex];
+    const float3 base = float3(proxy.transform.transformPoint(localCorners[tri[0]]));
+    float3 edge1 = float3(proxy.transform.transformPoint(localCorners[tri[1]])) - base;
+    float3 edge2 = float3(proxy.transform.transformPoint(localCorners[tri[2]])) - base;
+    if (dot(cross(edge1, edge2), float3(caustica::scene::getLightDirection(proxy.transform))) < 0.f)
+        std::swap(edge1, edge2);
+
+    PolymorphicLightInfo polymorphic{};
+    PolymorphicLightInfoEx polymorphicEx{};
+    polymorphic.Center = base + (edge1 + edge2) / 3.f;
+    polymorphic.ColorTypeAndFlags =
+        (uint32_t(PolymorphicLightType::kTriangle) << kPolymorphicLightTypeShift)
+        | kPolymorphicLightNotSampleableByBSDFBit;
+    packLightColor(proxy.color * std::max(0.f, rect.intensity), polymorphic);
+    polymorphic.Direction1 = fp32ToFp16(edge1.x) | (uint32_t(fp32ToFp16(edge2.x)) << 16);
+    polymorphic.Direction2 = fp32ToFp16(edge1.y) | (uint32_t(fp32ToFp16(edge2.y)) << 16);
+    polymorphic.Scalars = fp32ToFp16(edge1.z) | (uint32_t(fp32ToFp16(edge2.z)) << 16);
+    return PolymorphicLightInfoFull::make(polymorphic, polymorphicEx);
+}
+
 static PolymorphicLightInfoFull ConvertLightProxy(
     const caustica::scene::LightRenderProxy& proxy)
 {
@@ -616,30 +650,43 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
         {
         case LightType_Spot:
         case LightType_Point:
+        case LightType_Rect:
         {
-            PolymorphicLightInfoFull lightPackedFull = ConvertLightProxy(lightProxy);
-            outLightBuffer.push_back( lightPackedFull.Base );
-            outLightExBuffer.push_back( lightPackedFull.Extended );
-
             const uint32_t entityId = uint32_t(lightProxy.entity);
-            outLightExBuffer.back().UniqueID = Hash32Combine(entityId, 0u);
-
-            size_t lightHash = size_t(entityId);
-            uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
-            auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
-            if( entry != m_historyRemapAnalyticLightIndices.end() )
+            const uint32_t triangleCount = lightType == LightType_Rect ? 2u : 1u;
+            if (outLightBuffer.size() + triangleCount > CAUSTICA_LIGHTING_MAX_LIGHTS)
             {
-                historicIndex = entry->second;
-                entry->second = ctrlBuff.TotalLightCount;
+                allGood = false;
+                break;
             }
-            else
-                m_historyRemapAnalyticLightIndices.insert( std::make_pair(lightHash, ctrlBuff.TotalLightCount) );
 
-            outLightHistoryRemapCurrentToPastBuffer.push_back(historicIndex);
             m_currentFrameAnalyticLightIndex[entityId] = ctrlBuff.TotalLightCount;
+            for (uint32_t triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+            {
+                PolymorphicLightInfoFull lightPackedFull = lightType == LightType_Rect
+                    ? ConvertRectLightTriangle(lightProxy, triangleIndex)
+                    : ConvertLightProxy(lightProxy);
+                outLightBuffer.push_back(lightPackedFull.Base);
+                outLightExBuffer.push_back(lightPackedFull.Extended);
+                outLightExBuffer.back().UniqueID = Hash32Combine(entityId, triangleIndex);
 
-            ctrlBuff.AnalyticLightCount++;
-            ctrlBuff.TotalLightCount++;
+                size_t lightHash = size_t(entityId);
+                if (lightType == LightType_Rect)
+                    caustica::rhi::hash_combine(lightHash, triangleIndex);
+                uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+                auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
+                if (entry != m_historyRemapAnalyticLightIndices.end())
+                {
+                    historicIndex = entry->second;
+                    entry->second = ctrlBuff.TotalLightCount;
+                }
+                else
+                    m_historyRemapAnalyticLightIndices.insert(std::make_pair(lightHash, ctrlBuff.TotalLightCount));
+
+                outLightHistoryRemapCurrentToPastBuffer.push_back(historicIndex);
+                ctrlBuff.AnalyticLightCount++;
+                ctrlBuff.TotalLightCount++;
+            }
         } break;
         default: break;
         }

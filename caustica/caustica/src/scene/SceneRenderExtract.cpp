@@ -320,6 +320,12 @@ void ExtractLightsFull(ecs::World& world, SceneRenderData& out)
             if (!light.enabled) return;
             extractLight(entity, light.color, light.proxies, toLightData(light), global);
         });
+    world.each<RectLightComponent, GlobalTransformComponent>(
+        [&](ecs::Entity entity, const RectLightComponent& light, const GlobalTransformComponent& global)
+        {
+            if (!light.enabled) return;
+            extractLight(entity, light.color, {}, toLightData(light), global);
+        });
     world.each<EnvironmentLightComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, const EnvironmentLightComponent& light, const GlobalTransformComponent& global)
         {

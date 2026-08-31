@@ -30,14 +30,12 @@ void FillCommonLightConstants(dm::float3 color, LightConstants& lightConstants)
 
 int getLightType(const LightData& data)
 {
-    switch (data.index())
-    {
-    case 0: return LightType_Directional;
-    case 1: return LightType_Spot;
-    case 2: return LightType_Point;
-    case 3: return LightType_Environment;
-    default: return LightType_None;
-    }
+    if (std::holds_alternative<DirectionalLightData>(data)) return LightType_Directional;
+    if (std::holds_alternative<SpotLightData>(data)) return LightType_Spot;
+    if (std::holds_alternative<PointLightData>(data)) return LightType_Point;
+    if (std::holds_alternative<RectLightData>(data)) return LightType_Rect;
+    if (std::holds_alternative<EnvironmentLightData>(data)) return LightType_Environment;
+    return LightType_None;
 }
 
 int getLightType(const LightRenderProxy& proxy)
@@ -58,6 +56,11 @@ int getLightType(const SpotLightComponent&)
 int getLightType(const PointLightComponent&)
 {
     return LightType_Point;
+}
+
+int getLightType(const RectLightComponent&)
+{
+    return LightType_Rect;
 }
 
 int getLightType(const EnvironmentLightComponent&)
@@ -154,6 +157,11 @@ LightData toLightData(const PointLightComponent& component)
     return PointLightData{ component.intensity, component.radius, component.range };
 }
 
+LightData toLightData(const RectLightComponent& component)
+{
+    return RectLightData{ component.intensity, component.width, component.height };
+}
+
 LightData toLightData(const EnvironmentLightComponent& component)
 {
     return EnvironmentLightData{
@@ -210,6 +218,12 @@ void fillLightConstants(
         lightConstants.intensity = 0.0f;
         lightConstants.color = { 0, 0, 0 };
         break;
+    case LightType_Rect:
+        // Rect lights participate in the polymorphic direct-light sampler. The
+        // legacy LightConstants representation has no area-light payload.
+        lightConstants.intensity = 0.0f;
+        lightConstants.color = { 0, 0, 0 };
+        break;
     default:
         break;
     }
@@ -238,6 +252,11 @@ bool tryFillLightConstants(
         fillLightConstants(point->color, toLightData(*point), globalTransform, lightConstants);
         return true;
     }
+    if (const auto* rect = tryGetRectLight(world, entity))
+    {
+        fillLightConstants(rect->color, toLightData(*rect), globalTransform, lightConstants);
+        return true;
+    }
     if (const auto* environment = tryGetEnvironmentLight(world, entity))
     {
         fillLightConstants(environment->color, toLightData(*environment), globalTransform, lightConstants);
@@ -251,6 +270,7 @@ bool hasAnyLightComponent(const ecs::World& world, ecs::Entity entity)
     return world.has<DirectionalLightComponent>(entity)
         || world.has<SpotLightComponent>(entity)
         || world.has<PointLightComponent>(entity)
+        || world.has<RectLightComponent>(entity)
         || world.has<EnvironmentLightComponent>(entity);
 }
 
@@ -285,6 +305,16 @@ bool setLightProperty(
         return false;
     }
 
+
+    if (auto* rect = tryGetRectLight(world, entity))
+    {
+        if (propName == "color") { rect->color = value.xyz(); return true; }
+        if (propName == "intensity") { rect->intensity = value.x; return true; }
+        if (propName == "width") { rect->width = value.x; return true; }
+        if (propName == "height") { rect->height = value.x; return true; }
+        return false;
+    }
+
     if (auto* environment = tryGetEnvironmentLight(world, entity))
     {
         if (propName == "color") { environment->color = value.xyz(); return true; }
@@ -309,6 +339,11 @@ PointLightComponent* tryGetPointLight(ecs::World& world, ecs::Entity entity)
     return world.tryGet<PointLightComponent>(entity);
 }
 
+RectLightComponent* tryGetRectLight(ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<RectLightComponent>(entity);
+}
+
 EnvironmentLightComponent* tryGetEnvironmentLight(ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<EnvironmentLightComponent>(entity);
@@ -327,6 +362,11 @@ const SpotLightComponent* tryGetSpotLight(const ecs::World& world, ecs::Entity e
 const PointLightComponent* tryGetPointLight(const ecs::World& world, ecs::Entity entity)
 {
     return world.tryGet<PointLightComponent>(entity);
+}
+
+const RectLightComponent* tryGetRectLight(const ecs::World& world, ecs::Entity entity)
+{
+    return world.tryGet<RectLightComponent>(entity);
 }
 
 const EnvironmentLightComponent* tryGetEnvironmentLight(const ecs::World& world, ecs::Entity entity)
@@ -349,6 +389,11 @@ PointLightData* tryGetPointLightData(LightData& data)
     return std::get_if<PointLightData>(&data);
 }
 
+RectLightData* tryGetRectLightData(LightData& data)
+{
+    return std::get_if<RectLightData>(&data);
+}
+
 EnvironmentLightData* tryGetEnvironmentLightData(LightData& data)
 {
     return std::get_if<EnvironmentLightData>(&data);
@@ -367,6 +412,11 @@ const SpotLightData* tryGetSpotLightData(const LightData& data)
 const PointLightData* tryGetPointLightData(const LightData& data)
 {
     return std::get_if<PointLightData>(&data);
+}
+
+const RectLightData* tryGetRectLightData(const LightData& data)
+{
+    return std::get_if<RectLightData>(&data);
 }
 
 const EnvironmentLightData* tryGetEnvironmentLightData(const LightData& data)

@@ -24,6 +24,7 @@ bool isJsonLightLeafType(const std::string& type)
     return type == "DirectionalLight"
         || type == "PointLight"
         || type == "SpotLight"
+        || type == "RectLight"
         || type == "EnvironmentLight";
 }
 
@@ -69,6 +70,17 @@ std::optional<AnyLightComponent> makeLightComponentFromJson(const std::string& t
         src["radius"] >> component.radius;
         src["range"] >> component.range;
         loadProxyMeshNodes(src, component.proxies);
+        return component;
+    }
+
+    if (type == "RectLight")
+    {
+        RectLightComponent component;
+        if (src.isMember("enabled")) src["enabled"] >> component.enabled;
+        src["color"] >> component.color;
+        src["intensity"] >> component.intensity;
+        src["width"] >> component.width;
+        src["height"] >> component.height;
         return component;
     }
 

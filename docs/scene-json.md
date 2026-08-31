@@ -178,6 +178,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `DirectionalLight` | 方向光。方向来自同实体 `Transform.rotation`。 |
 | `PointLight` | 点光。 |
 | `SpotLight` | 聚光灯。 |
+| `RectLight` | 矩形面积光；位于实体局部 XY 平面并朝局部 -Z 发光。 |
 | `EnvironmentLight` | 环境光。贴图用 `source`（可用 `procedural:sky`）。 |
 | `PerspectiveCamera` / `PerspectiveCameraEx` | 透视相机。 |
 | `OrthographicCamera` | 正交相机。 |
@@ -256,6 +257,30 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `radius` | number | 光源半径。 |
 | `range` | number | 影响范围。`0` 表示无限范围。 |
 | `proxyMeshNodes` | string array | 可选。把网格节点作为 analytic light proxy。 |
+
+### `RectLight`
+
+```json
+{
+  "name": "CeilingPanel",
+  "type": "RectLight",
+  "translation": [0.0, 3.0, 0.0],
+  "rotation": [0.0, 0.0, 0.0, 1.0],
+  "color": [1.0, 0.95, 0.9],
+  "intensity": 20.0,
+  "width": 2.0,
+  "height": 1.0
+}
+```
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `color` | `[r, g, b]` | 线性 RGB 发光颜色。 |
+| `intensity` | number | 发射辐射亮度倍率；与无贴图 RECT mesh 的 `EmissiveColor × EmissiveIntensity` 等价。 |
+| `width` | number | 局部 X 方向宽度；还会受到实体 Transform 缩放。 |
+| `height` | number | 局部 Y 方向高度；还会受到实体 Transform 缩放。 |
+
+RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时它使用与自发光 RECT mesh 相同的两个三角形面积光采样语义，但不生成可见或可碰撞的网格。
 
 ### `EnvironmentLight`
 

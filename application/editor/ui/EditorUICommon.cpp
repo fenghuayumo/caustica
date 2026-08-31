@@ -72,7 +72,8 @@ namespace
         if (entity == ecs::NullEntity) return false;
         return caustica::scene::tryGetDirectionalLight(ew.world(), entity) != nullptr
             || caustica::scene::tryGetSpotLight(ew.world(), entity) != nullptr
-            || caustica::scene::tryGetPointLight(ew.world(), entity) != nullptr;
+            || caustica::scene::tryGetPointLight(ew.world(), entity) != nullptr
+            || caustica::scene::tryGetRectLight(ew.world(), entity) != nullptr;
     }
 
     bool IsLightEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
@@ -288,6 +289,8 @@ bool GetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
         return light->enabled;
     if (auto* light = caustica::scene::tryGetPointLight(ew.world(), entity))
         return light->enabled;
+    if (auto* light = caustica::scene::tryGetRectLight(ew.world(), entity))
+        return light->enabled;
     if (auto* light = caustica::scene::tryGetEnvironmentLight(ew.world(), entity))
         return light->enabled;
     return true;
@@ -313,6 +316,11 @@ void SetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity,
     {
         light->enabled = enabled;
         ew.world().notifyComponentChanged<caustica::scene::PointLightComponent>(entity);
+    }
+    if (auto* light = caustica::scene::tryGetRectLight(ew.world(), entity))
+    {
+        light->enabled = enabled;
+        ew.world().notifyComponentChanged<caustica::scene::RectLightComponent>(entity);
     }
     if (auto* light = caustica::scene::tryGetEnvironmentLight(ew.world(), entity))
     {
