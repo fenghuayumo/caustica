@@ -14,8 +14,7 @@
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
 
-#include <imgui/imgui_renderer.h>
-#include <imgui/ui_macros.h>
+#include <utility>
 
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -375,237 +374,37 @@ void OpacityMicromapBuilder::setGlobalShaderMacros(std::vector<caustica::ShaderM
         macros.push_back( { "OMM_DEBUG_VIEW_OVERLAY", "1" } );
 }
 
-bool OpacityMicromapBuilder::debugGUI(
-    float indent,
-    const caustica::scene::SceneRenderData& renderData)
+void OpacityMicromapBuilder::collectBakeStats(
+    const caustica::scene::SceneRenderData& renderData,
+    std::vector<OmmBakeMeshStat>& out) const
 {
-    RAII_SCOPE(ImGui::PushID("OpacityMicromapBuilderDebugGUI"); , ImGui::PopID(); );
-    
-    bool resetAccumulation = false;
-    #define RESET_ON_CHANGE(code) do{if (code) resetAccumulation = true;} while(false)
+    out.clear();
+    if (m_sceneGpuResources == nullptr)
+        return;
 
-    if (ImGui::Checkbox("Enable", &m_uiData.Enable))
-        resetAccumulation = true;
-
+    for (const auto& mesh : renderData.staticData().meshSnapshots)
     {
+        const auto meshGpuIt = m_sceneGpuResources->meshRegistry.find(mesh.id);
+        if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
+            continue;
+
+        const auto& geometryDebugData = meshGpuIt->second.geometryDebugData;
+        OmmBakeMeshStat meshStat;
+        meshStat.debugName = mesh.debugName;
+        for (const caustica::render::MeshGeometryGpuDebugData& debugData : geometryDebugData)
         {
-            UI_SCOPED_DISABLE(m_uiData.ActiveState.has_value() && m_uiData.ActiveState->Format != caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State);
-            if (ImGui::Checkbox("Force 2 State", &m_uiData.Force2State))
-                resetAccumulation = true;
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Will force 2-State via TLAS instance mask.");
+            if (debugData.ommIndexBufferOffset == 0xFFFFFFFF)
+                continue;
+            const uint64_t known = debugData.ommStatsTotalKnown;
+            const uint64_t unknown = debugData.ommStatsTotalUnknown;
+            const uint64_t total = known + unknown;
+            OmmBakeGeometryStat geomStat;
+            geomStat.known = known;
+            geomStat.unknown = unknown;
+            geomStat.knownRatioPercent = total == 0 ? -1.f : 100.f * float(known) / float(total);
+            meshStat.geometries.push_back(geomStat);
         }
-
-        {
-            if (ImGui::Checkbox("render ONLY OMMs", &m_uiData.OnlyOMMs))
-                resetAccumulation = true;
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Bake settings (Require Rebuild to take effect)");
-
-        if (m_uiData.BuildsLeftInQueue != 0)
-        {
-            const float progress = (1.f - (float)m_uiData.BuildsLeftInQueue / m_uiData.BuildsQueued);
-            std::stringstream ss;
-            ss << "Build progress: " << (uint32_t)(100.f * progress) << "%";
-            std::string str = ss.str();
-            ImGui::ProgressBar(progress, ImVec2(-FLT_MIN, 0), str.c_str());
-        }
-
-        {
-            UI_SCOPED_DISABLE(m_uiData.ActiveState.has_value() && m_uiData.ActiveState == m_uiData.DesiredState);
-            if (ImGui::Button("Trigger Rebuild"))
-            {
-                m_uiData.TriggerRebuild = true;
-            }
-        }
-
-        {
-            ImGui::Checkbox("Dynamic subdivision level", &m_uiData.DesiredState.EnableDynamicSubdivision);
-        }
-
-        {
-            UI_SCOPED_DISABLE(!m_uiData.DesiredState.EnableDynamicSubdivision);
-            ImGui::SliderFloat("Dynamic subdivision scale", &m_uiData.DesiredState.DynamicSubdivisionScale, 0.01f, 20.f, "%.1f", ImGuiSliderFlags_Logarithmic);
-        }
-
-        {
-            const int MaxSubdivisionLevel = m_uiData.DesiredState.ComputeOnly ? 12 : 10;
-            m_uiData.DesiredState.MaxSubdivisionLevel = std::clamp(m_uiData.DesiredState.MaxSubdivisionLevel, 1, MaxSubdivisionLevel);
-            ImGui::SliderInt("Max subdivision level", &m_uiData.DesiredState.MaxSubdivisionLevel, 1, MaxSubdivisionLevel, "%d", ImGuiSliderFlags_AlwaysClamp);
-        }
-
-        {
-            std::array<const char*, 3> formatNames =
-            {
-                "None",
-                "Fast Trace",
-                "Fast Build"
-            };
-
-            std::array<caustica::rhi::rt::OpacityMicromapBuildFlags, 3> formats =
-            {
-                caustica::rhi::rt::OpacityMicromapBuildFlags::None,
-                caustica::rhi::rt::OpacityMicromapBuildFlags::FastTrace,
-                caustica::rhi::rt::OpacityMicromapBuildFlags::FastBuild
-            };
-
-            if (ImGui::BeginCombo("Flag", formatNames[(uint32_t)m_uiData.DesiredState.Flag]))
-            {
-                for (uint i = 0; i < formats.size(); i++)
-                {
-                    bool is_selected = formats[i] == m_uiData.DesiredState.Flag;
-                    if (ImGui::Selectable(formatNames[i], is_selected))
-                        m_uiData.DesiredState.Flag = formats[i];
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-        }
-
-        {
-            auto FormatToString = [ ](caustica::rhi::rt::OpacityMicromapFormat format) {
-                assert(format == caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State || format == caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State);
-                return format == caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State ? "2-State" : "4-State";
-            };
-            std::array<caustica::rhi::rt::OpacityMicromapFormat, 2> formats = { caustica::rhi::rt::OpacityMicromapFormat::OC1_2_State, caustica::rhi::rt::OpacityMicromapFormat::OC1_4_State };
-            if (ImGui::BeginCombo("Format", FormatToString(m_uiData.DesiredState.Format)))
-            {
-                for (uint i = 0; i < formats.size(); i++)
-                {
-                    bool is_selected = formats[i] == m_uiData.DesiredState.Format;
-                    if (ImGui::Selectable(FormatToString(formats[i]), is_selected))
-                        m_uiData.DesiredState.Format = formats[i];
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-        }
-
-        {
-            auto StateToString = [ ](caustica::omm::OpacityState state) {
-                const char* strings[] = { "Transparent", "Opaque", "UnknownTransparent", "UnknownOpaque" };
-                assert((int)state >= 0 && (int)state < IM_ARRAYSIZE(strings));
-                return strings[(int)state];
-            };
-            const std::array<caustica::omm::OpacityState, 4> states = { caustica::omm::OpacityState::Transparent, caustica::omm::OpacityState::Opaque, caustica::omm::OpacityState::UnknownTransparent, caustica::omm::OpacityState::UnknownOpaque };
-
-            if (ImGui::BeginCombo("AlphaCutoffGT", StateToString(static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffGT))))
-            {
-                for (uint i = 0; i < states.size(); i++)
-                {
-                    bool is_selected = states[i] == static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffGT);
-                    if (ImGui::Selectable(StateToString(states[i]), is_selected))
-                        m_uiData.DesiredState.AlphaCutoffGT = (int)states[i];
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-
-            if (ImGui::BeginCombo("AlphaCutoffLE", StateToString(static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffLE))))
-            {
-                for (uint i = 0; i < states.size(); i++)
-                {
-                    bool is_selected = states[i] == static_cast<caustica::omm::OpacityState>(m_uiData.DesiredState.AlphaCutoffLE);
-                    if (ImGui::Selectable(StateToString(states[i]), is_selected))
-                        m_uiData.DesiredState.AlphaCutoffLE = (int)states[i];
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-        }
-
-        if (ImGui::CollapsingHeader("Debug settings"))
-        {
-            UI_SCOPED_INDENT(indent);
-
-#if ENABLE_DEBUG_VIZUALISATIONS
-            RESET_ON_CHANGE( ImGui::Combo("Debug View", (int*)&m_uiData.DebugView, "Disabled\0InWorld\0Overlay\0\0") );
-#else
-            ImGui::Text("Please enable ENABLE_DEBUG_VIZUALISATIONS for debug viz");
-            m_uiData.DebugView = OpacityMicroMapDebugView::Disabled;
-#endif
-
-            ImGui::Checkbox("Compute Only", &m_uiData.DesiredState.ComputeOnly);
-
-            ImGui::Checkbox("Enable \"Level Line Intersection\"", &m_uiData.DesiredState.LevelLineIntersection);
-
-            ImGui::Checkbox("Enable TexCoord deduplication", &m_uiData.DesiredState.EnableTexCoordDeduplication);
-
-            ImGui::Checkbox("Force 32-bit indices", &m_uiData.DesiredState.Force32BitIndices);
-
-            ImGui::Checkbox("Enable Special Indices", &m_uiData.DesiredState.EnableSpecialIndices);
-
-            ImGui::SliderInt("Max memory per OMM", &m_uiData.DesiredState.MaxOmmArrayDataSizeInMB, 1, 1000, "%dMB", ImGuiSliderFlags_Logarithmic);
-
-            ImGui::Checkbox("Enable NSight debug mode", &m_uiData.DesiredState.EnableNsightDebugMode);
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Stats");
-
-        {
-            std::stringstream ss;
-            ss << m_uiData.BuildsQueued << " active OMMs";
-            std::string str = ss.str();
-            ImGui::Text("%s", str.c_str());
-
-            if (ImGui::CollapsingHeader("Bake Stats"))
-            {
-                UI_SCOPED_INDENT(indent);
-
-                for (const auto& mesh : renderData.staticData().meshSnapshots)
-                {
-                    if (m_sceneGpuResources == nullptr)
-                        continue;
-                    const auto meshGpuIt =
-                        m_sceneGpuResources->meshRegistry.find(mesh.id);
-                    if (meshGpuIt == m_sceneGpuResources->meshRegistry.end())
-                        continue;
-                    const auto& geometryDebugData = meshGpuIt->second.geometryDebugData;
-                    bool meshHasOmms = false;
-                    for (const caustica::render::MeshGeometryGpuDebugData& debugData : geometryDebugData)
-                    {
-                        if (debugData.ommIndexBufferOffset != 0xFFFFFFFF)
-                        {
-                            meshHasOmms = true;
-                            break;
-                        }
-                    }
-
-                    if (!meshHasOmms)
-                        continue;
-
-                    ImGui::Text("%s", mesh.debugName.c_str());
-
-                    {
-                        UI_SCOPED_INDENT(indent);
-
-                        for (const caustica::render::MeshGeometryGpuDebugData& debugData : geometryDebugData)
-                        {
-                            if (debugData.ommIndexBufferOffset == 0xFFFFFFFF)
-                                continue;
-
-                            const uint64_t known = debugData.ommStatsTotalKnown;
-                            const uint64_t unknown = debugData.ommStatsTotalUnknown;
-                            const uint64_t total = known + unknown;
-                            const float ratio = total == 0 ? -1.f : 100.f * float(known) / float(total);
-
-                            std::stringstream ss;
-                            ss << ratio << "%% (" << known << " known, " << unknown << " unknown" << ")";
-
-                            std::string str = ss.str();
-                            ImGui::Text("%s", str.c_str());
-                        }
-                    }
-                }
-            }
-        }
+        if (!meshStat.geometries.empty())
+            out.push_back(std::move(meshStat));
     }
-
-    return resetAccumulation;
 }

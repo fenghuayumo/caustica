@@ -61,8 +61,6 @@ public:
 
     // caustica::rhi::TextureHandle            getEnvMapCube() const           { return m_cubemap; }
 
-    bool                            debugGUI(float indent);
-
     EnvMapImportanceSamplingParams  getShaderParams()                   { return m_envMapImportanceSamplingParams; }
 
 private:

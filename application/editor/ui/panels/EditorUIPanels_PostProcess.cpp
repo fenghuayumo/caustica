@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include "PassDebugGui.h"
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
@@ -48,8 +49,10 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
                     // Editor is outside beginGpuReadFrame; use the last published slot.
                     const uint32_t publishedFrame = scene->latestPublishedRenderFrameIndex();
                     if (publishedFrame != UINT32_MAX)
-                        opacityMicromapBuilder->debugGUI(
-                            layout.indent, scene->getRenderDataForFrame(publishedFrame));
+                        m_settings.ResetAccumulation |= DrawOpacityMicromapDebug(
+                            *opacityMicromapBuilder,
+                            scene->getRenderDataForFrame(publishedFrame),
+                            layout.indent);
                 }
             }
             else
@@ -426,7 +429,7 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
 #endif 
 
             if (m_sceneEditor.zoomTool() != nullptr && ImGui::CollapsingHeader("Zoom Tool"))
-                m_sceneEditor.zoomTool()->debugGUI(layout.indent);
+                DrawZoomToolDebug(*m_sceneEditor.zoomTool());
         }
 
 

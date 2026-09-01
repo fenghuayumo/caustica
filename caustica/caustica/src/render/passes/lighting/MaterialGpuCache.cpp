@@ -10,8 +10,6 @@
 
 #include <rhi/utils.h>
 
-#include <imgui/imgui_renderer.h>
-
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -21,7 +19,6 @@
 #include <core/command_line.h>
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
-#include <imgui/ui_macros.h>
 #include <render/core/TextureUtils.h>
 #include <scene/Scene.h>
 #include <scene/SceneRenderData.h>
@@ -2048,52 +2045,6 @@ void MaterialGpuCache::saveAll()
 {
     for (auto& standardMaterial : m_materials)
         saveSingle(*standardMaterial);
-}
-
-bool MaterialGpuCache::debugGui(float indent)
-{
-    RAII_SCOPE(ImGui::PushID("MaterialGpuCacheDebugGUI"); , ImGui::PopID(); );
-    
-    bool resetAccumulation = false;
-    #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
-
-    ImGui::Text("Scene material count: %d", (int)m_materials.size());
-    ImGui::Text("Material texture use count: %d", (int)m_textures.size());
-    ImGui::Text("Material shader count: %d", (int)m_shaderPermutationTable.size());
-
-    // ImGui::Separator();
-    // if (ImGui::CollapsingHeader("Debugging", ImGuiTreeNodeFlags_DefaultOpen))
-    // {
-    //     RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-    // 
-    //     ImGui::Text("<shrug>");
-    // }
-    // ImGui::Separator();
-
-    if (ImGui::CollapsingHeader("Advanced", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
-    {
-        ImGui::Text("Materials storage directory:");
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0, 1.0, 0.5, 1.0));
-        ImGui::TextWrapped("%s", m_materialsPath.string().c_str());
-        ImGui::PopStyleColor();
-
-        ImGui::Text("Set all sharedWithAllScenes props to");
-        {
-            RAII_SCOPE(ImGui::Indent();, ImGui::Unindent(););
-            if (ImGui::Button("Shared"))
-                for (auto& standardMaterial : m_materials)
-                    standardMaterial->sharedWithAllScenes = true;
-            ImGui::SameLine();
-            if (ImGui::Button("Not Shared"))
-                for (auto& standardMaterial : m_materials)
-                    standardMaterial->sharedWithAllScenes = false;
-        }
-
-        if( ImGui::Button("Save all") )
-            saveAll();
-    }
-
-    return resetAccumulation;
 }
 
 MaterialShaderPermutation StandardMaterial::computeShaderPermutation(const std::string& defaultShaderPath)

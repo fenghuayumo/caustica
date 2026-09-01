@@ -1,4 +1,5 @@
 #include "ui/EditorUIInternal.h"
+#include "PassDebugGui.h"
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
@@ -37,7 +38,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
 
             if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                m_settings.ResetAccumulation |= lightSamplingCache->infoGUI(layout.indent);
+                m_settings.ResetAccumulation |= DrawLightSamplingInfo(*lightSamplingCache);
 
             if (!m_settings.UseNEE)
                 ImGui::TextColored(warnColor, "NEE inactive — enable in Path Tracer.");
@@ -48,7 +49,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
-                    m_settings.ResetAccumulation |= envMapProcessor->debugGUI(layout.indent);
+                    m_settings.ResetAccumulation |= DrawEnvMapProcessorDebug(*envMapProcessor, layout.indent);
             }
 
             if (m_settings.UseNEE && m_settings.NEEType == 2)
@@ -87,7 +88,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
                 if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
-                    m_settings.ResetAccumulation |= lightSamplingCache->debugGUI(layout.indent);
+                    m_settings.ResetAccumulation |= DrawLightSamplingDebug(*lightSamplingCache, layout.indent);
             }
         }
 }

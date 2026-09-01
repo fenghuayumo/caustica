@@ -342,8 +342,6 @@ public:
     const std::unordered_map<std::string, StandardMaterialTexture> &
                                     getUsedTextures() const                 { return m_textures; }
 
-    bool                            debugGui(float indent);
-
     void                            sceneReloaded();
     // Incrementally create StandardMaterial objects for scene materials that do not yet have
     // standardData. Used by runtime mesh import so existing materials stay valid.

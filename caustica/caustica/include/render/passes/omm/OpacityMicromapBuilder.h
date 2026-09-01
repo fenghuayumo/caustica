@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <render/core/BindingCache.h>
@@ -83,6 +85,19 @@ struct OpacityMicroMapUIData
     OpacityMicroMapDebugView            DebugView = OpacityMicroMapDebugView::Disabled;
 };
 
+struct OmmBakeGeometryStat
+{
+    float knownRatioPercent = -1.f;
+    uint64_t known = 0;
+    uint64_t unknown = 0;
+};
+
+struct OmmBakeMeshStat
+{
+    std::string debugName;
+    std::vector<OmmBakeGeometryStat> geometries;
+};
+
 class OpacityMicromapBuilder
 {
 public:
@@ -99,7 +114,9 @@ public:
                                            const caustica::scene::SceneRenderData& renderData);
 
     OpacityMicroMapUIData &         uiData()    { return m_uiData; }
-    bool                            debugGUI(float indent, const caustica::scene::SceneRenderData& renderData);
+    void                            collectBakeStats(
+                                        const caustica::scene::SceneRenderData& renderData,
+                                        std::vector<OmmBakeMeshStat>& out) const;
 
     void                            sceneLoaded(size_t geometryCount);
     void                            sceneUnloading();

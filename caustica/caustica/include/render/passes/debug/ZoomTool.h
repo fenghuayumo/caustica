@@ -35,8 +35,6 @@ public:
 
      bool                           enabled( ) const    { return m_settings.enabled; }
 
-     bool                           debugGUI(float indent);
-
 private:
     const caustica::rhi::DeviceHandle       m_device;
     

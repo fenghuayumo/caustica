@@ -9,6 +9,8 @@
 #include <math/math.h>
 
 #include <filesystem>
+#include <string>
+#include <utility>
 
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -98,7 +100,12 @@ public:
     uint                            getEnvMapCubeDim() const        { return m_cubeDim; }
     uint64_t                        getEnvMapVersion() const        { return m_versionID; }
 
-    bool                            debugGUI(float indent);
+    bool&                           forceDynamicBake()              { return m_dbgForceDynamic; }
+    [[nodiscard]] bool              bc6uCompressionEnabled() const  { return m_BC6UCompressionEnabled; }
+    [[nodiscard]] int               compressionQuality() const      { return m_compressionQuality; }
+    void                            setCompressionQuality(int quality);
+    void                            requestSaveBakedCubemap(std::string fileName) { m_dbgSaveBaked = std::move(fileName); }
+    [[nodiscard]] uint              targetCubeResolutionRaw() const { return m_targetResolution; }
 
     bool                            isProcedural() const            { return isProceduralSky( m_loadedSourceBackgroundPath.c_str() ); }
     const std::shared_ptr<ProceduralSky> &

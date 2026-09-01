@@ -21,12 +21,10 @@
 #include <render/core/RenderDevice.h>
 #include <assets/loader/TextureLoader.h>
 
-#include <platform/file_dialog.h>
 #include <core/scope.h>
 
 #include <rhi/utils.h>
 
-#include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
 #include <assets/loader/DDSFile.h>
 
@@ -344,10 +342,18 @@ bool isnear(EMB_DirectionalLight const & a, EMB_DirectionalLight const & b)
         dm::all(dm::isnear( a.Direction, b.Direction ));
 }
 
-int EnvMapProcessor::getTargetCubeResolution() const     
-{ 
+int EnvMapProcessor::getTargetCubeResolution() const
+{
     assert( m_targetResolution != 0 ); // preUpdate() needs to be called to establish this value early
-    return m_targetResolution; 
+    return m_targetResolution;
+}
+
+void EnvMapProcessor::setCompressionQuality(int quality)
+{
+    if (m_compressionQuality == quality)
+        return;
+    m_compressionQuality = quality;
+    m_renderPassesDirty = true;
 }
 
 void EnvMapProcessor::preUpdate(caustica::rhi::CommandList* commandList, caustica::render::RenderDevice& renderDevice, std::string envMapBackgroundPath, const std::filesystem::path& sceneDirectory)
@@ -659,61 +665,6 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
     }
 
     return contentsChanged;
-}
-
-std::string CubeResToString(uint res)
-{
-    char resRet[1024]; 
-    snprintf(resRet, sizeof(resRet), "%d x %d x 6", res, res );
-    return resRet;
-}
-
-bool EnvMapProcessor::debugGUI(float indent)
-{
-    bool resetAccumulation = false;
-    #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
-
-    std::string currentRes = CubeResToString(m_targetResolution);
-    if (ImGui::BeginCombo("Target cube res", currentRes.c_str()))
-    {
-        uint resolutions[] = {512, 1024, 2048, 4096};
-        for (int i = 0; i < (int)std::size(resolutions); i++)   // note, std::size is equivalent of _countof :)
-        {
-            std::string itemName = CubeResToString(resolutions[i]);
-            bool is_selected = itemName == currentRes;
-            if (ImGui::Selectable(itemName.c_str(), is_selected))
-                m_targetResolution = resolutions[i];
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-        resetAccumulation = true;
-    }
-    IMAGE_QUALITY_OPTION(ImGui::Checkbox("Force dynamic", &m_dbgForceDynamic));
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Force re-generate every frame even if static (for performance testing only)");
-
-    if (m_BC6UCompressionEnabled)
-    {
-        if (ImGui::Combo("BC6U compression", &m_compressionQuality, "Off\0Fast\0Quality\0\0"))
-        {
-            m_renderPassesDirty = true;
-            resetAccumulation = true;
-        }
-    }
-    else
-    {
-        ImGui::Text("BC6U compression not currently supported in Vulkan");
-    }
-
-    if (ImGui::Button("Save baked cubemap"))
-    {
-        std::string fileName;
-        if (caustica::FileDialog(false, "DDS files\0*.dds\0\0", fileName))
-            m_dbgSaveBaked = fileName;
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save baked cubemap. It will be rebaked with EnvMapRadianceScale set to 1.0 before saving.");
-
-    return resetAccumulation;
 }
 
 bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::CommandList* commandList, caustica::BindingCache& bindingCache)

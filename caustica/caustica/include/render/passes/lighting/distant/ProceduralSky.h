@@ -33,9 +33,37 @@ public:
         const std::string& presetType,
         bool forceInstantUpdate);
 
-    // Returns true if any tuned parameter changed (caller should reset accumulation).
-    bool debugGUI(float indent);
     void reloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
+
+    [[nodiscard]] const std::string& activePresetType() const { return m_activePresetType; }
+    float3 computeSunDirection(float elevationDeg, float azimuthDeg) const;
+    void applySunPreset(float elevationDeg, float azimuthDeg);
+    void resetEarthAtmosphere();
+
+    float& sunElevationDeg() { return m_sunElevationDeg; }
+    float& sunAzimuthDeg() { return m_sunAzimuthDeg; }
+    float& noonAzimuthDeg() { return m_noonAzimuthDeg; }
+    bool& animateSun() { return m_animateSun; }
+    float& sunAnimSpeed() { return m_sunAnimSpeed; }
+    float& sunAnimMaxElevation() { return m_sunAnimMaxElevation; }
+    float& sunAnimPhase() { return m_sunAnimPhase; }
+    float& sunBrightness() { return m_sunBrightness; }
+    float& sunAngularDiameterDeg() { return m_sunAngularDiameterDeg; }
+    float& multiScatteringFactor() { return m_multiScatteringFactor; }
+    float& cameraHeightKm() { return m_cameraHeightKm; }
+    float& atmosphereHeightKm() { return m_atmosphereHeightKm; }
+    float& rayleighScatteringScale() { return m_rayleighScatteringScale; }
+    float& rayleighHeightKm() { return m_rayleighHeightKm; }
+    float& mieScatteringScale() { return m_mieScatteringScale; }
+    float& mieAbsorptionScale() { return m_mieAbsorptionScale; }
+    float& mieHeightKm() { return m_mieHeightKm; }
+    float& mieAnisotropy() { return m_mieAnisotropy; }
+    float& ozoneScale() { return m_ozoneScale; }
+    float3& groundAlbedo() { return m_groundAlbedo; }
+    bool& aerialPerspectiveEnabled() { return m_aerialPerspectiveEnabled; }
+    float& worldToKilometers() { return m_worldToKilometers; }
+    float& aerialPerspectiveMaxDistanceKm() { return m_aerialPerspectiveMaxDistanceKm; }
+    int& aerialPerspectiveSampleCount() { return m_aerialPerspectiveSampleCount; }
 
     bool isAerialPerspectiveEnabled() const { return m_aerialPerspectiveEnabled; }
     void applyAerialPerspective(
@@ -53,8 +81,6 @@ private:
     void createLutResources();
     void fillEarthAtmosphere(AtmosphereParameters& atm) const;
     void dispatchLutPasses(caustica::rhi::CommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
-    float3 computeSunDirection(float elevationDeg, float azimuthDeg) const;
-    void applySunPreset(float elevationDeg, float azimuthDeg);
 
     double m_lastSceneTime = 0.0;
 

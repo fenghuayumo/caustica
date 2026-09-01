@@ -6,7 +6,6 @@
 #include <scene/View.h>
 #include <shaders/render/lighting/distant/AerialPerspective.hlsli>
 #include <rhi/utils.h>
-#include <imgui/imgui_renderer.h>
 #include <core/scope.h>
 #include <algorithm>
 #include <cstring>
@@ -464,134 +463,15 @@ bool ProceduralSky::update(
     return changes;
 }
 
-bool ProceduralSky::debugGUI(float indent)
+void ProceduralSky::resetEarthAtmosphere()
 {
-    bool changed = false;
-    auto mark = [&](bool v) { changed |= v; };
-
-    ImGui::TextWrapped("Hillaire 2020 Sky Atmosphere — bake into dynamic environment cubemap.");
-    RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-
-    if (ImGui::CollapsingHeader("Sun Direction", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-
-        const bool namedPreset = isProceduralSky(m_activePresetType.c_str())
-            && m_activePresetType != c_EnvMapProcSky;
-        if (namedPreset)
-        {
-            ImGui::TextWrapped(
-                "A named sky preset is driving the sun direction.\n"
-                "Switch Environment Override to 'sky (manual)' for free elevation/azimuth control.");
-        }
-
-        ImGui::BeginDisabled(namedPreset);
-
-        mark(ImGui::Checkbox("animate sun (day cycle)", &m_animateSun));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("When enabled, elevation/azimuth follow a day arc.\nDisable for full manual control.");
-
-        if (m_animateSun)
-        {
-            mark(ImGui::SliderFloat("Day speed (cycles / min)", &m_sunAnimSpeed, 0.0f, 30.0f, "%.2f"));
-            mark(ImGui::SliderFloat("Max elevation (deg)", &m_sunAnimMaxElevation, 5.0f, 89.0f, "%.1f"));
-            mark(ImGui::SliderFloat("Noon azimuth (deg)", &m_noonAzimuthDeg, 0.0f, 360.0f, "%.1f"));
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Azimuth at solar noon. Day arc swings ±90° around this bearing.");
-            m_noonAzimuthDeg = WrapDegrees360(m_noonAzimuthDeg);
-            mark(ImGui::SliderFloat("Day phase", &m_sunAnimPhase, 0.0f, 1.0f, "%.3f"));
-        }
-        else
-        {
-            mark(ImGui::SliderFloat("Elevation (deg)", &m_sunElevationDeg, -20.0f, 89.0f, "%.2f"));
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("0 = horizon, 90 = zenith, negative = below horizon.");
-            mark(ImGui::SliderFloat("Azimuth (deg)", &m_sunAzimuthDeg, 0.0f, 360.0f, "%.2f"));
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("0 = +X, 90 = +Y in sky-local (Z-up) space.");
-            mark(ImGui::InputFloat("Elevation##in", &m_sunElevationDeg, 1.0f, 5.0f, "%.2f"));
-            mark(ImGui::InputFloat("Azimuth##in", &m_sunAzimuthDeg, 1.0f, 15.0f, "%.2f"));
-            m_sunElevationDeg = dm::clamp(m_sunElevationDeg, -89.0f, 89.0f);
-            m_sunAzimuthDeg = WrapDegrees360(m_sunAzimuthDeg);
-        }
-
-        ImGui::Text("Presets:");
-        if (ImGui::Button("Sunrise")) { applySunPreset(5.0f, 85.0f); changed = true; }
-        ImGui::SameLine();
-        if (ImGui::Button("Morning")) { applySunPreset(25.0f, 100.0f); changed = true; }
-        ImGui::SameLine();
-        if (ImGui::Button("Noon")) { applySunPreset(65.0f, 180.0f); changed = true; }
-        ImGui::SameLine();
-        if (ImGui::Button("Golden hour")) { applySunPreset(12.0f, 260.0f); changed = true; }
-        ImGui::SameLine();
-        if (ImGui::Button("Sunset")) { applySunPreset(3.0f, 275.0f); changed = true; }
-
-        ImGui::EndDisabled();
-
-        const float3 dir = computeSunDirection(m_sunElevationDeg, m_sunAzimuthDeg);
-        ImGui::Text("Direction: (%.3f, %.3f, %.3f)  elev=%.1f°  azim=%.1f°",
-            dir.x, dir.y, dir.z, m_sunElevationDeg, m_sunAzimuthDeg);
-    }
-
-    if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-        mark(ImGui::DragFloat("Sun illuminance", &m_sunBrightness, 0.01f, 0.0f, 64.0f));
-        mark(ImGui::SliderFloat("Multi-scattering", &m_multiScatteringFactor, 0.0f, 2.0f));
-        mark(ImGui::DragFloat("Sun angular diameter (deg)", &m_sunAngularDiameterDeg, 0.01f, 0.05f, 5.0f));
-        mark(ImGui::DragFloat("Camera height (km)", &m_cameraHeightKm, 0.01f, 0.001f, 50.0f));
-    }
-
-    if (ImGui::CollapsingHeader("Atmosphere / Aerosols", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-        ImGui::TextWrapped("Physical density and aerosol controls. Changes rebuild atmosphere LUTs.");
-
-        mark(ImGui::DragFloat("Atmosphere height (km)", &m_atmosphereHeightKm, 0.1f, 20.0f, 300.0f));
-        mark(ImGui::SliderFloat("Rayleigh scattering", &m_rayleighScatteringScale, 0.0f, 4.0f, "%.3f"));
-        mark(ImGui::DragFloat("Rayleigh scale height (km)", &m_rayleighHeightKm, 0.05f, 1.0f, 30.0f));
-
-        ImGui::SeparatorText("Mie aerosols");
-        mark(ImGui::SliderFloat("Mie scattering", &m_mieScatteringScale, 0.0f, 10.0f, "%.3f"));
-        mark(ImGui::SliderFloat("Mie absorption", &m_mieAbsorptionScale, 0.0f, 10.0f, "%.3f"));
-        mark(ImGui::DragFloat("Mie scale height (km)", &m_mieHeightKm, 0.01f, 0.1f, 10.0f));
-        mark(ImGui::SliderFloat("Mie anisotropy", &m_mieAnisotropy, 0.0f, 0.99f, "%.3f"));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Higher values create a tighter forward-scattering halo around the sun.");
-
-        ImGui::SeparatorText("Absorption / ground");
-        mark(ImGui::SliderFloat("Ozone absorption", &m_ozoneScale, 0.0f, 4.0f, "%.3f"));
-        mark(ImGui::ColorEdit3("Ground albedo", &m_groundAlbedo.x, ImGuiColorEditFlags_Float));
-
-        if (ImGui::Button("reset Earth atmosphere"))
-        {
-            m_atmosphereHeightKm = 100.0f;
-            m_rayleighScatteringScale = 1.0f;
-            m_rayleighHeightKm = 8.0f;
-            m_mieScatteringScale = 1.0f;
-            m_mieAbsorptionScale = 1.0f;
-            m_mieHeightKm = 1.2f;
-            m_mieAnisotropy = 0.8f;
-            m_ozoneScale = 1.0f;
-            m_groundAlbedo = float3(0.3f, 0.3f, 0.3f);
-            changed = true;
-        }
-    }
-
-    if (ImGui::CollapsingHeader("Aerial Perspective", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-        mark(ImGui::Checkbox("Enable aerial perspective", &m_aerialPerspectiveEnabled));
-        ImGui::BeginDisabled(!m_aerialPerspectiveEnabled);
-        mark(ImGui::DragFloat("World units to km", &m_worldToKilometers, 0.00001f, 0.000001f, 1.0f, "%.6f"));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Default 0.001 assumes one world unit is one meter.");
-        mark(ImGui::DragFloat("Aerial max distance (km)", &m_aerialPerspectiveMaxDistanceKm, 0.5f, 0.1f, 1000.0f));
-        mark(ImGui::SliderInt("Aerial samples", &m_aerialPerspectiveSampleCount, 4, 32));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Higher values improve long-distance quality but increase full-screen cost.");
-        ImGui::EndDisabled();
-    }
-
-    return changed;
+    m_atmosphereHeightKm = 100.0f;
+    m_rayleighScatteringScale = 1.0f;
+    m_rayleighHeightKm = 8.0f;
+    m_mieScatteringScale = 1.0f;
+    m_mieAbsorptionScale = 1.0f;
+    m_mieHeightKm = 1.2f;
+    m_mieAnisotropy = 0.8f;
+    m_ozoneScale = 1.0f;
+    m_groundAlbedo = float3(0.3f, 0.3f, 0.3f);
 }

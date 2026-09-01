@@ -17,7 +17,6 @@
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
-#include <imgui/imgui_renderer.h>
 
 using namespace caustica::math;
 
@@ -118,16 +117,5 @@ void DenoisingGuidesPass::renderDebugViz( caustica::rhi::CommandList * commandLi
     int threadGroupCountY = div_ceil(consts.RenderResolution.y, DGB_2D_THREADGROUP_SIZE);
 
     m_csDebugViz.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet, nullptr, nullptr, &consts, sizeof(consts) );
-}
-
-bool DenoisingGuidesPass::debugGUI(float indent)
-{
-    //ImGui::PushItemWidth(120.0f);
-
-    // ImGui::InputInt2("BoxPos", &m_settings.BoxPos.x);
-    // ImGui::InputInt2("BoxSize", &m_settings.BoxSize.x);
-
-    //ImGui::PopItemWidth();
-    return false;
 }
 

@@ -17,7 +17,6 @@
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
-#include <imgui/imgui_renderer.h>
 
 #define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
 #include <GLFW/glfw3.h>
@@ -112,19 +111,4 @@ void ZoomTool::render( caustica::rhi::CommandList * commandList, caustica::rhi::
 
         m_CSZoomTool.execute(commandList, threadGroupCountX, threadGroupCountY, 1, bindingSet);
     }
-}
-
-bool ZoomTool::debugGUI(float indent)
-{
-    //ImGui::PushItemWidth(120.0f);
-
-    ImGui::Checkbox("enabled", &m_settings.enabled);
-    ImGui::InputInt("ZoomFactor", &m_settings.ZoomFactor, 1);
-    m_settings.ZoomFactor = caustica::math::clamp(m_settings.ZoomFactor, 2, 32);
-
-    ImGui::InputInt2("BoxPos", &m_settings.BoxPos.x);
-    ImGui::InputInt2("BoxSize", &m_settings.BoxSize.x);
-
-    //ImGui::PopItemWidth();
-    return false;
 }

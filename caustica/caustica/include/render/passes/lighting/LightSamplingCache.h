@@ -110,8 +110,32 @@ public:
     caustica::rhi::TextureHandle            getHistoryDepth() const                     { return m_NEE_AT_HistoryDepth; }
 
 
-    bool                            infoGUI(float indent);
-    bool                            debugGUI(float indent);
+    struct LightCounts
+    {
+        uint total = 0;
+        uint envmap = 0;
+        uint triangle = 0;
+        uint analytic = 0;
+    };
+    [[nodiscard]] LightCounts       lightCounts() const;
+
+    bool&                           debugDrawLights() { return m_dbgDebugDrawLights; }
+    bool&                           debugDrawTileLightConnections() { return m_dbgDebugDrawTileLightConnections; }
+    bool&                           freezeUpdates() { return m_dbgFreezeUpdates; }
+    LightingDebugViewType&          debugDrawType() { return m_dbgDebugDrawType; }
+    bool&                           debugDisableJitter() { return m_dbgDebugDisableJitter; }
+    bool&                           debugDisableLastFrameFeedback() { return m_dbgDebugDisableLastFrameFeedback; }
+    bool&                           freezeFrustumUpdates() { return m_dbgFreezeFrustumUpdates; }
+    float&                          screenSpaceVsWorldSpaceThreshold() { return m_advSetting_ScreenSpaceVsWorldSpaceThreshold; }
+    bool&                           sampleBakedEnvironmentToggle() { return m_advSetting_SampleBakedEnvironment; }
+    float&                          reservoirHistoryDropoff() { return m_advSetting_reservoirHistoryDropoff; }
+    float&                          depthDisocclusionThreshold() { return m_depthDisocclusionThreshold; }
+    bool&                           importanceBoostIntensityDelta() { return m_importanceBoost_IntensityDelta; }
+    float&                          importanceBoostIntensityDeltaMul() { return m_importanceBoost_IntensityDeltaMul; }
+    bool&                           importanceBoostFrustum() { return m_importanceBoost_Frustum; }
+    float&                          importanceBoostFrustumMul() { return m_importanceBoost_FrustumMul; }
+    float&                          importanceBoostFrustumFadeDistance() { return m_importanceBoost_FrustumFadeDistance; }
+    bool&                           importanceBoostPreFilter() { return m_importanceBoost_PreFilter; }
 
     void                            setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros);
     [[nodiscard]] bool              sampleBakedEnvironment() const { return m_advSetting_SampleBakedEnvironment; }

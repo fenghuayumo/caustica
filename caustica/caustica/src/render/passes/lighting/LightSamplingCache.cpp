@@ -8,8 +8,9 @@
 #include <core/scope.h>
 
 #include <rhi/utils.h>
-
-#include <imgui/imgui_renderer.h>
+#if CAUSTICA_WITH_DX12
+#include <d3d12.h>
+#endif
 
 #include <core/file_utils.h>
 #include <core/format.h>
@@ -892,6 +893,12 @@ bool LightSamplingCache::totalLightCountOverflow() const
     return !m_noOverflow;
 }
 
+LightSamplingCache::LightCounts LightSamplingCache::lightCounts() const
+{
+    const LightingControlData& ctrl = m_currentCtrlBuff;
+    return { ctrl.TotalLightCount, ctrl.EnvmapQuadNodeCount, ctrl.TriangleLightCount, ctrl.AnalyticLightCount };
+}
+
 void LightSamplingCache::fillBindings(caustica::rhi::BindingSetDesc& outBindingSetDesc, const caustica::render::SceneGpuFrameHandles& gpuHandles, std::shared_ptr<class MaterialGpuCache> materialGpuCache, std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder, caustica::rhi::BufferHandle subInstanceDataBuffer,
 caustica::rhi::TextureHandle depthBuffer, caustica::rhi::TextureHandle motionVectors, caustica::rhi::TextureHandle envMapProcessed)
 {
@@ -1481,102 +1488,6 @@ void LightSamplingCache::updateEnd(caustica::rhi::CommandList * commandList, cau
 
     // this is useful to avoid "leaking" any barrier issues to subsequent passes which makes it difficult to debug
     commandList->commitBarriers();
-}
-
-bool LightSamplingCache::infoGUI(float indent)
-{
-    (void)indent;
-    RAII_SCOPE(ImGui::PushID("LightSamplingCacheInfoGUI");, ImGui::PopID(); );
-
-    // Keep only actionable status: overflow warning + compact light totals.
-    const LightingControlData& ctrl = m_currentCtrlBuff;
-    if (ctrl.TotalLightCount >= CAUSTICA_LIGHTING_MAX_LIGHTS)
-    {
-        ImGui::TextColored({ 1,0.5f,0.5f,1 }, "Light count overflow — raise CAUSTICA_LIGHTING_MAX_LIGHTS (%d)", CAUSTICA_LIGHTING_MAX_LIGHTS);
-    }
-    else
-    {
-        ImGui::Text("Lights: %u  (env %u / tri %u / analytic %u)",
-            ctrl.TotalLightCount, ctrl.EnvmapQuadNodeCount, ctrl.TriangleLightCount, ctrl.AnalyticLightCount);
-    }
-
-    return false;
-}
-
-bool LightSamplingCache::debugGUI(float indent)
-{
-    RAII_SCOPE(ImGui::PushID("LightSamplingCacheDebugGUI"); , ImGui::PopID(); );
-
-    bool resetAccumulation = false;
-    #define IMAGE_QUALITY_OPTION(code) do{if (code) resetAccumulation = true;} while(false)
-
-    ImGui::Checkbox("Debug draw all lights", &m_dbgDebugDrawLights);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Wireframe colour indicates type: red - environment map; green - emissive triangles; blue - analytic.");
-
-    ImGui::Checkbox("Debug draw NEE-AT tile light connections", &m_dbgDebugDrawTileLightConnections);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Shows lights sampled by a specific tile local sampling pdf");
-
-    ImGui::Checkbox("Freeze NEE-AT feedback updates", &m_dbgFreezeUpdates);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Feedback from the path tracer will remain frozen while this option is enabled.");
-
-    const char* debugOptions = "Disabled\0Disocclusion\0NoHistoryFeedback\0MissingFeedbackScreenSpaceCoherent\0MissingFeedbackWorldSpaceCoherent\0FeedbackRawScreenSpaceCoherent\0FeedbackRawWorldSpaceCoherent\0LowResBlendedFeedback\0FeedbackAfterClear\0TileHeatmap\0ValidateCorrectness\0\0";
-    ImGui::Combo("NEE-AT debug view", (int*)&m_dbgDebugDrawType, debugOptions);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Show various NEE-AT buffers");
-
-    ImGui::Checkbox("Debug disable local tile jitter", &m_dbgDebugDisableJitter);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Mapping from pixels to tiles will be jittered to avoid denoising artifacts.\nIt also helps with spatial sharing.\nDisable for debugging.");
-
-    ImGui::Checkbox("Debug disable last frame feedback", &m_dbgDebugDisableLastFrameFeedback);
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Simply disables last frame's feedback for debugging/validation.\nQuality should revert to slightly worse than power based sampling.");
-    
-    ImGui::Checkbox("Debug freeze frustum updates", &m_dbgFreezeFrustumUpdates);
-
-#if 1
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Advanced settings", 0/*ImGuiTreeNodeFlags_DefaultOpen*/))
-    {
-        ImGui::SliderFloat("ScreenSpaceVsWorldSpaceThreshold", &m_advSetting_ScreenSpaceVsWorldSpaceThreshold, 0.02f, 2.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Used to determine, for each sampling location, whether it's more optimal to use screen tiles or world voxels for caching.");
-
-        ImGui::SliderFloat("ReservoirHistoryDropoff", &m_advSetting_reservoirHistoryDropoff, 0.0f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("The amount of history sharing from past and from neighbours. Some is useful, \ntoo much will add lag and allow strong lights to dwarf out others.");
-
-        ImGui::SliderFloat("DepthDisocclusionThreshold", &m_depthDisocclusionThreshold, 0.999f, 20.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("During motion reprojection, drop samples if really far from target");
-
-        ImGui::Checkbox("Sample environment proxy lights", &m_advSetting_SampleBakedEnvironment);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("If enabled, environment map texture will not be sampled directly by NEE\nbut will be baked into sampling proxies like emissive triangles.\nBiased, faster but more blurry shadows in some cases.");
-
-        {
-            ImGui::Text("Importance boosts:");
-            RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-            ImGui::Checkbox("...by light intensity change", &m_importanceBoost_IntensityDelta);
-            {
-                RAII_SCOPE(ImGui::Indent(indent); , ImGui::Unindent(indent););
-                RAII_SCOPE(ImGui::PushID("Delta");, ImGui::PopID(); );
-                ImGui::InputFloat("multiplier", &m_importanceBoost_IntensityDeltaMul);
-                m_importanceBoost_IntensityDeltaMul = dm::clamp(m_importanceBoost_IntensityDeltaMul, 0.0f, 1000.0f);
-            }
-            ImGui::Checkbox("...by light frustum proximity", &m_importanceBoost_Frustum);
-            {
-                RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
-                RAII_SCOPE(ImGui::PushID("FrustProx"); , ImGui::PopID(); );
-                ImGui::InputFloat("multiplier", &m_importanceBoost_FrustumMul);
-                m_importanceBoost_FrustumMul = dm::clamp(m_importanceBoost_FrustumMul, 0.0f, 1000.0f);
-                ImGui::InputFloat("fade distance", &m_importanceBoost_FrustumFadeDistance);
-                m_importanceBoost_FrustumFadeDistance = dm::clamp(m_importanceBoost_FrustumFadeDistance, 0.0f, 1000.0f);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("How fast the boost fades outside of the frustum\nThe bigger the value, the slower it fades");
-                // ImGui::InputFloat("angle expand", &m_importanceBoost_FrustumAngleExpand);
-                // m_importanceBoost_FrustumAngleExpand = dm::clamp(m_importanceBoost_FrustumAngleExpand, 0.0f, 1000.0f);
-                // if (ImGui::IsItemHovered()) ImGui::SetTooltip("Expand frustum by specified number of degrees");
-            }
-            ImGui::Checkbox("...by pre-filter merge", &m_importanceBoost_PreFilter);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Will allow stronger feedback in 3x3 kernel to 'overwhelm' neighbors\nEXPERIMENTAL - SUPER-SLOW");
-        }
-    }
-#endif
-
-    return resetAccumulation;
 }
 
 void LightSamplingCache::setGlobalShaderMacros(std::vector<caustica::ShaderMacro> & macros)

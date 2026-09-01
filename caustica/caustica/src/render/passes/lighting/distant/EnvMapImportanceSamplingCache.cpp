@@ -7,8 +7,6 @@
 
 #include <rhi/utils.h>
 
-#include <imgui/imgui_renderer.h>
-
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -286,10 +284,4 @@ void EnvMapImportanceSamplingCache::executePresampling(caustica::rhi::CommandLis
         commandList->dispatch(groupCount, groupCount);
     }
 #endif
-}
-
-
-bool EnvMapImportanceSamplingCache::debugGUI(float indent)
-{
-    return false;
 }

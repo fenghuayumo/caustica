@@ -27,9 +27,6 @@ public:
     void                            computeAvgLayerRadiance( caustica::rhi::CommandList * commandList, caustica::rhi::BindingSetHandle bindingSet );
     void                            renderDebugViz( caustica::rhi::CommandList * commandList, DebugViewType debugView, caustica::rhi::BindingSetHandle bindingSet );
 
-    bool                            debugGUI(float indent);
-
-
 private:
     const caustica::rhi::DeviceHandle       m_device;
     

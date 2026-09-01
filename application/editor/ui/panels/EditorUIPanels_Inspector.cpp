@@ -1,4 +1,5 @@
 #include "MaterialEditorGui.h"
+#include "PassDebugGui.h"
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
@@ -465,7 +466,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::TextColored(categoryColor, "Sky Atmosphere");
-                markLightingEdited(envMapProcessor->getProceduralSky()->debugGUI(layout.indent));
+                markLightingEdited(DrawProceduralSkyDebug(*envMapProcessor->getProceduralSky(), layout.indent));
             }
         }
     }
