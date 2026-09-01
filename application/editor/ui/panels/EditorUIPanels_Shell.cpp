@@ -168,6 +168,8 @@ void EditorUI::BuildMainMenuBar()
         if (ImGui::MenuItem("Console Log", nullptr, &m_editorUI.ShowConsole) && m_editorUI.ShowConsole)
             m_editorUI.RequestFocusConsole = true;
         ImGui::Separator();
+        ImGui::MenuItem("Infinite Grid", nullptr, &m_editorUI.ShowInfiniteGrid);
+        ImGui::MenuItem("Light Gizmos", "G", &m_editorUI.ShowLightHelpers);
         ImGui::MenuItem("Show All UI", "F2", &m_editorUI.ShowUI);
         if (ImGui::MenuItem("Reset Layout"))
         {
@@ -381,15 +383,15 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     // Child window gives the tool strip its own hit-test layer above the canvas.
     {
         constexpr float kToolbarPad = 6.f;
-        // Match TransformGizmoToolbar strip: 8 buttons + 2 separators + padding.
-        constexpr float kToolbarW = 3.f * 2.f + 28.f * 8.f + 2.f * 5.f + 5.f * 2.f;
-        constexpr float kToolbarH = 28.f + 3.f * 2.f;
+        float toolbarW = 0.f;
+        float toolbarH = 0.f;
+        GetTransformGizmoToolbarSize(toolbarW, toolbarH);
         ImGui::SetCursorScreenPos(ImVec2(canvasPos.x + kToolbarPad, canvasPos.y + kToolbarPad));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.f, 0.f, 0.f, 0.f));
         if (ImGui::BeginChild(
                 "##GizmoToolbarOverlay",
-                ImVec2(kToolbarW + 2.f, kToolbarH + 2.f),
+                ImVec2(toolbarW + 2.f, toolbarH + 2.f),
                 ImGuiChildFlags_None,
                 ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
                     | ImGuiWindowFlags_NoBackground))

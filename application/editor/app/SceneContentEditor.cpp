@@ -341,6 +341,8 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     auto* ew = app ? caustica::entityWorld(*app) : nullptr;
     if (!app || !scene || !ew || !caustica::isSceneLoaded(*app))
         return caustica::ecs::NullEntity;
+    if (kind == EditorLightKind::Rect && caustica::isSceneStructureBusy(*app))
+        return caustica::ecs::NullEntity;
 
     const std::string id = makeUniqueAuthoringId(LightDisplayName(kind));
     ecs::Entity entity = caustica::ecs::NullEntity;
@@ -412,6 +414,19 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         placeInFrontOfCamera(entity, false);
     else
         ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
+
+    if (kind == EditorLightKind::Rect)
+    {
+        if (auto* local = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity))
+        {
+            dm::double3 translation = local->translation;
+            translation.y = std::max(translation.y, 1.6);
+            ew->setTranslation(entity, translation);
+        }
+        scene->syncRectLightVisualFromComponent(entity);
+        ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
+    }
+    ew->discardStructureDirtyIfGeometryUnchanged();
 
     registerAuthoredEntity(entity);
     selectCreatedEntity(entity, true);

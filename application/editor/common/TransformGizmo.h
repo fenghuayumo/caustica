@@ -18,7 +18,9 @@ struct TransformGizmoContext
 };
 
 void BuildTransformGizmoToolbar(EditorUIState& editorUI);
+void GetTransformGizmoToolbarSize(float& width, float& height);
 void DrawInfiniteGrid(const TransformGizmoContext& ctx);
+void DrawLightHelpers(const TransformGizmoContext& ctx);
 bool DrawTransformGizmo(const TransformGizmoContext& ctx);
 // Viewport top-right orientation widget (ImOGuizmo XYZ axes).
 void DrawViewOrientationGizmo(const TransformGizmoContext& ctx);

@@ -257,7 +257,11 @@ static uint16_t fp32ToFp16(float v)
 static PolymorphicLightInfoFull ConvertRectLightTriangle(
     const caustica::scene::LightRenderProxy& proxy, uint32_t triangleIndex)
 {
-    const auto& rect = std::get<caustica::scene::RectLightData>(proxy.data);
+    const auto* rectData = caustica::scene::tryGetRectLightData(proxy.data);
+    if (!rectData || triangleIndex > 1u)
+        return PolymorphicLightInfoFull::make(PolymorphicLightInfo{}, PolymorphicLightInfoEx::empty());
+
+    const auto& rect = *rectData;
     const double halfWidth = std::max(0.f, rect.width) * 0.5;
     const double halfHeight = std::max(0.f, rect.height) * 0.5;
     const dm::double3 localCorners[4] = {
@@ -558,30 +562,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandLis
     for (const scene::LightRenderProxy* lightProxy : sortedLights)
     {
         if (scene::getLightType(*lightProxy) == LightType_Rect)
-        {
-            if (lightBufferOffset + 2 > m_MaxLightsInBuffer)
-                break;
-
-            auto pOffset = m_PrimitiveLightBufferOffsets.find(lightProxy->entity);
-            const int previousBase = pOffset != m_PrimitiveLightBufferOffsets.end() ? pOffset->second : -1;
-            m_PrimitiveLightBufferOffsets[lightProxy->entity] = lightBufferOffset;
-
-            for (uint32_t triangleIndex = 0; triangleIndex < 2; ++triangleIndex)
-            {
-                PrepareLightsTask task;
-                task.instanceAndGeometryIndex = TASK_PRIMITIVE_LIGHT_BIT | uint32_t(primitiveLightInfos.size());
-                task.lightBufferOffset = lightBufferOffset++;
-                task.triangleCount = 1;
-                task.previousLightBufferOffset = previousBase >= 0 ? previousBase + int(triangleIndex) : -1;
-                tasks.push_back(task);
-
-                PolymorphicLightInfoFull triangle = ConvertRectLightTriangle(*lightProxy, triangleIndex);
-                triangle.Extended.UniqueID = GaussianProxyHash32Combine(uint32_t(lightProxy->entity), triangleIndex);
-                primitiveLightInfos.push_back(triangle);
-                numFinitePrimLights++;
-            }
             continue;
-        }
 
         PolymorphicLightInfoFull polymorphicLight = {};
         if (!ConvertLightProxy(*lightProxy, polymorphicLight, enableImportanceSampledEnvironmentLight, m_EnvironmentMap))

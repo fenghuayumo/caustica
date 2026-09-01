@@ -252,6 +252,12 @@ namespace caustica
         [[nodiscard]] ecs::Entity attachPointLightToRoot(scene::PointLightComponent component, const std::string& name = {});
         [[nodiscard]] ecs::Entity attachRectLightToRoot(scene::RectLightComponent component, const std::string& name = {});
         [[nodiscard]] ecs::Entity attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name = {});
+        // Unit XY emissive panel (faces local -Z). New lights rotate so -Z is
+        // world -Y (ceiling) and scale is width x height.
+        void ensureRectLightVisual(ecs::Entity entity);
+        void ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity entity);
+        void syncRectLightVisualFromComponent(ecs::Entity entity);
+        void syncRectLightVisualFromComponent(scene::SceneEntityWorld& world, ecs::Entity entity);
         void processNodesRecursive();
 
         [[nodiscard]] const SceneSettings* getSceneSettings() const

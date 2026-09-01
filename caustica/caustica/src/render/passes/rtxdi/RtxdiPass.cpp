@@ -19,6 +19,8 @@
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <scene/SceneRenderData.h>
+#include <scene/SceneLightAccess.h>
+#include <shaders/light_types.h>
 #include <shaders/render/rtxdi/ShaderParameters.h>
 #include <shaders/FrameConstantBuffer.h>
 #include <core/scope.h>
@@ -330,7 +332,15 @@ void RtxdiPass::prepareResources(
     bool envMapPresent = envMap != nullptr;
     uint32_t numEmissiveMeshes, numEmissiveTriangles = 0;
     m_PrepareLightsPass->countLightsInScene(numEmissiveMeshes, numEmissiveTriangles);
-    uint32_t numPrimitiveLights = renderData ? uint32_t(renderData->lights.size()) : 0;
+    uint32_t numPrimitiveLights = 0;
+    if (renderData)
+    {
+        for (const auto& light : renderData->lights)
+        {
+            if (caustica::scene::getLightType(light) != LightType_Rect)
+                ++numPrimitiveLights;
+        }
+    }
     if (m_BridgeParameters.gaussianSplatEmissionProxies != nullptr && m_BridgeParameters.gaussianSplatEmissionIntensity > 0.0f)
         numPrimitiveLights += uint32_t(m_BridgeParameters.gaussianSplatEmissionProxies->size());
     uint32_t numGeometryInstances = uint32_t(geometryInstanceCount);

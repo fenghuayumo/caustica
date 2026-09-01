@@ -426,8 +426,9 @@ void SceneEntityWorld::syncDirtyFlagsFromChangeDetection()
 
     if (renderStructureChanged)
     {
-        m_structureDirty = true;
         m_transformDirty = true;
+        if (!m_suppressStructureDirtyForLightOnlyEdit)
+            m_structureDirty = true;
     }
 
     const bool lightComponentsChanged =
@@ -762,6 +763,38 @@ void SceneEntityWorld::markTransformDirty()
     m_transformDirty = true;
 }
 
+void SceneEntityWorld::discardStructureDirtyIfGeometryUnchanged()
+{
+    ensureChangeDetection();
+    const auto* changeDetection = m_world->getResource<ecs::ChangeDetection>();
+    const auto& registry = m_world->registry();
+    const bool geometryTouched = changeDetection
+        && (changeDetection->worldStructureChanged()
+            || changeDetection->anyOfChangedThisFrame<
+                MeshInstanceComponent,
+                SkinnedMeshComponent,
+                CameraComponent,
+                AnimationComponent,
+                GaussianSplatComponent,
+                SkinnedMeshReferenceComponent>(registry)
+            || changeDetection->anyOfAddedThisFrame<
+                MeshInstanceComponent,
+                SkinnedMeshComponent,
+                CameraComponent,
+                AnimationComponent,
+                GaussianSplatComponent,
+                SkinnedMeshReferenceComponent>(registry));
+    if (geometryTouched)
+        return;
+
+    // createEntity/setParent marks Parent/Children, which syncDirtyFlags treats
+    // as a GPU structure rebuild. Analytic lights are render proxies only —
+    // keep the suppress bit until endChangeDetectionFrame so later
+    // hasPendingStructureChanges() calls do not revive m_structureDirty.
+    m_suppressStructureDirtyForLightOnlyEdit = true;
+    m_structureDirty = false;
+}
+
 void SceneEntityWorld::markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity)
 {
     if (!ecs::isValid(jointEntity))
@@ -806,6 +839,7 @@ void SceneEntityWorld::endChangeDetectionFrame()
 {
     m_world->endChangeFrame();
     m_frameLightDirty = false;
+    m_suppressStructureDirtyForLightOnlyEdit = false;
     if (auto* changeDetection = m_world->getResource<ecs::ChangeDetection>())
         changeDetection->clearWorldStructureChange();
     if (auto* transformEvents = m_world->getResource<ecs::Events<TransformChangedEvent>>())
@@ -1114,10 +1148,24 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
     }
     else if (m_world->has<CameraComponent>(entity))
         leafContent = getCameraContentFlags();
-    else if (hasAnyLightComponent(*m_world, entity))
-        leafContent = getLightContentFlags();
     else if (m_world->has<AnimationComponent>(entity))
         leafContent = getAnimationContentFlags();
+
+    if (hasAnyLightComponent(*m_world, entity))
+    {
+        leafContent |= getLightContentFlags();
+        if (localBounds.isempty())
+        {
+            if (const auto* rect = tryGetRectLight(*m_world, entity))
+            {
+                const float halfWidth = std::max(0.f, rect->width) * 0.5f;
+                const float halfHeight = std::max(0.f, rect->height) * 0.5f;
+                localBounds = dm::box3(
+                    dm::float3(-halfWidth, -halfHeight, -1e-3f),
+                    dm::float3(halfWidth, halfHeight, 1e-3f));
+            }
+        }
+    }
 
     m_world->emplace<LocalBoundsComponent>(entity, LocalBoundsComponent{ localBounds });
     m_world->emplace<SceneContentComponent>(entity, SceneContentComponent{
@@ -1260,6 +1308,7 @@ void SceneEntityWorld::setRectLight(ecs::Entity entity, RectLightComponent compo
 {
     reconcileLightExclusivity(entity);
     m_world->emplace<RectLightComponent>(entity, std::move(component));
+    updateLeafContentAndBounds(entity);
 }
 
 void SceneEntityWorld::setEnvironmentLight(ecs::Entity entity, EnvironmentLightComponent component)

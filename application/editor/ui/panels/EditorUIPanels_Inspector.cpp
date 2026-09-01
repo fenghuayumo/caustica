@@ -103,7 +103,9 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
     ImGui::TextUnformatted(entityName.c_str());
     ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
-    if (meshComp && meshComp->mesh)
+    if (rectLightComp)
+        ImGui::TextUnformatted("Light · Rect");
+    else if (meshComp && meshComp->mesh)
         ImGui::Text("Mesh · %s", meshComp->mesh->name.c_str());
     else if (gaussianSplat)
         ImGui::Text("3DGS · %u splats", gaussianSplat->loadedSplatCount);
@@ -117,8 +119,6 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         ImGui::TextUnformatted("Light · Spot");
     else if (pointLightComp)
         ImGui::TextUnformatted("Light · Point");
-    else if (rectLightComp)
-        ImGui::TextUnformatted("Light · Rect");
     else
         ImGui::TextUnformatted("Group");
     ImGui::PopStyleColor();
@@ -515,7 +515,30 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 changed |= InspectorDragFloat("Width", &rectLightComp->width, 0.01f, 0.f, 1e6f, "%.3f");
                 changed |= InspectorDragFloat("Height", &rectLightComp->height, 0.01f, 0.f, 1e6f, "%.3f");
                 if (markLightingEdited(changed))
+                {
                     ew->world().notifyComponentChanged<caustica::scene::RectLightComponent>(entity);
+                    if (auto scene = caustica::activeScene(*m_sceneEditor.app()))
+                    {
+                        scene->ensureRectLightVisual(entity);
+                        scene->syncRectLightVisualFromComponent(entity);
+                    }
+                    if (auto* mesh = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity))
+                    {
+                        if (mesh->mesh)
+                        {
+                            for (const auto& geometry : mesh->mesh->geometries)
+                            {
+                                auto standard = StandardMaterial::safeCast(geometry->material);
+                                if (!standard)
+                                    continue;
+                                standard->emissiveColor = rectLightComp->color;
+                                standard->emissiveIntensity = std::max(0.f, rectLightComp->intensity);
+                                standard->baseOrDiffuseColor = rectLightComp->color * 0.04f;
+                                standard->gpuDataDirty = true;
+                            }
+                        }
+                    }
+                }
             }
         }
     }

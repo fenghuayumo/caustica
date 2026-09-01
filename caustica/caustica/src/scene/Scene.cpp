@@ -119,6 +119,23 @@ namespace
         mesh.indices.insert(mesh.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
     }
 
+    BuiltinMeshData MakeRectLightPanelMesh()
+    {
+        BuiltinMeshData mesh;
+        mesh.name = "RectLightPanel";
+        mesh.materialName = "Mat_RectLightPanel";
+        mesh.baseColor = float3(0.02f, 0.02f, 0.02f);
+        // Unit quad in local XY, winding so the geometric normal is -Z
+        // (same emit direction as RectLight / getLightDirection).
+        AddQuad(mesh, {
+            float3(-0.5f, -0.5f, 0.0f),
+            float3(-0.5f,  0.5f, 0.0f),
+            float3( 0.5f,  0.5f, 0.0f),
+            float3( 0.5f, -0.5f, 0.0f),
+        }, float3(0.0f, 0.0f, -1.0f), float4(1.0f, 0.0f, 0.0f, 1.0f));
+        return mesh;
+    }
+
     BuiltinMeshData MakePlaneMesh()
     {
         BuiltinMeshData mesh;
@@ -623,6 +640,7 @@ ecs::Entity Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setDirectionalLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
@@ -634,6 +652,7 @@ ecs::Entity Scene::attachSpotLightToRoot(scene::SpotLightComponent component, co
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setSpotLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
@@ -645,6 +664,7 @@ ecs::Entity Scene::attachPointLightToRoot(scene::PointLightComponent component, 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setPointLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
@@ -655,8 +675,105 @@ ecs::Entity Scene::attachRectLightToRoot(scene::RectLightComponent component, co
 
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setRectLight(entity, std::move(component));
+    ensureRectLightVisual(entity);
+    // Panel is local XY facing -Z. Rotate -90° about X so emit is world -Y
+    // (ceiling light); identity would shine along -Z and miss the ground.
+    m_EntityWorld->setRotation(entity, rotationQuat(double3(-PI_d * 0.5, 0.0, 0.0)));
     m_EntityWorld->rebuildPathsFromRoot();
+    m_EntityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+    requestGpuStructureSync();
+    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
+}
+
+void Scene::ensureRectLightVisual(ecs::Entity entity)
+{
+    if (m_EntityWorld)
+        ensureRectLightVisual(*m_EntityWorld, entity);
+}
+
+void Scene::syncRectLightVisualFromComponent(ecs::Entity entity)
+{
+    if (m_EntityWorld)
+        syncRectLightVisualFromComponent(*m_EntityWorld, entity);
+}
+
+void Scene::syncRectLightVisualFromComponent(scene::SceneEntityWorld& world, ecs::Entity entity)
+{
+    const auto* rect = scene::tryGetRectLight(world.world(), entity);
+    if (!rect || !world.world().isAlive(entity))
+        return;
+
+    const float width = std::max(1e-4f, rect->width);
+    const float height = std::max(1e-4f, rect->height);
+    world.setScaling(entity, dm::double3(double(width), double(height), 1.0));
+
+    auto* meshComp = world.world().tryGet<scene::MeshInstanceComponent>(entity);
+    if (!meshComp || !meshComp->mesh)
+        return;
+
+    for (const auto& geometry : meshComp->mesh->geometries)
+    {
+        if (!geometry || !geometry->material)
+            continue;
+        geometry->material->emissiveColor = rect->color;
+        geometry->material->emissiveIntensity = std::max(0.f, rect->intensity);
+        geometry->material->baseOrDiffuseColor = rect->color * 0.04f;
+    }
+}
+
+void Scene::ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity entity)
+{
+    if (!m_SceneTypeFactory || !world.world().isAlive(entity))
+        return;
+    const auto* rect = scene::tryGetRectLight(world.world(), entity);
+    if (!rect)
+        return;
+
+    auto* existing = world.world().tryGet<scene::MeshInstanceComponent>(entity);
+    if (existing && existing->mesh)
+    {
+        syncRectLightVisualFromComponent(world, entity);
+        return;
+    }
+
+    const BuiltinMeshData src = MakeRectLightPanelMesh();
+    auto buffers = std::make_shared<BufferGroup>();
+    auto mesh = m_SceneTypeFactory->createMesh();
+    mesh->name = src.name;
+    mesh->buffers = buffers;
+
+    auto material = m_SceneTypeFactory->createMaterial();
+    material->name = src.materialName + "_" + std::to_string(uint32_t(entity));
+    material->modelFileName = "builtin:rect_light";
+    material->baseOrDiffuseColor = src.baseColor;
+    material->emissiveColor = rect->color;
+    material->emissiveIntensity = std::max(0.f, rect->intensity);
+    material->roughness = 1.0f;
+    material->metalness = 0.0f;
+    material->doubleSided = false;
+
+    AppendMeshToBuffers(src, *buffers);
+
+    auto geometry = m_SceneTypeFactory->createMeshGeometry();
+    geometry->material = material;
+    geometry->indexOffsetInMesh = 0;
+    geometry->vertexOffsetInMesh = 0;
+    geometry->numIndices = uint32_t(src.indices.size());
+    geometry->numVertices = uint32_t(src.vertices.size());
+    geometry->type = MeshGeometryPrimitiveType::Triangles;
+
+    box3 bounds = box3::empty();
+    for (const BuiltinVertex& vertex : src.vertices)
+        bounds |= vertex.position;
+    geometry->objectSpaceBounds = bounds;
+    mesh->objectSpaceBounds = bounds;
+    mesh->totalIndices = geometry->numIndices;
+    mesh->totalVertices = geometry->numVertices;
+    mesh->geometries.push_back(std::move(geometry));
+
+    world.setMeshInstance(entity, mesh);
+    syncRectLightVisualFromComponent(world, entity);
 }
 
 ecs::Entity Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name)
@@ -667,6 +784,7 @@ ecs::Entity Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent
     ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
     m_EntityWorld->setEnvironmentLight(entity, std::move(component));
     m_EntityWorld->rebuildPathsFromRoot();
+    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
@@ -1041,7 +1159,10 @@ void Scene::attachLeafFromJson(
                     else if constexpr (std::is_same_v<T, scene::PointLightComponent>)
                         world.setPointLight(entity, std::move(light));
                     else if constexpr (std::is_same_v<T, scene::RectLightComponent>)
+                    {
                         world.setRectLight(entity, std::move(light));
+                        ensureRectLightVisual(world, entity);
+                    }
                     else if constexpr (std::is_same_v<T, scene::EnvironmentLightComponent>)
                         world.setEnvironmentLight(entity, std::move(light));
                 },

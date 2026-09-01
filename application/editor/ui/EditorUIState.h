@@ -97,6 +97,8 @@ struct EditorSelectionState
     bool ShowTransformGizmo = true;
     // Viewport ground grid (ImGuizmo::DrawGrid); default visible.
     bool ShowInfiniteGrid = true;
+    // Viewport light icons / dashed helpers; toggle with G.
+    bool ShowLightHelpers = true;
     // Viewport corner orientation gizmo (ImOGuizmo); default visible.
     bool ShowViewOrientationGizmo = true;
     bool GizmoEnabled = true;

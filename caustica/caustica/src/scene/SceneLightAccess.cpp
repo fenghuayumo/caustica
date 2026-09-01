@@ -221,6 +221,7 @@ void fillLightConstants(
     case LightType_Rect:
         // Rect lights participate in the polymorphic direct-light sampler. The
         // legacy LightConstants representation has no area-light payload.
+        lightConstants.lightType = LightType_None;
         lightConstants.intensity = 0.0f;
         lightConstants.color = { 0, 0, 0 };
         break;

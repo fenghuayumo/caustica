@@ -463,7 +463,11 @@ static uint16_t fp32ToFp16(float v)
 static PolymorphicLightInfoFull ConvertRectLightTriangle(
     const caustica::scene::LightRenderProxy& proxy, uint32_t triangleIndex)
 {
-    const auto& rect = std::get<caustica::scene::RectLightData>(proxy.data);
+    const auto* rectData = caustica::scene::tryGetRectLightData(proxy.data);
+    if (!rectData || triangleIndex > 1u)
+        return PolymorphicLightInfoFull::make(PolymorphicLightInfo{}, PolymorphicLightInfoEx{});
+
+    const auto& rect = *rectData;
     const double halfWidth = std::max(0.f, rect.width) * 0.5;
     const double halfHeight = std::max(0.f, rect.height) * 0.5;
     const dm::double3 localCorners[4] = {
@@ -650,43 +654,36 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
         {
         case LightType_Spot:
         case LightType_Point:
-        case LightType_Rect:
         {
+            // RectLight lighting comes from its emissive panel mesh (real TLAS
+            // triangles). Virtual kTriangle proxies without geometry TDRed.
             const uint32_t entityId = uint32_t(lightProxy.entity);
-            const uint32_t triangleCount = lightType == LightType_Rect ? 2u : 1u;
-            if (outLightBuffer.size() + triangleCount > CAUSTICA_LIGHTING_MAX_LIGHTS)
+            if (outLightBuffer.size() + 1 > CAUSTICA_LIGHTING_MAX_LIGHTS)
             {
                 allGood = false;
                 break;
             }
 
             m_currentFrameAnalyticLightIndex[entityId] = ctrlBuff.TotalLightCount;
-            for (uint32_t triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+            PolymorphicLightInfoFull lightPackedFull = ConvertLightProxy(lightProxy);
+            outLightBuffer.push_back(lightPackedFull.Base);
+            outLightExBuffer.push_back(lightPackedFull.Extended);
+            outLightExBuffer.back().UniqueID = Hash32Combine(entityId, 0);
+
+            size_t lightHash = size_t(entityId);
+            uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
+            auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
+            if (entry != m_historyRemapAnalyticLightIndices.end())
             {
-                PolymorphicLightInfoFull lightPackedFull = lightType == LightType_Rect
-                    ? ConvertRectLightTriangle(lightProxy, triangleIndex)
-                    : ConvertLightProxy(lightProxy);
-                outLightBuffer.push_back(lightPackedFull.Base);
-                outLightExBuffer.push_back(lightPackedFull.Extended);
-                outLightExBuffer.back().UniqueID = Hash32Combine(entityId, triangleIndex);
-
-                size_t lightHash = size_t(entityId);
-                if (lightType == LightType_Rect)
-                    caustica::rhi::hash_combine(lightHash, triangleIndex);
-                uint historicIndex = CAUSTICA_INVALID_LIGHT_INDEX;
-                auto entry = m_historyRemapAnalyticLightIndices.find(lightHash);
-                if (entry != m_historyRemapAnalyticLightIndices.end())
-                {
-                    historicIndex = entry->second;
-                    entry->second = ctrlBuff.TotalLightCount;
-                }
-                else
-                    m_historyRemapAnalyticLightIndices.insert(std::make_pair(lightHash, ctrlBuff.TotalLightCount));
-
-                outLightHistoryRemapCurrentToPastBuffer.push_back(historicIndex);
-                ctrlBuff.AnalyticLightCount++;
-                ctrlBuff.TotalLightCount++;
+                historicIndex = entry->second;
+                entry->second = ctrlBuff.TotalLightCount;
             }
+            else
+                m_historyRemapAnalyticLightIndices.insert(std::make_pair(lightHash, ctrlBuff.TotalLightCount));
+
+            outLightHistoryRemapCurrentToPastBuffer.push_back(historicIndex);
+            ctrlBuff.AnalyticLightCount++;
+            ctrlBuff.TotalLightCount++;
         } break;
         default: break;
         }
@@ -698,7 +695,8 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
     for( uint lightIndex = startingLight; lightIndex < outLightHistoryRemapCurrentToPastBuffer.size(); lightIndex++ )
     {
         uint historicIndex = outLightHistoryRemapCurrentToPastBuffer[lightIndex];
-        if( historicIndex != CAUSTICA_INVALID_LIGHT_INDEX )
+        if( historicIndex != CAUSTICA_INVALID_LIGHT_INDEX
+            && historicIndex < outLightHistoryRemapPastToCurrent.size() )
             outLightHistoryRemapPastToCurrent[historicIndex] = lightIndex;
     }
 

@@ -305,6 +305,7 @@ void EditorUI::buildUI(void)
     // foreground draw list so the gizmo is never covered by the Viewport image.
     const TransformGizmoContext gizmoCtx{ m_sceneEditor, m_editorUI, m_settings };
     DrawInfiniteGrid(gizmoCtx);
+    DrawLightHelpers(gizmoCtx);
     DrawTransformGizmo(gizmoCtx);
     DrawViewOrientationGizmo(gizmoCtx);
     BuildStatusBar();

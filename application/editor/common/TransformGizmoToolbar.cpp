@@ -69,7 +69,17 @@ void ToolbarSeparator(ImDrawList* dl, float height)
 
 } // namespace
 
-void BuildTransformGizmoToolbar(EditorUIState& editorUI)
+void caustica::editor::GetTransformGizmoToolbarSize(float& width, float& height)
+{
+    // Select | Move | Rotate | Scale | Space | Snap | Grid | Lights | Material
+    constexpr int toolCount = 9;
+    constexpr int gapCount = 6;
+    constexpr int sepCount = 2;
+    width = kPad * 2.f + kBtn * float(toolCount) + kGap * float(gapCount) + 5.f * float(sepCount);
+    height = kBtn + kPad * 2.f;
+}
+
+void caustica::editor::BuildTransformGizmoToolbar(EditorUIState& editorUI)
 {
     const auto operation = static_cast<ImGuizmo::OPERATION>(editorUI.GizmoOperation);
     const auto mode = static_cast<ImGuizmo::MODE>(editorUI.GizmoMode);
@@ -82,11 +92,9 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
 
-    // Select | Move | Rotate | Scale | Space | Snap | Grid | Material picker
-    constexpr int toolCount = 8;
-    constexpr int sepCount = 2;
-    const float stripW = kPad * 2.f + kBtn * toolCount + kGap * 5.f + 5.f * sepCount;
-    const float stripH = kBtn + kPad * 2.f;
+    float stripW = 0.f;
+    float stripH = 0.f;
+    GetTransformGizmoToolbarSize(stripW, stripH);
 
     dl->AddRectFilled(
         origin,
@@ -157,6 +165,15 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
             editorUI.ShowInfiniteGrid,
             editorUI.ShowInfiniteGrid ? "Hide infinite grid" : "Show infinite grid"))
         editorUI.ShowInfiniteGrid = !editorUI.ShowInfiniteGrid;
+
+    ImGui::SameLine(0.f, kGap);
+
+    if (ToolButton(
+            "##GizmoLights",
+            editorUI.ShowLightHelpers ? ICON_MS_VISIBILITY : ICON_MS_VISIBILITY_OFF,
+            editorUI.ShowLightHelpers,
+            editorUI.ShowLightHelpers ? "Hide light gizmos (G)" : "Show light gizmos (G)"))
+        editorUI.ShowLightHelpers = !editorUI.ShowLightHelpers;
 
     ImGui::SameLine(0.f, kGap);
 

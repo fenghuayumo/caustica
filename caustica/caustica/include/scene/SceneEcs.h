@@ -446,6 +446,10 @@ public:
 
     void applyAnimations(float time);
     void markTransformDirty();
+    // createEntity/setParent dirties structure via Parent/Children. Analytic
+    // lights are render proxies, not GPU geometry — drop that bit when no mesh
+    // / camera / animation / splat actually changed this frame.
+    void discardStructureDirtyIfGeometryUnchanged();
     void markSkinnedMeshDirtyForJoint(ecs::Entity jointEntity);
     void resetSkinnedMeshMotionHistory();
     void assignGlobalResourceIndices();
@@ -538,6 +542,7 @@ private:
     bool m_structureDirty = true;         // refresh/Extract cache (from ChangeDetection)
     bool m_transformDirty = true;         // refresh/Extract cache (from ChangeDetection)
     bool m_lightDirty = true;             // refresh only analytic/environment light proxies
+    bool m_suppressStructureDirtyForLightOnlyEdit = false;
     bool m_previousTransformDirty = false;
     static inline const std::vector<ecs::Entity> s_emptyChildren{};
 };

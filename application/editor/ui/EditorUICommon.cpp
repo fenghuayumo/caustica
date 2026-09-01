@@ -101,16 +101,16 @@ namespace
 
     HierarchyTypeIcon ResolveHierarchyTypeIcon(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
+        if (IsEnvironmentLightEntity(ew, entity))
+            return HierarchyTypeIcon::EnvironmentLight;
+        if (IsLocalLightEntity(ew, entity))
+            return HierarchyTypeIcon::Light;
         if (IsMeshInstanceEntity(ew, entity))
             return HierarchyTypeIcon::Mesh;
         if (IsGaussianSplatEntity(ew, entity))
             return HierarchyTypeIcon::GaussianSplat;
         if (IsCameraEntity(ew, entity))
             return HierarchyTypeIcon::Camera;
-        if (IsEnvironmentLightEntity(ew, entity))
-            return HierarchyTypeIcon::EnvironmentLight;
-        if (IsLocalLightEntity(ew, entity))
-            return HierarchyTypeIcon::Light;
         return HierarchyTypeIcon::Group;
     }
 

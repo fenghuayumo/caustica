@@ -9,6 +9,7 @@
 
 #include <ImGuizmo.h>
 #include "common/imoguizmo.hpp"
+#include "common/EditorIcons.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <math/affine.h>
@@ -19,6 +20,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <utility>
+#include <vector>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -86,6 +90,189 @@ void Float4x4ToImGuizmoMatrix(const dm::float4x4& source, float matrix[16])
     for (int row = 0; row < 4; ++row)
         for (int col = 0; col < 4; ++col)
             matrix[row * 4 + col] = source[row][col];
+}
+
+// Same row-major product ImGuizmo uses for view * projection.
+void MultiplyImGuizmoMatrix(const float a[16], const float b[16], float r[16])
+{
+    float tmp[16];
+    tmp[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
+    tmp[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
+    tmp[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
+    tmp[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
+    tmp[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
+    tmp[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
+    tmp[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
+    tmp[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
+    tmp[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
+    tmp[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
+    tmp[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
+    tmp[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
+    tmp[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
+    tmp[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
+    tmp[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
+    tmp[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
+    std::memcpy(r, tmp, sizeof(tmp));
+}
+
+bool ProjectWorldWithGizmo(const dm::float3& world, const float viewProj[16], const EditorViewportState& vp, ImVec2& out)
+{
+    // ImGuizmo::worldToPos: row-vector TransformPoint, then Y-flip into the viewport rect.
+    const float x = world.x;
+    const float y = world.y;
+    const float z = world.z;
+    const float clipX = x * viewProj[0] + y * viewProj[4] + z * viewProj[8] + viewProj[12];
+    const float clipY = x * viewProj[1] + y * viewProj[5] + z * viewProj[9] + viewProj[13];
+    const float clipW = x * viewProj[3] + y * viewProj[7] + z * viewProj[11] + viewProj[15];
+    if (clipW <= 1e-4f)
+        return false;
+    const float invW = 0.5f / clipW;
+    const float ndcX = clipX * invW + 0.5f;
+    const float ndcY = 1.f - (clipY * invW + 0.5f);
+    // Near-plane / off-axis points explode to huge NDC and dash-fill the viewport.
+    if (ndcX < -2.f || ndcX > 3.f || ndcY < -2.f || ndcY > 3.f)
+        return false;
+    out.x = vp.PosX + ndcX * vp.SizeX;
+    out.y = vp.PosY + ndcY * vp.SizeY;
+    return true;
+}
+
+bool ClipSegmentToRect(ImVec2& a, ImVec2& b, ImVec2 min, ImVec2 max)
+{
+    auto outCode = [&](const ImVec2& p) -> int
+    {
+        int code = 0;
+        if (p.x < min.x) code |= 1;
+        if (p.x > max.x) code |= 2;
+        if (p.y < min.y) code |= 4;
+        if (p.y > max.y) code |= 8;
+        return code;
+    };
+
+    int codeA = outCode(a);
+    int codeB = outCode(b);
+    for (;;)
+    {
+        if ((codeA | codeB) == 0)
+            return true;
+        if ((codeA & codeB) != 0)
+            return false;
+        const int code = codeA ? codeA : codeB;
+        ImVec2 p;
+        if (code & 8)
+        {
+            p.x = a.x + (b.x - a.x) * (max.y - a.y) / (b.y - a.y);
+            p.y = max.y;
+        }
+        else if (code & 4)
+        {
+            p.x = a.x + (b.x - a.x) * (min.y - a.y) / (b.y - a.y);
+            p.y = min.y;
+        }
+        else if (code & 2)
+        {
+            p.y = a.y + (b.y - a.y) * (max.x - a.x) / (b.x - a.x);
+            p.x = max.x;
+        }
+        else
+        {
+            p.y = a.y + (b.y - a.y) * (min.x - a.x) / (b.x - a.x);
+            p.x = min.x;
+        }
+        if (code == codeA)
+        {
+            a = p;
+            codeA = outCode(a);
+        }
+        else
+        {
+            b = p;
+            codeB = outCode(b);
+        }
+    }
+}
+
+void BasisFromAxis(const dm::float3& axis, dm::float3& tangent, dm::float3& bitangent)
+{
+    const dm::float3 n = dm::normalize(axis);
+    tangent = dm::normalize(dm::orthogonal(n));
+    bitangent = dm::normalize(dm::cross(n, tangent));
+}
+
+void DashedScreenLine(ImDrawList* drawList, ImVec2 a, ImVec2 b, ImU32 col, float thickness, const EditorViewportState& vp)
+{
+    if (!ClipSegmentToRect(a, b, ImVec2(vp.PosX, vp.PosY), ImVec2(vp.PosX + vp.SizeX, vp.PosY + vp.SizeY)))
+        return;
+    const float dx = b.x - a.x;
+    const float dy = b.y - a.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 1.f || len > 4000.f)
+        return;
+    const float dash = 7.f;
+    const float gap = 4.f;
+    const ImVec2 dir(dx / len, dy / len);
+    for (float t = 0.f; t < len; t += dash + gap)
+    {
+        const float t1 = std::min(t + dash, len);
+        drawList->AddLine(
+            ImVec2(a.x + dir.x * t, a.y + dir.y * t),
+            ImVec2(a.x + dir.x * t1, a.y + dir.y * t1),
+            col,
+            thickness);
+    }
+}
+
+void DashedWorldLine(
+    ImDrawList* drawList,
+    const float viewProj[16],
+    const EditorViewportState& vp,
+    const dm::float3& a,
+    const dm::float3& b,
+    ImU32 col,
+    float thickness)
+{
+    ImVec2 sa, sb;
+    if (ProjectWorldWithGizmo(a, viewProj, vp, sa) && ProjectWorldWithGizmo(b, viewProj, vp, sb))
+        DashedScreenLine(drawList, sa, sb, col, thickness, vp);
+}
+
+void DashedWorldCircle(
+    ImDrawList* drawList,
+    const float viewProj[16],
+    const EditorViewportState& vp,
+    const dm::float3& center,
+    const dm::float3& axisX,
+    const dm::float3& axisY,
+    float radius,
+    ImU32 col,
+    float thickness,
+    int segments = 32)
+{
+    ImVec2 prev{};
+    bool prevOk = false;
+    for (int i = 0; i <= segments; ++i)
+    {
+        const float a = (dm::PI_f * 2.f * float(i)) / float(segments);
+        const dm::float3 world = center + axisX * (std::cos(a) * radius) + axisY * (std::sin(a) * radius);
+        ImVec2 screen;
+        const bool ok = ProjectWorldWithGizmo(world, viewProj, vp, screen);
+        if (ok && prevOk)
+            DashedScreenLine(drawList, prev, screen, col, thickness, vp);
+        prev = screen;
+        prevOk = ok;
+    }
+}
+
+void DrawViewportLightIcon(ImDrawList* drawList, ImVec2 center, EditorGlyphIcon kind, ImU32 col, float size)
+{
+    const float half = size * 0.5f;
+    drawList->AddCircleFilled(center, half + 3.f, IM_COL32(10, 12, 16, 170), 20);
+    DrawEditorGlyphIcon(
+        drawList,
+        ImVec2(center.x - half, center.y - half),
+        ImVec2(center.x + half, center.y + half),
+        kind,
+        col);
 }
 
 dm::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
@@ -164,6 +351,19 @@ void HandleTransformGizmoShortcuts(EditorUIState& editorUI)
         editorUI.GizmoEnabled = true;
         editorUI.GizmoOperation = static_cast<int>(ImGuizmo::SCALE);
     }
+}
+
+void HandleLightHelperShortcut(EditorUIState& editorUI)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard || ImGui::IsAnyItemActive())
+        return;
+    if (io.KeyCtrl || io.KeyAlt || io.KeySuper)
+        return;
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+        return;
+    if (ImGui::IsKeyPressed(ImGuiKey_G, false))
+        editorUI.ShowLightHelpers = !editorUI.ShowLightHelpers;
 }
 
 const float* GetSnapValues(const EditorUIState& editorUI)
@@ -281,6 +481,229 @@ void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
     drawList->PushClipRect(clipMin, clipMax, true);
     // Large finite grid on Y=0 (ImGuizmo DrawGrid); feels infinite in typical editor framing.
     ImGuizmo::DrawGrid(viewMatrix, projectionMatrix, identity, 120.f);
+    drawList->PopClipRect();
+}
+
+void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
+{
+    if (!ctx.editorUI.ShowUI)
+        return;
+
+    HandleLightHelperShortcut(ctx.editorUI);
+    if (!ctx.editorUI.ShowLightHelpers)
+        return;
+
+    App* app = ctx.sceneEditor.app();
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    const auto& view = app ? caustica::currentView(*app) : nullptr;
+    if (!ew || !view)
+        return;
+
+    const auto& vp = ctx.editorUI.Viewport;
+    if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
+        return;
+
+    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+    if (!viewportWindow || !viewportWindow->Active || viewportWindow->Hidden)
+        return;
+
+    ImDrawList* drawList = viewportWindow->DrawList;
+    const ImVec2 clipMin(vp.PosX, vp.PosY);
+    const ImVec2 clipMax(vp.PosX + vp.SizeX, vp.PosY + vp.SizeY);
+    drawList->PushClipRect(clipMin, clipMax, true);
+
+    // Match DrawInfiniteGrid / the transform gizmo. Reverse-Z viewProj plus
+    // clip.z < 0 rejects visible corners and shifts the overlay off the mesh.
+    float viewMatrix[16];
+    float projectionMatrix[16];
+    float viewProj[16];
+    Affine3ToImGuizmoMatrix(view->getViewMatrix(), viewMatrix);
+    BuildGizmoProjectionMatrix(ctx, *view, projectionMatrix);
+    MultiplyImGuizmoMatrix(viewMatrix, projectionMatrix, viewProj);
+
+    auto line = [&](const dm::float3& a, const dm::float3& b, ImU32 col, float thickness)
+    {
+        DashedWorldLine(drawList, viewProj, vp, a, b, col, thickness);
+    };
+    auto circle = [&](const dm::float3& center, const dm::float3& axisX, const dm::float3& axisY,
+        float radius, ImU32 col, float thickness)
+    {
+        DashedWorldCircle(drawList, viewProj, vp, center, axisX, axisY, radius, col, thickness);
+    };
+    auto wireSphere = [&](const dm::float3& center, float radius, ImU32 col, float thickness)
+    {
+        circle(center, dm::float3(1.f, 0.f, 0.f), dm::float3(0.f, 1.f, 0.f), radius, col, thickness);
+        circle(center, dm::float3(1.f, 0.f, 0.f), dm::float3(0.f, 0.f, 1.f), radius, col, thickness);
+        circle(center, dm::float3(0.f, 1.f, 0.f), dm::float3(0.f, 0.f, 1.f), radius, col, thickness);
+    };
+    auto cone = [&](const dm::float3& origin, const dm::float3& dir, float length, float halfAngleDeg,
+        ImU32 col, float thickness)
+    {
+        const float clamped = std::clamp(halfAngleDeg, 1.f, 80.f);
+        const float radius = std::tan(dm::radians(clamped)) * length;
+        dm::float3 tangent, bitangent;
+        BasisFromAxis(dir, tangent, bitangent);
+        const dm::float3 end = origin + dir * length;
+        circle(end, tangent, bitangent, radius, col, thickness);
+        constexpr int kRays = 4;
+        for (int i = 0; i < kRays; ++i)
+        {
+            const float a = (dm::PI_f * 2.f * float(i)) / float(kRays);
+            const dm::float3 rim = end + tangent * (std::cos(a) * radius) + bitangent * (std::sin(a) * radius);
+            line(origin, rim, col, thickness);
+        }
+    };
+
+    struct PendingIcon
+    {
+        ImVec2 screen;
+        EditorGlyphIcon kind;
+        ImU32 col;
+        float size;
+    };
+    std::vector<PendingIcon> icons;
+
+    auto queueIcon = [&](const dm::float3& origin, EditorGlyphIcon kind, ImU32 col, bool selected)
+    {
+        ImVec2 screen;
+        if (!ProjectWorldWithGizmo(origin, viewProj, vp, screen))
+            return;
+        if (screen.x < vp.PosX || screen.y < vp.PosY
+            || screen.x > vp.PosX + vp.SizeX || screen.y > vp.PosY + vp.SizeY)
+            return;
+        icons.push_back({ screen, kind, col, selected ? 26.f : 22.f });
+    };
+
+    auto style = [&](ecs::Entity entity, ImU32 idle) -> std::pair<ImU32, float>
+    {
+        const bool selected = ctx.editorUI.SelectedEntity == entity;
+        return {
+            selected ? IM_COL32(255, 230, 120, 255) : idle,
+            selected ? 2.2f : 1.35f
+        };
+    };
+
+    ew->world().each<scene::DirectionalLightComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, scene::DirectionalLightComponent& light, scene::GlobalTransformComponent& global)
+        {
+            if (!light.enabled)
+                return;
+            const auto [col, thickness] = style(entity, IM_COL32(255, 206, 92, 210));
+            const dm::float3 origin = global.transformFloat.m_translation;
+            dm::float3 dir = dm::float3(scene::getLightDirection(global.transform));
+            if (dm::length(dir) < 1e-5f)
+                dir = dm::float3(0.f, -1.f, 0.f);
+            dir = dm::normalize(dir);
+            dm::float3 tangent, bitangent;
+            BasisFromAxis(dir, tangent, bitangent);
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            if (selected)
+            {
+                circle(origin, tangent, bitangent, 0.22f, col, thickness);
+                constexpr int kRays = 8;
+                for (int i = 0; i < kRays; ++i)
+                {
+                    const float a = (dm::PI_f * 2.f * float(i)) / float(kRays);
+                    const dm::float3 radial = tangent * std::cos(a) + bitangent * std::sin(a);
+                    line(origin + radial * 0.22f, origin + radial * 0.42f, col, thickness);
+                }
+                line(origin, origin + dir * 0.7f, col, thickness);
+            }
+            queueIcon(origin, EditorGlyphIcon::DirectionalLight, col, selected);
+        });
+
+    ew->world().each<scene::PointLightComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, scene::PointLightComponent& light, scene::GlobalTransformComponent& global)
+        {
+            if (!light.enabled)
+                return;
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const auto [col, thickness] = style(entity, IM_COL32(255, 176, 82, 210));
+            const dm::float3 origin = global.transformFloat.m_translation;
+            const float coreRadius = std::max(light.radius, 0.18f);
+            if (selected)
+            {
+                wireSphere(origin, coreRadius, col, thickness);
+                if (light.range > coreRadius + 0.05f)
+                    wireSphere(origin, std::min(light.range, 8.f), IM_COL32(255, 230, 120, 140), 1.15f);
+            }
+            queueIcon(origin, EditorGlyphIcon::PointLight, col, selected);
+        });
+
+    ew->world().each<scene::SpotLightComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, scene::SpotLightComponent& light, scene::GlobalTransformComponent& global)
+        {
+            if (!light.enabled)
+                return;
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const auto [col, thickness] = style(entity, IM_COL32(255, 158, 72, 210));
+            const dm::float3 origin = global.transformFloat.m_translation;
+            dm::float3 dir = dm::float3(scene::getLightDirection(global.transform));
+            if (dm::length(dir) < 1e-5f)
+                dir = dm::float3(0.f, -1.f, 0.f);
+            dir = dm::normalize(dir);
+            const float fullLen = light.range > 1e-3f ? light.range : 2.5f;
+            const float coneLen = std::min(selected ? fullLen : 1.6f, 6.f);
+            if (selected)
+            {
+                cone(origin, dir, coneLen, light.outerAngle, col, thickness);
+                if (light.innerAngle > 1.f && light.innerAngle < light.outerAngle - 0.5f)
+                    cone(origin, dir, coneLen, light.innerAngle, IM_COL32(255, 230, 120, 150), 1.15f);
+            }
+            queueIcon(origin, EditorGlyphIcon::SpotLight, col, selected);
+        });
+
+    ew->world().each<scene::RectLightComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, scene::RectLightComponent& light, scene::GlobalTransformComponent& global)
+        {
+            if (!light.enabled)
+                return;
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const auto [col, thickness] = style(entity, IM_COL32(186, 158, 255, 210));
+
+            dm::float3 local[4] = {
+                { -0.5f, -0.5f, 0.0f },
+                { -0.5f,  0.5f, 0.0f },
+                {  0.5f,  0.5f, 0.0f },
+                {  0.5f, -0.5f, 0.0f },
+            };
+            if (const auto* meshComp = ew->world().tryGet<scene::MeshInstanceComponent>(entity))
+            {
+                const auto& mesh = meshComp->mesh;
+                if (mesh && mesh->buffers && mesh->buffers->positionData.size() >= 4)
+                {
+                    for (int i = 0; i < 4; ++i)
+                        local[i] = mesh->buffers->positionData[static_cast<size_t>(i)];
+                }
+            }
+
+            dm::float3 world[4];
+            for (int i = 0; i < 4; ++i)
+                world[i] = global.transformFloat.transformPoint(local[i]);
+            line(world[0], world[1], col, thickness);
+            line(world[1], world[2], col, thickness);
+            line(world[2], world[3], col, thickness);
+            line(world[3], world[0], col, thickness);
+
+            const dm::float3 origin = global.transformFloat.m_translation;
+            const dm::float3 tip = global.transformFloat.transformPoint(dm::float3(0.f, 0.f, -0.35f));
+            line(origin, tip, col, thickness);
+            queueIcon(origin, EditorGlyphIcon::RectLight, col, selected);
+        });
+
+    ew->world().each<scene::EnvironmentLightComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, scene::EnvironmentLightComponent& light, scene::GlobalTransformComponent& global)
+        {
+            if (!light.enabled)
+                return;
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const ImU32 col = selected ? IM_COL32(255, 230, 120, 255) : IM_COL32(110, 176, 255, 210);
+            queueIcon(global.transformFloat.m_translation, EditorGlyphIcon::EnvironmentLight, col, selected);
+        });
+
+    for (const PendingIcon& icon : icons)
+        DrawViewportLightIcon(drawList, icon.screen, icon.kind, icon.col, icon.size);
+
     drawList->PopClipRect();
 }
 
