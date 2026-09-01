@@ -209,6 +209,33 @@ GaussianSplatFramePass::prepareGraphResources(GaussianSplatRenderTarget renderTa
         pass->prepareGraphResources(objectSettings);
         resources.push_back(pass->graphResources(objectSettings));
     }
+
+    // Allocate shared sort scratch first, then pre-create every per-object
+    // binding set while still on the render thread. executeSort may be recorded
+    // later by Any-affinity graph workers and must perform no RHI creation.
+    if (m_gpuSort)
+    {
+        uint32_t maxSplatCount = 0;
+        for (const scene::GaussianSplatRenderProxy& proxy : m_context->frameGaussianSplats())
+        {
+            if (const GaussianSplatPass* pass = m_scenePasses->findPass(proxy.entity);
+                proxy.enabled && pass && pass->hasSplats())
+            {
+                maxSplatCount = std::max(maxSplatCount, pass->getSplatCount());
+            }
+        }
+        for (const GaussianSplatGraphResources& item : resources)
+        {
+            if (item.sortMode == GaussianSplatSortMode::GpuSort && maxSplatCount > 0)
+            {
+                m_gpuSort->prepare(
+                    maxSplatCount,
+                    item.sortControlBuffer,
+                    item.sortKeyBuffer,
+                    item.indexBuffer);
+            }
+        }
+    }
     return resources;
 }
 

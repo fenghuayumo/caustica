@@ -153,7 +153,7 @@ void EditorUI::buildUI(void)
             ? m_sceneEditor.app()->tryResource<caustica::render::AppDiagnostics>()
             : nullptr)
     {
-        const auto& warm = diag->rtPipelineWarmup;
+        const auto warm = diag->pipelineWarmupStatus();
         if (warm.active && warm.total > 0)
         {
             const char* preset = warm.currentPreset.empty() ? "..." : warm.currentPreset.data();

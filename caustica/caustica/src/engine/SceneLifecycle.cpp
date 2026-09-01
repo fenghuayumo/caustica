@@ -606,7 +606,9 @@ void tickLoadSession(App& app)
     // Mirror RT OMM / opacity streaming into LoadSession (sole busy signal).
     if (AppDiagnostics* diag = diagnostics(app))
     {
-        session.secondaryStreaming.store(diag->asyncLoadingInProgress, std::memory_order_relaxed);
+        session.secondaryStreaming.store(
+            diag->asyncLoadingInProgress.load(std::memory_order_acquire),
+            std::memory_order_relaxed);
         // Prefer session.secondaryStreaming; keep diag as RT scratch only.
     }
 

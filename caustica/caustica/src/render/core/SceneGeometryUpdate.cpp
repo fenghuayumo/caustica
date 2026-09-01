@@ -68,16 +68,28 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
     caustica::rhi::CommandList* commandList = params.commandList;
     const std::shared_ptr<Scene>& scene = params.scene;
     if (scene == nullptr || commandList == nullptr)
+    {
+        if (params.asyncLoadingInProgress != nullptr)
+            params.asyncLoadingInProgress->store(false, std::memory_order_release);
         return;
+    }
 
     // StructureGpu cold start / AccelOnly: committed serve may be null while build is in flight.
     if (params.renderData == nullptr)
+    {
+        if (params.asyncLoadingInProgress != nullptr)
+            params.asyncLoadingInProgress->store(false, std::memory_order_release);
         return;
+    }
 
     const scene::SceneRenderData& renderData = resolveRenderData(params);
     render::SceneGpuResources* gpuResources = params.gpuResources;
     if (gpuResources == nullptr)
+    {
+        if (params.asyncLoadingInProgress != nullptr)
+            params.asyncLoadingInProgress->store(false, std::memory_order_release);
         return;
+    }
 
     if (params.materials != nullptr)
         params.materials->ensureMaterialsFromScene(renderData.staticData().materialSnapshots);
@@ -107,18 +119,14 @@ void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryPa
 
     transitionSkinnedMeshBuffersToReadOnly(commandList, renderData, *gpuResources);
 
+    bool asyncLoading = false;
     if (params.opacityMaps != nullptr)
     {
-        if (params.asyncLoadingInProgress != nullptr)
-        {
-            *params.asyncLoadingInProgress |= params.opacityMaps->update(*commandList, renderData);
-            *params.asyncLoadingInProgress |= params.opacityMaps->uiData().BuildsLeftInQueue > 0;
-        }
-        else
-        {
-            (void)params.opacityMaps->update(*commandList, renderData);
-        }
+        asyncLoading = params.opacityMaps->update(*commandList, renderData)
+            || params.opacityMaps->uiData().BuildsLeftInQueue > 0;
     }
+    if (params.asyncLoadingInProgress != nullptr)
+        params.asyncLoadingInProgress->store(asyncLoading, std::memory_order_release);
 
     if (params.materials != nullptr)
         params.materials->update(commandList, renderData, gpuResources, accelStructs.getSubInstanceData());

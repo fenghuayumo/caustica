@@ -1140,13 +1140,10 @@ void caustica::render::WorldRenderer::preUpdatePathTracing( bool resetAccum, cau
 
     if( m_accumulationSampleIndex < 16 )
     {
-        m_context->diagnostics.benchStart = std::chrono::high_resolution_clock::now( );
-        m_context->diagnostics.benchLast = m_context->diagnostics.benchStart;
-        m_context->diagnostics.benchFrames = 0;
+        m_context->diagnostics.resetBenchmark();
     } else if( m_accumulationSampleIndex < m_context->activeSettings().AccumulationTarget )
     {
-        m_context->diagnostics.benchFrames++;
-        m_context->diagnostics.benchLast = std::chrono::high_resolution_clock::now( );
+        m_context->diagnostics.recordBenchmarkFrame();
     }
     m_accumulationCompleted = false;
     if( !m_context->activeSettings().RealtimeMode )

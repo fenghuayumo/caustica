@@ -14,6 +14,7 @@
 #include <core/system_utils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
+#include <core/ThreadContext.h>
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
 #include <render/passes/debug/ShaderDebug.h>
@@ -116,6 +117,7 @@ void GPUSort::createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug)
 
 void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
 {
+    caustica::assertRenderThread();
 // TODO: test; this should cause crashes.
 //    static uint debugTest = 0; debugTest++; 
 //    if (debugTest % 1234 == 0) 
@@ -132,14 +134,12 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
     uint32_t scratchIndicesBufferSize = maxItemCount;
     FFX_ParallelSort_CalculateScratchResourceSize(maxItemCount, scratchBufferSize, reducedScratchBufferSize);
 
-    if( m_scratchBuffer != nullptr )
-    {
-        // THREADING: sync-point, RT-only — ADR 0002 S2-adjacent (sort scratch recreate).
-        m_device->waitForIdle();    // make sure buffers are no longer used by the GPU
-        m_scratchBuffer = nullptr;
-        m_reducedScratchBuffer = nullptr;
-        m_reducedScratchBuffer = nullptr;
-    }
+    // RHI handles retire through the device garbage collector. Waiting for the
+    // entire GPU here caused a frame hitch whenever a larger splat set appeared.
+    m_bindingCache.clear();
+    m_scratchBuffer = nullptr;
+    m_reducedScratchBuffer = nullptr;
+    m_scratchIndicesBuffer = nullptr;
 
     caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
@@ -162,6 +162,65 @@ void GPUSort::reCreateWorkingBuffers(uint32_t maxItemCount)
     m_scratchIndicesBuffer = m_device->createBuffer(bufferDesc);
 }
 
+GPUSort::BindingSets GPUSort::findBindingSets(
+    caustica::rhi::BufferHandle controlBuffer,
+    caustica::rhi::BufferHandle bufferKeys,
+    caustica::rhi::BufferHandle bufferIndices,
+    bool create)
+{
+    caustica::rhi::BindingSetDesc initDesc, pingDesc, pongDesc;
+    initDesc.bindings = {
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),
+    };
+    pingDesc.bindings = {
+        caustica::rhi::BindingSetItem::PushConstants(1, 4*sizeof(uint32_t)),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, bufferIndices),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, m_scratchIndicesBuffer),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),
+        caustica::rhi::BindingSetItem::RawBuffer_UAV(
+            SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+    };
+    pongDesc.bindings = {
+        caustica::rhi::BindingSetItem::PushConstants(1, 4*sizeof(uint32_t)),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),
+        caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, m_scratchIndicesBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),
+        caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, bufferIndices),
+        caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),
+        caustica::rhi::BindingSetItem::RawBuffer_UAV(
+            SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
+    };
+
+    const auto lookup = [this, create](
+        const caustica::rhi::BindingSetDesc& desc,
+        caustica::rhi::BindingLayout* layout) {
+        return create
+            ? m_bindingCache.getOrCreateBindingSet(desc, layout)
+            : m_bindingCache.getCachedBindingSet(desc, layout);
+    };
+    return {
+        lookup(initDesc, m_initBindingLayout),
+        lookup(pingDesc, m_commonBindingLayout),
+        lookup(pongDesc, m_commonBindingLayout),
+    };
+}
+
+void GPUSort::prepare(
+    uint32_t maxItemCount,
+    caustica::rhi::BufferHandle controlBuffer,
+    caustica::rhi::BufferHandle bufferKeys,
+    caustica::rhi::BufferHandle bufferIndices)
+{
+    caustica::assertRenderThread();
+    reCreateWorkingBuffers(maxItemCount);
+    (void)findBindingSets(controlBuffer, bufferKeys, bufferIndices, true);
+}
+
 uint32_t FloorLog2(uint32_t n)  { assert(n > 0); return n == 1 ? 0 : 1 + FloorLog2(n >> 1); }
 uint32_t CeilLog2(uint32_t n)   { assert(n > 0); return n == 1 ? 0 : FloorLog2(n - 1) + 1; };
 
@@ -169,7 +228,9 @@ void GPUSort::sort(caustica::rhi::CommandList * commandList, caustica::rhi::Buff
 {
     RAII_SCOPE( commandList->beginMarker("GPUSort");, commandList->endMarker(); );
 
-    reCreateWorkingBuffers(maxItemCount);
+    // prepare() must have run on the render thread before this callback was
+    // dispatched to a render-graph recording worker.
+    assert(maxItemCount <= m_scratchMaxItemCountSize);
 
     commandList->copyBuffer( m_controlBuffer, 0, controlBuffer, itemCountByteOffset, sizeof(uint32_t) );
 
@@ -177,39 +238,11 @@ void GPUSort::sort(caustica::rhi::CommandList * commandList, caustica::rhi::Buff
     // commandList->setBufferState(m_controlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
     // commandList->commitBarriers();
 
-    // Bindings
-    caustica::rhi::BindingSetDesc bindingSetDescInit, bindingSetDescPing, bindingSetDescPong;
-    bindingSetDescInit.bindings = { 
-            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            //caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX),
-    };
-    bindingSetDescPing.bindings = {
-            caustica::rhi::BindingSetItem::PushConstants(1, 4*sizeof(uint32_t)), 
-            caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
-            caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, bufferIndices),                   // SrcIndices
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, m_scratchIndicesBuffer),          // DstIndices
-            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            //caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-        };
-    bindingSetDescPong.bindings = {
-            caustica::rhi::BindingSetItem::PushConstants(1, 4 * sizeof(uint32_t)),
-            caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, bufferKeys),                      // SrcKeys
-            caustica::rhi::BindingSetItem::TypedBuffer_SRV(1, m_scratchIndicesBuffer),          // SrcIndices
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(0, m_scratchBuffer),                 // ScratchBuffer
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(1, m_reducedScratchBuffer),          // ReducedScratchBuffer
-            caustica::rhi::BindingSetItem::TypedBuffer_UAV(2, bufferIndices),                   // DstIndices
-            caustica::rhi::BindingSetItem::StructuredBuffer_UAV(3, m_controlBuffer),            // ConstsUAV
-            //caustica::rhi::BindingSetItem::StructuredBuffer_UAV(4, m_dispatchIndirectBuffer),   // DispIndUAV
-            caustica::rhi::BindingSetItem::RawBuffer_UAV(SHADER_DEBUG_BUFFER_UAV_INDEX, m_shaderDebug->getGPUWriteBuffer()),
-    };
-
-    caustica::rhi::BindingSetHandle bindingSetInit = m_bindingCache.getOrCreateBindingSet(bindingSetDescInit, m_initBindingLayout);
-    caustica::rhi::BindingSetHandle bindingSetPing = m_bindingCache.getOrCreateBindingSet(bindingSetDescPing, m_commonBindingLayout);
-    caustica::rhi::BindingSetHandle bindingSetPong = m_bindingCache.getOrCreateBindingSet(bindingSetDescPong, m_commonBindingLayout);
+    const BindingSets bindingSets = findBindingSets(
+        controlBuffer, bufferKeys, bufferIndices, false);
+    assert(bindingSets.init && bindingSets.ping && bindingSets.pong);
+    if (!bindingSets.init || !bindingSets.ping || !bindingSets.pong)
+        return;
 
     auto RunCSPass = [ & ]( const char * markerName, const caustica::rhi::ComputePipelineHandle & pso, uint dispatchSizeX, uint indirectDispatchArgOffset, bool pong, uint rootConst, bool initOnly = false )
     {
@@ -218,9 +251,9 @@ void GPUSort::sort(caustica::rhi::CommandList * commandList, caustica::rhi::Buff
 #endif
 
         caustica::rhi::ComputeState state;
-        state.bindings = { (!pong)?(bindingSetPing):(bindingSetPong) };
+        state.bindings = { (!pong)?(bindingSets.ping):(bindingSets.pong) };
         if( initOnly )
-            state.bindings = {bindingSetInit};
+            state.bindings = {bindingSets.init};
         state.pipeline = pso;
 
         if (dispatchSizeX == 0)

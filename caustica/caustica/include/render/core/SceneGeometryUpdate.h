@@ -4,6 +4,7 @@
 #include <rhi/rhi.h>
 
 #include <cstdint>
+#include <atomic>
 #include <memory>
 
 class MaterialGpuCache;
@@ -42,7 +43,7 @@ struct UpdateSceneGeometryParams
     uint64_t                         frameIndex = 0;
 
     // OR-ed when OMM async builds are still in flight.
-    bool*                            asyncLoadingInProgress = nullptr;
+    std::atomic<bool>*               asyncLoadingInProgress = nullptr;
 };
 
 void updateSceneGeometry(AccelStructManager& accelStructs, UpdateSceneGeometryParams& params);

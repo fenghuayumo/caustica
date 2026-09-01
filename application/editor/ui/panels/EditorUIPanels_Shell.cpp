@@ -282,7 +282,7 @@ void EditorUI::BuildStatusBar()
 
             if (auto* diag = app->tryResource<caustica::render::AppDiagnostics>())
             {
-                const auto& warm = diag->rtPipelineWarmup;
+                const auto warm = diag->pipelineWarmupStatus();
                 if (warm.active && warm.total > 0)
                 {
                     ImGui::SameLine();

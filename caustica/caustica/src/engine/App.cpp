@@ -2,6 +2,7 @@
 #include <engine/AppResources.h>
 #include <engine/EntryPoint.h>
 #include <engine/internal/GpuRenderScheduleRegistration.h>
+#include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SceneViewState.h>
@@ -17,6 +18,8 @@
 #include <platform/window.h>
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/WorldRenderer.h>
+#include <render/passes/postProcess/ToneMappingPasses.h>
 
 #if CAUSTICA_WITH_STREAMLINE
 #include <StreamlineIntegration.h>
@@ -461,17 +464,12 @@ void App::enqueueRenderCommandImpl(std::function<void()> command)
 
 void App::requestExit()
 {
+    // requestExit() may be called by Logic, Render, or a worker. Only publish
+    // thread-safe state here; GLFW/window operations are consumed by run() on
+    // the main thread.
     m_requestExit.store(true, std::memory_order_release);
-    if (Window* w = window())
-        w->setExit(true);
     if (GpuDevice* gpuDevice = device())
-    {
         gpuDevice->setShuttingDown(true);
-        // Hide immediately so title-bar Close feels instant while the render
-        // thread / GPU drain finishes in the background (not a hang/crash).
-        if (GLFWwindow* glfwWindow = gpuDevice->getWindow())
-            glfwHideWindow(glfwWindow);
-    }
 }
 
 void App::requestRenderUnfocused()
@@ -1017,7 +1015,17 @@ void App::run()
         w->onUpdate();
         // Close was requested during event polling -- skip another full path-trace
         // frame so exit does not block on a multi-second render.
-        if (w->getExit() || m_requestExit.load(std::memory_order_acquire))
+        if (m_requestExit.load(std::memory_order_acquire))
+        {
+            // Window state and GLFW APIs are main-thread owned. requestExit()
+            // only publishes the request so Render/worker callers never race
+            // GlfwWindow::m_ExitRequested or call GLFW from the wrong thread.
+            w->setExit(true);
+            if (GLFWwindow* glfwWindow = gpuDevice->getWindow())
+                glfwHideWindow(glfwWindow);
+            break;
+        }
+        if (w->getExit())
             break;
 
         updateWindowSize();

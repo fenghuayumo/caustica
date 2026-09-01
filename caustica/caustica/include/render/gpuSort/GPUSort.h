@@ -30,6 +30,14 @@ public:
 
     void                            createRenderPasses(std::shared_ptr<ShaderDebug> shaderDebug);
 
+    // Render-thread preparation. Resource allocation and binding-set creation
+    // are forbidden from render-graph worker recording callbacks.
+    void                            prepare(
+        uint32_t maxItemCount,
+        caustica::rhi::BufferHandle controlBuffer,
+        caustica::rhi::BufferHandle bufferKeys,
+        caustica::rhi::BufferHandle bufferIndices);
+
     // Provide number of items to be sorted as a uint32 variable within the controlBuffer at the itemCountByteOffset. Must be less than or equal to maxItemCount. If bigger, behaviour is undefined.
     // Provide sort keys in the keys buffer (uint32). These will NOT be touched - only indices are sorted.
     // Provide indices in the indices buffer (uint32). These have to be already initialized to [1, 2, 3, 4, 5, ..., itemCount-1] and will be sorted in-place. Also known as the "payload". If you do not want to pre-initialize them, use `resetIndices`
@@ -39,6 +47,18 @@ public:
 
 private:
     void                            reCreateWorkingBuffers(uint32_t maxItemCount);
+
+    struct BindingSets
+    {
+        caustica::rhi::BindingSetHandle init;
+        caustica::rhi::BindingSetHandle ping;
+        caustica::rhi::BindingSetHandle pong;
+    };
+    [[nodiscard]] BindingSets findBindingSets(
+        caustica::rhi::BufferHandle controlBuffer,
+        caustica::rhi::BufferHandle bufferKeys,
+        caustica::rhi::BufferHandle bufferIndices,
+        bool create);
 
 private:
     caustica::rhi::DeviceHandle             m_device;

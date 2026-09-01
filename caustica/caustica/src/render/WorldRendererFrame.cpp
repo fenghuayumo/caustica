@@ -597,8 +597,9 @@ void caustica::render::WorldRenderer::framePassShaderUpdate(PathTracingFrameCont
         ctx.forcePathTracingShaderReload,
         m_context->activeSettings());
 
-    m_context->diagnostics.rtPipelineWarmup = rayTracing.pipelineWarmupStatus();
-    m_context->diagnostics.rtPipelineCacheStats = rayTracing.pipelineCacheStats();
+    m_context->diagnostics.publishPipelineStats(
+        rayTracing.pipelineWarmupStatus(),
+        rayTracing.pipelineCacheStats());
 
     if (m_context->scenePasses.lighting.computePipelines())
         m_context->scenePasses.lighting.computePipelines()->update(ctx.needNewPasses);

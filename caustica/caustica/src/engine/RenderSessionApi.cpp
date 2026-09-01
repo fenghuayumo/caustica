@@ -93,10 +93,7 @@ std::string resolutionInfo(const App& app)
 float avgTimePerFrame(const App& app)
 {
     AppDiagnostics* diag = diagnostics(app);
-    if (!diag || diag->benchFrames == 0)
-        return 0.0f;
-    std::chrono::duration<double> elapsed = (diag->benchLast - diag->benchStart);
-    return float(elapsed.count() / diag->benchFrames);
+    return diag ? diag->averageBenchmarkFrameSeconds() : 0.0f;
 }
 
 void requestMeshAccelRebuild(App& app, ecs::Entity entity, bool resetAccumulation)

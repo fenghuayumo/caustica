@@ -42,9 +42,8 @@ void beginExtractFrame(App& app)
     const bool loadSessionActive = vs && vs->loadSession.isActive();
     if (vs && !loadBusy)
         vs->progressLoading.stop();
-    if (diag && !loadSessionActive)
-        diag->asyncLoadingInProgress = false;
-    if (vs && !loadSessionActive && !(diag && diag->asyncLoadingInProgress))
+    if (vs && !loadSessionActive
+        && !(diag && diag->asyncLoadingInProgress.load(std::memory_order_acquire)))
         vs->loadSession.secondaryStreaming.store(false, std::memory_order_relaxed);
 
     const std::shared_ptr<Scene> scene = activeScene(app);
