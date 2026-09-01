@@ -169,7 +169,7 @@ float3 toneMapAgX(float3 color)
 {
     const float3x3 linearSrgbToLinearRec2020 = float3x3(
          0.6274,  0.3293,  0.0433,
-         0.0691,  0.9195,  0.0880,
+         0.0691,  0.9195,  0.0113,
          0.0164,  0.0880,  0.8956);
 
     const float3x3 linearRec2020ToLinearSrgb = float3x3(
