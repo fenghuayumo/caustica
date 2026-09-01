@@ -4,6 +4,7 @@
 #include <assets/TypedAssets.h>
 #include <ecs/Entity.h>
 #include <scene/SceneApply.h>
+#include <scene/SceneEcs.h>
 
 #include <filesystem>
 #include <string>
@@ -29,5 +30,18 @@ class App;
     const std::string& source,
     const SceneApplyCallbacks& callbacks = {});
 [[nodiscard]] bool despawn(App& app, ecs::Entity entity);
+
+[[nodiscard]] ecs::Entity spawnDirectionalLight(
+    App& app, scene::DirectionalLightComponent component, const std::string& name = {});
+[[nodiscard]] ecs::Entity spawnSpotLight(
+    App& app, scene::SpotLightComponent component, const std::string& name = {});
+[[nodiscard]] ecs::Entity spawnPointLight(
+    App& app, scene::PointLightComponent component, const std::string& name = {});
+[[nodiscard]] ecs::Entity spawnRectLight(
+    App& app, scene::RectLightComponent component, const std::string& name = {});
+[[nodiscard]] ecs::Entity spawnEnvironmentLight(
+    App& app, scene::EnvironmentLightComponent component, const std::string& name = {});
+void ensureRectLightVisual(App& app, ecs::Entity entity);
+void syncRectLightVisual(App& app, ecs::Entity entity);
 
 } // namespace caustica

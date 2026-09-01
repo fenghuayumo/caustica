@@ -1,6 +1,5 @@
 #pragma once
 
-#include <scene/Scene.h>
 #include <render/core/PathTracerSettings.h>
 
 #include "ui/EditorUIState.h"

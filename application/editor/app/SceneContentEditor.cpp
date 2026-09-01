@@ -9,12 +9,10 @@
 #include <core/path_utils.h>
 #include <engine/App.h>
 #include <engine/CameraApi.h>
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
-#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneSerializer.h>
 #include <json/json.h>
@@ -337,9 +335,8 @@ caustica::ecs::Entity SceneContentEditor::createBuiltinMesh(BuiltinPrimitiveKind
 caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
 {
     auto* app = m_sceneEditor.app();
-    auto scene = app ? caustica::activeScene(*app) : nullptr;
     auto* ew = app ? caustica::entityWorld(*app) : nullptr;
-    if (!app || !scene || !ew || !caustica::isSceneLoaded(*app))
+    if (!app || !ew || !caustica::isSceneLoaded(*app))
         return caustica::ecs::NullEntity;
     if (kind == EditorLightKind::Rect && caustica::isSceneStructureBusy(*app))
         return caustica::ecs::NullEntity;
@@ -355,7 +352,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         light.color = dm::float3(1.0f, 0.96f, 0.9f);
         light.irradiance = 4.0f;
         light.angularSize = 1.5f;
-        entity = scene->attachDirectionalLightToRoot(std::move(light), id);
+        entity = caustica::spawnDirectionalLight(*app, std::move(light), id);
         if (ecs::isValid(entity))
             ew->setRotation(entity, DefaultSunRotation());
         break;
@@ -367,7 +364,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         light.intensity = 40.0f;
         light.radius = 0.05f;
         light.range = 12.0f;
-        entity = scene->attachPointLightToRoot(std::move(light), id);
+        entity = caustica::spawnPointLight(*app, std::move(light), id);
         break;
     }
     case EditorLightKind::Spot:
@@ -379,7 +376,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         light.range = 14.0f;
         light.innerAngle = 18.0f;
         light.outerAngle = 32.0f;
-        entity = scene->attachSpotLightToRoot(std::move(light), id);
+        entity = caustica::spawnSpotLight(*app, std::move(light), id);
         break;
     }
     case EditorLightKind::Rect:
@@ -389,7 +386,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         light.intensity = 20.0f;
         light.width = 0.6f;
         light.height = 0.4f;
-        entity = scene->attachRectLightToRoot(std::move(light), id);
+        entity = caustica::spawnRectLight(*app, std::move(light), id);
         break;
     }
     case EditorLightKind::Environment:
@@ -397,7 +394,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
         caustica::scene::EnvironmentLightComponent light;
         light.radianceScale = dm::float3(1.0f);
         light.path = c_EnvMapProcSky;
-        entity = scene->attachEnvironmentLightToRoot(std::move(light), id);
+        entity = caustica::spawnEnvironmentLight(*app, std::move(light), id);
         break;
     }
     }
@@ -423,7 +420,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
             translation.y = std::max(translation.y, 1.6);
             ew->setTranslation(entity, translation);
         }
-        scene->syncRectLightVisualFromComponent(entity);
+        caustica::syncRectLightVisual(*app, entity);
         ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
     }
     ew->discardStructureDirtyIfGeometryUnchanged();

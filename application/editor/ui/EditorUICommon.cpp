@@ -5,21 +5,13 @@
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <scene/Scene.h>
+#include <core/path_utils.h>
 #include <imgui_internal.h>
-#include <assets/loader/ShaderFactory.h>
-#include <render/passes/lighting/MaterialGpuCache.h>
-#include <render/passes/postProcess/ToneMappingPasses.h>
-#include <render/passes/debug/Korgi.h>
-#include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <render/passes/debug/ZoomTool.h>
-#include <common/CaptureScriptManager.h>
 
 #include <algorithm>
 #include <cctype>
@@ -330,26 +322,25 @@ void SetEntityEnabled(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity,
 
 } // namespace
 
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter)
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& ew, ecs::Entity entity, const char* filter)
 {
-    auto* ew = scene.getEntityWorld();
-    if (!ew || entity == ecs::NullEntity)
+    if (entity == ecs::NullEntity)
         return;
-    if (!HierarchyNodePassesFilter(*ew, entity, filter))
+    if (!HierarchyNodePassesFilter(ew, entity, filter))
         return;
 
-    const bool isMeshEntity = IsMeshInstanceEntity(*ew, entity);
-    const bool isGaussianSplatEntity = IsGaussianSplatEntity(*ew, entity);
-    const bool isLightEntity = IsLightEntity(*ew, entity);
-    const bool isEnvironmentLightEntity = IsEnvironmentLightEntity(*ew, entity);
-    const bool isSelectable = IsHierarchyLeafEntity(*ew, entity);
+    const bool isMeshEntity = IsMeshInstanceEntity(ew, entity);
+    const bool isGaussianSplatEntity = IsGaussianSplatEntity(ew, entity);
+    const bool isLightEntity = IsLightEntity(ew, entity);
+    const bool isEnvironmentLightEntity = IsEnvironmentLightEntity(ew, entity);
+    const bool isSelectable = IsHierarchyLeafEntity(ew, entity);
     const bool showVisibilityToggle = isMeshEntity || isGaussianSplatEntity || isLightEntity;
-    const auto& children = ew->getEntityChildren(entity);
+    const auto& children = ew.getEntityChildren(entity);
 
     bool hasVisibleChildren = false;
     for (ecs::Entity child : children)
     {
-        if (HierarchyNodePassesFilter(*ew, child, filter))
+        if (HierarchyNodePassesFilter(ew, child, filter))
         {
             hasVisibleChildren = true;
             break;
@@ -366,16 +357,16 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
     // Only expand the scene root by default. Expanding every imported group
     // recursively makes deep glTF hierarchies (notably Bistro) turn into an
     // unreadable diagonal wall of clipped labels.
-    if (hasVisibleChildren && entity == ew->root())
+    if (hasVisibleChildren && entity == ew.root())
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if (filter && filter[0] != '\0' && hasVisibleChildren)
         ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 
-    std::string nodeName = ew->getEntityName(entity);
+    std::string nodeName = ew.getEntityName(entity);
     if (nodeName.empty())
         nodeName = "<unnamed>";
 
-    const bool enabled = GetEntityEnabled(*ew, entity);
+    const bool enabled = GetEntityEnabled(ew, entity);
     const ImU32 muted = ImGui::ColorConvertFloat4ToU32(GetEditorColors().TextMuted);
     const ImU32 textCol = enabled
         ? ImGui::ColorConvertFloat4ToU32(GetEditorColors().Text)
@@ -403,7 +394,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
 
     const float labelStartX = rowMin.x + ImGui::GetTreeNodeToLabelSpacing();
     const float iconX = labelStartX;
-    const HierarchyTypeIcon typeIcon = ResolveHierarchyTypeIcon(*ew, entity);
+    const HierarchyTypeIcon typeIcon = ResolveHierarchyTypeIcon(ew, entity);
     DrawHierarchyTypeIcon(
         dl,
         ImVec2(iconX, rowMin.y + (rowH - iconSize) * 0.5f),
@@ -430,7 +421,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
 
         if (eyeClicked)
         {
-            SetEntityEnabled(*ew, entity, !enabled);
+            SetEntityEnabled(ew, entity, !enabled);
             if (isEnvironmentLightEntity)
                 ui.render.settings.EnvironmentMapParams.enabled = !enabled;
             ui.render.settings.ResetAccumulation = true;
@@ -460,7 +451,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity 
     if (open && hasVisibleChildren)
     {
         for (ecs::Entity child : children)
-            BuildHierarchyNodeUI(ui, scene, child, filter);
+            BuildHierarchyNodeUI(ui, ew, child, filter);
         ImGui::TreePop();
     }
     ImGui::PopID();

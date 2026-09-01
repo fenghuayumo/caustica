@@ -7,16 +7,12 @@
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/passes/debug/Korgi.h>
-#include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
@@ -37,7 +33,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
         {
             RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
 
-            if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+            if (auto lightSamplingCache = caustica::lightSamplingCache(editorApp(m_sceneEditor)); lightSamplingCache)
                 m_settings.ResetAccumulation |= DrawLightSamplingInfo(*lightSamplingCache);
 
             if (!m_settings.UseNEE)
@@ -48,7 +44,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Distant lighting (envmap+directional)"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment(); envMapProcessor != nullptr)
+                if (auto envMapProcessor = caustica::envMapProcessor(editorApp(m_sceneEditor)); envMapProcessor)
                     m_settings.ResetAccumulation |= DrawEnvMapProcessorDebug(*envMapProcessor, layout.indent);
             }
 
@@ -87,7 +83,7 @@ void EditorUI::BuildLightingPanel(const PanelLayout& layout)
             if (ImGui::CollapsingHeader("Debugging"))
             {
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-                if (auto& lightSamplingCache = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().lightSampling(); lightSamplingCache != nullptr)
+                if (auto lightSamplingCache = caustica::lightSamplingCache(editorApp(m_sceneEditor)); lightSamplingCache)
                     m_settings.ResetAccumulation |= DrawLightSamplingDebug(*lightSamplingCache, layout.indent);
             }
         }

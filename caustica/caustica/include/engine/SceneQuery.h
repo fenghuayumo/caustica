@@ -4,6 +4,8 @@
 #include <ecs/Entity.h>
 #include <scene/SceneEcs.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -32,6 +34,21 @@ class Material;
 [[nodiscard]] bool isSceneLoaded(const App& app);
 [[nodiscard]] bool shouldSkipRender(const App& app);
 [[nodiscard]] bool shouldRenderWhenUnfocused(const App& app);
+
+struct SceneLoadStatus
+{
+    const char* phaseName = "Idle";
+    bool busy = false;
+    int progressPercent = 0;
+    bool gpuStreaming = false;
+    uint32_t streamStep = 0;
+    size_t texturesRemaining = 0;
+    size_t meshBegin = 0;
+    size_t meshTotal = 0;
+    bool stepInFlight = false;
+};
+
+[[nodiscard]] SceneLoadStatus sceneLoadStatus(const App& app);
 
 // Resolve by path-tracer pick id (StandardMaterial::gpuDataIndex). Not Material::materialID.
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);

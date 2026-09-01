@@ -6,11 +6,8 @@
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
-#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
 #include <vector>
 #include <imgui_internal.h>

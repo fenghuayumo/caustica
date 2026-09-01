@@ -23,14 +23,14 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 | `engine/SystemSets.h` / `engine/SystemLabel.h` | `Simulation` membership + labels |
 | `engine/AppSchedules.h` | Via `App.h`: `AppSchedule`, `Query`, `Res` / `ResMut`, `SystemContext` |
 | `engine/App.h` | Schedule runtime; prefer not to construct `App` yourself |
-| `engine/SceneSpawn.h` | `load` / `spawn` / `spawnFromFile` / `despawn` |
+| `engine/SceneSpawn.h` | `load` / `spawn` / `spawnFromFile` / `despawn` / spawn lights |
 | `engine/SceneTransform.h` | App-based transform / visibility |
-| `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials |
+| `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus` |
 | `engine/ActiveScene.h` | Name/path/generation metadata only (no `Scene*` digs) |
 | `engine/MeshDeformApi.h` | Entity + MeshHandle deform / geometry sequence |
-| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics |
-| `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots (entity overloads) |
-| `engine/SceneLifecycle.h` | `setCurrentScene` (prefer `EngineApp::setScene`) |
+| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities |
+| `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles |
+| `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene` (prefer `EngineApp::setScene`) |
 | `engine/EnqueueRenderCommand.h` | Occasional non-blocking RT work |
 | `engine/EngineSceneCallbacks.h` / `engine/SceneViewState.h` | Optional `EngineAppDesc` hooks |
 

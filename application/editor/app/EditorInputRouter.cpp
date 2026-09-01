@@ -5,6 +5,8 @@
 #include "SceneEditor.h"
 #include "EditorAccess.h"
 #include "EditorUIState.h"
+#include <engine/RenderSessionApi.h>
+#include <engine/CameraApi.h>
 
 #include <backend/GpuDevice.h>
 #include <GLFW/glfw3.h>
@@ -17,7 +19,6 @@
 #include <ImGuizmo.h>
 #include <imgui/imgui_renderer.h>
 #include <render/RenderAppState.h>
-#include <render/WorldRenderer.h>
 #include "game/GameScene.h"
 #include <render/passes/debug/ZoomTool.h>
 
@@ -124,17 +125,17 @@ bool gizmoCapturesInput(const SceneEditor& sceneEditor)
     return ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
-void activateFreeCameraForInput(CameraController& camera)
+void activateFreeCameraForInput(App& app)
 {
-    if (camera.selectedCameraIndex() == 0)
+    if (caustica::selectedCameraIndex(app) == 0)
         return;
 
     // Scene cameras are authoritative and are refreshed from ECS every frame.
     // Switch to the already-synced controller pose before applying viewport
     // input, so the first interaction preserves the reference view and then
     // remains freely editable.
-    camera.setSelectedCameraIndex(0);
-    camera.markCameraChanged();
+    caustica::selectedCameraIndex(app) = 0;
+    caustica::markCameraChanged(app);
 }
 
 void requestMaterialPick(SceneEditor& sceneEditor)
@@ -142,8 +143,7 @@ void requestMaterialPick(SceneEditor& sceneEditor)
     // Pick the hit geometry's material (per sub-mesh), not the whole instance.
     auto& picking = sceneEditor.renderAppState().runtime.Picking;
     picking.requestMaterialPick();
-    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor))
-        worldRenderer->submitImmediateMaterialPick(picking);
+    caustica::submitImmediateMaterialPick(editorApp(sceneEditor), picking);
 }
 
 void requestInstancePick(SceneEditor& sceneEditor)
@@ -151,8 +151,7 @@ void requestInstancePick(SceneEditor& sceneEditor)
     // Left-click: select the mesh instance entity for Inspector / gizmo.
     auto& picking = sceneEditor.renderAppState().runtime.Picking;
     picking.requestInstancePick();
-    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor))
-        worldRenderer->submitImmediateInstancePick(picking);
+    caustica::submitImmediateInstancePick(editorApp(sceneEditor), picking);
 }
 
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
@@ -278,8 +277,8 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
-    if (!camera)
+    App* app = sceneEditor.app();
+    if (!app)
         return true;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
@@ -293,8 +292,8 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     {
         if (!isCameraFlyKey(key) || isRightMouseDown(sceneEditor))
         {
-            activateFreeCameraForInput(*camera);
-            camera->camera().keyboardUpdate(key, e.getScancode(), action, mods);
+            activateFreeCameraForInput(*app);
+            caustica::currentCamera(*app).keyboardUpdate(key, e.getScancode(), action, mods);
         }
     }
 
@@ -337,8 +336,8 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
-    if (!camera)
+    App* app = sceneEditor.app();
+    if (!app)
         return true;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
@@ -349,7 +348,7 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     if (!(game && game->CameraActive()))
     {
         // Always accept releases so fly keys cannot stick after RMB-up.
-        camera->camera().keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods);
+        caustica::currentCamera(*app).keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods);
     }
     if (game && game->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
@@ -379,13 +378,13 @@ bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    App* app = sceneEditor.app();
     auto* game = sceneEditor.game().get();
 
     // Always track cursor for look/pan deltas. Those modes only apply while
     // their buttons are held, so this is safe over gizmos and side panels.
-    if (camera && !(game && game->CameraActive()))
-        camera->camera().mousePosUpdate(e.getX(), e.getY());
+    if (app && !(game && game->CameraActive()))
+        caustica::currentCamera(*app).mousePosUpdate(e.getX(), e.getY());
     if (game)
         game->mousePosUpdate(e.getX(), e.getY());
 
@@ -404,8 +403,8 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 
 bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressedEvent& e)
 {
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
-    if (!camera)
+    App* app = sceneEditor.app();
+    if (!app)
         return true;
 
     const int button = ToGlfwMouse(e.getButton());
@@ -423,8 +422,8 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (isLeft && altHeld(mods) && cursorInViewportForCamera(sceneEditor)
         && !(game && game->CameraActive()))
     {
-        activateFreeCameraForInput(*camera);
-        camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
+        activateFreeCameraForInput(*app);
+        caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwPress, mods);
         return true;
     }
 
@@ -447,9 +446,9 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (!(game && game->CameraActive()))
     {
         if (isLeft || isMiddle)
-            activateFreeCameraForInput(*camera);
+            activateFreeCameraForInput(*app);
         if (isMiddle)
-            camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
+            caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwPress, mods);
     }
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
@@ -471,22 +470,22 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
 
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    App* app = sceneEditor.app();
     auto* game = sceneEditor.game().get();
 
     // Always clear look/pan so Alt+LMB cannot stick if release happens over a gizmo.
-    if (camera && !(game && game->CameraActive()))
+    if (app && !(game && game->CameraActive()))
     {
         if (button != ToGlfwMouse(caustica::Mouse::Right))
-            camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
+            caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwRelease, mods);
         if (button == ToGlfwMouse(caustica::Mouse::Right))
-            camera->camera().clearFlyKeyboardState();
+            caustica::currentCamera(*app).clearFlyKeyboardState();
     }
 
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
-    if (!camera)
+    if (!app)
         return true;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
@@ -505,9 +504,9 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return true;
 
-    auto* camera = caustica::editor::editorCamera(sceneEditor);
+    App* app = sceneEditor.app();
     auto* game = sceneEditor.game().get();
-    if (!camera || (game && game->CameraActive()))
+    if (!app || (game && game->CameraActive()))
         return true;
 
     // Alt + wheel: change fly speed. Plain wheel: dolly zoom in/out.
@@ -519,8 +518,8 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     }
     else
     {
-        activateFreeCameraForInput(*camera);
-        camera->camera().mouseScrollUpdate(e.getXOffset(), e.getYOffset());
+        activateFreeCameraForInput(*app);
+        caustica::currentCamera(*app).mouseScrollUpdate(e.getXOffset(), e.getYOffset());
     }
     return true;
 }

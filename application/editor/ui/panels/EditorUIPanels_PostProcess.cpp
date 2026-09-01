@@ -3,21 +3,16 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/LoadSession.h>
 #include <core/task/TaskRuntime.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
-#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/passes/debug/Korgi.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
@@ -42,18 +37,13 @@ void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
         {
             UI_SCOPED_INDENT(layout.indent);
 
-            if (auto& opacityMicromapBuilder = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().opacityMaps(); opacityMicromapBuilder)
+            if (auto opacityMicromapBuilder = caustica::opacityMicromapBuilder(editorApp(m_sceneEditor)); opacityMicromapBuilder)
             {
-                if (const auto scene = caustica::activeScene(*m_sceneEditor.app()))
-                {
-                    // Editor is outside beginGpuReadFrame; use the last published slot.
-                    const uint32_t publishedFrame = scene->latestPublishedRenderFrameIndex();
-                    if (publishedFrame != UINT32_MAX)
-                        m_settings.ResetAccumulation |= DrawOpacityMicromapDebug(
-                            *opacityMicromapBuilder,
-                            scene->getRenderDataForFrame(publishedFrame),
-                            layout.indent);
-                }
+                if (const auto* renderData = caustica::latestPublishedRenderData(editorApp(m_sceneEditor)))
+                    m_settings.ResetAccumulation |= DrawOpacityMicromapDebug(
+                        *opacityMicromapBuilder,
+                        *renderData,
+                        layout.indent);
             }
             else
                 ImGui::Text("<Opacity Micro-Maps not supported on the current device>");
@@ -258,18 +248,18 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                     (unsigned long long)stats.frameGeneration,
                     (unsigned long long)stats.loadGeneration);
 
-                const LoadSession& session = m_sceneEditor.viewState().loadSession;
+                const caustica::SceneLoadStatus load = caustica::sceneLoadStatus(editorApp(m_sceneEditor));
                 ImGui::Text("LoadSession: %s  busy=%s  progress=%d%%",
-                    loadSessionPhaseName(session.phase),
-                    session.isBusy() ? "yes" : "no",
-                    session.progressPercent());
-                if (session.phase == LoadSessionPhase::GpuStreaming)
+                    load.phaseName,
+                    load.busy ? "yes" : "no",
+                    load.progressPercent);
+                if (load.gpuStreaming)
                 {
                     ImGui::Text("  stream step=%u  textures rem=%zu  meshes %zu/%zu  inFlight=%s",
-                        (unsigned)session.streamStep,
-                        session.stepTexturesRemaining.load(std::memory_order_relaxed),
-                        session.meshBegin, session.meshTotal,
-                        session.stepInFlight ? "yes" : "no");
+                        load.streamStep,
+                        load.texturesRemaining,
+                        load.meshBegin, load.meshTotal,
+                        load.stepInFlight ? "yes" : "no");
                 }
             }
 

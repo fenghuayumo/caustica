@@ -5,30 +5,27 @@
 #include "SceneEditor.h"
 #include "EditorAccess.h"
 #include "EditorUndoCommands.h"
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/SceneSpawn.h>
 #include "common/ImGuiManager.h"
 #include "common/TransformGizmo.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <core/vfs/VFS.h>
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneLightAccess.h>
-#include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
+#include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <render/passes/debug/Korgi.h>
-#include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
 #include <cmath>
@@ -351,9 +348,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             }
 
             ImGui::Spacing();
-            auto scene = caustica::activeScene(*m_sceneEditor.app());
-            static const std::vector<ecs::Entity> kNoCameras;
-            const auto& cameraEntities = scene ? scene->getCameraEntities() : kNoCameras;
+            const auto& cameraEntities = caustica::sceneCameraEntities(editorApp(m_sceneEditor));
             int sceneCamIndex = -1;
             for (size_t i = 0; i < cameraEntities.size(); ++i)
             {
@@ -459,8 +454,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             markLightingEdited(InspectorDragFloat3(
                 "Rotation XYZ", &m_settings.EnvironmentMapParams.RotationXYZ.x, 0.5f, -360.f, 360.f, "%.1f"));
 
-            if (auto& envMapProcessor = caustica::editor::requireWorldRenderer(m_sceneEditor).lightingPasses().environment();
-                envMapProcessor != nullptr && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
+            if (auto envMapProcessor = caustica::envMapProcessor(editorApp(m_sceneEditor));
+                envMapProcessor && envMapProcessor->isProcedural() && envMapProcessor->getProceduralSky() != nullptr)
             {
                 ImGui::Spacing();
                 ImGui::Separator();
@@ -518,11 +513,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 if (markLightingEdited(changed))
                 {
                     ew->world().notifyComponentChanged<caustica::scene::RectLightComponent>(entity);
-                    if (auto scene = caustica::activeScene(*m_sceneEditor.app()))
-                    {
-                        scene->ensureRectLightVisual(entity);
-                        scene->syncRectLightVisualFromComponent(entity);
-                    }
+                    caustica::ensureRectLightVisual(editorApp(m_sceneEditor), entity);
+                    caustica::syncRectLightVisual(editorApp(m_sceneEditor), entity);
                     if (auto* mesh = ew->world().tryGet<caustica::scene::MeshInstanceComponent>(entity))
                     {
                         if (mesh->mesh)
@@ -562,8 +554,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
     ImGui::PushItemWidth(layout.defItemWidth);
 
     std::shared_ptr<StandardMaterial> material = StandardMaterial::safeCast(m_editorUI.SelectedMaterial);
-    auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
-    auto materials = wr ? wr->lightingPasses().materials() : nullptr;
+    auto materials = caustica::materialGpuCache(editorApp(m_sceneEditor));
     if (material == nullptr || materials == nullptr)
     {
         ImGui::TextDisabled("No material selected");

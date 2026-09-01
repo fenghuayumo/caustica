@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
+#include <engine/GpuSharedCaches.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneGaussianSplatLogic.h>
 #include <engine/internal/ActiveSceneAccess.h>
@@ -16,7 +17,11 @@
 #include <render/SceneRayTracingResources.h>
 #include <render/WorldRenderer.h>
 #include <render/core/RenderTargets.h>
+#include <render/passes/debug/ZoomTool.h>
+#include <assets/loader/TextureLoader.h>
+#include <backend/GpuDevice.h>
 #include <math/math.h>
+#include <cstdint>
 
 using namespace caustica::render;
 
@@ -208,6 +213,105 @@ bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target)
         return false;
     wr->denoisedScreenshot(target);
     return true;
+}
+
+std::shared_ptr<LightSamplingCache> lightSamplingCache(const App& app)
+{
+    auto* wr = worldRenderer(app);
+    return wr ? wr->lightingPasses().lightSampling() : nullptr;
+}
+
+std::shared_ptr<EnvMapProcessor> envMapProcessor(const App& app)
+{
+    auto* wr = worldRenderer(app);
+    return wr ? wr->lightingPasses().environment() : nullptr;
+}
+
+std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder(const App& app)
+{
+    auto* wr = worldRenderer(app);
+    return wr ? wr->lightingPasses().opacityMaps() : nullptr;
+}
+
+std::shared_ptr<MaterialGpuCache> materialGpuCache(const App& app)
+{
+    auto* wr = worldRenderer(app);
+    return wr ? wr->lightingPasses().materials() : nullptr;
+}
+
+void saveAllMaterials(App& app)
+{
+    if (auto materials = materialGpuCache(app))
+        materials->saveAll();
+}
+
+void submitImmediateMaterialPick(App& app, const render::RenderPickState& picking)
+{
+    if (auto* wr = worldRenderer(app))
+        wr->submitImmediateMaterialPick(picking);
+}
+
+void submitImmediateInstancePick(App& app, const render::RenderPickState& picking)
+{
+    if (auto* wr = worldRenderer(app))
+        wr->submitImmediateInstancePick(picking);
+}
+
+const render::RenderPickState& lastRenderedPicking(const App& app)
+{
+    static const render::RenderPickState kEmpty{};
+    auto* wr = worldRenderer(app);
+    return wr ? wr->getLastRenderedPicking() : kEmpty;
+}
+
+std::vector<GaussianSplatObjectBounds> gaussianSplatObjectBounds(const App& app)
+{
+    std::vector<GaussianSplatObjectBounds> out;
+    auto* wr = worldRenderer(app);
+    if (!wr)
+        return out;
+    for (const auto& object : wr->gaussianSplatPasses().objects())
+    {
+        if (!ecs::isValid(object.entity) || !object.pass)
+            continue;
+        out.push_back({ object.entity, object.pass->getLocalBounds() });
+    }
+    return out;
+}
+
+const scene::SceneRenderData* latestPublishedRenderData(const App& app)
+{
+    auto scene = activeScene(app);
+    if (!scene)
+        return nullptr;
+    const uint32_t frame = scene->latestPublishedRenderFrameIndex();
+    if (frame == UINT32_MAX)
+        return nullptr;
+    return &scene->getRenderDataForFrame(frame);
+}
+
+std::unique_ptr<ZoomTool> createZoomTool(App& app)
+{
+    auto* infra = gpuSharedCaches(app);
+    auto* device = gpuDevice(app);
+    if (!infra || !infra->shaderFactory || !device)
+        return nullptr;
+    return std::make_unique<ZoomTool>(device->getDevice(), infra->shaderFactory);
+}
+
+bool saveCurrentFramebuffer(App& app, GpuDevice& gpuDevice, const char* fileName)
+{
+    caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
+    auto* infra = gpuSharedCaches(app);
+    if (!framebuffer || !infra || !infra->renderDevice || !fileName)
+        return false;
+    caustica::rhi::Texture* texture = framebuffer->getDesc().colorAttachments[0].texture;
+    return saveTextureToFile(
+        gpuDevice.getDevice(),
+        *infra->renderDevice,
+        texture,
+        caustica::rhi::ResourceStates::Common,
+        fileName);
 }
 
 } // namespace caustica

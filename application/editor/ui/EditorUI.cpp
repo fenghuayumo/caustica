@@ -9,12 +9,10 @@
 #include "ui/RenderSettingsConsole.h"
 
 #include <render/AppDiagnostics.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
-#include <scene/Scene.h>
 #include <imgui_internal.h>
 #include <GLFW/glfw3.h>
+#include <core/path_utils.h>
 #include <algorithm>
 #include <cstdio>
 #include <render/passes/debug/Korgi.h>

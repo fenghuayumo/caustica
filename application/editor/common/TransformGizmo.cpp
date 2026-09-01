@@ -386,8 +386,8 @@ const float* GetSnapValues(const EditorUIState& editorUI)
 
 void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarView& view, float outMatrix[16])
 {
-    auto* camera = caustica::editor::editorCamera(ctx.sceneEditor);
-    if (camera && view.isReverseDepth())
+    App* app = ctx.sceneEditor.app();
+    if (app && view.isReverseDepth())
     {
         const auto& vp = ctx.editorUI.Viewport;
         float aspect = 1.f;
@@ -398,8 +398,8 @@ void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarVi
             const ImGuiIO& io = ImGui::GetIO();
             aspect = (io.DisplaySize.y > 0.f) ? (io.DisplaySize.x / io.DisplaySize.y) : 1.f;
         }
-        const float fov = camera->verticalFOV();
-        const float zNear = std::max(camera->zNear(), 0.01f);
+        const float fov = caustica::cameraVerticalFOV(*app);
+        const float zNear = std::max(caustica::cameraZNear(*app), 0.01f);
         const float zFar = std::max(zNear * 10000.f, 1000.f);
         Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(fov, aspect, zNear, zFar), outMatrix);
         return;
@@ -963,7 +963,7 @@ void BuildImOGuizmoProjectionMatrix(float outMatrix[16])
     Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(dm::PI_f * 0.5f, 1.f, 0.1f, 1000.f), outMatrix);
 }
 
-bool ApplyImOGuizmoViewMatrix(CameraController& camera, const float viewMatrix[16])
+bool ApplyImOGuizmoViewMatrix(App& app, const float viewMatrix[16])
 {
     const dm::affine3 viewAffine = ImGuizmoMatrixToAffine3(viewMatrix);
     const dm::affine3 invView = inverse(viewAffine);
@@ -983,8 +983,8 @@ bool ApplyImOGuizmoViewMatrix(CameraController& camera, const float viewMatrix[1
     if (length(dir) < 1e-6f || length(up) < 1e-6f)
         return false;
 
-    camera.camera().lookTo(pos, dir, up);
-    camera.markCameraChanged();
+    caustica::currentCamera(app).lookTo(pos, dir, up);
+    caustica::markCameraChanged(app);
     return true;
 }
 
@@ -1000,8 +1000,7 @@ void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx
         return;
 
     App* app = ctx.sceneEditor.app();
-    auto* camera = caustica::editor::editorCamera(ctx.sceneEditor);
-    if (!app || !camera)
+    if (!app)
         return;
 
     const auto& view = caustica::currentView(*app);
@@ -1020,7 +1019,7 @@ void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx
 
     // Pivot distance enables click-to-axis / orbit. Prefer distance to origin so
     // framing stays stable; fall back when the camera sits near the origin.
-    float pivotDistance = length(camera->camera().getPosition());
+    float pivotDistance = length(caustica::currentCamera(*app).getPosition());
     if (pivotDistance < 0.25f)
         pivotDistance = 1.f;
 
@@ -1043,7 +1042,7 @@ void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx
 
     if (viewChanged)
     {
-        if (ApplyImOGuizmoViewMatrix(*camera, viewMatrix))
+        if (ApplyImOGuizmoViewMatrix(*app, viewMatrix))
             ctx.settings.ResetAccumulation = true;
     }
 

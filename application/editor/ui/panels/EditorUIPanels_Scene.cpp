@@ -2,7 +2,6 @@
 
 #include "SceneEditor.h"
 #include "EditorAccess.h"
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
@@ -10,8 +9,6 @@
 #include "common/IconsMaterialSymbols.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>
@@ -158,10 +155,9 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
         (void)layout;
         RAII_SCOPE(ImGui::Begin("Hierarchy", &m_editorUI.Viewport.ShowHierarchy, ImGuiWindowFlags_None);, ImGui::End(););
 
-        auto scene = caustica::activeScene(*m_sceneEditor.app());
         auto* ew = caustica::entityWorld(*m_sceneEditor.app());
 
-        if (scene && ew && ew->root() != ecs::NullEntity)
+        if (ew && ew->root() != ecs::NullEntity)
         {
             bool deleteSelectedEntity = false;
 
@@ -191,7 +187,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
                 m_editorUI.OpenSceneCreatePopup = true;
             if (sceneOpen)
             {
-                BuildHierarchyNodeUI(m_ui, *scene, ew->root(), m_editorUI.Viewport.HierarchyFilter);
+                BuildHierarchyNodeUI(m_ui, *ew, ew->root(), m_editorUI.Viewport.HierarchyFilter);
                 ImGui::TreePop();
             }
             ImGui::PopID();

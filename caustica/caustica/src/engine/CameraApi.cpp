@@ -2,20 +2,22 @@
 #include <engine/AppResources.h>
 #include <cassert>
 #include <engine/CameraApi.h>
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <render/core/CameraController.h>
-#include <scene/Scene.h>
 
 namespace caustica
 {
 
+const std::vector<ecs::Entity>& sceneCameraEntities(const App& app)
+{
+    static const std::vector<ecs::Entity> kEmpty;
+    auto* ew = entityWorld(app);
+    return ew ? ew->cameraEntitiesInRegistrationOrder() : kEmpty;
+}
+
 uint32_t sceneCameraCount(const App& app)
 {
-    auto scenePtr = activeScene(app);
-    if (!scenePtr)
-        return 1;
-    return static_cast<uint32_t>(scenePtr->getCameraEntities().size()) + 1;
+    return static_cast<uint32_t>(sceneCameraEntities(app).size()) + 1;
 }
 
 uint32_t& selectedCameraIndex(App& app)
@@ -30,10 +32,28 @@ float cameraVerticalFOV(const App& app)
     return cameraController(app)->verticalFOV();
 }
 
+float cameraZNear(const App& app)
+{
+    assert(cameraController(app));
+    return cameraController(app)->zNear();
+}
+
+FirstPersonCamera& currentCamera(App& app)
+{
+    assert(cameraController(app));
+    return cameraController(app)->camera();
+}
+
 const FirstPersonCamera& currentCamera(const App& app)
 {
     assert(cameraController(app));
     return cameraController(app)->camera();
+}
+
+void markCameraChanged(App& app)
+{
+    if (auto* camera = cameraController(app))
+        camera->markCameraChanged();
 }
 
 const std::shared_ptr<PlanarView>& currentView(const App& app)

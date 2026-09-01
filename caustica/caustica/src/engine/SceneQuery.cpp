@@ -242,4 +242,24 @@ ecs::Entity findEntity(
     return world->findEntity(path, context);
 }
 
+SceneLoadStatus sceneLoadStatus(const App& app)
+{
+    SceneLoadStatus out;
+    SceneViewState* vs = viewState(app);
+    if (!vs)
+        return out;
+
+    const LoadSession& session = vs->loadSession;
+    out.phaseName = loadSessionPhaseName(session.phase);
+    out.busy = session.isBusy();
+    out.progressPercent = session.progressPercent();
+    out.gpuStreaming = session.phase == LoadSessionPhase::GpuStreaming;
+    out.streamStep = static_cast<uint32_t>(session.streamStep);
+    out.texturesRemaining = session.stepTexturesRemaining.load(std::memory_order_relaxed);
+    out.meshBegin = session.meshBegin;
+    out.meshTotal = session.meshTotal;
+    out.stepInFlight = session.stepInFlight;
+    return out;
+}
+
 } // namespace caustica

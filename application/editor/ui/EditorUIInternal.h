@@ -6,6 +6,7 @@
 #include "common/EditorTheme.h"
 
 #include <render/core/PathTracerSettings.h>
+#include <shaders/FrameConstantBuffer.h>
 #include <imgui.h>
 #include <math/math.h>
 #include <ecs/Entity.h>
@@ -36,7 +37,7 @@ bool GaussianSplatSortingCombo(EditorUIData& ui);
 bool GaussianSplatFormatCombo(const char* label, int* value);
 bool GaussianSplatShadowKernelDegreeCombo(EditorUIData& ui);
 bool GaussianSplatShadowParticleFormatCombo(EditorUIData& ui);
-void BuildHierarchyNodeUI(EditorUIData& ui, caustica::Scene& scene, ecs::Entity entity, const char* filter);
+void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity, const char* filter);
 void BuildSceneCreatePopup(SceneEditor& sceneEditor, EditorUIData& ui, const char* popupId);
 void TryOpenSceneCreatePopupOnRightClick(const char* popupId, bool areaHovered);
 dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation);

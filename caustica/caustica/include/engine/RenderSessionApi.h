@@ -6,6 +6,8 @@
 #include <ecs/Entity.h>
 #include <math/math.h>
 
+#include <render/RenderRuntimeState.h>
+
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -16,12 +18,33 @@
 
 struct DebugFeedbackStruct;
 struct DeltaTreeVizPathVertex;
+class LightSamplingCache;
+class EnvMapProcessor;
+class OpacityMicromapBuilder;
+class MaterialGpuCache;
+class ZoomTool;
+
+namespace caustica
+{
+class GpuDevice;
+}
+
+namespace caustica::scene
+{
+class SceneRenderData;
+}
 
 namespace caustica
 {
 
 class App;
 struct MeshInfo;
+
+struct GaussianSplatObjectBounds
+{
+    ecs::Entity entity = ecs::NullEntity;
+    math::box3 localBounds = math::box3::empty();
+};
 
 void debugDrawLine(App& app, math::float3 start, math::float3 stop, math::float4 col1, math::float4 col2);
 
@@ -56,5 +79,21 @@ void requestFullAccelRebuild(App& app);
 [[nodiscard]] uint32_t renderFrameIndex(const App& app);
 void setGaussianSplatTemporalReset(App& app, bool enabled = true);
 bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target);
+
+[[nodiscard]] std::shared_ptr<LightSamplingCache> lightSamplingCache(const App& app);
+[[nodiscard]] std::shared_ptr<EnvMapProcessor> envMapProcessor(const App& app);
+[[nodiscard]] std::shared_ptr<OpacityMicromapBuilder> opacityMicromapBuilder(const App& app);
+[[nodiscard]] std::shared_ptr<MaterialGpuCache> materialGpuCache(const App& app);
+void saveAllMaterials(App& app);
+
+void submitImmediateMaterialPick(App& app, const render::RenderPickState& picking);
+void submitImmediateInstancePick(App& app, const render::RenderPickState& picking);
+[[nodiscard]] const render::RenderPickState& lastRenderedPicking(const App& app);
+
+[[nodiscard]] std::vector<GaussianSplatObjectBounds> gaussianSplatObjectBounds(const App& app);
+
+[[nodiscard]] const scene::SceneRenderData* latestPublishedRenderData(const App& app);
+[[nodiscard]] std::unique_ptr<ZoomTool> createZoomTool(App& app);
+bool saveCurrentFramebuffer(App& app, GpuDevice& gpuDevice, const char* fileName);
 
 } // namespace caustica

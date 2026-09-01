@@ -5,10 +5,9 @@
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
-#include <render/SceneLightingPasses.h>
-#include <render/SceneGaussianSplatPasses.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
+#include <core/format.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>

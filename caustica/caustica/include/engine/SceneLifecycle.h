@@ -5,6 +5,7 @@
 // initializeScene, onScene*, collectUncompressedTextures — EngineApp owns those.
 // Prefer EngineApp::setScene for applications (see docs/public-api.md).
 
+#include <filesystem>
 #include <string>
 
 namespace caustica
@@ -17,6 +18,7 @@ void bindCameraControllerSideEffects(App& app);
 void initStreamlineAndWindow(App& app);
 void initializeScene(App& app, const std::string& preferredScene);
 void setCurrentScene(App& app, const std::string& sceneName, bool forceReload = false);
+void retargetCurrentScene(App& app, std::string sceneName, std::filesystem::path scenePath);
 
 void onSceneLoaded(App& app);
 void onSceneUnloading(App& app);

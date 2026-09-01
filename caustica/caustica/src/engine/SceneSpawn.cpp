@@ -375,4 +375,46 @@ bool despawn(App& app, ecs::Entity entity)
     return true;
 }
 
+ecs::Entity spawnDirectionalLight(App& app, scene::DirectionalLightComponent component, const std::string& name)
+{
+    auto scene = activeScene(app);
+    return scene ? scene->attachDirectionalLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+ecs::Entity spawnSpotLight(App& app, scene::SpotLightComponent component, const std::string& name)
+{
+    auto scene = activeScene(app);
+    return scene ? scene->attachSpotLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+ecs::Entity spawnPointLight(App& app, scene::PointLightComponent component, const std::string& name)
+{
+    auto scene = activeScene(app);
+    return scene ? scene->attachPointLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+ecs::Entity spawnRectLight(App& app, scene::RectLightComponent component, const std::string& name)
+{
+    auto scene = activeScene(app);
+    return scene ? scene->attachRectLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+ecs::Entity spawnEnvironmentLight(App& app, scene::EnvironmentLightComponent component, const std::string& name)
+{
+    auto scene = activeScene(app);
+    return scene ? scene->attachEnvironmentLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+void ensureRectLightVisual(App& app, ecs::Entity entity)
+{
+    if (auto scene = activeScene(app))
+        scene->ensureRectLightVisual(entity);
+}
+
+void syncRectLightVisual(App& app, ecs::Entity entity)
+{
+    if (auto scene = activeScene(app))
+        scene->syncRectLightVisualFromComponent(entity);
+}
+
 } // namespace caustica

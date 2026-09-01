@@ -16,6 +16,7 @@
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <engine/ActiveScene.h>
+#include <engine/SceneSession.h>
 #include <core/task/TaskRuntime.h>
 #include <assets/AssetSystem.h>
 #include <backend/GpuDevice.h>
@@ -220,6 +221,14 @@ void setCurrentScene(App& app, const std::string& sceneName, bool forceReload)
     }
 
     detail::applySceneSwitch(app, sceneName, forceReload);
+}
+
+void retargetCurrentScene(App& app, std::string sceneName, std::filesystem::path scenePath)
+{
+    if (auto* session = sceneSession(app); session && session->manager)
+        session->manager->retargetCurrentScene(sceneName, scenePath);
+    if (auto scene = activeScene(app))
+        commitActiveScene(app, std::move(scene), std::move(sceneName), std::move(scenePath));
 }
 
 void onSceneUnloading(App& app)

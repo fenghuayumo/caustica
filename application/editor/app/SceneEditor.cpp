@@ -6,26 +6,17 @@
 #include "common/TransformGizmo.h"
 #include "ui/RenderSettingsConsole.h"
 
-#include <render/WorldRenderer.h>
 #include <render/core/PathTracerSettings.h>
-#include <render/core/TextureUtils.h>
 #include <render/passes/debug/ZoomTool.h>
-#include <render/passes/lighting/MaterialGpuCache.h>
-#include <render/SceneGaussianSplatPasses.h>
-#include <render/SceneLightingPasses.h>
-#include <assets/loader/ShaderFactory.h>
 #include <engine/App.h>
-#include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
 #include "EditorAccess.h"
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
-#include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
-#include <engine/SceneSession.h>
 #include <core/path_utils.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -33,7 +24,6 @@
 #include <scene/SceneSerializer.h>
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneEcs.h>
-#include <scene/SceneManager.h>
 #include <scene/SceneObjects.h>
 #include <scene/scene_utils.h>
 #include <scene/View.h>
@@ -288,10 +278,9 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) cons
     if (!m_app)
         return ecs::NullEntity;
 
-    auto* pathTracing = caustica::worldRenderer(*m_app);
     auto* entityWorld = caustica::entityWorld(*m_app);
     const auto& view = caustica::currentView(*m_app);
-    if (!pathTracing || !entityWorld || !view)
+    if (!entityWorld || !view)
         return ecs::NullEntity;
 
     const uint2 disp = caustica::displaySize(*m_app);
@@ -322,9 +311,9 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) cons
     ecs::Entity bestEntity = ecs::NullEntity;
     float bestDistance = FLT_MAX;
 
-    for (const auto& object : pathTracing->gaussianSplatPasses().objects())
+    for (const auto& object : caustica::gaussianSplatObjectBounds(*m_app))
     {
-        if (!ecs::isValid(object.entity) || !object.pass)
+        if (!ecs::isValid(object.entity))
             continue;
         const auto* splatComp = entityWorld->world().tryGet<scene::GaussianSplatComponent>(object.entity);
         if (!splatComp || !splatComp->splat.enabled)
@@ -335,7 +324,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) cons
         if (bbox.isempty())
         {
             auto* global = entityWorld->world().tryGet<scene::GlobalTransformComponent>(object.entity);
-            const box3 local = object.pass->getLocalBounds();
+            const box3 local = object.localBounds;
             if (global && !local.isempty())
                 bbox = local * global->transformFloat;
         }
@@ -682,11 +671,7 @@ namespace
 
 void SaveSceneMaterials(App& app)
 {
-    auto* wr = app.tryResource<render::WorldRenderer>();
-    if (!wr)
-        return;
-    if (auto materials = wr->lightingPasses().materials())
-        materials->saveAll();
+    caustica::saveAllMaterials(app);
 }
 
 const char* AnimationModeName(animation::InterpolationMode mode)
@@ -1012,11 +997,7 @@ bool SceneEditor::saveSceneAsFromDialog()
     }
 
     const std::string sceneName = path.filename().generic_string();
-    if (auto* session = m_app->tryResource<SceneSession>(); session && session->manager)
-        session->manager->retargetCurrentScene(sceneName, path);
-
-    if (auto scene = caustica::activeScene(*m_app))
-        caustica::commitActiveScene(*m_app, std::move(scene), sceneName, path);
+    caustica::retargetCurrentScene(*m_app, sceneName, path);
 
     m_editorState.loadedSceneName = sceneName;
     caustica::info("Saved scene as '%s'", path.generic_string().c_str());
@@ -1051,9 +1032,8 @@ void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool e
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
 {
-    auto* cam = m_app ? caustica::cameraController(*m_app) : nullptr;
-    if (m_game && cam)
-        m_game->TickCamera(fElapsedTimeSeconds, cam->camera());
+    if (m_game && m_app)
+        m_game->TickCamera(fElapsedTimeSeconds, caustica::currentCamera(*m_app));
 }
 
 void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
@@ -1566,10 +1546,8 @@ void SceneEditor::setMeshVertices(caustica::ecs::Entity entity,
 
 ZoomTool* SceneEditor::getOrCreateZoomTool()
 {
-    auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
-    auto* device = m_app ? m_app->getGpuDevice() : nullptr;
-    if (m_zoomTool == nullptr && infra && infra->shaderFactory && device)
-        m_zoomTool = std::make_unique<ZoomTool>(device->getDevice(), infra->shaderFactory);
+    if (m_zoomTool == nullptr && m_app)
+        m_zoomTool = caustica::createZoomTool(*m_app);
     return m_zoomTool.get();
 }
 
@@ -1601,37 +1579,34 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
 
 void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 {
-    auto* wr = m_app ? caustica::worldRenderer(*m_app) : nullptr;
-    if (!wr)
+    if (!m_app)
         return;
 
-    const auto& renderedPick = wr->getLastRenderedPicking();
+    const auto& renderedPick = caustica::lastRenderedPicking(*m_app);
     if (renderedPick.MaterialRequested)
     {
         // Publish data before the release-store of its request identity. The
         // logic thread consumes it in prepareEditorFrame and owns UI mutation.
         m_completedMaterialPickGpuId.store(
-            int(wr->getFeedbackData().pickedMaterialID),
+            int(caustica::feedbackData(*m_app).pickedMaterialID),
             std::memory_order_relaxed);
         m_completedMaterialPickRequestId.store(
             renderedPick.MaterialRequestId,
             std::memory_order_release);
     }
     if (m_settings.ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
-        resolvePickFeedback(wr->getFeedbackData(), renderedPick);
+        resolvePickFeedback(caustica::feedbackData(*m_app), renderedPick);
 
     if (renderedPick.InstanceRequested)
         m_renderState.Picking.completeInstancePick(renderedPick.InstanceRequestId);
 
-    auto saveFramebuffer = [this, &gpuDevice](const char* fileName) -> bool {
-        caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
-        auto* infra = m_app ? caustica::gpuSharedCaches(*m_app) : nullptr;
-        if (!framebuffer || !infra || !infra->renderDevice)
+    auto saveFramebuffer = [this](const char* fileName) -> bool {
+        if (!m_app)
             return false;
-        caustica::rhi::Texture* texture = framebuffer->getDesc().colorAttachments[0].texture;
-        auto* renderDevice = infra->renderDevice.get();
-        return saveTextureToFile(
-            gpuDevice.getDevice(), *renderDevice, texture, caustica::rhi::ResourceStates::Common, fileName);
+        GpuDevice* gpuDevice = m_app->getGpuDevice();
+        if (!gpuDevice)
+            return false;
+        return caustica::saveCurrentFramebuffer(*m_app, *gpuDevice, fileName);
     };
     captureScriptPostRender(saveFramebuffer);
 
@@ -1639,7 +1614,7 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
     {
         caustica::rhi::Framebuffer* framebuffer = gpuDevice.getCurrentFramebuffer(true);
         if (framebuffer)
-            wr->denoisedScreenshot(framebuffer->getDesc().colorAttachments[0].texture);
+            caustica::takeDenoisedScreenshot(*m_app, framebuffer->getDesc().colorAttachments[0].texture);
     }
 }
 
