@@ -228,7 +228,8 @@ void FirstPersonCamera::animate(float deltaT)
         cameraDirty = true;
     }
 
-    // Left or right mouse drag: look (yaw / pitch). RMB also looks while flying.
+    // Look (yaw / pitch). The editor only arms Left while Alt is held so
+    // transform-gizmo drags do not tumble the camera. RMB is fly, not look.
     if (lookHeld && !panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
     {
         float yaw = m_RotateSpeed * mouseMove.x;

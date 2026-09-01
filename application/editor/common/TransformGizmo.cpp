@@ -865,6 +865,18 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 
     const auto operation = static_cast<ImGuizmo::OPERATION>(ctx.editorUI.GizmoOperation);
     const auto mode = static_cast<ImGuizmo::MODE>(ctx.editorUI.GizmoMode);
+
+    // Alt+LMB is camera look. Swallow the click so rotate/translate handles
+    // cannot start a drag in the same gesture.
+    const bool altLook = io.KeyAlt && !ImGuizmo::IsUsing();
+    const bool savedMouseDown = io.MouseDown[0];
+    const bool savedMouseClicked = io.MouseClicked[0];
+    if (altLook)
+    {
+        io.MouseDown[0] = false;
+        io.MouseClicked[0] = false;
+    }
+
     const bool manipulated = ImGuizmo::Manipulate(
         viewMatrix,
         projectionMatrix,
@@ -873,6 +885,12 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         g_drag.matrix,
         nullptr,
         GetSnapValues(ctx.editorUI));
+
+    if (altLook)
+    {
+        io.MouseDown[0] = savedMouseDown;
+        io.MouseClicked[0] = savedMouseClicked;
+    }
 
     const bool usingGizmo = ImGuizmo::IsUsing() && !editingUi && !g_drag.suppressUntilRelease;
     g_drag.active = usingGizmo;
@@ -884,10 +902,11 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     }
 
     // Capture while dragging, or while hovering a handle so the first click does not
-    // fall through to camera orbit / instance picking.
+    // fall through to instance picking. Alt+LMB look is handled in the input router
+    // and must not be blocked by hover.
     const bool overGizmo = ImGuizmo::IsOver();
     ctx.editorUI.GizmoCapturingInput =
-        (usingGizmo || overGizmo || g_drag.suppressUntilRelease) && !editingUi;
+        (usingGizmo || overGizmo || g_drag.suppressUntilRelease) && !editingUi && !io.KeyAlt;
     if (ctx.editorUI.GizmoCapturingInput)
         io.WantCaptureMouse = true;
 
@@ -1008,12 +1027,19 @@ void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx
     ImOGuizmo::SetRect(gizmoX, gizmoY, kSize);
     ImOGuizmo::SetDrawList(ImGui::GetForegroundDrawList());
 
+    const bool altLook = ImGui::GetIO().KeyAlt;
+    const bool prevDrag = ImOGuizmo::config.drag;
+    if (altLook)
+        ImOGuizmo::config.drag = false;
+
     // Caustica camera basis is Y-up with +Z look (LHS); match ImOGuizmo's ZYX.
     const bool viewChanged = ImOGuizmo::DrawGizmo(
         viewMatrix,
         projectionMatrix,
         pivotDistance,
         ImOGuizmo::CoordinateSystem::ZYX);
+
+    ImOGuizmo::config.drag = prevDrag;
 
     if (viewChanged)
     {
@@ -1032,17 +1058,17 @@ void caustica::editor::DrawViewOrientationGizmo(const TransformGizmoContext& ctx
     const bool hovered = (dx * dx + dy * dy) <= (hoverRadius * hoverRadius);
 
     static bool s_viewGizmoCapturing = false;
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && !altLook)
     {
         if (hovered)
             s_viewGizmoCapturing = true;
     }
-    else
+    else if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
     {
         s_viewGizmoCapturing = false;
     }
 
-    if (hovered || s_viewGizmoCapturing || viewChanged)
+    if (!altLook && (hovered || s_viewGizmoCapturing || viewChanged))
     {
         ctx.editorUI.GizmoCapturingInput = true;
         ImGui::GetIO().WantCaptureMouse = true;

@@ -87,8 +87,33 @@ bool isRightMouseDown(SceneEditor& sceneEditor)
     return window && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 }
 
+bool altHeld(int mods)
+{
+    return (mods & GLFW_MOD_ALT) != 0;
+}
+
+bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
+{
+    const auto& vp = sceneEditor.editorUIState().Viewport;
+    if (vp.OverlayHovered)
+        return false;
+
+    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
+        ? sceneEditor.app()->getGpuDevice()->getWindow()
+        : nullptr;
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    if (window)
+        glfwGetCursorPos(window, &cursorX, &cursorY);
+    return mouseInViewportCanvas(sceneEditor, cursorX, cursorY);
+}
+
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
+    // Alt+LMB is camera look; gizmos must not swallow that chord.
+    if (ImGui::GetIO().KeyAlt)
+        return false;
+
     const auto& editor = sceneEditor.editorUIState();
     if (editor.GizmoCapturingInput)
         return true;
@@ -354,76 +379,87 @@ bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
-        return false;
-
     auto* camera = caustica::editor::editorCamera(sceneEditor);
-    if (!camera)
-        return true;
-
     auto* game = sceneEditor.game().get();
-    auto& session = sceneEditor.renderAppState();
 
-    if (!(game && game->CameraActive()))
+    // Always track cursor for look/pan deltas. Those modes only apply while
+    // their buttons are held, so this is safe over gizmos and side panels.
+    if (camera && !(game && game->CameraActive()))
         camera->camera().mousePosUpdate(e.getX(), e.getY());
     if (game)
         game->mousePosUpdate(e.getX(), e.getY());
 
-    syncPickPositionFromCursor(sceneEditor);
-    session.settings.MousePos = session.runtime.Picking.Position;
-
     auto* zoomTool = sceneEditor.zoomTool().get();
     if (zoomTool)
         zoomTool->mousePosUpdate(e.getX(), e.getY());
+
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
+        return false;
+
+    auto& session = sceneEditor.renderAppState();
+    syncPickPositionFromCursor(sceneEditor);
+    session.settings.MousePos = session.runtime.Picking.Position;
     return true;
 }
 
 bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressedEvent& e)
 {
-    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
-        return false;
-
     auto* camera = caustica::editor::editorCamera(sceneEditor);
     if (!camera)
         return true;
 
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
+    const bool isLeft = button == ToGlfwMouse(caustica::Mouse::Left);
+    const bool isMiddle = button == ToGlfwMouse(caustica::Mouse::Middle);
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
     auto& session = sceneEditor.renderAppState();
     auto& editor = sceneEditor.editorUIState();
 
+    // Alt+LMB looks, including over transform gizmos, so grabbing a rotate
+    // axis cannot also tumble the camera. Plain LMB is pick / gizmo only.
+    if (isLeft && altHeld(mods) && cursorInViewportForCamera(sceneEditor)
+        && !(game && game->CameraActive()))
+    {
+        activateFreeCameraForInput(*camera);
+        camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
+        return true;
+    }
+
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
+        return false;
+
     if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwPress, mods))
         return true;
 
     // While the eyedropper is active, each LMB click samples a material. Keep the
     // mode armed so the user can inspect several objects without returning to the toolbar.
-    if (button == ToGlfwMouse(caustica::Mouse::Left) && editor.MaterialPickerActive)
+    if (isLeft && editor.MaterialPickerActive)
     {
         syncPickPositionFromCursor(sceneEditor);
         requestMaterialPick(sceneEditor);
         return true;
     }
 
-    // LMB rotates the editor camera. RMB is deliberately not forwarded: it no
-    // longer rotates and no longer doubles as a material-pick gesture.
+    // MMB pans. RMB is fly (WASD), not look. LMB look requires Alt, above.
     if (!(game && game->CameraActive()))
     {
-        activateFreeCameraForInput(*camera);
-        if (button != ToGlfwMouse(caustica::Mouse::Right))
+        if (isLeft || isMiddle)
+            activateFreeCameraForInput(*camera);
+        if (isMiddle)
             camera->camera().mouseButtonUpdate(button, cGlfwPress, mods);
     }
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
-    if (button == ToGlfwMouse(caustica::Mouse::Left))
+    if (isLeft)
     {
         syncPickPositionFromCursor(sceneEditor);
         requestInstancePick(sceneEditor);
     }
 #if CAUSTICA_WITH_STREAMLINE
-    if (button == ToGlfwMouse(caustica::Mouse::Left))
+    if (isLeft)
         sceneEditor.app()->getGpuDevice()->getStreamline().reflexTriggerFlash(
             sceneEditor.app()->getGpuDevice()->getFrameIndex());
 #endif
@@ -435,25 +471,28 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
 
-    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
-        return false;
-
     auto* camera = caustica::editor::editorCamera(sceneEditor);
-    if (!camera)
-        return true;
-
-    auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
 
-    if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
-        return true;
-    if (!(game && game->CameraActive()))
+    // Always clear look/pan so Alt+LMB cannot stick if release happens over a gizmo.
+    if (camera && !(game && game->CameraActive()))
     {
         if (button != ToGlfwMouse(caustica::Mouse::Right))
             camera->camera().mouseButtonUpdate(button, cGlfwRelease, mods);
         if (button == ToGlfwMouse(caustica::Mouse::Right))
             camera->camera().clearFlyKeyboardState();
     }
+
+    if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
+        return false;
+
+    if (!camera)
+        return true;
+
+    auto* zoomTool = sceneEditor.zoomTool().get();
+
+    if (zoomTool && zoomTool->mouseButtonUpdate(button, cGlfwRelease, mods))
+        return true;
     if (game)
         game->mouseButtonUpdate(button, cGlfwRelease, mods);
     return true;
