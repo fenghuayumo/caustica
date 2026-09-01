@@ -32,14 +32,14 @@ void updateWindowTitle(App& app)
 
 void WindowTitlePlugin::configureSchedules(App& app)
 {
-    app.addSystemAfter<system_label::SceneUpdateWindowTitle, system_label::SceneTickSimulation>(
-        AppSchedule::update,
-        [](SystemContext& ctx) {
-            if (!ctx.windowFocused)
-                return;
-
-            updateWindowTitle(ctx.app);
-        });
+    // The built-in title contains only application/version/backend metadata.
+    // Updating it every frame made this main-thread-only GLFW call an exclusive
+    // barrier in the update schedule, preventing otherwise disjoint systems
+    // from overlapping. Graphics is initialized before Startup runs, so once is
+    // sufficient; editor-specific dynamic titles remain editor-owned.
+    app.addSystem<system_label::SceneUpdateWindowTitle>(
+        AppSchedule::Startup,
+        [](SystemContext& ctx) { updateWindowTitle(ctx.app); });
     // Last DefaultPlugins scene-schedule member: mark after systems exist so
     // App::buildPlugins skips the registerSceneSchedules fallback.
     app.markSceneSchedulesRegistered();

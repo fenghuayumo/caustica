@@ -7,8 +7,12 @@
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
+#include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
+#include <engine/Time.h>
+
+#include <render/core/PathTracerSettings.h>
 
 #include <scene/Scene.h>
 #include <scene/SceneManager.h>
@@ -54,11 +58,13 @@ void SceneAnimationPlugin::configureSchedules(App& app)
 
     app.addSystemAfter<system_label::SceneTickSimulation, system_label::SceneUpdateCamera>(
         AppSchedule::update,
-        [](SystemContext& ctx) {
-            if (!ctx.windowFocused)
+        [](Res<Time> time,
+           ResMut<SceneViewState> viewState,
+           Res<PathTracerSettings> settings) {
+            if (!time->simulationActive)
                 return;
 
-            tickSimulationAndFrameTiming(ctx.app, ctx.deltaTimeSeconds);
+            tickSimulationAndFrameTiming(*viewState, *settings, *time);
         });
 }
 

@@ -1,6 +1,8 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/SceneTransforms.h>
+#include <engine/ScenePlugins.h>
+#include <engine/SystemLabels.h>
 #include <engine/Time.h>
 
 #include <algorithm>
@@ -36,6 +38,7 @@ struct SystemA { static constexpr const char* name = "Test.A"; };
 struct SystemB { static constexpr const char* name = "Test.B"; };
 struct SystemC { static constexpr const char* name = "Test.C"; };
 struct SystemD { static constexpr const char* name = "Test.D"; };
+struct HostParallelSystem { static constexpr const char* name = "Test.HostParallel"; };
 
 using caustica::AppSchedule;
 using caustica::AppSchedules;
@@ -255,6 +258,29 @@ int main()
             "serial phase built a parallel graph");
         passed &= expect(schedules.planOrder(AppSchedule::update).size() == 2,
             "serial phase lost a system");
+    }
+
+    // Built-in per-frame bookkeeping must not turn the tail of update into an
+    // exclusive chain. SceneAnimate remains exclusive, but FPS bookkeeping has
+    // precise resource access and can overlap a disjoint host system. The
+    // static window title belongs to Startup and adds no update barrier.
+    {
+        caustica::App app;
+        caustica::SceneAnimationPlugin animationPlugin;
+        caustica::WindowTitlePlugin windowTitlePlugin;
+        animationPlugin.configureSchedules(app);
+        windowTitlePlugin.configureSchedules(app);
+        app.addSystem<HostParallelSystem>(
+            AppSchedule::update,
+            [](caustica::Query<Velocity>) {});
+
+        const auto& info = app.schedules().planInfo(AppSchedule::update);
+        passed &= expect(info.systemCount == 3,
+            "built-in window title still registered in update");
+        passed &= expect(info.exclusiveSystemCount == 1,
+            "built-in FPS bookkeeping remained exclusive");
+        passed &= expect(info.maxParallelWidth >= 2,
+            "built-in update tail cannot overlap a disjoint host system");
     }
 
     return passed ? 0 : 1;

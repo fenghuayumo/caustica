@@ -863,6 +863,8 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     {
         time->deltaSeconds = float(elapsedTime);
         time->elapsedSeconds += elapsedTime;
+        time->averageFrameSeconds = gpuDevice->getAverageFrameTimeSeconds();
+        time->simulationActive = scheduleContext.windowFocused;
         ++time->frameCount;
     }
 
@@ -886,6 +888,8 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         // drawing — but keep systems pumping while sceneGpuSuspended skips render
         // (async scene import joins via updateLoading).
         scheduleContext.windowFocused = scheduleContext.runRender || skipRenderPhase();
+        if (Time* time = tryResource<Time>())
+            time->simulationActive = scheduleContext.windowFocused;
         runSchedule(AppSchedule::First, scheduleContext);
         if (scheduleContext.abortFrame)
             return false;

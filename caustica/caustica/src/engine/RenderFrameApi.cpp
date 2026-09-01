@@ -10,6 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/Time.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
 #include <assets/AssetSystem.h>
@@ -86,28 +87,38 @@ namespace
         return false;
     }
 
-    void updateFpsInfo(App& app, double frameTimeSeconds)
+    void updateFpsInfo(
+        SceneViewState& viewState,
+        const PathTracerSettings& settings,
+        double frameTimeSeconds)
     {
-        SceneViewState* vs = caustica::viewState(app);
-        PathTracerSettings* cfg = caustica::settings(app);
-        if (!vs || !cfg || frameTimeSeconds <= 0.0)
+        if (frameTimeSeconds <= 0.0)
             return;
 
 #if CAUSTICA_WITH_STREAMLINE
-        if (cfg->actualDLSSFGMode() != SI::DLSSGMode::eOff)
+        if (settings.actualDLSSFGMode() != SI::DLSSGMode::eOff)
         {
-            uint32_t presentedFrames = cfg->DLSSFGMultiplier;
+            uint32_t presentedFrames = settings.DLSSFGMultiplier;
             if (presentedFrames == 0)
-                presentedFrames = 1u + cfg->DLSSFGNumFramesToGenerate;
+                presentedFrames = 1u + settings.DLSSFGNumFramesToGenerate;
 
             // Fixed-width fields avoid ImGui layout flicker in narrow docks.
-            vs->fpsInfo = stringFormat("%6.2f ms/%u-frames* (%5.1f FPS*) *DLSS-G",
+            viewState.fpsInfo = stringFormat("%6.2f ms/%u-frames* (%5.1f FPS*) *DLSS-G",
                 frameTimeSeconds * 1e3, presentedFrames, presentedFrames / frameTimeSeconds);
             return;
         }
 #endif
 
-        vs->fpsInfo = stringFormat("%6.2f ms/frame (%5.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+        viewState.fpsInfo = stringFormat(
+            "%6.2f ms/frame (%5.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+    }
+
+    void updateFpsInfo(App& app, double frameTimeSeconds)
+    {
+        SceneViewState* viewState = caustica::viewState(app);
+        PathTracerSettings* settings = caustica::settings(app);
+        if (viewState && settings)
+            updateFpsInfo(*viewState, *settings, frameTimeSeconds);
     }
 
     void recordFrameTiming(App& app, const GpuDevice& gpuDevice)
@@ -509,6 +520,17 @@ void tickSimulationAndFrameTiming(App& app, float fElapsedTimeSeconds)
     if (frameTime <= 0.0 && fElapsedTimeSeconds > 0.0f)
         frameTime = static_cast<double>(fElapsedTimeSeconds);
     updateFpsInfo(app, frameTime);
+}
+
+void tickSimulationAndFrameTiming(
+    SceneViewState& viewState,
+    const PathTracerSettings& settings,
+    const Time& time)
+{
+    const double frameTime = time.averageFrameSeconds > 0.0
+        ? time.averageFrameSeconds
+        : static_cast<double>(time.deltaSeconds);
+    updateFpsInfo(viewState, settings, frameTime);
 }
 
 void backBufferResizing(App& app)

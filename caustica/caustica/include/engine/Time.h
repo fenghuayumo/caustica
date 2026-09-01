@@ -19,6 +19,11 @@ struct Time
     float deltaSeconds = 0.f;
     // Seconds since the first frame.
     double elapsedSeconds = 0.0;
+    // Smoothed CPU frame duration reported by the device. Published before
+    // schedules run so read-only timing systems do not need SystemContext/App.
+    double averageFrameSeconds = 0.0;
+    // Simulation-facing focus gate after render/streaming state is folded in.
+    bool simulationActive = true;
     uint64_t frameCount = 0;
 };
 
