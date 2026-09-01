@@ -27,7 +27,7 @@ using namespace caustica;
 #include <shaders/render/lighting/distant/EnvMapProcessor.hlsl>
 #include <shaders/render/lighting/distant/BRDFLUTGenerator.hlsl>
 
-#include "SampleProceduralSky.h"
+#include "ProceduralSky.h"
 
 namespace caustica
 {
@@ -101,7 +101,7 @@ public:
     bool                            debugGUI(float indent);
 
     bool                            isProcedural() const            { return isProceduralSky( m_loadedSourceBackgroundPath.c_str() ); }
-    const std::shared_ptr<SampleProceduralSky> &
+    const std::shared_ptr<ProceduralSky> &
                                     getProceduralSky() const        { return m_proceduralSky; }
 
     void                            setTargetCubeResolution(uint res)   { m_targetResolution = res; }
@@ -187,7 +187,7 @@ private:
     int                             m_compressionQuality = 1;       // 0 - disabled; 1 - low quality; 2 - high quality
     bool                            m_outputIsCompressed = false;   // updated in update() - it reflects current state of textures while 'm_compressionQuality' reflects required (future) state
 
-    std::shared_ptr<SampleProceduralSky>
+    std::shared_ptr<ProceduralSky>
                                     m_proceduralSky;
     bool                            m_dbgForceDynamic = false;
 

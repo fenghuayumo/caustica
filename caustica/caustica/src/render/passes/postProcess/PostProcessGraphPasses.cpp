@@ -25,7 +25,7 @@ namespace
         if (!environment || !environment->isProcedural() || !ctx.settings->EnvironmentMapParams.enabled)
             return;
 
-        const std::shared_ptr<SampleProceduralSky>& sky = environment->getProceduralSky();
+        const std::shared_ptr<ProceduralSky>& sky = environment->getProceduralSky();
         if (!sky || !sky->isAerialPerspectiveEnabled())
             return;
 

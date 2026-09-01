@@ -1,4 +1,4 @@
-#include <render/passes/lighting/distant/SampleProceduralSky.h>
+#include <render/passes/lighting/distant/ProceduralSky.h>
 
 #include <core/path_utils.h>
 #include <assets/loader/ShaderFactory.h>
@@ -47,7 +47,7 @@ namespace
     }
 }
 
-SampleProceduralSky::SampleProceduralSky(
+ProceduralSky::ProceduralSky(
     caustica::rhi::Device* device,
     std::shared_ptr<caustica::ShaderFactory> shaderFactory)
     : m_device(device)
@@ -62,14 +62,14 @@ SampleProceduralSky::SampleProceduralSky(
     static_assert(sizeof(AerialPerspectiveConstants) % 16 == 0, "AerialPerspectiveConstants must be 16-byte aligned");
 }
 
-void SampleProceduralSky::reloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory)
+void ProceduralSky::reloadShaders(std::shared_ptr<caustica::ShaderFactory> shaderFactory)
 {
     assert(shaderFactory != nullptr);
     m_shaderFactory = std::move(shaderFactory);
     createLutResources();
 }
 
-float3 SampleProceduralSky::computeSunDirection(float elevationDeg, float azimuthDeg) const
+float3 ProceduralSky::computeSunDirection(float elevationDeg, float azimuthDeg) const
 {
     const float elev = dm::radians(dm::clamp(elevationDeg, -89.9f, 89.9f));
     const float azim = dm::radians(azimuthDeg);
@@ -80,7 +80,7 @@ float3 SampleProceduralSky::computeSunDirection(float elevationDeg, float azimut
         std::sin(elev)));
 }
 
-void SampleProceduralSky::applySunPreset(float elevationDeg, float azimuthDeg)
+void ProceduralSky::applySunPreset(float elevationDeg, float azimuthDeg)
 {
     m_sunElevationDeg = elevationDeg;
     m_sunAzimuthDeg = WrapDegrees360(azimuthDeg);
@@ -90,7 +90,7 @@ void SampleProceduralSky::applySunPreset(float elevationDeg, float azimuthDeg)
     m_animateSun = false;
 }
 
-void SampleProceduralSky::createLutResources()
+void ProceduralSky::createLutResources()
 {
     assert(m_shaderFactory != nullptr);
 
@@ -193,7 +193,7 @@ void SampleProceduralSky::createLutResources()
     m_atmosphereLutsValid = false;
 }
 
-void SampleProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
+void ProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
 {
     memset(&atm, 0, sizeof(atm));
     atm.BottomRadius = 6360.0f;
@@ -215,7 +215,7 @@ void SampleProceduralSky::fillEarthAtmosphere(AtmosphereParameters& atm) const
     atm.MultiScatteringFactor = m_multiScatteringFactor;
 }
 
-void SampleProceduralSky::dispatchLutPasses(
+void ProceduralSky::dispatchLutPasses(
     caustica::rhi::CommandList* commandList,
     const ProceduralSkyConstants& consts,
     bool rebuildAtmosphereLuts,
@@ -306,7 +306,7 @@ void SampleProceduralSky::dispatchLutPasses(
     }
 }
 
-void SampleProceduralSky::applyAerialPerspective(
+void ProceduralSky::applyAerialPerspective(
     caustica::rhi::CommandList* commandList,
     caustica::rhi::Texture* color,
     caustica::rhi::Texture* depth,
@@ -364,7 +364,7 @@ void SampleProceduralSky::applyAerialPerspective(
     commandList->dispatch((width + 7) / 8, (height + 7) / 8, 1);
 }
 
-bool SampleProceduralSky::update(
+bool ProceduralSky::update(
     caustica::rhi::CommandList* commandList,
     double sceneTime,
     ProceduralSkyConstants& outConstants,
@@ -464,7 +464,7 @@ bool SampleProceduralSky::update(
     return changes;
 }
 
-bool SampleProceduralSky::debugGUI(float indent)
+bool ProceduralSky::debugGUI(float indent)
 {
     bool changed = false;
     auto mark = [&](bool v) { changed |= v; };

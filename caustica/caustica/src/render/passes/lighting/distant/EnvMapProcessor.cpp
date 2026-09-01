@@ -413,7 +413,7 @@ void EnvMapProcessor::preUpdate(caustica::rhi::CommandList* commandList, caustic
     if (proceduralSkyEnabled && m_proceduralSky == nullptr)
     {
         assert(m_shaderFactory != nullptr);
-        m_proceduralSky = std::make_shared<SampleProceduralSky>(m_device, m_shaderFactory);
+        m_proceduralSky = std::make_shared<ProceduralSky>(m_device, m_shaderFactory);
     }
 }
 

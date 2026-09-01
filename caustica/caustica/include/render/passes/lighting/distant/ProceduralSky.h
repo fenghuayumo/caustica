@@ -8,7 +8,7 @@
 
 using namespace caustica::math;
 
-#include <shaders/render/lighting/distant/SampleProceduralSky.hlsli>
+#include <shaders/render/lighting/distant/ProceduralSky.hlsli>
 
 namespace caustica
 {
@@ -16,13 +16,13 @@ namespace caustica
     class ShaderFactory;
 }
 
-class SampleProceduralSky
+class ProceduralSky
 {
 public:
-    SampleProceduralSky(
+    ProceduralSky(
         caustica::rhi::Device* device,
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
-    ~SampleProceduralSky() = default;
+    ~ProceduralSky() = default;
 
     caustica::rhi::TextureHandle getTransmittanceTexture() const { return m_transmittanceLut; }
     caustica::rhi::TextureHandle getSkyViewTexture() const { return m_skyViewLut; }

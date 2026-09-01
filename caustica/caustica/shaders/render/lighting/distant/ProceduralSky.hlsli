@@ -1,5 +1,5 @@
-#ifndef __SAMPLE_PROCEDURAL_SKY_HLSLI__
-#define __SAMPLE_PROCEDURAL_SKY_HLSLI__
+#ifndef __PROCEDURAL_SKY_HLSLI__
+#define __PROCEDURAL_SKY_HLSLI__
 
 // Hillaire 2020 procedural sky sampled from runtime-generated atmosphere LUTs.
 #include "SkyAtmosphereCommon.hlsli"
@@ -79,7 +79,7 @@ float3 GetSunDiskLuminance(ProceduralSkyWorkingContext workingContext, float3 Wo
     return sunLuminance * sunDisk;
 }
 
-float3 ProceduralSky(const float3 viewDirection, ProceduralSkyWorkingContext workingContext)
+float3 EvaluateProceduralSky(const float3 viewDirection, ProceduralSkyWorkingContext workingContext)
 {
     float3 camera = float3(
         0.0f,
@@ -91,4 +91,4 @@ float3 ProceduralSky(const float3 viewDirection, ProceduralSkyWorkingContext wor
 
 #endif // !cplusplus
 
-#endif // __SAMPLE_PROCEDURAL_SKY_HLSLI__
+#endif // __PROCEDURAL_SKY_HLSLI__

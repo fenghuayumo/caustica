@@ -1,7 +1,7 @@
 #ifndef __ENVMAP_BAKER_HLSL__
 #define __ENVMAP_BAKER_HLSL__
 
-#include "SampleProceduralSky.hlsli"
+#include "ProceduralSky.hlsli"
 #include <shaders/Libraries/ShaderDebug/ShaderDebug.hlsl>
 
 #define EMB_NUM_COMPUTE_THREADS_PER_DIM     8
@@ -213,7 +213,7 @@ float4 GenerateTexel( const uint2 cubePixelPos, const uint cubeFace, const uint 
                                 0, 1, 0 };
         float3 localDirection = mul( cubeDir, toLocal );
 
-        envCol += ProceduralSky(localDirection, GetProcSkyContext());
+        envCol += EvaluateProceduralSky(localDirection, GetProcSkyContext());
     }
     
     envCol *= g_Const.ScaleColor;
