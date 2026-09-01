@@ -16,6 +16,7 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
         std::filesystem::path exe_path = _argv[0];
         Options options(exe_path.filename().string(),
             "RTX Path Tracing — ray tracing and neural graphics research platform.");
+        options.allow_unrecognised_options();
 
         bool help = false;
 
@@ -62,10 +63,6 @@ bool CommandLineOptions::initFromCommandLine(int _argc, char const* const* _argv
             ("disableFireflyFilters", "Disable firefly filters", value(DisableFireflyFilters))
             ("disablePostProcessFilters", "Disable post-process filters", value(DisablePostProcessFilters))
             ("cameraPosDirUp", "Camera position (9 comma-separated values)", value(cameraPosDirUp))
-            ("propShowTags", "Filter props by comma-separated tags", value(PropShowTags))
-            ("propCameraAttach", "Attach camera to named prop", value(PropCameraAttach))
-            ("pythonScript", "Path to Python script to run after scene load", value(pythonScript))
-            ("pythonExpr", "Inline Python expression to run after scene load", value(pythonExpr))
             ("sceneSwitchTest", "Auto-switch scenes every N render frames (render-thread path)", value(sceneSwitchTestInterval))
             ("sceneSwitchTestCount", "Exit after this many auto scene switches (0 = unlimited)", value(sceneSwitchTestCount))
             ("syncRender", "Run rendering on the main thread (disable async render thread)", value(syncRender))

@@ -12,7 +12,6 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>

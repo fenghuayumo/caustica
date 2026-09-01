@@ -126,7 +126,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     std::string preferredScene = "default.scene.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    if (!ProcessEditorStartupCommandLine(argc, argv, editor.cmdLine(), createDesc, preferredScene))
+    if (!ProcessEditorStartupCommandLine(argc, argv, editor.cmdLine(), editor.editorCmdLine(), createDesc, preferredScene))
         return nullptr;
 
     InitializeEditorUIDataFromCommandLine(editor.uiData(), editor.cmdLine());

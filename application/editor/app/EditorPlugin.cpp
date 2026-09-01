@@ -1,13 +1,12 @@
 #include "EditorPlugin.h"
-#include "EditorAccess.h"
 #include "EditorSystemLabels.h"
 #include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/RenderSessionApi.h>
 #include <engine/SystemLabels.h>
-#include <render/WorldRenderer.h>
 
 namespace caustica::editor
 {
@@ -19,8 +18,7 @@ void EditorPlugin::build(App& app)
     app.insertResourceRef(m_sceneEditor.captureScriptState());
     app.insertResourceRef(m_sceneEditor.selectionState());
     app.insertResourceRef(m_sceneEditor.editorCameraState());
-    if (m_sceneEditor.hasEditorUiData())
-        app.insertResourceRef(m_sceneEditor.uiData());
+    app.insertResourceRef(m_sceneEditor.uiData());
 
     if (uiConfig)
         app.emplaceResource<EditorUISubsystem>(*uiConfig);
@@ -57,24 +55,25 @@ void EditorPlugin::configureLateSchedules(App& app)
             if (ctx.runRender || !ctx.windowVisible || caustica::shouldSkipRender(*m_sceneEditor.app()))
                 return;
 
-            auto* wr = caustica::editor::editorWorldRenderer(m_sceneEditor);
+            auto* app = m_sceneEditor.app();
             auto* ui = ctx.tryRes<EditorUiData>();
             auto* capture = ctx.tryRes<CaptureScriptState>();
             const auto& settings = m_sceneEditor.pathTracerSettings();
 
+            if (!app || caustica::renderSize(*app).x == 0)
+                return;
+
             const bool captureActive = capture && capture->manager && capture->manager->isDoingWork();
             const bool editorRequestsRender = ui && ui->editor.RenderWhenOutOfFocus;
-            const bool accumulationIncomplete = wr
-                && !settings.RealtimeMode
-                && wr->getAccumulationSampleIndex() < settings.AccumulationTarget;
+            const bool accumulationIncomplete = !settings.RealtimeMode
+                && caustica::accumulationSampleIndex(*app) < settings.AccumulationTarget;
 
-            if (!wr || (
-                wr->getFrameIndex() >= 16
+            if (caustica::renderFrameIndex(*app) >= 16
                 && !settings.ResetAccumulation
                 && !settings.ResetRealtimeCaches
                 && !captureActive
                 && !editorRequestsRender
-                && !accumulationIncomplete))
+                && !accumulationIncomplete)
                 return;
 
             ctx.runRender = true;

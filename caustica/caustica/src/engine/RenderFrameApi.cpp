@@ -290,12 +290,6 @@ void animate(App& app, float fElapsedTimeSeconds)
     // Scrubbing applies poses via SceneEditor::evaluateAnimationsAt directly.
     const bool enableAnimationUpdate = anyPlayback;
 
-    if (auto* wr = worldRenderer(app))
-    {
-        if (auto* toneMappingPass = wr->getToneMappingPass())
-            toneMappingPass->advanceFrame(fElapsedTimeSeconds);
-    }
-
     if (isSceneLoaded(app) && enableAnimationUpdate)
     {
         const std::shared_ptr<Scene> scene = activeScene(app);

@@ -373,10 +373,9 @@ MaterialProperties EvaluateStandardMaterial(float3 normal, float4 tangent, Stand
 
         // Compute the BRDF inputs for the metal-rough model
         // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#metal-brdf-and-dielectric-brdf
-        bool useOpenPBR = (material.Flags & StandardMaterialFlags_UseOpenPBRMaterialModel) != 0;
-        float3 specularTint = useOpenPBR ? material.SpecularColor.rgb : float3(1, 1, 1);
+        float3 specularTint = material.SpecularColor.rgb;
         float relativeBaseIor = lerp(max(material.IoR, 1e-4f), max(material.IoR, 1e-4f) / max(material.CoatIor, 1e-4f), saturate(material.CoatWeight));
-        float effectiveIor = useOpenPBR ? OpenPBRModulatedIor(relativeBaseIor, max(material.SpecularWeight, 0.0f)) : material.IoR;
+        float effectiveIor = OpenPBRModulatedIor(relativeBaseIor, max(material.SpecularWeight, 0.0f));
         float dielectricF0 = OpenPBRDielectricF0(effectiveIor);
         result.diffuseAlbedo = result.baseColor * result.baseWeight * (1.0 - result.metalness); // Don't compensate for specular energy here. Energy compensation is built into Frostbite's diffuse, so this would be double dipping.
         result.dielectricSpecularF0 = lpfloat3(dielectricF0 * specularTint);

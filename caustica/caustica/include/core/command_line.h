@@ -6,13 +6,7 @@
 #include <string>
 #include <vector>
 
-// =============================================================================
-// CommandLineOptions — Application command-line configuration.
-//
-// Moved from editor/SampleCommon/CommandLine.h to base/core/ so it can be
-// used by both engine and editor layers without circular dependencies.
-// =============================================================================
-
+// Engine / host bootstrap options. Editor-only flags live on EditorCommandLine.
 struct CommandLineOptions
 {
     std::string scene;
@@ -57,12 +51,6 @@ struct CommandLineOptions
 
     bool DisableFireflyFilters = false;
     bool DisablePostProcessFilters = false;
-
-    std::string PropShowTags = "";
-    std::string PropCameraAttach = "";
-
-    std::string pythonScript = "";
-    std::string pythonExpr = "";
 
     int sceneSwitchTestInterval = 0;
     int sceneSwitchTestCount = 0;

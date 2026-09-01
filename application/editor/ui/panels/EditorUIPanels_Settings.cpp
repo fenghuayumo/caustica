@@ -8,7 +8,6 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <scene/Scene.h>
@@ -25,7 +24,7 @@
 #include <platform/file_dialog.h>
 
 #if CAUSTICA_WITH_PYTHON
-#include "Python/PythonScripting.h"
+#include "PythonScripting.h"
 #endif
 
 #include <cmath>

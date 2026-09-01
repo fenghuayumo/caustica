@@ -8,7 +8,6 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
 #include <imgui_internal.h>

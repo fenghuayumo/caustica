@@ -11,7 +11,6 @@
 #include <render/AppDiagnostics.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <scene/Scene.h>
 #include <imgui_internal.h>
@@ -21,10 +20,6 @@
 #include <render/passes/debug/Korgi.h>
 #include <common/CaptureScriptManager.h>
 #include <core/console/ConsoleInterpreter.h>
-
-#if CAUSTICA_WITH_PYTHON
-#include "Python/PythonScripting.h"
-#endif
 
 using namespace caustica;
 using namespace caustica::editor;

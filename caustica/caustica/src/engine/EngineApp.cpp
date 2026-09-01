@@ -203,16 +203,6 @@ bool EngineApp::initialize(EngineAppDesc desc)
     m_app->setUseDedicatedRenderThread(m_desc.dedicatedRenderThread && !m_desc.headless);
     m_app->schedules().setParallelExecutionEnabled(m_desc.parallelSystems);
 
-    if (m_desc.finishStartup)
-    {
-        if (!m_app->finishStartup())
-        {
-            error("EngineApp: finishStartup failed");
-            shutdown();
-            return false;
-        }
-    }
-
     m_valid = true;
     return true;
 }

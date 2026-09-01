@@ -12,7 +12,9 @@
 #include <render/WorldRenderer.h>
 #include <scene/Scene.h>
 
-// Editor may use internal WorldRenderer access; application samples must not.
+// Editor may use internal WorldRenderer access for remaining pass debug UI,
+// picking submit, and material-cache lookup until those surfaces move onto
+// public APIs. Frame/session hot paths must use RenderSessionApi / SceneQuery.
 
 #include <cassert>
 #include <memory>

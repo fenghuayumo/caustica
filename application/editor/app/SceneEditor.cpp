@@ -48,7 +48,7 @@
 #include <filesystem>
 
 #if CAUSTICA_WITH_PYTHON
-#include "Python/PythonScripting.h"
+#include "PythonScripting.h"
 #endif
 
 using namespace caustica::math;
@@ -378,15 +378,15 @@ void SceneEditor::bindCameraControllerSideEffects()
     if (m_app)
         caustica::bindCameraControllerSideEffects(*m_app);
 #if CAUSTICA_WITH_PYTHON
-    if (!m_pythonScripting)
-        m_pythonScripting = std::make_unique<PythonScripting>(*this);
+    if (!m_pythonScripting && m_app)
+        m_pythonScripting = std::make_unique<PythonScripting>(*m_app);
 #endif
     m_inputRouter.bind(*this);
 }
 
 void SceneEditor::onBeforeInitialSceneLoad()
 {
-    m_game = std::make_unique<::GameScene>(*this, m_cmdLine);
+    m_game = std::make_unique<::GameScene>(*this, m_editorCmdLine);
     m_viewState.progressLoading.Set(95);
 }
 
@@ -622,14 +622,14 @@ void SceneEditor::onSceneLoadedComplete()
 {
 #if CAUSTICA_WITH_PYTHON
     if (m_pythonScripting
-        && (!m_cmdLine.pythonScript.empty() || !m_cmdLine.pythonExpr.empty()))
+        && (!m_editorCmdLine.pythonScript.empty() || !m_editorCmdLine.pythonExpr.empty()))
     {
         if (m_pythonScripting->Initialize())
         {
-            if (!m_cmdLine.pythonScript.empty())
-                m_pythonScripting->QueueScriptFile(m_cmdLine.pythonScript);
-            if (!m_cmdLine.pythonExpr.empty())
-                m_pythonScripting->QueueScriptString(m_cmdLine.pythonExpr, "<--pythonExpr>");
+            if (!m_editorCmdLine.pythonScript.empty())
+                m_pythonScripting->QueueScriptFile(m_editorCmdLine.pythonScript);
+            if (!m_editorCmdLine.pythonExpr.empty())
+                m_pythonScripting->QueueScriptString(m_editorCmdLine.pythonExpr, "<--pythonExpr>");
         }
     }
 #endif

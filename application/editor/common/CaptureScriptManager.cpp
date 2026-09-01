@@ -16,7 +16,7 @@
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
-#include <engine/UserInterfaceUtils.h>
+#include <platform/file_dialog.h>
 #include <math/math.h>
 
 namespace caustica::editor

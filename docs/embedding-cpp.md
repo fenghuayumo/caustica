@@ -82,7 +82,6 @@ Frequently used fields:
 | `resourceRoot` | auto | Directory containing the `Assets/` pack folder. |
 | `assetPackRoot` | auto | Direct path to the asset pack (`CAUSTICA_ASSETS_DIR` / `--assets`). |
 | `device`, `window` | `nullptr` | Inject host-owned objects; `EngineApp` does not take ownership. |
-| `finishStartup` | `false` | Deprecated. `create()` leaves Startup pending; `run()` / `stepFrame()` finish automatically. Set true only if you need Startup inside `create()`. |
 
 `viewState`, `diagnostics`, `renderState`, and `cmdLine` can point to host-owned
 state. `preGpuDeviceInit` runs just before an owned device is created.

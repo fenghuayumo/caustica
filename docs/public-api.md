@@ -58,7 +58,7 @@ structural, ideally one-shot systems and give per-frame systems narrow parameter
 | GPU digs | `GpuSharedCaches`, `engine/internal/*`, `WorldRenderer`, `SceneManager` |
 | Frame schedule guts | `RenderFrameApi` (`beginFrameScheduled` / `renderScene` / …) |
 | Session guts | `SceneSession`, `SceneGaussianSplatLogic` |
-| Editor / tooling | `UserInterfaceUtils`, `Console*`, `SplashScreen`, `CaptureSequencer`, … |
+| Editor / tooling | `Console*`, `SplashScreen`, `CaptureSequencer`, … |
 
 Editor game (`application/editor/game`, `demo::`) is **not** an embedding API.
 

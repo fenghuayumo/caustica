@@ -157,7 +157,7 @@ struct StandardMaterial : public StandardMaterialBase
     dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
     dm::float3              emissiveColor                       = 0.f;
     
-    std::string             materialModel                       = "OpenPBR"; // Built-in material model.
+    std::string             materialModel                       = "OpenPBR"; // Serialized as OpenPBR only.
     float                   baseWeight                          = 1.f;
     float                   baseDiffuseRoughness                = 0.f;
     float                   specularWeight                      = 1.f;
@@ -272,7 +272,6 @@ struct StandardMaterial : public StandardMaterialBase
     bool                    skipRender                          = false;        // if 'true', we just skip drawing all geometries with this material; sometimes we can't edit a specific mesh but we can remove it this way; note: it can also be used for hidden emissives
 
     void                    fillData(StandardMaterialData & data);
-    bool                    editorGui(class MaterialGpuCache & cache);
     bool                    isEmissive() const;
     StandardMaterialTexture& getTexture(StandardMaterialTextureSlot slot);
     const StandardMaterialTexture& getTexture(StandardMaterialTextureSlot slot) const;

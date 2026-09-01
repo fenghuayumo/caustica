@@ -9,7 +9,6 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/operators.h>
 
-#include "SceneEditor.h"
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
@@ -26,7 +25,6 @@
 #include <render/WorldRenderer.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
-#include <EditorUI.h>
 #include <scene/Scene.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/lighting/LightSamplingCache.h>
@@ -57,13 +55,7 @@ using caustica::math::float3;
 using caustica::math::float4;
 using caustica::math::double3;
 using caustica::math::double4;
-using caustica::editor::SceneEditor;
-using caustica::editor::EditorUIData;
 using caustica::render::RenderAppState;
-
-// Singleton consumed by embed mode (set by PythonScripting before Py_Initialize).
-// In extension mode this stays nullptr - Renderer manages its own Sample.
-SceneEditor* g_pythonSceneEditorSingleton = nullptr;
 
 // Distinct C++ enum types so nanobind can register them as separate Python
 // enums (nb::enum_<T> requires T to be unique across the module).  All map
@@ -112,30 +104,13 @@ namespace
     nb::tuple Float3ToTuple(const float3& v) { return nb::make_tuple(v.x, v.y, v.z); }
     nb::tuple Double3ToTuple(const double3& v) { return nb::make_tuple(v.x, v.y, v.z); }
 
-    std::string LowerCopy(std::string value)
-    {
-        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-            return char(std::tolower(ch));
-        });
-        return value;
-    }
-
-    bool IsOpenPBRMaterialModelName(const std::string& materialModel)
-    {
-        std::string normalized = LowerCopy(materialModel);
-        // Accept former spelling variants when loading older scripts/files.
-        return normalized == "openpbr" || normalized == "openpbr-lite" || normalized == "openpbr_lite";
-    }
-
     void SetMaterialModelFromPython(StandardMaterial& self, const std::string& value)
     {
-        self.materialModel = IsOpenPBRMaterialModelName(value) ? "OpenPBR" : value;
-        if (IsOpenPBRMaterialModelName(value))
-        {
-            self.useSpecularGlossModel = false;
-            if (self.specularColor.x == 0.f && self.specularColor.y == 0.f && self.specularColor.z == 0.f)
-                self.specularColor = float3(1.f);
-        }
+        (void)value;
+        self.materialModel = "OpenPBR";
+        self.useSpecularGlossModel = false;
+        if (self.specularColor.x == 0.f && self.specularColor.y == 0.f && self.specularColor.z == 0.f)
+            self.specularColor = float3(1.f);
         self.gpuDataDirty = true;
     }
 
@@ -810,7 +785,8 @@ void RegisterCoreBindings(nb::module_& m)
             "OpenPBR alias for roughness.")
         .def_prop_rw("material_model",
             [](StandardMaterial& self) { return self.materialModel; },
-            [](StandardMaterial& self, const std::string& v) { SetMaterialModelFromPython(self, v); })
+            [](StandardMaterial& self, const std::string& v) { SetMaterialModelFromPython(self, v); },
+            "Always OpenPBR. Writes coerce any value to OpenPBR.")
         .def_prop_rw("base_weight",
             [](StandardMaterial& self) { return self.baseWeight; },
             [](StandardMaterial& self, float v) { self.baseWeight = v; self.gpuDataDirty = true; })
@@ -1812,12 +1788,6 @@ void RegisterCoreBindings(nb::module_& m)
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
 
-    nb::class_<EditorUIData>(m, "EditorSettings",
-        "Desktop-editor settings that extend `settings` with ImGui view state.")
-        .def_prop_rw("show_ui",
-            [](EditorUIData& ui) { return ui.editor.ShowUI; },
-            [](EditorUIData& ui, bool value) { ui.editor.ShowUI = value; });
-
     // --- Sample (top-level renderer access) -------------------------------
     nb::class_<App>(m, "Sample",
         "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
@@ -2144,72 +2114,6 @@ void RegisterCoreBindings(nb::module_& m)
                 return nb::make_tuple(size.x, size.y);
             },
             "Current path-tracer render resolution as (width, height).")
-        ;
-
-        nb::class_<SceneEditor>(m, "EditorSample",
-        "Editor host extensions. Prefer Sample.* APIs (load_mesh_file / deform_mesh / spawn);\n"
-        "these methods remain for embed-mode scripts that already hold an EditorSample.")
-        .def("load_mesh_file", [](SceneEditor& self, const std::string& fileName)
-            {
-                return self.loadMeshFile(fileName);
-            },
-            nb::arg("file_name"),
-            "Append a mesh file (.gltf/.glb/.obj/.urdf/.usd*) to the current scene.")
-        .def("get_mesh_vertices", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity) {
-                return Float3VectorToList(self.getMeshVertices(EntityFromPy(entity)));
-            }, nb::arg("entity"),
-            "Return unique mesh positions as a list of (x, y, z) tuples in object space.")
-        .def("set_mesh_vertices",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.setMeshVertices(EntityFromPy(entity), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Replace all unique object-space positions for a SceneEntity mesh.")
-        .def("deform_mesh",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity handle = EntityFromPy(entity);
-                std::vector<float3> vertices = self.getMeshVertices(handle);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.setMeshVertices(handle, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Apply callback(i, (x,y,z)) to each unique object-space vertex on a SceneEntity.")
-        .def("get_mesh_vertices_world", [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity) {
-                return Float3VectorToList(self.getMeshVerticesWorld(EntityFromPy(entity)));
-            }, nb::arg("entity"))
-        .def("set_mesh_vertices_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                self.setMeshVerticesWorld(EntityFromPy(entity), ToFloat3Vector(vertices), recomputeNormals, rebuildAccelerationStructure);
-            },
-            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
-        .def("deform_mesh_world",
-            [](SceneEditor& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity handle = EntityFromPy(entity);
-                std::vector<float3> vertices = self.getMeshVerticesWorld(handle);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                self.setMeshVerticesWorld(handle, vertices, recomputeNormals, rebuildAccelerationStructure);
-                return vertices.size();
-            },
-            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
         ;
 }
 

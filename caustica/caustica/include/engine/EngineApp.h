@@ -63,12 +63,6 @@ struct EngineAppDesc
     GpuDevice* device = nullptr;
     Window* window = nullptr;
 
-    // Deprecated: create() never runs Startup. Prefer addSystem/addPlugin after create,
-    // then run() / stepFrame() (auto finishStartup) or an explicit finishStartup() call.
-    // If true, Startup still runs inside create() for rare hosts that need a loaded scene
-    // before the first step without calling finishStartup().
-    bool finishStartup = false;
-
     // Optional host-owned state (nullptr = EngineApp owns internals as today).
     SceneViewState* viewState = nullptr;
     render::AppDiagnostics* diagnostics = nullptr;

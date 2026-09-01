@@ -63,7 +63,7 @@ namespace
 }
 
 
-GameScene::GameScene(caustica::editor::SceneEditor& editor, const CommandLineOptions& cmdLine)
+GameScene::GameScene(caustica::editor::SceneEditor& editor, const caustica::editor::EditorCommandLine& cmdLine)
     : m_editor(editor), m_cmdLine(cmdLine) // NOTE: at this point, SceneEditor is being constructed - beware of accessing incompletely constructed object
 {
 }
@@ -200,9 +200,9 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
             m_props.push_back( newProp );
     }
 
-    if( m_cmdLine.PropCameraAttach != "" )
+    if( m_cmdLine.propCameraAttach != "" )
     {
-        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<demo::PropBase> & prop ) { return caustica::equalsIgnoreCase(prop->getName(), m_cmdLine.PropCameraAttach); } );
+        auto it = std::find_if(m_props.begin(), m_props.end(), [this]( const std::shared_ptr<demo::PropBase> & prop ) { return caustica::equalsIgnoreCase(prop->getName(), m_cmdLine.propCameraAttach); } );
         if (it != m_props.end())
             AttachCamera(*it);
     }

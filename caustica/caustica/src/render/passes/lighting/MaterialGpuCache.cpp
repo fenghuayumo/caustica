@@ -199,6 +199,7 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(specularColor);
     STORE_FIELD(emissiveColor);
 
+    materialModel = "OpenPBR";
     STORE_FIELD(materialModel);
     STORE_FIELD(baseWeight);
     STORE_FIELD(baseDiffuseRoughness);
@@ -620,22 +621,19 @@ bool StandardMaterial::read(
         readOpenPBR(input["OpenPBR"]);
     else if ((hasMaterialModelField && IsOpenPBRMaterialModel(materialModel)) || hasTopLevelOpenPBRFields)
         readOpenPBR(input);
-    else if (!hasMaterialModelField && !useSpecularGlossModel)
-    {
-        // RTXPT-era metal-rough files have no material model field. OpenPBR
-        // treats specularColor as the dielectric edge tint, whose neutral
-        // default is white rather than the legacy zero.
-        materialModel = "OpenPBR";
-        specularColor = dm::float3(1.f);
-    }
-    else if (!hasMaterialModelField && useSpecularGlossModel)
-        materialModel = "RTXPT";
 
-    // RTXPT used its legacy roughness for Frostbite diffuse as well. Keep
-    // that behavior for old/unmigrated files, while leaving explicitly
-    // authored OpenPBR materials free to use an independent diffuse value.
+    // Runtime is OpenPBR-only. Convert RTXPT-era metal-rough files: white
+    // dielectric edge tint if specular was zero, and copy roughness into
+    // baseDiffuseRoughness unless the file already authored OpenPBR.
     const bool explicitlyAuthoredOpenPBR = hasOpenPBRBlock || hasTopLevelOpenPBRFields
         || (hasMaterialModelField && IsOpenPBRMaterialModel(materialModel));
+    materialModel = "OpenPBR";
+    if (!explicitlyAuthoredOpenPBR && !useSpecularGlossModel)
+    {
+        const float* specColor = specularColor.data();
+        if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
+            specularColor = dm::float3(1.f);
+    }
     if (!hasExplicitBaseDiffuseRoughness && !explicitlyAuthoredOpenPBR)
         baseDiffuseRoughness = roughness;
 
@@ -759,343 +757,6 @@ void StandardMaterial::setTextureEnabled(StandardMaterialTextureSlot slot, bool 
     }
 }
 
-bool StandardMaterial::editorGui(MaterialGpuCache & cache)
-{
-    bool update = false;
-
-    // Snapshot RT / hit-group / OMM inputs. Shading-only edits must not bump
-    // materialStateRevision — that forces full AS + OMM + SBT rebuilds.
-    const bool rtAlphaTestingBefore = enableAlphaTesting;
-    const bool rtTransmissionBefore = enableTransmission;
-    const bool rtExcludeFromNEEBefore = excludeFromNEE;
-    const bool rtSkipRenderBefore = skipRender;
-    const bool rtThinSurfaceBefore = thinSurface;
-    const bool rtBaseTextureBefore = enableBaseTexture;
-    const float rtAlphaCutoffBefore = alphaCutoff;
-    const MaterialShaderPermutationKey rtMspBefore(computeShaderPermutation(""));
-
-    float itemWidth = ImGui::CalcItemWidth();
-
-    auto getShortTexturePath = [ ](const StandardMaterialTexture & texture) -> std::string
-    {
-        if( texture.loaded == nullptr ) return "<nullptr>";
-        return texture.localPath.string();
-    };
-
-    if (ImGui::CollapsingHeader("Special Properties"))
-    {
-        ImGui::Indent();
-        {
-            UI_SCOPED_DISABLE(!enableTransmission);
-            update |= ImGui::Checkbox("Thin surface", &thinSurface);
-        }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Material has no volumetric properties - used for double sided thin surfaces like leafs.\nNon-transparent materials are always considered thin surface.");
-
-        update |= ImGui::Checkbox("Ignore by NEE shadow ray (bias!)", &excludeFromNEE);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Ignored for shadow rays during Next Event Estimation\nNote: this isn't physically correct - it adds bias!");
-
-        update |= ImGui::SliderFloat("Shadow NoL Fadeout", &shadowNoLFadeout, 0.0f, 0.2f);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-            "Low tessellation geometry often has triangle (flat) normals that differ significantly from shading normals. \n"
-            "This causes shading vs shadow discrepancy that exposes triangle edges. One way to mitigate this (other than \n"
-            "having more detailed mesh) is to add additional shadowing falloff to hide the seam. This setting is not \n"
-            "physically correct and adds bias. Setting of 0 means no fadeout (default).");
-
-        update |= ImGui::Checkbox("Unlit, receive shadows", &unlitReceiveShadows);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-            "Display the material's base color without BRDF, direct, or indirect lighting,\n"
-            "but keep shadows from sampled lights.");
-        {
-            UI_SCOPED_DISABLE(!unlitReceiveShadows);
-            update |= ImGui::SliderFloat("Unlit shadow strength", &unlitShadowStrength, 0.0f, 1.0f);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                "Artistic control for how strongly sampled-light visibility darkens the unlit color.\n"
-                "0 keeps the base color fully visible; 1 applies the full shadow mask.");
-
-            update |= ImGui::Checkbox("Bypass tone mapping", &unlitBypassToneMapping);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                "Keep this unlit material's reconstructed color unchanged by the tone mapper.\n"
-                "Other rendering and post-processing stages remain active.");
-        }
-
-        update |= ImGui::Checkbox("Enable as analytic light proxy", &enableAsAnalyticLightProxy);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-            "Any scene object with this material will look at it's parent node in the scenegraph; if the parent contains\n"
-            "an analytic light, the rays falling of this surface will also output radiance from the analytic light.\n"
-            "The more closely the object's mesh resembles the analytic light, the more physically correct results will be.\n");
-
-        update |= ImGui::Checkbox("Emissive intensity from engine material", &useEngineEmissiveIntensity);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Engine materials can have emissive intensity animation attached.\n");
-
-        update |= ImGui::Checkbox("Ignore mesh tangent space", &ignoreMeshTangentSpace);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("This will ignore tangent space loaded from the mesh and generate new one - can help issues with normals.");
-
-        update |= ImGui::Checkbox("Skip render", &skipRender);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Ignore all meshes with this material - sometimes easier than removing the object itself.\nNote: this will not remove it as an emissive light on the light sampling side!");
-
-        std::string fullName = uniqueFullName();
-        ImGui::TextWrapped("Full, unique ID: %s", fullName.c_str());
-        if (ImGui::Button("Copy to clipboard"))
-            ImGui::SetClipboardText(fullName.c_str());
-
-        ImGui::Unindent();
-    }
-
-    const ImVec4 filenameColor = ImVec4(0.474f, 0.722f, 0.176f, 1.0f);
-
-    auto drawTextureToggle = [&](const char* label, StandardMaterialTexture& texture, bool& enabled)
-    {
-        if (texture.loaded != nullptr)
-        {
-            update |= ImGui::Checkbox(label, &enabled);
-            ImGui::SameLine();
-            ImGui::TextColored(filenameColor, "%s", getShortTexturePath(texture).c_str());
-        }
-    };
-
-    bool useOpenPBR = IsOpenPBRMaterialModel(materialModel);
-    int materialModelIndex = useOpenPBR ? 0 : 1;
-    if (ImGui::Combo("Material Model", &materialModelIndex, "OpenPBR\0RTXPT legacy\0\0"))
-    {
-        useOpenPBR = (materialModelIndex == 0);
-        materialModel = useOpenPBR ? "OpenPBR" : "RTXPT";
-        if (useOpenPBR)
-        {
-            useSpecularGlossModel = false;
-            const float* specColor = specularColor.data();
-            if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
-                specularColor = dm::float3(1.f);
-        }
-        update = true;
-    }
-    if (useOpenPBR && useSpecularGlossModel)
-    {
-        useSpecularGlossModel = false;
-        update = true;
-    }
-
-    drawTextureToggle("Use base_color texture", baseTexture, enableBaseTexture);
-
-    update |= ImGui::ColorEdit3(enableBaseTexture ? "base_color factor" : "base_color", baseOrDiffuseColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat("base_weight", &baseWeight, 0.f, 1.f);
-    update |= ImGui::SliderFloat("base_diffuse_roughness", &baseDiffuseRoughness, 0.f, 1.f);
-
-    drawTextureToggle("Use base_metalness/specular_roughness texture", occlusionRoughnessMetallicTexture, enableOcclusionRoughnessMetallicTexture);
-
-    update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "base_metalness factor" : "base_metalness", &metalness, 0.f, 1.f);
-    update |= ImGui::SliderFloat("specular_weight", &specularWeight, 0.f, 2.f);
-    update |= ImGui::ColorEdit3("specular_color", specularColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat(enableOcclusionRoughnessMetallicTexture ? "specular_roughness factor" : "specular_roughness", &roughness, 0.f, 1.f);
-    update |= ImGui::SliderFloat("specular_roughness_anisotropy", &anisotropy, -1.f, 1.f);
-    update |= ImGui::InputFloat("specular_ior", &IoR);
-    if (IoR < 1.0f) { IoR = 1.0f; update = true; }
-
-    update |= ImGui::SliderFloat("fuzz_weight", &fuzzWeight, 0.f, 1.f);
-    update |= ImGui::ColorEdit3("fuzz_color", fuzzColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat("fuzz_roughness", &fuzzRoughness, 0.f, 1.f);
-
-    if (ImGui::CollapsingHeader("Coat", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        update |= ImGui::SliderFloat("coat_weight", &coatWeight, 0.f, 1.f);
-        update |= ImGui::ColorEdit3("coat_color", coatColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::SliderFloat("coat_roughness", &coatRoughness, 0.f, 1.f);
-        update |= ImGui::SliderFloat("coat_roughness_anisotropy", &coatAnisotropy, -1.f, 1.f);
-        update |= ImGui::InputFloat("coat_ior", &coatIor);
-        if (coatIor < 1.0f) { coatIor = 1.0f; update = true; }
-        update |= ImGui::SliderFloat("coat_darkening", &coatDarkening, 0.f, 1.f);
-    }
-
-    if (ImGui::CollapsingHeader("Subsurface"))
-    {
-        update |= ImGui::SliderFloat("subsurface_weight", &subsurfaceWeight, 0.f, 1.f);
-        update |= ImGui::ColorEdit3("subsurface_color", subsurfaceColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::InputFloat("subsurface_radius", &subsurfaceRadius);
-        if (subsurfaceRadius < 0.0f) { subsurfaceRadius = 0.0f; update = true; }
-        update |= ImGui::InputFloat3("subsurface_radius_scale", subsurfaceRadiusScale.data());
-        subsurfaceRadiusScale = dm::max(subsurfaceRadiusScale, dm::float3(0.0f));
-        update |= ImGui::SliderFloat("subsurface_scatter_anisotropy", &subsurfaceAnisotropy, -1.f, 1.f);
-    }
-
-    if (ImGui::CollapsingHeader("Hair"))
-    {
-        update |= ImGui::Checkbox("Enable hair BCSDF", &enableHair);
-        UI_SCOPED_DISABLE(!enableHair);
-
-        int hairModel = static_cast<int>(hair.model);
-        if (ImGui::Combo("Hair model", &hairModel, "Far-Field BCSDF\0Chiang BCSDF\0\0"))
-        {
-            hair.model = static_cast<caustica::Material::HairParams::Model>(hairModel);
-            update = true;
-        }
-        update |= ImGui::ColorEdit3("Hair base color", hair.baseColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::SliderFloat("Hair melanin", &hair.melanin, 0.f, 1.f);
-        update |= ImGui::SliderFloat("Hair melanin redness", &hair.melaninRedness, 0.f, 1.f);
-        update |= ImGui::SliderFloat("Hair longitudinal roughness", &hair.longitudinalRoughness, 0.001f, 1.f);
-        update |= ImGui::SliderFloat("Hair azimuthal roughness", &hair.azimuthalRoughness, 0.001f, 1.f);
-        update |= ImGui::SliderFloat("Hair IOR", &hair.ior, 1.001f, 2.f);
-        update |= ImGui::SliderFloat("Hair cuticle angle", &hair.cuticleAngle, -15.f, 15.f);
-
-        const bool farField = hair.model == caustica::Material::HairParams::Model::FarField;
-        UI_SCOPED_DISABLE(!farField);
-        update |= ImGui::SliderFloat("Hair diffuse weight", &hair.diffuseReflectionWeight, 0.f, 1.f);
-        update |= ImGui::ColorEdit3("Hair diffuse tint", hair.diffuseReflectionTint.data(), ImGuiColorEditFlags_Float);
-    }
-
-    if (ImGui::CollapsingHeader("Thin Film"))
-    {
-        update |= ImGui::SliderFloat("thin_film_weight", &thinFilmWeight, 0.f, 1.f);
-        update |= ImGui::SliderFloat("thin_film_thickness", &thinFilmThickness, 0.f, 3.f);
-        update |= ImGui::InputFloat("thin_film_ior", &thinFilmIor);
-        if (thinFilmIor < 1.0f) { thinFilmIor = 1.0f; update = true; }
-    }
-
-    update |= ImGui::SliderFloat("geometry_opacity", &opacity, 0.f, 1.f);
-    update |= ImGui::Checkbox("geometry_thin_walled", &thinSurface);
-
-    drawTextureToggle("Use transmission_weight texture", transmissionTexture, enableTransmissionTexture);
-
-    float previousTransmissionFactor = transmissionFactor;
-    float previousDiffuseTransmissionFactor = diffuseTransmissionFactor;
-    update |= ImGui::SliderFloat("transmission_weight", &transmissionFactor, 0.f, 1.f);
-    update |= ImGui::SliderFloat("transmission_diffuse_weight", &diffuseTransmissionFactor, 0.f, 1.f);
-    update |= ImGui::ColorEdit3("transmission_color", transmissionColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::InputFloat("transmission_depth", &transmissionDepth);
-    if (transmissionDepth < 0.0f) { transmissionDepth = 0.0f; update = true; }
-    update |= ImGui::ColorEdit3("transmission_scatter", transmissionScatter.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat("transmission_scatter_anisotropy", &transmissionScatterAnisotropy, -1.f, 1.f);
-    update |= ImGui::SliderFloat("transmission_dispersion_scale", &transmissionDispersionScale, 0.f, 1.f);
-    update |= ImGui::InputFloat("transmission_dispersion_abbe_number", &transmissionDispersionAbbeNumber);
-    if (transmissionDispersionAbbeNumber < 0.0f) { transmissionDispersionAbbeNumber = 0.0f; update = true; }
-
-    bool openPBRTransmissionEnabled = (transmissionFactor > 0.f) || (diffuseTransmissionFactor > 0.f);
-    if (openPBRTransmissionEnabled != enableTransmission)
-    {
-        enableTransmission = openPBRTransmissionEnabled;
-        update = true;
-    }
-    if (previousTransmissionFactor != transmissionFactor || previousDiffuseTransmissionFactor != diffuseTransmissionFactor)
-        enableTransmission = openPBRTransmissionEnabled;
-
-    if (enableTransmission && !thinSurface)
-    {
-        update |= ImGui::InputFloat("volume_attenuation_distance", &volumeAttenuationDistance);
-        if (volumeAttenuationDistance < 0.0f) { volumeAttenuationDistance = 0.0f; update = true; }
-        update |= ImGui::ColorEdit3("volume_attenuation_color", volumeAttenuationColor.data(), ImGuiColorEditFlags_Float);
-        update |= ImGui::InputInt("nested_priority", &nestedPriority);
-        if (nestedPriority < 0 || nestedPriority > 14) { nestedPriority = dm::clamp(nestedPriority, 0, 14); update = true; }
-    }
-
-    update |= ImGui::Checkbox("geometry_enable_alpha_test", &enableAlphaTesting);
-
-    if (enableAlphaTesting && baseTexture.loaded)
-    {
-        update |= ImGui::SliderFloat("geometry_alpha_cutoff", &alphaCutoff, 0.f, 1.f);
-    }
-
-    drawTextureToggle("Use geometry_normal texture", normalTexture, enableNormalTexture);
-
-    if (enableNormalTexture)
-    {
-        ImGui::SetNextItemWidth(itemWidth - 31.f);
-        update |= ImGui::SliderFloat("###normtexscale", &normalTextureScale, -2.f, 2.f);
-        ImGui::SameLine(0.f, 5.f);
-        ImGui::SetNextItemWidth(26.f);
-        if (ImGui::Button("1.0"))
-        {
-            normalTextureScale = 1.f;
-            update = true;
-        }
-        ImGui::SameLine();
-        ImGui::Text("geometry_normal_scale");
-    }
-
-    drawTextureToggle("Use coat_normal texture", coatNormalTexture, enableCoatNormalTexture);
-    if (enableCoatNormalTexture)
-    {
-        ImGui::SetNextItemWidth(itemWidth - 31.f);
-        update |= ImGui::SliderFloat("###coatnormtexscale", &coatNormalTextureScale, -2.f, 2.f);
-        ImGui::SameLine(0.f, 5.f);
-        ImGui::SetNextItemWidth(26.f);
-        if (ImGui::Button("1.0##coat_normal"))
-        {
-            coatNormalTextureScale = 1.f;
-            update = true;
-        }
-        ImGui::SameLine();
-        ImGui::Text("coat_normal_scale");
-    }
-
-    drawTextureToggle("Use emission_color texture", emissiveTexture, enableEmissiveTexture);
-
-    update |= ImGui::ColorEdit3("emission_color", emissiveColor.data(), ImGuiColorEditFlags_Float);
-    update |= ImGui::SliderFloat("emission_luminance", &emissiveIntensity, 0.f, 100000.f, "%.3f", ImGuiSliderFlags_Logarithmic);
-
-    if (ImGui::CollapsingHeader("Path Decomposition"))
-    {
-        ImGui::Indent();
-
-        update |= ImGui::Combo("Block mv-s at surface", (int*)&psdBlockMotionVectorsAtSurfaceType, "Off\0AutoLow\0AutoHigh\0Full\0");
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Curved surfaces cause motion vectors on reflected or transmitted\nsegments to be incorrect and are better disabled.\n"
-            "When this is enabled, motion for all de-composited paths will come\nfrom this surface. AutoLow and AutoHigh will attempt to set the flag based on\n surface curvature (with Low and High sensitivities).");
-
-        bool psdEnable = !psdExclude; // makes more sense from UI perspective - avoids double negative
-        update |= ImGui::Checkbox("Enable delta lobe decomposition", &psdEnable);
-        psdExclude = !psdEnable;
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Some materials/meshes look best without decomposition.");
-        
-        {
-            UI_SCOPED_DISABLE(psdExclude);
-            int dominantDeltaLobeP1 = dm::clamp(psdDominantDeltaLobe, -1, 2) + 1;
-            update |= ImGui::Combo("Dominant bounce", &dominantDeltaLobeP1, "None (surface)\0Transparency\0Reflection\0Coat\0\0");
-            psdDominantDeltaLobe = dm::clamp(dominantDeltaLobeP1 - 1, -1, 2);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Determines which surface will:\n * provide motion vectors for denoising\n * get ReSTIR DI lighting\n * get 'boost samples' for NEE lighting");
-        }
-        ImGui::Unindent();
-    }
-
-    if (ImGui::CollapsingHeader("Save/load"))
-    {
-        RAII_SCOPE( ImGui::Indent();, ImGui::Unindent(); );
-
-        ImGui::Checkbox("Share with all scenes", &sharedWithAllScenes);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("if checked, material saved to /Assets/materials/ and \nshared between all scenes; otherwise it is saved under \n/Assets/materials/<scene-stem>/ for the current scene");
-
-        auto matPath = cache.getMaterialStoragePath(*this);
-
-        ImGui::TextWrapped("File name: %s", matPath.string().c_str());
-
-        if (ImGui::Button("load"))
-        {
-            cache.loadSingle(*this);
-            update = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Save"))
-            cache.saveSingle(*this);
-    }
-
-    // mark for update
-    gpuDataDirty |= update;
-    if (update)
-    {
-        const MaterialShaderPermutationKey rtMspAfter(computeShaderPermutation(""));
-        const bool rayTracingStateChanged =
-            rtAlphaTestingBefore != enableAlphaTesting
-            || rtTransmissionBefore != enableTransmission
-            || rtExcludeFromNEEBefore != excludeFromNEE
-            || rtSkipRenderBefore != skipRender
-            || rtThinSurfaceBefore != thinSurface
-            || rtBaseTextureBefore != enableBaseTexture
-            || rtAlphaCutoffBefore != alphaCutoff
-            || !(rtMspBefore == rtMspAfter);
-        // Color/roughness/metalness etc. only need the material CB upload above.
-        if (rayTracingStateChanged)
-            cache.notifyMaterialEdited();
-    }
-
-    return update;
-}
-
 static void GetBindlessTextureIndex(const Handle<ImageAsset>& texture, uint& outEncodedInfo, unsigned int& flags, unsigned int textureBit)
 {
     // if bit not set, don't set the texture; if texture unavailable - remove the texture bit!
@@ -1177,8 +838,7 @@ void StandardMaterial::fillData(StandardMaterialData & data)
     if (ignoreMeshTangentSpace)
         data.Flags |= StandardMaterialFlags_IgnoreMeshTangentSpace;
 
-    if (IsOpenPBRMaterialModel(materialModel))
-        data.Flags |= StandardMaterialFlags_UseOpenPBRMaterialModel;
+    data.Flags |= StandardMaterialFlags_UseOpenPBRMaterialModel;
 
     if (unlitReceiveShadows)
         data.Flags |= StandardMaterialFlags_UnlitReceiveShadows;
@@ -1563,9 +1223,7 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
         standardMaterial->roughness = 1.0f;
         standardMaterial->baseDiffuseRoughness = 1.0f;
     }
-    // OpenPBR is the built-in model; imported engine materials should shade as OpenPBR.
-    if (!material.useSpecularGlossModel)
-        standardMaterial->materialModel = "OpenPBR";
+    standardMaterial->materialModel = "OpenPBR";
 
     standardMaterial->enableAlphaTesting = (material.domain == MaterialDomain::AlphaTested || material.domain == MaterialDomain::TransmissiveAlphaTested);
     standardMaterial->enableTransmission = (material.domain == MaterialDomain::Transmissive || material.domain == MaterialDomain::TransmissiveAlphaBlended || material.domain == MaterialDomain::TransmissiveAlphaTested);

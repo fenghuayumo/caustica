@@ -3,6 +3,8 @@
 #include <core/command_line.h>
 #include <core/progress.h>
 
+#include "EditorCommandLine.h"
+
 #include <engine/SceneViewState.h>
 #include <math/math.h>
 #include <render/RenderAppState.h>
@@ -69,6 +71,8 @@ public:
     [[nodiscard]] const render::RenderRuntimeState& renderRuntimeState() const { return m_renderState; }
     [[nodiscard]] CommandLineOptions& cmdLine() { return m_cmdLine; }
     [[nodiscard]] const CommandLineOptions& cmdLine() const { return m_cmdLine; }
+    [[nodiscard]] EditorCommandLine& editorCmdLine() { return m_editorCmdLine; }
+    [[nodiscard]] const EditorCommandLine& editorCmdLine() const { return m_editorCmdLine; }
     [[nodiscard]] render::AppDiagnostics& diagnostics() { return m_diagnostics; }
     [[nodiscard]] const render::AppDiagnostics& diagnostics() const { return m_diagnostics; }
 
@@ -81,7 +85,6 @@ public:
     const EditorUIData& uiData() const { return m_editorUiData; }
     EditorUIState& editorUIState() { return m_editor; }
     const EditorUIState& editorUIState() const { return m_editor; }
-    [[nodiscard]] bool hasEditorUiData() const { return true; }
     [[nodiscard]] EditorState& editorState() { return m_editorState; }
     [[nodiscard]] const EditorState& editorState() const { return m_editorState; }
     [[nodiscard]] CaptureScriptState& captureScriptState() { return m_captureScriptState; }
@@ -210,6 +213,7 @@ private:
 
     // Owned editor lifetime (formerly EditorHost bag).
     CommandLineOptions m_cmdLine;
+    EditorCommandLine m_editorCmdLine;
     EditorUIData m_editorUiData;
     render::AppDiagnostics m_diagnostics;
     std::unique_ptr<RenderSettingsConsoleBinding> m_console;

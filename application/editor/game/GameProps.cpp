@@ -423,7 +423,7 @@ void SimpleProp::load(const Json::Value& jsonRoot)
     PropBase::load(jsonRoot);
 
     if (m_showOnlyIfTagged != "")
-        if (findSubStringIgnoreCase(m_gameScene.GetCmdLine().PropShowTags, m_showOnlyIfTagged) == std::string::npos)
+        if (findSubStringIgnoreCase(m_gameScene.GetCmdLine().propShowTags, m_showOnlyIfTagged) == std::string::npos)
             return; // nothing to see here
 
     jsonRoot["modelName"] >> m_modelName;

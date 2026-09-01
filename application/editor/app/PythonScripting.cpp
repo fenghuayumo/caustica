@@ -2,29 +2,25 @@
 
 #if CAUSTICA_WITH_PYTHON
 
+#include "Python/PythonBindingsCore.h"
+
+#include <engine/App.h>
 #include <core/log.h>
 
-// nanobind & CPython
 #include <nanobind/nanobind.h>
 #include <Python.h>
 
-#include "SceneEditor.h"
+#include <cstdio>
+#include <exception>
 
 namespace nb = nanobind;
 
-// Forward declared in PythonBindings.cpp - registers the caustica module.
-extern caustica::editor::SceneEditor* g_pythonSceneEditorSingleton;
-
-// Symbol defined by NB_MODULE(caustica, m) inside PythonBindings.cpp - we declare
-// it manually here so we can hand it to PyImport_AppendInittab without pulling
-// nanobind into the call site.
 extern "C" PyObject* PyInit_caustica(void);
+
+caustica::App* g_pythonEmbedApp = nullptr;
 
 namespace
 {
-    // Captures stdout / stderr coming out of the Python interpreter so the
-    // host application can show them in the on-screen log even when launched
-    // without an attached console (the typical case for windowed builds).
     constexpr const char* kStdoutCaptureScript = R"PY(
 import sys
 
@@ -53,7 +49,7 @@ if not hasattr(sys, "_caustica_capture_stdout"):
 )PY";
 }
 
-PythonScripting::PythonScripting(caustica::editor::SceneEditor& app)
+PythonScripting::PythonScripting(caustica::App& app)
     : m_app(app)
 {
 }
@@ -62,20 +58,16 @@ PythonScripting::~PythonScripting()
 {
     if (m_initialized)
     {
-        // Releasing the interpreter ensures all nb::class_ owned objects are
-        // collected before the surrounding C++ machinery is torn down.
         try
         {
             nb::gil_scoped_acquire gil;
-            // Force a final garbage collection pass so __del__ side effects
-            // run while the bindings target classes are still valid.
             PyGC_Collect();
         }
         catch (...) {}
         Py_FinalizeEx();
         m_initialized = false;
     }
-    g_pythonSceneEditorSingleton = nullptr;
+    g_pythonEmbedApp = nullptr;
 }
 
 bool PythonScripting::Initialize()
@@ -83,11 +75,8 @@ bool PythonScripting::Initialize()
     if (m_initialized)
         return true;
 
-    // make the Sample pointer visible to nanobind bindings before init.
-    g_pythonSceneEditorSingleton = &m_app;
+    g_pythonEmbedApp = &m_app;
 
-    // Register our embedded module before Py_Initialize so that scripts can
-    // immediately `import caustica` without touching sys.path.
     if (PyImport_AppendInittab("caustica", PyInit_caustica) != 0)
     {
         caustica::error("PythonScripting: PyImport_AppendInittab failed");
@@ -101,14 +90,11 @@ bool PythonScripting::Initialize()
         return false;
     }
 
-    // Hook up stdout/stderr redirection so script output ends up in our log.
     {
         nb::gil_scoped_acquire gil;
         try
         {
             PyRun_SimpleString(kStdoutCaptureScript);
-            // Pre-import caustica so the user does not need to do it explicitly
-            // for inline expressions (interactive console, etc.).
             PyRun_SimpleString("import caustica as _caustica_preimported");
         }
         catch (const std::exception& e)
@@ -186,7 +172,6 @@ bool PythonScripting::RunPendingLocked(const PendingScript& script)
         return false;
     }
 
-    // Drain stdout/stderr capture buffers into m_outputLog.
     try
     {
         nb::object sys = nb::module_::import_("sys");
@@ -241,7 +226,7 @@ std::string PythonScripting::ConsumeOutputLog()
 
 #include <core/log.h>
 
-PythonScripting::PythonScripting(caustica::editor::SceneEditor& app) : m_app(app) {}
+PythonScripting::PythonScripting(caustica::App& app) : m_app(app) {}
 PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()

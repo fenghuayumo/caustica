@@ -9,7 +9,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 
-#include "SceneEditor.h"
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <caustica/version.h>
@@ -18,24 +17,14 @@
 
 namespace nb = nanobind;
 using caustica::App;
-using caustica::editor::SceneEditor;
 
 namespace
 {
-    SceneEditor& RequireSceneEditor()
-    {
-        if (!g_pythonSceneEditorSingleton)
-            throw std::runtime_error("caustica: no SceneEditor instance bound (renderer not initialized?)");
-        return *g_pythonSceneEditorSingleton;
-    }
-
     App& RequireApp()
     {
-        SceneEditor& editor = RequireSceneEditor();
-        App* app = editor.app();
-        if (!app)
-            throw std::runtime_error("caustica: SceneEditor has no App bound");
-        return *app;
+        if (!g_pythonEmbedApp)
+            throw std::runtime_error("caustica: no App instance bound (embedded Python host not initialized?)");
+        return *g_pythonEmbedApp;
     }
 }
 
@@ -48,7 +37,7 @@ NB_MODULE(caustica, m)
 
     m.def("app", []() -> App* { return &RequireApp(); },
           nb::rv_policy::reference,
-          "Return the App owned by the SceneEditor running in this caustica.exe.");
+          "Return the App bound by the embedded Python host in this caustica.exe.");
 
     m.def("settings", []() -> PathTracerSettings* {
             return caustica::settings(RequireApp());

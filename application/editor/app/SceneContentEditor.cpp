@@ -436,8 +436,8 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
 
 void SceneContentEditor::requestFullRebuild()
 {
-    if (auto* pathTracing = caustica::editor::editorWorldRenderer(m_sceneEditor))
-        pathTracing->rayTracingResources().requestFullRebuild();
+    if (m_sceneEditor.app())
+        caustica::requestFullAccelRebuild(*m_sceneEditor.app());
 }
 
 std::vector<caustica::math::float3> SceneContentEditor::getMeshVertices(caustica::ecs::Entity entity) const

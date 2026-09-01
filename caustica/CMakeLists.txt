@@ -403,9 +403,10 @@ endif()
 # Embedded Python scripting (nanobind + CPython development library)
 # -------------------------------------------------------------------
 if (CAUSTICA_WITH_PYTHON AND caustica_python_core_sources)
-    # Shared bindings + scripting host go into causticaApp so both the host
-    # executable (embed mode) and the standalone Python extension can pull
-    # them in.  The NB_MODULE() entry points themselves live in their own
+    # Shared bindings go into causticaApp so both the host executable
+    # (embed mode) and the standalone Python extension can pull them in.
+    # The embed host (PythonScripting) lives under application/editor/app.
+    # The NB_MODULE() entry points themselves live in their own
     # translation units which are added later to the matching targets.
     target_sources(causticaApp PRIVATE ${caustica_python_core_sources})
 

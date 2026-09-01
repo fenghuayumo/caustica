@@ -1,10 +1,10 @@
 // Shared bindings between the embedded Python (caustica.exe) and the Python
 // extension module (caustica.pyd).  The actual NB_MODULE() definitions live
-// in their respective hosts and only differ in how the running Sample (App) is
+// in their respective hosts and only differ in how the running App is
 // looked up:
 //
-//   - Embed     : module-level `app()` returns SceneEditor::app() from the
-//                 singleton set by PythonScripting (g_pythonSceneEditorSingleton).
+//   - Embed     : module-level `app()` returns the App* set by PythonScripting
+//                 (g_pythonEmbedApp).
 //   - Extension : Renderer.app returns EngineApp::app() from the RenderSession.
 
 #pragma once
@@ -13,7 +13,7 @@
 
 #include <nanobind/nanobind.h>
 
-namespace caustica::editor { class SceneEditor; }
+namespace caustica { class App; }
 
 namespace caustica_py
 {
@@ -24,8 +24,8 @@ namespace caustica_py
     void RegisterCoreBindings(nanobind::module_& m);
 }
 
-// Shared singleton pointer used by the embedded mode.  Set by PythonScripting
-// before Py_Initialize and consumed by PythonBindings_Embed.cpp.
-extern caustica::editor::SceneEditor* g_pythonSceneEditorSingleton;
+// Embed-mode App pointer. Set by the editor PythonScripting host before
+// Py_Initialize; stays null in extension mode.
+extern caustica::App* g_pythonEmbedApp;
 
 #endif // CAUSTICA_WITH_PYTHON

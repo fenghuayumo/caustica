@@ -5,8 +5,8 @@
 
 #include <scene/camera/Camera.h>
 #include <scene/Scene.h>
-#include <core/command_line.h>
 
+#include "EditorCommandLine.h"
 #include "GameModel.h"
 #include "GameProps.h"
 
@@ -21,7 +21,7 @@ namespace caustica::editor { class SceneEditor; }
 class GameScene
 {
 public:
-    GameScene(caustica::editor::SceneEditor& editor, const CommandLineOptions& cmdLine);
+    GameScene(caustica::editor::SceneEditor& editor, const caustica::editor::EditorCommandLine& cmdLine);
 
     void                    sceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    sceneUnloading( );
@@ -63,7 +63,7 @@ public:
 
     const std::vector<demo::Pose> & GetCamRecAnimation() const { return m_recordedCameraPoses; }
 
-    const CommandLineOptions & GetCmdLine() const           { return m_cmdLine; }
+    const caustica::editor::EditorCommandLine& GetCmdLine() const { return m_cmdLine; }
 
 private:
     std::shared_ptr<demo::PropBase> CreatePropFromFile(const std::string& name, const std::filesystem::path& storagePath, const Json::Value& jsonRoot);
@@ -107,6 +107,6 @@ private:
     float3                          m_sceneCameraLastDir;
     float3                          m_sceneCameraLastUp;
 
-    const CommandLineOptions &      m_cmdLine;
+    const caustica::editor::EditorCommandLine& m_cmdLine;
 };
 

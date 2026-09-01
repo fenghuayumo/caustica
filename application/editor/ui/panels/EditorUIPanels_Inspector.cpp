@@ -1,3 +1,4 @@
+#include "MaterialEditorGui.h"
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
@@ -13,7 +14,6 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/SceneLightingPasses.h>
 #include <render/SceneGaussianSplatPasses.h>
-#include <engine/UserInterfaceUtils.h>
 #include <core/vfs/VFS.h>
 #include <core/path_utils.h>
 #include <scene/SceneTypes.h>
@@ -581,7 +581,7 @@ void EditorUI::BuildMaterialEditorPanel(const PanelLayout& layout)
 
     MaterialShaderPermutationKey mspBefore = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 
-    bool dirty = material->editorGui(*materials);
+    bool dirty = DrawStandardMaterialEditor(*material, *materials);
 
     MaterialShaderPermutationKey mspAfter = MaterialShaderPermutationKey(material->computeShaderPermutation(""));
 

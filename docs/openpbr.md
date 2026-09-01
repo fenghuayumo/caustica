@@ -4,10 +4,14 @@ Caustica uses OpenPBR as the built-in material model (`MaterialModel`: `"OpenPBR
 Parameters map onto the path-tracer BSDF (rough diffuse, GGX specular,
 transmission, anisotropy, fuzz, coat, subsurface approximation, thin-film, and
 RGB hero-wavelength dispersion).
-Existing `.material.json` files remain valid.
+Existing `.material.json` files remain valid. Runtime shading is OpenPBR-only:
+legacy RTXPT files are converted on load (white dielectric specular if the
+legacy specular was zero; roughness is copied to `baseDiffuseRoughness` unless
+the file already authored OpenPBR). glTF specular-gloss remains a texture layout,
+not a second material model.
 
-When `MaterialModel` is `"OpenPBR"`, the inspector shows OpenPBR parameter names and
-converts them internally to `StandardMaterial` fields and the GPU data layout.
+The inspector always shows OpenPBR parameter names and maps them to
+`StandardMaterial` fields and the GPU data layout.
 The JSON reader accepts OpenPBR snake_case fields inside an `OpenPBR` object or
 at the material root. If both legacy/PascalCase fields and an `OpenPBR` object
 are present, the OpenPBR object is read after the legacy fields and therefore
@@ -17,7 +21,8 @@ OpenPBR.
 Authoritative implementation paths:
 
 - `caustica/caustica/src/render/passes/lighting/MaterialGpuCache.cpp` — JSON
-  load/save, editor controls, and GPU constant baking.
+  load/save and GPU constant baking.
+- `application/editor/ui/MaterialEditorGui.cpp` — inspector controls.
 - `caustica/caustica/shaders/PathTracer/Rendering/Materials/BxDF.hlsli` —
   path-tracer lobe evaluation.
 - `caustica/Python/PythonBindingsCore.cpp` — Python property names.

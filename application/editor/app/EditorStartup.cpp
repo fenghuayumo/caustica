@@ -1,4 +1,5 @@
 #include "EditorStartup.h"
+#include "EditorCommandLine.h"
 
 #include <core/log.h>
 #include <core/progress.h>
@@ -72,10 +73,14 @@ namespace
 
 bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
     CommandLineOptions& cmdLine,
+    EditorCommandLine& editorCmdLine,
     caustica::GpuDeviceCreateDesc& createDesc,
     std::string& preferredScene)
 {
     ApplyDefaultWindowSizeForLargeDisplays(cmdLine);
+
+    if (!editorCmdLine.parse(argc, argv))
+        return false;
 
     if (!cmdLine.initFromCommandLine(argc, argv))
         return false;

@@ -461,7 +461,7 @@ void App::enqueueRenderCommandImpl(std::function<void()> command)
 
 void App::requestExit()
 {
-    m_requestExit = true;
+    m_requestExit.store(true, std::memory_order_release);
     if (Window* w = window())
         w->setExit(true);
     if (GpuDevice* gpuDevice = device())
@@ -744,7 +744,7 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
         return true;
 
     // Window close: finish the frame token quickly without path-tracing / RTPSO work.
-    if (gpuDevice->isShuttingDown() || m_requestExit)
+    if (gpuDevice->isShuttingDown() || m_requestExit.load(std::memory_order_acquire))
         return true;
 
     gpuDevice->setRenderPhaseFrameIndex(frameIndex);
@@ -765,6 +765,14 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
             return false;
         }
         return true; // recoverable acquire/minimize condition
+    }
+
+    // ToneMappingPass is render-owned. Advancing it on Logic while Render(N)
+    // was still consuming the pass raced m_FrameTime/m_FrameParamsSet.
+    if (auto* renderer = worldRenderer(*this))
+    {
+        if (auto* toneMappingPass = renderer->getToneMappingPass())
+            toneMappingPass->advanceFrame(static_cast<float>(elapsedTime));
     }
 
     uint32_t fi = frameIndex;
@@ -972,7 +980,7 @@ void App::run()
         }
 
         constexpr double kHeadlessFrameTimeSeconds = 1.0 / 60.0;
-        while (!m_requestExit)
+        while (!m_requestExit.load(std::memory_order_acquire))
         {
             if (!runFrame(kHeadlessFrameTimeSeconds))
             {
@@ -1009,7 +1017,7 @@ void App::run()
         w->onUpdate();
         // Close was requested during event polling -- skip another full path-trace
         // frame so exit does not block on a multi-second render.
-        if (w->getExit() || m_requestExit)
+        if (w->getExit() || m_requestExit.load(std::memory_order_acquire))
             break;
 
         updateWindowSize();
