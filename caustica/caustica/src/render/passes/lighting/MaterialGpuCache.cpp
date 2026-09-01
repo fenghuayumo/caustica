@@ -281,7 +281,6 @@ void StandardMaterial::write(Json::Value& output)
     STORE_FIELD(shadowNoLFadeout);
     STORE_FIELD(unlitReceiveShadows);
     STORE_FIELD(unlitShadowStrength);
-    STORE_FIELD(unlitBypassToneMapping);
 
     STORE_FIELD(enableAsAnalyticLightProxy);
 
@@ -522,7 +521,6 @@ bool StandardMaterial::read(
     LOAD_FIELD_EITHER(shadowNoLFadeout, "ShadowNoLFadeout");
     LOAD_FIELD_EITHER(unlitReceiveShadows, "UnlitReceiveShadows");
     LOAD_FIELD_EITHER(unlitShadowStrength, "UnlitShadowStrength");
-    LOAD_FIELD_EITHER(unlitBypassToneMapping, "UnlitBypassToneMapping");
 
     LOAD_FIELD_EITHER(enableAsAnalyticLightProxy, "EnableAsAnalyticLightProxy");
 
@@ -839,8 +837,6 @@ void StandardMaterial::fillData(StandardMaterialData & data)
 
     if (unlitReceiveShadows)
         data.Flags |= StandardMaterialFlags_UnlitReceiveShadows;
-    if (unlitReceiveShadows && unlitBypassToneMapping)
-        data.Flags |= StandardMaterialFlags_UnlitBypassToneMapping;
     if (enableHair)
         data.Flags |= StandardMaterialFlags_Hair;
     // RTXCR continues the textured diffuse BSDF after evaluating spatial SSS.

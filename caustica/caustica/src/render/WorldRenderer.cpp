@@ -1323,7 +1323,6 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 dlssOptions.sharpness = 0; //m_recommendedDLSSSettings.sharpness;    // <- is this no longer valid?
                 dlssOptions.colorBuffersHDR = true;
                 dlssOptions.useAutoExposure = true;     // Optional: provide proper "kBufferTypeExposure" for 0-lag for better precision handling
-                dlssOptions.alphaUpscalingEnabled = true; // Preserve in-band per-pixel tone-map bypass coverage.
                 dlssOptions.preset = StreamlineInterface::DLSSPreset::eDefault;
                 // if (m_context->activeSettings().RealtimeAA < 4) <- docs https://github.com/NVIDIAGameWorks/Streamline/blob/main/docs/ProgrammingGuideDLSS_RR.md#50-provide-dlss--dlss-rr-options seem to imply that these should be set even when DLSS-RR enabled
                     streamline.setDLSSOptions(dlssOptions);
@@ -1378,7 +1377,7 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                 dlssRROptions.indicatorInvertAxisX 	= dlssOptions.indicatorInvertAxisX;
                 dlssRROptions.indicatorInvertAxisY 	= dlssOptions.indicatorInvertAxisY;
                 dlssRROptions.normalRoughnessMode 	= StreamlineInterface::DLSSRRNormalRoughnessMode::ePacked;
-                dlssRROptions.alphaUpscalingEnabled = true;
+                dlssRROptions.alphaUpscalingEnabled = false;
                 dlssRROptions.preset                = m_context->activeSettings().DLSRRPreset;
                 m_lastDLSSRROptions = dlssRROptions; // we need to fill them up with view info, but we can only have proper view after it was initialized with correct RT size
             }

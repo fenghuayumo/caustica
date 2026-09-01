@@ -65,11 +65,6 @@ bool DrawStandardMaterialEditor(StandardMaterial& material, MaterialGpuCache& ca
             if (ImGui::IsItemHovered()) ImGui::SetTooltip(
                 "Artistic control for how strongly sampled-light visibility darkens the unlit color.\n"
                 "0 keeps the base color fully visible; 1 applies the full shadow mask.");
-
-            update |= ImGui::Checkbox("Bypass tone mapping", &material.unlitBypassToneMapping);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-                "Keep this unlit material's reconstructed color unchanged by the tone mapper.\n"
-                "Other rendering and post-processing stages remain active.");
         }
 
         update |= ImGui::Checkbox("Enable as analytic light proxy", &material.enableAsAnalyticLightProxy);

@@ -160,16 +160,7 @@ float4 applyToneMapping(float2 texC)
             finalColor = saturate(finalColor);
     }
 
-    // Alpha carries the per-material tone-map bypass mask through the same
-    // temporal/upscaling path as RGB. Normal materials write 0 and keep the
-    // tone-mapped result; opted-in unlit materials write 1 and keep raw RGB.
-    const float toneMapBypass = saturate(color.a);
-    finalColor = lerp(finalColor, color.rgb, toneMapBypass);
-
-    // This texture is also sampled by the editor's ImGui viewport. The mask is
-    // only needed for RGB composition; carrying it into the display target
-    // makes ImGui alpha-blend the rendered scene away.
-    return float4(finalColor, 1.0);
+    return float4(finalColor, color.a);
 }
 
 #endif //__TONE_MAPPING_PS_HLSLI__

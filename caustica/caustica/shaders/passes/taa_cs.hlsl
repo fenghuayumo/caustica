@@ -35,7 +35,6 @@ Texture2D<float> t_HistoryClampRelaxMask : register(t3);
 
 groupshared float4 s_ColorsAndLengths[BUFFER_Y][BUFFER_X];
 groupshared float2 s_MotionVectors[BUFFER_Y][BUFFER_X];
-groupshared float s_ToneMappingBypassWeights[BUFFER_Y][BUFFER_X];
 
 static const float pq_m1 = 0.1593017578125;
 static const float pq_m2 = 78.84375;
@@ -98,14 +97,11 @@ float3 BicubicSampleCatmullRom(Texture2D tex, SamplerState samp, float2 samplePo
 void Preload(int2 sharedID, int2 globalID)
 {
 #if SAMPLE_COUNT == 1
-	float4 unfiltered = t_UnfilteredRT[globalID];
-	float3 color = PQEncode(unfiltered.rgb);
-	float toneMappingBypassWeight = unfiltered.a;
+	float3 color = PQEncode(t_UnfilteredRT[globalID].rgb);
 	float2 motion = t_MotionVectors[globalID].rg;
 	float motionLength = dot(motion, motion);
 #else
 	float3 color = 0;
-	float toneMappingBypassWeight = 0;
 	float2 motion = 0;
 	float motionLength = -1;
 	
@@ -114,13 +110,11 @@ void Preload(int2 sharedID, int2 globalID)
 	[unroll]
 	for (int nSample = 0; nSample < SAMPLE_COUNT; nSample++)
 	{
-		float4 unfiltered = t_UnfilteredRT.Load(globalID, nSample);
-		float3 sampleColor = PQEncode(unfiltered.rgb);
+		float3 sampleColor = PQEncode(t_UnfilteredRT.Load(globalID, nSample).rgb);
 		float2 sampleMotion = t_MotionVectors.Load(globalID, nSample).rg;
 		float sampleMotionLength = dot(sampleMotion, sampleMotion);
 
 		color += sampleColor;
-		toneMappingBypassWeight += unfiltered.a;
 
 		if (sampleMotionLength > motionLength)
 		{
@@ -130,12 +124,10 @@ void Preload(int2 sharedID, int2 globalID)
 	}
 
 	color /= float(SAMPLE_COUNT);
-	toneMappingBypassWeight /= float(SAMPLE_COUNT);
 #endif
 
 	s_ColorsAndLengths[sharedID.y][sharedID.x] = float4(color.rgb, motionLength);
 	s_MotionVectors[sharedID.y][sharedID.x] = motion;
-	s_ToneMappingBypassWeights[sharedID.y][sharedID.x] = toneMappingBypassWeight;
 }
 
 float2 OutputToInput(int2 pixelPosRelativeToOrigin)
@@ -189,7 +181,6 @@ void main(
     float longestMVLength = -1;
     int2 longestMVPos = 0;
     float3 thisPixelColor = 0;
-    float thisPixelBypassWeight = 0;
 
     [unroll]
     for (int dy = 0; dy <= 2; dy++)
@@ -206,7 +197,6 @@ void main(
             if (dx == 1 && dy == 1)
             {
                 thisPixelColor = color;
-                thisPixelBypassWeight = s_ToneMappingBypassWeights[pos.y][pos.x];
             }
 
             colorMoment1 += color;
@@ -254,7 +244,6 @@ void main(
     float2 sourcePos = float2(outputPixelPosition.xy) + longestMV + 0.5;
 
     float3 resultPQ;
-    float resultBypassWeight;
     if (newFrameWeight < 1.0 && all(sourcePos.xy > g_TemporalAA.outputViewOrigin) 
         && all(sourcePos.xy < g_TemporalAA.outputViewOrigin + g_TemporalAA.outputViewSize))
     {
@@ -263,8 +252,6 @@ void main(
 #else
         float3 history = t_FeedbackInput.SampleLevel(s_Sampler, sourcePos * g_TemporalAA.outputTextureSizeInv, 0).rgb;
 #endif
-        float historyBypassWeight = t_FeedbackInput.SampleLevel(
-            s_Sampler, sourcePos * g_TemporalAA.outputTextureSizeInv, 0).a;
 
         // Clamp the old color to the new color distribution
 
@@ -283,16 +270,14 @@ void main(
         float blendWeight = saturate(max(motionWeight, sampleWeight) * newFrameWeight);
 
         resultPQ = lerp(historyClamped, thisPixelColor, blendWeight);
-        resultBypassWeight = lerp(historyBypassWeight, thisPixelBypassWeight, blendWeight);
     }
     else
     {
         resultPQ = thisPixelColor;
-        resultBypassWeight = thisPixelBypassWeight;
     }
 
     float3 result = PQDecode(resultPQ);
 
-    u_ColorOutput[outputPixelPosition] = float4(result, resultBypassWeight);
-    u_FeedbackOutput[outputPixelPosition] = float4(resultPQ, resultBypassWeight);
+    u_ColorOutput[outputPixelPosition] = float4(result, 1.0);
+    u_FeedbackOutput[outputPixelPosition] = float4(resultPQ, 0.0);
 }

@@ -1082,7 +1082,6 @@ Editable properties automatically mark GPU data dirty:
 | `exclude_from_nee` | `bool` |
 | `unlit_receive_shadows` | `bool` |
 | `unlit_shadow_strength` | `float` (`0..1`) |
-| `unlit_bypass_tone_mapping` | `bool` |
 | `enable_as_analytic_light_proxy` | `bool` |
 | `skip_render` | `bool` |
 | `metalness_in_red_channel` | `bool` |
@@ -1106,14 +1105,12 @@ These flags are for flat-color receivers such as stylized objects, compositing c
 | --- | --- | --- |
 | `unlit_receive_shadows` | Displays the material's base color without BRDF, direct-light, or indirect-light shading, then darkens it with the visibility of sampled lights. | Enable when the color should stay constant but still show scene shadows. It also prevents the material from being treated as emissive. |
 | `unlit_shadow_strength` | Controls how much that shadow mask darkens the unlit color. `0.0` keeps the color fully visible; `1.0` applies the full sampled-light shadow. | Use a value between `0.0` and `1.0` for artistic shadow softness/contrast. It matters only when `unlit_receive_shadows=True`. |
-| `unlit_bypass_tone_mapping` | Keeps the reconstructed unlit/shadowed color unchanged by the tone mapper. Bloom and other rendering/post-processing stages still run. | Enable only when the flat color must not change with exposure or the selected tone-map curve. This flag has no effect unless `unlit_receive_shadows=True`. |
 
-For example, this makes a flat green object receive half-strength shadows while preserving that green through tone mapping:
+For example, this makes a flat green object receive half-strength shadows:
 
 ```python
 mat.unlit_receive_shadows = True
 mat.unlit_shadow_strength = 0.5
-mat.unlit_bypass_tone_mapping = True
 app.reset_accumulation()
 ```
 

@@ -3,6 +3,7 @@
 #include <engine/ActiveScene.h>
 #include <ecs/Entity.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneImport.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,8 @@ namespace caustica
 
 class App;
 class Material;
+class SceneTypeFactory;
+struct GameSettings;
 
 // Metadata only — does not expose extract/GPU Scene digs.
 [[nodiscard]] const ActiveScene* tryActiveScene(const App& app);
@@ -49,6 +52,10 @@ struct SceneLoadStatus
 };
 
 [[nodiscard]] SceneLoadStatus sceneLoadStatus(const App& app);
+
+[[nodiscard]] const GameSettings* gameSettings(const App& app);
+[[nodiscard]] const std::vector<SceneImportResult>& importedModels(const App& app);
+[[nodiscard]] std::shared_ptr<SceneTypeFactory> sceneTypeFactory(const App& app);
 
 // Resolve by path-tracer pick id (StandardMaterial::gpuDataIndex). Not Material::materialID.
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);

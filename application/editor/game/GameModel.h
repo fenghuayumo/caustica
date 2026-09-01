@@ -5,13 +5,17 @@
 
 #include "GameTypes.h"
 #include <ecs/Entity.h>
+#include <scene/SceneImport.h>
 
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace caustica { class Scene; }
+namespace caustica
+{
+class SceneTypeFactory;
+}
 
 namespace caustica::scene { class SceneEntityWorld; }
 
@@ -22,19 +26,26 @@ namespace demo
     class ModelType
     {
     public:
-        ModelType(caustica::Scene& scene, const std::string& name, const Json::Value& node);
+        ModelType(
+            caustica::scene::SceneEntityWorld& liveWorld,
+            std::shared_ptr<caustica::SceneTypeFactory> typeFactory,
+            const std::vector<caustica::SceneImportResult>& models,
+            const std::string& name,
+            const Json::Value& node);
 
         bool isValid() const { return m_valid; }
         [[nodiscard]] caustica::ecs::Entity getRootEntity() const { return m_rootEntity; }
         [[nodiscard]] const std::shared_ptr<caustica::scene::SceneEntityWorld>& getEntityWorld() const { return m_entityWorld; }
+        [[nodiscard]] caustica::scene::SceneEntityWorld* liveEntityWorld() const { return m_liveWorld; }
+        [[nodiscard]] caustica::SceneTypeFactory* typeFactory() const { return m_typeFactory.get(); }
         const std::string& getModelName() const { return m_name; }
         const Pose& getModelPose() const { return m_modelPose; }
-        caustica::Scene& getScene() const { return m_scene; }
 
         std::string findLightControllerInfo(const std::string& nodeName);
 
     private:
-        caustica::Scene& m_scene;
+        caustica::scene::SceneEntityWorld* m_liveWorld = nullptr;
+        std::shared_ptr<caustica::SceneTypeFactory> m_typeFactory;
         bool             m_valid = false;
         std::string      m_name;
         Pose             m_modelPose;

@@ -27,6 +27,7 @@ class ZoomTool;
 namespace caustica
 {
 class GpuDevice;
+class ShaderFactory;
 }
 
 namespace caustica::scene
@@ -93,6 +94,7 @@ void submitImmediateInstancePick(App& app, const render::RenderPickState& pickin
 [[nodiscard]] std::vector<GaussianSplatObjectBounds> gaussianSplatObjectBounds(const App& app);
 
 [[nodiscard]] const scene::SceneRenderData* latestPublishedRenderData(const App& app);
+[[nodiscard]] std::shared_ptr<ShaderFactory> shaderFactory(const App& app);
 [[nodiscard]] std::unique_ptr<ZoomTool> createZoomTool(App& app);
 bool saveCurrentFramebuffer(App& app, GpuDevice& gpuDevice, const char* fileName);
 

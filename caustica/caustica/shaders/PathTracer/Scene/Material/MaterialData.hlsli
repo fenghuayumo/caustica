@@ -29,9 +29,8 @@ struct MaterialHeader
     static const uint kUnlitShadowStrengthBits = 8;
     static const uint kUnlitShadowStrengthOffset = kUnlitReceiveShadowsFlagOffset + 1;
     static const uint kEyeChoroidFlagOffset = kUnlitShadowStrengthOffset + kUnlitShadowStrengthBits;
-    static const uint kUnlitBypassToneMappingFlagOffset = kEyeChoroidFlagOffset + 1;
 
-    static const uint kTotalHeaderBitsX = kUnlitBypassToneMappingFlagOffset + 1;
+    static const uint kTotalHeaderBitsX = kEyeChoroidFlagOffset + 1;
 
     /** Set the nested priority used for nested dielectrics.
     */
@@ -85,9 +84,6 @@ struct MaterialHeader
 
     void setEyeChoroid(bool enabled) { packedData.x = PACK_BITS(1, kEyeChoroidFlagOffset, packedData.x, enabled ? 1 : 0); }
     bool isEyeChoroid() { return packedData.x & (1u << kEyeChoroidFlagOffset); }
-
-    void setUnlitBypassToneMapping(bool enabled) { packedData.x = PACK_BITS(1, kUnlitBypassToneMappingFlagOffset, packedData.x, enabled ? 1 : 0); }
-    bool isUnlitBypassToneMapping() { return packedData.x & (1u << kUnlitBypassToneMappingFlagOffset); }
 
     static MaterialHeader make( ) { MaterialHeader header; header.packedData = 0; return header; }
 };

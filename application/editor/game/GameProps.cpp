@@ -7,7 +7,6 @@
 #include <math/math.h>
 #include <scene/camera/Camera.h>
 #include <scene/SceneEcs.h>
-#include <scene/Scene.h>
 #include <cmath>
 
 #include <core/command_line.h>
@@ -47,8 +46,7 @@ PropBase::PropBase(GameScene& gameScene, const std::string & name)
 
 caustica::scene::SceneEntityWorld* PropBase::EntityWorld() const
 {
-    const auto& scene = m_gameScene.scene();
-    return scene ? scene->getEntityWorld() : nullptr;
+    return m_gameScene.entityWorld();
 }
 
 std::string PropBase::getName() const

@@ -621,7 +621,7 @@ endif()
 add_library(causEngine STATIC ${caus_engine_headers} ${caus_engine_sources})
 caus_configure_static(causEngine)
 target_link_libraries(causEngine
-    PUBLIC causEvents causPlatform causBackend causRender causImgui
+    PUBLIC causEvents causPlatform causBackend causRender
     PUBLIC cxxopts
 )
 if (NOT WIN32)

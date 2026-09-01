@@ -2,12 +2,12 @@
 #include <scene/SceneImport.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/SceneObjects.h>
 #include <core/log.h>
 #include <core/json.h>
 #include <core/format.h>
 #include <math/math.h>
 #include <cmath>
-#include <scene/Scene.h>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -25,8 +25,14 @@ void ForEachEntityInSubtree(scene::SceneEntityWorld& world, ecs::Entity root, co
 }
 } // namespace
 
-ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json::Value& node)
-    : m_scene(scene)
+ModelType::ModelType(
+    scene::SceneEntityWorld& liveWorld,
+    std::shared_ptr<SceneTypeFactory> typeFactory,
+    const std::vector<SceneImportResult>& models,
+    const std::string& name,
+    const Json::Value& node)
+    : m_liveWorld(&liveWorld)
+    , m_typeFactory(std::move(typeFactory))
 {
     m_valid = false;
     m_name = name;
@@ -53,8 +59,6 @@ ModelType::ModelType(caustica::Scene& scene, const std::string& name, const Json
             m_lightsInfos.insert({ lightName, caustica::json::toString(lightData) });
         }
     }
-
-    const std::vector<caustica::SceneImportResult>& models = m_scene.getModels();
 
     if (modelIndex == -1 && modelName != "")
     {
@@ -104,8 +108,7 @@ ModelInstance::ModelInstance(const std::string& name,
     , m_name(name)
 {
     assert(modelType != nullptr);
-    caustica::Scene& scene = modelType->getScene();
-    auto* world = scene.getEntityWorld();
+    auto* world = modelType->liveEntityWorld();
     if (!world)
         return;
 
@@ -117,7 +120,7 @@ ModelInstance::ModelInstance(const std::string& name,
             m_entity,
             *modelType->getEntityWorld(),
             modelType->getRootEntity(),
-            scene.getSceneTypeFactory().get());
+            modelType->typeFactory());
         if (ecs::isValid(importedRoot))
         {
             const Pose& pose = modelType->getModelPose();
@@ -130,7 +133,7 @@ ModelInstance::ModelInstance(const std::string& name,
 
 void ModelInstance::mapLightControllers(ecs::Entity entity)
 {
-    auto* world = m_modelType->getScene().getEntityWorld();
+    auto* world = m_modelType->liveEntityWorld();
     if (!world)
         return;
 
@@ -166,7 +169,7 @@ void ModelInstance::mapLightControllers(ecs::Entity entity)
 
 void ModelInstance::updateLightFromControllers(double gameTime)
 {
-    auto* world = m_modelType->getScene().getEntityWorld();
+    auto* world = m_modelType->liveEntityWorld();
     if (!world)
         return;
 
@@ -233,7 +236,7 @@ void ModelInstance::updateLightFromControllers(double gameTime)
 
 void ModelInstance::setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
 {
-    if (auto* world = m_modelType->getScene().getEntityWorld())
+    if (auto* world = m_modelType->liveEntityWorld())
         world->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 

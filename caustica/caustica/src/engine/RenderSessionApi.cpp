@@ -290,13 +290,19 @@ const scene::SceneRenderData* latestPublishedRenderData(const App& app)
     return &scene->getRenderDataForFrame(frame);
 }
 
-std::unique_ptr<ZoomTool> createZoomTool(App& app)
+std::shared_ptr<ShaderFactory> shaderFactory(const App& app)
 {
     auto* infra = gpuSharedCaches(app);
+    return infra ? infra->shaderFactory : nullptr;
+}
+
+std::unique_ptr<ZoomTool> createZoomTool(App& app)
+{
+    auto factory = shaderFactory(app);
     auto* device = gpuDevice(app);
-    if (!infra || !infra->shaderFactory || !device)
+    if (!factory || !device)
         return nullptr;
-    return std::make_unique<ZoomTool>(device->getDevice(), infra->shaderFactory);
+    return std::make_unique<ZoomTool>(device->getDevice(), std::move(factory));
 }
 
 bool saveCurrentFramebuffer(App& app, GpuDevice& gpuDevice, const char* fileName)

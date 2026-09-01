@@ -262,4 +262,23 @@ SceneLoadStatus sceneLoadStatus(const App& app)
     return out;
 }
 
+const GameSettings* gameSettings(const App& app)
+{
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    return scene ? scene->getGameSettings() : nullptr;
+}
+
+const std::vector<SceneImportResult>& importedModels(const App& app)
+{
+    static const std::vector<SceneImportResult> kEmpty;
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    return scene ? scene->getModels() : kEmpty;
+}
+
+std::shared_ptr<SceneTypeFactory> sceneTypeFactory(const App& app)
+{
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    return scene ? scene->getSceneTypeFactory() : nullptr;
+}
+
 } // namespace caustica

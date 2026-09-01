@@ -373,7 +373,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=unused-result>
     )
 endif()
-target_link_libraries(causticaApp PUBLIC causEngine imguizmo)
+target_link_libraries(causticaApp PUBLIC causEngine causImgui imguizmo)
 if (CAUSTICA_WITH_AUDIO)
     target_link_libraries(causticaApp PUBLIC causAudio)
 endif()

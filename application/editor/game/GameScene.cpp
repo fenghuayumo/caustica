@@ -9,8 +9,8 @@
 #include <scene/camera/Camera.h>
 #include <cmath>
 
-#include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneObjects.h>
 #include <ecs/Entity.h>
 
 #include <core/file_utils.h>
@@ -19,6 +19,7 @@
 #include "SceneEditor.h"
 
 #include <engine/App.h>
+#include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
 #include <render/passes/debug/Korgi.h>
 #include <json/json.h>
@@ -75,9 +76,13 @@ GLFWwindow* GameScene::GetGLFWWindow() const
         : nullptr;
 }
 
+caustica::scene::SceneEntityWorld* GameScene::entityWorld() const
+{
+    return m_editor.app() ? caustica::entityWorld(*m_editor.app()) : nullptr;
+}
+
 void GameScene::Deinitialize()
 {
-    m_scene = nullptr;
     m_props.clear();
     m_modelTypes.clear();
     m_gameStoragePath = std::filesystem::path();
@@ -139,12 +144,20 @@ std::shared_ptr<demo::PropBase> GameScene::CreatePropFromFile(const std::string&
     return prop;
 }
 
-void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
+void GameScene::sceneLoaded(const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath)
 {
     Deinitialize();
 
-    const GameSettings* gameSettings = scene->getGameSettings();
+    caustica::App* app = m_editor.app();
+    if (!app)
+        return;
+
+    const GameSettings* gameSettings = caustica::gameSettings(*app);
     if (gameSettings == nullptr)
+        return;
+
+    scene::SceneEntityWorld* liveWorld = caustica::entityWorld(*app);
+    if (!liveWorld)
         return;
 
     const std::filesystem::path mediaGamePath = ResolveGameDataRoot(sceneFilePath, mediaPath);
@@ -167,7 +180,8 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         return;
     }
 
-    m_scene = scene;
+    auto typeFactory = caustica::sceneTypeFactory(*app);
+    const auto& models = caustica::importedModels(*app);
 
     auto modelFiles = enumerateFilesWithWildcard(m_gameStoragePath / "models", "*.model.json");
 
@@ -180,7 +194,7 @@ void GameScene::sceneLoaded(const std::shared_ptr<caustica::Scene>& scene, const
         Json::Value modelRoot;
         if (!caustica::json::loadFromFile(modelPath, modelRoot) || modelRoot.empty() || !modelRoot.isObject())
             continue;
-        m_modelTypes.push_back( std::make_shared<demo::ModelType>(*m_scene, fileNoExt.string(), modelRoot) );
+        m_modelTypes.push_back( std::make_shared<demo::ModelType>(*liveWorld, typeFactory, models, fileNoExt.string(), modelRoot) );
     }
 
     auto propFiles = enumerateFilesWithWildcard(m_gameStoragePath / "props", "*.prop.json");

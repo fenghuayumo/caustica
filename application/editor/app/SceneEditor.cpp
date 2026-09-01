@@ -11,7 +11,6 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include "EditorAccess.h"
-#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
@@ -579,15 +578,8 @@ void SceneEditor::onSceneLoadedEarly()
     if (m_game == nullptr || !m_app)
         return;
 
-    auto scene = caustica::activeScene(*m_app);
-    if (!scene)
-        return;
-
     const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
-    m_game->sceneLoaded(
-        scene,
-        caustica::currentScenePath(*m_app),
-        assetsRoot);
+    m_game->sceneLoaded(caustica::currentScenePath(*m_app), assetsRoot);
 }
 
 void SceneEditor::onSceneLoadedBeforeGpuPrep()

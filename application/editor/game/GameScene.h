@@ -1,18 +1,24 @@
 #pragma once
 
 #include <shaders/PathTracer/Config.h>
-//#include <EditorUI.h>
 
 #include <scene/camera/Camera.h>
-#include <scene/Scene.h>
+#include <scene/SceneEcs.h>
 
 #include "EditorCommandLine.h"
 #include "GameModel.h"
 #include "GameProps.h"
 
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
+
 #ifdef _DEBUG
 #define GAME_DEVELOPER_SETTINGS
 #endif
+
+struct GLFWwindow;
 
 namespace caustica::editor { class SceneEditor; }
 
@@ -23,12 +29,12 @@ class GameScene
 public:
     GameScene(caustica::editor::SceneEditor& editor, const caustica::editor::EditorCommandLine& cmdLine);
 
-    void                    sceneLoaded( const std::shared_ptr<caustica::Scene> & scene, const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
+    void                    sceneLoaded( const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    sceneUnloading( );
     bool                    debugGUI(float indent);
     void                    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize);
 
-    bool                    IsInitialized() const           { return m_scene != nullptr && !m_props.empty(); }
+    bool                    IsInitialized() const           { return !m_props.empty(); }
     bool                    CameraActive() const            { return m_gameCameraAttached.lock() != nullptr; }
     const caustica::FirstPersonCamera &
                             GetCamera() const               { return m_gameCamera; }
@@ -47,8 +53,7 @@ public:
     void                    Tick(float deltaTime, bool globalAnimationEnabled); // globalAnimationEnabled will be false if not in reference mode or global scene animations not enabled
     void                    TickCamera(float deltaTime, caustica::FirstPersonCamera & renderCamera);
 
-    const std::shared_ptr<caustica::Scene> &
-                            scene() const { return m_scene; }
+    [[nodiscard]] caustica::scene::SceneEntityWorld* entityWorld() const;
 
     double                  gameTime() const             { return m_gameTime; }
     void                    SetGameTime(double t)           { m_gameTime = t; }
@@ -72,8 +77,6 @@ private:
 
 private:
     caustica::editor::SceneEditor &          m_editor;
-    std::shared_ptr<caustica::Scene>
-                            m_scene = nullptr;
     int                     m_playSpeed = 3;   // speed: 0 - paused, 1 - 0.1x, 2 - 0.5x, 3 - 1.0x, 4 - 2.0x, 5 - 10.0x
 
     std::vector<std::shared_ptr<demo::ModelType>> m_modelTypes;

@@ -797,8 +797,6 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     ptShadingData.mtl.setEyeChoroid( (bridgeMaterial.flags & StandardMaterialFlags_EyeChoroid) != 0 );
     const bool unlitReceiveShadows = (bridgeMaterial.flags & StandardMaterialFlags_UnlitReceiveShadows) != 0;
     ptShadingData.mtl.setUnlitReceiveShadows(unlitReceiveShadows);
-    ptShadingData.mtl.setUnlitBypassToneMapping(
-        (bridgeMaterial.flags & StandardMaterialFlags_UnlitBypassToneMapping) != 0);
     ptShadingData.mtl.setUnlitShadowStrength(bridgeMaterial.unlitShadowStrength);
     ptShadingData.unlitColor = bridgeMaterial.baseColor;
     ptShadingData.unlitShadowStrength = bridgeMaterial.unlitShadowStrength;
@@ -1472,9 +1470,6 @@ void Bridge::ExportSurfaceInit(uint2 pixelPos)
 {
     u_Depth[pixelPos] = 0;                  // this is a signal that data is invalid - there's (rare) cases where neither ExportSurface or ExportNonSurface get called
     u_SpecularHitT[pixelPos] = 0;           // it is common for this to be missing
-    // Alpha is otherwise unused by the HDR output. Keep the per-material tone-map
-    // decision in-band so color and coverage take the exact same reconstruction path.
-    u_OutputColor[pixelPos].a = 0;
     
     // u_MotionVectors[pixelPos] = float4( 0, 0, 0, 0 );   // this should not be strictly necessary as we already know from u_Depth[] that the signal is invalid
     // DebugPixel( pixelPos.xy, float4( 0.0.xxx, 1 ) ); 
@@ -1483,10 +1478,6 @@ void Bridge::ExportSurfaceInit(uint2 pixelPos)
 void Bridge::ExportSurface(const PathState path, PathTracer::SurfaceData surfaceData, float sceneLength, float3 motionVectors )
 {
     uint2 pixelPos = path.GetPixelPos();
-
-    u_OutputColor[pixelPos].a =
-        surfaceData.shadingData.mtl.isUnlitReceiveShadows()
-        && surfaceData.shadingData.mtl.isUnlitBypassToneMapping() ? 1.0 : 0.0;
 
     u_MotionVectors[pixelPos]   = float4(motionVectors, 0);
 
@@ -1513,8 +1504,6 @@ void Bridge::ExportSurface(const PathState path, PathTracer::SurfaceData surface
 void Bridge::ExportNonSurface(const PathState path, float3 virtualWorldPos, float3 motionVectors )
 {
     uint2 pixelPos = path.GetPixelPos();
-
-    u_OutputColor[pixelPos].a = 0;
 
     u_MotionVectors[pixelPos]   = float4(motionVectors, 0);
 
