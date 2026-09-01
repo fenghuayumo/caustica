@@ -6,12 +6,15 @@
 
 enum class ToneMapperOperator : uint32_t
 {
-    Linear,             ///< Linear mapping
-    Reinhard,           ///< Reinhard operator
-    ReinhardModified,   ///< Reinhard operator with maximum white intensity
-    HejiHableAlu,       ///< John Hable's ALU approximation of Jim Heji's filmic operator
-    HableUc2,           ///< John Hable's filmic tone-mapping used in Uncharted 2
-    Aces,               ///< Aces Filmic Tone-Mapping
+    Linear,                 ///< Linear mapping
+    Reinhard,               ///< Reinhard operator
+    ReinhardModified,       ///< Reinhard operator with maximum white intensity
+    HejiHableAlu,           ///< John Hable's ALU approximation of Jim Heji's filmic operator
+    HableUc2,               ///< John Hable's filmic tone-mapping used in Uncharted 2
+    Aces,                   ///< Aces Filmic Tone-Mapping
+    PbrNeutral,             ///< Khronos PBR Neutral (midtones near-linear, highlight compression)
+    IdentitySoftShoulder,   ///< Identity below a threshold, soft highlight shoulder
+    AgX,                    ///< AgX (cinematic, wide-gamut highlight rolloff)
 };
 
 

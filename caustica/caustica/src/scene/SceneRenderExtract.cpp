@@ -406,6 +406,11 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
         else if (op == "HejiHableAlu") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HejiHableAlu;
         else if (op == "HableUc2") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
         else if (op == "Aces") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Aces;
+        else if (op == "PbrNeutral" || op == "KhronosPbrNeutral" || op == "Khronos PBR Neutral" || op == "Neutral")
+            settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::PbrNeutral;
+        else if (op == "IdentitySoftShoulder" || op == "Identity + Soft Shoulder")
+            settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::IdentitySoftShoulder;
+        else if (op == "AgX") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::AgX;
     }
     settings.ToneMappingParams.exposureCompensation =
         proxy.exposureCompensation.value_or(defaults.exposureCompensation);

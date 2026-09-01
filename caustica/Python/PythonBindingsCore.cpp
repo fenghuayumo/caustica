@@ -23,6 +23,7 @@
 #include <backend/GpuDevice.h>
 #include <render/RenderAppState.h>
 #include <render/WorldRenderer.h>
+#include <render/core/ToneMappingParameters.h>
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
 #include <scene/Scene.h>
@@ -586,6 +587,25 @@ void RegisterCoreBindings(nb::module_& m)
         .value("Realtime",  PathTracerMode::Realtime,  "Realtime mode - 1 SPP per frame, denoiser, DLSS, RTXDI.")
         .value("Reference", PathTracerMode::Reference, "Reference / accumulation mode - converges to ground truth.")
         .export_values();
+
+    nb::enum_<ToneMapperOperator>(m, "ToneMapOperator",
+        "Tone-mapping curve applied when Settings.enable_tone_mapping is true.",
+        nb::is_arithmetic())
+        .value("Linear", ToneMapperOperator::Linear)
+        .value("Reinhard", ToneMapperOperator::Reinhard)
+        .value("ReinhardModified", ToneMapperOperator::ReinhardModified)
+        .value("HejiHableAlu", ToneMapperOperator::HejiHableAlu)
+        .value("HableUc2", ToneMapperOperator::HableUc2)
+        .value("Aces", ToneMapperOperator::Aces)
+        .value("PbrNeutral", ToneMapperOperator::PbrNeutral)
+        .value("IdentitySoftShoulder", ToneMapperOperator::IdentitySoftShoulder)
+        .value("AgX", ToneMapperOperator::AgX);
+
+    nb::enum_<ExposureMode>(m, "ExposureMode",
+        "Camera exposure control mode used by ToneMappingParams.",
+        nb::is_arithmetic())
+        .value("AperturePriority", ExposureMode::AperturePriority)
+        .value("ShutterPriority", ExposureMode::ShutterPriority);
 
     // --- AA / super-resolution / denoising preset --------------------------
     nb::enum_<RealtimeAA>(m, "RealtimeAA",
@@ -1562,6 +1582,26 @@ void RegisterCoreBindings(nb::module_& m)
             [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
             [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
 
+    nb::class_<ToneMappingParameters>(m, "ToneMappingParams",
+        "Tone-mapping and exposure settings. Access the live instance through\n"
+        "``renderer.settings.tone_mapping_params``.")
+        .def(nb::init<>())
+        .def_rw("exposure_mode", &ToneMappingParameters::exposureMode)
+        .def_rw("tone_map_operator", &ToneMappingParameters::toneMapOperator)
+        .def_rw("auto_exposure", &ToneMappingParameters::autoExposure)
+        .def_rw("exposure_compensation", &ToneMappingParameters::exposureCompensation)
+        .def_rw("exposure_value", &ToneMappingParameters::exposureValue)
+        .def_rw("film_speed", &ToneMappingParameters::filmSpeed)
+        .def_rw("f_number", &ToneMappingParameters::fNumber)
+        .def_rw("shutter", &ToneMappingParameters::shutter)
+        .def_rw("white_balance", &ToneMappingParameters::whiteBalance)
+        .def_rw("white_point", &ToneMappingParameters::whitePoint)
+        .def_rw("white_max_luminance", &ToneMappingParameters::whiteMaxLuminance)
+        .def_rw("white_scale", &ToneMappingParameters::whiteScale)
+        .def_rw("clamped", &ToneMappingParameters::clamped)
+        .def_rw("exposure_value_min", &ToneMappingParameters::exposureValueMin)
+        .def_rw("exposure_value_max", &ToneMappingParameters::exposureValueMax);
+
     nb::class_<PathTracerSettings>(m, "Settings",
         "Live renderer session state (path tracer settings and runtime flags).\n"
         "Mutating attributes is equivalent to moving the corresponding ImGui widget.")
@@ -1633,6 +1673,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("reference_firefly_filter_threshold",&PathTracerSettings::ReferenceFireflyFilterThreshold)
 
         .def_rw("enable_tone_mapping",           &PathTracerSettings::EnableToneMapping)
+        .def_rw("tone_mapping_params",           &PathTracerSettings::ToneMappingParams,
+                "Live caustica.ToneMappingParams object used by the tone-mapping pass.")
         .def_rw("enable_bloom",                  &PathTracerSettings::EnableBloom)
         .def_rw("bloom_intensity",               &PathTracerSettings::BloomIntensity)
         .def_rw("bloom_radius",                  &PathTracerSettings::BloomRadius)

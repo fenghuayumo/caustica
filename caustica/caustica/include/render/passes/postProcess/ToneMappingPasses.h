@@ -31,7 +31,10 @@ static const std::unordered_map<ToneMapperOperator, std::string> tonemapOperator
     {ToneMapperOperator::ReinhardModified, "Reinhard Modified"},
     {ToneMapperOperator::HejiHableAlu, "Heji Hable ALU"},
     {ToneMapperOperator::HableUc2, "Hable UC2"},
-    {ToneMapperOperator::Aces, "Aces"}
+    {ToneMapperOperator::Aces, "Aces"},
+    {ToneMapperOperator::PbrNeutral, "Khronos PBR Neutral"},
+    {ToneMapperOperator::IdentitySoftShoulder, "Identity + Soft Shoulder"},
+    {ToneMapperOperator::AgX, "AgX"}
 };
 
 class ToneMappingPass

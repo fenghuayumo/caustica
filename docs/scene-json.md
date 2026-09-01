@@ -78,6 +78,7 @@
           "verticalFov": 0.7,
           "zNear": 0.001,
           "enableAutoExposure": false,
+          "toneMapOperator": "AgX",
           "exposureCompensation": 1.0
         }
       }
@@ -316,6 +317,7 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
   "zNear": 0.001,
   "zFar": 10000.0,
   "enableAutoExposure": false,
+  "toneMapOperator": "AgX",
   "exposureCompensation": 1.0,
   "exposureValue": 0.0,
   "exposureValueMin": -4.0,
@@ -330,10 +332,27 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 | `zNear` | number | 近裁剪面。 |
 | `zFar` | number | 远裁剪面。 |
 | `enableAutoExposure` | bool | `PerspectiveCameraEx` 扩展字段。是否启用自动曝光。 |
+| `toneMapOperator` | string | `PerspectiveCameraEx` 扩展字段。色调映射算子；省略时使用默认的 `Aces`。见下表。 |
 | `exposureCompensation` | number | `PerspectiveCameraEx` 扩展字段。曝光补偿。 |
 | `exposureValue` | number | `PerspectiveCameraEx` 扩展字段。固定曝光值。 |
 | `exposureValueMin` | number | `PerspectiveCameraEx` 扩展字段。自动曝光最小值。 |
 | `exposureValueMax` | number | `PerspectiveCameraEx` 扩展字段。自动曝光最大值。 |
+
+`toneMapOperator` 的推荐（规范）取值如下：
+
+| 值 | 说明 |
+| --- | --- |
+| `Linear` | 不进行曲线压缩。 |
+| `Reinhard` | 基于亮度的 Reinhard 压缩。 |
+| `ReinhardModified` | 带白点控制的 Reinhard 压缩。 |
+| `HejiHableAlu` | Heji/Hable 的 ALU 近似电影曲线。 |
+| `HableUc2` | Uncharted 2 电影曲线。 |
+| `Aces` | ACES 风格电影曲线，也是默认值。 |
+| `PbrNeutral` | Khronos PBR Neutral：中间调接近线性，仅压缩高光并降低高光饱和度。 |
+| `IdentitySoftShoulder` | `0.8` 以下保持逐通道线性，高光使用平滑肩部压缩。 |
+| `AgX` | AgX：采用 Rec.2020 工作空间和电影式高光滚降。 |
+
+为兼容已有场景，`PbrNeutral` 还接受 `KhronosPbrNeutral`、`Khronos PBR Neutral` 和 `Neutral`；`IdentitySoftShoulder` 还接受 `Identity + Soft Shoulder`。
 
 ### `OrthographicCamera`
 

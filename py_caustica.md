@@ -1385,9 +1385,29 @@ Rasterization runs over all enabled 3DGS scene objects. Emissive proxy sampling 
 | Property | Type |
 | --- | --- |
 | `enable_tone_mapping` | `bool` |
+| `tone_mapping_params` | `ToneMappingParams` | Live tone-mapping and exposure parameters. |
 | `enable_bloom` | `bool` |
 | `bloom_intensity` | `float` |
 | `bloom_radius` | `float` |
+
+`tone_mapping_params` is a live object; changes take effect on the next frame.
+Use `ToneMapOperator` to select the curve and `ExposureMode` for exposure
+control. The supported operators are `Linear`, `Reinhard`,
+`ReinhardModified`, `HejiHableAlu`, `HableUc2`, `Aces`, `PbrNeutral` (Khronos
+PBR Neutral), `IdentitySoftShoulder`, and `AgX`.
+
+```python
+settings = renderer.settings
+settings.enable_tone_mapping = True
+settings.tone_mapping_params.tone_map_operator = caustica.ToneMapOperator.AgX
+settings.tone_mapping_params.auto_exposure = True
+settings.tone_mapping_params.exposure_compensation = 1.0
+```
+
+The scene camera's `PerspectiveCameraEx.toneMapOperator` can override this
+runtime selection when a scene camera is active; see
+[Scene JSON](docs/scene-json.md#perspectivecamera) for the supported string
+values and aliases.
 
 ### Realtime AA / DLSS / Reflex
 
