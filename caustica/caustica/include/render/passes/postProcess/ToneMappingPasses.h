@@ -2,6 +2,7 @@
 
 #include <rhi/rhi.h>
 #include <memory>
+#include <vector>
 #include <unordered_map>
 #include <string>
 #include <math/math.h>
@@ -34,7 +35,8 @@ static const std::unordered_map<ToneMapperOperator, std::string> tonemapOperator
     {ToneMapperOperator::Aces, "Aces"},
     {ToneMapperOperator::PbrNeutral, "Khronos PBR Neutral"},
     {ToneMapperOperator::IdentitySoftShoulder, "Identity + Soft Shoulder"},
-    {ToneMapperOperator::AgX, "AgX"}
+    {ToneMapperOperator::AgX, "AgX"},
+    {ToneMapperOperator::CameraLut, "Camera LUT"}
 };
 
 class ToneMappingPass
@@ -75,6 +77,8 @@ private:
 
     caustica::rhi::SamplerHandle m_linearSampler;
     caustica::rhi::SamplerHandle m_pointSampler;
+    caustica::rhi::SamplerHandle m_cameraLutSampler;
+    caustica::rhi::TextureHandle m_cameraLut3DTexture;
 
     float m_FrameTime = 0.f;
 
@@ -108,6 +112,16 @@ private:
     float m_WhiteMaxLuminance;
     float m_WhiteScale;
     int m_Clamped;
+    bool m_CameraLutEnabled = false;
+    bool m_CameraLutAfterToneMap = true;
+    float3 m_CameraLutDomainMin = float3(0.f);
+    float3 m_CameraLutDomainMax = float3(1.f);
+    std::array<float3, ToneMappingParameters::CameraLutSize> m_CameraLut{};
+    bool m_CameraLutIs3D = false;
+    uint32_t m_CameraLut3DSize = 0;
+    uint64_t m_CameraLutRevision = 0;
+    uint64_t m_UploadedCameraLutRevision = uint64_t(-1);
+    std::shared_ptr<const std::vector<caustica::math::float4>> m_CameraLut3D;
         
     //Pre-computed fields
     float3x3 m_WhiteBalanceTransform; 
@@ -121,6 +135,7 @@ private:
 	void updateWhiteBalanceTransform();
 	void updateColorTransform();
     void generateMips(caustica::rhi::CommandList* commandList, uint32_t numberOfViews);
+    void uploadCameraLut3D();
 public:
     struct CreateParameters
     {

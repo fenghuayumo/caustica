@@ -55,6 +55,40 @@ python examples/python/render.py \
 | `environment_lighting.py` | HDRI environment maps and procedural-sky presets |
 | `embedded.py` | Scripting the running editor from inside `caustica.exe` |
 
+## Camera LUT reference matching
+
+Caustica accepts standard per-channel `LUT_1D_SIZE` and `LUT_3D_SIZE` `.cube` files. Fit the LUT
+from matching background-only renders and captured photographs, then render
+with the same camera, crop, exposure, and base tone mapper:
+
+```shell
+python examples/python/render.py \
+  --scene Assets/scenes/my_scene.scene.json \
+  --tone-mapper linear \
+  --camera-lut calibration/camera_match.cube \
+  --out matched.png
+```
+
+The LUT is sampled after the selected tone mapper and before the output
+framebuffer encoding. Auto exposure is disabled whenever `--camera-lut` is
+used so the calibrated response stays stable. 1D tables are resampled to 256
+entries. 3D tables retain their source resolution (2–64) and can model
+cross-channel color transforms.
+
+The same feature is available directly from Python:
+
+```python
+params = renderer.settings.tone_mapping_params
+params.tone_map_operator = caustica.ToneMapOperator.Linear
+params.auto_exposure = False
+params.load_camera_lut("calibration/camera_match.cube")
+```
+
+For optional, non-calibrated looks, the editor also offers `Neutral`, `Soft
+Contrast`, `Warm Film`, and `Cool Film` presets. They are disabled by default;
+selecting one enables it. Python can use the same presets with
+`params.apply_camera_lut_preset(caustica.CameraLutPreset.WarmFilm)`.
+
 Every script supports `--help`, and shares `--width`, `--height`, `--vulkan`,
 and `--adapter`. The adapter accepts `auto`, `index:N`, `name:text`, and the
 stable `uuid:hex` / `luid:hex` selectors; list devices with

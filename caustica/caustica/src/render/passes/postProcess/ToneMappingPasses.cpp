@@ -5,6 +5,7 @@
 #include <sstream>
 #include <algorithm>
 #include <assert.h>
+#include <stdexcept>
 #include <render/core/FramebufferFactory.h>
 #include <core/log.h>
 
@@ -56,8 +57,16 @@ ToneMappingPass::ToneMappingPass(
     samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Wrap);
     m_linearSampler = m_device->createSampler(samplerDesc);
 
-    samplerDesc.setAllFilters(false);
+	samplerDesc.setAllFilters(false);
 	m_pointSampler = m_device->createSampler(samplerDesc);
+
+    samplerDesc.setAllFilters(true);
+    samplerDesc.setAllAddressModes(caustica::rhi::SamplerAddressMode::Clamp);
+    m_cameraLutSampler = m_device->createSampler(samplerDesc);
+    // The 3D LUT slot is part of the shader's fixed binding layout. Keep it
+    // valid while LUTs are disabled or a 1D LUT is active; the shader only
+    // samples this fallback when cameraLutIs3D is set.
+    m_cameraLut3DTexture = m_renderDevice.builtins().blackTexture3D();
 
 
     m_PerView.resize(compositeView.getNumChildViews(ViewType::PLANAR));
@@ -160,7 +169,9 @@ ToneMappingPass::ToneMappingPass(
             caustica::rhi::BindingLayoutItem::Texture_SRV(0),
             caustica::rhi::BindingLayoutItem::Texture_SRV(1),
             caustica::rhi::BindingLayoutItem::Sampler(0),
-            caustica::rhi::BindingLayoutItem::Sampler(1)
+            caustica::rhi::BindingLayoutItem::Sampler(1),
+            caustica::rhi::BindingLayoutItem::Texture_SRV(2),
+            caustica::rhi::BindingLayoutItem::Sampler(2)
         };
         m_ToneMapBindingLayout = m_device->createBindingLayout(layoutDesc);
 
@@ -181,6 +192,7 @@ ToneMappingPass::ToneMappingPass(
 void ToneMappingPass::preRender(const ToneMappingParameters& params)
 {
     setParameters(params);
+    uploadCameraLut3D();
     updateExposureValue();
     updateWhiteBalanceTransform();
     updateColorTransform();
@@ -306,7 +318,9 @@ bool ToneMappingPass::render(
 				caustica::rhi::BindingSetItem::Texture_SRV(0, sourceTexture),                       //Color texture
 				caustica::rhi::BindingSetItem::Texture_SRV(1, m_PerView[viewIndex].luminanceTexture),                    //Luminance Texture
 				caustica::rhi::BindingSetItem::Sampler(0, m_linearSampler),    //Luminance sampler
-				caustica::rhi::BindingSetItem::Sampler(1, m_pointSampler)      //Color sampler
+				caustica::rhi::BindingSetItem::Sampler(1, m_pointSampler),     //Color sampler
+                caustica::rhi::BindingSetItem::Texture_SRV(2, m_cameraLut3DTexture),
+                caustica::rhi::BindingSetItem::Sampler(2, m_cameraLutSampler)
 			};
 			bindingSet = m_device->createBindingSet(bindingSetDesc, m_ToneMapBindingLayout);
 		}
@@ -348,6 +362,14 @@ bool ToneMappingPass::render(
 		toneMappingConsts.colorTransform[1] = float4(m_ColorTransform.col(1), 0);
 		toneMappingConsts.colorTransform[2] = float4(m_ColorTransform.col(2), 0);
         toneMappingConsts.enabled = enabled;
+        toneMappingConsts.cameraLutEnabled = m_CameraLutEnabled;
+        toneMappingConsts.cameraLutDomainMin = m_CameraLutDomainMin;
+        toneMappingConsts.cameraLutDomainMax = m_CameraLutDomainMax;
+        toneMappingConsts.cameraLutSize = ToneMappingParameters::CameraLutSize;
+        toneMappingConsts.cameraLutAfterToneMap = m_CameraLutAfterToneMap;
+        toneMappingConsts.cameraLutIs3D = m_CameraLutIs3D;
+        for (uint32_t i = 0; i < ToneMappingParameters::CameraLutSize; ++i)
+            toneMappingConsts.cameraLut[i] = float4(m_CameraLut[i], 0.0f);
         commandList->writeBuffer(constantsBuffer, &toneMappingConsts, sizeof(ToneMappingConstants));
 
         commandList->setGraphicsState(state);
@@ -470,6 +492,60 @@ void ToneMappingPass::setParameters(const ToneMappingParameters& params)
     m_Clamped = params.clamped;
     m_ExposureValueMin = params.exposureValueMin;
     m_ExposureValueMax = params.exposureValueMax;
+    m_CameraLutEnabled = params.cameraLutEnabled;
+    m_CameraLutAfterToneMap = params.cameraLutAfterToneMap;
+    m_CameraLutDomainMin = params.cameraLutDomainMin;
+    m_CameraLutDomainMax = params.cameraLutDomainMax;
+    m_CameraLut = params.cameraLut;
+    m_CameraLutIs3D = params.cameraLutIs3D;
+    m_CameraLut3DSize = params.cameraLut3DSize;
+    m_CameraLutRevision = params.cameraLutRevision;
+    m_CameraLut3D = params.cameraLut3D;
+}
+
+void ToneMappingPass::uploadCameraLut3D()
+{
+    // Do not create or submit GPU work for the default (disabled) path. Apart
+    // from avoiding unnecessary startup work, this ensures the fixed 3D SRV
+    // binding always uses the RenderDevice-owned fallback texture until a
+    // custom 3D LUT is explicitly enabled.
+    if (!m_CameraLutEnabled || !m_CameraLutIs3D || !m_CameraLut3D || m_CameraLut3DSize < 2)
+        return;
+
+    if (m_UploadedCameraLutRevision == m_CameraLutRevision && m_cameraLut3DTexture)
+        return;
+
+    const uint32_t size = m_CameraLut3DSize;
+    const std::vector<float4>* values = m_CameraLut3D.get();
+
+    caustica::rhi::TextureDesc desc;
+    desc.dimension = caustica::rhi::TextureDimension::Texture3D;
+    desc.width = size;
+    desc.height = size;
+    desc.depth = size;
+    desc.format = caustica::rhi::Format::RGBA32_FLOAT;
+    desc.debugName = "CameraLut3D";
+    m_cameraLut3DTexture = m_device->createTexture(desc);
+
+    caustica::rhi::CommandListHandle commandList = m_device->createCommandList();
+    if (!commandList || !commandList->open())
+        throw std::runtime_error("Failed to create a command list for CameraLut3D upload");
+
+    commandList->beginTrackingTextureState(
+        m_cameraLut3DTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
+    commandList->writeTexture(
+        m_cameraLut3DTexture, 0, 0, values->data(),
+        size_t(size) * sizeof(float4), size_t(size) * size * sizeof(float4));
+    commandList->setTextureState(
+        m_cameraLut3DTexture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::ShaderResource);
+    commandList->setPermanentTextureState(
+        m_cameraLut3DTexture, caustica::rhi::ResourceStates::ShaderResource);
+    commandList->commitBarriers();
+    commandList->close();
+    m_device->executeCommandList(commandList);
+    m_UploadedCameraLutRevision = m_CameraLutRevision;
+    for (PerViewData& viewData : m_PerView)
+        viewData.colorBindingSet = nullptr;
 }
 
 

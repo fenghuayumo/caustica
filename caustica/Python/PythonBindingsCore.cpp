@@ -599,13 +599,23 @@ void RegisterCoreBindings(nb::module_& m)
         .value("Aces", ToneMapperOperator::Aces)
         .value("PbrNeutral", ToneMapperOperator::PbrNeutral)
         .value("IdentitySoftShoulder", ToneMapperOperator::IdentitySoftShoulder)
-        .value("AgX", ToneMapperOperator::AgX);
+        .value("AgX", ToneMapperOperator::AgX)
+        .value("CameraLut", ToneMapperOperator::CameraLut);
 
     nb::enum_<ExposureMode>(m, "ExposureMode",
         "Camera exposure control mode used by ToneMappingParams.",
         nb::is_arithmetic())
         .value("AperturePriority", ExposureMode::AperturePriority)
         .value("ShutterPriority", ExposureMode::ShutterPriority);
+
+    nb::enum_<CameraLutPreset>(m, "CameraLutPreset",
+        "Built-in optional 1D camera-LUT looks.",
+        nb::is_arithmetic())
+        .value("Disabled", CameraLutPreset::None)
+        .value("Neutral", CameraLutPreset::Neutral)
+        .value("SoftContrast", CameraLutPreset::SoftContrast)
+        .value("WarmFilm", CameraLutPreset::WarmFilm)
+        .value("CoolFilm", CameraLutPreset::CoolFilm);
 
     // --- AA / super-resolution / denoising preset --------------------------
     nb::enum_<RealtimeAA>(m, "RealtimeAA",
@@ -1600,7 +1610,27 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("white_scale", &ToneMappingParameters::whiteScale)
         .def_rw("clamped", &ToneMappingParameters::clamped)
         .def_rw("exposure_value_min", &ToneMappingParameters::exposureValueMin)
-        .def_rw("exposure_value_max", &ToneMappingParameters::exposureValueMax);
+        .def_rw("exposure_value_max", &ToneMappingParameters::exposureValueMax)
+        .def_rw("camera_lut_enabled", &ToneMappingParameters::cameraLutEnabled)
+        .def_rw("camera_lut_after_tone_map", &ToneMappingParameters::cameraLutAfterToneMap)
+        .def_rw("camera_lut_preset", &ToneMappingParameters::cameraLutPreset)
+        .def_prop_ro("camera_lut_is_3d", [](ToneMappingParameters& s) { return s.cameraLutIs3D; })
+        .def_prop_rw("camera_lut_domain_min",
+            [](ToneMappingParameters& s) { return Float3ToTuple(s.cameraLutDomainMin); },
+            [](ToneMappingParameters& s, nb::object v) { s.cameraLutDomainMin = ToFloat3(v); })
+        .def_prop_rw("camera_lut_domain_max",
+            [](ToneMappingParameters& s) { return Float3ToTuple(s.cameraLutDomainMax); },
+            [](ToneMappingParameters& s, nb::object v) { s.cameraLutDomainMax = ToFloat3(v); })
+        .def_prop_ro("camera_lut_path", [](ToneMappingParameters& s) { return s.cameraLutPath; })
+        .def("load_camera_lut", [](ToneMappingParameters& s, const std::string& path) {
+            std::string error;
+            if (!s.loadCameraLut(path, &error))
+                throw std::runtime_error(error);
+        }, nb::arg("path"), "Load and enable a 1D .cube camera LUT.")
+        .def("apply_camera_lut_preset", &ToneMappingParameters::applyCameraLutPreset,
+            nb::arg("preset"), "Apply a built-in optional 1D camera-LUT look.")
+        .def("clear_camera_lut", &ToneMappingParameters::clearCameraLut,
+            "Disable the camera LUT and restore its identity table.");
 
     nb::class_<PathTracerSettings>(m, "Settings",
         "Live renderer session state (path tracer settings and runtime flags).\n"
@@ -1675,6 +1705,14 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("enable_tone_mapping",           &PathTracerSettings::EnableToneMapping)
         .def_rw("tone_mapping_params",           &PathTracerSettings::ToneMappingParams,
                 "Live caustica.ToneMappingParams object used by the tone-mapping pass.")
+        .def("load_camera_lut", [](PathTracerSettings& s, const std::string& path) {
+            std::string error;
+            if (!s.ToneMappingParams.loadCameraLut(path, &error))
+                throw std::runtime_error(error);
+        }, nb::arg("path"), "Load and enable a 1D .cube camera LUT.")
+        .def("clear_camera_lut", [](PathTracerSettings& s) {
+            s.ToneMappingParams.clearCameraLut();
+        })
         .def_rw("enable_bloom",                  &PathTracerSettings::EnableBloom)
         .def_rw("bloom_intensity",               &PathTracerSettings::BloomIntensity)
         .def_rw("bloom_radius",                  &PathTracerSettings::BloomRadius)

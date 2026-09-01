@@ -15,6 +15,7 @@ enum class ToneMapperOperator : uint32_t
     PbrNeutral,             ///< Khronos PBR Neutral (midtones near-linear, highlight compression)
     IdentitySoftShoulder,   ///< Identity below a threshold, soft highlight shoulder
     AgX,                    ///< AgX (cinematic, wide-gamut highlight rolloff)
+    CameraLut,              ///< Camera 1D LUT without an additional tone curve
 };
 
 
@@ -33,6 +34,15 @@ struct ToneMappingConstants
     uint _padding0;
     uint _padding1;
     uint _padding2;
+    uint cameraLutEnabled;
+    float3 cameraLutDomainMin;
+    float3 cameraLutDomainMax;
+    uint cameraLutSize;
+    uint cameraLutAfterToneMap;
+    uint cameraLutIs3D;
+    uint _cameraLutPadding1;
+    uint _cameraLutPadding2;
+    float4 cameraLut[256];
 };
 
 

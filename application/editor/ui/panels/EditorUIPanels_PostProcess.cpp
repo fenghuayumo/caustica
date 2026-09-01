@@ -18,6 +18,8 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
+#include <platform/file_dialog.h>
+#include <core/log.h>
 
 #include <algorithm>
 #include <cmath>
@@ -197,6 +199,39 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
             dm::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
 
         SettingsCheckbox("Clamp", &m_settings.ToneMappingParams.clamped);
+
+        SettingsCategoryHeader("Camera LUT");
+        SettingsCheckbox("Enabled##CameraLut", &m_settings.ToneMappingParams.cameraLutEnabled);
+        SettingsCheckbox("After Tone Map", &m_settings.ToneMappingParams.cameraLutAfterToneMap);
+        const std::string currentPreset =
+            CameraLutPresetToString.at(m_settings.ToneMappingParams.cameraLutPreset);
+        if (SettingsBeginCombo("Preset", currentPreset.c_str()))
+        {
+            for (const auto& preset : CameraLutPresetToString)
+            {
+                if (preset.first == CameraLutPreset::CustomFile)
+                    continue;
+                const bool selected = preset.first == m_settings.ToneMappingParams.cameraLutPreset;
+                if (ImGui::Selectable(preset.second.c_str(), selected))
+                    m_settings.ToneMappingParams.applyCameraLutPreset(preset.first);
+            }
+            SettingsEndCombo();
+        }
+        if (ImGui::Button("Load 1D / 3D .cube##CameraLut"))
+        {
+            std::string picked = m_settings.ToneMappingParams.cameraLutPath;
+            if (::caustica::FileDialog(true, "Cube LUT (*.cube)\0*.cube\0All files\0*.*\0", picked))
+            {
+                std::string error;
+                if (!m_settings.ToneMappingParams.loadCameraLut(picked, &error))
+                    caustica::warning("Failed to load camera LUT '%s': %s", picked.c_str(), error.c_str());
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear##CameraLut"))
+            m_settings.ToneMappingParams.clearCameraLut();
+        if (!m_settings.ToneMappingParams.cameraLutPath.empty())
+            ImGui::TextWrapped("%s", m_settings.ToneMappingParams.cameraLutPath.c_str());
     }
 
     if (ImGui::CollapsingHeader("Late (LDR)", ImGuiTreeNodeFlags_DefaultOpen))

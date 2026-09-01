@@ -68,6 +68,17 @@ def parse_args() -> argparse.Namespace:
         help="Denoise the reference render with OIDN.",
     )
     parser.add_argument("--frames", type=int, default=32, help="Realtime frames to render.")
+    parser.add_argument(
+        "--camera-lut",
+        type=Path,
+        help="Apply a fitted 1D or 3D .cube camera LUT after tone mapping.",
+    )
+    parser.add_argument(
+        "--tone-mapper",
+        choices=["linear", "reinhard", "aces", "pbr-neutral", "soft-shoulder", "agx"],
+        default="aces",
+        help="Base tone mapper used before --camera-lut (default: aces).",
+    )
 
     scene_edits = parser.add_argument_group("scene edits")
     scene_edits.add_argument("--spawn", help="Mesh or prefab to spawn after loading the scene.")
@@ -159,6 +170,22 @@ def main() -> int:
         accumulation_target=args.spp if is_reference else 1,
     ) as renderer:
         apply_common_settings(renderer, caustica, bounces=args.bounces)
+        tone_mapper = {
+            "linear": caustica.ToneMapOperator.Linear,
+            "reinhard": caustica.ToneMapOperator.Reinhard,
+            "aces": caustica.ToneMapOperator.Aces,
+            "pbr-neutral": caustica.ToneMapOperator.PbrNeutral,
+            "soft-shoulder": caustica.ToneMapOperator.IdentitySoftShoulder,
+            "agx": caustica.ToneMapOperator.AgX,
+        }[args.tone_mapper]
+        renderer.settings.tone_mapping_params.tone_map_operator = tone_mapper
+        if args.camera_lut:
+            lut_path = require_input_file(args.camera_lut, "Camera LUT")
+            tone_params = renderer.settings.tone_mapping_params
+            tone_params.auto_exposure = False
+            tone_params.camera_lut_after_tone_map = True
+            tone_params.load_camera_lut(str(lut_path))
+            print(f"[caustica] Camera LUT: {lut_path}")
         mode_label = (
             apply_reference_mode(renderer, caustica, spp=args.spp, oidn=args.oidn)
             if is_reference

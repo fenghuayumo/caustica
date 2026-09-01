@@ -8,6 +8,8 @@ SamplerState gColorSampler : register(s1);
 
 Texture2D gColorTex : register(t0);
 Texture2D gLuminanceTex : register(t1);
+Texture3D gCameraLutTex : register(t2);
+SamplerState gCameraLutSampler : register(s2);
 
 //static const uint kOperator = _TONE_MAPPER_OPERATOR;
 static const float kExposureKey = TONEMAPPING_EXPOSURE_KEY;
@@ -17,6 +19,32 @@ cbuffer PerImageCB : register(b0)
 {
     ToneMappingConstants gParams;
 };
+
+float sampleCameraLutChannel(float value, uint channel)
+{
+    const float domainMin = gParams.cameraLutDomainMin[channel];
+    const float domainMax = gParams.cameraLutDomainMax[channel];
+    const float normalized = saturate((value - domainMin) / max(domainMax - domainMin, 1e-6));
+    const float position = normalized * (float)(gParams.cameraLutSize - 1);
+    const uint lower = (uint)floor(position);
+    const uint upper = min(lower + 1, gParams.cameraLutSize - 1);
+    return lerp(gParams.cameraLut[lower][channel], gParams.cameraLut[upper][channel], frac(position));
+}
+
+float3 applyCameraLut(float3 color)
+{
+    if (gParams.cameraLutIs3D)
+    {
+        const float3 normalized = saturate(
+            (color - gParams.cameraLutDomainMin) /
+            max(gParams.cameraLutDomainMax - gParams.cameraLutDomainMin, 1e-6.xxx));
+        return gCameraLutTex.SampleLevel(gCameraLutSampler, normalized, 0).rgb;
+    }
+    return float3(
+        sampleCameraLutChannel(color.r, 0),
+        sampleCameraLutChannel(color.g, 1),
+        sampleCameraLutChannel(color.b, 2));
+}
 
 float calcLuminance(float3 color)
 {
@@ -227,6 +255,8 @@ float3 toneMap(float3 color)
             return toneMapIdentitySoftShoulder(color);
         case ToneMapperOperator::AgX:
             return toneMapAgX(color);
+        case ToneMapperOperator::CameraLut:
+            return color;
         default:
             return color;
     }
@@ -267,8 +297,14 @@ float4 applyToneMapping(float2 texC)
         // apply color grading
         finalColor = mul(finalColor, (float3x3) gParams.colorTransform);
 
+        if (gParams.cameraLutEnabled && !gParams.cameraLutAfterToneMap)
+            finalColor = applyCameraLut(finalColor);
+
         // apply tone mapping
         finalColor = toneMap(finalColor);
+
+        if (gParams.cameraLutEnabled && gParams.cameraLutAfterToneMap)
+            finalColor = applyCameraLut(finalColor);
 
         if (gParams.clamped)
             finalColor = saturate(finalColor);

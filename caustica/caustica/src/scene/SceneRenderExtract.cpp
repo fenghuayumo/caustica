@@ -411,6 +411,7 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
         else if (op == "IdentitySoftShoulder" || op == "Identity + Soft Shoulder")
             settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::IdentitySoftShoulder;
         else if (op == "AgX") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::AgX;
+        else if (op == "CameraLut") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::CameraLut;
     }
     settings.ToneMappingParams.exposureCompensation =
         proxy.exposureCompensation.value_or(defaults.exposureCompensation);
