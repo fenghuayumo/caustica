@@ -693,6 +693,7 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
         m_frameRuntimeSnapshot.Invalidation = sessionData.renderSettings.invalidation;
         m_frameRuntimeSnapshot.Picking = sessionData.renderSettings.picking;
         mergeImmediateMaterialPick();
+        mergeImmediateInstancePick();
         m_frameRuntimeSnapshot.GaussianSplats = m_context->runtimeState.GaussianSplats;
         m_frameGaussianSplatTemporalReset = sessionData.renderSettings.gaussianSplatTemporalReset;
         m_context->sceneTime = sessionData.renderSettings.sceneTime;
@@ -799,6 +800,12 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
     {
         m_completedImmediateMaterialPickRequestId.store(
             m_lastRenderedPicking.MaterialRequestId,
+            std::memory_order_release);
+    }
+    if (m_lastRenderedPicking.InstanceRequested)
+    {
+        m_completedImmediateInstancePickRequestId.store(
+            m_lastRenderedPicking.InstanceRequestId,
             std::memory_order_release);
     }
 

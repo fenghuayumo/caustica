@@ -202,6 +202,7 @@ public:
 
 private:
     void consumeCompletedMaterialPickFeedback();
+    void consumeCompletedInstancePickFeedback();
     void onSceneLoadedEarly();
     void onSceneLoadedBeforeGpuPrep();
     void onSceneLoadedAfterCollectTextures();
@@ -258,6 +259,10 @@ private:
     std::atomic<int> m_completedMaterialPickGpuId{-1};
     std::atomic<uint64_t> m_completedMaterialPickRequestId{0};
     uint64_t m_consumedMaterialPickRequestId = 0;
+    std::atomic<int> m_completedInstancePickIndex{-1};
+    std::atomic<uint64_t> m_completedInstancePickPosition{0};
+    std::atomic<uint64_t> m_completedInstancePickRequestId{0};
+    uint64_t m_consumedInstancePickRequestId = 0;
 };
 
 } // namespace caustica::editor

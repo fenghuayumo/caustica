@@ -7,6 +7,7 @@
 #include "EditorUIState.h"
 
 #include <backend/GpuDevice.h>
+#include <GLFW/glfw3.h>
 #include <core/log.h>
 #include <ecs/Entity.h>
 #include <events/event.h>
@@ -25,12 +26,35 @@ namespace caustica::editor
 
 namespace
 {
+bool mouseInViewportCanvas(const SceneEditor& sceneEditor, double cursorX, double cursorY)
+{
+    const auto& vp = sceneEditor.editorUIState().Viewport;
+    if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
+        return false;
+    return cursorX >= static_cast<double>(vp.PosX)
+        && cursorY >= static_cast<double>(vp.PosY)
+        && cursorX < static_cast<double>(vp.PosX + vp.SizeX)
+        && cursorY < static_cast<double>(vp.PosY + vp.SizeY);
+}
+
 bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
 {
-    // Viewport canvas is an ImGui item, but camera/gizmo must still receive mouse there.
-    if (!ImGui::GetIO().WantCaptureMouse)
+    const auto& vp = sceneEditor.editorUIState().Viewport;
+    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
+        ? sceneEditor.app()->getGpuDevice()->getWindow()
+        : nullptr;
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    if (window)
+        glfwGetCursorPos(window, &cursorX, &cursorY);
+
+    // Hit-test the canvas rect at event time. Viewport.Hovered is from last UI
+    // frame and is often false: no InvisibleButton, and ImGuizmo BeginFrame's
+    // NoInputs window can become HoveredWindow.
+    if (mouseInViewportCanvas(sceneEditor, cursorX, cursorY) && !vp.OverlayHovered)
         return false;
-    if (sceneEditor.editorUIState().Viewport.Hovered)
+
+    if (!ImGui::GetIO().WantCaptureMouse)
         return false;
     return true;
 }
@@ -66,7 +90,13 @@ bool isRightMouseDown(SceneEditor& sceneEditor)
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
     const auto& editor = sceneEditor.editorUIState();
-    return editor.GizmoCapturingInput || ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+    if (editor.GizmoCapturingInput)
+        return true;
+    // IsOver() is only meaningful after Manipulate() this/last frame. Calling it
+    // with no selected gizmo (or after DrawGrid's leftover context) blocks picks.
+    if (!editor.GizmoEnabled || !caustica::ecs::isValid(editor.SelectedEntity))
+        return false;
+    return ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 }
 
 void activateFreeCameraForInput(CameraController& camera)
@@ -91,10 +121,13 @@ void requestMaterialPick(SceneEditor& sceneEditor)
         worldRenderer->submitImmediateMaterialPick(picking);
 }
 
-void requestInstancePick(caustica::render::RenderRuntimeState& runtime)
+void requestInstancePick(SceneEditor& sceneEditor)
 {
     // Left-click: select the mesh instance entity for Inspector / gizmo.
-    runtime.Picking.requestInstancePick();
+    auto& picking = sceneEditor.renderAppState().runtime.Picking;
+    picking.requestInstancePick();
+    if (auto* worldRenderer = caustica::editor::editorWorldRenderer(sceneEditor))
+        worldRenderer->submitImmediateInstancePick(picking);
 }
 
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
@@ -336,10 +369,7 @@ bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
     if (game)
         game->mousePosUpdate(e.getX(), e.getY());
 
-    // Display/window space — see syncPickPositionFromCursor.
-    session.runtime.Picking.Position = dm::uint2{
-        static_cast<uint>(e.getX()),
-        static_cast<uint>(e.getY())};
+    syncPickPositionFromCursor(sceneEditor);
     session.settings.MousePos = session.runtime.Picking.Position;
 
     auto* zoomTool = sceneEditor.zoomTool().get();
@@ -390,7 +420,7 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     if (button == ToGlfwMouse(caustica::Mouse::Left))
     {
         syncPickPositionFromCursor(sceneEditor);
-        requestInstancePick(session.runtime);
+        requestInstancePick(sceneEditor);
     }
 #if CAUSTICA_WITH_STREAMLINE
     if (button == ToGlfwMouse(caustica::Mouse::Left))

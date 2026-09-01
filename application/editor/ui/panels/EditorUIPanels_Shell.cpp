@@ -342,8 +342,14 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
 
     caustica::rhi::Texture* color = m_viewportColor;
     // Do NOT cover the canvas with InvisibleButton/Dummy: ImGuizmo::CanActivate()
-    // rejects grabs while any item is hovered/active. Hover comes from the window.
-    vp.Hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    // rejects grabs while any item is hovered/active. Hit-test the canvas rect so
+    // overlapping NoInputs overlay windows cannot steal Viewport.Hovered.
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const bool mouseInCanvas =
+        mouse.x >= canvasPos.x && mouse.x < canvasPos.x + canvasSize.x
+        && mouse.y >= canvasPos.y && mouse.y < canvasPos.y + canvasSize.y;
+    vp.OverlayHovered = false;
+    vp.Hovered = mouseInCanvas;
     vp.Focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -396,7 +402,10 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
 
         // Hovering the tool strip should not drive camera / picking.
         if (ImGui::IsItemHovered())
+        {
             vp.Hovered = false;
+            vp.OverlayHovered = true;
+        }
     }
 
     TryOpenSceneCreatePopupOnRightClick(
@@ -404,7 +413,10 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
         vp.Hovered && !m_editorUI.GizmoCapturingInput && !m_editorUI.MaterialPickerActive);
     BuildSceneCreatePopup(m_sceneEditor, m_ui, "##ViewportCreateMenu");
     if (ImGui::IsPopupOpen("##ViewportCreateMenu"))
+    {
         vp.Hovered = false;
+        vp.OverlayHovered = true;
+    }
 
     ImGui::End();
 }

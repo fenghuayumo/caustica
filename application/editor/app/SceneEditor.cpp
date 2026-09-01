@@ -298,7 +298,7 @@ ecs::Entity SceneEditor::pickGaussianSplatAtPixel(math::uint2 displayPixel) cons
     if (disp.x == 0 || disp.y == 0)
         return ecs::NullEntity;
 
-    // Picking.Position is already display/window space (see EditorInputRouter).
+    // Picking.Position is viewport-local display pixels (see EditorInputRouter).
     const float2 mousePos = float2(float(displayPixel.x), float(displayPixel.y));
     const float2 displaySizeF = float2(float(disp.x), float(disp.y));
     const float4x4 viewProj = view->getViewProjectionMatrix();
@@ -410,6 +410,40 @@ void SceneEditor::consumeCompletedMaterialPickFeedback()
             picking.completeMaterialPick(completedRequestId);
         }
     }
+}
+
+void SceneEditor::consumeCompletedInstancePickFeedback()
+{
+    const uint64_t completedRequestId =
+        m_completedInstancePickRequestId.load(std::memory_order_acquire);
+    if (completedRequestId <= m_consumedInstancePickRequestId)
+        return;
+
+    m_consumedInstancePickRequestId = completedRequestId;
+    auto& picking = m_renderState.Picking;
+    // SceneAfterWorldRender may already have cleared the one-shot bool.
+    if (picking.InstanceRequestId != completedRequestId)
+        return;
+
+    const int instanceIndex = m_completedInstancePickIndex.load(std::memory_order_relaxed);
+    const uint64_t packedPosition =
+        m_completedInstancePickPosition.load(std::memory_order_relaxed);
+    const math::uint2 pickPixel{
+        uint32_t(packedPosition >> 32u),
+        uint32_t(packedPosition & 0xffffffffu)};
+
+    ecs::Entity picked = m_app
+        ? caustica::findEntityByInstanceIndex(*m_app, instanceIndex)
+        : ecs::NullEntity;
+    bool pickedGaussian = false;
+    if (picked == ecs::NullEntity)
+    {
+        picked = pickGaussianSplatAtPixel(pickPixel);
+        pickedGaussian = (picked != ecs::NullEntity);
+    }
+    m_editor.SelectedEntity = picked;
+    m_editor.SelectedGaussianSplat = pickedGaussian;
+    picking.completeInstancePick(completedRequestId);
 }
 
 void SceneEditor::prepareEditorFrame()
@@ -994,6 +1028,7 @@ void SceneEditor::onAnimateBegin(float& fElapsedTimeSeconds)
     // Consume render feedback before EditorUIAnimate so the material panel
     // reflects the completed click in this logic/UI frame.
     consumeCompletedMaterialPickFeedback();
+    consumeCompletedInstancePickFeedback();
     m_captureScriptManager->preAnim(fElapsedTimeSeconds);
 
 #if CAUSTICA_WITH_PYTHON
@@ -1548,18 +1583,20 @@ void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const
     if (!m_app)
         return;
 
-    if (m_renderState.Picking.isCurrentInstanceRequest(renderedPick))
-    {
-        ecs::Entity picked = caustica::findEntityByInstanceIndex(*m_app, int(feedback.pickedInstanceIndex));
-        bool pickedGaussian = false;
-        if (picked == ecs::NullEntity)
-        {
-            picked = pickGaussianSplatAtPixel(renderedPick.Position);
-            pickedGaussian = (picked != ecs::NullEntity);
-        }
-        m_editor.SelectedEntity = picked;
-        m_editor.SelectedGaussianSplat = pickedGaussian;
-    }
+    if (!renderedPick.InstanceRequested)
+        return;
+
+    // Publish POD results for the logic thread. SelectedEntity is UI state and
+    // must not be mutated from the dedicated render thread.
+    m_completedInstancePickIndex.store(
+        int(feedback.pickedInstanceIndex),
+        std::memory_order_relaxed);
+    const uint64_t packedPosition = (uint64_t(renderedPick.Position.x) << 32u)
+        | uint64_t(renderedPick.Position.y);
+    m_completedInstancePickPosition.store(packedPosition, std::memory_order_relaxed);
+    m_completedInstancePickRequestId.store(
+        renderedPick.InstanceRequestId,
+        std::memory_order_release);
 }
 
 void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)

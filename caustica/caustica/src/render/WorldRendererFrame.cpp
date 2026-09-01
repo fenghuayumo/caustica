@@ -862,11 +862,43 @@ void caustica::render::WorldRenderer::mergeImmediateMaterialPick()
     m_frameRuntimeSnapshot.Picking.MaterialRequested = true;
 }
 
+void caustica::render::WorldRenderer::submitImmediateInstancePick(const RenderPickState& picking)
+{
+    if (!picking.InstanceRequested)
+        return;
+
+    const uint64_t packedPosition = (uint64_t(picking.Position.x) << 32u)
+        | uint64_t(picking.Position.y);
+    m_immediateInstancePickPosition.store(packedPosition, std::memory_order_relaxed);
+    m_immediateInstancePickRequestId.store(
+        picking.InstanceRequestId,
+        std::memory_order_release);
+}
+
+void caustica::render::WorldRenderer::mergeImmediateInstancePick()
+{
+    const uint64_t requestId = m_immediateInstancePickRequestId.load(std::memory_order_acquire);
+    const uint64_t completedId =
+        m_completedImmediateInstancePickRequestId.load(std::memory_order_acquire);
+    if (requestId <= completedId
+        || requestId <= m_frameRuntimeSnapshot.Picking.InstanceRequestId)
+        return;
+
+    const uint64_t packedPosition =
+        m_immediateInstancePickPosition.load(std::memory_order_relaxed);
+    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+        uint32_t(packedPosition >> 32u),
+        uint32_t(packedPosition & 0xffffffffu)};
+    m_frameRuntimeSnapshot.Picking.InstanceRequestId = requestId;
+    m_frameRuntimeSnapshot.Picking.InstanceRequested = true;
+}
+
 void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext& ctx)
 {
     // A click can arrive after this frame's Extract snapshot was captured. Merge
     // it at the last safe point before constants and ray dispatch are recorded.
     mergeImmediateMaterialPick();
+    mergeImmediateInstancePick();
 
     FrameConstants& constants = m_frameConstants;
     memset(&constants, 0, sizeof(constants));

@@ -43,6 +43,9 @@ struct EditorViewportState
     bool Hovered = false;
     bool Focused = false;
     bool RectValid = false;
+    // Toolbar / viewport popup ate the last UI hit-test. Input routing uses this
+    // with the canvas rect so a leftover ImGui hover window cannot steal picks.
+    bool OverlayHovered = false;
 };
 
 struct EditorWindowState

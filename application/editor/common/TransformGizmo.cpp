@@ -255,7 +255,9 @@ void caustica::editor::DrawInfiniteGrid(const TransformGizmoContext& ctx)
     if (!viewportWindow || !viewportWindow->Active || viewportWindow->Hidden)
         return;
 
-    ImGuizmo::BeginFrame();
+    // Do not call BeginFrame() here: it creates a fullscreen NoInputs "gizmo"
+    // window that steals ImGui hover from Viewport and makes ImGuizmo::IsOver()
+    // true across the canvas (blocking left-click pick when nothing is selected).
     ImDrawList* drawList = viewportWindow->DrawList;
     ImGuizmo::SetDrawlist(drawList);
     ImGuizmo::SetAlternativeWindow(viewportWindow);

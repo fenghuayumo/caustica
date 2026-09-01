@@ -157,6 +157,7 @@ public:
     [[nodiscard]] const RenderPickState& getLastRenderedPicking() const { return m_lastRenderedPicking; }
     // Logic-thread fast path for latency-sensitive editor clicks.
     void submitImmediateMaterialPick(const RenderPickState& picking);
+    void submitImmediateInstancePick(const RenderPickState& picking);
     const DeltaTreeVizPathVertex* getDebugDeltaPathTree() const { return m_debugDeltaPathTree; }
 
     std::vector<DebugLineStruct>& getCpuSideDebugLines() { return m_cpuSideDebugLines; }
@@ -184,6 +185,7 @@ private:
     void populateRenderFrameContext(caustica::rhi::Framebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
     void mergeImmediateMaterialPick();
+    void mergeImmediateInstancePick();
     [[nodiscard]] FrameGraphContext makeFrameGraphContext(RenderFrameContext& ctx);
     void framePassSetup(PathTracingFrameContext& ctx);
     void framePassEnsureRenderTargets(PathTracingFrameContext& ctx);
@@ -274,6 +276,9 @@ private:
     std::atomic<uint64_t>                       m_immediateMaterialPickPosition{0};
     std::atomic<uint64_t>                       m_immediateMaterialPickRequestId{0};
     std::atomic<uint64_t>                       m_completedImmediateMaterialPickRequestId{0};
+    std::atomic<uint64_t>                       m_immediateInstancePickPosition{0};
+    std::atomic<uint64_t>                       m_immediateInstancePickRequestId{0};
+    std::atomic<uint64_t>                       m_completedImmediateInstancePickRequestId{0};
     bool                                        m_frameGaussianSplatTemporalReset = false;
 
     caustica::rhi::BufferHandle                         m_feedback_Buffer_Gpu;
