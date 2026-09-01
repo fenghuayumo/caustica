@@ -5,12 +5,14 @@
 #include "EditorAccess.h"
 #include <engine/SceneQuery.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/CameraApi.h>
 #include <core/task/TaskRuntime.h>
 #include "common/ImGuiManager.h"
 
 #include <render/core/PathTracerSettings.h>
 #include <core/vfs/VFS.h>
 #include <scene/SceneTypes.h>
+#include <scene/SceneCameraAccess.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
@@ -32,6 +34,38 @@ using namespace caustica::editor;
 
 namespace caustica::editor
 {
+
+namespace
+{
+// Scene cameras may carry glTF exposure / tone-map metadata. The camera update
+// system applies that metadata every frame, so mirror editor overrides back to
+// the active camera rather than letting the next update undo the UI change.
+void syncToneMappingToActiveSceneCamera(SceneEditor& sceneEditor, const ToneMappingParameters& params)
+{
+    auto& app = editorApp(sceneEditor);
+    const uint32_t selectedCamera = caustica::selectedCameraIndex(app);
+    if (selectedCamera == 0)
+        return; // Free camera: PathTracerSettings is the authoritative source.
+
+    const auto& cameras = caustica::sceneCameraEntities(app);
+    const size_t index = size_t(selectedCamera - 1);
+    auto* entityWorld = caustica::entityWorld(app);
+    if (!entityWorld || index >= cameras.size())
+        return;
+
+    auto* camera = caustica::scene::tryGetCamera(entityWorld->world(), cameras[index]);
+    auto* perspective = camera ? caustica::scene::tryGetPerspectiveCameraData(*camera) : nullptr;
+    if (!perspective)
+        return;
+
+    perspective->enableAutoExposure = params.autoExposure;
+    perspective->toneMapOperator = tonemapOperatorToString.at(params.toneMapOperator);
+    perspective->exposureCompensation = params.exposureCompensation;
+    perspective->exposureValue = params.exposureValue;
+    perspective->exposureValueMin = params.exposureValueMin;
+    perspective->exposureValueMax = params.exposureValueMax;
+}
+} // namespace
 
 void EditorUI::BuildOpacityMicroMapsPanel(const PanelLayout& layout)
 {
@@ -118,7 +152,8 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
     if (ImGui::CollapsingHeader("Tone Mapping", ImGuiTreeNodeFlags_DefaultOpen))
     {
         RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
-        SettingsCheckbox("Enabled##ToneMapping", &m_settings.EnableToneMapping);
+        bool toneMappingChanged = false;
+        toneMappingChanged |= SettingsCheckbox("Enabled##ToneMapping", &m_settings.EnableToneMapping);
 
         const std::string currentOperator =
             tonemapOperatorToString.at(m_settings.ToneMappingParams.toneMapOperator);
@@ -128,21 +163,24 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
             {
                 const bool is_selected = it->first == m_settings.ToneMappingParams.toneMapOperator;
                 if (ImGui::Selectable(it->second.c_str(), is_selected))
+                {
                     m_settings.ToneMappingParams.toneMapOperator = it->first;
+                    toneMappingChanged = true;
+                }
             }
             SettingsEndCombo();
         }
 
         SettingsCategoryHeader("Exposure");
-        SettingsCheckbox("Auto Exposure", &m_settings.ToneMappingParams.autoExposure);
+        toneMappingChanged |= SettingsCheckbox("Auto Exposure", &m_settings.ToneMappingParams.autoExposure);
 
         if (m_settings.ToneMappingParams.autoExposure)
         {
-            SettingsInputFloat("Minimum EV", &m_settings.ToneMappingParams.exposureValueMin);
+            toneMappingChanged |= SettingsInputFloat("Minimum EV", &m_settings.ToneMappingParams.exposureValueMin);
             m_settings.ToneMappingParams.exposureValueMin = dm::min(
                 m_settings.ToneMappingParams.exposureValueMax,
                 m_settings.ToneMappingParams.exposureValueMin);
-            SettingsInputFloat("Maximum EV", &m_settings.ToneMappingParams.exposureValueMax);
+            toneMappingChanged |= SettingsInputFloat("Maximum EV", &m_settings.ToneMappingParams.exposureValueMax);
             m_settings.ToneMappingParams.exposureValueMax = dm::max(
                 m_settings.ToneMappingParams.exposureValueMin,
                 m_settings.ToneMappingParams.exposureValueMax);
@@ -156,53 +194,56 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
             {
                 const bool is_selected = it->first == m_settings.ToneMappingParams.exposureMode;
                 if (ImGui::Selectable(it->second.c_str(), is_selected))
+                {
                     m_settings.ToneMappingParams.exposureMode = it->first;
+                    toneMappingChanged = true;
+                }
             }
             SettingsEndCombo();
         }
 
-        SettingsInputFloat("Compensation", &m_settings.ToneMappingParams.exposureCompensation);
+        toneMappingChanged |= SettingsInputFloat("Compensation", &m_settings.ToneMappingParams.exposureCompensation);
         m_settings.ToneMappingParams.exposureCompensation =
             dm::clamp(m_settings.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
 
-        SettingsInputFloat("Exposure Value", &m_settings.ToneMappingParams.exposureValue);
+        toneMappingChanged |= SettingsInputFloat("Exposure Value", &m_settings.ToneMappingParams.exposureValue);
         m_settings.ToneMappingParams.exposureValue = dm::clamp(
             m_settings.ToneMappingParams.exposureValue,
             dm::log2f(0.1f * 0.1f * 0.1f),
             dm::log2f(100000.f * 100.f * 100.f));
 
-        SettingsInputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
+        toneMappingChanged |= SettingsInputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
         m_settings.ToneMappingParams.filmSpeed =
             dm::clamp(m_settings.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
 
-        SettingsInputFloat("F-Number", &m_settings.ToneMappingParams.fNumber);
+        toneMappingChanged |= SettingsInputFloat("F-Number", &m_settings.ToneMappingParams.fNumber);
         m_settings.ToneMappingParams.fNumber =
             dm::clamp(m_settings.ToneMappingParams.fNumber, 0.1f, 100.0f);
 
-        SettingsInputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
+        toneMappingChanged |= SettingsInputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
         m_settings.ToneMappingParams.shutter =
             dm::clamp(m_settings.ToneMappingParams.shutter, 0.1f, 10000.0f);
 
         SettingsCategoryHeader("White Balance");
-        SettingsCheckbox("Enabled##WhiteBalance", &m_settings.ToneMappingParams.whiteBalance);
+        toneMappingChanged |= SettingsCheckbox("Enabled##WhiteBalance", &m_settings.ToneMappingParams.whiteBalance);
 
-        SettingsInputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
+        toneMappingChanged |= SettingsInputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
         m_settings.ToneMappingParams.whitePoint =
             dm::clamp(m_settings.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
 
-        SettingsInputFloat("Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
+        toneMappingChanged |= SettingsInputFloat("Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
         m_settings.ToneMappingParams.whiteMaxLuminance =
             dm::clamp(m_settings.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
 
-        SettingsInputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
+        toneMappingChanged |= SettingsInputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
         m_settings.ToneMappingParams.whiteScale =
             dm::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
 
-        SettingsCheckbox("Clamp", &m_settings.ToneMappingParams.clamped);
+        toneMappingChanged |= SettingsCheckbox("Clamp", &m_settings.ToneMappingParams.clamped);
 
         SettingsCategoryHeader("Camera LUT");
-        SettingsCheckbox("Enabled##CameraLut", &m_settings.ToneMappingParams.cameraLutEnabled);
-        SettingsCheckbox("After Tone Map", &m_settings.ToneMappingParams.cameraLutAfterToneMap);
+        toneMappingChanged |= SettingsCheckbox("Enabled##CameraLut", &m_settings.ToneMappingParams.cameraLutEnabled);
+        toneMappingChanged |= SettingsCheckbox("After Tone Map", &m_settings.ToneMappingParams.cameraLutAfterToneMap);
         const std::string currentPreset =
             CameraLutPresetToString.at(m_settings.ToneMappingParams.cameraLutPreset);
         if (SettingsBeginCombo("Preset", currentPreset.c_str()))
@@ -213,7 +254,10 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
                     continue;
                 const bool selected = preset.first == m_settings.ToneMappingParams.cameraLutPreset;
                 if (ImGui::Selectable(preset.second.c_str(), selected))
+                {
                     m_settings.ToneMappingParams.applyCameraLutPreset(preset.first);
+                    toneMappingChanged = true;
+                }
             }
             SettingsEndCombo();
         }
@@ -225,13 +269,24 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
                 std::string error;
                 if (!m_settings.ToneMappingParams.loadCameraLut(picked, &error))
                     caustica::warning("Failed to load camera LUT '%s': %s", picked.c_str(), error.c_str());
+                else
+                    toneMappingChanged = true;
             }
         }
         ImGui::SameLine();
         if (ImGui::Button("Clear##CameraLut"))
+        {
             m_settings.ToneMappingParams.clearCameraLut();
+            toneMappingChanged = true;
+        }
         if (!m_settings.ToneMappingParams.cameraLutPath.empty())
             ImGui::TextWrapped("%s", m_settings.ToneMappingParams.cameraLutPath.c_str());
+
+        if (toneMappingChanged)
+        {
+            syncToneMappingToActiveSceneCamera(m_sceneEditor, m_settings.ToneMappingParams);
+            m_settings.ResetAccumulation = true;
+        }
     }
 
     if (ImGui::CollapsingHeader("Late (LDR)", ImGuiTreeNodeFlags_DefaultOpen))
