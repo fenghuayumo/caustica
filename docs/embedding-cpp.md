@@ -192,15 +192,15 @@ Prefer system parameters, then focused application headers:
 | `Commands` (system param) | Deferred edits on `App::world()`. `spawn()` is raw ECS — not a scene node. |
 | `SceneTransforms` (system param) | Local transform writes only, safe to run in parallel. |
 | `Query<...>` (system param) | Bevy-style `each` over `App::world()` (`Changed<>` / `With<>` supported). |
-| `engine/SceneQuery.h` | `entityWorld`, load status, materials, entity lookup (no diggable `Scene*`). |
-| `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, and `despawn`. |
+| `engine/SceneQuery.h` | `entityWorld`, load status (`sceneLoadStatus`), materials, entity lookup, `gameSettings` / `importedModels` / `sceneTypeFactory` (no diggable `Scene*`). |
+| `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, `despawn`, plus spawn lights / rect-light visuals. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
 | `engine/MeshDeformApi.h` | Vertex reads/deformation and geometry-sequence playback (entity + MeshHandle only). |
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
-| `engine/CameraApi.h` | Camera selection state, pose, FOV, and intrinsics. |
-| `engine/SceneLifecycle.h` | Scene selection/reload operations. |
-| `engine/RenderSessionApi.h` | Session-level render controls. |
+| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. |
+| `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene`. |
+| `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles, `shaderFactory`. |
 | `engine/RenderFrameApi.h` | Accumulation and rendered-frame access. |
 
 Bundle spawn example (plain component emplace; Extract/refresh syncs resource lists):
@@ -287,6 +287,9 @@ The official sample links the engine and RHI targets:
 add_executable(my_caustica_host Main.cpp)
 target_link_libraries(my_caustica_host PRIVATE causEngine caustica_rhi)
 ```
+
+`causEngine` does not link ImGui. The editor (`causticaApp`) links `causImgui`;
+a headless or `EngineApp` host should not.
 
 It also depends on the shader targets and copies optional runtime payloads.
 Use the `caustica_thin_client` block in `caustica/CMakeLists.txt` as the

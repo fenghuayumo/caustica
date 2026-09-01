@@ -89,7 +89,9 @@ Game/render split above is necessary but not sufficient for parallel GPU recordi
 
 Prefer these for application / Python / editor scene edits (no WorldRenderer / AS words):
 
-- `SceneSpawn.h` - `load` / `spawn` / `despawn`
+- `SceneSpawn.h` - `load` / `spawn` / `despawn` / spawn lights
+- `SceneQuery.h` - `entityWorld`, load status, `gameSettings` / `importedModels` / `sceneTypeFactory`
+- `CameraApi.h` / `RenderSessionApi.h` - camera input, picking, pass handles, `shaderFactory`
 - `SceneTransform.h` - local transform / translation / visibility
 - `MeshDeformApi.h` - mesh deform / geometry sequence (`MeshDeformOptions`) via **entity** only
 - `MeshHandle` / `MaterialHandle` + `MeshInstanceComponent::meshHandle()` — app asset identity
@@ -219,7 +221,7 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | TaskGraph | `task::TaskEvent` / `task::TaskGraph` DAG authoring over TaskRuntime |
 | SceneSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
-| Scene query path | Apps use `entityWorld` / lifecycle only; engine+editor use `internal/ActiveSceneAccess` (`activeScene`) — not `gpu->sceneManager()->getScene()` |
+| Scene query path | Apps and editor use `entityWorld` / `SceneQuery` / lifecycle — not `Scene*` or `gpu->sceneManager()->getScene()`. `internal/ActiveSceneAccess` (`activeScene`) is engine-internal |
 | `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
 | Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
 | Camera wrappers | Interactive side effects live on `CameraController::bindSideEffects` |

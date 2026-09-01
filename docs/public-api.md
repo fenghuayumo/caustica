@@ -25,7 +25,7 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 | `engine/App.h` | Schedule runtime; prefer not to construct `App` yourself |
 | `engine/SceneSpawn.h` | `load` / `spawn` / `spawnFromFile` / `despawn` / spawn lights |
 | `engine/SceneTransform.h` | App-based transform / visibility |
-| `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, game settings / imported models |
+| `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, `gameSettings` / `importedModels` / `sceneTypeFactory` |
 | `engine/ActiveScene.h` | Name/path/generation metadata only (no `Scene*` digs) |
 | `engine/MeshDeformApi.h` | Entity + MeshHandle deform / geometry sequence |
 | `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities |
