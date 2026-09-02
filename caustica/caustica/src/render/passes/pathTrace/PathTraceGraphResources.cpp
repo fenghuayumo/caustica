@@ -45,6 +45,8 @@ PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, Rende
         .secondarySurfaceRadiance = graph.importTexture(
             targets.secondarySurfaceRadiance,
             rg::TextureAccess::UnorderedAccess),
+        .sensorNormalDepth = graph.importTexture(targets.sensorNormalDepth, rg::TextureAccess::UnorderedAccess),
+        .sensorIds = graph.importTexture(targets.sensorIds, rg::TextureAccess::UnorderedAccess),
     };
 }
 
@@ -80,6 +82,8 @@ void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTa
     setup.write(handles.roughnessMetal, rg::TextureAccess::UnorderedAccess);
     setup.write(handles.materialInfo, rg::TextureAccess::UnorderedAccess);
     setup.write(handles.surfaceDataBuffer, rg::BufferAccess::UnorderedAccess);
+    setup.write(handles.sensorNormalDepth, rg::TextureAccess::UnorderedAccess);
+    setup.write(handles.sensorIds, rg::TextureAccess::UnorderedAccess);
 }
 
 PathTraceLightingEndTargets importPathTraceLightingEndTargets(

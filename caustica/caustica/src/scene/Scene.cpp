@@ -6,6 +6,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneAnimation.h>
 #include <scene/SceneAnimationAccess.h>
+#include <scene/SceneSemanticIds.h>
 #include <scene/loader/GltfImporter.h>
 #include <scene/loader/ObjImporter.h>
 #include <scene/loader/CausUsdImporter.h>
@@ -1179,6 +1180,25 @@ void Scene::attachLeafFromJson(
             world.setCamera(entity, std::move(*component));
         else
             caustica::warning("Failed to build camera leaf type '%s'.", type.c_str());
+        return;
+    }
+
+    if (type == "SemanticLabel")
+    {
+        uint32_t instanceId = 0;
+        uint32_t semanticId = 0;
+        std::string semanticLabel;
+        const Json::Value& instanceNode = src.isMember("instance_id") ? src["instance_id"] : src["instanceId"];
+        const Json::Value& semanticNode = src.isMember("semantic_id") ? src["semantic_id"] : src["semanticId"];
+        const Json::Value& classNode = src.isMember("class") ? src["class"]
+            : (src.isMember("semantic_label") ? src["semantic_label"] : src["semanticLabel"]);
+        if (instanceNode.isUInt() || instanceNode.isInt())
+            instanceId = instanceNode.asUInt();
+        if (semanticNode.isUInt() || semanticNode.isInt())
+            semanticId = semanticNode.asUInt();
+        if (classNode.isString())
+            semanticLabel = classNode.asString();
+        scene::setSemanticLabel(world.world(), entity, instanceId, semanticId, std::move(semanticLabel));
         return;
     }
 

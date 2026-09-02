@@ -656,6 +656,13 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     caustica::rhi::Framebuffer* framebuffer = ctx.framebuffer;
 
     syncCameraViews();
+    if (m_context->frameScene && m_context->frameScene->previousCamera)
+    {
+        m_context->camera.setPreviousViewFromCameraProxy(
+            *m_context->frameScene->previousCamera,
+            m_renderSize,
+            m_displayAspectRatio);
+    }
     {
         const ViewportDesc viewport = m_context->camera.view()->getViewport();
         float2 jitter = m_context->camera.view()->getPixelOffset();

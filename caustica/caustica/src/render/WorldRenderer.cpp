@@ -268,6 +268,8 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(85));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(86));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(87));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(88));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(89));
 
     m_bindingLayout = gpuDevice->createBindingLayout(globalBindingLayoutDesc);
 }
@@ -1003,6 +1005,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(86, m_context->renderDevice.builtins().whiteTexture()));  // t_GTAOOutput placeholder
         // Previous frame depth (default to black = zero depth; overridden by AddCustomBindings)
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(88, m_renderTargets->sensorNormalDepth));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(89, m_renderTargets->sensorIds));
 
         caustica::rhi::BindingSetHandle bindingSet =
             device()->createBindingSet(bindingSetDesc, m_bindingLayout);

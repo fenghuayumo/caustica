@@ -37,6 +37,8 @@ struct PathTraceGraphTargets
     rg::BufferHandle surfaceDataBuffer;
     rg::TextureHandle secondarySurfacePositionNormal;
     rg::TextureHandle secondarySurfaceRadiance;
+    rg::TextureHandle sensorNormalDepth;
+    rg::TextureHandle sensorIds;
 };
 
 struct PathTraceLightingEndTargets

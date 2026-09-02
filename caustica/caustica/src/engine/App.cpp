@@ -741,6 +741,44 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     return ok;
 }
 
+bool App::extractAndRenderFrozenFrame()
+{
+    GpuDevice* gpuDevice = device();
+    if (!gpuDevice || gpuDevice->isShuttingDown())
+        return false;
+
+    waitForRenderThreadIdle();
+
+    const double curTime = GetNow();
+    SystemContext scheduleContext{
+        *this,
+        m_world,
+        gpuDevice,
+        0.f,
+        gpuDevice->getFrameIndex(),
+        true,
+        true,
+    };
+    scheduleContext.elapsedTime = 0.0;
+    scheduleContext.currentTime = curTime;
+    scheduleContext.runUpdate = false;
+    scheduleContext.runRender = !skipRenderPhase();
+    if (!scheduleContext.runRender)
+        return false;
+
+    runSchedule(AppSchedule::Extract, scheduleContext);
+    if (scheduleContext.abortFrame)
+        return false;
+    if (!dispatchScheduledRender(scheduleContext))
+        return false;
+
+    waitForRenderThreadIdle();
+    // A sensor product is another view of the already-simulated tick.  In
+    // particular, do not advance the device frame clock here: doing so changes
+    // the frame identity seen by later products even though no simulation ran.
+    return true;
+}
+
 bool App::runFrame(std::optional<double> elapsedTimeOverride)
 {
     GpuDevice* gpuDevice = device();

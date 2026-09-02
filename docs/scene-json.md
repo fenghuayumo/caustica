@@ -184,6 +184,7 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `PerspectiveCamera` / `PerspectiveCameraEx` | 透视相机。 |
 | `OrthographicCamera` | 正交相机。 |
 | `GaussianSplat` | 3DGS PLY。 |
+| `SemanticLabel` | 稳定 `instance_id` / `semantic_id`，供传感器 AOV 与物理实体对齐。 |
 | `MaterialOverride` | 显式材质资产。 |
 | `GameSettings` | 编辑器 `game/` 层原始 JSON。 |
 
@@ -411,6 +412,26 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 - `gaussian_splat_scale`、`gaussian_splat_alpha_scale`、`gaussian_splat_brightness` 等会话级外观现在可以写入顶层 `settings.gaussianSplat`，Save Scene 会把 Inspector 里的 Footprint / Alpha / Brightness 等存回去。
 - 节点 Transform 控制对象整体位置、旋转、缩放。
 - 当前 RTX/path-tracing splat shadow 资源槽仍以第一个启用的 3DGS 对象为主要 shadow source。
+
+### `SemanticLabel`
+
+给网格、URDF link 等渲染实体写稳定标识，使每帧 `instance_id` / `semantic_id` AOV 能对上物理实体或数据集 object ID。`0` 在 AOV 中表示 miss / unlabeled，不要手工指定 `instance_id = 0`。
+
+```json
+"SemanticLabel": {
+  "instance_id": 42,
+  "semantic_id": 7,
+  "class": "cube"
+}
+```
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `instance_id` / `instanceId` | uint | 可选。非 0 时写入 instance AOV。省略或 `0` 时对 `entities[].id`、路径或名字做 FNV-1a（结果不为 0）。 |
+| `semantic_id` / `semanticId` | uint | 可选。非 0 时写入 semantic AOV。省略或 `0` 且没有 `class` 时输出 0（unlabeled）。 |
+| `class` / `semantic_label` / `semanticLabel` | string | 可选类别名。`semantic_id` 为 0 时对其哈希。 |
+
+运行时读写见 [caustica.md — Sensor output](../caustica.md#sensor-output--aov)。
 
 ## `settings`
 

@@ -50,6 +50,10 @@ Texture2D<float>                        t_DepthHierarchy                : regist
 // SSR result UAV
 RWTexture2D<float4>                     u_SSRResult                     : register(u85);  // SSR output (rgb=color, a=confidence)
 
+// Sensor / AOV outputs for robotics (linear view-Z meters, camera-space normal, stable IDs)
+RWTexture2D<float4>                     u_SensorNormalDepth             : register(u88); // xyz camera-space normal, w = |view Z|
+RWTexture2D<uint2>                      u_SensorIds                     : register(u89); // x = instance_id, y = semantic_id
+
 // Ambient occlusion output consumed by deferred lighting
 Texture2D<float>                        t_GTAOOutput                    : register(t86);
 

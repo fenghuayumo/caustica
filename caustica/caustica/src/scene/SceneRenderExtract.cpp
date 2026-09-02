@@ -3,6 +3,7 @@
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/SceneSemanticIds.h>
 #include <scene/internal/RenderResourceAccess.h>
 
 using caustica::scene::internal::RenderResourceAccess;
@@ -27,6 +28,7 @@ void FrameDynamicPacket::clear()
     cameras.clear();
     gaussianSplats.clear();
     camera = {};
+    previousCamera.reset();
     renderSettings = {};
     meshInstanceEntities.clear();
     skinnedMeshInstanceEntities.clear();
@@ -148,6 +150,8 @@ void FillMeshInstanceProxy(
     proxy.leafContent = ref.content->leafContent;
     proxy.proxiedAnalyticLight = ref.meshComp->proxiedAnalyticLight;
     proxy.parentLightEntity = ecs::NullEntity;
+    proxy.instanceId = resolveInstanceId(world, ref.entity);
+    proxy.semanticId = resolveSemanticId(world, ref.entity);
 
     if (const auto* parent = world.get<ParentComponent>(ref.entity);
         parent && ecs::isValid(parent->parent) && hasAnyLightComponent(world, parent->parent))
@@ -219,6 +223,8 @@ bool ExtractMeshInstancesTransforms(ecs::World& world, SceneRenderData& inout)
     {
         if (const auto* meshComp = world.tryGet<MeshInstanceComponent>(proxy.entity))
             proxy.enabled = meshComp->enabled;
+        proxy.instanceId = resolveInstanceId(world, proxy.entity);
+        proxy.semanticId = resolveSemanticId(world, proxy.entity);
     }
     return true;
 }
@@ -763,6 +769,10 @@ void extractFrameRenderState(const FrameExtractInputs& inputs, SceneRenderData& 
     // Pure copy — free vs scene resolve runs in ResolveActiveCamera (PostUpdate).
     if (inputs.activeCamera)
         out.camera = *inputs.activeCamera;
+    if (inputs.previousCamera)
+        out.previousCamera = *inputs.previousCamera;
+    else
+        out.previousCamera.reset();
 }
 
 } // namespace caustica::scene

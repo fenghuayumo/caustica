@@ -64,6 +64,7 @@ Schedule internals: [docs/embedding-cpp.md](docs/embedding-cpp.md) · header all
 - [Scene](#scene)
 - [SceneEntity](#sceneentity)
 - [Camera](#camera)
+- [Sensor output / AOV](#sensor-output--aov)
 - [Materials](#materials)
 - [Lights](#lights)
 - [Spawn / despawn](#spawn--despawn)
@@ -1004,6 +1005,11 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 | `setActiveCamera(entity)` | `use_camera(entity)` | `bool` / `None` | `NullEntity` / `None` returns to the free camera. C++ returns `false` on failure; Python raises on failure. |
 | `setActiveCameraByPath(path)` | `use_camera_path(path)` | `bool` / `None` | Select a registered scene camera by hierarchy path. |
 | `saveCurrentCamera()` / `loadCurrentCamera()` | `save_current_camera()` / `load_current_camera()` | `void` | Persistence path used by the host. |
+| `addRenderProduct(desc)` | `add_render_product(name, camera=None, aovs=Aov.all)` | `bool` / `None` | Register a named camera + AOV set. `camera=None` is the active camera. |
+| `removeRenderProduct(name)` / `clearRenderProducts()` | `remove_render_product` / `clear_render_products` | `bool` / `void` | |
+| `readSensorOutput(aovs=Aov::All)` | `read_sensor_output(aovs=Aov.all)` | `SensorOutput` | AOVs for the camera that was just rendered. |
+| `captureSensorOutputs()` | `capture_sensor_outputs()` | `vector` / `list[SensorOutput]` | Every registered RenderProduct at the current physical time. Extra cameras re-render without stepping simulation or advancing the device frame clock. |
+| `setEntitySemanticLabel(entity, instanceId, semanticId, label)` | `SceneEntity.instance_id` / `.semantic_id` / `.semantic_label` | `bool` / `None` | Stable ids for AOV alignment. |
 
 Per-scene-camera C++ helpers are on `CameraApi.h` (`setSceneCameraVerticalFOV`, `setSceneCameraLookTo`, `setSceneCameraIntrinsics`, …) and take `App&` plus `ecs::Entity`. Python uses the same operations as properties / methods on `SceneEntity`.
 
@@ -1124,6 +1130,9 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | `mesh_handle` | `MeshHandle` | Asset identity. |
 | `is_mesh` | `bool` | Has a mesh instance. |
 | `is_camera` | `bool` | Has a `CameraComponent`. |
+| `instance_id` | `int` | Stable instance AOV id. `0` auto-hashes authoring id / path. |
+| `semantic_id` | `int` | Class AOV id. `0` = unlabeled unless `semantic_label` is set. |
+| `semantic_label` | `str` | Optional class name (`SemanticLabel.class`). |
 | `is_light` | `bool` | Has a typed light component. |
 | `light_type` | `int` / `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment`. |
 | `translation` | `(x,y,z)` | Local. Each assign refreshes the hierarchy; prefer `set_local_pose` for a full TRS. |
@@ -1331,6 +1340,48 @@ engine->setActiveCamera(wrist);
 ```
 
 `CameraPose` is `{ position, direction, up }` in the same look-to space as Python `camera_pose`.
+
+## Sensor output / AOV
+
+RGB, linear depth, camera-space normals, stable instance/semantic IDs, and motion vectors for Caelis Sim and other hosts. Multiple `RenderProduct`s can be captured at the **same physical time** without stepping simulation.
+
+| AOV | Format | Convention |
+| --- | --- | --- |
+| RGB | RGBA8 | Same LDR as `save_screenshot` |
+| Depth | float32 `H×W` | Linear **\|view Z\|** in meters; **0 = miss** |
+| Normal | float32 `H×W×3` | **Camera / view space**; background 0 |
+| Instance ID | uint32 `H×W` | **0 = miss**; never auto-assigned 0 |
+| Semantic ID | uint32 `H×W` | **0 = unlabeled / miss** |
+| Motion | float32 `H×W×2` | Screen-space pixel motion |
+| Segmentation | | Alias of instance ID |
+
+`depth == 0` means a camera-ray miss (including the environment); it is not a far-plane value. `normal`, `instance_id`, and `semantic_id` are also zero on a miss.
+
+Motion uses the current camera view minus that camera's previous captured view, in pixels. Caustica keeps history **per camera entity**, so switching between wrist, third-person, and stereo cameras does not leak one camera's history into another. The first captured frame for a camera has zero camera motion; object motion remains available when the renderer has a previous transform.
+
+`engine.render()` fills these on `Frame`. To capture wrist / third-person / stereo together, register products then call `capture_sensor_outputs()` after `step_frame()`:
+
+```python
+wrist = engine.find_entity("wrist")
+third = engine.find_entity("third_person")
+engine.add_render_product("wrist", wrist, caustica.Aov.all)
+engine.add_render_product("third", third, caustica.Aov.rgb | caustica.Aov.depth)
+engine.step_frame()
+for product in engine.capture_sensor_outputs():
+    depth = product.depth   # NumPy (H, W) float32
+    inst = product.instance_id
+```
+
+```cpp
+engine->addRenderProduct({ .name = "wrist", .camera = wrist, .aovs = uint32_t(caustica::Aov::All) });
+engine->stepFrame();
+for (const caustica::SensorOutput& product : engine->captureSensorOutputs())
+    (void)product.depth;
+```
+
+Stable IDs: set `SceneEntity.instance_id` / `semantic_id` / `semantic_label`, or author `SemanticLabel` in scene JSON. Auto instance IDs hash `entities[].id`, then the entity path. Dataset alignment should set IDs explicitly, both to make object/URDF-link correspondence explicit and to avoid an authoring-name hash collision. Details: [docs/scene-json.md](docs/scene-json.md#semanticlabel). Extra views override `ResolvedActiveCamera` for one frozen Extract+Render while preserving per-camera motion history.
+
+Orthographic cameras are not valid RenderProduct cameras.
 
 ## Materials
 
@@ -1719,6 +1770,7 @@ Arithmetic: `int(enum_value)` works and enum values can be assigned to int-backe
 | `OidnQuality` | `Fast=0`, `Balanced=1`, `High=2` |
 | `TextureSlot` | `Base`, `ORM` / `OcclusionRoughnessMetallic`, `Normal`, `CoatNormal`, `Emissive`, `Transmission` |
 | `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment` |
+| `Aov` | `none`, `rgb`, `depth`, `normal`, `instance_id`, `semantic_id`, `motion_vector`, `segmentation` (= instance_id), `all` |
 | `GaussianSplatSortMode` | `GpuSort=0`, `StochasticSplats=1` |
 | `GaussianSplatPrimaryMethod` | `GS=0` (3DGS), `GUT=1` (3DGUT) |
 | `GaussianSplatStorageFormat` | `Float32=0`, `Float16=1`, `Uint8=2` |
@@ -1745,8 +1797,9 @@ Python-only EngineApp sugar, plus `GpuDevice` and `Frame`. Module functions are 
 | `step_until_accumulated(max_frames=0)` | Step until `accumulation_completed`. |
 | `get_pixels()` | NumPy `(H, W, 4)` uint8 RGBA. Requires NumPy. Extension. |
 | `read_ldr_framebuffer()` | `Framebuffer` (raw bytes). Extension. |
-| `render(dt=-1.0)` | `step_frame` then `Frame`. Extension. |
+| `render(dt=-1.0)` | `step_frame` then `Frame` (RGB + AOVs). Extension. |
 | `render_reference(spp=64, oidn=True)` | Accumulate then `Frame`. Extension. |
+| `capture_sensor_outputs()` | `list[SensorOutput]` for registered RenderProducts. |
 | `render_reference_frame` / `render_realtime_frame` | Shared with embed; return a frame count, not a `Frame`. |
 | `deform_mesh` / `deform_mesh_world` | Callback `(index, (x,y,z)) -> triple or None`. |
 | `with EngineApp.create(...)` | Calls `shutdown()` on exit. |
@@ -1782,7 +1835,11 @@ LDR final color after at least one successful step. Tightly packed **RGBA8**, ro
 | `rgb` | NumPy `(H, W, 4)` uint8 |
 | `pixels` | `bytes` |
 | `width`, `height`, `channels` | |
-| `depth`, `segmentation` | Reserved (`None`) |
+| `depth` | NumPy `(H, W)` float32 linear \|view Z\| meters; `None` if empty |
+| `normal` | NumPy `(H, W, 3)` float32 camera-space; `None` if empty |
+| `instance_id` / `segmentation` | NumPy `(H, W)` uint32; `0` = miss |
+| `semantic_id` | NumPy `(H, W)` uint32; `0` = unlabeled / miss |
+| `motion_vector` | NumPy `(H, W, 2)` float32 pixels; `None` if empty |
 
 `Framebuffer` (from `read_ldr_framebuffer` / C++ `LdrFramebuffer`):
 

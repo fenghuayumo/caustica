@@ -714,9 +714,7 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     // World pos and prev world pos
     float3 posW     = mul(bridgeGS.instance.transform, float4(bridgeGS.objectSpacePosition, 1.0)).xyz;
 
-#if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
     float3 prevPosW = mul(bridgeGS.instance.prevTransform, float4(bridgeGS.prevObjectSpacePosition, 1.0)).xyz;
-#endif
 
     // transpose is to go from row_major to column_major; it is likely unnecessary here since both should work the same for this specific function, but leaving in for correctness
     float coneTexLODValue = computeRayConeTriangleLODValue( bridgeGS.vertexPositions, bridgeGS.vertexTexcoords, transpose((float3x3)bridgeGS.instance.transform) );
@@ -1008,10 +1006,9 @@ static PathTracer::SurfaceData Bridge::loadSurface( const uint instanceIndex, co
     //ConstructONB( ptShadingData.N, ptShadingData.T, ptShadingData.B );
 
     PathTracer::SurfaceData ret = PathTracer::SurfaceData::make(/*ptVertex, */ptShadingData, bsdf, 
-#if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
-                                    prevPosW, 
-#endif
+                                    prevPosW,
                                     matIoR, neeTriangleLightIndex, neeAnalyticLightIndex);
+    ret.instanceIndex = instanceIndex;
 
 #if ENABLE_DEBUG_VIZUALISATIONS && !NON_PATH_TRACING_PASS
     if( debug.IsDebugPixel(pixelPos) && pathVertexIndex==1 && !debug.constants.exploreDeltaTree )
@@ -1470,6 +1467,8 @@ void Bridge::ExportSurfaceInit(uint2 pixelPos)
 {
     u_Depth[pixelPos] = 0;                  // this is a signal that data is invalid - there's (rare) cases where neither ExportSurface or ExportNonSurface get called
     u_SpecularHitT[pixelPos] = 0;           // it is common for this to be missing
+    u_SensorNormalDepth[pixelPos] = 0;
+    u_SensorIds[pixelPos] = 0;
     
     // u_MotionVectors[pixelPos] = float4( 0, 0, 0, 0 );   // this should not be strictly necessary as we already know from u_Depth[] that the signal is invalid
     // DebugPixel( pixelPos.xy, float4( 0.0.xxx, 1 ) ); 
@@ -1487,6 +1486,21 @@ void Bridge::ExportSurface(const PathState path, PathTracer::SurfaceData surface
     float4 clipPos = mul(float4(/*bridgedData.shadingData.posW*/virtualWorldPos, 1), g_Const.view.matWorldToClip);
     u_Depth[pixelPos] = clipPos.z / clipPos.w;
     u_Throughput[pixelPos] = Pack_R11G11B10_FLOAT(saturate(path.GetThp()));
+
+    float viewZ = mul(float4(virtualWorldPos, 1), g_Const.view.matWorldToView).z;
+    float3 normalV = mul((float3x3)g_Const.view.matWorldToView, surfaceData.shadingData.N);
+    float normalLen = length(normalV);
+    if (normalLen > 1e-8)
+        normalV /= normalLen;
+    u_SensorNormalDepth[pixelPos] = float4(normalV, abs(viewZ));
+
+    uint2 ids = uint2(0, 0);
+    if (surfaceData.instanceIndex != 0xFFFFFFFFu)
+    {
+        InstanceData inst = t_InstanceData[surfaceData.instanceIndex];
+        ids = uint2(inst.instanceId, inst.semanticId);
+    }
+    u_SensorIds[pixelPos] = ids;
     
 #if EXPORT_GBUFFER
     if (g_Const.ptConsts.useReSTIRDI || g_Const.ptConsts.useReSTIRGI || g_Const.ptConsts.useReSTIRPT)
@@ -1510,6 +1524,10 @@ void Bridge::ExportNonSurface(const PathState path, float3 virtualWorldPos, floa
     float4 clipPos = mul(float4( /*bridgedData.shadingData.posW*/virtualWorldPos, 1), g_Const.view.matWorldToClip);
     u_Depth[pixelPos] = clipPos.z / clipPos.w;
     u_Throughput[pixelPos] = 0;
+    // Non-surfaces are camera-ray misses (typically the environment).  Preserve
+    // the sensor contract: depth == 0 and ids == 0 for a miss.
+    u_SensorNormalDepth[pixelPos] = 0;
+    u_SensorIds[pixelPos] = 0;
 
     //DebugPixel( pixelPos.xy, float4( 0, 0, 0.2, 1 ) );
 

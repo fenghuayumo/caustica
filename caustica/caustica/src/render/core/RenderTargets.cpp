@@ -67,6 +67,14 @@ void RenderTargets::init(
     desc.debugName = "screenMotionVectors";
     screenMotionVectors = device->createTexture(desc);
     desc.isRenderTarget = false;
+    desc.format = caustica::rhi::Format::RGBA32_FLOAT;
+    desc.debugName = "sensorNormalDepth";
+    sensorNormalDepth = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::RG32_UINT;
+    desc.debugName = "sensorIds";
+    sensorIds = device->createTexture(desc);
+
     desc.format = caustica::rhi::Format::RGBA16_FLOAT;
     desc.debugName = "denoiserMotionVectors";
     denoiserMotionVectors = device->createTexture(desc);

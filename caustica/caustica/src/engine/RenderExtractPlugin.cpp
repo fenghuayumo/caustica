@@ -4,6 +4,7 @@
 #include <engine/AppSchedules.h>
 #include <engine/RenderExtractScratch.h>
 #include <engine/ResolvedActiveCamera.h>
+#include <engine/SensorApi.h>
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
@@ -72,6 +73,13 @@ void beginExtractFrame(App& app)
 
     scratch.frameIndex = device->getPreparedRenderFrameIndex();
     scratch.frameInputs.activeCamera = &resolvedCamera->camera;
+    if (auto* sensorProducts = app.tryResource<RenderProductRegistry>();
+        sensorProducts && sensorProducts->pendingPreviousCamera)
+    {
+        scratch.frameInputs.previousCamera = *sensorProducts->pendingPreviousCamera;
+        // The override is scoped to precisely one frozen Extract.
+        sensorProducts->pendingPreviousCamera.reset();
+    }
     scratch.frameInputs.gaussianSplatTemporalReset =
         worldRendererResource->consumeGaussianSplatTemporalReset();
     scratch.frameInputs.settings = app.tryResource<PathTracerSettings>();

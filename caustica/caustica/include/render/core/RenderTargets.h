@@ -39,6 +39,8 @@ public:
     caustica::rhi::TextureHandle throughput;            // when using PSR we need to remember throughput after perfect speculars with color for RTXDI to know how to do its thing correctly
     caustica::rhi::TextureHandle depth;                 // exported by path tracer, used by TAA and others
     caustica::rhi::TextureHandle screenMotionVectors;   // screen space motion vectors, exported by path tracer, used by RTXDI, TAA and others
+    caustica::rhi::TextureHandle sensorNormalDepth;     // xyz camera-space normal, w = linear |view Z| meters
+    caustica::rhi::TextureHandle sensorIds;             // RG32UINT: R = instance_id, G = semantic_id
 
     caustica::rhi::TextureHandle denoiserViewspaceZ;
     caustica::rhi::TextureHandle denoiserMotionVectors;

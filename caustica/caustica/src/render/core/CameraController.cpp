@@ -3,6 +3,7 @@
 #include <render/passes/geometry/TemporalAntiAliasingPass.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/WorldRenderer.h>
+#include <scene/SceneRenderData.h>
 #include <core/file_utils.h>
 #include <core/format.h>
 #include <core/path_utils.h>
@@ -125,6 +126,31 @@ void CameraController::syncPreviousViewFromCurrent()
     m_viewPrevious->setPixelOffset(m_view->getPixelOffset());
     m_viewPrevious->updateCache();
     updateLastCameraState();
+}
+
+void CameraController::setPreviousViewFromCameraProxy(
+    const scene::ActiveCameraRenderProxy& camera,
+    dm::uint2 renderSize,
+    float displayAspectRatio)
+{
+    if (!camera.valid || !m_viewPrevious)
+        return;
+
+    FirstPersonCamera previousCamera;
+    previousCamera.lookTo(camera.position, camera.direction, camera.up);
+    const ViewportDesc viewport(float(renderSize.x), float(renderSize.y));
+    const dm::float4x4 projection = camera.useCustomIntrinsics
+        ? MakePinholeIntrinsicsProjection(
+            camera.intrinsics.x, camera.intrinsics.y, camera.intrinsics.z, camera.intrinsics.w,
+            camera.intrinsicsViewport.x, camera.intrinsicsViewport.y, camera.zNear)
+        : dm::perspProjD3DStyleReverse(camera.verticalFovRadians, displayAspectRatio, camera.zNear);
+
+    m_viewPrevious->setViewport(viewport);
+    m_viewPrevious->setMatrices(previousCamera.getWorldToViewMatrix(), projection);
+    // Sensor outputs use the current view's jitter convention; this avoids
+    // treating an independently captured camera as a TAA sub-pixel jump.
+    m_viewPrevious->setPixelOffset(m_view ? m_view->getPixelOffset() : dm::float2::zero());
+    m_viewPrevious->updateCache();
 }
 
 void CameraController::saveToFile(const std::filesystem::path& path,

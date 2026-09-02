@@ -15,6 +15,7 @@
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/CameraApi.h>
+#include <engine/SensorApi.h>
 #include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneViewState.h>
@@ -29,6 +30,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace caustica
@@ -262,6 +264,21 @@ public:
     [[nodiscard]] uint32_t frameIndex() const;
     bool saveScreenshot(const std::filesystem::path& path);
     [[nodiscard]] std::optional<LdrFramebuffer> readLdrFramebuffer();
+
+    bool addRenderProduct(RenderProductDesc product);
+    bool removeRenderProduct(std::string_view name);
+    void clearRenderProducts();
+    [[nodiscard]] std::vector<RenderProductDesc> renderProducts() const;
+    bool setEntitySemanticLabel(
+        ecs::Entity entity,
+        uint32_t instanceId,
+        uint32_t semanticId,
+        std::string semanticLabel = {});
+    [[nodiscard]] uint32_t entityInstanceId(ecs::Entity entity) const;
+    [[nodiscard]] uint32_t entitySemanticId(ecs::Entity entity) const;
+    [[nodiscard]] std::string entitySemanticLabel(ecs::Entity entity) const;
+    [[nodiscard]] std::optional<SensorOutput> readSensorOutput(uint32_t aovs = uint32_t(Aov::All));
+    [[nodiscard]] std::vector<SensorOutput> captureSensorOutputs();
 
 private:
     EngineApp() = default;

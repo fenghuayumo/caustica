@@ -686,7 +686,11 @@ namespace PathTracer
         // Keep exported depth as the primary camera surface for post path-trace
         // passes such as rasterized 3DGS mesh-depth testing.
         if (path.getVertexIndex() == 1)
-            Bridge::ExportSurface(path, surfaceData, path.GetSceneLength(), float3(0,0,0) );
+        {
+            const float3 motionVectors = Bridge::computeMotionVector(
+                surfaceData.shadingData.posW, surfaceData.prevPosW);
+            Bridge::ExportSurface(path, surfaceData, path.GetSceneLength(), motionVectors);
+        }
 #endif
 
         if (pathStopping)

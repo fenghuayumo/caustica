@@ -91,7 +91,7 @@ Prefer these for application / Python / editor scene edits (no WorldRenderer / A
 
 - `SceneSpawn.h` - `load` / `spawn` / `despawn` / spawn lights
 - `SceneQuery.h` - `entityWorld`, load status, `gameSettings` / `importedModels` / `sceneTypeFactory`
-- `CameraApi.h` / `RenderSessionApi.h` - camera input, picking, pass handles, `shaderFactory`
+- `CameraApi.h` / `SensorApi.h` / `RenderSessionApi.h` - camera input, AOV capture, picking, pass handles, `shaderFactory`
 - `SceneTransform.h` - local transform / translation / visibility
 - `MeshDeformApi.h` - mesh deform / geometry sequence (`MeshDeformOptions`) via **entity** only
 - `MeshHandle` / `MaterialHandle` + `MeshInstanceComponent::meshHandle()` — app asset identity

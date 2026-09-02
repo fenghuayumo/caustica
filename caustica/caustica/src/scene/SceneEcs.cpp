@@ -229,6 +229,8 @@ void CopyEntityComponents(
         dstWorld.emplace<PrefabInstanceComponent>(dstEntity, *prefab);
     if (const auto* materialOverride = srcWorld.get<MaterialOverrideComponent>(srcEntity))
         dstWorld.emplace<MaterialOverrideComponent>(dstEntity, *materialOverride);
+    if (const auto* semantic = srcWorld.get<SemanticLabelComponent>(srcEntity))
+        dstWorld.emplace<SemanticLabelComponent>(dstEntity, *semantic);
     if (const auto* directional = srcWorld.get<DirectionalLightComponent>(srcEntity))
         dstWorld.emplace<DirectionalLightComponent>(dstEntity, *directional);
     if (const auto* spot = srcWorld.get<SpotLightComponent>(srcEntity))
@@ -510,7 +512,8 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             EnvironmentLightComponent,
             AnimationComponent,
             GaussianSplatComponent,
-            SkinnedMeshReferenceComponent>(registry)
+            SkinnedMeshReferenceComponent,
+            SemanticLabelComponent>(registry)
         || changeDetection->anyOfChangedThisFrame<
             DirectionalLightComponent,
             SpotLightComponent,
@@ -519,7 +522,8 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             EnvironmentLightComponent,
             AnimationComponent,
             GaussianSplatComponent,
-            SkinnedMeshReferenceComponent>(registry);
+            SkinnedMeshReferenceComponent,
+            SemanticLabelComponent>(registry);
 
     if (meshDirty)
     {

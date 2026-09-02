@@ -23,6 +23,9 @@
 
 using namespace caustica::math;
 #include <shaders/skinning_cb.h>
+#include <shaders/bindless.h>
+
+static_assert(sizeof(InstanceData) == 128, "InstanceData must stay 8 x 16 bytes for HLSL LoadInstanceData");
 
 #if CAUSTICA_WITH_STATIC_SHADERS
 #if CAUSTICA_WITH_DX11
@@ -322,6 +325,10 @@ void UpdateInstance(SceneGpuResources& gpu, const scene::MeshInstanceRenderProxy
     idata.numGeometries = proxy.geometryCount;
     idata.firstGeometryIndex = proxy.firstGlobalGeometryIndex;
     idata.flags = 0u;
+    idata.instanceId = proxy.instanceId;
+    idata.semanticId = proxy.semanticId;
+    idata.pad0 = 0u;
+    idata.pad1 = 0u;
 
     if (proxy.meshType == MeshType::CurveDisjointOrthogonalTriangleStrips)
     {

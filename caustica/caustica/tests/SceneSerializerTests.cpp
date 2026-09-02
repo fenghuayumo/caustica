@@ -4,6 +4,7 @@
 #include <scene/ScenePoseAccess.h>
 #include <scene/SceneComponentBuilders.h>
 #include <scene/SceneObjects.h>
+#include <scene/SceneSemanticIds.h>
 #include <core/json.h>
 #include <core/path_utils.h>
 
@@ -514,6 +515,22 @@ int main()
         passed &= expect(
             document["entities"].empty(),
             "removeAuthoredEntityNode did not drop the entity");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity cube = world.createEntity("Cube", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cube, caustica::scene::SceneAuthoringIdComponent{ "Cube" });
+        caustica::scene::setSemanticLabel(world.world(), cube, 42u, 7u, "cube");
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::upsertAuthoredEntityNode(document, world, cube);
+        const Json::Value& label = document["entities"][0]["components"]["SemanticLabel"];
+        passed &= expect(label["instance_id"].asUInt() == 42u, "SemanticLabel.instance_id was not saved");
+        passed &= expect(label["semantic_id"].asUInt() == 7u, "SemanticLabel.semantic_id was not saved");
+        passed &= expect(label["class"].asString() == "cube", "SemanticLabel.class was not saved");
     }
 
     return passed ? 0 : 1;

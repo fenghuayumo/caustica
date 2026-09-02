@@ -206,6 +206,7 @@ Prefer system parameters, then focused application headers:
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
 | `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. Host usage: [caustica.md — Camera](../caustica.md#camera). |
+| `engine/SensorApi.h` | RenderProduct / AOV capture. Host usage: [caustica.md — Sensor output](../caustica.md#sensor-output--aov). |
 | `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene`. |
 | `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles, `shaderFactory`. |
 | `engine/RenderFrameApi.h` | Accumulation and rendered-frame access. |
@@ -248,7 +249,7 @@ active).
 
 ## Camera and frame control
 
-`EngineApp` forwards the common operations. `setCameraVerticalFOV` / `setCameraIntrinsics` / `setCameraPosDirUp` write the **active** camera (free controller at index 0, or the selected scene camera). Per-camera FOV, pose, and pinhole live on the scene camera entity via `CameraApi.h` (`setSceneCameraVerticalFOV`, `setSceneCameraLookTo`, `setActiveCamera`).
+`EngineApp` forwards the common operations. `setCameraVerticalFOV` / `setCameraIntrinsics` / `setCameraPosDirUp` write the **active** camera (free controller at index 0, or the selected scene camera). Per-camera FOV, pose, and pinhole live on the scene camera entity via `CameraApi.h` (`setSceneCameraVerticalFOV`, `setSceneCameraLookTo`, `setActiveCamera`). Multi-camera AOV capture is `SensorApi.h` (`addRenderProduct`, `captureSensorOutputs`).
 
 ```cpp
 engine->setScene("kitchen.scene.json");

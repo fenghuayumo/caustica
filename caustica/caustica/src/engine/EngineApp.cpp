@@ -1107,4 +1107,66 @@ std::optional<LdrFramebuffer> EngineApp::readLdrFramebuffer()
     return result;
 }
 
+bool EngineApp::addRenderProduct(RenderProductDesc product)
+{
+    return m_app && caustica::addRenderProduct(*m_app, std::move(product));
+}
+
+bool EngineApp::removeRenderProduct(std::string_view name)
+{
+    return m_app && caustica::removeRenderProduct(*m_app, name);
+}
+
+void EngineApp::clearRenderProducts()
+{
+    if (m_app)
+        caustica::clearRenderProducts(*m_app);
+}
+
+std::vector<RenderProductDesc> EngineApp::renderProducts() const
+{
+    if (!m_app)
+        return {};
+    return caustica::renderProducts(*m_app);
+}
+
+bool EngineApp::setEntitySemanticLabel(
+    ecs::Entity entity,
+    uint32_t instanceId,
+    uint32_t semanticId,
+    std::string semanticLabel)
+{
+    return m_app && caustica::setEntitySemanticLabel(
+        *m_app, entity, instanceId, semanticId, std::move(semanticLabel));
+}
+
+uint32_t EngineApp::entityInstanceId(ecs::Entity entity) const
+{
+    return m_app ? caustica::entityInstanceId(*m_app, entity) : 0u;
+}
+
+uint32_t EngineApp::entitySemanticId(ecs::Entity entity) const
+{
+    return m_app ? caustica::entitySemanticId(*m_app, entity) : 0u;
+}
+
+std::string EngineApp::entitySemanticLabel(ecs::Entity entity) const
+{
+    return m_app ? caustica::entitySemanticLabel(*m_app, entity) : std::string{};
+}
+
+std::optional<SensorOutput> EngineApp::readSensorOutput(uint32_t aovs)
+{
+    if (!m_app)
+        return std::nullopt;
+    return caustica::readSensorOutput(*m_app, aovs);
+}
+
+std::vector<SensorOutput> EngineApp::captureSensorOutputs()
+{
+    if (!m_app)
+        return {};
+    return caustica::captureSensorOutputs(*m_app);
+}
+
 } // namespace caustica

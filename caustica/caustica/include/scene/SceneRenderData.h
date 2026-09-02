@@ -58,6 +58,8 @@ namespace caustica::scene
         SceneContentFlags leafContent = SceneContentFlags::None;
         ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
         ecs::Entity parentLightEntity = ecs::NullEntity;
+        uint32_t instanceId = 0;
+        uint32_t semanticId = 0;
     };
 
     struct SkinnedMeshRenderProxy
@@ -256,6 +258,7 @@ namespace caustica::scene
     struct FrameExtractInputs
     {
         const ActiveCameraRenderProxy* activeCamera = nullptr;
+        std::optional<ActiveCameraRenderProxy> previousCamera;
         PathTracerSettings* settings = nullptr; // non-const: one-shot flags cleared after copy
         const render::RenderRuntimeState* runtime = nullptr;
         double sceneTime = 0.0;
@@ -293,6 +296,7 @@ namespace caustica::scene
         std::vector<GaussianSplatRenderProxy> gaussianSplats;
 
         ActiveCameraRenderProxy camera;
+        std::optional<ActiveCameraRenderProxy> previousCamera;
         RenderSettingsSnapshot renderSettings;
 
         std::vector<ecs::Entity> meshInstanceEntities;

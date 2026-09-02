@@ -10,6 +10,7 @@
 #include <caustica/version.h>
 
 #include <engine/EngineApp.h>
+#include <engine/SensorApi.h>
 #include <backend/GpuDevice.h>
 
 #include <nanobind/nanobind.h>
@@ -43,7 +44,7 @@ namespace
 
     struct PyFrame
     {
-        caustica::LdrFramebuffer rgb;
+        caustica::SensorOutput sensor;
     };
 
     std::shared_ptr<caustica_py::PythonDevice> MakePythonDevice(
@@ -191,20 +192,30 @@ NB_MODULE(caustica, m)
         });
 
     nb::class_<PyFrame>(m, "Frame",
-        "One rendered output. rgb is LDR RGBA8. depth and segmentation are reserved.")
-        .def_prop_ro("width", [](const PyFrame& self) { return self.rgb.width; })
-        .def_prop_ro("height", [](const PyFrame& self) { return self.rgb.height; })
-        .def_prop_ro("channels", [](const PyFrame& self) { return self.rgb.channels; })
+        "One rendered output. rgb is LDR RGBA8. depth is linear |view Z|. segmentation aliases instance_id.")
+        .def_prop_ro("width", [](const PyFrame& self) { return self.sensor.width; })
+        .def_prop_ro("height", [](const PyFrame& self) { return self.sensor.height; })
+        .def_prop_ro("channels", [](const PyFrame&) { return 4; })
         .def_prop_ro("pixels", [](const PyFrame& self) {
-                return nb::bytes(self.rgb.pixels.data(), self.rgb.pixels.size());
+                return nb::bytes(self.sensor.rgb.data(), self.sensor.rgb.size());
             })
-        .def_prop_ro("rgb", [](PyFrame& self) { return FramebufferToNumpy(self.rgb); },
+        .def_prop_ro("rgb", [](const PyFrame& self) { return caustica_py::sensorRgbNumpy(self.sensor); },
             "NumPy (H, W, 4) uint8 RGBA. Requires NumPy.")
-        .def_prop_ro("depth", [](const PyFrame&) -> nb::object { return nb::none(); })
-        .def_prop_ro("segmentation", [](const PyFrame&) -> nb::object { return nb::none(); })
+        .def_prop_ro("depth", [](const PyFrame& self) { return caustica_py::sensorDepthNumpy(self.sensor); },
+            "NumPy (H, W) float32 linear |view Z| meters. 0 = miss.")
+        .def_prop_ro("normal", [](const PyFrame& self) { return caustica_py::sensorNormalNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 camera-space normals.")
+        .def_prop_ro("instance_id", [](const PyFrame& self) { return caustica_py::sensorInstanceIdNumpy(self.sensor); },
+            "NumPy (H, W) uint32. 0 = miss.")
+        .def_prop_ro("semantic_id", [](const PyFrame& self) { return caustica_py::sensorSemanticIdNumpy(self.sensor); },
+            "NumPy (H, W) uint32. 0 = unlabeled / miss.")
+        .def_prop_ro("segmentation", [](const PyFrame& self) { return caustica_py::sensorInstanceIdNumpy(self.sensor); },
+            "Alias of instance_id.")
+        .def_prop_ro("motion_vector", [](const PyFrame& self) { return caustica_py::sensorMotionVectorNumpy(self.sensor); },
+            "NumPy (H, W, 2) float32 screen-space motion in pixels.")
         .def("__repr__", [](const PyFrame& self) {
             return std::string("<caustica.Frame ")
-                + std::to_string(self.rgb.width) + "x" + std::to_string(self.rgb.height) + " RGBA8>";
+                + std::to_string(self.sensor.width) + "x" + std::to_string(self.sensor.height) + ">";
         });
 
     nb::class_<caustica::LdrFramebuffer>(m, "Framebuffer",
@@ -275,15 +286,21 @@ NB_MODULE(caustica, m)
              [](caustica_py::PyEngineApp& self, float dt) {
                  if (!self.step(dt))
                      throw std::runtime_error("EngineApp.render: step_frame failed");
-                 return PyFrame{ RequireLdrFramebuffer(self) };
+                 auto output = self.engine().readSensorOutput();
+                 if (!output)
+                     throw std::runtime_error("EngineApp.render: sensor readback failed");
+                 return PyFrame{ std::move(*output) };
              },
              nb::arg("dt") = -1.0f,
-             "Python sugar: step_frame() then return a Frame.")
+             "Python sugar: step_frame() then return a Frame with RGB and AOV buffers.")
         .def("render_reference",
              [](caustica_py::PyEngineApp& self, int spp, bool oidn, int maxFrames) {
                  if (self.renderReferenceFrame(spp, oidn, maxFrames) <= 0)
                      throw std::runtime_error("EngineApp.render_reference: accumulation failed");
-                 return PyFrame{ RequireLdrFramebuffer(self) };
+                 auto output = self.engine().readSensorOutput();
+                 if (!output)
+                     throw std::runtime_error("EngineApp.render_reference: sensor readback failed");
+                 return PyFrame{ std::move(*output) };
              },
              nb::arg("spp") = 64, nb::arg("oidn") = true, nb::arg("max_frames") = 0,
              "Python sugar: accumulate a reference frame and return a Frame.");

@@ -48,6 +48,16 @@ struct SceneAuthoringIdComponent
     std::string id;
 };
 
+// Stable instance / semantic identifiers for sensor AOVs (depth, segmentation).
+// instanceId 0 = auto-hash from authoring id or path. semanticId 0 = unlabeled
+// unless semanticLabel is set (then hashed). 0 is reserved in the AOV for miss.
+struct SemanticLabelComponent
+{
+    uint32_t instanceId = 0;
+    uint32_t semanticId = 0;
+    std::string semanticLabel;
+};
+
 // Root of an imported glTF/OBJ/USD/builtin prefab. Scene save writes this
 // instead of the expanded import subtree.
 struct PrefabInstanceComponent

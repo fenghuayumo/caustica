@@ -399,6 +399,10 @@ public:
 
     bool runFrame(std::optional<double> elapsedTimeOverride = std::nullopt);
 
+    // Extract + render without simulation or Time advance. Used by SensorApi
+    // to capture extra cameras at the current physical time.
+    bool extractAndRenderFrozenFrame();
+
     void setUseDedicatedRenderThread(bool enabled) { m_useDedicatedRenderThread = enabled; }
     [[nodiscard]] bool useDedicatedRenderThread() const { return m_useDedicatedRenderThread; }
     [[nodiscard]] RenderThread& renderThread() { return m_renderThread; }

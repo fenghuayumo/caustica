@@ -233,6 +233,16 @@ void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, 
         WriteCameraIntoComponents(EnsureObject(entityNode["components"]), *camera);
     if (const GaussianSplatComponent* splat = world.world().tryGet<GaussianSplatComponent>(entity))
         EnsureComponent(entityNode, "GaussianSplat")["enabled"] << splat->splat.enabled;
+    if (const auto* label = world.world().tryGet<SemanticLabelComponent>(entity))
+    {
+        Json::Value& node = EnsureComponent(entityNode, "SemanticLabel");
+        if (label->instanceId != 0)
+            node["instance_id"] = label->instanceId;
+        if (label->semanticId != 0)
+            node["semantic_id"] = label->semanticId;
+        if (!label->semanticLabel.empty())
+            node["class"] = label->semanticLabel;
+    }
 }
 
 bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
@@ -243,7 +253,8 @@ bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
         || tryGetRectLight(world.world(), entity)
         || tryGetEnvironmentLight(world.world(), entity)
         || tryGetCamera(world.world(), entity)
-        || world.world().tryGet<GaussianSplatComponent>(entity);
+        || world.world().tryGet<GaussianSplatComponent>(entity)
+        || world.world().tryGet<SemanticLabelComponent>(entity);
 }
 
 std::string EntityPathString(SceneEntityWorld& world, ecs::Entity entity)

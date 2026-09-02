@@ -9,6 +9,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/operators.h>
+#include <nanobind/ndarray.h>
 
 #include <engine/EngineApp.h>
 #include <engine/App.h>
@@ -17,6 +18,7 @@
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
+#include <engine/SensorApi.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/MeshDeformApi.h>
 #include <engine/SceneSpawn.h>
@@ -39,6 +41,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneCameraAccess.h>
+#include <scene/SceneSemanticIds.h>
 #include <ecs/Entity.h>
 #include <core/log.h>
 #include <math/math.h>
@@ -804,6 +807,103 @@ caustica::EngineApp* embedEngine()
     return g_embedEngine;
 }
 
+namespace
+{
+
+bool SensorShape(const caustica::SensorOutput& output, uint32_t channels, size_t count, uint32_t& width, uint32_t& height)
+{
+    if (count == 0 || channels == 0)
+        return false;
+    width = output.width;
+    height = output.height;
+    const size_t pixels = count / channels;
+    if (channels != 0 && count % channels != 0)
+        return false;
+    const size_t expected = size_t(width) * size_t(height) * size_t(channels);
+    if (count == expected)
+        return width != 0 && height != 0;
+    if (width != 0 && pixels % width == 0)
+    {
+        height = uint32_t(pixels / width);
+        return height != 0;
+    }
+    return false;
+}
+
+} // namespace
+
+nb::object sensorRgbNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 4, output.rgb.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<uint8_t>(output.rgb);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint8_t>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, uint8_t, nb::shape<-1, -1, 4>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 4 }, owner));
+}
+
+nb::object sensorDepthNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 1, output.depth.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.depth);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorNormalNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 3, output.normal.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.normal);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorInstanceIdNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 1, output.instanceId.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<uint32_t>(output.instanceId);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, uint32_t, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorSemanticIdNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 1, output.semanticId.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<uint32_t>(output.semanticId);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, uint32_t, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorMotionVectorNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 2, output.motionVector.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.motionVector);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 2>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 2 }, owner));
+}
+
 void RegisterCoreBindings(nb::module_& m)
 {
     // --- helpers ----------------------------------------------------------
@@ -989,6 +1089,47 @@ void RegisterCoreBindings(nb::module_& m)
         .value("Point", LightType::Point)
         .value("Rect", LightType::Rect)
         .value("Environment", LightType::Environment);
+
+    nb::enum_<Aov>(m, "Aov",
+        "Sensor / AOV mask. Combine with bitwise OR: Aov.rgb | Aov.depth.",
+        nb::is_arithmetic())
+        .value("none", Aov::None)
+        .value("rgb", Aov::Rgb)
+        .value("depth", Aov::Depth)
+        .value("normal", Aov::Normal)
+        .value("instance_id", Aov::InstanceId)
+        .value("semantic_id", Aov::SemanticId)
+        .value("motion_vector", Aov::MotionVector)
+        .value("segmentation", Aov::Segmentation)
+        .value("all", Aov::All)
+        .def("__or__", [](Aov a, Aov b) { return uint32_t(a) | uint32_t(b); })
+        .def("__or__", [](Aov a, uint32_t b) { return uint32_t(a) | b; })
+        .def("__ror__", [](Aov a, uint32_t b) { return uint32_t(a) | b; });
+
+    nb::class_<SensorOutput>(m, "SensorOutput",
+        "One captured camera + AOV set. Empty arrays mean the AOV was not requested.")
+        .def_ro("name", &SensorOutput::name)
+        .def_ro("width", &SensorOutput::width)
+        .def_ro("height", &SensorOutput::height)
+        .def_ro("aovs", &SensorOutput::aovs)
+        .def_prop_ro("rgb", [](const SensorOutput& self) { return sensorRgbNumpy(self); },
+            "NumPy (H, W, 4) uint8 RGBA, or None.")
+        .def_prop_ro("depth", [](const SensorOutput& self) { return sensorDepthNumpy(self); },
+            "NumPy (H, W) float32 linear |view Z| meters. 0 = miss.")
+        .def_prop_ro("normal", [](const SensorOutput& self) { return sensorNormalNumpy(self); },
+            "NumPy (H, W, 3) float32 camera-space normals.")
+        .def_prop_ro("instance_id", [](const SensorOutput& self) { return sensorInstanceIdNumpy(self); },
+            "NumPy (H, W) uint32. 0 = miss.")
+        .def_prop_ro("semantic_id", [](const SensorOutput& self) { return sensorSemanticIdNumpy(self); },
+            "NumPy (H, W) uint32. 0 = unlabeled / miss.")
+        .def_prop_ro("segmentation", [](const SensorOutput& self) { return sensorInstanceIdNumpy(self); },
+            "Alias of instance_id.")
+        .def_prop_ro("motion_vector", [](const SensorOutput& self) { return sensorMotionVectorNumpy(self); },
+            "NumPy (H, W, 2) float32 screen-space motion in pixels.")
+        .def("__repr__", [](const SensorOutput& self) {
+            return std::string("<caustica.SensorOutput '") + self.name + "' "
+                + std::to_string(self.width) + "x" + std::to_string(self.height) + ">";
+        });
 
     nb::class_<Handle<ScenePrefabAsset>>(m, "ScenePrefab",
         "CPU-side prefab handle from Sample.load() / assets.load. Pass to Sample.spawn().")
@@ -1709,6 +1850,66 @@ void RegisterCoreBindings(nb::module_& m)
                     throw std::runtime_error("SceneEntity is not a registered scene camera");
             },
             "Make this the rendered / main camera.")
+        .def_prop_rw("instance_id",
+            [](PySceneEntity& self) {
+                return entityInstanceId(RequireEntityApp(self), self.entity);
+            },
+            [](PySceneEntity& self, uint32_t value) {
+                App& app = RequireEntityApp(self);
+                uint32_t semantic = 0;
+                std::string label;
+                if (ecs::World* world = sceneEcs(app))
+                {
+                    if (const auto* component = world->tryGet<scene::SemanticLabelComponent>(self.entity))
+                    {
+                        semantic = component->semanticId;
+                        label = component->semanticLabel;
+                    }
+                }
+                if (!setEntitySemanticLabel(app, self.entity, value, semantic, std::move(label)))
+                    throw std::runtime_error("instance_id setter failed");
+            },
+            "Stable instance id written into the instance_id AOV. 0 auto-hashes authoring id / path.")
+        .def_prop_rw("semantic_id",
+            [](PySceneEntity& self) {
+                return entitySemanticId(RequireEntityApp(self), self.entity);
+            },
+            [](PySceneEntity& self, uint32_t value) {
+                App& app = RequireEntityApp(self);
+                uint32_t instance = 0;
+                std::string label;
+                if (ecs::World* world = sceneEcs(app))
+                {
+                    if (const auto* component = world->tryGet<scene::SemanticLabelComponent>(self.entity))
+                    {
+                        instance = component->instanceId;
+                        label = component->semanticLabel;
+                    }
+                }
+                if (!setEntitySemanticLabel(app, self.entity, instance, value, std::move(label)))
+                    throw std::runtime_error("semantic_id setter failed");
+            },
+            "Stable class id written into the semantic_id AOV. 0 = unlabeled unless semantic_label is set.")
+        .def_prop_rw("semantic_label",
+            [](PySceneEntity& self) {
+                return entitySemanticLabel(RequireEntityApp(self), self.entity);
+            },
+            [](PySceneEntity& self, const std::string& value) {
+                App& app = RequireEntityApp(self);
+                uint32_t instance = 0;
+                uint32_t semantic = 0;
+                if (ecs::World* world = sceneEcs(app))
+                {
+                    if (const auto* component = world->tryGet<scene::SemanticLabelComponent>(self.entity))
+                    {
+                        instance = component->instanceId;
+                        semantic = component->semanticId;
+                    }
+                }
+                if (!setEntitySemanticLabel(app, self.entity, instance, semantic, value))
+                    throw std::runtime_error("semantic_label setter failed");
+            },
+            "Optional class name. Hashed into semantic_id when semantic_id is 0.")
         .def_prop_ro("bounds",
             [](PySceneEntity& self) -> nb::object {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -2228,6 +2429,41 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              "Select a registered scene camera by stable hierarchy path.")
         .def("save_current_camera", [](PyEngineApp& self) { self.engine().saveCurrentCamera(); })
         .def("load_current_camera", [](PyEngineApp& self) { self.engine().loadCurrentCamera(); })
+
+        .def("add_render_product",
+             [](PyEngineApp& self, const std::string& name, const std::shared_ptr<PySceneEntity>& camera, uint32_t aovs) {
+                 RenderProductDesc desc;
+                 desc.name = name;
+                 desc.camera = camera ? EntityFromPy(camera) : ecs::NullEntity;
+                 desc.aovs = aovs == 0u ? uint32_t(Aov::All) : aovs;
+                 if (!self.engine().addRenderProduct(std::move(desc)))
+                     throw std::runtime_error("add_render_product failed");
+             },
+             nb::arg("name"),
+             nb::arg("camera").none() = std::shared_ptr<PySceneEntity>{},
+             nb::arg("aovs") = uint32_t(Aov::All),
+             "Register a named camera + AOV set. camera=None uses the active camera.")
+        .def("remove_render_product",
+             [](PyEngineApp& self, const std::string& name) {
+                 if (!self.engine().removeRenderProduct(name))
+                     throw std::runtime_error("remove_render_product failed");
+             },
+             nb::arg("name"))
+        .def("clear_render_products", [](PyEngineApp& self) { self.engine().clearRenderProducts(); })
+        .def("read_sensor_output",
+             [](PyEngineApp& self, uint32_t aovs) {
+                 auto output = self.engine().readSensorOutput(aovs);
+                 if (!output)
+                     throw std::runtime_error("read_sensor_output failed (call step_frame() first)");
+                 return std::move(*output);
+             },
+             nb::arg("aovs") = uint32_t(Aov::All),
+             "Read AOVs for the camera that was just rendered.")
+        .def("capture_sensor_outputs",
+             [](PyEngineApp& self) {
+                 return self.engine().captureSensorOutputs();
+             },
+             "Capture every registered RenderProduct at the current physical time.")
 
         .def("load", [](PyEngineApp& self, const std::string& path) {
                 return self.engine().load(path);

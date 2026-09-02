@@ -10,6 +10,7 @@
 #include <string>
 
 struct PathTracerSettings;
+namespace caustica::scene { struct ActiveCameraRenderProxy; }
 
 namespace caustica::render
 {
@@ -85,6 +86,10 @@ public:
 
     void updateViews(const CameraUpdateParams& params);
     void syncPreviousViewFromCurrent();
+    void setPreviousViewFromCameraProxy(
+        const scene::ActiveCameraRenderProxy& camera,
+        dm::uint2 renderSize,
+        float displayAspectRatio);
 
     void saveToFile(const std::filesystem::path& path, float zNear, float fovYRadians) const;
     void loadFromFile(const std::filesystem::path& path);

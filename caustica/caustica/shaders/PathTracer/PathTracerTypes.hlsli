@@ -44,9 +44,9 @@ namespace PathTracer
     {
         ShadingData     shadingData;
         ActiveBSDF      bsdf;
-#if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES  // otherwise motion vectors not needed
+        // Sensor motion vectors are also exported by the reference pipeline.
+        // Keep the previous position available in every path-tracer mode.
         float3          prevPosW;                           // <-- consider storing delta instead of prevPosW and then fp16 might be enough
-#endif
         lpfloat         interiorIoR;    // a.k.a. material IoR
 #if !CAUSTICA_USE_APPROXIMATE_MIS
 #if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
@@ -56,18 +56,15 @@ namespace PathTracer
 #if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
         uint            neeAnalyticLightIndex;  // 0xFFFFFFFF if none
 #endif
+        uint            instanceIndex;
         static SurfaceData make( ShadingData shadingData, ActiveBSDF bsdf, 
-#if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
-                                float3 prevPosW, 
-#endif
+                                float3 prevPosW,
                                 lpfloat interiorIoR, uint neeTriangleLightIndex, uint neeAnalyticLightIndex )
         { 
             SurfaceData ret; 
             ret.shadingData             = shadingData; 
             ret.bsdf                    = bsdf; 
-#if PATH_TRACER_MODE==PATH_TRACER_MODE_BUILD_STABLE_PLANES // otherwise motion vectors not needed
-            ret.prevPosW                = prevPosW; 
-#endif
+            ret.prevPosW                = prevPosW;
             ret.interiorIoR             = interiorIoR; 
 #if !CAUSTICA_USE_APPROXIMATE_MIS
 #if !defined(CAUSTICA_MATERIAL_IS_EMISSIVE) || CAUSTICA_MATERIAL_IS_EMISSIVE
@@ -77,6 +74,7 @@ namespace PathTracer
 #if !defined(CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY) || CAUSTICA_MATERIAL_IS_ANALYTIC_LIGHT_PROXY
             ret.neeAnalyticLightIndex   = neeAnalyticLightIndex;
 #endif
+            ret.instanceIndex           = 0xFFFFFFFFu;
             return ret; 
         }
     };

@@ -43,6 +43,11 @@ struct InstanceData
     float3x4 transform;
     float3x4 prevTransform;
 
+    uint instanceId;
+    uint semanticId;
+    uint pad0;
+    uint pad1;
+
     bool IsCurveDOTS() { return (flags & InstanceFlags_CurveDisjointOrthogonalTriangleStrips) != 0; }
     bool IsCurveLSS() { return (flags & InstanceFlags_CurveLinearSweptSpheres) != 0; }
 };
@@ -59,7 +64,7 @@ static const uint c_SizeOfCurveRadius = 4;
 
 // Define the sizes of these structures because FXC doesn't support sizeof(x)
 static const uint c_SizeOfGeometryData = 4*16;
-static const uint c_SizeOfInstanceData = 7*16;
+static const uint c_SizeOfInstanceData = 8*16;
 
 GeometryData LoadGeometryData(ByteAddressBuffer buffer, uint offset)
 {
@@ -97,6 +102,7 @@ InstanceData LoadInstanceData(ByteAddressBuffer buffer, uint offset)
     uint4 e = buffer.Load4(offset + 16 * 4);
     uint4 f = buffer.Load4(offset + 16 * 5);
     uint4 g = buffer.Load4(offset + 16 * 6);
+    uint4 h = buffer.Load4(offset + 16 * 7);
 
     InstanceData ret;
     ret.flags = a.x;
@@ -105,6 +111,10 @@ InstanceData LoadInstanceData(ByteAddressBuffer buffer, uint offset)
     ret.numGeometries = a.w;
     ret.transform = float3x4(asfloat(b), asfloat(c), asfloat(d));
     ret.prevTransform = float3x4(asfloat(e), asfloat(f), asfloat(g));
+    ret.instanceId = h.x;
+    ret.semanticId = h.y;
+    ret.pad0 = h.z;
+    ret.pad1 = h.w;
     return ret;
 }
 

@@ -6,6 +6,7 @@
 #include <engine/GpuSharedCaches.h>
 #include <render/core/CameraController.h>
 #include <engine/ResolvedActiveCamera.h>
+#include <engine/SensorApi.h>
 #include <engine/SceneSession.h>
 #include <engine/ScenePlugins.h>
 #include <render/WorldRenderer.h>
@@ -38,6 +39,7 @@ void SceneRuntimePlugin::build(App& app)
     app.emplaceResource<GpuSharedCaches>();
     app.emplaceResource<CameraController>();
     app.emplaceResource<ResolvedActiveCamera>();
+    app.emplaceResource<RenderProductRegistry>();
     app.emplaceResource<SceneSession>();
     app.emplaceResource<render::WorldRenderer>();
     app.emplaceResource<GpuRenderSubsystem>();

@@ -1,6 +1,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneRenderSnapshot.h>
+#include <scene/SceneSemanticIds.h>
 
 #include <cstdio>
 
@@ -150,6 +151,45 @@ int main()
         const caustica::ecs::Entity extra = scratch.createEntity("Extra", scratch.root());
         passed &= expect(live.isAlive(extra) && &scratch.world() == &live,
             "borrowed SceneEntityWorld did not spawn into the live registry");
+    }
+
+    {
+        using caustica::scene::hashStableLabel;
+        using caustica::scene::resolveInstanceId;
+        using caustica::scene::resolveSemanticId;
+        using caustica::scene::setSemanticLabel;
+
+        passed &= expect(hashStableLabel("cube") != 0u, "stable label hash reserved 0");
+        passed &= expect(hashStableLabel("cube") == hashStableLabel("cube"), "stable label hash is not stable");
+        passed &= expect(hashStableLabel("cube") != hashStableLabel("sphere"), "distinct labels collided");
+
+        caustica::scene::SceneEntityWorld entityWorld;
+        const caustica::ecs::Entity root = entityWorld.createEntity("Root");
+        const caustica::ecs::Entity cube = entityWorld.createEntity("Cube", root);
+        entityWorld.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cube, caustica::scene::SceneAuthoringIdComponent{ "link/wrist" });
+
+        const uint32_t autoId = resolveInstanceId(entityWorld.world(), cube);
+        passed &= expect(autoId == hashStableLabel("link/wrist"),
+            "instance id did not hash SceneAuthoringId");
+        passed &= expect(resolveSemanticId(entityWorld.world(), cube) == 0u,
+            "unlabeled entity did not report semantic id 0");
+
+        passed &= expect(
+            setSemanticLabel(entityWorld.world(), cube, 42u, 7u, "manipulator"),
+            "setSemanticLabel failed");
+        passed &= expect(resolveInstanceId(entityWorld.world(), cube) == 42u,
+            "explicit instance_id was not used");
+        passed &= expect(resolveSemanticId(entityWorld.world(), cube) == 7u,
+            "explicit semantic_id was not used");
+
+        passed &= expect(
+            setSemanticLabel(entityWorld.world(), cube, 0u, 0u, "cube"),
+            "setSemanticLabel failed to restore auto ids");
+        passed &= expect(resolveInstanceId(entityWorld.world(), cube) == hashStableLabel("link/wrist"),
+            "instance id 0 did not fall back to authoring id");
+        passed &= expect(resolveSemanticId(entityWorld.world(), cube) == hashStableLabel("cube"),
+            "semantic id 0 did not hash semantic_label");
     }
 
     return passed ? 0 : 1;
