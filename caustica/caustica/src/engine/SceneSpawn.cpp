@@ -363,9 +363,9 @@ bool despawn(App& app, ecs::Entity entity)
     if (!destroySceneEntity(DestroySceneEntityParams{
             .scene = scenePtr,
             .entity = entity,
-            .beforeDetach = [worldRendererResource](ecs::Entity deletedEntity) {
+            .beforeDetach = [worldRendererResource, &app](ecs::Entity deletedEntity) {
                 SceneGaussianSplatLogic::removeObjectsUnderEntity(
-                    worldRendererResource->gaussianSplatPasses(), deletedEntity);
+                    worldRendererResource->gaussianSplatPasses(), deletedEntity, app);
             },
         }))
     {

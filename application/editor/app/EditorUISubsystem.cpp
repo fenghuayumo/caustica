@@ -47,17 +47,12 @@ void EditorUISubsystem::startup(caustica::GpuDevice& gpuDevice, caustica::Window
 
     app.emplaceResource<caustica::RenderFramebufferOverride>();
 
-    if (caustica::Window* platformWindow = gpuDevice.getPlatformWindow())
-    {
-        platformWindow->setFileDropCallback(
-            [this](int count, const char** paths)
-            {
-                for (int i = 0; i < count; ++i)
-                    m_config.editorUiData.editor.PendingDroppedFiles.emplace_back(paths[i]);
-            });
-    }
-
-    (void)window;
+    window.setFileDropCallback(
+        [this](int count, const char** paths)
+        {
+            for (int i = 0; i < count; ++i)
+                m_config.editorUiData.editor.PendingDroppedFiles.emplace_back(paths[i]);
+        });
 }
 
 void EditorUISubsystem::shutdown()
@@ -204,13 +199,13 @@ void EditorUISubsystem::renderSceneScheduled(caustica::GpuDevice& gpuDevice)
         m_viewport->flushRetired(gpuDevice);
 }
 
-void EditorUISubsystem::onBackBufferResizing()
+void EditorUISubsystem::onSurfaceResizing()
 {
     if (m_ui)
         m_ui->backBufferResizing();
 }
 
-void EditorUISubsystem::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
+void EditorUISubsystem::onSurfaceResized(uint32_t width, uint32_t height, uint32_t sampleCount)
 {
     if (m_ui)
         m_ui->backBufferResized(width, height, sampleCount);

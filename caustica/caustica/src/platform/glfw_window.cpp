@@ -236,12 +236,30 @@ void GlfwWindow::maximise()
     glfwMaximizeWindow(m_Window);
 }
 
+void GlfwWindow::hide()
+{
+    if (m_Window)
+        glfwHideWindow(m_Window);
+}
+
+void GlfwWindow::setSize(uint32_t width, uint32_t height)
+{
+    if (m_Window)
+        glfwSetWindowSize(m_Window, static_cast<int>(width), static_cast<int>(height));
+}
+
 void GlfwWindow::hideMouse(bool hide)
 {
     if (hide)
         glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     else
         glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+}
+
+void GlfwWindow::setCursorVisible(bool visible)
+{
+    if (m_Window)
+        glfwSetInputMode(m_Window, GLFW_CURSOR, visible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN);
 }
 
 void GlfwWindow::setMousePosition(float x, float y)

@@ -1,5 +1,5 @@
 #include <engine/EngineApp.h>
-
+#include <backend/GpuSurface.h>
 #include <engine/DefaultPlugins.h>
 #include <engine/EntryPoint.h>
 #include <engine/SceneQuery.h>
@@ -147,6 +147,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
     {
         m_device = m_desc.device;
         m_window = m_desc.window;
+        m_surface = m_desc.surface;
         m_ownsDevice = false;
     }
     else
@@ -170,7 +171,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.d3d12DeviceFactory = m_desc.d3d12DeviceFactory;
 #endif
 
-        GpuDeviceCreateResult graphicsResult = GpuDevice::createInitialized(createDesc);
+        GpuDeviceCreateResult graphicsResult = GpuDevice::create(createDesc);
         if (!graphicsResult.gpuDevice)
         {
             error("EngineApp: failed to create GPU device");
@@ -179,9 +180,17 @@ bool EngineApp::initialize(EngineAppDesc desc)
 
         m_ownedDevice = std::move(graphicsResult.gpuDevice);
         m_ownedWindow = std::move(graphicsResult.window);
+        m_ownedSurface = std::move(graphicsResult.surface);
         m_device = m_ownedDevice.get();
         m_window = m_ownedWindow.get();
+        m_surface = m_ownedSurface.get();
         m_ownsDevice = true;
+    }
+
+    if (m_device && !m_surface)
+    {
+        m_ownedSurface = GpuSurface::adopt(*m_device, m_window);
+        m_surface = m_ownedSurface.get();
     }
 
     m_viewStatePtr->progressLoading.start("Starting up...");
@@ -189,7 +198,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.scene.json") : m_desc.scene;
 
-    m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window);
+    m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window, m_surface);
     m_app->addPlugins(DefaultPlugins{SceneAppConfig{
         .viewState = *m_viewStatePtr,
         .diagnostics = *m_diagnosticsPtr,
@@ -259,14 +268,12 @@ void EngineApp::shutdown()
 {
     m_valid = false;
 
-    if (m_device)
-        m_device->setFrameDriver(nullptr);
-
     m_app.reset();
+    m_ownedSurface.reset();
+    m_surface = nullptr;
 
     if (m_ownsDevice && m_ownedDevice)
     {
-        m_ownedDevice->releaseWindowOwnership();
         m_ownedDevice->shutdown();
         m_ownedDevice.reset();
     }
@@ -290,6 +297,16 @@ const App& EngineApp::app() const
 GpuDevice* EngineApp::device() const
 {
     return m_device;
+}
+
+GpuSurface* EngineApp::surface() const
+{
+    return m_surface;
+}
+
+Window* EngineApp::window() const
+{
+    return m_window;
 }
 
 void EngineApp::setScene(const std::string& name, bool forceReload)

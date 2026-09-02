@@ -2,6 +2,7 @@
 
 #include <core/command_line.h>
 #include <engine/App.h>
+#include <backend/SurfaceObserver.h>
 #include <rhi/rhi.h>
 
 #include <chrono>
@@ -32,7 +33,7 @@ struct EditorUISubsystemConfig
     RenderSettingsConsoleBinding& console;
 };
 
-class EditorUISubsystem
+class EditorUISubsystem : public ISurfaceObserver
 {
 public:
     explicit EditorUISubsystem(EditorUISubsystemConfig config);
@@ -45,10 +46,9 @@ public:
     // Prepare viewport FB + RenderFramebufferOverride before WorldRenderer::render.
     void prepareViewportForRender(caustica::GpuDevice& gpuDevice);
     void renderSceneScheduled(caustica::GpuDevice& gpuDevice);
-    void onBackBufferResizing();
-    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
-
-    void onDisplayScaleChanged(float scaleX, float scaleY);
+    void onSurfaceResizing() override;
+    void onSurfaceResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
+    void onDisplayScaleChanged(float scaleX, float scaleY) override;
 
 private:
     EditorUISubsystemConfig m_config;

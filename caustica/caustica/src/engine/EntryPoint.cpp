@@ -1,8 +1,6 @@
 #include <engine/EntryPoint.h>
-#include <engine/App.h>
 #include <engine/EngineApp.h>
 
-#include <assets/loader/TextureLoader.h>
 #include <core/task/TaskRuntime.h>
 #include <core/log.h>
 #include <platform/engine/os.h>
@@ -14,20 +12,12 @@
 namespace caustica
 {
 
+#ifdef _WIN32
 namespace
 {
-AppHook s_preGpuInit = nullptr;
-
-#ifdef _WIN32
 bool s_comNeedsUninit = false;
+}
 #endif
-}
-
-void invokePreGpuDeviceInitHook()
-{
-    if (s_preGpuInit)
-        s_preGpuInit();
-}
 
 void initializeAppPlatform()
 {
@@ -51,48 +41,6 @@ void shutdownAppPlatform()
         s_comNeedsUninit = false;
     }
 #endif
-}
-
-int runApp(App& app, const std::function<bool(App&)>& startup, AppHook preGpuInit)
-{
-    s_preGpuInit = preGpuInit;
-
-    initializeAppPlatform();
-
-    const auto shutdownOnFailure = [&app]() {
-        app.shutdown();
-        shutdownAppPlatform();
-    };
-
-    if (!startup)
-    {
-        error("runApp requires a startup callback");
-        shutdownOnFailure();
-        s_preGpuInit = nullptr;
-        return 1;
-    }
-
-    if (!startup(app))
-    {
-        shutdownOnFailure();
-        s_preGpuInit = nullptr;
-        return 1;
-    }
-
-    if (!app.isStarted())
-    {
-        error("runApp startup must call finishStartup");
-        shutdownOnFailure();
-        s_preGpuInit = nullptr;
-        return 1;
-    }
-
-    s_preGpuInit = nullptr;
-
-    app.run();
-
-    shutdownAppPlatform();
-    return 0;
 }
 
 int runEngineApp(std::unique_ptr<EngineApp> engine)

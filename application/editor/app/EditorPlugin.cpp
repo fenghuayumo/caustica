@@ -4,9 +4,11 @@
 
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
+#include <events/event.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SystemLabels.h>
+#include <backend/GpuSurface.h>
 
 namespace caustica::editor
 {
@@ -21,12 +23,17 @@ void EditorPlugin::build(App& app)
     app.insertResourceRef(m_sceneEditor.uiData());
 
     if (uiConfig)
-        app.emplaceResource<EditorUISubsystem>(*uiConfig);
+    {
+        auto& ui = app.emplaceResource<EditorUISubsystem>(*uiConfig);
+        if (GpuSurface* surface = app.getSurface())
+            surface->addObserver(ui);
+    }
 }
 
 void EditorPlugin::configureSchedules(App& app)
 {
     m_sceneEditor.setApp(app);
+    app.addEventObserver([this](Event& event) { m_sceneEditor.onEvent(event); });
 
     // Scene.Startup callbacks are owned by EngineAppDesc / SceneRuntimePlugin.
     // EditorPlugin only registers editor Pre/Post startup around that system.
@@ -81,7 +88,7 @@ void EditorPlugin::configureLateSchedules(App& app)
             ctx.app.requestRenderUnfocused();
         });
 
-    app.addSystemAfter<system_label::EditorSceneAnimateBegin, caustica::system_label::BeforeAnimate>(
+    app.addSystemAfter<system_label::EditorSceneAnimateBegin, caustica::system_label::PrepareSimulation>(
         AppSchedule::preUpdate,
         [this](SystemContext& ctx) {
             if (!ctx.windowFocused)

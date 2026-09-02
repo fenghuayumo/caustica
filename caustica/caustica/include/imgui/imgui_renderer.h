@@ -129,7 +129,7 @@ namespace caustica
         void prepareImGuiFrame(float elapsedTimeSeconds);
 
     public:
-        ImGui_Renderer(GpuDevice *devManager);
+        ImGui_Renderer(GpuDevice* device);
         ~ImGui_Renderer();
         bool init(std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 

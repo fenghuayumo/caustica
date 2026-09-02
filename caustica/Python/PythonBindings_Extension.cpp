@@ -7,6 +7,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "PythonBindingsCore.h"
+#include "PythonDevice.h"
 #include "RenderSession.h"
 
 #include <caustica/version.h>
@@ -14,6 +15,7 @@
 #include <engine/EntryPoint.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/optional.h>
@@ -29,11 +31,13 @@
 #include <math/math.h>
 #include <scene/Scene.h>
 
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
 namespace nb = nanobind;
 using caustica::App;
+using caustica::Scene;
 
 namespace
 {
@@ -44,7 +48,7 @@ namespace
     App& RequireCurrentApp()
     {
         if (!g_currentExtensionApp)
-            throw std::runtime_error("caustica: no Renderer is currently active. create one via caustica.Renderer(...)");
+            throw std::runtime_error("caustica: no App is currently active. create one via caustica.App(...) or caustica.Renderer(...)");
         return *g_currentExtensionApp;
     }
 
@@ -82,35 +86,70 @@ namespace
     }
 }
 
-// Small wrapper holding RenderSession + automatic singleton tracking so the
-// shared bindings (Material, Light, settings, ...) keep functioning unchanged.
-class PyRenderer
+nb::ndarray<nb::numpy, uint8_t, nb::shape<-1, -1, 4>, nb::c_contig, nb::device::cpu>
+FramebufferToNumpy(const RenderSession::FramebufferLdr& fb)
+{
+    auto* data = new std::vector<uint8_t>(fb.pixels);
+    const size_t height = fb.height;
+    const size_t width = fb.width;
+    nb::capsule owner(data, [](void* p) noexcept {
+        delete static_cast<std::vector<uint8_t>*>(p);
+    });
+    return nb::ndarray<nb::numpy, uint8_t, nb::shape<-1, -1, 4>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 4 }, owner);
+}
+
+struct PyFrame
+{
+    RenderSession::FramebufferLdr rgb;
+};
+
+std::shared_ptr<caustica_py::PythonDevice> MakePythonDevice(
+    bool useVulkan, const std::string& adapter, bool debug)
+{
+    caustica_py::PythonDevice::Config cfg;
+    cfg.useVulkan = useVulkan;
+    cfg.adapter = adapter;
+    cfg.debug = debug;
+    return std::make_shared<caustica_py::PythonDevice>(cfg);
+}
+
+// Scene + frame loop bound to an existing Device. Device/GPU outlive scene switches.
+class PyApp
 {
 public:
-    PyRenderer(int width, int height, bool headless, bool useVulkan,
-               const std::string& adapter, bool debug, const std::string& scene,
-               bool realtimeMode, int accumulationTarget)
+    PyApp(std::shared_ptr<caustica_py::PythonDevice> device,
+              int width, int height, bool headless,
+              const std::string& scene, bool realtimeMode, int accumulationTarget)
     {
+        if (!device)
+            throw std::runtime_error("caustica.App: Device is required");
+
         RenderSession::Config cfg;
         cfg.width              = width;
         cfg.height             = height;
         cfg.headless           = headless;
-        cfg.useVulkan          = useVulkan;
-        cfg.adapter            = adapter;
-        cfg.debug              = debug;
+        cfg.useVulkan          = device->useVulkan();
+        cfg.adapter            = device->config().adapter;
+        cfg.debug              = device->config().debug;
         cfg.nonInteractive     = true;
         cfg.scene              = scene;
         cfg.realtimeMode       = realtimeMode;
         cfg.accumulationTarget = accumulationTarget;
 
-        m_session = std::make_unique<RenderSession>(cfg);
+        m_session = std::make_unique<RenderSession>(std::move(device), cfg);
         m_owned   = m_session->GetEngine() != nullptr;
         if (!m_owned)
-            throw std::runtime_error("caustica.Renderer: failed to initialize the renderer (see log for details)");
+            throw std::runtime_error("caustica.App: failed to initialize (see log for details)");
         g_currentExtensionApp = &m_session->GetEngine()->app();
     }
 
-    ~PyRenderer()
+    PyApp(PyApp&&) noexcept = default;
+    PyApp& operator=(PyApp&&) noexcept = default;
+    PyApp(const PyApp&) = delete;
+    PyApp& operator=(const PyApp&) = delete;
+
+    ~PyApp()
     {
         Close();
     }
@@ -212,8 +251,15 @@ public:
 
     bool isValid() const { return m_session && m_session->GetEngine() != nullptr; }
 
+    std::shared_ptr<caustica_py::PythonDevice> GetDevice() const
+    {
+        return m_session ? m_session->GetDevice() : nullptr;
+    }
+
     std::optional<caustica::AdapterInfo> GetSelectedAdapter() const
     {
+        if (auto device = GetDevice())
+            return device->selectedAdapter();
         if (!m_session || !m_session->GetEngine())
             return std::nullopt;
         caustica::GpuDevice* device = m_session->GetEngine()->app().getGpuDevice();
@@ -222,9 +268,51 @@ public:
         return *device->getSelectedAdapter();
     }
 
-private:
+    PyFrame GetFrame()
+    {
+        auto fb = GetFramebufferLdr();
+        if (!fb)
+            throw std::runtime_error("get_frame failed: no rendered LDR texture (call step() or render() first)");
+        return PyFrame{ std::move(*fb) };
+    }
+
+    PyFrame Render(float dt)
+    {
+        if (!Step(dt))
+            throw std::runtime_error("caustica.App.render: step failed");
+        return GetFrame();
+    }
+
+    PyFrame RenderReference(int spp, bool oidn, int maxFrames)
+    {
+        if (RenderReferenceFrame(spp, oidn, maxFrames) <= 0)
+            throw std::runtime_error("caustica.App.render_reference: accumulation failed");
+        return GetFrame();
+    }
+
+    bool CreateScene(const std::string& builtin, bool wait, double timeoutSeconds, int warmupFrames)
+    {
+        std::string name = builtin;
+        if (name.rfind("builtin:", 0) != 0)
+            name = "builtin:" + name;
+        return LoadScene(name, wait, timeoutSeconds, warmupFrames);
+    }
+
+protected:
     std::unique_ptr<RenderSession> m_session;
     bool m_owned = false;
+};
+
+class PyRenderer : public PyApp
+{
+public:
+    PyRenderer(int width, int height, bool headless, bool useVulkan,
+               const std::string& adapter, bool debug, const std::string& scene,
+               bool realtimeMode, int accumulationTarget)
+        : PyApp(MakePythonDevice(useVulkan, adapter, debug),
+                    width, height, headless, scene, realtimeMode, accumulationTarget)
+    {
+    }
 };
 
 NB_MODULE(caustica, m)
@@ -298,6 +386,58 @@ NB_MODULE(caustica, m)
         nb::arg("debug") = false,
         "Enumerate GPU adapters for DX12 or Vulkan without creating a renderer.");
 
+    auto deviceClass = nb::class_<caustica_py::PythonDevice>(m, "Device",
+        "GPU handle. Creating a Device does not load a scene.\n"
+        "The logical GPU, presentation surface, and optional window are created\n"
+        "on the first App bind.")
+        .def(nb::new_([](bool vulkan, const std::string& adapter, bool debug) {
+                return MakePythonDevice(vulkan, adapter, debug);
+            }),
+            nb::arg("vulkan") = false,
+            nb::arg("adapter") = "auto",
+            nb::arg("debug") = false)
+        .def_prop_ro("vulkan", [](const caustica_py::PythonDevice& self) { return self.useVulkan(); })
+        .def_prop_ro("adapter", [](const caustica_py::PythonDevice& self) { return self.config().adapter; })
+        .def_prop_ro("debug", [](const caustica_py::PythonDevice& self) { return self.config().debug; })
+        .def_prop_ro("created", [](const caustica_py::PythonDevice& self) { return self.isCreated(); })
+        .def_prop_ro("bound", [](const caustica_py::PythonDevice& self) { return self.isBound(); })
+        .def_prop_ro("width", [](const caustica_py::PythonDevice& self) { return self.width(); })
+        .def_prop_ro("height", [](const caustica_py::PythonDevice& self) { return self.height(); })
+        .def_prop_ro("headless", [](const caustica_py::PythonDevice& self) { return self.headless(); })
+        .def_prop_ro("selected_adapter", &caustica_py::PythonDevice::selectedAdapter)
+        .def("close", &caustica_py::PythonDevice::close,
+             "Release the GPU, surface, and window. Fails if an App is still bound;\n"
+             "close the App first.")
+        .def("__enter__", [](caustica_py::PythonDevice& self) -> caustica_py::PythonDevice* { return &self; },
+             nb::rv_policy::reference)
+        .def("__exit__", [](caustica_py::PythonDevice& self, nb::object, nb::object, nb::object) -> bool {
+             self.close();
+             return false;
+        }, nb::arg().none(), nb::arg().none(), nb::arg().none())
+        .def("__repr__", [](const caustica_py::PythonDevice& self) {
+            return std::string("<caustica.Device created=") + (self.isCreated() ? "True" : "False")
+                + " bound=" + (self.isBound() ? "True" : "False") + ">";
+        });
+
+    nb::class_<PyFrame>(m, "Frame",
+        "One rendered output. rgb is LDR RGBA8. depth and segmentation are reserved.")
+        .def_prop_ro("width", [](const PyFrame& self) { return self.rgb.width; })
+        .def_prop_ro("height", [](const PyFrame& self) { return self.rgb.height; })
+        .def_prop_ro("channels", [](const PyFrame& self) { return self.rgb.channels; })
+        .def_prop_ro("pixels", [](const PyFrame& self) {
+                return nb::bytes(self.rgb.pixels.data(), self.rgb.pixels.size());
+            })
+        .def_prop_ro("rgb", [](PyFrame& self) { return FramebufferToNumpy(self.rgb); },
+            "NumPy (H, W, 4) uint8 RGBA. Requires NumPy.")
+        .def_prop_ro("depth", [](const PyFrame&) -> nb::object { return nb::none(); },
+            "Not implemented yet.")
+        .def_prop_ro("segmentation", [](const PyFrame&) -> nb::object { return nb::none(); },
+            "Not implemented yet.")
+        .def("__repr__", [](const PyFrame& self) {
+            return std::string("<caustica.Frame ")
+                + std::to_string(self.rgb.width) + "x" + std::to_string(self.rgb.height) + " RGBA8>";
+        });
+
     nb::class_<RenderSession::FramebufferLdr>(m, "Framebuffer",
         "CPU-side LDR framebuffer from Renderer.get_framebuffer().\n"
         "pixels are tightly packed RGBA8 bytes (row-major, top-left origin).")
@@ -321,109 +461,103 @@ NB_MODULE(caustica, m)
                     + " RGBA8, " + std::to_string(self.pixels.size()) + " bytes>";
             });
 
-    nb::class_<PyRenderer>(m, "Renderer",
-        "Standalone path-tracer renderer.  Each instance owns its own GPU\n"
-        "device (DX12 / Vulkan), shaders, scene, and back buffer.  In headless\n"
-        "mode rendering uses offscreen back buffers without creating an OS window.\n\n"
+    nb::class_<PyApp>(m, "App",
+        "Application session bound to a Device: scene, camera, settings, and stepping.\n"
+        "load_scene / create_scene do not recreate the GPU.\n\n"
         "Example:\n"
-        "    import caustica\n"
-        "    r = caustica.Renderer(width=1280, height=720, headless=True,\n"
-        "                       scene='builtin:plane_cube')\n"
-        "    r.settings.accumulation_target = 256\n"
-        "    r.step_until_accumulated()\n"
-        "    fb = r.get_framebuffer()          # RGBA8 bytes\n"
-        "    arr = r.get_pixels()              # numpy (H,W,4) uint8\n"
-        "    r.save_screenshot('frame.png')\n"
-        "    r.close()")
-        .def(nb::init<int, int, bool, bool, const std::string&, bool, const std::string&, bool, int>(),
+        "    device = caustica.Device(adapter='auto')\n"
+        "    app = device.create_app(width=1280, height=720, headless=True)\n"
+        "    app.create_scene('plane_cube')\n"
+        "    frame = app.render_reference(spp=64)\n"
+        "    rgb = frame.rgb")
+        .def(nb::init<std::shared_ptr<caustica_py::PythonDevice>, int, int, bool, const std::string&, bool, int>(),
+             nb::arg("device"),
              nb::arg("width") = 1920,
              nb::arg("height") = 1080,
              nb::arg("headless") = true,
-             nb::arg("vulkan") = false,
-             nb::arg("adapter") = "auto",
-             nb::arg("debug") = false,
-             nb::arg("scene") = std::string(),
+             nb::arg("scene") = std::string("{\"entities\":[]}"),
              nb::arg("realtime") = false,
              nb::arg("accumulation_target") = 64)
 
-        .def_prop_ro("selected_adapter", &PyRenderer::GetSelectedAdapter,
+        .def_prop_ro("device", &PyApp::GetDevice,
+             "The Device that owns the GPU and presentation surface for this runtime.")
+        .def_prop_ro("selected_adapter", &PyApp::GetSelectedAdapter,
              "The adapter selected during renderer creation.")
 
-        .def("close", &PyRenderer::Close,
-             "Tear down the GPU device, scene and back buffer.  Called automatically\n"
-             "by the destructor but can be invoked explicitly to free GPU memory before\n"
-             "the Python process exits.")
+        .def("close", &PyApp::Close,
+             "Tear down the scene session and unbind this App from its Device.\n"
+             "The Device keeps the GPU and surface; call Device.close() to release them.")
 
         .def("load_scene",
-             [](PyRenderer& self, const std::string& name, bool wait, double timeoutSeconds, int warmupFrames) {
+             [](PyApp& self, const std::string& name, bool wait, double timeoutSeconds, int warmupFrames) {
                  return self.LoadScene(name, wait, timeoutSeconds, warmupFrames);
              },
              nb::arg("scene_name"), nb::arg("wait_until_ready") = true,
              nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4,
              "load a scene by name, builtin primitive reference, or inline scene JSON string.")
 
-        .def("wait_until_ready", &PyRenderer::WaitUntilReady,
+        .def("wait_until_ready", &PyApp::WaitUntilReady,
              nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4,
              "Wait for scene import and GPU publication, then render warm-up frames.")
 
-        .def_prop_ro("scene_ready", &PyRenderer::IsSceneReady,
+        .def_prop_ro("scene_ready", &PyApp::IsSceneReady,
              "True after scene import and GPU publication complete.")
 
         .def("load_gaussian_splats",
-             [](PyRenderer& self, const std::string& fileName, bool convertRdfToRub) {
+             [](PyApp& self, const std::string& fileName, bool convertRdfToRub) {
                  return self.LoadGaussianSplats(fileName, convertRdfToRub);
              },
              nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
              "Append a 3DGS .ply file as a GaussianSplat entity in the current scene.")
 
-        .def("load_mesh_file", &PyRenderer::loadMeshFile,
+        .def("load_mesh_file", &PyApp::loadMeshFile,
              nb::arg("file_name"),
              "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc) to the current scene.")
 
-        .def("step", &PyRenderer::Step,
+        .def("step", &PyApp::Step,
              nb::arg("dt") = -1.0f,
              "render exactly one frame.  Returns True on success.")
 
-        .def("step_n", &PyRenderer::StepN,
+        .def("step_n", &PyApp::StepN,
              nb::arg("frames"),
              "render N frames.")
 
-        .def("precache_rt_feature_presets", &PyRenderer::PrecacheRtFeaturePresets,
+        .def("precache_rt_feature_presets", &PyApp::PrecacheRtFeaturePresets,
              nb::arg("show_progress") = true,
              "UE-style load/cook precache: CreateStateObject for every cooked PT feature\n"
              "preset (REF/BUILD/FILL). Call after step()/step_n(1). Returns ready count.\n"
              "Interactive runtime does not background-warm these on the frame loop.")
 
-        .def("step_until_accumulated", &PyRenderer::StepUntilAccumulated,
+        .def("step_until_accumulated", &PyApp::StepUntilAccumulated,
              nb::arg("max_frames") = 0,
              "reset accumulation and keep stepping until the SPP target is reached\n"
              "(or `max_frames` frames have been produced if positive).")
 
-        .def("prepare_animation_frame", &PyRenderer::PrepareAnimationFrame,
+        .def("prepare_animation_frame", &PyApp::PrepareAnimationFrame,
              nb::arg("time_seconds"),
              nb::arg("imported_animations") = true,
              nb::arg("keyframes") = true,
              "Evaluate animation once at an exact timeline time, reset temporal history,\n"
              "and leave the resulting pose frozen for reference accumulation.")
 
-        .def("render_reference_frame", &PyRenderer::RenderReferenceFrame,
+        .def("render_reference_frame", &PyApp::RenderReferenceFrame,
              nb::arg("spp") = 64,
              nb::arg("oidn") = true,
              nb::arg("max_frames") = 0,
              "Render one frozen-time reference output frame. Accumulates `spp` samples\n"
              "with dt=0, optionally runs OIDN synchronously, and returns engine frame count.")
 
-        .def("render_realtime_frame", &PyRenderer::RenderRealtimeFrame,
+        .def("render_realtime_frame", &PyApp::RenderRealtimeFrame,
              nb::arg("dt") = 1.0f / 60.0f,
              "Render one realtime output frame and advance animation by `dt`. Keeps NRD,\n"
              "TAA, or DLSS-RR temporal history according to the current settings.")
 
-        .def("save_screenshot", &PyRenderer::SaveScreenshot,
+        .def("save_screenshot", &PyApp::SaveScreenshot,
              nb::arg("output_path"),
              "Save the current back buffer to PNG/JPG/BMP/TGA.")
 
         .def("get_framebuffer",
-             [](PyRenderer& self, bool hdr) -> RenderSession::FramebufferLdr {
+             [](PyApp& self, bool hdr) -> RenderSession::FramebufferLdr {
                  if (hdr)
                      throw std::runtime_error("get_framebuffer(hdr=True) is not implemented yet; use hdr=False for LDR RGBA8");
                  auto fb = self.GetFramebufferLdr();
@@ -437,7 +571,7 @@ NB_MODULE(caustica, m)
              "hdr=True is reserved for a future HDR path.")
 
         .def("get_pixels",
-             [](PyRenderer& self, bool hdr) {
+             [](PyApp& self, bool hdr) {
                  if (hdr)
                      throw std::runtime_error("get_pixels(hdr=True) is not implemented yet; use hdr=False for LDR RGBA8");
                  auto fb = self.GetFramebufferLdr();
@@ -457,21 +591,21 @@ NB_MODULE(caustica, m)
              "Read back the current LDR final color as a NumPy array of shape (H, W, 4), dtype=uint8 RGBA.\n"
              "Requires NumPy. Prefer get_framebuffer() if you only need raw bytes.")
 
-        .def("set_camera", &PyRenderer::SetCamera,
+        .def("set_camera", &PyApp::SetCamera,
              nb::arg("position"), nb::arg("direction"),
              nb::arg("up") = nb::make_tuple(0.0f, 1.0f, 0.0f),
              "Position the camera using world-space pos / dir / up triples.")
 
-        .def("set_camera_fov", &PyRenderer::SetCameraFOV,
+        .def("set_camera_fov", &PyApp::SetCameraFOV,
              nb::arg("vertical_fov_degrees"))
 
-        .def("set_camera_intrinsics", &PyRenderer::SetCameraIntrinsics,
+        .def("set_camera_intrinsics", &PyApp::SetCameraIntrinsics,
              nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"),
              nb::arg("width"), nb::arg("height"),
              "Set an off-center pinhole projection from pixel-space camera intrinsics.")
 
         .def("get_scene_bounds",
-             [](PyRenderer& self) -> nb::object {
+             [](PyApp& self) -> nb::object {
                  auto bbox = CurrentSceneBoundingBox(self.GetApp());
                  if (!bbox) return nb::none();
                  return nb::make_tuple(Float3ToTuple(bbox->m_mins), Float3ToTuple(bbox->m_maxs));
@@ -479,7 +613,7 @@ NB_MODULE(caustica, m)
              "Return the active scene's world-space ((min.xyz), (max.xyz)) AABB, or None.")
 
         .def_prop_ro("scene_bounds",
-             [](PyRenderer& self) -> nb::object {
+             [](PyApp& self) -> nb::object {
                  auto bbox = CurrentSceneBoundingBox(self.GetApp());
                  if (!bbox) return nb::none();
                  return nb::make_tuple(Float3ToTuple(bbox->m_mins), Float3ToTuple(bbox->m_maxs));
@@ -490,7 +624,7 @@ NB_MODULE(caustica, m)
              "Refreshed automatically after every ``load_scene`` / ``load_mesh_file`` call.")
 
         .def_prop_ro("scene_bounds_center",
-             [](PyRenderer& self) -> nb::object {
+             [](PyApp& self) -> nb::object {
                  auto bbox = CurrentSceneBoundingBox(self.GetApp());
                  if (!bbox) return nb::none();
                  return Float3ToTuple(bbox->center());
@@ -498,36 +632,119 @@ NB_MODULE(caustica, m)
              "Center of `scene_bounds`, or ``None`` for an empty scene.")
 
         .def_prop_ro("scene_bounds_size",
-             [](PyRenderer& self) -> nb::object {
+             [](PyApp& self) -> nb::object {
                  auto bbox = CurrentSceneBoundingBox(self.GetApp());
                  if (!bbox) return nb::none();
                  return Float3ToTuple(bbox->diagonal());
              },
              "Diagonal extent (max - min) of `scene_bounds`, or ``None`` for an empty scene.")
 
+        .def_prop_ro("scene",
+             [](PyApp& self) {
+                 App* app = self.GetApp();
+                 return app ? caustica::activeScene(*app) : std::shared_ptr<Scene>{};
+             },
+             "Current loaded Scene, or None before a scene is available.")
+
         .def_prop_ro("app",
-             [](PyRenderer& self) -> App* { return self.GetApp(); },
+             [](PyApp& self) -> App* { return self.GetApp(); },
              nb::rv_policy::reference,
-             "Access the underlying Sample instance to use the shared bindings.")
+             "Underlying engine Sample. Prefer app.scene / app.settings / app.step().")
 
         .def_prop_ro("settings",
-             [](PyRenderer& self) -> PathTracerSettings* {
+             [](PyApp& self) -> PathTracerSettings* {
                  App* app = self.GetApp();
                  return app ? caustica::settings(*app) : nullptr;
              },
              nb::rv_policy::reference,
              "Live `settings` mirror (same object as caustica.settings()).")
 
-        .def("__enter__", [](PyRenderer& self) -> PyRenderer* { return &self; },
+        .def("create_scene", &PyApp::CreateScene,
+             nb::arg("builtin") = std::string("plane"),
+             nb::arg("wait_until_ready") = true,
+             nb::arg("timeout_seconds") = 600.0,
+             nb::arg("warmup_frames") = 4,
+             "Load a builtin primitive scene without recreating the Device.")
+
+        .def("render",
+             [](PyApp& self, float dt, nb::object cameras) {
+                 if (!cameras.is_none() && nb::len(cameras) != 1)
+                     throw std::runtime_error("App.render(cameras=...): multiple cameras are not implemented yet");
+                 return self.Render(dt);
+             },
+             nb::arg("dt") = -1.0f,
+             nb::arg("cameras") = nb::none(),
+             "Step one frame and return a Frame. Multi-camera lists are not implemented yet.")
+
+        .def("render_reference", &PyApp::RenderReference,
+             nb::arg("spp") = 64,
+             nb::arg("oidn") = true,
+             nb::arg("max_frames") = 0,
+             "Accumulate a reference frame and return a Frame.")
+
+        .def("get_frame", &PyApp::GetFrame,
+             "Return the last rendered LDR frame without stepping.")
+
+        .def("get_rgb",
+             [](PyApp& self, bool hdr) {
+                 if (hdr)
+                     throw std::runtime_error("get_rgb(hdr=True) is not implemented yet");
+                 auto fb = self.GetFramebufferLdr();
+                 if (!fb)
+                     throw std::runtime_error("get_rgb failed: no rendered LDR texture (call step() or render() first)");
+                 return FramebufferToNumpy(*fb);
+             },
+             nb::arg("hdr") = false,
+             "Read back LDR RGBA8 as a NumPy (H, W, 4) uint8 array.")
+
+        .def("get_depth", [](PyApp&) {
+                throw std::runtime_error("App.get_depth() is not implemented yet");
+            },
+            "Reserved. Depth readback is not implemented yet.")
+
+        .def("get_segmentation", [](PyApp&) {
+                throw std::runtime_error("App.get_segmentation() is not implemented yet");
+            },
+            "Reserved. Segmentation readback is not implemented yet.")
+
+        .def("__enter__", [](PyApp& self) -> PyApp* { return &self; },
              nb::rv_policy::reference)
-        .def("__exit__",  [](PyRenderer& self, nb::object, nb::object, nb::object) -> bool {
+        .def("__exit__",  [](PyApp& self, nb::object, nb::object, nb::object) -> bool {
              self.Close();
              return false;
         }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 
+    nb::class_<PyRenderer, PyApp>(m, "Renderer",
+        "Compatibility wrapper: creates a Device and App together.\n"
+        "Prefer Device + App when the GPU should outlive scene loads.")
+        .def(nb::init<int, int, bool, bool, const std::string&, bool, const std::string&, bool, int>(),
+             nb::arg("width") = 1920,
+             nb::arg("height") = 1080,
+             nb::arg("headless") = true,
+             nb::arg("vulkan") = false,
+             nb::arg("adapter") = "auto",
+             nb::arg("debug") = false,
+             nb::arg("scene") = std::string(),
+             nb::arg("realtime") = false,
+             nb::arg("accumulation_target") = 64);
+
+    deviceClass.def("create_app",
+        [](std::shared_ptr<caustica_py::PythonDevice> device,
+           int width, int height, bool headless,
+           const std::string& scene, bool realtime, int accumulationTarget) {
+            return PyApp(std::move(device), width, height, headless, scene, realtime, accumulationTarget);
+        },
+        nb::arg("width") = 1920,
+        nb::arg("height") = 1080,
+        nb::arg("headless") = true,
+        nb::arg("scene") = std::string("{\"entities\":[]}"),
+        nb::arg("realtime") = false,
+        nb::arg("accumulation_target") = 64,
+        "Create an App on this Device. The GPU and surface are created on the first bind.");
+
     m.def("app", []() -> App* { return &RequireCurrentApp(); },
           nb::rv_policy::reference,
-          "Return the Sample owned by the most recently created Renderer.");
+          "Return the engine Sample owned by the most recently created App or Renderer.");
 
     m.def("settings", []() -> PathTracerSettings* {
             return caustica::settings(RequireCurrentApp());

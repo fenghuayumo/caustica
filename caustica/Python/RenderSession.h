@@ -5,6 +5,8 @@
 
 #if CAUSTICA_WITH_PYTHON
 
+#include "PythonDevice.h"
+
 #include <engine/EngineApp.h>
 
 #include <memory>
@@ -14,11 +16,6 @@
 #include <vector>
 
 #include <math/math.h>
-
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-#include <d3d12.h>
-#include <wrl/client.h>
-#endif
 
 namespace caustica_py
 {
@@ -46,7 +43,9 @@ public:
         int         accumulationTarget = 64;
     };
 
-    explicit RenderSession(const Config& cfg);
+    // `device` must outlive the session. GPU creation is applied on this
+    // constructor via Device::ensureCreated(width, height, headless).
+    explicit RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, const Config& cfg);
     ~RenderSession();
 
     RenderSession(const RenderSession&) = delete;
@@ -93,19 +92,16 @@ public:
 
     caustica::GpuDevice* getGpuDevice() { return m_engine ? m_engine->device() : nullptr; }
     const Config&              GetConfig() const  { return m_config; }
+    std::shared_ptr<caustica_py::PythonDevice> GetDevice() const { return m_device; }
 
 private:
     void shutdown();
 
     Config                                          m_config;
+    std::shared_ptr<caustica_py::PythonDevice>      m_device;
     std::unique_ptr<caustica::EngineApp>            m_engine;
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    Microsoft::WRL::ComPtr<ID3D12DeviceFactory>     m_d3d12DeviceFactory;
-#endif
     bool                                            m_initialized = false;
-    bool                                            m_platformInitialized = false;
     double                                          m_lastTimeSeconds = 0.0;
-    uint32_t                                        m_lastRenderedBackBufferIndex = UINT32_MAX;
 };
 
 #endif // CAUSTICA_WITH_PYTHON

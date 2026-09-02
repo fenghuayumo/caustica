@@ -1,6 +1,6 @@
 #include <engine/App.h>
+#include <engine/AppObservers.h>
 #include <engine/AppResources.h>
-#include <engine/EntryPoint.h>
 #include <engine/internal/GpuRenderScheduleRegistration.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneQuery.h>
@@ -12,9 +12,10 @@
 #include <engine/Time.h>
 
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <core/ThreadContext.h>
+
 #include <core/task/TaskRuntime.h>
-#include <engine/cmdline_utils.h>
 #include <platform/window.h>
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
@@ -34,10 +35,25 @@
 namespace caustica
 {
 
-void App::onEvent(Event& event)
+void App::addEventObserver(std::function<void(Event&)> handler)
 {
-    if (m_eventHandler)
-        m_eventHandler(event);
+    if (auto* observers = tryResource<EventObservers>())
+        observers->handlers.push_back(std::move(handler));
+}
+
+void App::dispatchEvent(Event& event)
+{
+    if (event.getEventType() == EventType::WindowClose)
+        requestExit();
+
+    if (auto* observers = tryResource<EventObservers>())
+    {
+        for (auto& handler : observers->handlers)
+        {
+            if (handler)
+                handler(event);
+        }
+    }
 }
 
 void App::queueEvent(std::unique_ptr<Event> event)
@@ -56,39 +72,36 @@ void App::processEventQueue()
     for (auto& e : pending)
     {
         if (e)
-            onEvent(*e);
+            dispatchEvent(*e);
     }
-}
-
-void App::onWindowEvent(Event& event)
-{
-    onEvent(event);
 }
 
 void App::installWindowEventCallback()
 {
     if (Window* w = window())
-        w->setEventCallback([this](Event& e) { onWindowEvent(e); });
+        w->setEventCallback([this](Event& e) { dispatchEvent(e); });
 }
 
-static double GetNow(bool headless)
+static double GetNow()
 {
-    if (!headless)
-        return glfwGetTime();
     using Clock = std::chrono::steady_clock;
     static const auto start = Clock::now();
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
-App::App() = default;
-
-App::App(GpuDevice* gpuDevice, Window* window)
-    : m_ExternalGpuDevice(gpuDevice)
-    , m_ExternalWindow(window)
+App::App()
+    : m_surfaceHook(*this)
 {
-    bindFrameDriver(gpuDevice);
-    if (gpuDevice)
-        m_graphicsInitialized = true;
+    emplaceResource<EventObservers>();
+}
+
+App::App(GpuDevice* gpuDevice, Window* window, GpuSurface* surface)
+    : App()
+{
+    m_device = gpuDevice;
+    m_window = window;
+    bindSurface(surface);
+    installWindowEventCallback();
 }
 
 App::~App()
@@ -180,33 +193,22 @@ void App::registerDefaultSchedules()
 
 #if CAUSTICA_WITH_STREAMLINE
     addSystem<system_label::StreamlineSimStart>(AppSchedule::First, [](SystemContext& ctx) {
-        if (ctx.gpuDevice && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
+        if (ctx.gpuDevice && !ctx.gpuDevice->isHeadless())
             StreamlineIntegration::Get().simStart(*ctx.gpuDevice);
     });
 #endif
-
-    addSystem<system_label::BeforeFrame>(AppSchedule::First, [](SystemContext& ctx) {
-        if (ctx.gpuDevice && ctx.app.beforeFrame)
-            ctx.app.beforeFrame(*ctx.gpuDevice, ctx.frameIndex);
-    });
 
     addSystem<system_label::ProcessEventQueue>(AppSchedule::First, [](SystemContext& ctx) {
         ctx.app.processEventQueue();
     });
 
     addSystem<system_label::NotifyDpiScale>(AppSchedule::preUpdate, [](SystemContext& ctx) {
-        if (ctx.runRender && ctx.gpuDevice)
-            ctx.app.notifyDpiScaleIfChanged(*ctx.gpuDevice);
+        if (ctx.runRender)
+            ctx.app.notifyDpiScaleIfChanged();
     });
 
-    addSystem<system_label::BeforeAnimate>(AppSchedule::preUpdate, [](SystemContext& ctx) {
-        if (!ctx.gpuDevice)
-            return;
-
-        if (ctx.app.beforeAnimate)
-            ctx.app.beforeAnimate(*ctx.gpuDevice, ctx.frameIndex);
-        ctx.app.onBeforeAnimate(*ctx.gpuDevice, ctx.frameIndex);
-    });
+    // Ordering fence for editor / host systems that run just before simulation.
+    addSystem<system_label::PrepareSimulation>(AppSchedule::preUpdate, [](SystemContext&) {});
 
     addSystem<system_label::SetRenderFrameIndex>(AppSchedule::Extract, [](SystemContext& ctx) {
         if (ctx.gpuDevice)
@@ -236,16 +238,14 @@ void App::ensurePostUpdateTail()
     if (m_postUpdateTailRegistered)
         return;
 
-    addSystem<system_label::AfterAnimate>(AppSchedule::Last, [](SystemContext& ctx) {
+    addSystem<system_label::EndSimulation>(AppSchedule::Last, [](SystemContext& ctx) {
         if (!ctx.runUpdate || !ctx.gpuDevice)
             return;
 
 #if CAUSTICA_WITH_STREAMLINE
-        if (ctx.runRender && !ctx.gpuDevice->m_DeviceParams.headlessDevice)
+        if (ctx.runRender && !ctx.gpuDevice->isHeadless())
             StreamlineIntegration::Get().simEnd(*ctx.gpuDevice);
 #endif
-        if (ctx.app.afterAnimate)
-            ctx.app.afterAnimate(*ctx.gpuDevice, ctx.frameIndex);
     });
 
     m_postUpdateTailRegistered = true;
@@ -259,37 +259,11 @@ void App::runStartupSchedules()
         m_world,
         gpuDevice,
         0.0f,
-        gpuDevice ? gpuDevice->m_FrameIndex : 0u,
+        gpuDevice ? gpuDevice->getFrameIndex() : 0u,
         isWindowFocused(),
         isWindowVisible(),
     };
     runSchedule(AppSchedule::Startup, context);
-}
-
-bool App::initializeGraphics(const GpuDeviceCreateDesc& desc)
-{
-    GpuDeviceCreateResult result = GpuDevice::createInitialized(desc);
-    if (!result.gpuDevice)
-        return false;
-
-    m_GpuDevice = std::move(result.gpuDevice);
-    m_Window = std::move(result.window);
-
-    bindFrameDriver(m_GpuDevice.get());
-    installWindowEventCallback();
-    m_graphicsInitialized = true;
-    return true;
-}
-
-bool App::initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc)
-{
-    invokePreGpuDeviceInitHook();
-
-    desc.api = resolveGraphicsAPIFromCommandLine(argc, argv);
-    if (desc.headless)
-        desc.vsyncEnabled = false;
-
-    return initializeGraphics(desc);
 }
 
 bool App::finishStartup()
@@ -297,9 +271,9 @@ bool App::finishStartup()
     if (m_started)
         return true;
 
-    if (!m_graphicsInitialized && !m_ExternalGpuDevice)
+    if (!device())
     {
-        error("App::finishStartup requires initializeGraphics or an external GpuDevice");
+        error("App::finishStartup requires a GpuDevice");
         return false;
     }
 
@@ -317,13 +291,12 @@ bool App::finishStartup()
 
 void App::syncSwapChain()
 {
-    GpuDevice* gpuDevice = device();
-    if (!gpuDevice || !gpuDevice->getDevice())
+    GpuSurface* gpuSurface = surface();
+    if (!gpuSurface)
         return;
 
-    const BackBufferInfo backBuffer = gpuDevice->getBackBufferInfo();
-    notifyBackBufferResizing();
-    notifyBackBufferResized(backBuffer.width, backBuffer.height, backBuffer.sampleCount);
+    gpuSurface->handleResizing();
+    gpuSurface->handleResized();
 }
 
 void App::shutdown()
@@ -339,7 +312,7 @@ void App::shutdown()
             m_world,
             gpuDevice,
             0.0f,
-            gpuDevice ? gpuDevice->m_FrameIndex : 0u,
+            gpuDevice ? gpuDevice->getFrameIndex() : 0u,
             isWindowFocused(),
             isWindowVisible(),
         };
@@ -357,58 +330,40 @@ void App::shutdown()
     m_updateTailRegistered = false;
     m_postUpdateTailRegistered = false;
 
-    GpuDevice* gpuDevice = device();
-    unbindFrameDriver(gpuDevice);
+    unbindSurface();
+    m_device = nullptr;
+    m_window = nullptr;
 
-    if (m_GpuDevice)
-    {
-        m_GpuDevice->releaseWindowOwnership();
-        m_Window.reset();
-        m_GpuDevice->shutdown();
-        m_GpuDevice.reset();
-    }
-
-    m_graphicsInitialized = false;
     m_pluginsBuilt = false;
     m_shutdownCalled = true;
 }
 
 GpuDevice* App::getGpuDevice() const { return device(); }
 Window* App::getWindow() const { return window(); }
+GpuSurface* App::getSurface() const { return surface(); }
 
-GpuDevice* App::device() const
+void App::bindSurface(GpuSurface* gpuSurface)
 {
-    return m_GpuDevice ? m_GpuDevice.get() : m_ExternalGpuDevice;
+    unbindSurface();
+    m_surface = gpuSurface;
+    if (m_surface)
+        m_surface->addObserver(m_surfaceHook);
 }
 
-Window* App::window() const
+void App::unbindSurface()
 {
-    return m_Window ? m_Window.get() : m_ExternalWindow;
+    if (m_surface)
+        m_surface->removeObserver(m_surfaceHook);
+    m_surface = nullptr;
 }
 
-void App::bindFrameDriver(GpuDevice* gpuDevice)
-{
-    if (gpuDevice)
-        gpuDevice->setFrameDriver(this);
-}
-
-void App::unbindFrameDriver(GpuDevice* gpuDevice)
-{
-    if (gpuDevice && gpuDevice->getFrameDriver() == static_cast<IGpuFrameDriver*>(this))
-        gpuDevice->setFrameDriver(nullptr);
-}
-
-void App::notifyBackBufferResizing()
+void App::handleSurfaceResizing()
 {
     caustica::backBufferResizing(*this);
-
-    if (m_backBufferResizeHandler)
-        m_backBufferResizeHandler(true, 0, 0, 0);
 }
 
-void App::notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
+void App::handleSurfaceResized(uint32_t, uint32_t, uint32_t)
 {
-    onBackBufferResized(width, height, sampleCount);
 }
 
 void App::waitForRenderThreadIdle()
@@ -475,13 +430,9 @@ void App::requestExit()
 void App::requestRenderUnfocused()
 {
     if (GpuDevice* gpuDevice = device())
-        gpuDevice->m_RequestedRenderUnfocused = true;
+        gpuDevice->requestRenderUnfocused();
 }
 
-void App::notifyDisplayScaleChanged(float scaleX, float scaleY)
-{
-    onDisplayScaleChanged(scaleX, scaleY);
-}
 
 bool App::isWindowVisible() const
 {
@@ -497,13 +448,8 @@ bool App::isWindowFocused() const
 
 void App::syncDpiScaleFromWindow()
 {
-    Window* w = window();
-    GpuDevice* gpuDevice = device();
-    if (!w || !gpuDevice)
-        return;
-
-    gpuDevice->m_DPIScaleFactorX = w->getDPIScaleX();
-    gpuDevice->m_DPIScaleFactorY = w->getDPIScaleY();
+    if (GpuSurface* gpuSurface = surface())
+        gpuSurface->syncDpiFromWindow();
 }
 
 void App::syncWindowState()
@@ -519,33 +465,20 @@ void App::syncWindowState()
 
 void App::updateWindowSize()
 {
-    GpuDevice* gpuDevice = device();
-    if (!gpuDevice)
+    GpuSurface* gpuSurface = surface();
+    if (!gpuSurface)
         return;
 
-    // ADR 0002 S5: non-blocking resize — do not AndWait behind a path-trace frame.
-    // RT applies swapchain resize before the next present; Logic continues immediately.
     if (m_useDedicatedRenderThread && m_renderThread.isRunning())
     {
-        if (!gpuDevice->needsWindowSizeSync())
+        if (!gpuSurface->needsWindowSizeSync())
             return;
-        enqueueRenderCommandImpl([gpuDevice]() { gpuDevice->updateWindowSize(); });
+        enqueueRenderCommandImpl([gpuSurface]() { gpuSurface->updateWindowSize(); });
     }
     else
     {
-        gpuDevice->updateWindowSize();
+        gpuSurface->updateWindowSize();
     }
-}
-
-void App::animate(double elapsedTime, bool windowIsFocused)
-{
-    (void)elapsedTime;
-    (void)windowIsFocused;
-}
-
-void App::render()
-{
-    onRender();
 }
 
 bool App::skipRenderPhase() const
@@ -587,23 +520,6 @@ void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
     runSchedule(AppSchedule::render, context);
 }
 
-void App::onBackBufferResizing()
-{
-    if (m_backBufferResizeHandler)
-        m_backBufferResizeHandler(true, 0, 0, 0);
-}
-
-void App::onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount)
-{
-    if (m_backBufferResizeHandler)
-        m_backBufferResizeHandler(false, width, height, sampleCount);
-}
-
-void App::onDisplayScaleChanged(float scaleX, float scaleY)
-{
-    if (m_displayScaleHandler)
-        m_displayScaleHandler(scaleX, scaleY);
-}
 
 bool App::shouldRenderWhenUnfocused() const
 {
@@ -615,21 +531,19 @@ bool App::shouldRenderWhenUnfocused() const
 
 void App::finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime)
 {
-    gpuDevice->updateAverageFrameTime(elapsedTime);
-    gpuDevice->m_PreviousFrameTimestamp = curTime;
-    ++gpuDevice->m_FrameIndex;
+    gpuDevice->advanceFrameClock(elapsedTime, curTime);
 }
 
-void App::notifyDpiScaleIfChanged(GpuDevice& gpuDevice)
+void App::notifyDpiScaleIfChanged()
 {
-    if (gpuDevice.m_PrevDPIScaleFactorX != gpuDevice.m_DPIScaleFactorX ||
-        gpuDevice.m_PrevDPIScaleFactorY != gpuDevice.m_DPIScaleFactorY)
+    if (GpuSurface* gpuSurface = surface())
     {
-        notifyDisplayScaleChanged(gpuDevice.m_DPIScaleFactorX, gpuDevice.m_DPIScaleFactorY);
-        gpuDevice.m_PrevDPIScaleFactorX = gpuDevice.m_DPIScaleFactorX;
-        gpuDevice.m_PrevDPIScaleFactorY = gpuDevice.m_DPIScaleFactorY;
+        float scaleX = 1.f;
+        float scaleY = 1.f;
+        (void)gpuSurface->takeDpiScaleChange(scaleX, scaleY);
     }
-    gpuDevice.m_RequestedRenderUnfocused = false;
+    if (GpuDevice* gpuDevice = device())
+        gpuDevice->clearRenderUnfocusedRequest();
 }
 
 bool App::syncRenderThreadCompletedFrames(SystemContext& context)
@@ -673,7 +587,7 @@ bool App::dispatchScheduledRender(SystemContext& context)
         && frameSettings->EnableAnimations;
 #if CAUSTICA_WITH_STREAMLINE
     void* slFrameToken = nullptr;
-    if (!gpuDevice->m_DeviceParams.headlessDevice)
+    if (!gpuDevice->isHeadless())
         slFrameToken = StreamlineIntegration::Get().getFrameTokenForRender();
 #endif
 
@@ -719,10 +633,7 @@ bool App::dispatchScheduledRender(SystemContext& context)
 void App::finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(0));
-    // RHI GC always runs at the end of executeRenderPhase (dedicated and --syncRender).
-    gpuDevice.updateAverageFrameTime(elapsedTime);
-    gpuDevice.m_PreviousFrameTimestamp = curTime;
-    ++gpuDevice.m_FrameIndex;
+    gpuDevice.advanceFrameClock(elapsedTime, curTime);
 }
 
 bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double curTime, uint32_t frameIndex)
@@ -738,10 +649,6 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (!m_useDedicatedRenderThread || !m_renderThread.isRunning())
         task::pumpRender();
 
-    if (frameIndex == 0 && gpuDevice->m_SkipRenderOnFirstFrame)
-        return true;
-
-    // Window close: finish the frame token quickly without path-tracing / RTPSO work.
     if (gpuDevice->isShuttingDown() || m_requestExit.load(std::memory_order_acquire))
         return true;
 
@@ -751,7 +658,7 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     {
         render::ScopedFrameCpuTimer acquireTimer(
             telemetry, frameIndex, render::FrameCpuStage::Acquire);
-        beganFrame = gpuDevice->beginFrame();
+        beganFrame = m_surface ? m_surface->acquireFrame() : false;
     }
     if (!beganFrame)
     {
@@ -762,29 +669,20 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
             gpuDevice->setShuttingDown(true);
             return false;
         }
-        return true; // recoverable acquire/minimize condition
+        return true;
     }
 
-    // ToneMappingPass is render-owned. Advancing it on Logic while Render(N)
-    // was still consuming the pass raced m_FrameTime/m_FrameParamsSet.
     if (auto* renderer = worldRenderer(*this))
     {
         if (auto* toneMappingPass = renderer->getToneMappingPass())
             toneMappingPass->advanceFrame(static_cast<float>(elapsedTime));
     }
 
-    uint32_t fi = frameIndex;
-    if (gpuDevice->m_SkipRenderOnFirstFrame)
-        --fi;
 #if CAUSTICA_WITH_STREAMLINE
-    if (!gpuDevice->m_DeviceParams.headlessDevice)
+    if (!gpuDevice->isHeadless())
         StreamlineIntegration::Get().renderStart(*gpuDevice);
 #endif
-    if (beforeRender)
-        beforeRender(*gpuDevice, fi);
-    render();
-    if (afterRender)
-        afterRender(*gpuDevice, fi);
+    onRender();
 
     if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
         rhiDevice && !rhiDevice->isDeviceHealthy())
@@ -794,19 +692,17 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
         return false;
     }
 #if CAUSTICA_WITH_STREAMLINE
-    if (!gpuDevice->m_DeviceParams.headlessDevice)
+    if (!gpuDevice->isHeadless())
     {
         StreamlineIntegration::Get().renderEnd(*gpuDevice);
         StreamlineIntegration::Get().presentStart(*gpuDevice);
     }
 #endif
-    if (beforePresent)
-        beforePresent(*gpuDevice, fi);
     bool ok = false;
     {
         render::ScopedFrameCpuTimer presentTimer(
             telemetry, frameIndex, render::FrameCpuStage::Present);
-        ok = gpuDevice->present();
+        ok = m_surface ? m_surface->presentFrame() : false;
     }
     if (telemetry)
     {
@@ -821,13 +717,10 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
             present.tearingActive,
             present.backBufferCount);
     }
-    if (afterPresent)
-        afterPresent(*gpuDevice, fi);
 #if CAUSTICA_WITH_STREAMLINE
-    if (!gpuDevice->m_DeviceParams.headlessDevice)
+    if (!gpuDevice->isHeadless())
         StreamlineIntegration::Get().presentEnd(*gpuDevice);
 #endif
-    // Sole GC site for both dedicated RT and --syncRender (ADR 0001 P2).
     if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice())
         rhiDevice->runGarbageCollection();
     return ok;
@@ -839,19 +732,19 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
     if (!gpuDevice)
         return false;
 
-    const double curTime = GetNow(gpuDevice->m_DeviceParams.headlessDevice);
-    const double elapsedTime = elapsedTimeOverride.value_or(curTime - gpuDevice->m_PreviousFrameTimestamp);
+    const double curTime = GetNow();
+    const double elapsedTime = elapsedTimeOverride.value_or(curTime - gpuDevice->getPreviousFrameTimestamp());
 
     const bool windowVisible = isWindowVisible();
     const bool windowFocused = isWindowFocused();
-    const bool wantsRender = windowFocused || shouldRenderWhenUnfocused() || gpuDevice->m_RequestedRenderUnfocused;
+    const bool wantsRender = windowFocused || shouldRenderWhenUnfocused() || gpuDevice->wantsRenderUnfocused();
 
     SystemContext scheduleContext{
         *this,
         m_world,
         gpuDevice,
         float(elapsedTime),
-        gpuDevice->m_FrameIndex,
+        gpuDevice->getFrameIndex(),
         windowFocused,
         windowVisible,
     };
@@ -962,8 +855,8 @@ void App::run()
         return;
     }
 
-    bindFrameDriver(gpuDevice);
-    gpuDevice->m_PreviousFrameTimestamp = GetNow(gpuDevice->m_DeviceParams.headlessDevice);
+    bindSurface(m_surface);
+    gpuDevice->seedFrameClock(GetNow());
 
     if (m_useDedicatedRenderThread)
         m_renderThread.start();
@@ -975,7 +868,7 @@ void App::run()
     Window* w = window();
     if (!w)
     {
-        if (!gpuDevice->m_DeviceParams.headlessDevice)
+        if (!gpuDevice->isHeadless())
         {
             error("App::run requires a Window");
             return;
@@ -1002,7 +895,7 @@ void App::run()
         bool ok = gpuDevice->getDevice()->waitForIdle();
 #if CAUSTICA_WITH_AFTERMATH
         dumpingCrash |= !ok;
-        if (dumpingCrash && gpuDevice->m_DeviceParams.enableAftermath)
+        if (dumpingCrash && gpuDevice->isAftermathEnabled())
             AftermathCrashDump::waitForCrashDump();
 #else
         (void)ok;
@@ -1025,8 +918,7 @@ void App::run()
             // only publishes the request so Render/worker callers never race
             // GlfwWindow::m_ExitRequested or call GLFW from the wrong thread.
             w->setExit(true);
-            if (GLFWwindow* glfwWindow = gpuDevice->getWindow())
-                glfwHideWindow(glfwWindow);
+            w->hide();
             break;
         }
         if (w->getExit())
@@ -1053,18 +945,13 @@ void App::run()
     bool ok = gpuDevice->getDevice()->waitForIdle();
 #if CAUSTICA_WITH_AFTERMATH
     dumpingCrash |= !ok;
-    if (dumpingCrash && gpuDevice->m_DeviceParams.enableAftermath)
+    if (dumpingCrash && gpuDevice->isAftermathEnabled())
         AftermathCrashDump::waitForCrashDump();
 #else
     (void)ok;
 #endif
 
     shutdown();
-}
-
-bool App::frame()
-{
-    return stepFrame();
 }
 
 bool App::stepFrame()

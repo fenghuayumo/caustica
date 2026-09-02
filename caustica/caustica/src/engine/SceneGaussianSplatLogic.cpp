@@ -1,4 +1,5 @@
 #include <engine/SceneGaussianSplatLogic.h>
+#include <engine/App.h>
 #include <render/SceneGaussianSplatPasses.h>
 
 #include <backend/GpuDevice.h>
@@ -57,13 +58,13 @@ void ApplyGaussianSplatLocalBounds(
 
 void SceneGaussianSplatLogic::onSceneLoaded(
     SceneGaussianSplatPasses& passes,
-    PathTracerSettings& settings)
+    PathTracerSettings& settings,
+    App& app)
 {
     assertLogicThread();
     // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic;
     // move GaussianSplatPass factory to RT before removing this drain).
-    if (passes.m_gpuDevice)
-        passes.m_gpuDevice->waitForRenderThreadIdle();
+    app.waitForRenderThreadIdle();
     loadFromSceneEntities(passes, settings);
 }
 
@@ -71,23 +72,23 @@ bool SceneGaussianSplatLogic::loadFromFile(
     SceneGaussianSplatPasses& passes,
     PathTracerSettings& settings,
     const std::filesystem::path& fileName,
+    App& app,
     bool convertRdfToRub)
 {
     assertLogicThread();
     // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass create still on Logic).
-    if (passes.m_gpuDevice)
-        passes.m_gpuDevice->waitForRenderThreadIdle();
+    app.waitForRenderThreadIdle();
     return attachToScene(passes, settings, fileName, convertRdfToRub);
 }
 
 bool SceneGaussianSplatLogic::removeObjectsUnderEntity(
     SceneGaussianSplatPasses& passes,
-    ecs::Entity rootEntity)
+    ecs::Entity rootEntity,
+    App& app)
 {
     assertLogicThread();
     // THREADING: Logic↔RT wait — ADR 0002 S5 remaining (Pass shared_ptr drop vs RT use).
-    if (passes.m_gpuDevice)
-        passes.m_gpuDevice->waitForRenderThreadIdle();
+    app.waitForRenderThreadIdle();
 
     if (!ecs::isValid(rootEntity))
         return false;

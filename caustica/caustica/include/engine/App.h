@@ -1,7 +1,7 @@
 #pragma once
 
 #include <backend/GpuDevice.h>
-#include <backend/GpuFrameDriver.h>
+#include <backend/SurfaceObserver.h>
 #include <engine/AppSchedules.h>
 #include <engine/EntityWorld.h>
 #include <engine/Plugin.h>
@@ -11,8 +11,8 @@
 #include <ecs/World.h>
 #include <events/event.h>
 
+#include <atomic>
 #include <cstdint>
-
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -27,6 +27,7 @@ namespace caustica
 
 class App;
 class GpuDevice;
+class GpuSurface;
 class Window;
 
 void EnqueueRenderCommand(App& app, std::function<void()> command);
@@ -200,23 +201,18 @@ SystemFn makeTypedSystem(F&& system)
 }
 } // namespace detail
 
-// Plugin-driven application: window/GPU and frame loop.
+// Plugin-driven ECS runtime: schedules, plugins, and the frame loop.
+// Borrows a GpuDevice created by EngineApp (or a host). Does not create GPU.
 //
-// Prefer EngineApp::create for new apps (Bevy-like one-liner):
+// Prefer EngineApp::create for new apps:
 //   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
 //   engine->addSystem<MySimLabel>(AppSchedule::update, [](EntityWorld scene, ...) { ... });
-//   engine->run(); // finishStartup runs automatically
-//
-// Low-level lifecycle (advanced):
-//   app.addPlugins(DefaultPlugins{sceneConfig});
-//   app.initializeGraphics(argc, argv, desc);
-//   app.finishStartup();
-//   app.run();
-class App : public IGpuFrameDriver
+//   engine->run();
+class App
 {
 public:
     App();
-    App(GpuDevice* gpuDevice, Window* window = nullptr);
+    App(GpuDevice* gpuDevice, Window* window = nullptr, GpuSurface* surface = nullptr);
     ~App();
 
     template<typename T, typename... Args>
@@ -379,11 +375,8 @@ public:
     [[nodiscard]] AppSchedules& schedules() { return m_schedules; }
     [[nodiscard]] const AppSchedules& schedules() const { return m_schedules; }
 
-    bool initializeGraphics(const GpuDeviceCreateDesc& desc);
-    bool initializeGraphics(int argc, const char* const* argv, GpuDeviceCreateDesc& desc);
     bool finishStartup();
 
-    [[nodiscard]] bool isGraphicsInitialized() const { return m_graphicsInitialized; }
     [[nodiscard]] bool isStarted() const { return m_started; }
 
     void syncSwapChain();
@@ -392,16 +385,14 @@ public:
 
     GpuDevice* getGpuDevice() const;
     Window* getWindow() const;
+    GpuSurface* getSurface() const;
 
     void run();
 
-    bool frame();
     bool stepFrame();
     bool stepFrame(double fixedElapsedTimeSeconds);
 
     bool runFrame(std::optional<double> elapsedTimeOverride = std::nullopt);
-    void animate(double elapsedTime, bool windowIsFocused);
-    void render();
 
     void setUseDedicatedRenderThread(bool enabled) { m_useDedicatedRenderThread = enabled; }
     [[nodiscard]] bool useDedicatedRenderThread() const { return m_useDedicatedRenderThread; }
@@ -410,34 +401,9 @@ public:
 
     void requestExit();
     void requestRenderUnfocused();
+    void waitForRenderThreadIdle();
 
-    using FrameCallback = std::function<void(GpuDevice&, uint32_t frameIndex)>;
-    FrameCallback beforeFrame;
-    FrameCallback beforeAnimate;
-    FrameCallback afterAnimate;
-    FrameCallback beforeRender;
-    FrameCallback afterRender;
-    FrameCallback beforePresent;
-    FrameCallback afterPresent;
-
-    using EventHandler = std::function<void(Event&)>;
-    void setEventHandler(EventHandler handler) { m_eventHandler = std::move(handler); }
-
-    using DisplayScaleHandler = std::function<void(float, float)>;
-    void setDisplayScaleHandler(DisplayScaleHandler handler) { m_displayScaleHandler = std::move(handler); }
-
-    using BackBufferResizeHandler = std::function<void(bool resizing, uint32_t width, uint32_t height, uint32_t sampleCount)>;
-    void setBackBufferResizeHandler(BackBufferResizeHandler handler) { m_backBufferResizeHandler = std::move(handler); }
-
-    // IGpuFrameDriver
-    void notifyBackBufferResizing() override;
-    void notifyBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount) override;
-    void waitForRenderThreadIdle() override;
-
-    void notifyDisplayScaleChanged(float scaleX, float scaleY);
-
-    virtual void onEvent(Event& event);
-
+    void addEventObserver(std::function<void(Event&)> handler);
     void queueEvent(std::unique_ptr<Event> event);
     void processEventQueue();
 
@@ -445,29 +411,34 @@ public:
     friend void EnqueueRenderCommand(App&, std::function<void()>);
     friend void EnqueueRenderCommandAndWait(App&, std::function<void()>);
 
-protected:
-    virtual void onBeforeAnimate(GpuDevice& gpuDevice, uint32_t frameIndex) {}
+private:
+    struct SurfaceHook final : ISurfaceObserver
+    {
+        explicit SurfaceHook(App& app) : app(app) {}
+        void onSurfaceResizing() override { app.handleSurfaceResizing(); }
+        void onSurfaceResized(uint32_t width, uint32_t height, uint32_t sampleCount) override
+        {
+            app.handleSurfaceResized(width, height, sampleCount);
+        }
 
-    void bindFrameDriver(GpuDevice* dm);
-    void unbindFrameDriver(GpuDevice* dm);
+        App& app;
+    };
+
+    void bindSurface(GpuSurface* surface);
+    void unbindSurface();
 
     void onRender();
-    void onBackBufferResizing();
-    void onBackBufferResized(uint32_t width, uint32_t height, uint32_t sampleCount);
-    void onDisplayScaleChanged(float scaleX, float scaleY);
+    void dispatchEvent(Event& event);
+    void handleSurfaceResizing();
+    void handleSurfaceResized(uint32_t width, uint32_t height, uint32_t sampleCount);
 
     [[nodiscard]] bool skipRenderPhase() const;
     [[nodiscard]] bool shouldRenderWhenUnfocused() const;
 
-    void onWindowEvent(Event& event);
     void installWindowEventCallback();
-
-    std::unique_ptr<GpuDevice> m_GpuDevice;
-    std::unique_ptr<Window> m_Window;
 
     bool m_shutdownCalled = false;
     bool m_pluginsBuilt = false;
-    bool m_graphicsInitialized = false;
     bool m_started = false;
     bool m_defaultSchedulesRegistered = false;
     bool m_sceneSchedulesRegistered = false;
@@ -477,8 +448,6 @@ protected:
 
     AppSchedules m_schedules;
     ecs::World m_world;
-
-private:
     // Backing for the typed addSystem. Access is always derived from the system
     // signature; hand-written access would silently un-declare what a system
     // touches, so this is not part of the public surface.
@@ -503,27 +472,26 @@ private:
     void finishFrameWithRenderFailure(GpuDevice* gpuDevice, double elapsedTime, double curTime);
     void runStartupSchedules();
 
-    void notifyDpiScaleIfChanged(GpuDevice& gpuDevice);
+    void notifyDpiScaleIfChanged();
     bool syncRenderThreadCompletedFrames(SystemContext& context);
     bool dispatchScheduledRender(SystemContext& context);
     void finalizeFrameTiming(GpuDevice& gpuDevice, double elapsedTime, double curTime);
     void runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex);
 
-    GpuDevice* device() const;
-    Window* window() const;
+    GpuDevice* device() const { return m_device; }
+    Window* window() const { return m_window; }
+    GpuSurface* surface() const { return m_surface; }
 
-    GpuDevice* m_ExternalGpuDevice = nullptr;
-    Window* m_ExternalWindow = nullptr;
+    GpuDevice* m_device = nullptr;
+    Window* m_window = nullptr;
+    GpuSurface* m_surface = nullptr;
+    SurfaceHook m_surfaceHook;
 
     std::mutex m_EventQueueMutex;
     std::vector<std::unique_ptr<Event>> m_EventQueue;
 
     std::vector<Plugin*> m_pluginRefs;
     std::vector<std::unique_ptr<Plugin>> m_ownedPlugins;
-
-    EventHandler m_eventHandler;
-    DisplayScaleHandler m_displayScaleHandler;
-    BackBufferResizeHandler m_backBufferResizeHandler;
 
     RenderThread m_renderThread;
     bool m_useDedicatedRenderThread = true;

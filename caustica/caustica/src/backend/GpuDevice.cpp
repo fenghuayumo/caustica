@@ -1,14 +1,16 @@
 #include <backend/GpuDevice.h>
 #include <platform/window.h>
 #include <platform/glfw_window.h>
-#include <math/math.h>
-#include <core/log.h>
-#include <rhi/utils.h>
 
-#include <cstdio>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#endif
+#include <GLFW/glfw3native.h>
+#include <core/log.h>
+
 #include <algorithm>
-#include <iomanip>
-#include <sstream>
 
 #if CAUSTICA_WITH_DX11
 #include <d3d11.h>
@@ -38,55 +40,6 @@ extern "C"
 #endif
 
 using namespace caustica;
-
-// The joystick interface in glfw is not per-window like the keys, mouse, etc. The joystick callbacks
-// don't take a window arg. So glfw's model is a global joystick shared by all windows. Hence, the equivalent 
-// is a singleton class that all GpuDevice instances can use.
-
-static void ErrorCallback_GLFW(int error, const char *description)
-{
-    fprintf(stderr, "GLFW error: %s\n", description);
-    exit(1);
-}
-
-static const struct
-{
-    caustica::rhi::Format format;
-    uint32_t redBits;
-    uint32_t greenBits;
-    uint32_t blueBits;
-    uint32_t alphaBits;
-    uint32_t depthBits;
-    uint32_t stencilBits;
-} formatInfo[] = {
-    { caustica::rhi::Format::UNKNOWN,            0,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R8_UINT,            8,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RG8_UINT,           8,  8,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RG8_UNORM,          8,  8,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R16_UINT,          16,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R16_UNORM,         16,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R16_FLOAT,         16,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RGBA8_UNORM,        8,  8,  8,  8,  0,  0, },
-    { caustica::rhi::Format::RGBA8_SNORM,        8,  8,  8,  8,  0,  0, },
-    { caustica::rhi::Format::BGRA8_UNORM,        8,  8,  8,  8,  0,  0, },
-    { caustica::rhi::Format::SRGBA8_UNORM,       8,  8,  8,  8,  0,  0, },
-    { caustica::rhi::Format::SBGRA8_UNORM,       8,  8,  8,  8,  0,  0, },
-    { caustica::rhi::Format::R10G10B10A2_UNORM, 10, 10, 10,  2,  0,  0, },
-    { caustica::rhi::Format::R11G11B10_FLOAT,   11, 11, 10,  0,  0,  0, },
-    { caustica::rhi::Format::RG16_UINT,         16, 16,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RG16_FLOAT,        16, 16,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R32_UINT,          32,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::R32_FLOAT,         32,  0,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RGBA16_FLOAT,      16, 16, 16, 16,  0,  0, },
-    { caustica::rhi::Format::RGBA16_UNORM,      16, 16, 16, 16,  0,  0, },
-    { caustica::rhi::Format::RGBA16_SNORM,      16, 16, 16, 16,  0,  0, },
-    { caustica::rhi::Format::RG32_UINT,         32, 32,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RG32_FLOAT,        32, 32,  0,  0,  0,  0, },
-    { caustica::rhi::Format::RGB32_UINT,        32, 32, 32,  0,  0,  0, },
-    { caustica::rhi::Format::RGB32_FLOAT,       32, 32, 32,  0,  0,  0, },
-    { caustica::rhi::Format::RGBA32_UINT,       32, 32, 32, 32,  0,  0, },
-    { caustica::rhi::Format::RGBA32_FLOAT,      32, 32, 32, 32,  0,  0, },
-};
 
 bool GpuDevice::createInstance(const InstanceParameters& params)
 {
@@ -122,22 +75,12 @@ bool GpuDevice::createInstance(const InstanceParameters& params)
     return m_InstanceCreated;
 }
 
-bool GpuDevice::initializeHeadlessGraphics(const DeviceCreationParameters& params)
+bool GpuDevice::createHeadlessTargets(const DeviceCreationParameters& params)
 {
-    DeviceCreationParameters headlessParams = params;
-    headlessParams.headlessDevice = true;
-
-    if (!initializeGraphicsDevice(headlessParams))
-        return false;
-
-    if (!createHeadlessBackBuffers())
-        return false;
-
-    backBufferResized();
-    return true;
+    return createLogicalDevice(params);
 }
 
-bool GpuDevice::initializeGraphicsDevice(const DeviceCreationParameters& params)
+bool GpuDevice::createLogicalDevice(const DeviceCreationParameters& params)
 {
     m_DeviceParams = params;
     m_RequestedVSync = params.vsyncEnabled;
@@ -196,7 +139,7 @@ bool GpuDevice::enumerateAvailableAdapters(
     std::string* outError)
 {
     outAdapters.clear();
-    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::create(api));
+    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::createBackend(api));
     if (!gpuDevice)
     {
         if (outError)
@@ -227,76 +170,36 @@ bool GpuDevice::enumerateAvailableAdapters(
     return success;
 }
 
-bool GpuDevice::bindWindow(Window* window)
+bool GpuDevice::bindPresentTarget(Window& window)
 {
-    if (!window || !window->hasInitialised())
+    if (!window.hasInitialised())
     {
-        caustica::error("initializeWindowSwapChain: Window must be created first");
+        caustica::error("GpuDevice::bindPresentTarget: Window must be created first");
         return false;
     }
 
     m_DeviceParams.headlessDevice = false;
 
-    GlfwWindow* glfwWin = dynamic_cast<GlfwWindow*>(window);
-    if (!glfwWin)
-    {
-        caustica::error("initializeWindowSwapChain: Window is not a GlfwWindow");
-        return false;
-    }
-
-    GLFWwindow* glfwHandle = glfwWin->glfwWindow();
+    GLFWwindow* glfwHandle = nativeGlfwWindow(&window);
     if (!glfwHandle)
     {
-        caustica::error("initializeWindowSwapChain: Window has no GLFW handle");
+        caustica::error("GpuDevice::bindPresentTarget: Window has no GLFW handle");
         return false;
     }
 
-    m_WindowPtr = window;
-    m_Window = glfwHandle;
-    m_WindowTitle = window->getTitle();
-
-    m_DPIScaleFactorX = window->getDPIScaleX();
-    m_DPIScaleFactorY = window->getDPIScaleY();
-
-    window->setRenderDuringMove(m_EnableRenderDuringWindowMovement);
-
+    m_presentGlfw = glfwHandle;
+    m_nativeWindowHandle = window.getNativeHandle();
+    window.setRenderDuringMove(m_EnableRenderDuringWindowMovement);
     return true;
 }
 
-bool GpuDevice::initializeWindowSwapChain(Window* window)
-{
-    if (!bindWindow(window))
-        return false;
-
-    if (!createSwapChain())
-        return false;
-
-    m_DeviceParams.backBufferWidth = 0;
-    m_DeviceParams.backBufferHeight = 0;
-    updateWindowSize();
-
-    caustica::info("initializeWindowSwapChain: Device ready with platform Window [%ux%u]",
-        window->getWidth(), window->getHeight());
-
-    return true;
-}
-
-void GpuDevice::backBufferResizing()
+void GpuDevice::beginSurfaceResize()
 {
     m_SwapChain.framebuffers.clear();
     m_SwapChain.framebuffersWithDepth.clear();
-
-    if (m_frameDriver)
-        m_frameDriver->notifyBackBufferResizing();
 }
 
-void GpuDevice::waitForRenderThreadIdle()
-{
-    if (m_frameDriver)
-        m_frameDriver->waitForRenderThreadIdle();
-}
-
-void GpuDevice::backBufferResized()
+void GpuDevice::endSurfaceResize()
 {
     const uint32_t backBufferCount = getBackBufferCount();
     std::vector<caustica::rhi::Texture*> backBuffers;
@@ -317,19 +220,13 @@ void GpuDevice::backBufferResized()
 
     createDepthBuffer();
 
-    if (m_frameDriver)
-        m_frameDriver->notifyBackBufferResized(
-            m_DeviceParams.backBufferWidth,
-            m_DeviceParams.backBufferHeight,
-            m_DeviceParams.swapChainSampleCount);
-
     m_SwapChain.framebuffers.resize(backBufferCount);
     m_SwapChain.framebuffersWithDepth.resize(backBufferCount);
     for (uint32_t index = 0; index < backBufferCount; index++)
     {
         caustica::rhi::FramebufferDesc framebufferDesc = caustica::rhi::FramebufferDesc()
             .addColorAttachment(backBuffers[index]);
-        
+
         m_SwapChain.framebuffers[index] = getDevice()->createFramebuffer(framebufferDesc);
 
         if (m_SwapChain.depthBuffer)
@@ -453,6 +350,18 @@ uint32_t GpuDevice::getHeadlessBackBufferCount() const
     return uint32_t(m_HeadlessBackBuffers.size());
 }
 
+void GpuDevice::seedFrameClock(double timestamp)
+{
+    m_PreviousFrameTimestamp = timestamp;
+}
+
+void GpuDevice::advanceFrameClock(double elapsedTime, double currentTime)
+{
+    updateAverageFrameTime(elapsedTime);
+    m_PreviousFrameTimestamp = currentTime;
+    ++m_FrameIndex;
+}
+
 void GpuDevice::updateAverageFrameTime(double elapsedTime)
 {
     if (elapsedTime <= 0.0)
@@ -470,26 +379,6 @@ void GpuDevice::updateAverageFrameTime(double elapsedTime)
         m_AverageFrameTime = m_FrameTimeSum / double(m_NumberOfAccumulatedFrames);
         m_NumberOfAccumulatedFrames = 0;
         m_FrameTimeSum = 0.0;
-    }
-}
-
-void GpuDevice::getDPIScaleInfo(float& x, float& y) const
-{
-    if (m_WindowPtr) { x = m_WindowPtr->getDPIScaleX(); y = m_WindowPtr->getDPIScaleY(); }
-    else            { x = m_DPIScaleFactorX;   y = m_DPIScaleFactorY; }
-}
-
-void GpuDevice::getWindowDimensions(int& width, int& height)
-{
-    if (m_WindowPtr)
-    {
-        width  = static_cast<int>(m_WindowPtr->getWidth());
-        height = static_cast<int>(m_WindowPtr->getHeight());
-    }
-    else
-    {
-        width  = m_DeviceParams.backBufferWidth;
-        height = m_DeviceParams.backBufferHeight;
     }
 }
 
@@ -551,68 +440,6 @@ caustica::GpuDevice::GpuDevice()
 {
 }
 
-bool GpuDevice::needsWindowSizeSync() const
-{
-    if (!m_Window)
-        return false;
-
-    int width = 0;
-    int height = 0;
-    glfwGetWindowSize(m_Window, &width, &height);
-
-    if (width == 0 || height == 0)
-        return m_CanPresentSwapChain;
-
-    if (!m_CanPresentSwapChain)
-        return true;
-
-    if (int(m_DeviceParams.backBufferWidth) != width
-        || int(m_DeviceParams.backBufferHeight) != height)
-        return true;
-
-    // VSync toggles apply through updateWindowSize (Vulkan may rebuild the swapchain).
-    if (m_DeviceParams.vsyncEnabled != m_RequestedVSync)
-        return true;
-
-    return false;
-}
-
-void GpuDevice::updateWindowSize()
-{
-    if (!m_Window)
-        return;
-
-    int width;
-    int height;
-    glfwGetWindowSize(m_Window, &width, &height);
-
-    if (width == 0 || height == 0)
-    {
-        m_CanPresentSwapChain = false;
-        return;
-    }
-
-    m_CanPresentSwapChain = true;
-
-    if (int(m_DeviceParams.backBufferWidth) != width ||
-        int(m_DeviceParams.backBufferHeight) != height ||
-        (m_DeviceParams.vsyncEnabled != m_RequestedVSync && getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN))
-    {
-        // window is not minimized, and the size has changed
-
-        backBufferResizing();
-
-        m_DeviceParams.backBufferWidth = width;
-        m_DeviceParams.backBufferHeight = height;
-        m_DeviceParams.vsyncEnabled = m_RequestedVSync;
-
-        resizeSwapChain();
-        backBufferResized();
-    }
-
-    m_DeviceParams.vsyncEnabled = m_RequestedVSync;
-}
-
 void GpuDevice::shutdown()
 {
 #if CAUSTICA_WITH_STREAMLINE
@@ -630,8 +457,9 @@ void GpuDevice::shutdown()
 
     destroyDeviceAndSwapChain();
 
-    m_Window = nullptr;
-    m_WindowPtr = nullptr;
+    m_presentGlfw = nullptr;
+    m_nativeWindowHandle = nullptr;
+    m_surface = nullptr;
 
     m_InstanceCreated = false;
 }
@@ -657,59 +485,7 @@ caustica::rhi::Framebuffer* caustica::GpuDevice::getFramebuffer(uint32_t index, 
     return nullptr;
 }
 
-void GpuDevice::setWindowTitle(const char* title)
-{
-    assert(title);
-    if (m_WindowTitle == title)
-        return;
-
-    if (m_Window != nullptr)
-        glfwSetWindowTitle(m_Window, title);
-
-    m_WindowTitle = title;
-}
-
-void GpuDevice::setInformativeWindowTitle(const char* applicationName, bool includeFramerate, const char* extraInfo)
-{
-    std::stringstream ss;
-    ss << applicationName;
-    ss << " (" << caustica::rhi::utils::GraphicsAPIToString(getDevice()->getGraphicsAPI());
-
-    if (m_DeviceParams.enableDebugRuntime)
-    {
-        if (getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN)
-            ss << ", VulkanValidationLayer";
-        else
-            ss << ", DebugRuntime";
-    }
-
-    if (m_DeviceParams.enableRhiValidationLayer)
-    {
-        ss << ", RhiValidationLayer";
-    }
-
-    ss << ")";
-
-    double frameTime = getAverageFrameTimeSeconds();
-    if (includeFramerate && frameTime > 0)
-    {
-        double const fps = 1.0 / frameTime;
-        int const precision = (fps <= 20.0) ? 1 : 0;
-        ss << " - " << std::fixed << std::setprecision(precision) << fps << " FPS ";
-    }
-
-    if (extraInfo)
-        ss << extraInfo;
-
-    setWindowTitle(ss.str().c_str());
-}
-
-const char* caustica::GpuDevice::getWindowTitle()
-{
-    return m_WindowTitle.c_str();
-}
-
-caustica::GpuDevice* caustica::GpuDevice::create(caustica::rhi::GraphicsAPI api)
+caustica::GpuDevice* caustica::GpuDevice::createBackend(caustica::rhi::GraphicsAPI api)
 {
     switch (api)
     {
@@ -726,7 +502,7 @@ caustica::GpuDevice* caustica::GpuDevice::create(caustica::rhi::GraphicsAPI api)
         return createVK();
 #endif
     default:
-        caustica::error("GpuDevice::create: Unsupported Graphics API (%d)", api);
+        caustica::error("GpuDevice::createBackend: Unsupported Graphics API (%d)", api);
         return nullptr;
     }
 }

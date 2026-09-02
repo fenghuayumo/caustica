@@ -2,6 +2,8 @@
 
 #include <core/log.h>
 #include <backend/AftermathCrashDump.h>
+#include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <core/path_utils.h>
 
 #include <GFSDK_Aftermath_GpuCrashDump.h>
@@ -70,7 +72,10 @@ static void ShaderDebugInfoCallback(const void* pShaderDebugInfo, const uint32_t
 static void DescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDescription addDescription, void* pUserData)
 {
     caustica::AftermathCrashDump* dumper = reinterpret_cast<caustica::AftermathCrashDump*>(pUserData);
-    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, dumper->getGpuDevice().getWindowTitle());
+    const char* title = "caustica";
+    if (caustica::GpuSurface* gpuSurface = dumper->getGpuDevice().surface())
+        title = gpuSurface->windowTitle();
+    addDescription(GFSDK_Aftermath_GpuCrashDumpDescriptionKey_ApplicationName, title);
 }
 
 // this callback should call into the RHI device which has the necessary information
@@ -161,8 +166,8 @@ void caustica::AftermathCrashDump::initializeAftermathCrashDump(AftermathCrashDu
 }
 
 
-caustica::AftermathCrashDump::AftermathCrashDump(GpuDevice& deviceManager) :
-    m_deviceManager(deviceManager)
+caustica::AftermathCrashDump::AftermathCrashDump(GpuDevice& device) :
+    m_device(device)
 {
 }
 
@@ -180,13 +185,13 @@ void caustica::AftermathCrashDump::enableCrashDumpTracking()
 
 const std::string& caustica::AftermathCrashDump::resolveMarker(uint64_t markerHash)
 {
-    auto [found, markerString] = m_deviceManager.getDevice()->getAftermathCrashDumpHelper().resolveMarker(markerHash);
+    auto [found, markerString] = m_device.getDevice()->getAftermathCrashDumpHelper().resolveMarker(markerHash);
     return markerString;
 }
 
 caustica::GpuDevice& caustica::AftermathCrashDump::getGpuDevice()
 {
-    return m_deviceManager;
+    return m_device;
 }
 
 std::filesystem::path caustica::AftermathCrashDump::getDumpFolder()

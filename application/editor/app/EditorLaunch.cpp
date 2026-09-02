@@ -9,8 +9,6 @@
 #include <engine/SceneLifecycle.h>
 #include <core/console/ConsoleObjects.h>
 #include <core/log.h>
-#include <events/application_event.h>
-#include <events/event.h>
 #include <platform/window.h>
 #include <render/passes/debug/Korgi.h>
 #include <caustica/version.h>
@@ -178,19 +176,8 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     caustica::App* app = &engine->app();
 
-    if (automatedRun)
-    {
-        caustica::App::FrameCallback previousAfterPresent = app->afterPresent;
-        app->afterPresent = [previousAfterPresent](GpuDevice& device, uint32_t frameIndex) {
-            if (previousAfterPresent)
-                previousAfterPresent(device, frameIndex);
-
-            // THREADING: sync-point, RT-only — ADR 0002 tool path (automated run drain).
-            const bool waitOk = device.getDevice()->waitForIdle();
-            if (!waitOk)
-                error("Automated run frame sync detected device loss after frame %u", frameIndex);
-        };
-    }
+    if (automatedRun && engine->surface())
+        engine->surface()->setWaitForIdleAfterPresent(true);
 
     // EditorPlugin only needs renderState for PostAppInit; scene callbacks live on EngineAppDesc.
     const SceneAppConfig sceneConfig{
@@ -217,32 +204,6 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     {
         app->addPlugin<EditorPlugin>(sceneConfig, editor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
-
-    app->setEventHandler([&editor, app](Event& event) {
-        editor.onEvent(event);
-
-        EventDispatcher dispatcher(event);
-        dispatcher.dispatch<WindowCloseEvent>([app](WindowCloseEvent&) {
-            app->requestExit();
-            return true;
-        });
-    });
-
-    app->setDisplayScaleHandler([app](float scaleX, float scaleY) {
-        if (auto* uiSubsystem = app->tryResource<EditorUISubsystem>())
-            uiSubsystem->onDisplayScaleChanged(scaleX, scaleY);
-    });
-
-    app->setBackBufferResizeHandler([app](bool resizing, uint32_t width, uint32_t height, uint32_t sampleCount) {
-        auto* uiSubsystem = app->tryResource<EditorUISubsystem>();
-        if (!uiSubsystem)
-            return;
-
-        if (resizing)
-            uiSubsystem->onBackBufferResizing();
-        else
-            uiSubsystem->onBackBufferResized(width, height, sampleCount);
-    });
 
     if (!engine->finishStartup())
         return nullptr;

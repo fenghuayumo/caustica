@@ -3,7 +3,15 @@
 #include <vector>
 
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <backend/dx12/GpuDevice_DX12.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 #include <backend/dx12/D3D12AgilityBootstrap.h>
 #include <backend/DxgiVideoMemory.h>
 #include <core/log.h>
@@ -431,10 +439,10 @@ bool GpuDevice_DX12::createSwapChain()
     {
         RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
         if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
-            glfwSetWindowPos(m_Window, rect.left, rect.top);
+            glfwSetWindowPos(presentGlfw(), rect.left, rect.top);
     }
 
-    m_hWnd = glfwGetWin32Window(m_Window);
+    m_hWnd = glfwGetWin32Window(presentGlfw());
 
     HRESULT hr = E_FAIL;
 
@@ -636,7 +644,10 @@ bool GpuDevice_DX12::beginFrame()
     {
         if (m_FullScreenDesc.Windowed != newFullScreenDesc.Windowed)
         {
-            backBufferResizing();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResizing();
+            else
+                beginSurfaceResize();
             
             m_FullScreenDesc = newFullScreenDesc;
             m_SwapChainDesc = newSwapChainDesc;
@@ -644,10 +655,13 @@ bool GpuDevice_DX12::beginFrame()
             m_DeviceParams.backBufferHeight = newSwapChainDesc.Height;
 
             if(newFullScreenDesc.Windowed)
-                glfwSetWindowMonitor(m_Window, nullptr, 50, 50, newSwapChainDesc.Width, newSwapChainDesc.Height, 0);
+                glfwSetWindowMonitor(presentGlfw(), nullptr, 50, 50, newSwapChainDesc.Width, newSwapChainDesc.Height, 0);
 
             resizeSwapChain();
-            backBufferResized();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResized();
+            else
+                endSurfaceResize();
         }
 
     }

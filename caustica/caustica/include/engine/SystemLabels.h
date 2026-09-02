@@ -6,13 +6,12 @@ namespace caustica::system_label
 {
 
 // App default schedules
-struct BeforeFrame { static constexpr const char* name = "BeforeFrame"; };
 struct ProcessEventQueue { static constexpr const char* name = "ProcessEventQueue"; };
 struct SyncRenderThread { static constexpr const char* name = "SyncRenderThread"; };
 struct NotifyDpiScale { static constexpr const char* name = "NotifyDpiScale"; };
-struct BeforeAnimate { static constexpr const char* name = "BeforeAnimate"; };
+struct PrepareSimulation { static constexpr const char* name = "PrepareSimulation"; };
 struct SetRenderFrameIndex { static constexpr const char* name = "SetRenderFrameIndex"; };
-struct AfterAnimate { static constexpr const char* name = "AfterAnimate"; };
+struct EndSimulation { static constexpr const char* name = "EndSimulation"; };
 #if CAUSTICA_WITH_STREAMLINE
 struct StreamlineSimStart { static constexpr const char* name = "StreamlineSimStart"; };
 #endif

@@ -37,7 +37,10 @@ public:
     void setVSync(bool set) override;
     void setBorderless(bool borderless) override;
     void maximise() override;
+    void hide() override;
+    void setSize(uint32_t width, uint32_t height) override;
     void hideMouse(bool hide) override;
+    void setCursorVisible(bool visible) override;
     void setMousePosition(float x, float y) override;
     void setIcon(const WindowDesc& desc) override;
 
@@ -47,7 +50,7 @@ public:
 
     void setEventCallback(const EventCallbackFn& callback) override;
 
-    // --- Window events (with DPI tracking from GpuDevice) ---
+    // --- Window events ---
     void onFocusChanged(bool focused) override;
     void onIconifyChanged(bool iconified) override;
     void onMove(int x, int y) override;
@@ -58,7 +61,7 @@ public:
     // Access the raw GLFW window
     GLFWwindow* glfwWindow() const { return m_Window; }
 
-    // render-during-move callback (set by GpuDevice/Application)
+    // render-during-move callback
     using RenderDuringMoveFn = std::function<void()>;
     void setRenderDuringMoveCallback(RenderDuringMoveFn fn) { m_OnRenderDuringMove = std::move(fn); }
 
@@ -85,5 +88,11 @@ private:
     bool m_ExitRequested = false;
     std::string m_Title;
 };
+
+[[nodiscard]] inline GLFWwindow* nativeGlfwWindow(Window* window)
+{
+    auto* glfw = dynamic_cast<GlfwWindow*>(window);
+    return glfw ? glfw->glfwWindow() : nullptr;
+}
 
 } // namespace caustica

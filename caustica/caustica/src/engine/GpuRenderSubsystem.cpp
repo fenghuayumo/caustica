@@ -1,4 +1,5 @@
 #include <engine/internal/GpuRenderSubsystem.h>
+#include <engine/App.h>
 #include <engine/SceneGaussianSplatLogic.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/SceneSession.h>
@@ -95,6 +96,7 @@ bool GpuRenderSubsystem::initialize(const gpuRenderSubsystemInitParams& params)
     m_sceneSession = &params.sceneSession;
     m_worldRenderer = &params.worldRenderer;
     m_gpuDevice = &params.gpuDevice;
+    m_app = &params.app;
     m_assetSystem = &params.assetSystem;
     m_settings = &params.settings;
     m_runtimeState = &params.runtimeState;
@@ -213,7 +215,7 @@ bool GpuRenderSubsystem::finishLoadedScene(const scene::SceneRenderData& renderD
         return false;
 
     SceneGaussianSplatLogic::onSceneLoaded(
-        m_worldRenderer->gaussianSplatPasses(), *m_settings);
+        m_worldRenderer->gaussianSplatPasses(), *m_settings, *m_app);
     m_worldRenderer->lightingPasses().onSceneLoaded(renderData, *m_settings);
     // Lighting reset wipes EnvironmentMapParams / env override. Re-apply only
     // fields that were actually present in the scene JSON.
@@ -249,7 +251,8 @@ void GpuRenderSubsystem::shutdown()
     if (m_gpuDevice)
     {
         // THREADING: sync-point, shutdown — ADR 0002 allowed.
-        m_gpuDevice->waitForRenderThreadIdle();
+        if (m_app)
+            m_app->waitForRenderThreadIdle();
         if (caustica::rhi::Device* device = m_gpuDevice->getDevice())
             device->waitForIdle();
     }

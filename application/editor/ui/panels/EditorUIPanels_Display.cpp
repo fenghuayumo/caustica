@@ -16,6 +16,10 @@
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
+#include <platform/window.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include <cmath>
 #include <cstdio>
@@ -76,7 +80,10 @@ void EditorUI::BuildUIResolutionPicker()
         std::string displayLabel = std::string(res.label) + (isCurrent ? "  [current]" : "");
         if (ImGui::Selectable(displayLabel.c_str(), isCurrent))
         {
-            glfwSetWindowSize(getGpuDevice()->getWindow(), res.w, res.h);
+            if (Window* window = getGpuDevice() && getGpuDevice()->surface()
+                    ? getGpuDevice()->surface()->window()
+                    : nullptr)
+                window->setSize(res.w, res.h);
             ImGui::CloseCurrentPopup();
         }
     }

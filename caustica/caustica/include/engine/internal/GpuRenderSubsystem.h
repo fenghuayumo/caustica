@@ -11,6 +11,7 @@
 namespace caustica
 {
 
+class App;
 class GpuDevice;
 class AssetSystem;
 struct GpuSharedCaches;
@@ -24,6 +25,7 @@ namespace scene { class SceneRenderData; }
 
 struct gpuRenderSubsystemInitParams
 {
+    App& app;
     GpuDevice& gpuDevice;
     AssetSystem& assetSystem;
     GpuSharedCaches& gpuSharedCaches;
@@ -69,6 +71,7 @@ private:
     SceneSession* m_sceneSession = nullptr;
     render::WorldRenderer* m_worldRenderer = nullptr;
     GpuDevice* m_gpuDevice = nullptr;
+    App* m_app = nullptr;
     AssetSystem* m_assetSystem = nullptr;
     PathTracerSettings* m_settings = nullptr;
     render::RenderRuntimeState* m_runtimeState = nullptr;

@@ -8,7 +8,7 @@
 #include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>
 
-#include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <scene/Scene.h>
 #include <caustica/version.h>
 
@@ -21,13 +21,13 @@ namespace caustica
 
 void updateWindowTitle(App& app)
 {
-    GpuDevice* device = app.getGpuDevice();
-    if (!device)
+    GpuSurface* gpuSurface = app.getSurface();
+    if (!gpuSurface)
         return;
 
     const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
         + " " + caustica::kVersionString;
-    device->setInformativeWindowTitle(versionedTitle.c_str(), false);
+    gpuSurface->setInformativeWindowTitle(versionedTitle.c_str(), false);
 }
 
 void WindowTitlePlugin::configureSchedules(App& app)

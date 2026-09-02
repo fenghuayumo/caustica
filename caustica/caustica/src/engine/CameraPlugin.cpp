@@ -11,6 +11,7 @@
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
 #include <scene/SceneCameraAccess.h>
@@ -85,11 +86,11 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     }
 
     // Logic-thread CameraController PlanarView is logic-side only (gizmo / 3DGS CPU pick).
-    if (GpuDevice* device = app.getGpuDevice(); device && !device->isHeadless())
+    if (GpuSurface* gpuSurface = app.getSurface(); gpuSurface && app.getGpuDevice() && !app.getGpuDevice()->isHeadless())
     {
         int width = 0;
         int height = 0;
-        device->getWindowDimensions(width, height);
+        gpuSurface->getWindowDimensions(width, height);
         if (width > 0 && height > 0)
         {
             CameraUpdateParams viewParams;

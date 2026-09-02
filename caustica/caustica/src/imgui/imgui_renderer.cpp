@@ -1,13 +1,19 @@
 #include <imgui/imgui_renderer.h>
+#include <backend/GpuSurface.h>
 #include <core/vfs/VFS.h>
+#include <platform/glfw_window.h>
+#include <platform/window.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include <algorithm>
 
 using namespace caustica;
 
-ImGui_Renderer::ImGui_Renderer(GpuDevice *devManager)
-    : renderContext(devManager)
-    , m_supportExplicitDisplayScaling(devManager->supportsExplicitDisplayScaling())
+ImGui_Renderer::ImGui_Renderer(GpuDevice* device)
+    : renderContext(device)
+    , m_supportExplicitDisplayScaling(device->supportsExplicitDisplayScaling())
 {
     ImGui::CreateContext();
 
@@ -267,8 +273,21 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
         m_pendingDisplayScaleChanged = false;
     }
 
-    float scaleX, scaleY;
-    getGpuDevice()->getDPIScaleInfo(scaleX, scaleY);
+    float scaleX = 1.f;
+    float scaleY = 1.f;
+    int w = 0;
+    int h = 0;
+    Window* platformWindow = nullptr;
+    if (GpuDevice* gpuDevice = getGpuDevice())
+    {
+        if (GpuSurface* gpuSurface = gpuDevice->surface())
+        {
+            gpuSurface->getDpiScale(scaleX, scaleY);
+            gpuSurface->getWindowDimensions(w, h);
+            platformWindow = gpuSurface->window();
+        }
+    }
+
     for (auto& font : m_fonts)
     {
         if (!font->getScaledFont())
@@ -276,9 +295,6 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
     }
 
     m_imguiRhi->updateFontTexture();
-
-    int w, h;
-    getGpuDevice()->getWindowDimensions(w, h);
 
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(float(w), float(h));
@@ -291,7 +307,7 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
     io.DeltaTime = (elapsedTimeSeconds > 0.0f) ? elapsedTimeSeconds : (1.0f / 60.0f);
     io.MouseDrawCursor = false;
 
-    GLFWwindow* glfwWindow = getGpuDevice()->getWindow();
+    GLFWwindow* glfwWindow = nativeGlfwWindow(platformWindow);
     if (glfwWindow)
     {
         ImGui_ImplGlfw_UpdateKeyModifiers(io, glfwWindow);

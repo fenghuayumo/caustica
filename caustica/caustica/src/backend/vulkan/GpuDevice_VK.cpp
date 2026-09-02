@@ -6,7 +6,15 @@
 #include <string_view>
 
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <backend/vulkan/GpuDevice_VK.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 
 #include <rhi/vulkan.h>
 #include <rhi/validation.h>
@@ -760,7 +768,7 @@ bool GpuDevice_VK::createVulkanDevice()
 
 bool GpuDevice_VK::createWindowSurface()
 {
-    const VkResult res = glfwCreateWindowSurface(m_VulkanInstance, m_Window, nullptr, (VkSurfaceKHR *)&m_WindowSurface);
+    const VkResult res = glfwCreateWindowSurface(m_VulkanInstance, presentGlfw(), nullptr, (VkSurfaceKHR *)&m_WindowSurface);
     if (res != VK_SUCCESS)
     {
         caustica::error("Failed to create a GLFW window surface, error code = %s", caustica::rhi::vulkan::resultToString(res));
@@ -1210,14 +1218,20 @@ bool GpuDevice_VK::beginFrame()
 
         if ((res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR) && attempt < maxAttempts)
         {
-            backBufferResizing();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResizing();
+            else
+                beginSurfaceResize();
             auto surfaceCaps = m_VulkanPhysicalDevice.getSurfaceCapabilitiesKHR(m_WindowSurface);
 
             m_DeviceParams.backBufferWidth = surfaceCaps.currentExtent.width;
             m_DeviceParams.backBufferHeight = surfaceCaps.currentExtent.height;
 
             resizeSwapChain();
-            backBufferResized();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResized();
+            else
+                endSurfaceResize();
         }
         else
             break;

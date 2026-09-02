@@ -44,7 +44,7 @@ class EditorUI : public caustica::ImGui_Renderer
 {
 public:
     EditorUI(
-        caustica::GpuDevice* deviceManager,
+        caustica::GpuDevice* device,
         SceneEditor& sceneEditor,
         EditorUIData& ui,
         bool NVAPI_SERSupported,

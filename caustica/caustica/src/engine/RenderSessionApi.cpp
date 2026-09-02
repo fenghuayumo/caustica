@@ -61,7 +61,7 @@ bool loadGaussianSplatFile(App& app, const std::filesystem::path& fileName, bool
         return false;
 
     return SceneGaussianSplatLogic::loadFromFile(
-        renderer->gaussianSplatPasses(), *cfg, fileName, convertRdfToRub);
+        renderer->gaussianSplatPasses(), *cfg, fileName, app, convertRdfToRub);
 }
 
 uint32_t gaussianSplatCount(const App& app)

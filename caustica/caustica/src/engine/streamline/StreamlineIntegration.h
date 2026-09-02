@@ -138,7 +138,7 @@ private:
     [[nodiscard]] sl::FrameToken* activeFrameToken() const;
 
 public:
-    // Interface for device manager
+    // Process-wide Streamline integration bound to the active GpuDevice.
     static StreamlineIntegration& Get();
     StreamlineIntegration(const StreamlineIntegration&) = delete;
     StreamlineIntegration(StreamlineIntegration&&) = delete;

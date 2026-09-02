@@ -59,9 +59,10 @@ struct EngineAppDesc
     ID3D12DeviceFactory* d3d12DeviceFactory = nullptr;
 #endif
 
-    // Optional: inject an already-created device/window. EngineApp does not take ownership.
+    // Optional: inject an already-created device/window/surface. EngineApp does not take ownership.
     GpuDevice* device = nullptr;
     Window* window = nullptr;
+    GpuSurface* surface = nullptr;
 
     // Optional host-owned state (nullptr = EngineApp owns internals as today).
     SceneViewState* viewState = nullptr;
@@ -73,7 +74,7 @@ struct EngineAppDesc
     bool hasSceneCallbacks = false;
     EngineSceneCallbacks sceneCallbacks{};
 
-    // Called before GpuDevice::createInitialized (e.g. stop splash).
+    // Called before GpuDevice::create (e.g. stop splash).
     AppHook preGpuDeviceInit = nullptr;
 };
 
@@ -135,6 +136,8 @@ public:
     [[nodiscard]] App& app();
     [[nodiscard]] const App& app() const;
     [[nodiscard]] GpuDevice* device() const;
+    [[nodiscard]] GpuSurface* surface() const;
+    [[nodiscard]] Window* window() const;
 
     void setScene(const std::string& name, bool forceReload = false);
     [[nodiscard]] bool isSceneLoaded() const;
@@ -173,8 +176,10 @@ private:
 
     std::unique_ptr<GpuDevice> m_ownedDevice;
     std::unique_ptr<Window> m_ownedWindow;
+    std::unique_ptr<GpuSurface> m_ownedSurface;
     GpuDevice* m_device = nullptr;
     Window* m_window = nullptr;
+    GpuSurface* m_surface = nullptr;
 
     std::unique_ptr<App> m_app;
 

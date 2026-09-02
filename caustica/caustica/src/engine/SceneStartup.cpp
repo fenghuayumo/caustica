@@ -106,6 +106,7 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     }
 
     if (!gpuRenderSubsystem->initialize(gpuRenderSubsystemInitParams{
+            .app = app,
             .gpuDevice = *gpuDevice,
             .assetSystem = *assetSystem,
             .gpuSharedCaches = *gpuSharedCaches,

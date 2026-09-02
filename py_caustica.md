@@ -12,13 +12,17 @@ This document describes how to use the current `caustica` Python bindings. The A
 ### Getting Started
 
 - [Two Usage Modes](#two-usage-modes)
+- [Device / App / Frame](#device--app--frame)
 - [Import Setup](#import-setup)
 - [Quick Examples](#quick-examples)
 
 ### API Reference
 
 - [Module-Level API](#module-level-api)
-- [Renderer](#renderer) — extension-mode standalone renderer
+- [Device](#device) — GPU handle that outlives scene loads
+- [App](#app-session) — scene + stepping bound to a Device
+- [Frame](#frame) — one rendered output (`rgb`; depth/seg reserved)
+- [Renderer](#renderer) — compatibility wrapper that creates Device + App
 - [GPU selection](#gpu-selection) — enumeration, automatic choice, and stable selectors
 - [App & Scene](#app--scene) — `app()`, scene, camera, accumulation
 - [Spawn / Despawn](#spawn--despawn) — prefab load/spawn and entity removal
@@ -52,8 +56,35 @@ import caustica
 print(caustica.MODE)  # "extension" or "embed"
 ```
 
-In extension mode, `caustica.Renderer` creates its own window, device, and scene.  
-In embed mode there is no `Renderer` class; use `caustica.app()` to access the renderer inside the running `caustica.exe`.
+In extension mode, prefer `Device` + `App` so the GPU outlives scene loads.  
+`caustica.Renderer(...)` is still supported and just creates those two objects for you.  
+In embed mode there is no `Device` / `App` / `Renderer`; use `caustica.app()` to access the editor session.
+
+## Device / App / Frame
+
+```python
+import caustica
+
+device = caustica.Device(vulkan=False, adapter="auto")
+with device.create_app(width=1280, height=720, headless=True) as app:
+    app.create_scene("plane_cube")              # or app.load_scene(...)
+    app.scene.find_material("Floor")
+
+    frame = app.render_reference(spp=64)        # or app.render() / app.step()
+    rgb = frame.rgb                             # numpy (H, W, 4) uint8
+    app.save_screenshot("frame.png")
+
+# Close the App before the Device. load_scene / create_scene reuse the same GPU.
+```
+
+| Type | Owns | Notes |
+| --- | --- | --- |
+| `Device` | GPU adapter + (lazy) logical device, surface, and optional window | No scene. Created on the first `App` bind. |
+| `App` | Scene, cameras, settings, stepping | One live App per Device. Call `app.scene` / `app.settings` / `app.step()`. |
+| `Frame` | Last LDR RGBA8 output | `depth` / `segmentation` are reserved and currently `None`. |
+| `Renderer` | Device + App | Old one-shot constructor. All App methods still work. |
+
+`get_depth()` and `get_segmentation()` exist so sensor-style callers can start wiring against them; they raise until those AOVs are exposed. `render(cameras=[...])` only accepts a single camera for now.
 
 ## Import Setup
 
@@ -584,12 +615,73 @@ These functions exist in both embed and extension mode unless noted.
 | `caustica.log_warning(message)` | `None` | Writes to caustica log at warning level. |
 | `caustica.log_error(message)` | `None` | Writes to caustica log at error level. |
 | `caustica.enumerate_adapters(vulkan=False, debug=False)` | `list[AdapterInfo]` | Extension mode only. Enumerates DX12 or Vulkan adapters without creating a renderer. |
-| `caustica.Renderer(...)` | `Renderer` | Extension mode only. Creates a standalone renderer/device/window or headless backbuffer. |
+| `caustica.Device(...)` | `Device` | Extension mode only. GPU handle; no scene. |
+| `device.create_app(...)` / `caustica.App(device, ...)` | `App` | Extension mode only. Scene + stepping on an existing Device. |
+| `caustica.Renderer(...)` | `Renderer` | Extension mode only. Compatibility wrapper that creates Device + App. |
 | `caustica.builtin_scene_json(builtin_model="plane_cube")` | `str` | Extension mode only. Returns minimal inline scene JSON for `plane`, `cube`, `sphere`, or `plane_cube`. |
+
+## Device
+
+Extension mode only. Create with `caustica.Device(...)`. This does not load a scene.
+
+```python
+caustica.Device(
+    vulkan=False,
+    adapter="auto",
+    debug=False,
+)
+```
+
+The logical GPU, presentation surface, and optional window are created on the first `App` bind, using that App's `width` / `height` / `headless`. A second App must use the same size. Close the App before `device.close()`.
+
+## App session
+
+Extension mode only. Bind a Device, then load scenes and step frames.
+
+```python
+app = device.create_app(
+    width=1920,
+    height=1080,
+    headless=True,
+    scene='{"entities":[]}',
+    realtime=False,
+    accumulation_target=64,
+)
+# equivalent: caustica.App(device, width=1920, height=1080, headless=True)
+```
+
+`load_scene` / `create_scene` reuse the Device. After `app.close()`, the same Device can be bound to a new App at the same resolution.
+
+Additional observation helpers:
+
+| API | Return | Notes |
+| --- | --- | --- |
+| `create_scene(builtin="plane")` | `bool` | Load `builtin:plane` / `cube` / `sphere` / `plane_cube`. |
+| `render(dt=-1.0, cameras=None)` | `Frame` | One step plus LDR readback. Multi-camera lists are not implemented. |
+| `render_reference(spp=64, oidn=True)` | `Frame` | Accumulate and return a `Frame`. |
+| `get_frame()` | `Frame` | Last LDR output without stepping. |
+| `get_rgb()` | `numpy.ndarray` | Same as `get_pixels()`. |
+| `get_depth()` | — | Not implemented yet. |
+| `get_segmentation()` | — | Not implemented yet. |
+| `device` | `Device` | The GPU handle bound to this runtime. |
+
+All other `Renderer` methods (`step`, `load_scene`, `set_camera`, `save_screenshot`, `settings`, ...) live on `App`. Prefer `app.scene` over `app.app`.
+
+## Frame
+
+Returned by `App.render()`, `render_reference()`, and `get_frame()`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `rgb` | `numpy.ndarray` | `(H, W, 4)` uint8 RGBA. Requires NumPy. |
+| `pixels` | `bytes` | Tightly packed RGBA8. |
+| `width`, `height` | `int` | |
+| `depth` | `None` | Reserved. |
+| `segmentation` | `None` | Reserved. |
 
 ## Renderer
 
-Extension mode only. Create with `caustica.Renderer(...)`.
+Extension mode only. Compatibility wrapper that constructs a `Device` and `App`. Create with `caustica.Renderer(...)`. All `App` methods are available.
 
 ### Constructor
 
@@ -637,6 +729,10 @@ caustica.Renderer(
 | `save_screenshot(output_path)` | `bool` | Save current LDR final color to PNG/JPG/BMP/TGA. |
 | `get_framebuffer(hdr=False)` | `Framebuffer` | CPU readback of current LDR final color. See `Framebuffer` below. `hdr=True` is not implemented yet. |
 | `get_pixels(hdr=False)` | `numpy.ndarray` | Same LDR readback as `(H, W, 4)` `uint8` RGBA. Requires NumPy. `hdr=True` is not implemented yet. |
+| `get_rgb(hdr=False)` | `numpy.ndarray` | Alias for `get_pixels()`. |
+| `render(dt=-1.0)` | `Frame` | Step once and return a `Frame`. |
+| `render_reference(spp=64, oidn=True)` | `Frame` | Accumulate and return a `Frame`. |
+| `device` | `Device` | GPU handle created by this Renderer. |
 | `set_camera(position, direction, up=(0, 1, 0))` | `bool` | Triples can be lists/tuples of 3 floats. |
 | `set_camera_fov(vertical_fov_degrees)` | `None` | Set vertical FOV in degrees. |
 | `set_camera_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Set an off-center pinhole projection from pixel-space intrinsics. This overrides the symmetric FOV projection until `set_camera_fov(...)` or `clear_camera_intrinsics()` is used. |
@@ -1606,7 +1702,7 @@ For windowed extension usage:
 - `headless=False` opens a GLFW window.
 - `Renderer.step()` must be called repeatedly to pump events and render frames.
 - Clicking the window close button makes `step()` return `False`.
-- Resize/maximize/minimize are handled by the underlying device manager during `step()`.
+- Resize/maximize/minimize are handled by the GPU device during `step()`.
 
 ## Existing Examples
 

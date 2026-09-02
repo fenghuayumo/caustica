@@ -9,6 +9,7 @@
 #include <engine/CameraApi.h>
 
 #include <backend/GpuDevice.h>
+#include <platform/glfw_window.h>
 #include <GLFW/glfw3.h>
 #include <core/log.h>
 #include <ecs/Entity.h>
@@ -38,12 +39,17 @@ bool mouseInViewportCanvas(const SceneEditor& sceneEditor, double cursorX, doubl
         && cursorY < static_cast<double>(vp.PosY + vp.SizeY);
 }
 
+GLFWwindow* editorGlfwWindow(const SceneEditor& sceneEditor)
+{
+    if (!sceneEditor.app())
+        return nullptr;
+    return nativeGlfwWindow(sceneEditor.app()->getWindow());
+}
+
 bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
 {
     const auto& vp = sceneEditor.editorUIState().Viewport;
-    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
-        ? sceneEditor.app()->getGpuDevice()->getWindow()
-        : nullptr;
+    GLFWwindow* window = editorGlfwWindow(sceneEditor);
     double cursorX = 0.0;
     double cursorY = 0.0;
     if (window)
@@ -82,9 +88,7 @@ bool isCameraFlyKey(int key)
 
 bool isRightMouseDown(SceneEditor& sceneEditor)
 {
-    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
-        ? sceneEditor.app()->getGpuDevice()->getWindow()
-        : nullptr;
+    GLFWwindow* window = editorGlfwWindow(sceneEditor);
     return window && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 }
 
@@ -99,9 +103,7 @@ bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
     if (vp.OverlayHovered)
         return false;
 
-    GLFWwindow* window = sceneEditor.app() && sceneEditor.app()->getGpuDevice()
-        ? sceneEditor.app()->getGpuDevice()->getWindow()
-        : nullptr;
+    GLFWwindow* window = editorGlfwWindow(sceneEditor);
     double cursorX = 0.0;
     double cursorY = 0.0;
     if (window)
@@ -157,7 +159,7 @@ void requestInstancePick(SceneEditor& sceneEditor)
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
 {
     auto& session = sceneEditor.renderAppState();
-    GLFWwindow* window = sceneEditor.app()->getGpuDevice()->getWindow();
+    GLFWwindow* window = editorGlfwWindow(sceneEditor);
     if (!window)
         return;
 

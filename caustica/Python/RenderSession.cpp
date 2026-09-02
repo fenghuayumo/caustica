@@ -3,6 +3,8 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include <engine/EngineApp.h>
+#include <backend/GpuSurface.h>
+#include <platform/window.h>
 #include <engine/EntryPoint.h>
 #include <engine/GpuSharedCaches.h>
 #include <engine/AppResources.h>
@@ -18,107 +20,20 @@
 #include <core/path_utils.h>
 #include <core/progress.h>
 
-#include <GLFW/glfw3.h>
 #include <json/json.h>
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cctype>
 #include <cstring>
 #include <cmath>
 #include <filesystem>
 #include <thread>
-#include <mutex>
 #include <vector>
-
-#if CAUSTICA_WITH_DX12
-#include <d3d12.h>
-#include <wrl/client.h>
-#endif
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 namespace
 {
     constexpr double c_HeadlessFrameTimeSeconds = 1.0 / 60.0;
-    std::mutex g_platformMutex;
-    uint32_t g_platformUsers = 0;
-
-    void AcquireAppPlatform()
-    {
-        std::lock_guard lock(g_platformMutex);
-        if (g_platformUsers++ == 0)
-            caustica::initializeAppPlatform();
-    }
-
-    void ReleaseAppPlatform()
-    {
-        std::lock_guard lock(g_platformMutex);
-        if (g_platformUsers > 0 && --g_platformUsers == 0)
-            caustica::shutdownAppPlatform();
-    }
-
-    void AppendUnique(std::vector<std::string>& values, const std::string& value)
-    {
-        if (std::find(values.begin(), values.end(), value) == values.end())
-            values.push_back(value);
-    }
-
-    std::filesystem::path GetCurrentModuleDirectory()
-    {
-#ifdef _WIN32
-        HMODULE module = nullptr;
-        if (GetModuleHandleExW(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                reinterpret_cast<LPCWSTR>(&GetCurrentModuleDirectory),
-                &module))
-        {
-            std::array<wchar_t, 32768> path = {};
-            DWORD length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
-            if (length > 0 && length < path.size())
-                return std::filesystem::path(path.data()).parent_path();
-        }
-#else
-        Dl_info info = {};
-        if (dladdr(reinterpret_cast<void*>(&GetCurrentModuleDirectory), &info) && info.dli_fname)
-            return std::filesystem::path(info.dli_fname).parent_path();
-#endif
-
-        return caustica::getDirectoryWithExecutable();
-    }
-
-    std::filesystem::path ResolveRuntimeDirectory()
-    {
-        std::filesystem::path moduleDirectory = GetCurrentModuleDirectory();
-        if (std::filesystem::exists(moduleDirectory / "ShaderBin"))
-            return moduleDirectory;
-
-        std::filesystem::path executableDirectory = caustica::getDirectoryWithExecutable();
-        if (std::filesystem::exists(executableDirectory / "ShaderBin"))
-            return executableDirectory;
-
-        return moduleDirectory;
-    }
-
-    std::filesystem::path ResolveResourceRoot(const std::filesystem::path& runtimeDirectory)
-    {
-        if (std::filesystem::exists(runtimeDirectory / caustica::c_AssetsFolder))
-            return runtimeDirectory;
-
-        std::filesystem::path parentDirectory = runtimeDirectory.parent_path();
-        if (std::filesystem::exists(parentDirectory / caustica::c_AssetsFolder))
-            return parentDirectory;
-
-        return caustica::getDirectoryWithExecutable();
-    }
 
     std::string TrimCopy(const std::string& value)
     {
@@ -243,98 +158,6 @@ namespace
         return sceneArgument;
     }
 
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    std::string GetAgilitySDKPath()
-    {
-        std::string sdkPath = (ResolveRuntimeDirectory() / "D3D12").string();
-        if (!sdkPath.empty() && sdkPath.back() != '\\' && sdkPath.back() != '/')
-            sdkPath += "\\";
-        return sdkPath;
-    }
-
-    bool EnableD3D12ExperimentalShaderModels(ID3D12DeviceFactory* factory)
-    {
-        static const UUID D3D12ExperimentalShaderModels = { 0x76f5573e, 0xf13a, 0x40f5, {0xb2, 0x97, 0x81, 0xce, 0x9e, 0x18, 0x93, 0x3f} };
-        UUID features[] = { D3D12ExperimentalShaderModels };
-
-        HRESULT hr = factory
-            ? factory->EnableExperimentalFeatures(_countof(features), features, nullptr, nullptr)
-            : D3D12EnableExperimentalFeatures(_countof(features), features, nullptr, nullptr);
-        if (FAILED(hr))
-        {
-            if (factory && hr == E_NOINTERFACE)
-                return false;
-            caustica::warning("RenderSession: D3D12 experimental shader models could not be enabled, HRESULT = 0x%08x", unsigned(hr));
-            return false;
-        }
-        return true;
-    }
-
-    Microsoft::WRL::ComPtr<ID3D12DeviceFactory> CreateD3D12AgilityDeviceFactory()
-    {
-        const std::string sdkPath = GetAgilitySDKPath();
-
-        Microsoft::WRL::ComPtr<ID3D12SDKConfiguration1> sdkConfig1;
-        HRESULT hr = D3D12GetInterface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdkConfig1));
-        if (SUCCEEDED(hr))
-        {
-            Microsoft::WRL::ComPtr<ID3D12DeviceFactory> factory;
-            hr = sdkConfig1->CreateDeviceFactory(
-                CAUSTICA_D3D_AGILITY_SDK_VERSION,
-                sdkPath.c_str(),
-                IID_PPV_ARGS(&factory));
-
-            if (SUCCEEDED(hr) && factory)
-            {
-                EnableD3D12ExperimentalShaderModels(factory.Get());
-                return factory;
-            }
-
-            caustica::warning("RenderSession: ID3D12SDKConfiguration1::CreateDeviceFactory('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
-        }
-        else
-        {
-            caustica::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration1) failed, HRESULT = 0x%08x", unsigned(hr));
-        }
-
-        // Fallback for older runtimes. This works when the host process has
-        // not already locked D3D12 to the system SDK.
-        Microsoft::WRL::ComPtr<ID3D12SDKConfiguration> sdkConfig;
-        hr = D3D12GetInterface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdkConfig));
-        if (FAILED(hr))
-        {
-            caustica::warning("RenderSession: D3D12GetInterface(ID3D12SDKConfiguration) failed, HRESULT = 0x%08x", unsigned(hr));
-            return nullptr;
-        }
-
-        hr = sdkConfig->SetSDKVersion(CAUSTICA_D3D_AGILITY_SDK_VERSION, sdkPath.c_str());
-        if (FAILED(hr))
-        {
-            caustica::warning("RenderSession: ID3D12SDKConfiguration::SetSDKVersion('%s') failed, HRESULT = 0x%08x", sdkPath.c_str(), unsigned(hr));
-            return nullptr;
-        }
-
-        EnableD3D12ExperimentalShaderModels(nullptr);
-        return nullptr;
-    }
-#endif
-
-    caustica::rhi::GraphicsAPI ResolveGraphicsAPI(const RenderSession::Config& cfg)
-    {
-#if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_VULKAN
-        return cfg.useVulkan ? caustica::rhi::GraphicsAPI::VULKAN : caustica::rhi::GraphicsAPI::D3D12;
-#elif CAUSTICA_WITH_VULKAN
-        if (!cfg.useVulkan)
-            caustica::warning("RenderSession: DX12 was requested but this build only has Vulkan; using Vulkan.");
-        return caustica::rhi::GraphicsAPI::VULKAN;
-#elif CAUSTICA_WITH_DX12
-        if (cfg.useVulkan)
-            caustica::warning("RenderSession: Vulkan was requested but this build only has DX12; using DX12.");
-        return caustica::rhi::GraphicsAPI::D3D12;
-#else
-        static_assert(CAUSTICA_WITH_DX12 || CAUSTICA_WITH_VULKAN, "Caustica requires at least one graphics backend");
-#endif
-    }
 }
 
 namespace caustica_py
@@ -345,52 +168,55 @@ namespace caustica_py
     }
 }
 
-RenderSession::RenderSession(const Config& cfg)
+RenderSession::RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, const Config& cfg)
     : m_config(cfg)
+    , m_device(std::move(device))
 {
-    AcquireAppPlatform();
-    m_platformInitialized = true;
-    m_config.scene = PrepareSceneArgument(cfg.scene);
-
-    if (cfg.nonInteractive)
+    if (!m_device)
     {
-        caustica::enableOutputToMessageBox(false);
-        caustica::enableOutputToConsole(true);
-        caustica::setMinSeverity(caustica::Severity::Warning);
-        caustica::helpersSetNonInteractive();
-    }
-
-#if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    if (!cfg.useVulkan)
-        m_d3d12DeviceFactory = CreateD3D12AgilityDeviceFactory();
-#endif
-
-    caustica::EngineAppDesc desc{};
-    desc.width = uint32_t(cfg.width);
-    desc.height = uint32_t(cfg.height);
-    desc.headless = cfg.headless;
-    desc.debugDevice = cfg.debug;
-    std::string adapterError;
-    if (!caustica::rhi::parseAdapterSelector(cfg.adapter, desc.adapter, &adapterError))
-    {
-        caustica::error("RenderSession: invalid GPU adapter selector '%s': %s",
-            cfg.adapter.c_str(), adapterError.c_str());
+        caustica::error("RenderSession: Device is required");
         return;
     }
-    desc.useVulkan = cfg.useVulkan;
+
+    m_config.width = m_config.width > 0 ? m_config.width : 1920;
+    m_config.height = m_config.height > 0 ? m_config.height : 1080;
+    m_config.scene = PrepareSceneArgument(cfg.scene);
+
+    if (!m_device->ensureCreated(m_config.width, m_config.height, m_config.headless))
+        return;
+    if (!m_device->tryBind())
+        return;
+
+    m_config.width = m_device->width();
+    m_config.height = m_device->height();
+    m_config.headless = m_device->headless();
+    m_config.useVulkan = m_device->useVulkan();
+    m_config.adapter = m_device->config().adapter;
+    m_config.debug = m_device->config().debug;
+
+    caustica::EngineAppDesc desc{};
+    desc.width = uint32_t(m_config.width);
+    desc.height = uint32_t(m_config.height);
+    desc.headless = m_config.headless;
+    desc.debugDevice = m_config.debug;
+    desc.adapter = m_device->adapterSelector();
+    desc.useVulkan = m_config.useVulkan;
     desc.scene = m_config.scene;
     desc.windowTitle = "caustica_py";
-    desc.dedicatedRenderThread = !cfg.headless;
-    desc.runtimeDirectory = ResolveRuntimeDirectory();
+    desc.dedicatedRenderThread = !m_config.headless;
+    desc.runtimeDirectory = caustica_py::ResolveRuntimeDirectory();
+    desc.device = m_device->gpu();
+    desc.window = m_device->window();
+    desc.surface = m_device->surface();
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
-    if (m_d3d12DeviceFactory)
-        desc.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
+    desc.d3d12DeviceFactory = m_device->d3d12Factory();
 #endif
 
     m_engine = caustica::EngineApp::create(std::move(desc));
     if (!m_engine || !m_engine->isValid())
     {
         caustica::error("RenderSession: failed to initialize EngineApp");
+        m_device->unbind();
         return;
     }
 
@@ -400,10 +226,6 @@ RenderSession::RenderSession(const Config& cfg)
     cmdLine.OverrideToRealtimeMode = cfg.realtimeMode;
     cmdLine.ReferenceSamplesPerPixel = cfg.accumulationTarget;
     m_engine->renderAppState().settings.AccumulationTarget = cfg.accumulationTarget;
-
-    m_engine->app().beforePresent = [this](caustica::GpuDevice& manager, uint32_t) {
-        m_lastRenderedBackBufferIndex = manager.getCurrentBackBufferIndex();
-    };
 
     m_initialized = true;
 
@@ -425,11 +247,8 @@ void RenderSession::shutdown()
         m_engine->shutdown();
     m_engine.reset();
     m_initialized = false;
-    if (m_platformInitialized)
-    {
-        ReleaseAppPlatform();
-        m_platformInitialized = false;
-    }
+    if (m_device)
+        m_device->unbind();
 }
 
 bool RenderSession::LoadScene(const std::string& sceneName, bool waitUntilReady,
@@ -514,19 +333,8 @@ bool RenderSession::Step(float dt)
     if (!frameOk)
         return false;
 
-    // Headless Python stepping can outrun the GPU and cause resource hazards
-    // (e.g. screenshot readback or auto-exposure buffer maps). Serialize frames.
-    if (m_config.headless)
-    {
-        if (!device->getDevice()->waitForIdle())
-        {
-            caustica::error("RenderSession: GPU device lost or removed");
-            return false;
-        }
-    }
-
-    GLFWwindow* window = device->getWindow();
-    return !window || !glfwWindowShouldClose(window);
+    caustica::Window* window = m_engine->app().getWindow();
+    return !window || !window->getExit();
 }
 
 bool RenderSession::StepN(int frames)
@@ -644,9 +452,9 @@ bool RenderSession::SaveScreenshot(const std::string& outputPath)
 
     if (!tex)
     {
-        uint32_t backBufferIndex = m_lastRenderedBackBufferIndex;
-        if (backBufferIndex == UINT32_MAX)
-            backBufferIndex = device->getCurrentBackBufferIndex();
+        uint32_t backBufferIndex = m_engine->surface()
+            ? m_engine->surface()->getLastPresentedBackBufferIndex()
+            : 0;
 
         tex = device->getBackBuffer(backBufferIndex);
         state = m_config.headless
@@ -706,9 +514,9 @@ std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
 
     if (!texture)
     {
-        uint32_t backBufferIndex = m_lastRenderedBackBufferIndex;
-        if (backBufferIndex == UINT32_MAX)
-            backBufferIndex = gpuDevice->getCurrentBackBufferIndex();
+        uint32_t backBufferIndex = m_engine->surface()
+            ? m_engine->surface()->getLastPresentedBackBufferIndex()
+            : 0;
 
         texture = gpuDevice->getBackBuffer(backBufferIndex);
         textureState = m_config.headless

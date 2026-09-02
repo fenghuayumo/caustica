@@ -15,7 +15,7 @@ namespace caustica
         static void waitForCrashDump(uint32_t maxTimeoutSeconds = 60);
         static uint64_t getShaderHashForBinary(std::pair<const void*, size_t> shaderBinary, caustica::rhi::GraphicsAPI api);
 
-        AftermathCrashDump(GpuDevice& deviceManager);
+        AftermathCrashDump(GpuDevice& device);
 
         void enableCrashDumpTracking();
         // markers are stored with Aftermath as hashed 64bit values
@@ -27,7 +27,7 @@ namespace caustica
     private:
         static void initializeAftermathCrashDump(AftermathCrashDump* dumper);
 
-        GpuDevice& m_deviceManager;
+        GpuDevice& m_device;
         std::filesystem::path m_dumpFolder;
     };
 } // end namespace caustica

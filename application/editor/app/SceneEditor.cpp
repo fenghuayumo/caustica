@@ -1050,13 +1050,10 @@ void SceneEditor::updateWindowTitle()
     if (!m_app)
         return;
 
-    auto* device = m_app->getGpuDevice();
-    if (!device)
-        return;
-
     const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
         + " " + caustica::kVersionString;
-    device->setInformativeWindowTitle(versionedTitle.c_str(), false);
+    if (GpuSurface* gpuSurface = m_app->getSurface())
+        gpuSurface->setInformativeWindowTitle(versionedTitle.c_str(), false);
 }
 
 void SceneEditor::setSceneTime(double sceneTime)

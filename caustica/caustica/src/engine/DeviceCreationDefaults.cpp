@@ -1,4 +1,5 @@
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 
 #include <core/log.h>
 #include <core/progress.h>
@@ -37,7 +38,6 @@ namespace
         AppendUnique(params.requiredVulkanDeviceExtensions, "VK_KHR_buffer_device_address");
         AppendUnique(params.requiredVulkanDeviceExtensions, "VK_KHR_format_feature_flags2");
 
-        // OMM baker / validation-layer noise that is benign on our targets.
         params.ignoredVulkanValidationMessageLocations.push_back(0x0000000023e43bb7);
         params.ignoredVulkanValidationMessageLocations.push_back(0x000000000609a13b);
         params.ignoredVulkanValidationMessageLocations.push_back(0x00000000c5a3822a);
@@ -82,7 +82,7 @@ namespace
         ApplyPathTracerVulkanDefaults(params);
     }
 
-    DeviceCreationParameters MakePathTracerDeviceParameters(const GpuDeviceCreateDesc& desc)
+    DeviceCreationParameters MakeBackendParams(const GpuDeviceCreateDesc& desc)
     {
         DeviceCreationParameters params;
         ApplyPathTracerEngineDefaults(params);
@@ -111,17 +111,38 @@ namespace
 
         return params;
     }
+
+    std::unique_ptr<Window> CreatePlatformWindow(const GpuDeviceCreateDesc& desc)
+    {
+        GlfwWindow::makeDefault();
+
+        WindowDesc windowDesc;
+        windowDesc.Width = desc.backBufferWidth;
+        windowDesc.Height = desc.backBufferHeight;
+        windowDesc.Fullscreen = desc.startFullscreen;
+        windowDesc.Maximized = desc.startMaximized && !desc.startFullscreen;
+        windowDesc.Borderless = desc.startBorderless;
+        windowDesc.VSync = desc.vsyncEnabled;
+        windowDesc.Title = desc.windowTitle;
+        windowDesc.RenderAPI = static_cast<int>(desc.api);
+
+        std::unique_ptr<Window> window(Window::create(windowDesc));
+        if (!window || !window->hasInitialised())
+            return nullptr;
+        return window;
+    }
 } // namespace
 
-GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& desc)
+GpuDeviceCreateResult GpuDevice::create(const GpuDeviceCreateDesc& desc)
 {
     GpuDeviceCreateResult result;
-    const DeviceCreationParameters deviceParams = MakePathTracerDeviceParameters(desc);
+    const DeviceCreationParameters backendParams = MakeBackendParams(desc);
 
-    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::create(desc.api));
+    // 1. Backend object (DX12 / Vulkan / DX11).
+    std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::createBackend(desc.api));
     if (!gpuDevice)
     {
-        caustica::error("GpuDevice::createInitialized: GpuDevice::create returned null");
+        caustica::error("GpuDevice: no backend for the requested graphics API");
         return result;
     }
 
@@ -129,9 +150,16 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
 
     if (desc.headless)
     {
-        if (!gpuDevice->initializeHeadlessGraphics(deviceParams))
+        if (!gpuDevice->createHeadlessTargets(backendParams))
         {
-            caustica::error("GpuDevice::createInitialized: failed to create headless graphics device");
+            caustica::error("GpuDevice: failed to create headless device / targets");
+            return result;
+        }
+
+        result.surface = GpuSurface::createHeadless(*gpuDevice);
+        if (!result.surface)
+        {
+            caustica::error("GpuDevice: failed to create headless surface");
             return result;
         }
 
@@ -139,47 +167,33 @@ GpuDeviceCreateResult GpuDevice::createInitialized(const GpuDeviceCreateDesc& de
         return result;
     }
 
-    GlfwWindow::makeDefault();
-
-    WindowDesc windowDesc;
-    windowDesc.Width = desc.backBufferWidth;
-    windowDesc.Height = desc.backBufferHeight;
-    windowDesc.Fullscreen = desc.startFullscreen;
-    windowDesc.Maximized = desc.startMaximized && !desc.startFullscreen;
-    windowDesc.Borderless = desc.startBorderless;
-    windowDesc.VSync = desc.vsyncEnabled;
-    windowDesc.Title = desc.windowTitle;
-    windowDesc.RenderAPI = static_cast<int>(desc.api);
-
-    std::unique_ptr<Window> window(Window::create(windowDesc));
-    if (!window || !window->hasInitialised())
+    std::unique_ptr<Window> window = CreatePlatformWindow(desc);
+    if (!window)
     {
-        caustica::error("GpuDevice::createInitialized: failed to create platform window");
+        caustica::error("GpuDevice: failed to create platform window");
         return result;
     }
 
-    if (!gpuDevice->bindWindow(window.get()))
+    if (!gpuDevice->bindPresentTarget(*window))
     {
-        caustica::error("GpuDevice::createInitialized: failed to bind platform window");
+        caustica::error("GpuDevice: failed to bind present target");
         return result;
     }
 
-    if (!gpuDevice->initializeGraphicsDevice(deviceParams))
+    if (!gpuDevice->createLogicalDevice(backendParams))
     {
-        caustica::error("GpuDevice::createInitialized: failed to create graphics device");
+        caustica::error("GpuDevice: failed to create logical device");
         return result;
     }
 
-    if (!gpuDevice->initializeWindowSwapChain(window.get()))
+    result.surface = GpuSurface::createWindowed(*gpuDevice, *window);
+    if (!result.surface)
     {
-        caustica::error("GpuDevice::createInitialized: failed to create swap chain");
+        caustica::error("GpuDevice: failed to create window surface");
         return result;
     }
 
-    // Maximize only after backend/device/swap-chain initialization. Vulkan
-    // integration may touch the native window while initializing and otherwise
-    // restore a window that DX12 leaves maximized.
-    if (windowDesc.Maximized)
+    if (desc.startMaximized && !desc.startFullscreen)
         window->maximise();
 
     helpersRegisterActiveWindow(window->getNativeHandle());

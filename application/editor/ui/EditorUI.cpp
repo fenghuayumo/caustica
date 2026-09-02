@@ -11,7 +11,7 @@
 #include <render/AppDiagnostics.h>
 #include <core/vfs/VFS.h>
 #include <imgui_internal.h>
-#include <GLFW/glfw3.h>
+#include <platform/window.h>
 #include <core/path_utils.h>
 #include <algorithm>
 #include <cstdio>
@@ -31,13 +31,13 @@ void InitializeEditorUIDataFromCommandLine(EditorUIData& ui, const CommandLineOp
 }
 
 EditorUI::EditorUI(
-    GpuDevice* deviceManager,
+    GpuDevice* device,
     SceneEditor& sceneEditor,
     EditorUIData& ui,
     bool NVAPI_SERSupported,
     const CommandLineOptions& cmdLine,
     RenderSettingsConsoleBinding& console)
-        : ImGui_Renderer(deviceManager)
+        : ImGui_Renderer(device)
         , m_sceneEditor(sceneEditor)
         , m_ui(ui)
         , m_settings(ui.render.settings)
@@ -77,8 +77,10 @@ EditorUI::~EditorUI()
 {
     if (m_materialPickerCursorVisible)
     {
-        if (GLFWwindow* window = getGpuDevice() ? getGpuDevice()->getWindow() : nullptr)
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        if (Window* window = getGpuDevice() && getGpuDevice()->surface()
+                ? getGpuDevice()->surface()->window()
+                : nullptr)
+            window->setCursorVisible(true);
     }
 #if ENABLE_DEBUG_DELTA_TREE_VIZUALISATION
     ImNodes::Ez::FreeContext(m_ImNodesContext);
@@ -94,9 +96,11 @@ void EditorUI::UpdateMaterialPickerCursor()
         && viewport.RectValid
         && viewport.Hovered;
 
-    GLFWwindow* window = getGpuDevice() ? getGpuDevice()->getWindow() : nullptr;
+    Window* window = getGpuDevice() && getGpuDevice()->surface()
+        ? getGpuDevice()->surface()->window()
+        : nullptr;
     if (window && visible != m_materialPickerCursorVisible)
-        glfwSetInputMode(window, GLFW_CURSOR, visible ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
+        window->setCursorVisible(!visible);
     m_materialPickerCursorVisible = visible;
 
     if (!visible)

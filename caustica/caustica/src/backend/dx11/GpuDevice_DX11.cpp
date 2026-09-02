@@ -3,7 +3,15 @@
 #include <locale>
 
 #include <backend/GpuDevice.h>
+#include <backend/GpuSurface.h>
 #include <backend/dx11/GpuDevice_DX11.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 #include <backend/DxgiVideoMemory.h>
 #include <core/log.h>
 
@@ -72,17 +80,23 @@ bool GpuDevice_DX11::beginFrame()
     {
         if (m_SwapChainDesc.Windowed != newSwapChainDesc.Windowed)
         {
-            backBufferResizing();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResizing();
+            else
+                beginSurfaceResize();
 
             m_SwapChainDesc = newSwapChainDesc;
             m_DeviceParams.backBufferWidth = newSwapChainDesc.BufferDesc.Width;
             m_DeviceParams.backBufferHeight = newSwapChainDesc.BufferDesc.Height;
 
             if (newSwapChainDesc.Windowed)
-                glfwSetWindowMonitor(m_Window, nullptr, 50, 50, newSwapChainDesc.BufferDesc.Width, newSwapChainDesc.BufferDesc.Height, 0);
+                glfwSetWindowMonitor(presentGlfw(), nullptr, 50, 50, newSwapChainDesc.BufferDesc.Width, newSwapChainDesc.BufferDesc.Height, 0);
 
             resizeSwapChain();
-            backBufferResized();
+            if (GpuSurface* surface = this->surface())
+                surface->handleResized();
+            else
+                endSurfaceResize();
         }
     }
     return true;
@@ -264,10 +278,10 @@ bool GpuDevice_DX11::createSwapChain()
     {
         RECT rect = { 0, 0, LONG(m_DeviceParams.backBufferWidth), LONG(m_DeviceParams.backBufferHeight) };
         if (moveWindowOntoAdapter(m_DxgiAdapter, rect))
-            glfwSetWindowPos(m_Window, rect.left, rect.top);
+            glfwSetWindowPos(presentGlfw(), rect.left, rect.top);
     }
 
-    m_hWnd = glfwGetWin32Window(m_Window);
+    m_hWnd = glfwGetWin32Window(presentGlfw());
 
     RECT clientRect;
     GetClientRect(m_hWnd, &clientRect);

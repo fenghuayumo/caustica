@@ -88,7 +88,10 @@ public:
     virtual void setVSync(bool set)                        = 0;
     virtual void setBorderless(bool borderless)            = 0;
     virtual void maximise()                                {}
+    virtual void hide()                                    {}
+    virtual void setSize(uint32_t width, uint32_t height)  { (void)width; (void)height; }
     virtual void hideMouse(bool hide)                      {}
+    virtual void setCursorVisible(bool visible)            { (void)visible; }
     virtual void setMousePosition(float x, float y)        {}
     virtual void setIcon(const WindowDesc& desc)           = 0;
 
@@ -97,7 +100,7 @@ public:
     virtual void processInput()       {}
     virtual void updateCursorImgui()  = 0;
 
-    // --- Event callback (set by Application) ---
+    // --- Event callback (set by the engine frame owner) ---
     virtual void setEventCallback(const EventCallbackFn& callback) = 0;
 
     // --- File drag-and-drop (GLFW-backed windows only) ---

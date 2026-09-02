@@ -21,6 +21,7 @@
 #include <engine/App.h>
 #include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
+#include <platform/glfw_window.h>
 #include <render/passes/debug/Korgi.h>
 #include <json/json.h>
 
@@ -71,9 +72,9 @@ GameScene::GameScene(caustica::editor::SceneEditor& editor, const caustica::edit
 
 GLFWwindow* GameScene::GetGLFWWindow() const
 {
-    return m_editor.app() && m_editor.app()->getGpuDevice()
-        ? m_editor.app()->getGpuDevice()->getWindow()
-        : nullptr;
+    if (!m_editor.app())
+        return nullptr;
+    return nativeGlfwWindow(m_editor.app()->getWindow());
 }
 
 caustica::scene::SceneEntityWorld* GameScene::entityWorld() const
