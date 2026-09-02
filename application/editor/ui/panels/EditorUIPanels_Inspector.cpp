@@ -326,6 +326,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 if (InspectorDragFloat("Vertical FOV", &fovDeg, 0.1f, 1.f, 179.f, "%.1f°"))
                 {
                     pers->verticalFov = dm::radians(dm::clamp(fovDeg, 1.f, 179.f));
+                    pers->intrinsics.reset();
                     m_settings.ResetAccumulation = true;
                 }
                 RESET_ON_CHANGE(InspectorDragFloat("Near Clip", &pers->zNear, 0.01f, 0.001f, 1e6f, "%.3f"));
@@ -358,11 +359,12 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                     break;
                 }
             }
-            uint& activeCam = caustica::selectedCameraIndex(*m_sceneEditor.app());
-            const bool isActive = sceneCamIndex >= 0 && activeCam == static_cast<uint>(sceneCamIndex + 1);
+            uint32_t activeCam = caustica::selectedCameraIndex(*m_sceneEditor.app());
+            const bool isActive = sceneCamIndex >= 0 && activeCam == static_cast<uint32_t>(sceneCamIndex + 1);
             ImGui::BeginDisabled(isActive || sceneCamIndex < 0);
             if (ImGui::Button("Set as Active Camera", ImVec2(-1.f, 0.f)) && sceneCamIndex >= 0)
-                activeCam = static_cast<uint>(sceneCamIndex + 1);
+                caustica::setSelectedCameraIndex(
+                    *m_sceneEditor.app(), static_cast<uint32_t>(sceneCamIndex + 1));
             ImGui::EndDisabled();
             if (isActive)
             {

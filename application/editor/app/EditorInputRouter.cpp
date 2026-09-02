@@ -109,7 +109,7 @@ void activateFreeCameraForInput(App& app)
     // Switch to the already-synced controller pose before applying viewport
     // input, so the first interaction preserves the reference view and then
     // remains freely editable.
-    caustica::selectedCameraIndex(app) = 0;
+    caustica::setSelectedCameraIndex(app, 0);
     caustica::markCameraChanged(app);
 }
 
