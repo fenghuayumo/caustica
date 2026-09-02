@@ -90,7 +90,7 @@ namespace
                     ecs::Entity camEntity = cameraEntities[camIdx];
                     const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
                     const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-                    if (camComp && globalComp)
+                    if (camComp && globalComp && scene::isPerspectiveCamera(*camComp))
                     {
                         const scene::CameraRenderProxy proxy =
                             scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
@@ -101,6 +101,12 @@ namespace
                         if (auto* wr = caustica::worldRenderer(app))
                             wr->setGaussianSplatTemporalReset(true);
                         syncedCamera = proxy.projection == scene::CameraProjectionKind::Perspective;
+                    }
+                    else if (selectedIndex > 0)
+                    {
+                        // Keep the selection state consistent with the
+                        // perspective-only active-camera controller.
+                        cam->setSelectedCameraIndex(0);
                     }
                 }
             }

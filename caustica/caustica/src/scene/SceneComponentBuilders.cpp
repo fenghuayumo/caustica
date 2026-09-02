@@ -119,6 +119,19 @@ std::optional<CameraComponent> makeCameraComponentFromJson(const std::string& ty
         src["exposureValue"] >> data.exposureValue;
         src["exposureValueMin"] >> data.exposureValueMin;
         src["exposureValueMax"] >> data.exposureValueMax;
+        if (src.isMember("fx") && src.isMember("fy") && src.isMember("cx") && src.isMember("cy")
+            && src.isMember("width") && src.isMember("height"))
+        {
+            CameraIntrinsics k;
+            src["fx"] >> k.fx;
+            src["fy"] >> k.fy;
+            src["cx"] >> k.cx;
+            src["cy"] >> k.cy;
+            src["width"] >> k.width;
+            src["height"] >> k.height;
+            if (k.fx > 0.f && k.fy > 0.f && k.width > 0.f && k.height > 0.f)
+                data.intrinsics = k;
+        }
         component.data = std::move(data);
         return component;
     }

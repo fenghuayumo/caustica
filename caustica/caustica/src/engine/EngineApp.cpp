@@ -601,10 +601,19 @@ std::string EngineApp::currentCameraPosDirUp() const
     return m_app ? caustica::currentCameraPosDirUp(*m_app) : std::string{};
 }
 
-void EngineApp::setCameraVerticalFOV(float radians)
+CameraPose EngineApp::currentCameraPose() const
 {
-    if (m_app)
-        caustica::setCameraVerticalFOV(*m_app, radians);
+    return m_app ? caustica::currentCameraPose(*m_app) : CameraPose{};
+}
+
+bool EngineApp::setCameraPose(const CameraPose& pose)
+{
+    return m_app && caustica::setCurrentCameraPose(*m_app, pose);
+}
+
+bool EngineApp::setCameraVerticalFOV(float radians)
+{
+    return m_app && caustica::setCameraVerticalFOV(*m_app, radians);
 }
 
 float EngineApp::cameraVerticalFOV() const
@@ -612,16 +621,14 @@ float EngineApp::cameraVerticalFOV() const
     return m_app ? caustica::cameraVerticalFOV(*m_app) : 0.f;
 }
 
-void EngineApp::setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
+bool EngineApp::setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
 {
-    if (m_app)
-        caustica::setCameraIntrinsics(*m_app, fx, fy, cx, cy, width, height);
+    return m_app && caustica::setCameraIntrinsics(*m_app, fx, fy, cx, cy, width, height);
 }
 
-void EngineApp::clearCameraIntrinsics()
+bool EngineApp::clearCameraIntrinsics()
 {
-    if (m_app)
-        caustica::clearCameraIntrinsics(*m_app);
+    return m_app && caustica::clearCameraIntrinsics(*m_app);
 }
 
 uint32_t EngineApp::sceneCameraCount() const
@@ -631,15 +638,42 @@ uint32_t EngineApp::sceneCameraCount() const
 
 uint32_t EngineApp::selectedCameraIndex() const
 {
-    if (!m_app)
-        return 0;
-    return caustica::selectedCameraIndex(*const_cast<App*>(m_app.get()));
+    return m_app ? caustica::selectedCameraIndex(*m_app) : 0;
 }
 
-void EngineApp::setSelectedCameraIndex(uint32_t index)
+bool EngineApp::setSelectedCameraIndex(uint32_t index)
 {
-    if (m_app)
-        caustica::selectedCameraIndex(*m_app) = index;
+    return m_app && caustica::setSelectedCameraIndex(*m_app, index);
+}
+
+ecs::Entity EngineApp::activeCameraEntity() const
+{
+    return m_app ? caustica::activeSceneCameraEntity(*m_app) : ecs::NullEntity;
+}
+
+bool EngineApp::activeCameraIsFree() const
+{
+    return !m_app || caustica::activeCameraIsFree(*m_app);
+}
+
+std::string EngineApp::activeCameraPath() const
+{
+    return m_app ? caustica::activeCameraPath(*m_app) : std::string{};
+}
+
+std::string EngineApp::activeCameraName() const
+{
+    return m_app ? caustica::activeCameraName(*m_app) : std::string{};
+}
+
+bool EngineApp::setActiveCamera(ecs::Entity entity)
+{
+    return m_app && caustica::setActiveCamera(*m_app, entity);
+}
+
+bool EngineApp::setActiveCameraByPath(const std::string& path)
+{
+    return m_app && caustica::setActiveCameraByPath(*m_app, path);
 }
 
 void EngineApp::saveCurrentCamera()

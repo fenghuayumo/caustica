@@ -337,6 +337,7 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 | `exposureValue` | number | `PerspectiveCameraEx` 扩展字段。固定曝光值。 |
 | `exposureValueMin` | number | `PerspectiveCameraEx` 扩展字段。自动曝光最小值。 |
 | `exposureValueMax` | number | `PerspectiveCameraEx` 扩展字段。自动曝光最大值。 |
+| `fx`, `fy`, `cx`, `cy`, `width`, `height` | number | 可选。OpenCV/COLMAP 针孔内参。存在且 `fx/fy/width/height > 0` 时覆盖对称 `verticalFov`。 |
 
 `toneMapOperator` 的推荐（规范）取值如下：
 

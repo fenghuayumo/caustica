@@ -108,6 +108,9 @@ namespace caustica::scene
         std::optional<float> exposureValue;
         std::optional<float> exposureValueMin;
         std::optional<float> exposureValueMax;
+        bool useCustomIntrinsics = false;
+        dm::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
+        dm::float2 intrinsicsViewport = { 0.f, 0.f };
 
         // Orthographic
         float xMag = 1.f;

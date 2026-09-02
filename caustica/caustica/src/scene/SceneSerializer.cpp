@@ -180,10 +180,30 @@ void WriteCameraIntoComponents(Json::Value& components, const CameraComponent& c
         Json::Value& cam = EnsureObject(components[key]);
         cam["verticalFov"] << pers->verticalFov;
         cam["zNear"] << pers->zNear;
+        // Patch an existing authoring node in place. Remove optional values
+        // first so clearing a runtime property does not resurrect it after a
+        // save/reload cycle.
+        cam.removeMember("zFar");
+        cam.removeMember("aspectRatio");
+        cam.removeMember("fx");
+        cam.removeMember("fy");
+        cam.removeMember("cx");
+        cam.removeMember("cy");
+        cam.removeMember("width");
+        cam.removeMember("height");
         if (pers->zFar)
             cam["zFar"] << *pers->zFar;
         if (pers->aspectRatio)
             cam["aspectRatio"] << *pers->aspectRatio;
+        if (pers->intrinsics)
+        {
+            cam["fx"] << pers->intrinsics->fx;
+            cam["fy"] << pers->intrinsics->fy;
+            cam["cx"] << pers->intrinsics->cx;
+            cam["cy"] << pers->intrinsics->cy;
+            cam["width"] << pers->intrinsics->width;
+            cam["height"] << pers->intrinsics->height;
+        }
         return;
     }
 

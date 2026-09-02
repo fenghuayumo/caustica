@@ -1,5 +1,7 @@
 #include <scene/SceneSerializer.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneCameraAccess.h>
+#include <scene/ScenePoseAccess.h>
 #include <scene/SceneComponentBuilders.h>
 #include <scene/SceneObjects.h>
 #include <core/json.h>
@@ -312,6 +314,123 @@ int main()
         passed &= expect(
             std::abs(entities[1]["components"]["PerspectiveCameraEx"]["zNear"].asFloat() - 0.05f) < 1e-5f,
             "save patch did not write PerspectiveCameraEx.zNear");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity cam = world.createEntity("Camera", root);
+        caustica::scene::CameraComponent camera;
+        caustica::scene::PerspectiveCameraData pers;
+        pers.verticalFov = 0.7f;
+        pers.zNear = 0.1f;
+        pers.intrinsics = caustica::scene::CameraIntrinsics{ 800.f, 800.f, 640.f, 360.f, 1280.f, 720.f };
+        camera.data = pers;
+        world.world().emplace<caustica::scene::CameraComponent>(cam, camera);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cam, caustica::scene::SceneAuthoringIdComponent{ "cam" });
+
+        Json::Value entities = parse(R"([
+            {"id":"cam","name":"Camera","components":{"PerspectiveCameraEx":{"verticalFov":0.7}}}
+        ])");
+        caustica::scene::patchEntityTransforms(entities, world);
+        passed &= expect(
+            std::abs(entities[0]["components"]["PerspectiveCameraEx"]["fx"].asFloat() - 800.f) < 1e-5f,
+            "save patch did not write PerspectiveCameraEx.fx");
+        passed &= expect(
+            std::abs(entities[0]["components"]["PerspectiveCameraEx"]["height"].asFloat() - 720.f) < 1e-5f,
+            "save patch did not write PerspectiveCameraEx.height");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity cam = world.createEntity("Camera", root);
+        caustica::scene::CameraComponent camera;
+        camera.data = caustica::scene::PerspectiveCameraData{};
+        world.world().emplace<caustica::scene::CameraComponent>(cam, camera);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            cam, caustica::scene::SceneAuthoringIdComponent{ "cam" });
+
+        Json::Value entities = parse(R"([
+            {"id":"cam","name":"Camera","components":{
+                "PerspectiveCameraEx": {
+                    "verticalFov":0.7,
+                    "fx":800,"fy":800,"cx":640,"cy":360,"width":1280,"height":720
+                }
+            }}
+        ])");
+        caustica::scene::patchEntityTransforms(entities, world);
+        const Json::Value& saved = entities[0]["components"]["PerspectiveCameraEx"];
+        passed &= expect(!saved.isMember("fx") && !saved.isMember("fy")
+                && !saved.isMember("cx") && !saved.isMember("cy")
+                && !saved.isMember("width") && !saved.isMember("height"),
+            "cleared camera intrinsics were not removed from the save patch");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity cam = world.createEntity("Camera", root);
+        caustica::scene::CameraComponent camera;
+        camera.data = caustica::scene::PerspectiveCameraData{};
+        world.world().emplace<caustica::scene::CameraComponent>(cam, camera);
+        world.refreshHierarchy();
+        passed &= expect(
+            caustica::scene::setCameraWorldLookTo(
+                world, cam, dm::float3(0.f, 1.5f, 4.f), dm::float3(0.f, 0.f, -1.f), dm::float3(0.f, 1.f, 0.f)),
+            "setCameraWorldLookTo failed");
+        caustica::scene::CameraWorldLookTo look;
+        passed &= expect(
+            caustica::scene::tryGetCameraWorldLookTo(world, cam, look),
+            "tryGetCameraWorldLookTo failed");
+        passed &= expect(std::abs(look.position.y - 1.5f) < 1e-4f, "look_to did not keep world position");
+        passed &= expect(std::abs(look.direction.z + 1.f) < 1e-3f, "look_to did not keep look direction");
+        passed &= expect(std::abs(look.up.y - 1.f) < 1e-3f, "look_to did not keep up");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity child = world.createEntity("Child", root);
+        world.setTranslation(root, dm::double3(4.0, 1.0, -2.0));
+        world.setRotation(root, dm::rotationQuat(dm::double3(0.0, dm::PI_d * 0.5, 0.0)));
+        world.refreshHierarchy();
+
+        caustica::scene::EntityPose desired;
+        desired.position = dm::double3(7.0, 2.0, -3.0);
+        desired.rotation = dm::dquat::identity();
+        desired.scaling = dm::double3(1.0);
+        passed &= expect(
+            caustica::scene::setEntityWorldPose(world, child, desired),
+            "setEntityWorldPose failed under a rotated parent");
+        world.refreshHierarchy();
+        caustica::scene::EntityPose actual;
+        passed &= expect(
+            caustica::scene::getEntityWorldPose(world, child, actual),
+            "getEntityWorldPose failed after a rotated-parent write");
+        passed &= expect(
+            std::abs(actual.position.x - desired.position.x) < 1e-4
+                && std::abs(actual.position.y - desired.position.y) < 1e-4
+                && std::abs(actual.position.z - desired.position.z) < 1e-4,
+            "world pose write used the wrong parent multiplication order");
+    }
+
+    {
+        Json::Value src = parse(R"({
+            "verticalFov": 0.7,
+            "zNear": 0.1,
+            "fx": 900, "fy": 900, "cx": 640, "cy": 360, "width": 1280, "height": 720
+        })");
+        auto camera = caustica::scene::makeCameraComponentFromJson("PerspectiveCameraEx", src);
+        passed &= expect(camera.has_value(), "failed to parse PerspectiveCameraEx with intrinsics");
+        const auto* pers = camera ? caustica::scene::tryGetPerspectiveCameraData(*camera) : nullptr;
+        passed &= expect(
+            pers && pers->intrinsics && std::abs(pers->intrinsics->fx - 900.f) < 1e-5f,
+            "JSON did not load camera fx");
+        passed &= expect(
+            pers && pers->intrinsics && std::abs(pers->intrinsics->height - 720.f) < 1e-5f,
+            "JSON did not load camera height");
     }
 
     {

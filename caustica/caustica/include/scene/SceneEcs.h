@@ -261,6 +261,16 @@ struct EnvironmentLightComponent
     std::string path;
 };
 
+struct CameraIntrinsics
+{
+    float fx = 0.f;
+    float fy = 0.f;
+    float cx = 0.f;
+    float cy = 0.f;
+    float width = 0.f;
+    float height = 0.f;
+};
+
 struct PerspectiveCameraData
 {
     float zNear = 1.f;
@@ -273,6 +283,8 @@ struct PerspectiveCameraData
     std::optional<float> exposureValue;
     std::optional<float> exposureValueMin;
     std::optional<float> exposureValueMax;
+    // When set, overrides symmetric verticalFov with an off-center pinhole.
+    std::optional<CameraIntrinsics> intrinsics;
 };
 
 struct OrthographicCameraData

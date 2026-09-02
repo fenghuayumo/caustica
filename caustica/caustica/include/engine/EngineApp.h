@@ -174,13 +174,21 @@ public:
     bool setCameraPosDirUp(const math::float3& pos, const math::float3& dir, const math::float3& up);
     bool setCameraPosDirUp(const std::string& value);
     [[nodiscard]] std::string currentCameraPosDirUp() const;
-    void setCameraVerticalFOV(float radians);
+    [[nodiscard]] CameraPose currentCameraPose() const;
+    bool setCameraPose(const CameraPose& pose);
+    bool setCameraVerticalFOV(float radians);
     [[nodiscard]] float cameraVerticalFOV() const;
-    void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
-    void clearCameraIntrinsics();
+    bool setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
+    bool clearCameraIntrinsics();
     [[nodiscard]] uint32_t sceneCameraCount() const;
     [[nodiscard]] uint32_t selectedCameraIndex() const;
-    void setSelectedCameraIndex(uint32_t index);
+    bool setSelectedCameraIndex(uint32_t index);
+    [[nodiscard]] ecs::Entity activeCameraEntity() const;
+    [[nodiscard]] bool activeCameraIsFree() const;
+    [[nodiscard]] std::string activeCameraPath() const;
+    [[nodiscard]] std::string activeCameraName() const;
+    bool setActiveCamera(ecs::Entity entity);
+    bool setActiveCameraByPath(const std::string& path);
     void saveCurrentCamera();
     void loadCurrentCamera();
 

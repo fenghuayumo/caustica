@@ -42,12 +42,19 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
                 * affineToHomogeneous(viewReprojection)
                 * camera.viewPrevious()->getProjectionMatrix(false);
             const float outputAspectRatio = params.displayAspectRatio;
-            float4x4 projection = perspProjD3DStyleReverse(
-                dm::radians(camera.verticalFOV()), outputAspectRatio, camera.zNear());
+            const dm::float2 intrinsicsViewport = camera.intrinsicsViewport();
+            const float cameraAspectRatio = camera.useCustomIntrinsics()
+                && intrinsicsViewport.x > 0.f && intrinsicsViewport.y > 0.f
+                ? intrinsicsViewport.x / intrinsicsViewport.y
+                : outputAspectRatio;
+            // Use the projection that was actually installed in the view. In
+            // particular, custom pinhole intrinsics may be off-center and
+            // cannot be reconstructed from a symmetric-FOV approximation.
+            const float4x4 projection = camera.view()->getProjectionMatrix(false);
 
             StreamlineInterface::Constants slConstants = {};
-            slConstants.cameraAspectRatio = outputAspectRatio;
-            slConstants.cameraFOV = dm::radians(camera.verticalFOV());
+            slConstants.cameraAspectRatio = cameraAspectRatio;
+            slConstants.cameraFOV = camera.verticalFOV();
             slConstants.cameraFar = camera.zFar();
             slConstants.cameraMotionIncluded = true;
             slConstants.cameraNear = camera.zNear();

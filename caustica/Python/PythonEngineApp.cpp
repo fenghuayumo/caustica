@@ -30,6 +30,7 @@ PyEngineApp::PyEngineApp(std::shared_ptr<PythonDevice> device, const RenderSessi
     m_session = std::make_unique<RenderSession>(std::move(device), cfg);
     if (!m_session->GetEngine())
         throw std::runtime_error("caustica.EngineApp: failed to initialize (see log for details)");
+    m_context->engine = m_session->GetEngine();
     adoptCurrent();
 }
 
@@ -38,13 +39,16 @@ PyEngineApp::PyEngineApp(caustica::EngineApp* borrowed)
 {
     if (!m_borrowed)
         throw std::runtime_error("caustica.EngineApp: borrowed engine is null");
+    m_context->engine = m_borrowed;
 }
 
 PyEngineApp::PyEngineApp(PyEngineApp&& other) noexcept
     : m_session(std::move(other.m_session))
     , m_borrowed(other.m_borrowed)
+    , m_context(std::move(other.m_context))
 {
     other.m_borrowed = nullptr;
+    other.m_context = std::make_shared<PyEngineAppContext>();
     if (g_current == &other)
         g_current = this;
 }
@@ -56,7 +60,9 @@ PyEngineApp& PyEngineApp::operator=(PyEngineApp&& other) noexcept
     shutdown();
     m_session = std::move(other.m_session);
     m_borrowed = other.m_borrowed;
+    m_context = std::move(other.m_context);
     other.m_borrowed = nullptr;
+    other.m_context = std::make_shared<PyEngineAppContext>();
     if (g_current == &other)
         g_current = this;
     return *this;
@@ -76,6 +82,8 @@ void PyEngineApp::shutdown()
 {
     if (g_current == this)
         g_current = nullptr;
+    if (m_context)
+        m_context->engine = nullptr;
     if (m_session)
         m_session.reset();
     m_borrowed = nullptr;

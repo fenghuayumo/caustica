@@ -428,11 +428,14 @@ C++ equivalent is `engine->run()`, or a host loop calling `stepFrame()` until it
 
 FOV is **radians**. Python triples match C++ `float3`.
 
+`engine.set_camera_*` always writes the **active / main** camera: the free controller camera when `selected_camera_index == 0`, or the selected scene camera otherwise. Scenes with more than one camera should look the entity up and call methods on it.
+
 ```python
 import math
 import caustica
 
 with caustica.EngineApp.create(scene="builtin:plane_cube", headless=True) as engine:
+    # No camera nodes in this scene: these APIs drive the free / main camera.
     engine.set_camera_vertical_fov(math.radians(35.0))
     engine.set_camera_pos_dir_up(
         (0.0, 1.5, 4.0),
@@ -448,12 +451,42 @@ engine->setCameraVerticalFOV(0.610865f);
 engine->setCameraPosDirUp({0.f, 1.5f, 4.f}, {0.f, 0.f, -1.f}, {0.f, 1.f, 0.f});
 ```
 
-Off-center pinhole (COLMAP / OpenCV), same argument order in both languages:
+Named scene cameras (wrist, third-person, …) live on `SceneEntity`. Optical edits on an inactive camera are stored on the component; `activate()` / `use_camera()` selects which one the renderer uses.
+
+`look_to` / `set_camera_pos_dir_up` write **camera view space** (the renderer applies a Z-flip). `world_pose` / `set_world_pose` write the entity TRS with **no** Z-flip. Aim cameras with `look_to`. Copying a mesh `world_pose` onto a camera points the wrong way.
+
+```python
+import math
+
+wrist = engine.scene.find_camera("wrist")
+wrist.vertical_fov = math.radians(55.0)
+wrist.look_to((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
+wrist.set_intrinsics(fx, fy, cx, cy, width, height)
+wrist.activate()
+
+# equivalent: engine.use_camera(wrist)
+# back to the free camera:
+engine.use_camera(None)
+```
+
+```cpp
+ecs::Entity wrist = caustica::findEntity(engine->app(), "wrist");
+caustica::setSceneCameraVerticalFOV(engine->app(), wrist, dm::radians(55.f));
+caustica::setSceneCameraLookTo(
+    engine->app(), wrist,
+    {0.f, 1.2f, 0.15f}, {0.f, 0.f, 1.f}, {0.f, 1.f, 0.f});
+engine->setActiveCamera(wrist);
+engine->setActiveCamera(ecs::NullEntity); // free camera
+```
+
+Off-center pinhole (COLMAP / OpenCV), same argument order in both languages. Distortion is intentionally not modeled yet; keep calibration as pinhole for this phase. On the active camera:
 
 ```python
 engine.set_camera_intrinsics(fx, fy, cx, cy, width, height)
 engine.clear_camera_intrinsics()  # back to symmetric FOV
 ```
+
+On a specific scene camera: `camera.set_intrinsics(...)` / `camera.clear_intrinsics()`.
 
 ### Load 3D Gaussian splats
 
@@ -934,22 +967,40 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 
 ### Camera
 
+`EngineApp` camera methods write the **active / main** camera (free controller at index `0`, or the selected perspective scene camera). Per-camera optics and pose live on the scene camera `SceneEntity` — see [SceneEntity](#sceneentity). Index `0` is the free camera; `1..N` match `scene.get_cameras()` registration order. `scene.camera_count` counts entities only and does **not** include the free camera; `engine.scene_camera_count` is `camera_count + 1`. Orthographic scene cameras are exposed for inspection but are not selectable by the active-camera API until an orthographic controller path is implemented.
+
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
-| `setCameraPosDirUp(pos, dir, up)` | `set_camera_pos_dir_up(position, direction, up=(0,1,0))` | `bool` | World-space triples. C++ also has a string overload matching `.current_camera_pos_dir_up`. |
+| `setCameraPosDirUp(pos, dir, up)` | `set_camera_pos_dir_up(position, direction, up=(0,1,0))` | `bool` / `None` | Active camera. World-space triples. C++ returns `false` on failure; Python raises on failure. C++ also has a string overload matching `.current_camera_pos_dir_up`. |
 | `currentCameraPosDirUp()` | `.current_camera_pos_dir_up` | `str` | `pos.xyz,dir.xyz,up.xyz`. |
-| `setCameraVerticalFOV(radians)` | `set_camera_vertical_fov(radians)` | `void` | **Radians**, not degrees. |
+| `currentCameraPose()` | `.camera_pose` | `CameraPose` / tuple | Typed active-camera `(position, direction, up)` in world space. |
+| `setCameraPose(pose)` | `.camera_pose = pose` / `set_camera_pose(...)` | `bool` / `None` | Typed active-camera pose. Python raises on invalid input. |
+| `setCameraVerticalFOV(radians)` | `set_camera_vertical_fov(radians)` | `bool` / `None` | Active camera. **Radians**, not degrees. Python raises on failure. |
 | `cameraVerticalFOV()` | `.camera_vertical_fov` | `float` | Radians. |
-| `setCameraIntrinsics(fx, fy, cx, cy, width, height)` | `set_camera_intrinsics(...)` | `void` | Off-center pinhole. Overrides symmetric FOV until cleared. |
-| `clearCameraIntrinsics()` | `clear_camera_intrinsics()` | `void` | Restore FOV projection. |
-| `sceneCameraCount()` | `.scene_camera_count` | `int` | |
-| `selectedCameraIndex()` / `setSelectedCameraIndex` | `.selected_camera_index` | `int` | `0 .. scene_camera_count-1`. |
+| `setCameraIntrinsics(fx, fy, cx, cy, width, height)` | `set_camera_intrinsics(...)` | `bool` / `None` | Active camera. Off-center pinhole. Overrides symmetric FOV until cleared. Python raises on failure. |
+| `clearCameraIntrinsics()` | `clear_camera_intrinsics()` | `bool` / `None` | Restore FOV projection on the active camera. Python raises on failure. |
+| `sceneCameraCount()` | `.scene_camera_count` | `int` | Scene cameras plus the free camera. |
+| `selectedCameraIndex()` / `setSelectedCameraIndex` | `.selected_camera_index` | `int` | `0` = free camera; `1..N` = scene-camera registration order. Only perspective scene cameras can be selected. |
+| `activeCameraEntity()` | `.active_camera` | entity / `None` | `None` when the free camera is selected. |
+| `activeCameraIsFree()` | `.active_camera_is_free` | `bool` | Whether the free/controller camera is active. |
+| `activeCameraPath()` / `activeCameraName()` | `.active_camera_path` / `.active_camera_name` | `str` | Stable metadata for the selected scene camera; empty for the free camera. |
+| `setActiveCamera(entity)` | `use_camera(entity)` | `bool` / `None` | `NullEntity` / `None` returns to the free camera. C++ returns `false` on failure; Python raises on failure. |
+| `setActiveCameraByPath(path)` | `use_camera_path(path)` | `bool` / `None` | Select a registered scene camera by hierarchy path. |
 | `saveCurrentCamera()` / `loadCurrentCamera()` | `save_current_camera()` / `load_current_camera()` | `void` | Persistence path used by the host. |
+
+Per-scene-camera C++ helpers are on `CameraApi.h` (`setSceneCameraVerticalFOV`, `setSceneCameraLookTo`, `setSceneCameraIntrinsics`, …) and take `App&` plus `ecs::Entity`. Python uses the same operations as properties / methods on `SceneEntity`.
 
 ```python
 import math
 engine.set_camera_vertical_fov(math.radians(35.0))
 engine.set_camera_pos_dir_up((0.0, 1.5, 4.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
+
+wrist = engine.scene.find_camera("wrist")
+wrist.vertical_fov = math.radians(55.0)
+wrist.activate()
+
+# Typed camera pose is view-space look-to, not entity TRS.
+wrist.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
 ```
 
 ### Spawn / lights / 3DGS
@@ -1019,14 +1070,15 @@ C++ hosts iterate with `Query` / `EntityWorld::findEntity`. Python exposes a `Sc
 | `find_material_by_id(material_id)` | `Material \| None` | GPU index only. Prefer `EngineApp.find_material`. |
 | `get_lights()` | `list[SceneEntity]` | |
 | `find_light(name)` | `SceneEntity \| None` | |
-| `get_cameras()` | `list[SceneEntity]` | |
+| `get_cameras()` | `list[SceneEntity]` | Scene camera entities (not the free camera). |
+| `find_camera(name)` | `SceneEntity \| None` | Match entity name. |
 | `find_entity(path)` | `SceneEntity \| None` | Name or path. |
 | `get_mesh_entities()` | `list[SceneEntity]` | Mesh-instance entities. |
 | `find_mesh_entity(name)` | `SceneEntity \| None` | Mesh asset name or entity name. |
 | `material_count` | `int` | |
 | `mesh_count` | `int` | Engine mesh records. |
 | `light_count` | `int` | |
-| `camera_count` | `int` | |
+| `camera_count` | `int` | Scene camera entities only. |
 | `bounds` | `((min),(max)) \| None` | World AABB of renderable leaves. `None` if empty / not refreshed. |
 | `bounds_center` | `(x,y,z) \| None` | |
 | `bounds_size` | `(x,y,z) \| None` | `max - min`. |
@@ -1054,16 +1106,31 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light helpers. C
 | `path` | `str` | Read-only. |
 | `mesh_handle` | `MeshHandle` | Asset identity. |
 | `is_mesh` | `bool` | Has a mesh instance. |
+| `is_camera` | `bool` | Has a `CameraComponent`. |
 | `is_light` | `bool` | Has a typed light component. |
 | `light_type` | `int` / `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment`. |
-| `translation` | `(x,y,z)` | Local. Writes reset accumulation. |
+| `translation` | `(x,y,z)` | Local. Each assign refreshes the hierarchy; prefer `set_local_pose` for a full TRS. |
 | `rotation` | `(x,y,z,w)` | Local quaternion (XYZW, matching scene JSON). |
 | `euler` | `(x,y,z)` | Local XYZ **radians**. Assigning converts to the stored quaternion. |
 | `scaling` | `(x,y,z)` | |
+| `local_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Read-only local TRS. Write with `set_local_pose`. |
+| `world_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Entity world TRS, **no** camera Z-flip. |
+| `set_local_pose(position, rotation, scaling=(1,1,1))` | `None` | One hierarchy refresh. |
+| `set_world_pose(position, rotation, scaling=(1,1,1))` | `None` | Entity TRS through the parent. Do not use this to aim a camera. |
 | `bounds` | AABB tuple or `None` | World subgraph. |
 | `color` | `(r,g,b)` | Light. Writable. |
-| `position` | `(x,y,z)` | Light world position (updates local translation). |
-| `direction` | `(x,y,z)` | Light world direction (updates local rotation). |
+| `position` | `(x,y,z)` | World position (updates local translation). Lights and cameras. |
+| `direction` | `(x,y,z)` | World look direction. Cameras keep the current up; lights use `lookatZ`. |
+| `camera_pose` | `((x,y,z), (x,y,z), (x,y,z))` | Camera-only world-space look-to `(position, direction, up)`. |
+| `vertical_fov` | `float` | Camera, **radians**. Assigning clears custom pinhole intrinsics. |
+| `z_near` | `float` | Camera near clip. |
+| `z_far` | `float \| None` | Camera far clip. |
+| `aspect_ratio` | `float \| None` | Camera. `None` uses the render target. |
+| `intrinsics` | `(fx,fy,cx,cy,w,h) \| None` | Camera pinhole, or `None` when using symmetric FOV. |
+| `look_to(position, direction, up=(0,1,0))` | `None` | Camera view-space pose (Z-flip). Use this to aim a camera, not `world_pose`. |
+| `set_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Camera off-center pinhole. |
+| `clear_intrinsics()` | `None` | Restore symmetric FOV on this camera. |
+| `activate()` | `None` | Make this the rendered / main camera. |
 | `irradiance` | `float` | Directional. |
 | `angular_size` | `float` | Directional. |
 | `intensity` | `float` | Point / spot, or rect emitted radiance. |

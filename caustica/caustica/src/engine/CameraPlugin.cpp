@@ -45,17 +45,28 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     if (cam->selectedCameraIndex() > 0 && cameraEntities)
     {
         const uint32_t camIdx = cam->selectedCameraIndex() - 1;
+        bool selectedPerspectiveCamera = false;
         if (camIdx < cameraEntities->size())
         {
             const ecs::Entity camEntity = (*cameraEntities)[camIdx];
             const auto* camComp = scene::tryGetCamera(ew->world(), camEntity);
             const auto* globalComp = ew->world().get<scene::GlobalTransformComponent>(camEntity);
-            if (camComp && globalComp)
+            if (camComp && globalComp && scene::isPerspectiveCamera(*camComp))
             {
                 const scene::CameraRenderProxy proxy =
                     scene::makeCameraRenderProxy(camEntity, *camComp, *globalComp);
                 scene::applyCameraRenderProxyToController(proxy, *cam, cfg);
+                selectedPerspectiveCamera = true;
             }
+        }
+        if (!selectedPerspectiveCamera)
+        {
+            // The active-camera controller currently resolves perspective
+            // cameras only. Do not leave the public selection state pointing
+            // at an orthographic/stale entry that silently renders the free
+            // camera instead.
+            cam->setSelectedCameraIndex(0);
+            cam->markCameraChanged();
         }
     }
 

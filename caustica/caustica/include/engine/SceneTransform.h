@@ -11,6 +11,7 @@ namespace caustica
 class App;
 
 // App-facing transform / visibility edits. Logic-thread ECS only; Extract publishes proxies.
+// Typed entity TRS (EntityPose) lives in scene/ScenePoseAccess.h.
 bool setEntityLocalTransform(
     App& app,
     ecs::Entity entity,

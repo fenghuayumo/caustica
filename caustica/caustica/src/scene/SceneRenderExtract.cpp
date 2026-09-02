@@ -440,9 +440,9 @@ void fillActiveCameraFromPerspectiveProxy(const CameraRenderProxy& proxy, uint32
     out.up = viewToWorld.m_linear.row1;
     out.verticalFovRadians = proxy.verticalFovRadians;
     out.zNear = proxy.zNear;
-    out.useCustomIntrinsics = false;
-    out.intrinsics = dm::float4(0.f);
-    out.intrinsicsViewport = dm::float2(0.f);
+    out.useCustomIntrinsics = proxy.useCustomIntrinsics;
+    out.intrinsics = proxy.intrinsics;
+    out.intrinsicsViewport = proxy.intrinsicsViewport;
     out.valid = true;
 }
 
@@ -468,6 +468,16 @@ CameraRenderProxy makeCameraRenderProxy(
         proxy.exposureValue = pers->exposureValue;
         proxy.exposureValueMin = pers->exposureValueMin;
         proxy.exposureValueMax = pers->exposureValueMax;
+        if (pers->intrinsics)
+        {
+            const CameraIntrinsics& k = *pers->intrinsics;
+            if (k.fx > 0.f && k.fy > 0.f && k.width > 0.f && k.height > 0.f)
+            {
+                proxy.useCustomIntrinsics = true;
+                proxy.intrinsics = dm::float4(k.fx, k.fy, k.cx, k.cy);
+                proxy.intrinsicsViewport = dm::float2(k.width, k.height);
+            }
+        }
         return proxy;
     }
 
@@ -493,9 +503,17 @@ void applyCameraRenderProxyToController(
     ActiveCameraRenderProxy active;
     fillActiveCameraFromPerspectiveProxy(proxy, camera.selectedCameraIndex(), active);
     camera.camera().lookTo(active.position, active.direction, active.up);
-    camera.setVerticalFOV(active.verticalFovRadians);
     camera.setZNear(active.zNear);
-    camera.clearIntrinsics();
+    if (active.useCustomIntrinsics)
+    {
+        camera.setIntrinsics(
+            active.intrinsics.x, active.intrinsics.y, active.intrinsics.z, active.intrinsics.w,
+            active.intrinsicsViewport.x, active.intrinsicsViewport.y);
+    }
+    else
+    {
+        camera.setVerticalFOV(active.verticalFovRadians);
+    }
 
     if (settings)
         ApplyCameraExposureToSettings(proxy, *settings);

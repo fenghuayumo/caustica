@@ -14,6 +14,14 @@
 namespace caustica_py
 {
 
+// Shared identity/lifetime token for Python objects created from an EngineApp.
+// Entity and Scene wrappers keep the token, never a borrowed PyEngineApp pointer.
+// shutdown() clears engine before the underlying session is destroyed.
+struct PyEngineAppContext
+{
+    caustica::EngineApp* engine = nullptr;
+};
+
 // Python-facing EngineApp: owns a RenderSession (extension) or borrows the
 // editor's EngineApp (embed). Methods match C++ EngineApp in snake_case.
 class PyEngineApp
@@ -36,6 +44,7 @@ public:
     [[nodiscard]] caustica::EngineApp* tryEngine();
     [[nodiscard]] const caustica::EngineApp* tryEngine() const;
     [[nodiscard]] caustica::App* tryApp();
+    [[nodiscard]] std::shared_ptr<PyEngineAppContext> context() const { return m_context; }
     [[nodiscard]] std::shared_ptr<PythonDevice> device() const;
 
     bool step(float dt = -1.f);
@@ -47,6 +56,7 @@ public:
 private:
     void adoptCurrent();
 
+    std::shared_ptr<PyEngineAppContext> m_context = std::make_shared<PyEngineAppContext>();
     std::unique_ptr<RenderSession> m_session;
     caustica::EngineApp* m_borrowed = nullptr;
 };

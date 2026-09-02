@@ -64,9 +64,9 @@ namespace caustica::math
 
 		// Subscript operators - built-in subscripts are ambiguous without these
 		T & operator [] (int i)
-			{ return &w[i]; }
+			{ return (&w)[i]; }
 		const T & operator [] (int i) const
-			{ return &w[i]; }
+			{ return (&w)[i]; }
 
 		// Convert to a matrix
 		[[nodiscard]] matrix<T, 3, 3> toMatrix() const

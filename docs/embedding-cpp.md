@@ -201,6 +201,7 @@ Prefer system parameters, then focused application headers:
 | `engine/SceneQuery.h` | `entityWorld`, load status (`sceneLoadStatus`), materials, entity lookup, `gameSettings` / `importedModels` / `sceneTypeFactory` (no diggable `Scene*`). |
 | `engine/SceneSpawn.h` | Prefab `load`, `spawn`, `spawnFromFile`, `despawn`, plus spawn lights / rect-light visuals. |
 | `engine/SceneTransform.h` | Free-function local transform / visibility (App-based). |
+| `scene/ScenePoseAccess.h` | Typed entity TRS (`EntityPose`). Camera aiming stays on `CameraApi` / `look_to`. |
 | `engine/MeshDeformApi.h` | Vertex reads/deformation and geometry-sequence playback (entity + MeshHandle only). |
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
@@ -247,7 +248,7 @@ active).
 
 ## Camera and frame control
 
-`EngineApp` forwards the common operations:
+`EngineApp` forwards the common operations. `setCameraVerticalFOV` / `setCameraIntrinsics` / `setCameraPosDirUp` write the **active** camera (free controller at index 0, or the selected scene camera). Per-camera FOV, pose, and pinhole live on the scene camera entity via `CameraApi.h` (`setSceneCameraVerticalFOV`, `setSceneCameraLookTo`, `setActiveCamera`).
 
 ```cpp
 engine->setScene("kitchen.scene.json");

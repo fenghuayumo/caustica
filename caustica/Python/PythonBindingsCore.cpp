@@ -20,6 +20,7 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/MeshDeformApi.h>
 #include <engine/SceneSpawn.h>
+#include <scene/ScenePoseAccess.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/RenderFrameApi.h>
 #include <backend/GpuDevice.h>
@@ -37,6 +38,7 @@
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
+#include <scene/SceneCameraAccess.h>
 #include <ecs/Entity.h>
 #include <core/log.h>
 #include <math/math.h>
@@ -146,6 +148,62 @@ namespace
         return caustica::math::dquat::fromXYZW(ToDouble4(src));
     }
 
+    nb::tuple EntityPoseToTuple(const scene::EntityPose& pose)
+    {
+        return nb::make_tuple(
+            Double3ToTuple(pose.position),
+            DQuatToXYZWTuple(pose.rotation),
+            Double3ToTuple(pose.scaling));
+    }
+
+    scene::EntityPose EntityPoseFromPython(
+        const nb::object& position,
+        const nb::object& rotation,
+        const nb::object& scaling)
+    {
+        scene::EntityPose pose;
+        pose.position = ToDouble3(position);
+        pose.rotation = ToDQuatXYZW(rotation);
+        pose.scaling = ToDouble3(scaling);
+        if (!dm::all(dm::isfinite(pose.position))
+            || !dm::all(dm::isfinite(pose.rotation))
+            || !dm::all(dm::isfinite(pose.scaling)))
+        {
+            throw std::runtime_error("pose values must be finite");
+        }
+        const double rotationNorm = dm::length(pose.rotation);
+        if (!std::isfinite(rotationNorm) || rotationNorm <= 1e-12)
+            throw std::runtime_error("pose rotation quaternion must be non-zero");
+        pose.rotation /= rotationNorm;
+        return pose;
+    }
+
+    nb::tuple CameraPoseToTuple(const CameraPose& pose)
+    {
+        return nb::make_tuple(
+            Float3ToTuple(pose.position),
+            Float3ToTuple(pose.direction),
+            Float3ToTuple(pose.up));
+    }
+
+    CameraPose CameraPoseFromPython(const nb::object& value)
+    {
+        nb::sequence pose = nb::cast<nb::sequence>(value);
+        if (nb::len(pose) != 3)
+            throw std::runtime_error("camera_pose must be (position, direction, up)");
+        CameraPose result{
+            ToFloat3(nb::borrow<nb::object>(pose[0])),
+            ToFloat3(nb::borrow<nb::object>(pose[1])),
+            ToFloat3(nb::borrow<nb::object>(pose[2])) };
+        if (!dm::all(dm::isfinite(result.position))
+            || !dm::all(dm::isfinite(result.direction))
+            || !dm::all(dm::isfinite(result.up)))
+        {
+            throw std::runtime_error("camera_pose values must be finite");
+        }
+        return result;
+    }
+
     double3 DQuatToEulerRadiansXYZ(const caustica::math::dquat& rotation)
     {
         const caustica::math::double3x3 m = rotation.toMatrix();
@@ -168,16 +226,58 @@ namespace
         return double3(x, y, z);
     }
 
+    struct PyScene
+    {
+        std::shared_ptr<Scene> scene;
+        std::shared_ptr<caustica_py::PyEngineAppContext> owner;
+    };
+
     struct PySceneEntity
     {
-        Scene* scene = nullptr;
+        std::shared_ptr<Scene> scene;
+        std::shared_ptr<caustica_py::PyEngineAppContext> owner;
         ecs::Entity entity = ecs::NullEntity;
+
+        [[nodiscard]] bool isUsable() const
+        {
+            if (!scene || !owner || !owner->engine || !owner->engine->isValid())
+                return false;
+            const std::shared_ptr<Scene> active = caustica::activeScene(owner->engine->app());
+            if (!active || active.get() != scene.get())
+                return false;
+            const scene::SceneEntityWorld* world = scene->getEntityWorld();
+            return world && world->world().isAlive(entity);
+        }
+
+        [[nodiscard]] App* ownerApp() const
+        {
+            return isUsable() ? &owner->engine->app() : nullptr;
+        }
 
         [[nodiscard]] scene::SceneEntityWorld* entityWorld() const
         {
-            return scene ? scene->getEntityWorld() : nullptr;
+            return isUsable() ? scene->getEntityWorld() : nullptr;
         }
     };
+
+    std::shared_ptr<PySceneEntity> MakePySceneEntity(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        ecs::Entity entity)
+    {
+        if (!scene || !owner || !ecs::isValid(entity))
+            return nullptr;
+        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, owner, entity });
+    }
+
+    std::shared_ptr<PyScene> MakePyScene(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
+    {
+        if (!scene || !owner)
+            return nullptr;
+        return std::make_shared<PyScene>(PyScene{ scene, owner });
+    }
 
     [[nodiscard]] int EntityLightType(const PySceneEntity& self)
     {
@@ -197,6 +297,8 @@ namespace
             return LightType_Environment;
         return LightType_None;
     }
+
+    scene::SceneEntityWorld& RequireEntityWorld(PySceneEntity& entity, const char* property);
 
     [[nodiscard]] dm::float3* TryMutableLightColor(PySceneEntity& self)
     {
@@ -230,6 +332,29 @@ namespace
         if (auto* rect = scene::tryGetRectLight(world, self.entity))
             return &rect->intensity;
         return nullptr;
+    }
+
+    void SetLightProperty(PySceneEntity& self, const char* property, const dm::float4& value)
+    {
+        scene::SceneEntityWorld& entityWorld = RequireEntityWorld(self, property);
+        if (!scene::setLightProperty(entityWorld.world(), self.entity, property, value))
+        {
+            throw std::runtime_error(
+                std::string("SceneEntity ") + property + " setter failed: unsupported light property");
+        }
+    }
+
+    void SetEnvironmentLightPath(PySceneEntity& self, const std::string& path)
+    {
+        scene::SceneEntityWorld& entityWorld = RequireEntityWorld(self, "environment_path");
+        if (auto* environment = scene::tryGetEnvironmentLight(entityWorld.world(), self.entity))
+        {
+            environment->path = path;
+            entityWorld.world().notifyComponentChanged<scene::EnvironmentLightComponent>(self.entity);
+            return;
+        }
+        throw std::runtime_error(
+            "SceneEntity environment_path setter failed: entity is not an environment light");
     }
 
 
@@ -277,25 +402,31 @@ namespace
         return nullptr;
     }
 
-    std::vector<std::shared_ptr<PySceneEntity>> GetSceneLights(Scene* scene)
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneLights(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
     {
         std::vector<std::shared_ptr<PySceneEntity>> result;
         if (!scene)
             return result;
 
         for (ecs::Entity entity : scene->getLightEntities())
-            result.push_back(std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity }));
+            if (auto pyEntity = MakePySceneEntity(scene, owner, entity))
+                result.push_back(std::move(pyEntity));
         return result;
     }
 
-    std::vector<std::shared_ptr<PySceneEntity>> GetSceneCameras(Scene* scene)
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneCameras(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
     {
         std::vector<std::shared_ptr<PySceneEntity>> result;
         if (!scene)
             return result;
 
         for (ecs::Entity entity : scene->getCameraEntities())
-            result.push_back(std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity }));
+            if (auto pyEntity = MakePySceneEntity(scene, owner, entity))
+                result.push_back(std::move(pyEntity));
         return result;
     }
 
@@ -324,7 +455,10 @@ namespace
             WalkLightsByName(entityWorld, child, name, outEntity);
     }
 
-    std::shared_ptr<PySceneEntity> FindSceneLight(Scene* scene, const std::string& name)
+    std::shared_ptr<PySceneEntity> FindSceneLight(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& name)
     {
         if (!scene || name.empty())
             return nullptr;
@@ -337,10 +471,52 @@ namespace
         WalkLightsByName(*entityWorld, entityWorld->root(), name, entity);
         if (!ecs::isValid(entity))
             return nullptr;
-        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
+        return MakePySceneEntity(scene, owner, entity);
     }
 
-    std::string MakeUniqueLightName(Scene* scene, const std::string& requested, const char* prefix)
+    void WalkCamerasByName(
+        const scene::SceneEntityWorld& entityWorld,
+        ecs::Entity entity,
+        const std::string& name,
+        ecs::Entity& outEntity)
+    {
+        if (!ecs::isValid(entity) || ecs::isValid(outEntity))
+            return;
+
+        if (scene::tryGetCamera(entityWorld.world(), entity) && entityWorld.getEntityName(entity) == name)
+        {
+            outEntity = entity;
+            return;
+        }
+
+        for (ecs::Entity child : entityWorld.getEntityChildren(entity))
+            WalkCamerasByName(entityWorld, child, name, outEntity);
+    }
+
+    std::shared_ptr<PySceneEntity> FindSceneCamera(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& name)
+    {
+        if (!scene || name.empty())
+            return nullptr;
+
+        scene::SceneEntityWorld* entityWorld = scene->getEntityWorld();
+        if (!entityWorld)
+            return nullptr;
+
+        ecs::Entity entity = ecs::NullEntity;
+        WalkCamerasByName(*entityWorld, entityWorld->root(), name, entity);
+        if (!ecs::isValid(entity))
+            return nullptr;
+        return MakePySceneEntity(scene, owner, entity);
+    }
+
+    std::string MakeUniqueLightName(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& requested,
+        const char* prefix)
     {
         if (!requested.empty())
             return requested;
@@ -350,16 +526,17 @@ namespace
             const std::string candidate = i == 0
                 ? std::string(prefix)
                 : std::string(prefix) + "_" + std::to_string(i);
-            if (!FindSceneLight(scene, candidate))
+            if (!FindSceneLight(scene, owner, candidate))
                 return candidate;
         }
     }
 
-    std::shared_ptr<PySceneEntity> PyEntityFromEntity(Scene* scene, ecs::Entity entity)
+    std::shared_ptr<PySceneEntity> PyEntityFromEntity(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        ecs::Entity entity)
     {
-        if (!scene || !ecs::isValid(entity))
-            return nullptr;
-        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
+        return MakePySceneEntity(scene, owner, entity);
     }
 
     void WalkEntitiesByName(const scene::SceneEntityWorld& entityWorld, ecs::Entity root, const std::string& name, ecs::Entity& outEntity)
@@ -377,7 +554,10 @@ namespace
             WalkEntitiesByName(entityWorld, child, name, outEntity);
     }
 
-    std::shared_ptr<PySceneEntity> FindSceneEntity(Scene* scene, const std::string& path)
+    std::shared_ptr<PySceneEntity> FindSceneEntity(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& path)
     {
         if (!scene || path.empty())
             return nullptr;
@@ -398,10 +578,12 @@ namespace
         if (!ecs::isValid(entity))
             return nullptr;
 
-        return std::make_shared<PySceneEntity>(PySceneEntity{ scene, entity });
+        return MakePySceneEntity(scene, owner, entity);
     }
 
-    std::vector<std::shared_ptr<PySceneEntity>> GetSceneMeshEntities(Scene* scene)
+    std::vector<std::shared_ptr<PySceneEntity>> GetSceneMeshEntities(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
     {
         std::vector<std::shared_ptr<PySceneEntity>> result;
         if (!scene)
@@ -409,13 +591,16 @@ namespace
 
         for (ecs::Entity entity : scene->getMeshInstances())
         {
-            if (auto pyEntity = PyEntityFromEntity(scene, entity))
+            if (auto pyEntity = PyEntityFromEntity(scene, owner, entity))
                 result.push_back(std::move(pyEntity));
         }
         return result;
     }
 
-    std::shared_ptr<PySceneEntity> FindSceneMeshEntity(Scene* scene, const std::string& name)
+    std::shared_ptr<PySceneEntity> FindSceneMeshEntity(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& name)
     {
         if (!scene || name.empty())
             return nullptr;
@@ -427,14 +612,14 @@ namespace
                 continue;
 
             if (entityWorld && entityWorld->getEntityName(entity) == name)
-                return PyEntityFromEntity(scene, entity);
+                return PyEntityFromEntity(scene, owner, entity);
 
             if (entityWorld)
             {
                 const auto* meshComponent =
                     entityWorld->world().tryGet<scene::MeshInstanceComponent>(entity);
                 if (meshComponent && meshComponent->mesh && meshComponent->mesh->name == name)
-                    return PyEntityFromEntity(scene, entity);
+                    return PyEntityFromEntity(scene, owner, entity);
             }
         }
         return nullptr;
@@ -521,9 +706,49 @@ namespace
         return *app;
     }
 
-    Scene* RequirePyScene(caustica_py::PyEngineApp& self)
+    bool EntityIsCamera(const PySceneEntity& self)
     {
-        return caustica::activeScene(RequirePyApp(self)).get();
+        scene::SceneEntityWorld* entityWorld = self.entityWorld();
+        return entityWorld && scene::tryGetCamera(entityWorld->world(), self.entity) != nullptr;
+    }
+
+    void RequireCamera(const PySceneEntity& self)
+    {
+        if (!self.isUsable())
+            throw std::runtime_error("SceneEntity is stale, closed, or belongs to another EngineApp");
+        if (!EntityIsCamera(self))
+            throw std::runtime_error("SceneEntity is not a camera");
+    }
+
+    std::shared_ptr<Scene> RequirePyScene(caustica_py::PyEngineApp& self)
+    {
+        std::shared_ptr<Scene> scene = caustica::activeScene(RequirePyApp(self));
+        if (!scene)
+            throw std::runtime_error("caustica.EngineApp: no active scene");
+        return scene;
+    }
+
+    App& RequireEntityApp(const PySceneEntity& entity)
+    {
+        if (App* app = entity.ownerApp())
+            return *app;
+        throw std::runtime_error("SceneEntity is stale, closed, or belongs to another EngineApp");
+    }
+
+    void RequireEntityForApp(
+        const caustica_py::PyEngineApp& app,
+        const std::shared_ptr<PySceneEntity>& entity)
+    {
+        if (!entity || !entity->isUsable() || entity->owner != app.context())
+            throw std::runtime_error("SceneEntity belongs to another EngineApp or is no longer active");
+    }
+
+    scene::SceneEntityWorld& RequireEntityWorld(PySceneEntity& entity, const char* property)
+    {
+        if (scene::SceneEntityWorld* world = entity.entityWorld())
+            return *world;
+        throw std::runtime_error(
+            std::string("SceneEntity ") + property + " setter failed: entity is stale or invalid");
     }
 
     nb::object MaterialTexturePath(const StandardMaterial& material, StandardMaterialTextureSlot slot)
@@ -1080,6 +1305,9 @@ void RegisterCoreBindings(nb::module_& m)
                     return false;
                 return entityWorld->world().tryGet<scene::MeshInstanceComponent>(self.entity) != nullptr;
             })
+        .def_prop_ro("is_camera", [](PySceneEntity& self) {
+                return EntityIsCamera(self);
+            }, "True when this entity has a CameraComponent.")
         .def_prop_ro("is_light", [](PySceneEntity& self) {
                 return EntityLightType(self) != LightType_None;
             })
@@ -1093,8 +1321,8 @@ void RegisterCoreBindings(nb::module_& m)
                 return Float3ToTuple(dm::float3(1.f));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (dm::float3* color = TryMutableLightColor(self))
-                    *color = ToFloat3(v);
+                const dm::float3 color = ToFloat3(v);
+                SetLightProperty(self, "color", dm::float4(color.x, color.y, color.z, 0.f));
             },
             "Light color when this entity has a light component.")
         .def_prop_rw("intensity",
@@ -1103,8 +1331,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return intensity ? *intensity : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                if (float* intensity = TryMutableLightIntensity(self))
-                    *intensity = nb::cast<float>(v);
+                SetLightProperty(self, "intensity", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             },
             "Point/spot intensity, or emitted radiance multiplier for a rectangular light.")
         .def_prop_rw("width",
@@ -1114,9 +1341,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->width : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    if (auto* rect = scene::tryGetRectLight(entityWorld->world(), self.entity))
-                        rect->width = value;
+                SetLightProperty(self, "width", dm::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight width in local X.")
         .def_prop_rw("height",
             [](PySceneEntity& self) {
@@ -1125,9 +1350,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->height : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    if (auto* rect = scene::tryGetRectLight(entityWorld->world(), self.entity))
-                        rect->height = value;
+                SetLightProperty(self, "height", dm::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight height in local Y.")
         .def_prop_rw("irradiance",
             [](PySceneEntity& self) {
@@ -1137,11 +1360,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->irradiance : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                {
-                    if (auto* directional = scene::tryGetDirectionalLight(entityWorld->world(), self.entity))
-                        directional->irradiance = nb::cast<float>(v);
-                }
+                SetLightProperty(self, "irradiance", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("angular_size",
             [](PySceneEntity& self) {
@@ -1151,11 +1370,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->angularSize : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                {
-                    if (auto* directional = scene::tryGetDirectionalLight(entityWorld->world(), self.entity))
-                        directional->angularSize = nb::cast<float>(v);
-                }
+                SetLightProperty(self, "angularSize", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("radius",
             [](PySceneEntity& self) {
@@ -1169,14 +1384,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                scene::SceneEntityWorld* entityWorld = self.entityWorld();
-                if (!entityWorld)
-                    return;
-                const float radius = nb::cast<float>(v);
-                if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
-                    spot->radius = radius;
-                else if (auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
-                    point->radius = radius;
+                SetLightProperty(self, "radius", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("range",
             [](PySceneEntity& self) {
@@ -1190,14 +1398,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                scene::SceneEntityWorld* entityWorld = self.entityWorld();
-                if (!entityWorld)
-                    return;
-                const float range = nb::cast<float>(v);
-                if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
-                    spot->range = range;
-                else if (auto* point = scene::tryGetPointLight(entityWorld->world(), self.entity))
-                    point->range = range;
+                SetLightProperty(self, "range", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("inner_angle",
             [](PySceneEntity& self) {
@@ -1206,11 +1407,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->innerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                {
-                    if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
-                        spot->innerAngle = nb::cast<float>(v);
-                }
+                SetLightProperty(self, "innerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("outer_angle",
             [](PySceneEntity& self) {
@@ -1219,11 +1416,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->outerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                {
-                    if (auto* spot = scene::tryGetSpotLight(entityWorld->world(), self.entity))
-                        spot->outerAngle = nb::cast<float>(v);
-                }
+                SetLightProperty(self, "outerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("environment_path",
             [](PySceneEntity& self) {
@@ -1233,11 +1426,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return environment ? environment->path : std::string{};
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                {
-                    if (auto* environment = scene::tryGetEnvironmentLight(entityWorld->world(), self.entity))
-                        environment->path = nb::cast<std::string>(v);
-                }
+                SetEnvironmentLightPath(self, nb::cast<std::string>(v));
             },
             "Environment light HDRI path.")
         .def_prop_rw("position",
@@ -1248,22 +1437,70 @@ void RegisterCoreBindings(nb::module_& m)
                 return Double3ToTuple(global ? scene::getLightPosition(global->transform) : double3(0.0));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    scene::setLightWorldPosition(*entityWorld, self.entity, ToDouble3(v));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    throw std::runtime_error("position setter failed for stale or invalid SceneEntity");
+                scene::EntityPose pose;
+                if (!scene::getEntityWorldPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("position setter failed: entity has no world pose");
+                pose.position = ToDouble3(v);
+                if (!scene::setEntityWorldPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("position setter failed");
             },
-            "World-space light position (updates local translation).")
+            "World-space position (updates local translation). Lights and cameras.")
         .def_prop_rw("direction",
             [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (entityWorld && EntityIsCamera(self))
+                {
+                    scene::CameraWorldLookTo look;
+                    if (scene::tryGetCameraWorldLookTo(*entityWorld, self.entity, look))
+                        return Float3ToTuple(look.direction);
+                }
                 const auto* global = entityWorld
                     ? entityWorld->world().tryGet<scene::GlobalTransformComponent>(self.entity) : nullptr;
                 return Double3ToTuple(global ? scene::getLightDirection(global->transform) : double3(0.0, -1.0, 0.0));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    scene::setLightWorldDirection(*entityWorld, self.entity, ToDouble3(v));
+                scene::SceneEntityWorld& entityWorld = RequireEntityWorld(self, "direction");
+                if (EntityIsCamera(self))
+                {
+                    scene::CameraWorldLookTo look;
+                    if (!scene::tryGetCameraWorldLookTo(entityWorld, self.entity, look))
+                        throw std::runtime_error("direction setter failed: camera pose is unavailable");
+                    const dm::float3 dir = ToFloat3(v);
+                    if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, look.position, dir, look.up))
+                        throw std::runtime_error("direction setter failed");
+                    return;
+                }
+                if (EntityLightType(self) == LightType_None)
+                    throw std::runtime_error("SceneEntity direction setter failed: entity has no light component");
+                scene::setLightWorldDirection(entityWorld, self.entity, ToDouble3(v));
             },
-            "World-space light direction (updates local rotation).")
+            "World-space look direction. Cameras keep the current up; lights use lookatZ.")
+        .def_prop_rw("camera_pose",
+            [](PySceneEntity& self) {
+                RequireCamera(self);
+                scene::CameraWorldLookTo look;
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::tryGetCameraWorldLookTo(*entityWorld, self.entity, look))
+                    throw std::runtime_error("camera_pose unavailable");
+                return nb::make_tuple(
+                    Float3ToTuple(look.position),
+                    Float3ToTuple(look.direction),
+                    Float3ToTuple(look.up));
+            },
+            [](PySceneEntity& self, nb::object value) {
+                RequireCamera(self);
+                const CameraPose pose = CameraPoseFromPython(value);
+                if (!setSceneCameraLookTo(
+                    RequireEntityApp(self), self.entity,
+                    pose.position, pose.direction, pose.up))
+                {
+                    throw std::runtime_error("camera_pose setter failed");
+                }
+            },
+            "Typed camera pose: (position.xyz, direction.xyz, up.xyz), all in world space.")
         .def_prop_rw("translation",
             [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -1273,8 +1510,13 @@ void RegisterCoreBindings(nb::module_& m)
                 return Double3ToTuple(local ? local->translation : double3(0.0));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    entityWorld->setTranslation(self.entity, ToDouble3(v));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                scene::EntityPose pose;
+                if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("translation setter failed");
+                pose.position = ToDouble3(v);
+                if (!scene::setEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("translation setter failed");
             },
             "Local translation in scene space.")
         .def_prop_rw("rotation",
@@ -1286,8 +1528,13 @@ void RegisterCoreBindings(nb::module_& m)
                 return DQuatToXYZWTuple(local ? local->rotation : caustica::math::dquat::identity());
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    entityWorld->setRotation(self.entity, ToDQuatXYZW(v));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                scene::EntityPose pose;
+                if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("rotation setter failed");
+                pose.rotation = ToDQuatXYZW(v);
+                if (!scene::setEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("rotation setter failed");
             },
             "Local rotation quaternion as `(x, y, z, w)`.")
         .def_prop_rw("euler",
@@ -1298,8 +1545,13 @@ void RegisterCoreBindings(nb::module_& m)
                 return Double3ToTuple(DQuatToEulerRadiansXYZ(rotation));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    entityWorld->setRotation(self.entity, caustica::math::rotationQuat(ToDouble3(v)));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                scene::EntityPose pose;
+                if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("euler setter failed");
+                pose.rotation = caustica::math::rotationQuat(ToDouble3(v));
+                if (!scene::setEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("euler setter failed");
             },
             "Local XYZ Euler rotation in radians. Assigning this updates the entity rotation quaternion.")
         .def_prop_rw("scaling",
@@ -1311,10 +1563,152 @@ void RegisterCoreBindings(nb::module_& m)
                 return Double3ToTuple(local ? local->scaling : double3(1.0));
             },
             [](PySceneEntity& self, nb::object v) {
-                if (scene::SceneEntityWorld* entityWorld = self.entityWorld())
-                    entityWorld->setScaling(self.entity, ToDouble3(v));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                scene::EntityPose pose;
+                if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("scaling setter failed");
+                pose.scaling = ToDouble3(v);
+                if (!scene::setEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("scaling setter failed");
             },
             "Local non-uniform scaling.")
+        .def_prop_ro("local_pose",
+            [](PySceneEntity& self) {
+                scene::EntityPose pose;
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("local_pose unavailable for stale or invalid SceneEntity");
+                return EntityPoseToTuple(pose);
+            },
+            "Local entity TRS: ((x,y,z), (x,y,z,w), (sx,sy,sz)). Prefer this over assigning translation/rotation/scaling separately.")
+        .def_prop_rw("world_pose",
+            [](PySceneEntity& self) {
+                scene::EntityPose pose;
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::getEntityWorldPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("world_pose unavailable for stale or invalid SceneEntity");
+                return EntityPoseToTuple(pose);
+            },
+            [](PySceneEntity& self, nb::object value) {
+                nb::sequence pose = nb::cast<nb::sequence>(value);
+                if (nb::len(pose) != 3)
+                    throw std::runtime_error("world_pose must be (position, rotation, scaling)");
+                const scene::EntityPose parsed = EntityPoseFromPython(
+                    nb::borrow<nb::object>(pose[0]),
+                    nb::borrow<nb::object>(pose[1]),
+                    nb::borrow<nb::object>(pose[2]));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::setEntityWorldPose(*entityWorld, self.entity, parsed))
+                    throw std::runtime_error("world_pose setter failed");
+            },
+            "World entity TRS: ((x,y,z), (x,y,z,w), (sx,sy,sz)). Entity space, no camera Z-flip — aim cameras with look_to.")
+        .def("set_local_pose",
+            [](PySceneEntity& self, nb::object position, nb::object rotation, nb::object scaling) {
+                const scene::EntityPose pose = EntityPoseFromPython(position, rotation, scaling);
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::setEntityLocalPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("set_local_pose failed");
+            },
+            nb::arg("position"), nb::arg("rotation"), nb::arg("scaling") = nb::make_tuple(1.0, 1.0, 1.0),
+            "Write local TRS in one hierarchy refresh. Prefer this over assigning translation/rotation/scaling separately.")
+        .def("set_world_pose",
+            [](PySceneEntity& self, nb::object position, nb::object rotation, nb::object scaling) {
+                const scene::EntityPose pose = EntityPoseFromPython(position, rotation, scaling);
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::setEntityWorldPose(*entityWorld, self.entity, pose))
+                    throw std::runtime_error("set_world_pose failed");
+            },
+            nb::arg("position"), nb::arg("rotation"), nb::arg("scaling") = nb::make_tuple(1.0, 1.0, 1.0),
+            "Write world entity TRS through the parent. Not camera view space — aim cameras with look_to.")
+        .def_prop_rw("vertical_fov",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? scene::getCameraVerticalFov(*entityWorld, self.entity) : 0.f;
+            },
+            [](PySceneEntity& self, float radians) {
+                RequireCamera(self);
+                if (!setSceneCameraVerticalFOV(RequireEntityApp(self), self.entity, radians))
+                    throw std::runtime_error("vertical_fov setter failed");
+            },
+            "Perspective vertical FOV in radians. Assigning this clears custom pinhole intrinsics.")
+        .def_prop_rw("z_near",
+            [](PySceneEntity& self) {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? scene::getCameraZNear(*entityWorld, self.entity) : 0.f;
+            },
+            [](PySceneEntity& self, float zNear) {
+                RequireCamera(self);
+                if (!setSceneCameraZNear(RequireEntityApp(self), self.entity, zNear))
+                    throw std::runtime_error("z_near setter failed");
+            },
+            "Near clip plane.")
+        .def_prop_rw("z_far",
+            [](PySceneEntity& self) -> std::optional<float> {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? scene::getCameraZFar(*entityWorld, self.entity) : std::nullopt;
+            },
+            [](PySceneEntity& self, std::optional<float> zFar) {
+                RequireCamera(self);
+                if (!setSceneCameraZFar(RequireEntityApp(self), self.entity, zFar))
+                    throw std::runtime_error("z_far setter failed");
+            },
+            "Far clip plane, or None when unbounded.")
+        .def_prop_rw("aspect_ratio",
+            [](PySceneEntity& self) -> std::optional<float> {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                return entityWorld ? scene::getCameraAspectRatio(*entityWorld, self.entity) : std::nullopt;
+            },
+            [](PySceneEntity& self, std::optional<float> aspectRatio) {
+                RequireCamera(self);
+                if (!setSceneCameraAspectRatio(RequireEntityApp(self), self.entity, aspectRatio))
+                    throw std::runtime_error("aspect_ratio setter failed");
+            },
+            "Optional aspect ratio. None lets the render target decide.")
+        .def_prop_ro("intrinsics",
+            [](PySceneEntity& self) -> nb::object {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                const scene::CameraIntrinsics* k = entityWorld
+                    ? scene::tryGetCameraIntrinsics(*entityWorld, self.entity) : nullptr;
+                if (!k)
+                    return nb::none();
+                return nb::make_tuple(k->fx, k->fy, k->cx, k->cy, k->width, k->height);
+            },
+            "Pinhole `(fx, fy, cx, cy, width, height)` or None when using symmetric FOV.")
+        .def("look_to",
+            [](PySceneEntity& self, nb::object position, nb::object direction, nb::object up) {
+                RequireCamera(self);
+                const dm::float3 pos = ToFloat3(position);
+                const dm::float3 dir = ToFloat3(direction);
+                const dm::float3 upVec = ToFloat3(up);
+                if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, pos, dir, upVec))
+                    throw std::runtime_error("look_to failed");
+            },
+            nb::arg("position"), nb::arg("direction"),
+            nb::arg("up") = nb::make_tuple(0.0f, 1.0f, 0.0f),
+            "Aim this camera in view space (renderer Z-flip). Do not copy a mesh world_pose here.")
+        .def("set_intrinsics",
+            [](PySceneEntity& self, float fx, float fy, float cx, float cy, float width, float height) {
+                RequireCamera(self);
+                if (!setSceneCameraIntrinsics(RequireEntityApp(self), self.entity, fx, fy, cx, cy, width, height))
+                    throw std::runtime_error("set_intrinsics failed (need a perspective camera and finite positive fx,fy,width,height)");
+            },
+            nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"),
+            nb::arg("width"), nb::arg("height"),
+            "Off-center pinhole. Overrides symmetric vertical_fov until cleared.")
+        .def("clear_intrinsics",
+            [](PySceneEntity& self) {
+                RequireCamera(self);
+                if (!clearSceneCameraIntrinsics(RequireEntityApp(self), self.entity))
+                    throw std::runtime_error("clear_intrinsics failed");
+            },
+            "Restore symmetric vertical_fov projection.")
+        .def("activate",
+            [](PySceneEntity& self) {
+                RequireCamera(self);
+                if (!setActiveCamera(RequireEntityApp(self), self.entity))
+                    throw std::runtime_error("SceneEntity is not a registered scene camera");
+            },
+            "Make this the rendered / main camera.")
         .def_prop_ro("bounds",
             [](PySceneEntity& self) -> nb::object {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -1331,75 +1725,78 @@ void RegisterCoreBindings(nb::module_& m)
             });
 
     // --- Scene ------------------------------------------------------------
-    nb::class_<Scene>(m, "Scene",
+    nb::class_<PyScene>(m, "Scene",
         "Loaded caustica scene. Materials, lights, and SceneEntity lookup live here.\n"
         "Prefer Sample.find_entity / get_mesh_entities over digging engine MeshInfo.")
-        .def("get_materials", [](Scene& self) {
-                return GetSceneMaterials(&self);
+        .def("get_materials", [](PyScene& self) {
+                return GetSceneMaterials(self.scene.get());
             }, "Return every StandardMaterial in this scene.")
 
-        .def("find_material", [](Scene& self, const std::string& name) {
-                return FindSceneMaterial(&self, name);
+        .def("find_material", [](PyScene& self, const std::string& name) {
+                return FindSceneMaterial(self.scene.get(), name);
             }, nb::arg("name"), "Look up a material by Name or uniqueName.")
 
-        .def("find_material_by_id", [](Scene& self, int materialId) {
-                return FindSceneMaterialById(&self, materialId);
+        .def("find_material_by_id", [](PyScene& self, int materialId) {
+                return FindSceneMaterialById(self.scene.get(), materialId);
             }, nb::arg("material_id"),
             "Look up by gpuDataIndex only. Prefer EngineApp.find_material (cache-backed).")
 
-        .def("get_lights", [](Scene& self) {
-                return GetSceneLights(&self);
+        .def("get_lights", [](PyScene& self) {
+                return GetSceneLights(self.scene, self.owner);
             }, "Return every light entity as SceneEntity.")
 
-        .def("find_light", [](Scene& self, const std::string& name) {
-                return FindSceneLight(&self, name);
+        .def("find_light", [](PyScene& self, const std::string& name) {
+                return FindSceneLight(self.scene, self.owner, name);
             }, nb::arg("name"), "Look up a light entity by name; returns SceneEntity or None.")
-        .def("get_cameras", [](Scene& self) {
-                return GetSceneCameras(&self);
+        .def("get_cameras", [](PyScene& self) {
+                return GetSceneCameras(self.scene, self.owner);
             }, "Return every camera entity as SceneEntity.")
-        .def("find_entity", [](Scene& self, const std::string& path) {
-                return FindSceneEntity(&self, path);
+        .def("find_camera", [](PyScene& self, const std::string& name) {
+                return FindSceneCamera(self.scene, self.owner, name);
+            }, nb::arg("name"), "Look up a camera entity by name; returns SceneEntity or None.")
+        .def("find_entity", [](PyScene& self, const std::string& path) {
+                return FindSceneEntity(self.scene, self.owner, path);
             }, nb::arg("path"), "Look up a scene entity by name or path.")
-        .def("get_mesh_entities", [](Scene& self) {
-                return GetSceneMeshEntities(&self);
+        .def("get_mesh_entities", [](PyScene& self) {
+                return GetSceneMeshEntities(self.scene, self.owner);
             }, "Return every mesh-instance entity as SceneEntity.")
-        .def("find_mesh_entity", [](Scene& self, const std::string& name) {
-                return FindSceneMeshEntity(&self, name);
+        .def("find_mesh_entity", [](PyScene& self, const std::string& name) {
+                return FindSceneMeshEntity(self.scene, self.owner, name);
             }, nb::arg("name"),
             "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
-        .def_prop_ro("material_count", [](Scene& self) {
-                return GetSceneMaterials(&self).size();
+        .def_prop_ro("material_count", [](PyScene& self) {
+                return GetSceneMaterials(self.scene.get()).size();
             }, "Number of StandardMaterial instances in this scene.")
-        .def_prop_ro("mesh_count", [](Scene& self) {
-                return self.getMeshes().size();
+        .def_prop_ro("mesh_count", [](PyScene& self) {
+                return self.scene ? self.scene->getMeshes().size() : 0;
             }, "Number of meshes in this scene.")
-        .def_prop_ro("light_count", [](Scene& self) {
-                return self.getLightEntities().size();
+        .def_prop_ro("light_count", [](PyScene& self) {
+                return self.scene ? self.scene->getLightEntities().size() : 0;
             }, "Number of lights in this scene.")
-        .def_prop_ro("camera_count", [](Scene& self) {
-                return self.getCameraEntities().size();
-            }, "Number of camera entities in this scene.")
+        .def_prop_ro("camera_count", [](PyScene& self) {
+                return self.scene ? self.scene->getCameraEntities().size() : 0;
+            }, "Number of camera entities in this scene (does not include the free / controller camera).")
 
-        .def_prop_ro("bounds", [](Scene& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(&self));
+        .def_prop_ro("bounds", [](PyScene& self) {
+                return SceneBoundsTuple(SceneBoundsFromScene(self.scene));
             },
             "World-space axis-aligned bounding box that covers every renderable\n"
             "leaf in the scene (mesh instances, lights, splats, ...).\n"
             "Returns ``((min_x, min_y, min_z), (max_x, max_y, max_z))`` or\n"
             "``None`` when the scene is empty / not refreshed yet.")
-        .def_prop_ro("bounds_center", [](Scene& self) {
-                return SceneBoundsCenter(SceneBoundsFromScene(&self));
+        .def_prop_ro("bounds_center", [](PyScene& self) {
+                return SceneBoundsCenter(SceneBoundsFromScene(self.scene));
             },
             "Center point of `Scene.bounds`, or ``None`` for an empty scene.")
-        .def_prop_ro("bounds_size", [](Scene& self) {
-                return SceneBoundsSize(SceneBoundsFromScene(&self));
+        .def_prop_ro("bounds_size", [](PyScene& self) {
+                return SceneBoundsSize(SceneBoundsFromScene(self.scene));
             },
             "Diagonal extent (max - min) of `Scene.bounds`, or ``None`` for an empty scene.")
 
-        .def("__repr__", [](Scene& self) {
-                const auto materialCount = GetSceneMaterials(&self).size();
-                const auto lightCount = self.getLightEntities().size();
+        .def("__repr__", [](PyScene& self) {
+                const auto materialCount = GetSceneMaterials(self.scene.get()).size();
+                const auto lightCount = self.scene ? self.scene->getLightEntities().size() : 0;
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
             });
@@ -1711,7 +2108,9 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::rv_policy::reference,
              "Live PathTracerSettings (same object as C++ EngineApp::settings()).")
         .def_prop_ro("scene",
-             [](PyEngineApp& self) { return caustica::activeScene(RequirePyApp(self)); },
+             [](PyEngineApp& self) {
+                 return MakePyScene(caustica::activeScene(RequirePyApp(self)), self.context());
+             },
              "Read-only Scene view, or None before a scene is available.")
         .def_prop_ro("scene_name", [](PyEngineApp& self) { return self.engine().currentSceneName(); })
         .def_prop_ro("available_scenes", [](PyEngineApp& self) { return self.engine().availableScenes(); })
@@ -1726,7 +2125,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
         .def_prop_ro("gaussian_splat_file_name", [](PyEngineApp& self) { return self.engine().gaussianSplatFileName(); })
 
         .def("find_entity", [](PyEngineApp& self, const std::string& path) {
-                return FindSceneEntity(RequirePyScene(self), path);
+                return FindSceneEntity(RequirePyScene(self), self.context(), path);
             }, nb::arg("path"))
         .def("find_material", [](PyEngineApp& self, int materialId) {
                 return StandardMaterial::safeCast(self.engine().findMaterial(materialId));
@@ -1738,30 +2137,95 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
 
         .def("set_camera_pos_dir_up",
              [](PyEngineApp& self, nb::object pos, nb::object dir, nb::object up) {
-                 return self.engine().setCameraPosDirUp(ToFloat3(pos), ToFloat3(dir), ToFloat3(up));
+                 if (!self.engine().setCameraPosDirUp(ToFloat3(pos), ToFloat3(dir), ToFloat3(up)))
+                     throw std::runtime_error("set_camera_pos_dir_up failed");
              },
              nb::arg("position"), nb::arg("direction"),
              nb::arg("up") = nb::make_tuple(0.0f, 1.0f, 0.0f))
         .def_prop_ro("current_camera_pos_dir_up", [](PyEngineApp& self) {
                 return self.engine().currentCameraPosDirUp();
             })
+        .def_prop_rw("camera_pose",
+             [](PyEngineApp& self) { return CameraPoseToTuple(self.engine().currentCameraPose()); },
+             [](PyEngineApp& self, nb::object value) {
+                 if (!self.engine().setCameraPose(CameraPoseFromPython(value)))
+                     throw std::runtime_error("camera_pose setter failed");
+             },
+             "Typed active-camera pose: (position.xyz, direction.xyz, up.xyz), all in world space.")
+        .def("set_camera_pose",
+             [](PyEngineApp& self, nb::object position, nb::object direction, nb::object up) {
+                 CameraPose pose{
+                     ToFloat3(position), ToFloat3(direction), ToFloat3(up) };
+                 if (!self.engine().setCameraPose(pose))
+                     throw std::runtime_error("set_camera_pose failed");
+             },
+             nb::arg("position"), nb::arg("direction"),
+             nb::arg("up") = nb::make_tuple(0.0f, 1.0f, 0.0f),
+             "Set the typed active-camera pose in world space.")
         .def("set_camera_vertical_fov", [](PyEngineApp& self, float radians) {
-                self.engine().setCameraVerticalFOV(radians);
+                if (!self.engine().setCameraVerticalFOV(radians))
+                    throw std::runtime_error("set_camera_vertical_fov failed");
             }, nb::arg("radians"))
         .def_prop_ro("camera_vertical_fov", [](PyEngineApp& self) {
                 return self.engine().cameraVerticalFOV();
             })
         .def("set_camera_intrinsics",
              [](PyEngineApp& self, float fx, float fy, float cx, float cy, float width, float height) {
-                 self.engine().setCameraIntrinsics(fx, fy, cx, cy, width, height);
+                 if (!self.engine().setCameraIntrinsics(fx, fy, cx, cy, width, height))
+                     throw std::runtime_error("set_camera_intrinsics failed");
              },
              nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"),
              nb::arg("width"), nb::arg("height"))
-        .def("clear_camera_intrinsics", [](PyEngineApp& self) { self.engine().clearCameraIntrinsics(); })
+        .def("clear_camera_intrinsics", [](PyEngineApp& self) {
+                if (!self.engine().clearCameraIntrinsics())
+                    throw std::runtime_error("clear_camera_intrinsics failed");
+            })
         .def_prop_ro("scene_camera_count", [](PyEngineApp& self) { return self.engine().sceneCameraCount(); })
         .def_prop_rw("selected_camera_index",
              [](PyEngineApp& self) { return self.engine().selectedCameraIndex(); },
-             [](PyEngineApp& self, unsigned int index) { self.engine().setSelectedCameraIndex(index); })
+             [](PyEngineApp& self, unsigned int index) {
+                 if (!self.engine().setSelectedCameraIndex(index))
+                     throw std::runtime_error("selected_camera_index is out of range");
+             },
+             "0 is the free / controller camera. 1..N are scene cameras from get_cameras() order.")
+        .def_prop_ro("active_camera",
+             [](PyEngineApp& self) -> std::shared_ptr<PySceneEntity> {
+                 const ecs::Entity entity = self.engine().activeCameraEntity();
+                 if (!ecs::isValid(entity))
+                     return nullptr;
+                  return PyEntityFromEntity(RequirePyScene(self), self.context(), entity);
+             },
+             "Scene camera currently driving the renderer, or None for the free camera.")
+        .def_prop_ro("active_camera_is_free", [](PyEngineApp& self) {
+                 return self.engine().activeCameraIsFree();
+             })
+        .def_prop_ro("active_camera_path", [](PyEngineApp& self) {
+                 return self.engine().activeCameraPath();
+             })
+        .def_prop_ro("active_camera_name", [](PyEngineApp& self) {
+                 return self.engine().activeCameraName();
+             })
+        .def("use_camera",
+               [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                   if (entity)
+                   {
+                       RequireEntityForApp(self, entity);
+                       if (!self.engine().setActiveCamera(EntityFromPy(entity)))
+                           throw std::runtime_error("use_camera failed: entity is not a selectable perspective camera");
+                       return;
+                   }
+                   if (!self.engine().setActiveCamera(ecs::NullEntity))
+                       throw std::runtime_error("use_camera(None) failed");
+               },
+             nb::arg("entity").none(),
+             "Select a scene camera, or None to return to the free / controller camera.")
+        .def("use_camera_path",
+             [](PyEngineApp& self, const std::string& path) {
+                 if (!self.engine().setActiveCameraByPath(path))
+                     throw std::runtime_error("use_camera_path failed: path is not a registered scene camera");
+             },
+             nb::arg("path"),
+             "Select a registered scene camera by stable hierarchy path.")
         .def("save_current_camera", [](PyEngineApp& self) { self.engine().saveCurrentCamera(); })
         .def("load_current_camera", [](PyEngineApp& self) { self.engine().loadCurrentCamera(); })
 
@@ -1769,15 +2233,16 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                 return self.engine().load(path);
             }, nb::arg("path"))
         .def("spawn", [](PyEngineApp& self, const Handle<ScenePrefabAsset>& prefab) {
-                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawn(prefab));
+                return PyEntityFromEntity(RequirePyScene(self), self.context(), self.engine().spawn(prefab));
             }, nb::arg("prefab"))
         .def("spawn_from_file", [](PyEngineApp& self, const std::string& path) {
-                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawnFromFile(path));
+                return PyEntityFromEntity(RequirePyScene(self), self.context(), self.engine().spawnFromFile(path));
             }, nb::arg("path"))
         .def("spawn_from_source", [](PyEngineApp& self, const std::string& source) {
-                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawnFromSource(source));
+                return PyEntityFromEntity(RequirePyScene(self), self.context(), self.engine().spawnFromSource(source));
             }, nb::arg("source"))
         .def("despawn", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                RequireEntityForApp(self, entity);
                 return self.engine().despawn(EntityFromPy(entity));
             }, nb::arg("entity"))
 
@@ -1787,9 +2252,9 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  component.color = ToFloat3(color);
                  component.irradiance = irradiance;
                  component.angularSize = angularSize;
-                 Scene* scene = RequirePyScene(self);
-                 const std::string lightName = MakeUniqueLightName(scene, name, "DirectionalLight");
-                 return PyEntityFromEntity(scene, self.engine().spawnDirectionalLight(std::move(component), lightName));
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, self.context(), name, "DirectionalLight");
+                 return PyEntityFromEntity(scene, self.context(), self.engine().spawnDirectionalLight(std::move(component), lightName));
              },
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("irradiance") = 1.f, nb::arg("angular_size") = 0.f, nb::arg("name") = std::string())
@@ -1800,9 +2265,9 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  component.intensity = intensity;
                  component.radius = radius;
                  component.range = range;
-                 Scene* scene = RequirePyScene(self);
-                 const std::string lightName = MakeUniqueLightName(scene, name, "PointLight");
-                 return PyEntityFromEntity(scene, self.engine().spawnPointLight(std::move(component), lightName));
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, self.context(), name, "PointLight");
+                 return PyEntityFromEntity(scene, self.context(), self.engine().spawnPointLight(std::move(component), lightName));
              },
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("intensity") = 1.f, nb::arg("radius") = 0.f, nb::arg("range") = 0.f,
@@ -1817,9 +2282,9 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  component.range = range;
                  component.innerAngle = innerAngle;
                  component.outerAngle = outerAngle;
-                 Scene* scene = RequirePyScene(self);
-                 const std::string lightName = MakeUniqueLightName(scene, name, "SpotLight");
-                 return PyEntityFromEntity(scene, self.engine().spawnSpotLight(std::move(component), lightName));
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, self.context(), name, "SpotLight");
+                 return PyEntityFromEntity(scene, self.context(), self.engine().spawnSpotLight(std::move(component), lightName));
              },
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("intensity") = 1.f, nb::arg("radius") = 0.f, nb::arg("range") = 0.f,
@@ -1831,9 +2296,9 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  component.intensity = intensity;
                  component.width = width;
                  component.height = height;
-                 Scene* scene = RequirePyScene(self);
-                 const std::string lightName = MakeUniqueLightName(scene, name, "RectLight");
-                 return PyEntityFromEntity(scene, self.engine().spawnRectLight(std::move(component), lightName));
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, self.context(), name, "RectLight");
+                 return PyEntityFromEntity(scene, self.context(), self.engine().spawnRectLight(std::move(component), lightName));
              },
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("intensity") = 1.f, nb::arg("width") = 1.f, nb::arg("height") = 1.f,
@@ -1844,19 +2309,21 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  component.color = ToFloat3(color);
                  component.path = path;
                  component.rotation = rotation;
-                 Scene* scene = RequirePyScene(self);
-                 const std::string lightName = MakeUniqueLightName(scene, name, "EnvironmentLight");
-                 return PyEntityFromEntity(scene, self.engine().spawnEnvironmentLight(std::move(component), lightName));
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, self.context(), name, "EnvironmentLight");
+                 return PyEntityFromEntity(scene, self.context(), self.engine().spawnEnvironmentLight(std::move(component), lightName));
              },
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("path") = std::string(), nb::arg("rotation") = 0.f, nb::arg("name") = std::string())
 
         .def("get_mesh_vertices", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                RequireEntityForApp(self, entity);
                 return Float3VectorToList(self.engine().getMeshVertices(EntityFromPy(entity)));
             }, nb::arg("entity"))
         .def("set_mesh_vertices",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 RequireEntityForApp(self, entity);
                  self.engine().setMeshVertices(
                      EntityFromPy(entity),
                      ToFloat3Vector(vertices),
@@ -1868,6 +2335,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
         .def("deform_mesh",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 RequireEntityForApp(self, entity);
                  const ecs::Entity handle = EntityFromPy(entity);
                  std::vector<float3> vertices = self.engine().getMeshVertices(handle);
                  for (size_t i = 0; i < vertices.size(); ++i)
@@ -1885,11 +2353,13 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
              nb::arg("rebuild_acceleration_structure") = true)
         .def("get_mesh_vertices_world", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                RequireEntityForApp(self, entity);
                 return Float3VectorToList(self.engine().getMeshVerticesWorld(EntityFromPy(entity)));
             }, nb::arg("entity"))
         .def("set_mesh_vertices_world",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 RequireEntityForApp(self, entity);
                  self.engine().setMeshVerticesWorld(
                      EntityFromPy(entity),
                      ToFloat3Vector(vertices),
@@ -1901,6 +2371,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
         .def("deform_mesh_world",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 RequireEntityForApp(self, entity);
                  const ecs::Entity handle = EntityFromPy(entity);
                  std::vector<float3> vertices = self.engine().getMeshVerticesWorld(handle);
                  for (size_t i = 0; i < vertices.size(); ++i)
@@ -1926,6 +2397,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
             })
         .def("request_mesh_accel_rebuild",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                 RequireEntityForApp(self, entity);
                  self.engine().requestMeshAccelRebuild(EntityFromPy(entity));
              }, nb::arg("entity"))
         .def("precache_rt_feature_presets",

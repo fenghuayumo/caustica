@@ -26,6 +26,13 @@ void FillCommonLightConstants(dm::float3 color, LightConstants& lightConstants)
     lightConstants.outOfBoundsShadow = 1.f;
 }
 
+template<typename T>
+bool MarkLightComponentChanged(ecs::World& world, ecs::Entity entity)
+{
+    world.notifyComponentChanged<T>(entity);
+    return true;
+}
+
 } // namespace
 
 int getLightType(const LightData& data)
@@ -112,8 +119,9 @@ void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const d
             parentToWorld = globalTransform->transform;
     }
 
-    const dm::daffine3 worldToLocal = lookatZ(direction);
-    const dm::daffine3 localToParent = inverse(worldToLocal * parentToWorld);
+    const dm::daffine3 desiredWorld = lookatZ(direction);
+    // Scene hierarchy composition is row-vector based: world = local * parent.
+    const dm::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
 
     dm::dquat rotation;
     dm::double3 scaling;
@@ -280,45 +288,117 @@ bool setLightProperty(
 {
     if (auto* directional = tryGetDirectionalLight(world, entity))
     {
-        if (propName == "color") { directional->color = value.xyz(); return true; }
-        if (propName == "irradiance") { directional->irradiance = value.x; return true; }
-        if (propName == "angularSize") { directional->angularSize = value.x; return true; }
+        if (propName == "color")
+        {
+            directional->color = value.xyz();
+            return MarkLightComponentChanged<DirectionalLightComponent>(world, entity);
+        }
+        if (propName == "irradiance")
+        {
+            directional->irradiance = value.x;
+            return MarkLightComponentChanged<DirectionalLightComponent>(world, entity);
+        }
+        if (propName == "angularSize")
+        {
+            directional->angularSize = value.x;
+            return MarkLightComponentChanged<DirectionalLightComponent>(world, entity);
+        }
         return false;
     }
 
     if (auto* spot = tryGetSpotLight(world, entity))
     {
-        if (propName == "color") { spot->color = value.xyz(); return true; }
-        if (propName == "intensity") { spot->intensity = value.x; return true; }
-        if (propName == "radius") { spot->radius = value.x; return true; }
-        if (propName == "range") { spot->range = value.x; return true; }
-        if (propName == "innerAngle") { spot->innerAngle = value.x; return true; }
-        if (propName == "outerAngle") { spot->outerAngle = value.x; return true; }
+        if (propName == "color")
+        {
+            spot->color = value.xyz();
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
+        if (propName == "intensity")
+        {
+            spot->intensity = value.x;
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
+        if (propName == "radius")
+        {
+            spot->radius = value.x;
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
+        if (propName == "range")
+        {
+            spot->range = value.x;
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
+        if (propName == "innerAngle")
+        {
+            spot->innerAngle = value.x;
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
+        if (propName == "outerAngle")
+        {
+            spot->outerAngle = value.x;
+            return MarkLightComponentChanged<SpotLightComponent>(world, entity);
+        }
         return false;
     }
 
     if (auto* point = tryGetPointLight(world, entity))
     {
-        if (propName == "color") { point->color = value.xyz(); return true; }
-        if (propName == "intensity") { point->intensity = value.x; return true; }
-        if (propName == "radius") { point->radius = value.x; return true; }
-        if (propName == "range") { point->range = value.x; return true; }
+        if (propName == "color")
+        {
+            point->color = value.xyz();
+            return MarkLightComponentChanged<PointLightComponent>(world, entity);
+        }
+        if (propName == "intensity")
+        {
+            point->intensity = value.x;
+            return MarkLightComponentChanged<PointLightComponent>(world, entity);
+        }
+        if (propName == "radius")
+        {
+            point->radius = value.x;
+            return MarkLightComponentChanged<PointLightComponent>(world, entity);
+        }
+        if (propName == "range")
+        {
+            point->range = value.x;
+            return MarkLightComponentChanged<PointLightComponent>(world, entity);
+        }
         return false;
     }
 
 
     if (auto* rect = tryGetRectLight(world, entity))
     {
-        if (propName == "color") { rect->color = value.xyz(); return true; }
-        if (propName == "intensity") { rect->intensity = value.x; return true; }
-        if (propName == "width") { rect->width = value.x; return true; }
-        if (propName == "height") { rect->height = value.x; return true; }
+        if (propName == "color")
+        {
+            rect->color = value.xyz();
+            return MarkLightComponentChanged<RectLightComponent>(world, entity);
+        }
+        if (propName == "intensity")
+        {
+            rect->intensity = value.x;
+            return MarkLightComponentChanged<RectLightComponent>(world, entity);
+        }
+        if (propName == "width")
+        {
+            rect->width = value.x;
+            return MarkLightComponentChanged<RectLightComponent>(world, entity);
+        }
+        if (propName == "height")
+        {
+            rect->height = value.x;
+            return MarkLightComponentChanged<RectLightComponent>(world, entity);
+        }
         return false;
     }
 
     if (auto* environment = tryGetEnvironmentLight(world, entity))
     {
-        if (propName == "color") { environment->color = value.xyz(); return true; }
+        if (propName == "color")
+        {
+            environment->color = value.xyz();
+            return MarkLightComponentChanged<EnvironmentLightComponent>(world, entity);
+        }
         return false;
     }
 
