@@ -3,9 +3,11 @@
 #include <engine/DefaultPlugins.h>
 #include <engine/EntryPoint.h>
 #include <engine/SceneQuery.h>
+#include <engine/SceneStartup.h>
 #include <core/path_utils.h>
 #include <core/log.h>
 #include <platform/window.h>
+#include <rhi/rhi.h>
 
 #include <array>
 #include <utility>
@@ -91,6 +93,43 @@ caustica::rhi::GraphicsAPI ResolveGraphicsApi(const EngineAppDesc& desc)
 
 } // namespace
 
+bool EngineAppDesc::applyCommandLine(const CommandLineOptions& options)
+{
+    cli = options;
+    width = options.width;
+    height = options.height;
+    headless = options.noWindow;
+    dedicatedRenderThread = !options.syncRender;
+    parallelSystems = !options.serialSystems;
+    debugDevice = options.debug;
+    useVulkan = options.useVulkan;
+    fullscreen = options.fullscreen;
+    if (!options.scene.empty())
+        scene = options.scene;
+    if (!options.assetsDir.empty())
+        assetPackRoot = options.assetsDir;
+
+    std::string adapterError;
+    if (!caustica::rhi::parseAdapterSelector(options.gpu, adapter, &adapterError))
+    {
+        caustica::error("Invalid --gpu selector '%s': %s", options.gpu.c_str(), adapterError.c_str());
+        return false;
+    }
+    return true;
+}
+
+std::optional<EngineAppDesc> EngineAppDesc::fromArgv(int argc, char const* const* argv)
+{
+    CommandLineOptions options;
+    if (!options.initFromCommandLine(argc, argv))
+        return std::nullopt;
+
+    EngineAppDesc desc;
+    if (!desc.applyCommandLine(options))
+        return std::nullopt;
+    return desc;
+}
+
 std::unique_ptr<EngineApp> EngineApp::create(EngineAppDesc desc)
 {
     auto engine = std::unique_ptr<EngineApp>(new EngineApp());
@@ -107,11 +146,7 @@ EngineApp::~EngineApp()
 bool EngineApp::initialize(EngineAppDesc desc)
 {
     m_desc = std::move(desc);
-
-    m_viewStatePtr = m_desc.viewState ? m_desc.viewState : &m_viewState;
-    m_diagnosticsPtr = m_desc.diagnostics ? m_desc.diagnostics : &m_diagnostics;
-    m_renderStatePtr = m_desc.renderState ? m_desc.renderState : &m_renderAppState;
-    m_cmdLinePtr = m_desc.cmdLine ? m_desc.cmdLine : &m_cmdLine;
+    m_cmdLine = m_desc.cli;
 
     const std::filesystem::path runtimeDirectory = m_desc.runtimeDirectory.empty()
         ? ResolveDefaultRuntimeDirectory()
@@ -124,27 +159,24 @@ bool EngineApp::initialize(EngineAppDesc desc)
     setLocalPathBaseOverride(resourceRoot);
 
     std::filesystem::path assetPackRoot = m_desc.assetPackRoot;
-    if (assetPackRoot.empty() && m_cmdLinePtr && !m_cmdLinePtr->assetsDir.empty())
-        assetPackRoot = m_cmdLinePtr->assetsDir;
+    if (assetPackRoot.empty() && !m_cmdLine.assetsDir.empty())
+        assetPackRoot = m_cmdLine.assetsDir;
     if (assetPackRoot.empty())
         assetPackRoot = discoverAssetPackRoot(runtimeDirectory, resourceRoot);
     setAssetPackRootOverride(assetPackRoot);
 
-    if (!m_desc.cmdLine)
-    {
-        m_cmdLine.width = m_desc.width;
-        m_cmdLine.height = m_desc.height;
-        m_cmdLine.noWindow = m_desc.headless;
-        m_cmdLine.useVulkan = m_desc.useVulkan;
-        m_cmdLine.gpu = caustica::rhi::adapterSelectorToString(m_desc.adapter);
-        m_cmdLine.debug = m_desc.debugDevice;
-        m_cmdLine.scene = m_desc.scene;
-        m_cmdLine.syncRender = !m_desc.dedicatedRenderThread;
-        m_cmdLine.serialSystems = !m_desc.parallelSystems;
-    }
-
     if (m_desc.device)
     {
+        if (!m_desc.window && !m_desc.headless)
+        {
+            error("EngineApp: borrowed device requires a Window unless headless");
+            return false;
+        }
+        if (!m_desc.surface)
+        {
+            error("EngineApp: borrowed device requires a GpuSurface");
+            return false;
+        }
         m_device = m_desc.device;
         m_window = m_desc.window;
         m_surface = m_desc.surface;
@@ -171,44 +203,49 @@ bool EngineApp::initialize(EngineAppDesc desc)
         createDesc.d3d12DeviceFactory = m_desc.d3d12DeviceFactory;
 #endif
 
-        GpuDeviceCreateResult graphicsResult = GpuDevice::create(createDesc);
-        if (!graphicsResult.gpuDevice)
+        if (!m_desc.headless)
+        {
+            m_ownedWindow = createGpuWindow(createDesc);
+            if (!m_ownedWindow)
+            {
+                error("EngineApp: failed to create window");
+                return false;
+            }
+            m_window = m_ownedWindow.get();
+        }
+
+        GpuDeviceCreateResult graphicsResult = GpuDevice::create(createDesc, m_window);
+        if (!graphicsResult.gpuDevice || !graphicsResult.surface)
         {
             error("EngineApp: failed to create GPU device");
             return false;
         }
 
         m_ownedDevice = std::move(graphicsResult.gpuDevice);
-        m_ownedWindow = std::move(graphicsResult.window);
         m_ownedSurface = std::move(graphicsResult.surface);
         m_device = m_ownedDevice.get();
-        m_window = m_ownedWindow.get();
         m_surface = m_ownedSurface.get();
         m_ownsDevice = true;
     }
 
-    if (m_device && !m_surface)
-    {
-        m_ownedSurface = GpuSurface::adopt(*m_device, m_window);
-        m_surface = m_ownedSurface.get();
-    }
-
-    m_viewStatePtr->progressLoading.start("Starting up...");
-    m_viewStatePtr->progressLoading.Set(50);
+    m_viewState.progressLoading.start("Starting up...");
+    m_viewState.progressLoading.Set(50);
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.scene.json") : m_desc.scene;
 
     m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window, m_surface);
-    m_app->addPlugins(DefaultPlugins{SceneAppConfig{
-        .viewState = *m_viewStatePtr,
-        .diagnostics = *m_diagnosticsPtr,
+    m_app->insertResourceRef(m_viewState);
+    m_app->insertResourceRef(m_diagnostics);
+    m_app->insertResourceRef(m_renderAppState);
+    m_app->insertResourceRef(m_renderAppState.settings);
+    m_app->insertResourceRef(m_renderAppState.runtime);
+    m_app->insertResourceRef(m_cmdLine);
+    m_app->emplaceResource<EngineBootstrap>(EngineBootstrap{
         .preferredScene = preferredScene,
-        .renderState = m_renderStatePtr,
-        .cmdLine = m_cmdLinePtr,
-        .applyCmdLineToRenderState = m_desc.applyCmdLineToRenderState,
         .hasSceneCallbacks = m_desc.hasSceneCallbacks,
         .sceneCallbacks = m_desc.sceneCallbacks,
-    }});
+    });
+    m_app->addPlugins(DefaultPlugins{});
     m_app->setUseDedicatedRenderThread(m_desc.dedicatedRenderThread && !m_desc.headless);
     m_app->schedules().setParallelExecutionEnabled(m_desc.parallelSystems);
 
@@ -342,22 +379,22 @@ const PathTracerSettings& EngineApp::settings() const
 
 render::RenderAppState& EngineApp::renderAppState()
 {
-    return *m_renderStatePtr;
+    return m_renderAppState;
 }
 
 const render::RenderAppState& EngineApp::renderAppState() const
 {
-    return *m_renderStatePtr;
+    return m_renderAppState;
 }
 
 CommandLineOptions& EngineApp::commandLine()
 {
-    return *m_cmdLinePtr;
+    return m_cmdLine;
 }
 
 const CommandLineOptions& EngineApp::commandLine() const
 {
-    return *m_cmdLinePtr;
+    return m_cmdLine;
 }
 
 bool EngineApp::setCameraPosDirUp(const std::string& value)

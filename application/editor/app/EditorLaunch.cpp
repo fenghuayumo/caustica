@@ -7,6 +7,7 @@
 
 #include <engine/App.h>
 #include <engine/SceneLifecycle.h>
+#include <backend/GpuSurface.h>
 #include <core/console/ConsoleObjects.h>
 #include <core/log.h>
 #include <platform/window.h>
@@ -120,23 +121,21 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     korgi::init();
     installEditorLogFilter();
 
-    GpuDeviceCreateDesc createDesc{};
     std::string preferredScene = "default.scene.json";
     LocalConfig::PreferredSceneOverride(preferredScene);
 
-    if (!ProcessEditorStartupCommandLine(argc, argv, editor.cmdLine(), editor.editorCmdLine(), createDesc, preferredScene))
+    caustica::EngineAppDesc desc{};
+    desc.scene = preferredScene;
+    desc.windowTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
+        + " " + caustica::kVersionString;
+
+    if (!ProcessEditorStartupCommandLine(argc, argv, desc, editor.editorCmdLine(), preferredScene))
         return nullptr;
 
-    InitializeEditorUIDataFromCommandLine(editor.uiData(), editor.cmdLine());
-    editor.setConsole(std::make_unique<RenderSettingsConsoleBinding>(editor.uiData()));
-    ApplyConsoleSets(editor, true);
-
-    const bool automatedRun = editor.cmdLine().nonInteractive
-        || editor.cmdLine().captureSimple
-        || editor.cmdLine().captureSequence;
-
-    // Owned by SceneRuntimePlugin via EngineAppDesc — single source for Scene.Startup.
-    EngineSceneCallbacks sceneCallbacks{
+    desc.scene = preferredScene;
+    desc.preGpuDeviceInit = preGpuDeviceInit;
+    desc.hasSceneCallbacks = true;
+    desc.sceneCallbacks = EngineSceneCallbacks{
         .OnSceneLoaded = [&editor]() {
             editor.onSceneLoadedFromLoader();
         },
@@ -147,48 +146,24 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
         },
     };
 
-    caustica::EngineAppDesc desc{};
-    desc.width = createDesc.backBufferWidth;
-    desc.height = createDesc.backBufferHeight;
-    desc.headless = editor.cmdLine().noWindow;
-    desc.dedicatedRenderThread = !editor.cmdLine().syncRender;
-    desc.parallelSystems = !editor.cmdLine().serialSystems;
-    desc.debugDevice = editor.cmdLine().debug || createDesc.enableDebug;
-    desc.adapter = createDesc.adapter;
-    desc.useVulkan = editor.cmdLine().useVulkan;
-    desc.fullscreen = editor.cmdLine().fullscreen;
-    desc.maximized = createDesc.startMaximized;
-    desc.scene = preferredScene;
-    desc.windowTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
-        + " " + caustica::kVersionString;
-    desc.viewState = &editor.viewState();
-    desc.diagnostics = &editor.diagnostics();
-    desc.renderState = &editor.uiData().render;
-    desc.cmdLine = &editor.cmdLine();
-    desc.applyCmdLineToRenderState = editor.cmdLine().noWindow || automatedRun;
-    desc.hasSceneCallbacks = true;
-    desc.sceneCallbacks = std::move(sceneCallbacks);
-    desc.preGpuDeviceInit = preGpuDeviceInit;
-
     auto engine = caustica::EngineApp::create(std::move(desc));
     if (!engine || !engine->isValid())
         return nullptr;
 
-    caustica::App* app = &engine->app();
+    editor.bindEngine(*engine);
+
+    InitializeEditorUIDataFromCommandLine(editor.uiData(), editor.cmdLine());
+    editor.setConsole(std::make_unique<RenderSettingsConsoleBinding>(editor.uiData()));
+    ApplyConsoleSets(editor, true);
+
+    const bool automatedRun = editor.cmdLine().nonInteractive
+        || editor.cmdLine().captureSimple
+        || editor.cmdLine().captureSequence;
 
     if (automatedRun && engine->surface())
         engine->surface()->setWaitForIdleAfterPresent(true);
 
-    // EditorPlugin only needs renderState for PostAppInit; scene callbacks live on EngineAppDesc.
-    const SceneAppConfig sceneConfig{
-        .viewState = editor.viewState(),
-        .diagnostics = editor.diagnostics(),
-        .preferredScene = preferredScene,
-        .renderState = &editor.uiData().render,
-        .cmdLine = &editor.cmdLine(),
-        .applyCmdLineToRenderState = editor.cmdLine().noWindow || automatedRun,
-    };
-
+    caustica::App* app = &engine->app();
     if (!editor.cmdLine().noWindow)
     {
         EditorUISubsystemConfig uiConfig{
@@ -198,11 +173,11 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
             .cmdLine = editor.cmdLine(),
             .console = *editor.console(),
         };
-        app->addPlugin<EditorPlugin>(sceneConfig, editor, &uiConfig);
+        app->addPlugin<EditorPlugin>(editor, &uiConfig);
     }
     else
     {
-        app->addPlugin<EditorPlugin>(sceneConfig, editor, static_cast<const EditorUISubsystemConfig*>(nullptr));
+        app->addPlugin<EditorPlugin>(editor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
 
     if (!engine->finishStartup())

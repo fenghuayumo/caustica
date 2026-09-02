@@ -2,6 +2,11 @@
 
 #include <events/event.h>
 
+namespace caustica
+{
+class App;
+}
+
 namespace caustica::editor
 {
 
@@ -18,5 +23,7 @@ public:
 private:
     SceneEditor* m_sceneEditor = nullptr;
 };
+
+void updateEditorCameraInputGate(SceneEditor& sceneEditor, caustica::App& app);
 
 } // namespace caustica::editor

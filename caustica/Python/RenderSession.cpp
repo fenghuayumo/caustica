@@ -208,6 +208,10 @@ RenderSession::RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, 
     desc.device = m_device->gpu();
     desc.window = m_device->window();
     desc.surface = m_device->surface();
+    desc.cli.nonInteractive = cfg.nonInteractive;
+    desc.cli.OverrideToReferenceMode = !cfg.realtimeMode;
+    desc.cli.OverrideToRealtimeMode = cfg.realtimeMode;
+    desc.cli.ReferenceSamplesPerPixel = cfg.accumulationTarget;
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     desc.d3d12DeviceFactory = m_device->d3d12Factory();
 #endif

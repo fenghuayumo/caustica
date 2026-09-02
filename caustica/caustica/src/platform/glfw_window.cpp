@@ -280,16 +280,6 @@ void GlfwWindow::onUpdate()
     glfwPollEvents();
 }
 
-void GlfwWindow::processInput()
-{
-    // Input polling is done via GLFW callbacks → events
-}
-
-void GlfwWindow::updateCursorImgui()
-{
-    // ImGui cursor updates — handled by ImGuiManager via the callback
-}
-
 void GlfwWindow::setEventCallback(const EventCallbackFn& callback)
 {
     m_EventCallback = callback;
@@ -315,14 +305,12 @@ void GlfwWindow::glfwKeyCallback(GLFWwindow* window, int key, int scancode, int 
 
     if (keyAction == KeyAction::Release)
     {
-        KeyReleasedEvent e(keyCode, scancode, modifiers);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<KeyReleasedEvent>(keyCode, scancode, modifiers));
     }
     else
     {
         int repeatCount = (keyAction == KeyAction::Repeat) ? 1 : 0;
-        KeyPressedEvent e(keyCode, scancode, repeatCount, modifiers);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<KeyPressedEvent>(keyCode, scancode, repeatCount, modifiers));
     }
 }
 
@@ -331,8 +319,7 @@ void GlfwWindow::glfwCharCallback(GLFWwindow* window, unsigned int codepoint)
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        KeyTypedEvent e(codepoint);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<KeyTypedEvent>(codepoint));
     }
 }
 
@@ -341,8 +328,7 @@ void GlfwWindow::glfwCursorPosCallback(GLFWwindow* window, double xpos, double y
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        MouseMovedEvent e(xpos, ypos);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<MouseMovedEvent>(xpos, ypos));
     }
 }
 
@@ -356,15 +342,9 @@ void GlfwWindow::glfwMouseButtonCallback(GLFWwindow* window, int button, int act
     auto modifiers = FromGlfwMods(mods);
 
     if (action == GLFW_PRESS)
-    {
-        MouseButtonPressedEvent e(mouseCode, modifiers);
-        self->m_EventCallback(e);
-    }
+        self->m_EventCallback(std::make_unique<MouseButtonPressedEvent>(mouseCode, modifiers));
     else
-    {
-        MouseButtonReleasedEvent e(mouseCode, modifiers);
-        self->m_EventCallback(e);
-    }
+        self->m_EventCallback(std::make_unique<MouseButtonReleasedEvent>(mouseCode, modifiers));
 }
 
 void GlfwWindow::glfwScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
@@ -372,8 +352,7 @@ void GlfwWindow::glfwScrollCallback(GLFWwindow* window, double xoffset, double y
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        MouseScrolledEvent e(xoffset, yoffset);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<MouseScrolledEvent>(xoffset, yoffset));
     }
 }
 
@@ -382,8 +361,7 @@ void GlfwWindow::glfwWindowCloseCallback(GLFWwindow* window)
     auto* self = static_cast<GlfwWindow*>(glfwGetWindowUserPointer(window));
     if (self && self->m_EventCallback)
     {
-        WindowCloseEvent e;
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<WindowCloseEvent>());
     }
 }
 
@@ -393,8 +371,7 @@ void GlfwWindow::glfwWindowSizeCallback(GLFWwindow* window, int width, int heigh
     if (self && self->m_EventCallback)
     {
         self->m_HasResized = true;
-        WindowResizeEvent e(width, height);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<WindowResizeEvent>(width, height));
     }
 }
 
@@ -409,15 +386,9 @@ void GlfwWindow::glfwWindowFocusCallback(GLFWwindow* window, int focused)
     if (self->m_EventCallback)
     {
         if (focused == GLFW_TRUE)
-        {
-            WindowFocusEvent e;
-            self->m_EventCallback(e);
-        }
+            self->m_EventCallback(std::make_unique<WindowFocusEvent>());
         else
-        {
-            WindowLostFocusEvent e;
-            self->m_EventCallback(e);
-        }
+            self->m_EventCallback(std::make_unique<WindowLostFocusEvent>());
     }
 }
 
@@ -431,8 +402,7 @@ void GlfwWindow::glfwWindowIconifyCallback(GLFWwindow* window, int iconified)
 
     if (self->m_EventCallback)
     {
-        WindowIconifyEvent e(iconified == GLFW_TRUE);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<WindowIconifyEvent>(iconified == GLFW_TRUE));
     }
 }
 
@@ -453,8 +423,7 @@ void GlfwWindow::glfwWindowPosCallback(GLFWwindow* window, int xpos, int ypos)
 
     if (self->m_EventCallback)
     {
-        WindowMovedEvent e(xpos, ypos);
-        self->m_EventCallback(e);
+        self->m_EventCallback(std::make_unique<WindowMovedEvent>(xpos, ypos));
     }
 }
 

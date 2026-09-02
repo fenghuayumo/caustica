@@ -1,12 +1,12 @@
 #include <engine/App.h>
 #include <engine/AppObservers.h>
 #include <engine/AppResources.h>
+#include <engine/Input.h>
 #include <engine/internal/GpuRenderScheduleRegistration.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/RenderFrameApi.h>
 #include <engine/SceneViewState.h>
-#include <engine/SceneScheduleRegistration.h>
 #include <engine/SystemLabels.h>
 #include <engine/SystemSets.h>
 #include <engine/Time.h>
@@ -69,17 +69,24 @@ void App::processEventQueue()
         std::lock_guard<std::mutex> lock(m_EventQueueMutex);
         pending.swap(m_EventQueue);
     }
+
+    if (InputState* input = tryResource<InputState>())
+        input->beginFrame();
+
     for (auto& e : pending)
     {
-        if (e)
-            dispatchEvent(*e);
+        if (!e)
+            continue;
+        if (InputState* input = tryResource<InputState>())
+            applyEventToInput(*input, *e);
+        dispatchEvent(*e);
     }
 }
 
 void App::installWindowEventCallback()
 {
     if (Window* w = window())
-        w->setEventCallback([this](Event& e) { dispatchEvent(e); });
+        w->setEventCallback([this](std::unique_ptr<Event> e) { queueEvent(std::move(e)); });
 }
 
 static double GetNow()
@@ -127,7 +134,6 @@ void App::buildPlugins()
     if (!m_defaultSchedulesRegistered)
         registerDefaultSchedules();
 
-    registerSceneSchedules(*this);
     registerGpuRenderSchedules(*this);
 
     for (Plugin* plugin : m_pluginRefs)
@@ -325,7 +331,6 @@ void App::shutdown()
     m_schedules.clear();
     m_world.clear();
     m_defaultSchedulesRegistered = false;
-    m_sceneSchedulesRegistered = false;
     m_gpuRenderSchedulesRegistered = false;
     m_updateTailRegistered = false;
     m_postUpdateTailRegistered = false;

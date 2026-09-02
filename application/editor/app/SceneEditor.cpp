@@ -14,6 +14,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneLifecycle.h>
+#include <engine/EngineApp.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <core/path_utils.h>
@@ -243,20 +244,80 @@ void RecalculateAnimationsForTarget(
 } // namespace
 
 SceneEditor::SceneEditor()
-    : m_renderAppState(m_editorUiData.render)
-    , m_settings(m_editorUiData.render.settings)
-    , m_renderState(m_editorUiData.render.runtime)
-    , m_editor(m_editorUiData.editor)
-    , m_selectionState(m_editorUiData.editor)
-    , m_editorCameraState(m_viewState)
-    , m_inputRouter()
-    , m_contentEditor(*this)
+    : m_contentEditor(*this)
 {
-    m_viewState.progressLoading.start("Starting up...");
-    m_viewState.progressLoading.Set(50);
     m_inputRouter.bind(*this);
-    m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, m_renderAppState, m_cmdLine);
+}
+
+void SceneEditor::bindEngine(EngineApp& engine)
+{
+    m_engine = &engine;
+    m_app = &engine.app();
+    m_editorUiData = std::make_unique<EditorUIData>(engine.renderAppState());
+    m_selectionState.editor = &m_editorUiData->editor;
+    m_editorCameraState.viewState = &engine.viewState();
+    m_captureScriptManager = std::make_unique<CaptureScriptManager>(*this, engine.renderAppState(), engine.commandLine());
     m_captureScriptState.manager = m_captureScriptManager.get();
+}
+
+SceneViewState& SceneEditor::viewState()
+{
+    return m_engine->viewState();
+}
+
+const SceneViewState& SceneEditor::viewState() const
+{
+    return m_engine->viewState();
+}
+
+render::RenderAppState& SceneEditor::renderAppState()
+{
+    return m_engine->renderAppState();
+}
+
+const render::RenderAppState& SceneEditor::renderAppState() const
+{
+    return m_engine->renderAppState();
+}
+
+PathTracerSettings& SceneEditor::pathTracerSettings()
+{
+    return m_engine->renderAppState().settings;
+}
+
+const PathTracerSettings& SceneEditor::pathTracerSettings() const
+{
+    return m_engine->renderAppState().settings;
+}
+
+render::RenderRuntimeState& SceneEditor::renderRuntimeState()
+{
+    return m_engine->renderAppState().runtime;
+}
+
+const render::RenderRuntimeState& SceneEditor::renderRuntimeState() const
+{
+    return m_engine->renderAppState().runtime;
+}
+
+CommandLineOptions& SceneEditor::cmdLine()
+{
+    return m_engine->commandLine();
+}
+
+const CommandLineOptions& SceneEditor::cmdLine() const
+{
+    return m_engine->commandLine();
+}
+
+render::AppDiagnostics& SceneEditor::diagnostics()
+{
+    return m_engine->diagnostics();
+}
+
+const render::AppDiagnostics& SceneEditor::diagnostics() const
+{
+    return m_engine->diagnostics();
 }
 
 SceneEditor::~SceneEditor()
@@ -375,7 +436,7 @@ void SceneEditor::bindCameraControllerSideEffects()
 void SceneEditor::onBeforeInitialSceneLoad()
 {
     m_game = std::make_unique<::GameScene>(*this, m_editorCmdLine);
-    m_viewState.progressLoading.Set(95);
+    viewState().progressLoading.Set(95);
 }
 
 void SceneEditor::consumeCompletedMaterialPickFeedback()
@@ -385,14 +446,14 @@ void SceneEditor::consumeCompletedMaterialPickFeedback()
     if (completedRequestId > m_consumedMaterialPickRequestId)
     {
         m_consumedMaterialPickRequestId = completedRequestId;
-        auto& picking = m_renderState.Picking;
+        auto& picking = renderRuntimeState().Picking;
         // SceneAfterWorldRender may already have cleared the one-shot bool.
         // Request identity, which remains monotonic, is the authoritative match.
         if (picking.MaterialRequestId == completedRequestId)
         {
             const int materialGpuId =
                 m_completedMaterialPickGpuId.load(std::memory_order_relaxed);
-            m_editor.SelectedMaterial = m_app
+            editorUIState().SelectedMaterial = m_app
                 ? caustica::findMaterial(*m_app, materialGpuId)
                 : nullptr;
             picking.completeMaterialPick(completedRequestId);
@@ -408,7 +469,7 @@ void SceneEditor::consumeCompletedInstancePickFeedback()
         return;
 
     m_consumedInstancePickRequestId = completedRequestId;
-    auto& picking = m_renderState.Picking;
+    auto& picking = renderRuntimeState().Picking;
     // SceneAfterWorldRender may already have cleared the one-shot bool.
     if (picking.InstanceRequestId != completedRequestId)
         return;
@@ -429,14 +490,14 @@ void SceneEditor::consumeCompletedInstancePickFeedback()
         picked = pickGaussianSplatAtPixel(pickPixel);
         pickedGaussian = (picked != ecs::NullEntity);
     }
-    m_editor.SelectedEntity = picked;
-    m_editor.SelectedGaussianSplat = pickedGaussian;
+    editorUIState().SelectedEntity = picked;
+    editorUIState().SelectedGaussianSplat = pickedGaussian;
     picking.completeInstancePick(completedRequestId);
 }
 
 void SceneEditor::prepareEditorFrame()
 {
-    m_settings.DebugExploreDeltaTree = m_editor.ShowDeltaTree;
+    pathTracerSettings().DebugExploreDeltaTree = editorUIState().ShowDeltaTree;
 }
 
 void SceneEditor::onSceneUnloading()
@@ -445,13 +506,13 @@ void SceneEditor::onSceneUnloading()
     m_undoStack.clear();
     ResetTransformGizmoInteraction();
     m_editorAnimationEntity = ecs::NullEntity;
-    m_editor.TogglableNodes = nullptr;
-    m_editor.SelectedMaterial = nullptr;
-    m_editor.SelectedEntity = caustica::ecs::NullEntity;
-    m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
-    m_editor.InspectorRotationEntity = caustica::ecs::NullEntity;
-    m_editor.InspectorRotationEulerValid = false;
-    m_editor.SelectedGaussianSplat = false;
+    editorUIState().TogglableNodes = nullptr;
+    editorUIState().SelectedMaterial = nullptr;
+    editorUIState().SelectedEntity = caustica::ecs::NullEntity;
+    editorUIState().PendingDeleteEntity = caustica::ecs::NullEntity;
+    editorUIState().InspectorRotationEntity = caustica::ecs::NullEntity;
+    editorUIState().InspectorRotationEulerValid = false;
+    editorUIState().SelectedGaussianSplat = false;
     m_editorState.sceneDocument = Json::Value();
     m_editorState.sceneDocumentPath.clear();
     m_editorState.sceneDocumentValid = false;
@@ -584,19 +645,19 @@ void SceneEditor::onSceneLoadedEarly()
 
 void SceneEditor::onSceneLoadedBeforeGpuPrep()
 {
-    if (m_editor.TogglableNodes != nullptr || !m_app)
+    if (editorUIState().TogglableNodes != nullptr || !m_app)
         return;
 
     if (auto* ew = caustica::entityWorld(*m_app))
     {
-        m_editor.TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
-        UpdateTogglableNodes(*m_editor.TogglableNodes, *ew, ew->root());
+        editorUIState().TogglableNodes = std::make_shared<std::vector<TogglableNode>>();
+        UpdateTogglableNodes(*editorUIState().TogglableNodes, *ew, ew->root());
     }
 }
 
 void SceneEditor::onSceneLoadedAfterCollectTextures()
 {
-    LocalConfig::PostSceneLoad(*this, m_renderAppState, m_editor);
+    LocalConfig::PostSceneLoad(*this, renderAppState(), editorUIState());
 }
 
 void SceneEditor::onSceneLoadedComplete()
@@ -1031,7 +1092,7 @@ void SceneEditor::onAnimateGameTick(float fElapsedTimeSeconds, bool enableAnimat
 void SceneEditor::onAnimateUpdateSceneTime(float /*fElapsedTimeSeconds*/, bool enableAnimations, bool /*enableAnimationUpdate*/)
 {
     if (enableAnimations && m_game && m_game->IsInitialized())
-        m_viewState.sceneTime = m_game->gameTime();
+        viewState().sceneTime = m_game->gameTime();
 }
 
 void SceneEditor::onAnimateGameCamera(float fElapsedTimeSeconds)
@@ -1060,24 +1121,24 @@ void SceneEditor::setSceneTime(double sceneTime)
 {
     if (m_game && m_game->IsInitialized())
         m_game->SetGameTime(sceneTime);
-    m_viewState.sceneTime = sceneTime;
+    viewState().sceneTime = sceneTime;
 }
 
 double SceneEditor::sceneTime() const
 {
     if (m_game && m_game->IsInitialized())
         return m_game->gameTime();
-    return m_viewState.sceneTime;
+    return viewState().sceneTime;
 }
 
 void SceneEditor::setTimelineTime(double timelineTime)
 {
-    m_viewState.keyframeTime = timelineTime;
+    viewState().keyframeTime = timelineTime;
 }
 
 double SceneEditor::timelineTime() const
 {
-    return m_viewState.keyframeTime;
+    return viewState().keyframeTime;
 }
 
 bool SceneEditor::insertTransformKeyframe(ecs::Entity entity, float timeSeconds)
@@ -1130,7 +1191,7 @@ bool SceneEditor::insertTransformKeyframe(ecs::Entity entity, float timeSeconds)
     scaling->sampler->upsertKeyframe(MakeKeyframe(timeSeconds, transform->scaling));
 
     RecalculateAnimationsForTarget(*entityWorld, entity);
-    m_settings.ResetAccumulation = true;
+    pathTracerSettings().ResetAccumulation = true;
     return true;
 }
 
@@ -1160,7 +1221,7 @@ bool SceneEditor::deleteTransformKeyframe(ecs::Entity entity, float timeSeconds)
     if (removed)
     {
         RecalculateAnimationsForTarget(*entityWorld, entity);
-        m_settings.ResetAccumulation = true;
+        pathTracerSettings().ResetAccumulation = true;
     }
     return removed;
 }
@@ -1226,9 +1287,9 @@ bool SceneEditor::insertVisibilityKeyframe(ecs::Entity entity, float timeSeconds
         MakeVisibilityKeyframe(timeSeconds, GetEntityVisibility(*entityWorld, entity)));
 
     RecalculateAnimationsForTarget(*entityWorld, entity);
-    m_settings.ResetAccumulation = true;
+    pathTracerSettings().ResetAccumulation = true;
     if (entityWorld->world().tryGet<scene::GaussianSplatComponent>(entity))
-        m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
+        renderRuntimeState().Invalidation.AccelerationStructRebuildRequested = true;
     return true;
 }
 
@@ -1251,7 +1312,7 @@ bool SceneEditor::deleteVisibilityKeyframe(ecs::Entity entity, float timeSeconds
         return false;
 
     RecalculateAnimationsForTarget(*entityWorld, entity);
-    m_settings.ResetAccumulation = true;
+    pathTracerSettings().ResetAccumulation = true;
     return true;
 }
 
@@ -1386,17 +1447,17 @@ void SceneEditor::evaluateAnimationsAt(float timeSeconds, AnimationEvaluateMode 
     {
         // Accumulation alone is not enough  - realtime temporal history (TAA/NRD/DLSS)
         // must also drop on large seeks, otherwise the jump ghosts for many frames.
-        m_settings.ResetAccumulation = true;
-        m_settings.ResetRealtimeCaches = true;
+        pathTracerSettings().ResetAccumulation = true;
+        pathTracerSettings().ResetRealtimeCaches = true;
     }
 
     if (touchedGaussianVisibility)
-        m_renderState.Invalidation.AccelerationStructRebuildRequested = true;
+        renderRuntimeState().Invalidation.AccelerationStructRebuildRequested = true;
 }
 
 void SceneEditor::handleDroppedFiles()
 {
-    m_contentEditor.handleDroppedFiles(m_editor.PendingDroppedFiles);
+    m_contentEditor.handleDroppedFiles(editorUIState().PendingDroppedFiles);
 }
 
 bool SceneEditor::loadMeshFile(const std::filesystem::path& filePath)
@@ -1421,11 +1482,11 @@ bool SceneEditor::deleteEntity(caustica::ecs::Entity entity)
 
 void SceneEditor::processPendingSceneDeletes()
 {
-    if (m_editor.PendingDeleteEntity == caustica::ecs::NullEntity || !m_app)
+    if (editorUIState().PendingDeleteEntity == caustica::ecs::NullEntity || !m_app)
         return;
 
-    const caustica::ecs::Entity entity = m_editor.PendingDeleteEntity;
-    m_editor.PendingDeleteEntity = caustica::ecs::NullEntity;
+    const caustica::ecs::Entity entity = editorUIState().PendingDeleteEntity;
+    editorUIState().PendingDeleteEntity = caustica::ecs::NullEntity;
 
     auto* ew = caustica::entityWorld(*m_app);
     if (!ew || !ew->world().isAlive(entity))
@@ -1436,14 +1497,14 @@ void SceneEditor::processPendingSceneDeletes()
 
 void SceneEditor::processPendingSceneCreates()
 {
-    if (m_editor.PendingCreate == EditorSelectionState::PendingSceneCreate::None || !m_app)
+    if (editorUIState().PendingCreate == EditorSelectionState::PendingSceneCreate::None || !m_app)
         return;
 
     if (caustica::isSceneStructureBusy(*m_app) || !caustica::isSceneLoaded(*m_app))
         return;
 
-    const auto kind = m_editor.PendingCreate;
-    m_editor.PendingCreate = EditorSelectionState::PendingSceneCreate::None;
+    const auto kind = editorUIState().PendingCreate;
+    editorUIState().PendingCreate = EditorSelectionState::PendingSceneCreate::None;
 
     switch (kind)
     {
@@ -1494,10 +1555,10 @@ void SceneEditor::requestCreateBuiltinMesh(BuiltinPrimitiveKind kind)
     using Kind = EditorSelectionState::PendingSceneCreate;
     switch (kind)
     {
-    case BuiltinPrimitiveKind::Plane: m_editor.PendingCreate = Kind::Plane; break;
-    case BuiltinPrimitiveKind::Cube: m_editor.PendingCreate = Kind::Cube; break;
-    case BuiltinPrimitiveKind::Sphere: m_editor.PendingCreate = Kind::Sphere; break;
-    case BuiltinPrimitiveKind::Cylinder: m_editor.PendingCreate = Kind::Cylinder; break;
+    case BuiltinPrimitiveKind::Plane: editorUIState().PendingCreate = Kind::Plane; break;
+    case BuiltinPrimitiveKind::Cube: editorUIState().PendingCreate = Kind::Cube; break;
+    case BuiltinPrimitiveKind::Sphere: editorUIState().PendingCreate = Kind::Sphere; break;
+    case BuiltinPrimitiveKind::Cylinder: editorUIState().PendingCreate = Kind::Cylinder; break;
     }
 }
 
@@ -1506,11 +1567,11 @@ void SceneEditor::requestCreateLight(EditorLightKind kind)
     using Kind = EditorSelectionState::PendingSceneCreate;
     switch (kind)
     {
-    case EditorLightKind::Directional: m_editor.PendingCreate = Kind::DirectionalLight; break;
-    case EditorLightKind::Point: m_editor.PendingCreate = Kind::PointLight; break;
-    case EditorLightKind::Spot: m_editor.PendingCreate = Kind::SpotLight; break;
-    case EditorLightKind::Rect: m_editor.PendingCreate = Kind::RectLight; break;
-    case EditorLightKind::Environment: m_editor.PendingCreate = Kind::EnvironmentLight; break;
+    case EditorLightKind::Directional: editorUIState().PendingCreate = Kind::DirectionalLight; break;
+    case EditorLightKind::Point: editorUIState().PendingCreate = Kind::PointLight; break;
+    case EditorLightKind::Spot: editorUIState().PendingCreate = Kind::SpotLight; break;
+    case EditorLightKind::Rect: editorUIState().PendingCreate = Kind::RectLight; break;
+    case EditorLightKind::Environment: editorUIState().PendingCreate = Kind::EnvironmentLight; break;
     }
 }
 
@@ -1554,7 +1615,7 @@ ZoomTool* SceneEditor::getOrCreateZoomTool()
 
 bool SceneEditor::showDeltaTree() const
 {
-    return m_editor.ShowDeltaTree;
+    return editorUIState().ShowDeltaTree;
 }
 
 void SceneEditor::resolvePickFeedback(const DebugFeedbackStruct& feedback, const caustica::render::RenderPickState& renderedPick)
@@ -1595,11 +1656,11 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
             renderedPick.MaterialRequestId,
             std::memory_order_release);
     }
-    if (m_settings.ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
+    if (pathTracerSettings().ContinuousDebugFeedback || renderedPick.hasActivePickRequest())
         resolvePickFeedback(caustica::feedbackData(*m_app), renderedPick);
 
     if (renderedPick.InstanceRequested)
-        m_renderState.Picking.completeInstancePick(renderedPick.InstanceRequestId);
+        renderRuntimeState().Picking.completeInstancePick(renderedPick.InstanceRequestId);
 
     auto saveFramebuffer = [this](const char* fileName) -> bool {
         if (!m_app)
@@ -1621,9 +1682,9 @@ void SceneEditor::afterWorldRender(GpuDevice& gpuDevice)
 
 bool SceneEditor::consumeExperimentalPhotoScreenshot()
 {
-    if (!m_editor.ExperimentalPhotoModeScreenshot)
+    if (!editorUIState().ExperimentalPhotoModeScreenshot)
         return false;
-    m_editor.ExperimentalPhotoModeScreenshot = false;
+    editorUIState().ExperimentalPhotoModeScreenshot = false;
     return true;
 }
 

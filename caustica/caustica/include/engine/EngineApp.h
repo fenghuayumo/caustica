@@ -24,13 +24,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace caustica
 {
 
-// Minimal config for embedding caustica in a new application.
-// Prefer EngineApp::create() over assembling SceneAppConfig / DefaultPlugins yourself.
+// Single create config for EngineApp. Parse argv with fromArgv(); do not keep a
+// second live copy of these fields on the host.
 struct EngineAppDesc
 {
     uint32_t width = 1920;
@@ -59,23 +60,22 @@ struct EngineAppDesc
     ID3D12DeviceFactory* d3d12DeviceFactory = nullptr;
 #endif
 
-    // Optional: inject an already-created device/window/surface. EngineApp does not take ownership.
+    // Python Device-outlives-App only. All three must be set together.
     GpuDevice* device = nullptr;
     Window* window = nullptr;
     GpuSurface* surface = nullptr;
 
-    // Optional host-owned state (nullptr = EngineApp owns internals as today).
-    SceneViewState* viewState = nullptr;
-    render::AppDiagnostics* diagnostics = nullptr;
-    render::RenderAppState* renderState = nullptr;
-    CommandLineOptions* cmdLine = nullptr;
+    // Snapshot of parsed CLI (capture / path-tracer overrides / console). EngineApp owns a copy.
+    CommandLineOptions cli{};
 
-    bool applyCmdLineToRenderState = true;
     bool hasSceneCallbacks = false;
     EngineSceneCallbacks sceneCallbacks{};
 
     // Called before GpuDevice::create (e.g. stop splash).
     AppHook preGpuDeviceInit = nullptr;
+
+    [[nodiscard]] static std::optional<EngineAppDesc> fromArgv(int argc, char const* const* argv);
+    bool applyCommandLine(const CommandLineOptions& options);
 };
 
 // Bevy-style embed entry: create → add systems/plugins → run() / stepFrame().
@@ -88,11 +88,6 @@ struct EngineAppDesc
 // Headless:
 //   auto engine = caustica::EngineApp::create({ .headless = true });
 //   while (running) engine->stepFrame(); // also auto-starts
-//
-// Scene mutations: EntityWorld::spawn / setLocalTransform, or SceneSpawn / SceneTransform.
-// Scene queries: EntityWorld / Query<> system params — not Scene extract/GPU digs.
-// Systems on update default to system_set::Simulation; hierarchy refresh is TransformPropagate.
-// Occasional RT work: EnqueueRenderCommand (non-blocking).
 class EngineApp
 {
 public:
@@ -105,7 +100,6 @@ public:
 
     [[nodiscard]] bool isValid() const { return m_valid; }
 
-    // Runs Startup schedules once. Optional — run() / stepFrame() call this automatically.
     bool finishStartup();
 
     void run();
@@ -139,10 +133,14 @@ public:
     [[nodiscard]] GpuSurface* surface() const;
     [[nodiscard]] Window* window() const;
 
+    [[nodiscard]] SceneViewState& viewState() { return m_viewState; }
+    [[nodiscard]] const SceneViewState& viewState() const { return m_viewState; }
+    [[nodiscard]] render::AppDiagnostics& diagnostics() { return m_diagnostics; }
+    [[nodiscard]] const render::AppDiagnostics& diagnostics() const { return m_diagnostics; }
+
     void setScene(const std::string& name, bool forceReload = false);
     [[nodiscard]] bool isSceneLoaded() const;
     [[nodiscard]] bool isSceneLoading() const;
-    // Live scene ECS (nullptr while unloaded / switching). Prefer EntityWorld system param in systems.
     [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] PathTracerSettings& settings();
     [[nodiscard]] const PathTracerSettings& settings() const;
@@ -168,11 +166,6 @@ private:
     render::RenderAppState m_renderAppState{};
     render::AppDiagnostics m_diagnostics{};
     SceneViewState m_viewState{};
-
-    CommandLineOptions* m_cmdLinePtr = &m_cmdLine;
-    render::RenderAppState* m_renderStatePtr = &m_renderAppState;
-    render::AppDiagnostics* m_diagnosticsPtr = &m_diagnostics;
-    SceneViewState* m_viewStatePtr = &m_viewState;
 
     std::unique_ptr<GpuDevice> m_ownedDevice;
     std::unique_ptr<Window> m_ownedWindow;

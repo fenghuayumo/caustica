@@ -112,33 +112,33 @@ namespace
         return params;
     }
 
-    std::unique_ptr<Window> CreatePlatformWindow(const GpuDeviceCreateDesc& desc)
-    {
-        GlfwWindow::makeDefault();
-
-        WindowDesc windowDesc;
-        windowDesc.Width = desc.backBufferWidth;
-        windowDesc.Height = desc.backBufferHeight;
-        windowDesc.Fullscreen = desc.startFullscreen;
-        windowDesc.Maximized = desc.startMaximized && !desc.startFullscreen;
-        windowDesc.Borderless = desc.startBorderless;
-        windowDesc.VSync = desc.vsyncEnabled;
-        windowDesc.Title = desc.windowTitle;
-        windowDesc.RenderAPI = static_cast<int>(desc.api);
-
-        std::unique_ptr<Window> window(Window::create(windowDesc));
-        if (!window || !window->hasInitialised())
-            return nullptr;
-        return window;
-    }
 } // namespace
 
-GpuDeviceCreateResult GpuDevice::create(const GpuDeviceCreateDesc& desc)
+std::unique_ptr<Window> createGpuWindow(const GpuDeviceCreateDesc& desc)
+{
+    GlfwWindow::makeDefault();
+
+    WindowDesc windowDesc;
+    windowDesc.Width = desc.backBufferWidth;
+    windowDesc.Height = desc.backBufferHeight;
+    windowDesc.Fullscreen = desc.startFullscreen;
+    windowDesc.Maximized = desc.startMaximized && !desc.startFullscreen;
+    windowDesc.Borderless = desc.startBorderless;
+    windowDesc.VSync = desc.vsyncEnabled;
+    windowDesc.Title = desc.windowTitle;
+    windowDesc.RenderAPI = static_cast<int>(desc.api);
+
+    std::unique_ptr<Window> window(Window::create(windowDesc));
+    if (!window || !window->hasInitialised())
+        return nullptr;
+    return window;
+}
+
+GpuDeviceCreateResult GpuDevice::create(const GpuDeviceCreateDesc& desc, Window* window)
 {
     GpuDeviceCreateResult result;
     const DeviceCreationParameters backendParams = MakeBackendParams(desc);
 
-    // 1. Backend object (DX12 / Vulkan / DX11).
     std::unique_ptr<GpuDevice> gpuDevice(GpuDevice::createBackend(desc.api));
     if (!gpuDevice)
     {
@@ -167,10 +167,9 @@ GpuDeviceCreateResult GpuDevice::create(const GpuDeviceCreateDesc& desc)
         return result;
     }
 
-    std::unique_ptr<Window> window = CreatePlatformWindow(desc);
     if (!window)
     {
-        caustica::error("GpuDevice: failed to create platform window");
+        caustica::error("GpuDevice: windowed create requires a Window");
         return result;
     }
 
@@ -198,7 +197,6 @@ GpuDeviceCreateResult GpuDevice::create(const GpuDeviceCreateDesc& desc)
 
     helpersRegisterActiveWindow(window->getNativeHandle());
     result.gpuDevice = std::move(gpuDevice);
-    result.window = std::move(window);
     return result;
 }
 

@@ -17,9 +17,7 @@
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
 #include <render/core/TextureUtils.h>
-
-#define GLFW_INCLUDE_NONE // Do not include any OpenGL headers
-#include <GLFW/glfw3.h>
+#include <events/key_codes.h>
 
 using namespace caustica::math;
 
@@ -53,10 +51,14 @@ ZoomTool::~ZoomTool( )
 
 bool ZoomTool::keyboardUpdate(int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_Z && action == GLFW_PRESS && mods == GLFW_MOD_CONTROL)
+    (void)scancode;
+    if (key == static_cast<int>(caustica::Key::Z)
+        && action == static_cast<int>(caustica::KeyAction::Press)
+        && mods == static_cast<int>(caustica::ModifierKey::Control))
         m_settings.enabled = !m_settings.enabled;
 
-    if (key == GLFW_KEY_Z && mods == GLFW_MOD_CONTROL)
+    if (key == static_cast<int>(caustica::Key::Z)
+        && mods == static_cast<int>(caustica::ModifierKey::Control))
         return true;
 
     return false;
@@ -71,9 +73,9 @@ bool ZoomTool::mouseButtonUpdate(int button, int action, int mods)
 {
     if (m_settings.enabled)
     {
-        if (button == GLFW_MOUSE_BUTTON_1)
+        if (button == static_cast<int>(caustica::Mouse::Left))
         {
-            if (action == GLFW_PRESS)
+            if (action == static_cast<int>(caustica::KeyAction::Press))
                 m_settings.BoxPos = int2(m_lastMousePos - float2(m_settings.BoxSize.x / 2, m_settings.BoxSize.y / 2));
             return true;
         }

@@ -44,16 +44,6 @@ std::unique_ptr<GpuSurface> GpuSurface::createHeadless(GpuDevice& device)
     return surface;
 }
 
-std::unique_ptr<GpuSurface> GpuSurface::adopt(GpuDevice& device, Window* window)
-{
-    auto surface = std::unique_ptr<GpuSurface>(new GpuSurface(device, window));
-    if (window && !surface->attachWindowed(false))
-        return nullptr;
-    if (!window)
-        surface->handleResized();
-    return surface;
-}
-
 bool GpuSurface::attachWindowed(bool createSwapChain)
 {
     if (!m_window)

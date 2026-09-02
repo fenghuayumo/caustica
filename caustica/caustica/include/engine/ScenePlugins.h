@@ -15,8 +15,7 @@ class Scene;
 enum class StructureGpuUploadMode : uint8_t;
 namespace scene { class SceneRenderData; }
 
-// Scene runtime plugins (schedules). DefaultPlugins adds these; App::buildPlugins
-// still calls registerSceneSchedules as a fallback when they were not registered.
+// Scene runtime plugins (schedules). DefaultPlugins adds these.
 struct SceneLoadingPlugin : Plugin
 {
     void configureSchedules(App& app) override;

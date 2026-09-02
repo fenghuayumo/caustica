@@ -1,3 +1,4 @@
+#include <engine/Input.h>
 #include <engine/ScenePlugins.h>
 
 #include <engine/App.h>
@@ -146,6 +147,7 @@ void CameraPlugin::configureSchedules(App& app)
     app.addSystem<system_label::SceneUpdateCamera>(AppSchedule::update, [](SystemContext& ctx) {
         if (!ctx.windowFocused)
             return;
+        applyCameraWindowInput(ctx.app);
         updateCamera(ctx.app, ctx.deltaTimeSeconds);
     });
 

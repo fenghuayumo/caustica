@@ -103,33 +103,33 @@ void PropBase::Tick(double gameTime, float deltaTime)
         float rotateAroundRight = 0.0;
         float rotateAroundUp = 0.0;
 
-        auto IsDown = [&](int key) { return glfwGetKey( m_gameScene.GetGLFWWindow(), key ) == GLFW_PRESS; };
+        auto IsDown = [&](caustica::KeyCode key) { return m_gameScene.isKeyDown(key); };
 
         float moveSpeed = deltaTime;
-        if (IsDown(GLFW_KEY_LEFT_CONTROL) || IsDown(GLFW_KEY_RIGHT_CONTROL))
+        if (IsDown(Key::LeftControl) || IsDown(Key::RightControl))
             moveSpeed *= 0.1f;
-        if (IsDown(GLFW_KEY_LEFT_SHIFT) || IsDown(GLFW_KEY_RIGHT_SHIFT))
+        if (IsDown(Key::LeftShift) || IsDown(Key::RightShift))
             moveSpeed *= 10.0f;
         float rotateSpeed = moveSpeed;
 
-        bool rotateInsteadOfMove = IsDown(GLFW_KEY_RIGHT_ALT);
+        bool rotateInsteadOfMove = IsDown(Key::RightAlt);
         if (!rotateInsteadOfMove)
         {
-            if (IsDown(GLFW_KEY_KP_8))  forward += moveSpeed;
-            if (IsDown(GLFW_KEY_KP_2))  forward -= moveSpeed;
-            if (IsDown(GLFW_KEY_KP_4))  right -= moveSpeed;
-            if (IsDown(GLFW_KEY_KP_6))  right += moveSpeed;
-            if (IsDown(GLFW_KEY_KP_9))  up += moveSpeed;
-            if (IsDown(GLFW_KEY_KP_3))  up -= moveSpeed;
+            if (IsDown(Key::KP8))  forward += moveSpeed;
+            if (IsDown(Key::KP2))  forward -= moveSpeed;
+            if (IsDown(Key::KP4))  right -= moveSpeed;
+            if (IsDown(Key::KP6))  right += moveSpeed;
+            if (IsDown(Key::KP9))  up += moveSpeed;
+            if (IsDown(Key::KP3))  up -= moveSpeed;
         }
         else
         {
-            if (IsDown(GLFW_KEY_KP_8))  rotateAroundRight += rotateSpeed;
-            if (IsDown(GLFW_KEY_KP_2))  rotateAroundRight -= rotateSpeed;
-            if (IsDown(GLFW_KEY_KP_4))  rotateAroundUp += rotateSpeed;
-            if (IsDown(GLFW_KEY_KP_6))  rotateAroundUp -= rotateSpeed;
-            if (IsDown(GLFW_KEY_KP_7))  rotateAroundForward -= rotateSpeed;
-            if (IsDown(GLFW_KEY_KP_9))  rotateAroundForward += rotateSpeed;
+            if (IsDown(Key::KP8))  rotateAroundRight += rotateSpeed;
+            if (IsDown(Key::KP2))  rotateAroundRight -= rotateSpeed;
+            if (IsDown(Key::KP4))  rotateAroundUp += rotateSpeed;
+            if (IsDown(Key::KP6))  rotateAroundUp -= rotateSpeed;
+            if (IsDown(Key::KP7))  rotateAroundForward -= rotateSpeed;
+            if (IsDown(Key::KP9))  rotateAroundForward += rotateSpeed;
         }
 
         if (forward != 0 || right != 0 || up != 0)

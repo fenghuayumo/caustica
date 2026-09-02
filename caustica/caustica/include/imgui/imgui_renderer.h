@@ -173,7 +173,6 @@ namespace caustica
             bool compressed, float fontSize);
     };
 
-    // Forward GLFW-style input to ImGui (call from application event handlers).
-    void imGuiForwardKeyboard(int glfwKey, int action, int scancode);
-    void imGuiForwardInputCharacter(unsigned int codepoint);
+    // Apply this frame's engine InputState to ImGui (no native GLFW polling).
+    void imGuiApplyFrameInput(const struct InputState& input);
 }

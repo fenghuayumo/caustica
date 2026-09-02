@@ -599,6 +599,7 @@ endif()
 file(GLOB caus_engine_headers include/engine/*.h)
 file(GLOB caus_engine_internal_headers include/engine/internal/*.h)
 list(APPEND caus_engine_headers ${caus_engine_internal_headers})
+# Scene schedules are registered by DefaultPlugins (InputPlugin + CameraPlugin + ...).
 file(GLOB caus_engine_sources src/engine/*.cpp src/engine/*.c)
 if (NOT WIN32)
     list(FILTER caus_engine_sources EXCLUDE REGEX "SplashScreen\\.cpp$")

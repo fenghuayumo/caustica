@@ -6,6 +6,7 @@
 #include <imgui/imgui_renderer.h>
 
 #include <engine/App.h>
+#include <engine/Input.h>
 #include <engine/RenderFramebufferOverride.h>
 #include <engine/RenderSessionApi.h>
 #include <platform/window.h>
@@ -78,7 +79,11 @@ void EditorUISubsystem::animateScheduled(float elapsedTimeSeconds, bool windowFo
 
     auto& ui = static_cast<caustica::ImGui_Renderer&>(*m_ui);
     if (windowFocused || ui.shouldAnimateUnfocused())
+    {
+        if (const auto* input = m_config.app.tryResource<caustica::InputState>())
+            caustica::imGuiApplyFrameInput(*input);
         ui.animate(elapsedTimeSeconds);
+    }
 }
 
 void EditorUISubsystem::prepareViewportForRender(caustica::GpuDevice& gpuDevice)

@@ -99,11 +99,14 @@ struct PresentRuntimeInfo
     uint32_t backBufferCount = 0;
 };
 
+// Create a platform window from device/window fields. GpuDevice::create does not own windows.
+[[nodiscard]] std::unique_ptr<Window> createGpuWindow(const GpuDeviceCreateDesc& desc);
+
 class GpuDevice
 {
 public:
-    // Instance → adapter → device → optional surface / headless targets.
-    static GpuDeviceCreateResult create(const GpuDeviceCreateDesc& desc);
+    // Logical GPU + presentation surface. Windowed mode requires an already-created Window.
+    static GpuDeviceCreateResult create(const GpuDeviceCreateDesc& desc, Window* window = nullptr);
 
     static bool enumerateAvailableAdapters(
         caustica::rhi::GraphicsAPI api,
@@ -278,7 +281,6 @@ private:
 struct GpuDeviceCreateResult
 {
     std::unique_ptr<GpuDevice> gpuDevice;
-    std::unique_ptr<Window> window;
     std::unique_ptr<GpuSurface> surface;
 };
 

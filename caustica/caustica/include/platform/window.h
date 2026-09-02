@@ -1,10 +1,13 @@
 #pragma once
 
+#include <events/event.h>
+
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
-#include <array>
-#include <functional>
-#include <cstdint>
 
 namespace caustica
 {
@@ -55,7 +58,7 @@ struct WindowDesc
 class Window
 {
 public:
-    using EventCallbackFn = std::function<void(Event&)>;
+    using EventCallbackFn = std::function<void(std::unique_ptr<Event>)>;
     using FileDropCallbackFn = std::function<void(int count, const char** paths)>;
 
     // Factory
@@ -95,12 +98,8 @@ public:
     virtual void setMousePosition(float x, float y)        {}
     virtual void setIcon(const WindowDesc& desc)           = 0;
 
-    // --- Per-frame updates ---
     virtual void onUpdate()           = 0;
-    virtual void processInput()       {}
-    virtual void updateCursorImgui()  = 0;
 
-    // --- Event callback (set by the engine frame owner) ---
     virtual void setEventCallback(const EventCallbackFn& callback) = 0;
 
     // --- File drag-and-drop (GLFW-backed windows only) ---

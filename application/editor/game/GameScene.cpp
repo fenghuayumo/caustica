@@ -19,9 +19,9 @@
 #include "SceneEditor.h"
 
 #include <engine/App.h>
+#include <engine/Input.h>
 #include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
-#include <platform/glfw_window.h>
 #include <render/passes/debug/Korgi.h>
 #include <json/json.h>
 
@@ -70,11 +70,12 @@ GameScene::GameScene(caustica::editor::SceneEditor& editor, const caustica::edit
 {
 }
 
-GLFWwindow* GameScene::GetGLFWWindow() const
+bool GameScene::isKeyDown(caustica::KeyCode key) const
 {
     if (!m_editor.app())
-        return nullptr;
-    return nativeGlfwWindow(m_editor.app()->getWindow());
+        return false;
+    const auto* input = m_editor.app()->tryResource<caustica::InputState>();
+    return input && input->keyDown(key);
 }
 
 caustica::scene::SceneEntityWorld* GameScene::entityWorld() const

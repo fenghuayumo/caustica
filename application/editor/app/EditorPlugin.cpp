@@ -1,8 +1,10 @@
 #include "EditorPlugin.h"
 #include "EditorSystemLabels.h"
+#include "EditorInputRouter.h"
 #include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
+#include <engine/Input.h>
 #include <engine/SceneQuery.h>
 #include <events/event.h>
 #include <engine/SceneLifecycle.h>
@@ -22,6 +24,14 @@ void EditorPlugin::build(App& app)
     app.insertResourceRef(m_sceneEditor.editorCameraState());
     app.insertResourceRef(m_sceneEditor.uiData());
 
+    if (auto* cameraConfig = app.tryResource<CameraInputConfig>())
+    {
+        cameraConfig->flyRequiresRightMouse = true;
+        cameraConfig->lookWithAltLeft = true;
+        cameraConfig->lookWithRightMouse = false;
+        cameraConfig->panWithMiddleMouse = true;
+    }
+
     if (uiConfig)
     {
         auto& ui = app.emplaceResource<EditorUISubsystem>(*uiConfig);
@@ -38,7 +48,6 @@ void EditorPlugin::configureSchedules(App& app)
     // Scene.Startup callbacks are owned by EngineAppDesc / SceneRuntimePlugin.
     // EditorPlugin only registers editor Pre/Post startup around that system.
     registerEditorSceneStartup(app, EditorSceneStartupConfig{
-        .appConfig = appConfig,
         .sceneEditor = &m_sceneEditor,
     });
 
@@ -48,6 +57,12 @@ void EditorPlugin::configureSchedules(App& app)
 
 void EditorPlugin::configureLateSchedules(App& app)
 {
+    app.addSystemAfter<system_label::EditorCameraInputGate, caustica::system_label::PrepareSimulation>(
+        AppSchedule::preUpdate,
+        [this](SystemContext& ctx) {
+            updateEditorCameraInputGate(m_sceneEditor, ctx.app);
+        });
+
     app.addSystemBefore<system_label::EditorSceneBeginFrame, caustica::system_label::SceneBeginFrame>(
         AppSchedule::First,
         [](SystemContext& ctx) {

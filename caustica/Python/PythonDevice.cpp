@@ -238,15 +238,25 @@ namespace caustica_py
         createDesc.d3d12DeviceFactory = m_d3d12DeviceFactory.Get();
 #endif
 
-        caustica::GpuDeviceCreateResult result = caustica::GpuDevice::create(createDesc);
-        if (!result.gpuDevice || !result.surface || (!headless && !result.window))
+        if (!headless)
+        {
+            m_window = caustica::createGpuWindow(createDesc);
+            if (!m_window)
+            {
+                caustica::error("caustica.Device: failed to create window");
+                return false;
+            }
+        }
+
+        caustica::GpuDeviceCreateResult result = caustica::GpuDevice::create(createDesc, m_window.get());
+        if (!result.gpuDevice || !result.surface)
         {
             caustica::error("caustica.Device: failed to create GPU device / surface");
+            m_window.reset();
             return false;
         }
 
         m_gpu = std::move(result.gpuDevice);
-        m_window = std::move(result.window);
         m_surface = std::move(result.surface);
         m_width = width;
         m_height = height;

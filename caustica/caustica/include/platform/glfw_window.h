@@ -45,8 +45,6 @@ public:
     void setIcon(const WindowDesc& desc) override;
 
     void onUpdate() override;
-    void processInput() override;
-    void updateCursorImgui() override;
 
     void setEventCallback(const EventCallbackFn& callback) override;
 

@@ -11,9 +11,11 @@
 #include <engine/SceneLifecycle.h>
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
+#include <engine/SceneViewState.h>
 #include <engine/SystemLabels.h>
 #include <scene/SceneManager.h>
 
+#include <core/command_line.h>
 #include <core/log.h>
 #include <core/path_utils.h>
 #include <render/core/RenderSceneTypeFactory.h>
@@ -23,7 +25,7 @@
 namespace caustica
 {
 
-void initializeSceneApp(App& app, const SceneAppConfig& config)
+void initializeSceneApp(App& app)
 {
     GpuDevice* gpuDevice = app.getGpuDevice();
     auto* assetSystem = app.tryResource<AssetSystem>();
@@ -32,21 +34,23 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     auto* sceneSession = app.tryResource<SceneSession>();
     auto* worldRenderer = app.tryResource<render::WorldRenderer>();
     auto* gpuRenderSubsystem = app.tryResource<GpuRenderSubsystem>();
+    auto* bootstrap = app.tryResource<EngineBootstrap>();
+    auto* viewState = app.tryResource<SceneViewState>();
+    auto* diagnostics = app.tryResource<render::AppDiagnostics>();
+    auto* renderState = app.tryResource<render::RenderAppState>();
     if (!gpuDevice || !assetSystem || !gpuSharedCaches || !cam || !sceneSession
-        || !worldRenderer || !gpuRenderSubsystem)
+        || !worldRenderer || !gpuRenderSubsystem || !bootstrap || !viewState
+        || !diagnostics || !renderState)
         return;
 
-    SceneViewState& viewState = config.viewState;
-
     caustica::initStreamlineAndWindow(app);
-    assert(config.renderState && "SceneAppConfig.renderState is required for scene GPU bootstrap");
 
     EngineSceneCallbacks sceneCallbacks{
         .OnSceneLoaded = [&app]() { caustica::onSceneLoaded(app); },
         .OnSceneUnloading = [&app]() { caustica::onSceneUnloading(app); },
     };
-    if (config.hasSceneCallbacks)
-        sceneCallbacks = config.sceneCallbacks;
+    if (bootstrap->hasSceneCallbacks)
+        sceneCallbacks = bootstrap->sceneCallbacks;
 
     if (!gpuSharedCaches->initialize(*gpuDevice, *assetSystem))
     {
@@ -56,7 +60,6 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 
     cam->camera().setRotateSpeed(.003f);
 
-    // Commit ActiveScene before host/editor loaded callbacks so early hooks see SSOT.
     auto onLoadedCb = std::move(sceneCallbacks.OnSceneLoaded);
     auto onUnloadingCb = std::move(sceneCallbacks.OnSceneUnloading);
     auto onLoaded = [onLoadedCb = std::move(onLoadedCb), &app]() {
@@ -83,22 +86,22 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
 
     if (sceneSession->manager)
     {
-        sceneSession->manager->setLoadFailedCallback([&app, &viewState]() {
+        sceneSession->manager->setLoadFailedCallback([&app, viewState]() {
             caustica::error("Scene load failed");
             clearActiveScene(app);
-            viewState.progressLoading.stop();
-            viewState.loadSession.reset();
-            viewState.sceneGpuSuspended.store(false, std::memory_order_release);
+            viewState->progressLoading.stop();
+            viewState->loadSession.reset();
+            viewState->sceneGpuSuspended.store(false, std::memory_order_release);
         });
     }
 
     if (!worldRenderer->create(render::WorldRenderer::createParams{
             .gpuDevice = *gpuDevice,
             .gpuSharedCaches = *gpuSharedCaches,
-            .settings = config.renderState->settings,
-            .runtimeState = config.renderState->runtime,
-            .diagnostics = config.diagnostics,
-            .sceneTime = viewState.sceneTime,
+            .settings = renderState->settings,
+            .runtimeState = renderState->runtime,
+            .diagnostics = *diagnostics,
+            .sceneTime = viewState->sceneTime,
         }))
     {
         caustica::error("WorldRenderer::create failed");
@@ -112,9 +115,9 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
             .gpuSharedCaches = *gpuSharedCaches,
             .sceneSession = *sceneSession,
             .worldRenderer = *worldRenderer,
-            .settings = config.renderState->settings,
-            .runtimeState = config.renderState->runtime,
-            .diagnostics = config.diagnostics,
+            .settings = renderState->settings,
+            .runtimeState = renderState->runtime,
+            .diagnostics = *diagnostics,
         }))
     {
         caustica::error("GpuRenderSubsystem::initialize failed");
@@ -122,23 +125,25 @@ void initializeSceneApp(App& app, const SceneAppConfig& config)
     }
 
     caustica::bindCameraControllerSideEffects(app);
-    caustica::initializeScene(app, config.preferredScene);
+    caustica::initializeScene(app, bootstrap->preferredScene);
 
-    if (config.refreshEnvMapMediaList)
+    if (bootstrap->refreshEnvMapMediaList)
     {
         worldRenderer->lightingPasses().refreshEnvironmentMapMediaList(
             getLocalPath(c_AssetsFolder), std::filesystem::path());
     }
 
-    if (config.renderState && config.cmdLine && config.applyCmdLineToRenderState)
-        render::InitializeRenderAppStateFromCommandLine(*config.renderState, *config.cmdLine);
+    if (bootstrap->applyRenderCli)
+    {
+        if (const CommandLineOptions* cmd = app.tryResource<CommandLineOptions>())
+            render::InitializeRenderAppStateFromCommandLine(*renderState, *cmd);
+    }
 }
 
-void registerSceneStartup(App& app, const SceneAppConfig& config)
+void registerSceneStartup(App& app)
 {
-    app.addSystem<system_label::SceneStartup>(AppSchedule::Startup, [&app, config](SystemContext& ctx) {
-        (void)ctx;
-        initializeSceneApp(app, config);
+    app.addSystem<system_label::SceneStartup>(AppSchedule::Startup, [](SystemContext& ctx) {
+        initializeSceneApp(ctx.app);
     });
 }
 
@@ -147,8 +152,6 @@ void registerGpuRenderShutdown(App& app)
     app.addSystem<system_label::GpuRenderShutdown>(AppSchedule::shutdown, [](SystemContext& ctx) {
         if (auto* gpuRender = ctx.tryRes<GpuRenderSubsystem>())
             gpuRender->shutdown();
-        // SceneSession reset drops SceneManager's scene, but ActiveScene may still
-        // keep the Scene (+ TextureLoader) alive until AssetSystemShutdown.
         clearActiveScene(ctx.app);
     });
 }

@@ -9,6 +9,8 @@
 #include "GameModel.h"
 #include "GameProps.h"
 
+#include <events/key_codes.h>
+
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -17,8 +19,6 @@
 #ifdef _DEBUG
 #define GAME_DEVELOPER_SETTINGS
 #endif
-
-struct GLFWwindow;
 
 namespace caustica::editor { class SceneEditor; }
 
@@ -64,7 +64,7 @@ public:
     std::shared_ptr<demo::PropBase>
                             GetSelectedProp() const { return m_selectedProp.lock(); }
 
-    GLFWwindow *            GetGLFWWindow() const;
+    [[nodiscard]] bool      isKeyDown(caustica::KeyCode key) const;
 
     const std::vector<demo::Pose> & GetCamRecAnimation() const { return m_recordedCameraPoses; }
 

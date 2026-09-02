@@ -32,6 +32,7 @@ struct CaptureScriptState
 
 struct SelectionState
 {
+    SelectionState() = default;
     explicit SelectionState(EditorUIState& editorUi)
         : editor(&editorUi)
     {
@@ -47,6 +48,7 @@ struct SelectionState
 
 struct EditorCameraState
 {
+    EditorCameraState() = default;
     explicit EditorCameraState(SceneViewState& sceneViewState)
         : viewState(&sceneViewState)
     {

@@ -41,9 +41,6 @@ enum class EventType : uint16_t
     WindowLostFocus,
     WindowMoved,
     WindowIconify,
-    AppTick,
-    AppUpdate,
-    AppRender,
 
     // --- Sentinel ---
     Count

@@ -7,10 +7,10 @@
 #include "EditorUIState.h"
 #include <engine/RenderSessionApi.h>
 #include <engine/CameraApi.h>
+#include <engine/Input.h>
+#include <engine/App.h>
 
 #include <backend/GpuDevice.h>
-#include <platform/glfw_window.h>
-#include <GLFW/glfw3.h>
 #include <core/log.h>
 #include <ecs/Entity.h>
 #include <events/event.h>
@@ -18,7 +18,6 @@
 #include <events/mouse_event.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
-#include <imgui/imgui_renderer.h>
 #include <render/RenderAppState.h>
 #include "game/GameScene.h"
 #include <render/passes/debug/ZoomTool.h>
@@ -39,25 +38,20 @@ bool mouseInViewportCanvas(const SceneEditor& sceneEditor, double cursorX, doubl
         && cursorY < static_cast<double>(vp.PosY + vp.SizeY);
 }
 
-GLFWwindow* editorGlfwWindow(const SceneEditor& sceneEditor)
+const InputState* editorInput(const SceneEditor& sceneEditor)
 {
     if (!sceneEditor.app())
         return nullptr;
-    return nativeGlfwWindow(sceneEditor.app()->getWindow());
+    return sceneEditor.app()->tryResource<InputState>();
 }
 
 bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
 {
     const auto& vp = sceneEditor.editorUIState().Viewport;
-    GLFWwindow* window = editorGlfwWindow(sceneEditor);
-    double cursorX = 0.0;
-    double cursorY = 0.0;
-    if (window)
-        glfwGetCursorPos(window, &cursorX, &cursorY);
+    const InputState* input = editorInput(sceneEditor);
+    const double cursorX = input ? input->cursor.x : 0.0;
+    const double cursorY = input ? input->cursor.y : 0.0;
 
-    // Hit-test the canvas rect at event time. Viewport.Hovered is from last UI
-    // frame and is often false: no InvisibleButton, and ImGuizmo BeginFrame's
-    // NoInputs window can become HoveredWindow.
     if (mouseInViewportCanvas(sceneEditor, cursorX, cursorY) && !vp.OverlayHovered)
         return false;
 
@@ -73,28 +67,9 @@ inline constexpr int cGlfwPress = 1;
 inline constexpr int cGlfwRelease = 0;
 inline constexpr int cGlfwRepeat = 2;
 
-// WASD/QE/ZC only apply while RMB is held (fly mode). Arrow keys stay free for pan.
-bool isCameraFlyKey(int key)
-{
-    return key == ToGlfwKey(caustica::Key::W)
-        || key == ToGlfwKey(caustica::Key::A)
-        || key == ToGlfwKey(caustica::Key::S)
-        || key == ToGlfwKey(caustica::Key::D)
-        || key == ToGlfwKey(caustica::Key::Q)
-        || key == ToGlfwKey(caustica::Key::E)
-        || key == ToGlfwKey(caustica::Key::Z)
-        || key == ToGlfwKey(caustica::Key::C);
-}
-
-bool isRightMouseDown(SceneEditor& sceneEditor)
-{
-    GLFWwindow* window = editorGlfwWindow(sceneEditor);
-    return window && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-}
-
 bool altHeld(int mods)
 {
-    return (mods & GLFW_MOD_ALT) != 0;
+    return (mods & static_cast<int>(ModifierKey::Alt)) != 0;
 }
 
 bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
@@ -103,12 +78,10 @@ bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
     if (vp.OverlayHovered)
         return false;
 
-    GLFWwindow* window = editorGlfwWindow(sceneEditor);
-    double cursorX = 0.0;
-    double cursorY = 0.0;
-    if (window)
-        glfwGetCursorPos(window, &cursorX, &cursorY);
-    return mouseInViewportCanvas(sceneEditor, cursorX, cursorY);
+    const InputState* input = editorInput(sceneEditor);
+    if (!input)
+        return false;
+    return mouseInViewportCanvas(sceneEditor, input->cursor.x, input->cursor.y);
 }
 
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
@@ -159,13 +132,12 @@ void requestInstancePick(SceneEditor& sceneEditor)
 void syncPickPositionFromCursor(SceneEditor& sceneEditor)
 {
     auto& session = sceneEditor.renderAppState();
-    GLFWwindow* window = editorGlfwWindow(sceneEditor);
-    if (!window)
+    const InputState* input = editorInput(sceneEditor);
+    if (!input)
         return;
 
-    double cursorX = 0.0;
-    double cursorY = 0.0;
-    glfwGetCursorPos(window, &cursorX, &cursorY);
+    double cursorX = input->cursor.x;
+    double cursorY = input->cursor.y;
 
     // Map window cursor into viewport-local display pixels when the true viewport is active.
     // Path-trace pick pixels are derived later from this frame's settled renderSize (after DLSS).
@@ -192,8 +164,6 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     const int key = ToGlfwKey(e.getKeyCode());
     const int mods = ToGlfwMods(e.getModifiers());
     const int action = e.isRepeat() ? cGlfwRepeat : cGlfwPress;
-
-    imGuiForwardKeyboard(key, action, e.getScancode());
 
     const bool ctrlDown = (mods & ToGlfwMods(caustica::ModifierKey::Control)) != 0;
     const bool shiftDown = (mods & ToGlfwMods(caustica::ModifierKey::Shift)) != 0;
@@ -289,16 +259,6 @@ bool onKeyPressed(SceneEditor& sceneEditor, caustica::KeyPressedEvent& e)
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
-    // WASD/QE fly only while RMB is held so Q/T/R/S gizmo hotkeys stay free.
-    if (!(game && game->CameraActive()))
-    {
-        if (!isCameraFlyKey(key) || isRightMouseDown(sceneEditor))
-        {
-            activateFreeCameraForInput(*app);
-            caustica::currentCamera(*app).keyboardUpdate(key, e.getScancode(), action, mods);
-        }
-    }
-
     if (game && game->keyboardUpdate(key, e.getScancode(), action, mods))
         return true;
 
@@ -334,7 +294,6 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
     const int key = ToGlfwKey(e.getKeyCode());
     const int mods = ToGlfwMods(e.getModifiers());
 
-    imGuiForwardKeyboard(key, cGlfwRelease, e.getScancode());
     if (ImGui::GetIO().WantCaptureKeyboard)
         return true;
 
@@ -347,11 +306,6 @@ bool onKeyReleased(SceneEditor& sceneEditor, caustica::KeyReleasedEvent& e)
 
     if (zoomTool && zoomTool->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
-    if (!(game && game->CameraActive()))
-    {
-        // Always accept releases so fly keys cannot stick after RMB-up.
-        caustica::currentCamera(*app).keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods);
-    }
     if (game && game->keyboardUpdate(key, e.getScancode(), cGlfwRelease, mods))
         return true;
     return true;
@@ -374,19 +328,12 @@ bool onKeyTyped(SceneEditor& sceneEditor, caustica::KeyTypedEvent& e)
         return true;
     }
 
-    imGuiForwardInputCharacter(cp);
     return ImGui::GetIO().WantTextInput;
 }
 
 bool onMouseMoved(SceneEditor& sceneEditor, caustica::MouseMovedEvent& e)
 {
-    App* app = sceneEditor.app();
     auto* game = sceneEditor.game().get();
-
-    // Always track cursor for look/pan deltas. Those modes only apply while
-    // their buttons are held, so this is safe over gizmos and side panels.
-    if (app && !(game && game->CameraActive()))
-        caustica::currentCamera(*app).mousePosUpdate(e.getX(), e.getY());
     if (game)
         game->mousePosUpdate(e.getX(), e.getY());
 
@@ -412,22 +359,15 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
     const int button = ToGlfwMouse(e.getButton());
     const int mods = ToGlfwMods(e.getModifiers());
     const bool isLeft = button == ToGlfwMouse(caustica::Mouse::Left);
-    const bool isMiddle = button == ToGlfwMouse(caustica::Mouse::Middle);
 
     auto* zoomTool = sceneEditor.zoomTool().get();
     auto* game = sceneEditor.game().get();
-    auto& session = sceneEditor.renderAppState();
     auto& editor = sceneEditor.editorUIState();
 
-    // Alt+LMB looks, including over transform gizmos, so grabbing a rotate
-    // axis cannot also tumble the camera. Plain LMB is pick / gizmo only.
+    // Alt+LMB is camera look (CameraPlugin). Do not pick under that chord.
     if (isLeft && altHeld(mods) && cursorInViewportForCamera(sceneEditor)
         && !(game && game->CameraActive()))
-    {
-        activateFreeCameraForInput(*app);
-        caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwPress, mods);
         return true;
-    }
 
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
@@ -444,14 +384,6 @@ bool onMouseButtonPressed(SceneEditor& sceneEditor, caustica::MouseButtonPressed
         return true;
     }
 
-    // MMB pans. RMB is fly (WASD), not look. LMB look requires Alt, above.
-    if (!(game && game->CameraActive()))
-    {
-        if (isLeft || isMiddle)
-            activateFreeCameraForInput(*app);
-        if (isMiddle)
-            caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwPress, mods);
-    }
     if (game)
         game->mouseButtonUpdate(button, cGlfwPress, mods);
     if (isLeft)
@@ -475,15 +407,6 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
     App* app = sceneEditor.app();
     auto* game = sceneEditor.game().get();
 
-    // Always clear look/pan so Alt+LMB cannot stick if release happens over a gizmo.
-    if (app && !(game && game->CameraActive()))
-    {
-        if (button != ToGlfwMouse(caustica::Mouse::Right))
-            caustica::currentCamera(*app).mouseButtonUpdate(button, cGlfwRelease, mods);
-        if (button == ToGlfwMouse(caustica::Mouse::Right))
-            caustica::currentCamera(*app).clearFlyKeyboardState();
-    }
-
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return false;
 
@@ -501,8 +424,6 @@ bool onMouseButtonReleased(SceneEditor& sceneEditor, caustica::MouseButtonReleas
 
 bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    io.AddMouseWheelEvent(static_cast<float>(e.getXOffset()), static_cast<float>(e.getYOffset()));
     if (uiCapturesMouseForEditor(sceneEditor) || gizmoCapturesInput(sceneEditor))
         return true;
 
@@ -511,22 +432,67 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     if (!app || (game && game->CameraActive()))
         return true;
 
-    // Alt + wheel: change fly speed. Plain wheel: dolly zoom in/out.
-    const bool altHeld = io.KeyAlt;
-    if (altHeld)
+    const InputState* input = editorInput(sceneEditor);
+    // Alt + wheel: change fly speed. Plain wheel is dolly (CameraPlugin).
+    if (ImGui::GetIO().KeyAlt || (input && input->alt()))
     {
         float& speed = sceneEditor.renderAppState().settings.CameraMoveSpeed;
         speed = std::clamp(speed * (1.0f + static_cast<float>(e.getYOffset()) * 0.1f), 0.01f, 100.f);
-    }
-    else
-    {
-        activateFreeCameraForInput(*app);
-        caustica::currentCamera(*app).mouseScrollUpdate(e.getXOffset(), e.getYOffset());
     }
     return true;
 }
 
 } // namespace
+
+void updateEditorCameraInputGate(SceneEditor& sceneEditor, App& app)
+{
+    auto* gate = app.tryResource<CameraInputGate>();
+    if (!gate)
+        return;
+
+    auto* game = sceneEditor.game().get();
+    if (game && game->CameraActive())
+    {
+        *gate = CameraInputGate{
+            .enabled = false,
+            .fly = false,
+            .look = false,
+            .pan = false,
+            .scroll = false,
+            .keyboard = false,
+        };
+        return;
+    }
+
+    const InputState* input = editorInput(sceneEditor);
+    const bool uiBlocks = uiCapturesMouseForEditor(sceneEditor);
+    const bool gizmoBlocks = gizmoCapturesInput(sceneEditor);
+    const bool inViewport = cursorInViewportForCamera(sceneEditor);
+    const bool alt = input && input->alt();
+    const bool rmb = input && input->mouse.pressed(Mouse::Right);
+    const bool lmb = input && input->mouse.pressed(Mouse::Left);
+    const bool mmb = input && input->mouse.pressed(Mouse::Middle);
+    const bool looking = alt && lmb;
+    const bool panning = mmb;
+    const bool flying = rmb;
+    const bool flyKey = input && (input->keyDown(Key::W) || input->keyDown(Key::A)
+        || input->keyDown(Key::S) || input->keyDown(Key::D)
+        || input->keyDown(Key::Q) || input->keyDown(Key::E)
+        || input->keyDown(Key::Z) || input->keyDown(Key::C));
+    const bool hasScroll = input && (input->scrollX != 0.0 || input->scrollY != 0.0);
+    const bool imguiWantsKeyboard = ImGui::GetCurrentContext()
+        && (ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantTextInput);
+
+    gate->enabled = true;
+    gate->fly = flying || (inViewport && !uiBlocks);
+    gate->look = looking || (inViewport && !uiBlocks && (!gizmoBlocks || alt));
+    gate->pan = panning || (inViewport && !uiBlocks && !gizmoBlocks);
+    gate->scroll = inViewport && !uiBlocks && !gizmoBlocks && !alt;
+    gate->keyboard = !imguiWantsKeyboard;
+
+    if (looking || panning || (flying && flyKey) || (gate->scroll && hasScroll))
+        activateFreeCameraForInput(app);
+}
 
 void EditorInputRouter::bind(SceneEditor& sceneEditor)
 {

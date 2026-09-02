@@ -10,6 +10,7 @@ struct EditorScenePostStartup { static constexpr const char* name = "EditorScene
 struct EditorUIStartup { static constexpr const char* name = "EditorUI.Startup"; };
 struct EditorUIShutdown { static constexpr const char* name = "EditorUI.shutdown"; };
 
+struct EditorCameraInputGate { static constexpr const char* name = "EditorCamera.InputGate"; };
 struct EditorSceneBeginFrame { static constexpr const char* name = "EditorScene.beginFrame"; };
 struct EditorSceneRequestUnfocusedRender { static constexpr const char* name = "EditorScene.RequestUnfocusedRender"; };
 struct EditorSceneAnimateBegin { static constexpr const char* name = "EditorScene.AnimateBegin"; };

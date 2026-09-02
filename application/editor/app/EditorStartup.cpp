@@ -72,41 +72,32 @@ namespace
 }
 
 bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
-    CommandLineOptions& cmdLine,
+    EngineAppDesc& desc,
     EditorCommandLine& editorCmdLine,
-    caustica::GpuDeviceCreateDesc& createDesc,
     std::string& preferredScene)
 {
-    ApplyDefaultWindowSizeForLargeDisplays(cmdLine);
+    ApplyDefaultWindowSizeForLargeDisplays(desc.cli);
+    desc.width = desc.cli.width;
+    desc.height = desc.cli.height;
 
     if (!editorCmdLine.parse(argc, argv))
         return false;
 
-    if (!cmdLine.initFromCommandLine(argc, argv))
+    if (!desc.cli.initFromCommandLine(argc, argv))
         return false;
 
-    if (cmdLine.noWindow)
-        cmdLine.nonInteractive = true;
+    if (desc.cli.noWindow)
+        desc.cli.nonInteractive = true;
 
-    ApplyHeadlessConsoleMode(cmdLine);
+    ApplyHeadlessConsoleMode(desc.cli);
 
-    if (!cmdLine.scene.empty())
-        preferredScene = cmdLine.scene;
-
-    if (cmdLine.debug)
-        createDesc.enableDebug = true;
-
-    createDesc.backBufferWidth = cmdLine.width;
-    createDesc.backBufferHeight = cmdLine.height;
-    createDesc.startFullscreen = cmdLine.fullscreen;
-    createDesc.startMaximized = !cmdLine.fullscreen;
-    std::string adapterError;
-    if (!caustica::rhi::parseAdapterSelector(cmdLine.gpu, createDesc.adapter, &adapterError))
-    {
-        caustica::error("Invalid --gpu selector '%s': %s", cmdLine.gpu.c_str(), adapterError.c_str());
+    if (!desc.applyCommandLine(desc.cli))
         return false;
-    }
 
+    if (!desc.cli.scene.empty())
+        preferredScene = desc.cli.scene;
+    desc.scene = preferredScene;
+    desc.maximized = !desc.fullscreen;
     return true;
 }
 

@@ -22,8 +22,6 @@ class GpuSurface
 public:
     static std::unique_ptr<GpuSurface> createWindowed(GpuDevice& device, Window& window);
     static std::unique_ptr<GpuSurface> createHeadless(GpuDevice& device);
-    // Swapchain already exists (injected device). Does not recreate it.
-    static std::unique_ptr<GpuSurface> adopt(GpuDevice& device, Window* window);
 
     ~GpuSurface();
 

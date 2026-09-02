@@ -28,6 +28,7 @@
 namespace caustica
 {
 class App;
+class EngineApp;
 class Event;
 class GpuDevice;
 } // namespace caustica
@@ -57,34 +58,36 @@ public:
     SceneEditor();
     ~SceneEditor();
 
-    [[nodiscard]] SceneViewState& viewState() { return m_viewState; }
-    [[nodiscard]] const SceneViewState& viewState() const { return m_viewState; }
+    void bindEngine(EngineApp& engine);
+
+    [[nodiscard]] SceneViewState& viewState();
+    [[nodiscard]] const SceneViewState& viewState() const;
 
     void setApp(App& app) { m_app = &app; }
     [[nodiscard]] App* app() const { return m_app; }
 
-    [[nodiscard]] render::RenderAppState& renderAppState() { return m_renderAppState; }
-    [[nodiscard]] const render::RenderAppState& renderAppState() const { return m_renderAppState; }
-    [[nodiscard]] PathTracerSettings& pathTracerSettings() { return m_settings; }
-    [[nodiscard]] const PathTracerSettings& pathTracerSettings() const { return m_settings; }
-    [[nodiscard]] render::RenderRuntimeState& renderRuntimeState() { return m_renderState; }
-    [[nodiscard]] const render::RenderRuntimeState& renderRuntimeState() const { return m_renderState; }
-    [[nodiscard]] CommandLineOptions& cmdLine() { return m_cmdLine; }
-    [[nodiscard]] const CommandLineOptions& cmdLine() const { return m_cmdLine; }
+    [[nodiscard]] render::RenderAppState& renderAppState();
+    [[nodiscard]] const render::RenderAppState& renderAppState() const;
+    [[nodiscard]] PathTracerSettings& pathTracerSettings();
+    [[nodiscard]] const PathTracerSettings& pathTracerSettings() const;
+    [[nodiscard]] render::RenderRuntimeState& renderRuntimeState();
+    [[nodiscard]] const render::RenderRuntimeState& renderRuntimeState() const;
+    [[nodiscard]] CommandLineOptions& cmdLine();
+    [[nodiscard]] const CommandLineOptions& cmdLine() const;
     [[nodiscard]] EditorCommandLine& editorCmdLine() { return m_editorCmdLine; }
     [[nodiscard]] const EditorCommandLine& editorCmdLine() const { return m_editorCmdLine; }
-    [[nodiscard]] render::AppDiagnostics& diagnostics() { return m_diagnostics; }
-    [[nodiscard]] const render::AppDiagnostics& diagnostics() const { return m_diagnostics; }
+    [[nodiscard]] render::AppDiagnostics& diagnostics();
+    [[nodiscard]] const render::AppDiagnostics& diagnostics() const;
 
     [[nodiscard]] RenderSettingsConsoleBinding* console() const { return m_console.get(); }
     void setConsole(std::unique_ptr<RenderSettingsConsoleBinding> console);
 
     const std::unique_ptr<::GameScene>& game() const { return m_game; }
 
-    EditorUIData& uiData() { return m_editorUiData; }
-    const EditorUIData& uiData() const { return m_editorUiData; }
-    EditorUIState& editorUIState() { return m_editor; }
-    const EditorUIState& editorUIState() const { return m_editor; }
+    EditorUIData& uiData() { return *m_editorUiData; }
+    const EditorUIData& uiData() const { return *m_editorUiData; }
+    EditorUIState& editorUIState() { return m_editorUiData->editor; }
+    const EditorUIState& editorUIState() const { return m_editorUiData->editor; }
     [[nodiscard]] EditorState& editorState() { return m_editorState; }
     [[nodiscard]] const EditorState& editorState() const { return m_editorState; }
     [[nodiscard]] CaptureScriptState& captureScriptState() { return m_captureScriptState; }
@@ -193,8 +196,8 @@ public:
         float timeSeconds,
         AnimationEvaluateMode mode = AnimationEvaluateMode::DiscontinuousSeek);
 
-    auto& uncompressedTextures() { return m_viewState.uncompressedTextures; }
-    [[nodiscard]] ProgressBar& loadingProgress() { return m_viewState.progressLoading; }
+    auto& uncompressedTextures() { return viewState().uncompressedTextures; }
+    [[nodiscard]] ProgressBar& loadingProgress() { return viewState().progressLoading; }
 
     const std::unique_ptr<::ZoomTool>& zoomTool() const { return m_zoomTool; }
     const std::unique_ptr<CaptureScriptManager>& captureScriptManager() const { return m_captureScriptManager; }
@@ -211,24 +214,14 @@ private:
     void onSceneLoadedAfterCollectTextures();
     void onSceneLoadedComplete();
 
-    // Owned editor lifetime (formerly EditorHost bag).
-    CommandLineOptions m_cmdLine;
     EditorCommandLine m_editorCmdLine;
-    EditorUIData m_editorUiData;
-    render::AppDiagnostics m_diagnostics;
+    std::unique_ptr<EditorUIData> m_editorUiData;
     std::unique_ptr<RenderSettingsConsoleBinding> m_console;
 
-    // Aliases into m_editorUiData for existing call sites.
-    render::RenderAppState& m_renderAppState;
-    PathTracerSettings& m_settings;
-    render::RenderRuntimeState& m_renderState;
-    EditorUIState& m_editor;
-
-    SceneViewState m_viewState;
-    EditorState m_editorState;
-
+    EngineApp* m_engine = nullptr;
     App* m_app = nullptr;
 
+    EditorState m_editorState;
     SelectionState m_selectionState;
     EditorCameraState m_editorCameraState;
 

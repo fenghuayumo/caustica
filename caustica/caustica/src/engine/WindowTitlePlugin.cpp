@@ -40,9 +40,6 @@ void WindowTitlePlugin::configureSchedules(App& app)
     app.addSystem<system_label::SceneUpdateWindowTitle>(
         AppSchedule::Startup,
         [](SystemContext& ctx) { updateWindowTitle(ctx.app); });
-    // Last DefaultPlugins scene-schedule member: mark after systems exist so
-    // App::buildPlugins skips the registerSceneSchedules fallback.
-    app.markSceneSchedulesRegistered();
 }
 
 } // namespace caustica

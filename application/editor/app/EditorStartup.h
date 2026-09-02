@@ -1,7 +1,6 @@
 #pragma once
 
-#include <backend/GpuDevice.h>
-#include <core/command_line.h>
+#include <engine/EngineApp.h>
 
 #include "EditorCommandLine.h"
 
@@ -10,11 +9,10 @@
 namespace caustica::editor
 {
 
-// Parses engine and editor command lines, applies host/console defaults, and fills GpuDeviceCreateDesc.
+// Parses engine and editor command lines into a single EngineAppDesc.
 bool ProcessEditorStartupCommandLine(int argc, char const* const* argv,
-    CommandLineOptions& cmdLine,
+    EngineAppDesc& desc,
     EditorCommandLine& editorCmdLine,
-    caustica::GpuDeviceCreateDesc& createDesc,
     std::string& preferredScene);
 
 } // namespace caustica::editor

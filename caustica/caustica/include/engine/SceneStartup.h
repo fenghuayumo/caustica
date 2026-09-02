@@ -3,13 +3,7 @@
 // ENGINE-INTERNAL — not part of the public API (see docs/public-api.md).
 // Hosts: EngineApp::create configures startup; do not call registerSceneAppResources yourself.
 
-#include <core/command_line.h>
-
 #include <engine/EngineSceneCallbacks.h>
-#include <engine/SceneViewState.h>
-
-#include <render/RenderAppState.h>
-#include <render/AppDiagnostics.h>
 
 #include <string>
 
@@ -18,23 +12,19 @@ namespace caustica
 
 class App;
 
-struct SceneAppConfig
+// Bootstrap values EngineApp inserts before DefaultPlugins. Startup reads these
+// instead of a parallel SceneAppConfig.
+struct EngineBootstrap
 {
-    SceneViewState& viewState;
-    render::AppDiagnostics& diagnostics;
-    std::string preferredScene;
-
-    render::RenderAppState* renderState = nullptr;
-    const CommandLineOptions* cmdLine = nullptr;
+    std::string preferredScene = "default.scene.json";
     bool refreshEnvMapMediaList = true;
-    bool applyCmdLineToRenderState = true;
+    bool applyRenderCli = true;
     bool hasSceneCallbacks = false;
     EngineSceneCallbacks sceneCallbacks{};
 };
 
-void initializeSceneApp(App& app, const SceneAppConfig& config);
-
-void registerSceneStartup(App& app, const SceneAppConfig& config);
+void initializeSceneApp(App& app);
+void registerSceneStartup(App& app);
 void registerGpuRenderShutdown(App& app);
 
 } // namespace caustica

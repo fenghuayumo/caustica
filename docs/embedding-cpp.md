@@ -81,10 +81,13 @@ Frequently used fields:
 | `runtimeDirectory` | auto | Directory containing cooked shaders and runtime libraries. |
 | `resourceRoot` | auto | Directory containing the `Assets/` pack folder. |
 | `assetPackRoot` | auto | Direct path to the asset pack (`CAUSTICA_ASSETS_DIR` / `--assets`). |
-| `device`, `window` | `nullptr` | Inject host-owned objects; `EngineApp` does not take ownership. |
+| `device`, `window`, `surface` | `nullptr` | Borrow an existing GPU trio (Python Device-outlives-App). All three must be set together; `EngineApp` does not take ownership. |
+| `cli` | `{}` | Snapshot of parsed CLI. Copied into the engine; do not keep a second live copy on the host. |
+| `fromArgv(argc, argv)` | — | Parse argv into a desc. CLI apps should start here instead of filling overlapping structs. |
 
-`viewState`, `diagnostics`, `renderState`, and `cmdLine` can point to host-owned
-state. `preGpuDeviceInit` runs just before an owned device is created.
+`EngineApp` owns `viewState`, `diagnostics`, and `renderAppState`. Bind host references after `create` (the editor does this with `SceneEditor::bindEngine`). `preGpuDeviceInit` runs just before an owned device is created.
+
+Windowed create order is Window → Device(bind) → Surface. `GpuDevice::create` does not create a window.
 
 ## Registering simulation systems
 

@@ -1,7 +1,7 @@
 #include <imgui/imgui_renderer.h>
 #include <backend/GpuSurface.h>
 #include <core/vfs/VFS.h>
-#include <platform/glfw_window.h>
+#include <engine/Input.h>
 #include <platform/window.h>
 
 #define GLFW_INCLUDE_NONE
@@ -157,12 +157,13 @@ static ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int keycode)
 // Also copied from imgui_impl_glfw.cpp
 // X11 does not include current pressed/released modifier key in 'mods' flags submitted by GLFW
 // See https://github.com/ocornut/imgui/issues/6034 and https://github.com/glfw/glfw/issues/1630
-static void ImGui_ImplGlfw_UpdateKeyModifiers(ImGuiIO& io, GLFWwindow* window)
+static void ImGui_ApplyKeyModifiers(ImGuiIO& io, const InputState& input)
 {
-    io.AddKeyEvent(ImGuiMod_Ctrl,  (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS));
-    io.AddKeyEvent(ImGuiMod_Shift, (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)   == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT)   == GLFW_PRESS));
-    io.AddKeyEvent(ImGuiMod_Alt,   (glfwGetKey(window, GLFW_KEY_LEFT_ALT)     == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_ALT)     == GLFW_PRESS));
-    io.AddKeyEvent(ImGuiMod_Super, (glfwGetKey(window, GLFW_KEY_LEFT_SUPER)   == GLFW_PRESS) || (glfwGetKey(window, GLFW_KEY_RIGHT_SUPER)   == GLFW_PRESS));
+    io.AddKeyEvent(ImGuiMod_Ctrl, input.control());
+    io.AddKeyEvent(ImGuiMod_Shift, input.shift());
+    io.AddKeyEvent(ImGuiMod_Alt, input.alt());
+    io.AddKeyEvent(ImGuiMod_Super,
+        input.keys.pressed(Key::LeftSuper) || input.keys.pressed(Key::RightSuper));
 }
 
 bool ImGui_Renderer::init(std::shared_ptr<ShaderFactory> shaderFactory)
@@ -277,14 +278,12 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
     float scaleY = 1.f;
     int w = 0;
     int h = 0;
-    Window* platformWindow = nullptr;
     if (GpuDevice* gpuDevice = getGpuDevice())
     {
         if (GpuSurface* gpuSurface = gpuDevice->surface())
         {
             gpuSurface->getDpiScale(scaleX, scaleY);
             gpuSurface->getWindowDimensions(w, h);
-            platformWindow = gpuSurface->window();
         }
     }
 
@@ -306,19 +305,6 @@ void ImGui_Renderer::prepareImGuiFrame(float elapsedTimeSeconds)
 
     io.DeltaTime = (elapsedTimeSeconds > 0.0f) ? elapsedTimeSeconds : (1.0f / 60.0f);
     io.MouseDrawCursor = false;
-
-    GLFWwindow* glfwWindow = nativeGlfwWindow(platformWindow);
-    if (glfwWindow)
-    {
-        ImGui_ImplGlfw_UpdateKeyModifiers(io, glfwWindow);
-
-        double mouseX, mouseY;
-        glfwGetCursorPos(glfwWindow, &mouseX, &mouseY);
-        io.AddMousePosEvent((float)mouseX, (float)mouseY);
-
-        for (int i = 0; i < ImGuiMouseButton_COUNT; i++)
-            io.AddMouseButtonEvent(i, glfwGetMouseButton(glfwWindow, i) == GLFW_PRESS);
-    }
 
     ImGui::NewFrame();
     m_imguiFrameOpened = true;
@@ -427,20 +413,30 @@ void RegisteredFont::releaseScaledFont()
     m_imFont = nullptr;
 }
 
-void caustica::imGuiForwardKeyboard(int glfwKey, int action, int /*scancode*/)
+void caustica::imGuiApplyFrameInput(const InputState& input)
 {
-    if (action == GLFW_REPEAT)
+    if (!ImGui::GetCurrentContext())
         return;
 
     ImGuiIO& io = ImGui::GetIO();
-    const ImGuiKey imguiKey = ImGui_ImplGlfw_KeyToImGuiKey(glfwKey);
-    if (imguiKey == ImGuiKey_None)
-        return;
+    ImGui_ApplyKeyModifiers(io, input);
+    io.AddMousePosEvent(static_cast<float>(input.cursor.x), static_cast<float>(input.cursor.y));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Left, input.mouse.pressed(Mouse::Left));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Right, input.mouse.pressed(Mouse::Right));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Middle, input.mouse.pressed(Mouse::Middle));
+    io.AddMouseWheelEvent(static_cast<float>(input.scrollX), static_cast<float>(input.scrollY));
 
-    io.AddKeyEvent(imguiKey, action != GLFW_RELEASE);
-}
+    input.keys.forEachJustPressed([&](KeyCode key) {
+        const ImGuiKey imguiKey = ImGui_ImplGlfw_KeyToImGuiKey(static_cast<int>(key));
+        if (imguiKey != ImGuiKey_None)
+            io.AddKeyEvent(imguiKey, true);
+    });
+    input.keys.forEachJustReleased([&](KeyCode key) {
+        const ImGuiKey imguiKey = ImGui_ImplGlfw_KeyToImGuiKey(static_cast<int>(key));
+        if (imguiKey != ImGuiKey_None)
+            io.AddKeyEvent(imguiKey, false);
+    });
 
-void caustica::imGuiForwardInputCharacter(unsigned int codepoint)
-{
-    ImGui::GetIO().AddInputCharacter(codepoint);
+    for (unsigned int codepoint : input.text)
+        io.AddInputCharacter(codepoint);
 }
