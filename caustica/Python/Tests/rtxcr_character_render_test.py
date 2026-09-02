@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import traceback
 from pathlib import Path
@@ -20,11 +21,11 @@ def full_roi(width: int, height: int) -> list[int]:
     return [y * width + x for y in range(height) for x in range(width)]
 
 
-def configure_renderer(renderer: object, spp: int) -> None:
-    renderer.set_camera((0.0, 1.30, 5.2), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
-    renderer.set_camera_fov(27.5)
-    renderer.app.set_reference_mode(spp=spp, oidn=False)
-    settings = renderer.settings
+def configure_engine(engine: object, spp: int) -> None:
+    engine.set_camera_pos_dir_up((0.0, 1.30, 5.2), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
+    engine.set_camera_vertical_fov(math.radians(27.5))
+    engine.set_reference_mode(spp=spp, oidn=False)
+    settings = engine.settings
     settings.bounce_count = 8
     settings.use_nee = True
     settings.use_restir_di = False
@@ -33,8 +34,8 @@ def configure_renderer(renderer: object, spp: int) -> None:
     settings.enable_bloom = False
 
 
-def cached_materials(renderer: object) -> dict[str, object]:
-    materials = [renderer.app.find_material_by_id(index) for index in range(32)]
+def cached_materials(engine: object) -> dict[str, object]:
+    materials = [engine.find_material(index) for index in range(32)]
     return {material.name: material for material in materials if material is not None}
 
 
@@ -62,38 +63,38 @@ def main() -> int:
         prefab = (entity.get("components") or {}).get("PrefabInstance")
         if prefab is not None:
             prefab["source"] = str(skin_model)
-    with caustica.Renderer(
+    with caustica.EngineApp.create(
         width=args.width,
         height=args.height,
         headless=True,
         scene=json.dumps(skin_only_scene),
         realtime=False,
         accumulation_target=args.spp,
-    ) as renderer:
-        if not renderer.scene_ready and not renderer.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
+    ) as engine:
+        if not engine.is_scene_ready and not engine.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
             raise RuntimeError("RTXCR skin-only validation scene did not become ready")
-        configure_renderer(renderer, args.spp)
-        skin = cached_materials(renderer).get("ValidationSkin")
+        configure_engine(engine, args.spp)
+        skin = cached_materials(engine).get("ValidationSkin")
         if skin is None:
             raise RuntimeError("skin-only validation material unavailable")
         skin.subsurface_weight = 1.0
         skin.mark_dirty()
-        skin_only = render(renderer, args.output_dir / "character_skin_only.png", args.spp)
+        skin_only = render(engine, args.output_dir / "character_skin_only.png", args.spp)
 
-    with caustica.Renderer(
+    with caustica.EngineApp.create(
         width=args.width,
         height=args.height,
         headless=True,
         scene=str(scene),
         realtime=False,
         accumulation_target=args.spp,
-    ) as renderer:
-        if not renderer.scene_ready and not renderer.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
+    ) as engine:
+        if not engine.is_scene_ready and not engine.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
             raise RuntimeError("RTXCR character validation scene did not become ready")
 
-        configure_renderer(renderer, args.spp)
+        configure_engine(engine, args.spp)
 
-        material_by_name = cached_materials(renderer)
+        material_by_name = cached_materials(engine)
         skin = material_by_name.get("ValidationSkin")
         hair = material_by_name.get("ValidationHair")
         if skin is None or hair is None:
@@ -108,11 +109,11 @@ def main() -> int:
 
         skin.subsurface_weight = 0.0
         skin.mark_dirty()
-        skin_off = render(renderer, args.output_dir / "character_skin_off.png", args.spp)
+        skin_off = render(engine, args.output_dir / "character_skin_off.png", args.spp)
 
         skin.subsurface_weight = 1.0
         skin.mark_dirty()
-        combined = render(renderer, args.output_dir / "character_skin_hair.png", args.spp)
+        combined = render(engine, args.output_dir / "character_skin_hair.png", args.spp)
 
         roi = full_roi(args.width, args.height)
         _, skin_mae, _ = compare_roi(skin_off, combined, roi)

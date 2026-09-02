@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 from _common import (
@@ -34,7 +35,7 @@ from _common import (
     apply_realtime_mode,
     apply_reference_mode,
     import_caustica,
-    make_renderer,
+    make_engine,
     normalize,
     render_reference_to,
     require_input_file,
@@ -66,7 +67,7 @@ PLY_HINT = (
 # --------------------------------------------------------------------------
 
 
-def aim_camera_at_ply(renderer, args: argparse.Namespace, ply_path: Path) -> None:
+def aim_camera_at_ply(engine, args: argparse.Namespace, ply_path: Path) -> None:
     center, extents, vertex_count = read_ply_bounds(
         ply_path, convert_rdf_to_rub=args.rdf_to_rub, sample_cap=args.sample_cap
     )
@@ -82,13 +83,13 @@ def aim_camera_at_ply(renderer, args: argparse.Namespace, ply_path: Path) -> Non
 
     print(f"[caustica] PLY vertices={vertex_count} center={center} extents={extents}")
     print(f"[caustica] camera pos={cam_pos} dir={cam_dir}")
-    renderer.set_camera(cam_pos, cam_dir, cam_up)
-    renderer.set_camera_fov(args.fov)
+    engine.set_camera_pos_dir_up(cam_pos, cam_dir, cam_up)
+    engine.set_camera_vertical_fov(math.radians(args.fov))
 
 
-def open_splat_renderer(caustica, args, ply_path: Path, *, realtime: bool, headless: bool):
-    """Create a renderer on the splat-only scene and append the .ply."""
-    renderer = make_renderer(
+def open_splat_engine(caustica, args, ply_path: Path, *, realtime: bool, headless: bool):
+    """Create an EngineApp on the splat-only scene and append the .ply."""
+    engine = make_engine(
         caustica,
         args,
         scene=args.scene or create_splat_only_scene(),
@@ -96,10 +97,10 @@ def open_splat_renderer(caustica, args, ply_path: Path, *, realtime: bool, headl
         headless=headless,
         accumulation_target=args.spp if not realtime else 1,
     )
-    if not renderer.load_gaussian_splats(str(ply_path), args.rdf_to_rub):
-        renderer.close()
+    if not engine.load_gaussian_splat_file(str(ply_path), args.rdf_to_rub):
+        engine.shutdown()
         raise SystemExit(f"Failed to load Gaussian splats: {ply_path}")
-    return renderer
+    return engine
 
 
 def run_view(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
@@ -107,43 +108,43 @@ def run_view(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
     print(f"[caustica] mode={args.mode} ply={ply_path}")
 
     if args.mode == "interactive":
-        with open_splat_renderer(
+        with open_splat_engine(
             caustica, args, ply_path, realtime=True, headless=False
-        ) as renderer:
-            apply_realtime_mode(renderer.app, caustica, "off")
-            apply_common_settings(renderer, caustica, bounces=args.bounces)
-            apply_gaussian_settings(caustica, renderer.settings, args)
-            aim_camera_at_ply(renderer, args, ply_path)
-            run_window_loop(renderer)
+        ) as engine:
+            apply_realtime_mode(engine, caustica, "off")
+            apply_common_settings(engine, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, engine.settings, args)
+            aim_camera_at_ply(engine, args, ply_path)
+            run_window_loop(engine)
         return 0
 
     out_dir = resolve_output_path(args.out_dir, launch_cwd)
     batch = args.mode == "batch"
 
     if args.mode in {"reference", "batch"}:
-        with open_splat_renderer(
+        with open_splat_engine(
             caustica, args, ply_path, realtime=False, headless=True
-        ) as renderer:
-            label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=True)
-            apply_common_settings(renderer, caustica, bounces=args.bounces)
-            apply_gaussian_settings(caustica, renderer.settings, args)
-            aim_camera_at_ply(renderer, args, ply_path)
-            renderer.settings.reset_accumulation = True
+        ) as engine:
+            label = apply_reference_mode(engine, caustica, spp=args.spp, oidn=True)
+            apply_common_settings(engine, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, engine.settings, args)
+            aim_camera_at_ply(engine, args, ply_path)
+            engine.settings.reset_accumulation = True
             out = out_dir / "reference_oidn.png" if batch else args.out
-            render_reference_to(renderer, out, launch_cwd=launch_cwd, label=label)
+            render_reference_to(engine, out, launch_cwd=launch_cwd, label=label)
 
     if args.mode in {"realtime", "batch"}:
-        with open_splat_renderer(
+        with open_splat_engine(
             caustica, args, ply_path, realtime=True, headless=True
-        ) as renderer:
-            label = apply_realtime_mode(renderer.app, caustica, args.denoiser)
-            apply_common_settings(renderer, caustica, bounces=args.bounces)
-            apply_gaussian_settings(caustica, renderer.settings, args)
-            aim_camera_at_ply(renderer, args, ply_path)
-            renderer.settings.reset_accumulation = True
-            renderer.step_n(args.frames)
+        ) as engine:
+            label = apply_realtime_mode(engine, caustica, args.denoiser)
+            apply_common_settings(engine, caustica, bounces=args.bounces)
+            apply_gaussian_settings(caustica, engine.settings, args)
+            aim_camera_at_ply(engine, args, ply_path)
+            engine.settings.reset_accumulation = True
+            engine.step_n(args.frames)
             out = out_dir / "realtime.png" if batch else args.out
-            saved = save_screenshot(renderer, out, launch_cwd=launch_cwd)
+            saved = save_screenshot(engine, out, launch_cwd=launch_cwd)
             print(f"[caustica] Saved {saved} after {args.frames} frame(s) [{label}]")
 
     return 0
@@ -159,18 +160,17 @@ def run_hybrid(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
     print(f"[caustica] Scene : {scene}")
     print(f"[caustica] Mode  : {'headless' if args.headless else 'windowed'}")
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=scene,
         realtime=not args.headless,
         accumulation_target=args.spp,
-    ) as renderer:
-        app = renderer.app
-        print(f"[caustica] Loaded scene   : {app.scene_name}")
-        print(f"[caustica] 3DGS objects   : {app.gaussian_splat_object_count}")
-        print(f"[caustica] 3DGS splats    : {app.gaussian_splat_count}")
-        if app.gaussian_splat_object_count == 0:
+    ) as engine:
+        print(f"[caustica] Loaded scene   : {engine.scene_name}")
+        print(f"[caustica] 3DGS objects   : {engine.gaussian_splat_object_count}")
+        print(f"[caustica] 3DGS splats    : {engine.gaussian_splat_count}")
+        if engine.gaussian_splat_object_count == 0:
             print(
                 "[caustica] WARNING: this scene declares no GaussianSplat nodes, so the "
                 "3DGS shadow and emission settings will have no visible effect.\n"
@@ -179,20 +179,20 @@ def run_hybrid(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
             )
 
         if args.headless:
-            label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=args.oidn)
+            label = apply_reference_mode(engine, caustica, spp=args.spp, oidn=args.oidn)
         else:
-            label = apply_realtime_mode(app, caustica, args.denoiser)
-        apply_common_settings(renderer, caustica, bounces=args.bounces)
-        apply_gaussian_settings(caustica, renderer.settings, args)
-        renderer.settings.reset_accumulation = True
+            label = apply_realtime_mode(engine, caustica, args.denoiser)
+        apply_common_settings(engine, caustica, bounces=args.bounces)
+        apply_gaussian_settings(caustica, engine.settings, args)
+        engine.settings.reset_accumulation = True
 
         if args.shadow_mode != "disabled":
-            rebuild_acceleration_structures(renderer, args.warmup_frames)
+            rebuild_acceleration_structures(engine, args.warmup_frames)
 
         if args.headless:
-            render_reference_to(renderer, args.out, launch_cwd=launch_cwd, label=label)
+            render_reference_to(engine, args.out, launch_cwd=launch_cwd, label=label)
         else:
-            run_window_loop(renderer)
+            run_window_loop(engine)
     return 0
 
 
@@ -241,17 +241,17 @@ def run_colmap(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
         )
 
     records = []
-    with open_splat_renderer(
+    with open_splat_engine(
         caustica, args, ply_path, realtime=True, headless=not args.windowed
-    ) as renderer:
-        apply_realtime_mode(renderer.app, caustica, "off")
-        settings = renderer.settings
+    ) as engine:
+        apply_realtime_mode(engine, caustica, "off")
+        settings = engine.settings
         settings.enable_tone_mapping = args.tonemap
         settings.enable_bloom = args.bloom
         apply_gaussian_settings(caustica, settings, args)
 
         if args.warmup_frames > 0:
-            renderer.step_n(args.warmup_frames)
+            engine.step_n(args.warmup_frames)
 
         for index, view in enumerate(views):
             if view.width != first.width or view.height != first.height:
@@ -260,11 +260,11 @@ def run_colmap(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
                     f"differs from render size {width}x{height}"
                 )
 
-            record = apply_colmap_view(renderer, _colmap, view, width, height, args)
-            renderer.step_n(max(1, args.frames_per_view))
+            record = apply_colmap_view(engine, _colmap, view, width, height, args)
+            engine.step_n(max(1, args.frames_per_view))
 
             out_path = out_dir / f"{index:04d}_{_colmap.safe_stem(view.name)}.png"
-            save_screenshot(renderer, out_path)
+            save_screenshot(engine, out_path)
             print(f"[caustica] saved {index + 1}/{len(views)}: {out_path.name}")
             records.append(
                 {
@@ -287,9 +287,9 @@ def run_colmap(caustica, args: argparse.Namespace, launch_cwd: Path) -> int:
     return 0
 
 
-def apply_colmap_view(renderer, _colmap, view, width: int, height: int, args) -> dict:
+def apply_colmap_view(engine, _colmap, view, width: int, height: int, args) -> dict:
     cam_pos, cam_dir, cam_up = _colmap.caustica_camera(view, args.rdf_to_rub)
-    renderer.set_camera(cam_pos, cam_dir, cam_up)
+    engine.set_camera_pos_dir_up(cam_pos, cam_dir, cam_up)
     record: dict = {
         "caustica_position": cam_pos,
         "caustica_direction": cam_dir,
@@ -298,13 +298,13 @@ def apply_colmap_view(renderer, _colmap, view, width: int, height: int, args) ->
     }
 
     if args.symmetric_fov:
-        renderer.set_camera_fov(view.vertical_fov_degrees)
+        engine.set_camera_vertical_fov(math.radians(view.vertical_fov_degrees))
         record["projection"] = "symmetric_vertical_fov"
         record["vertical_fov_degrees"] = view.vertical_fov_degrees
         return record
 
     fx, fy, cx, cy = _colmap.scaled_intrinsics(view, width, height)
-    renderer.set_camera_intrinsics(fx, fy, cx, cy, float(width), float(height))
+    engine.set_camera_intrinsics(fx, fy, cx, cy, float(width), float(height))
     record.update(
         projection="pinhole_intrinsics", fx=fx, fy=fy, cx=cx, cy=cy, width=width, height=height
     )

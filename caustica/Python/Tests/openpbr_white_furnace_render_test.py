@@ -95,24 +95,24 @@ def configure_common_material(material: object) -> None:
     material.material_model = "OpenPBR"
     material.base_color = (1.0, 1.0, 1.0)
     material.base_weight = 1.0
-    material.base_metalness = 0.0
+    material.metalness = 0.0
     material.base_diffuse_roughness = 0.0
     material.specular_color = (1.0, 1.0, 1.0)
     material.specular_weight = 1.0
-    material.specular_roughness = 0.0
-    material.specular_ior = 1.5
-    material.transmission_weight = 0.0
-    material.transmission_diffuse_weight = 0.0
+    material.roughness = 0.0
+    material.ior = 1.5
+    material.transmission_factor = 0.0
+    material.diffuse_transmission_factor = 0.0
     material.subsurface_weight = 0.0
     material.thin_film_weight = 0.0
-    material.emission_color = (0.0, 0.0, 0.0)
-    material.emission_luminance = 0.0
-    material.geometry_opacity = 1.0
-    material.enable_base_color_texture = False
-    material.enable_base_metalness_specular_roughness_texture = False
-    material.enable_geometry_normal_texture = False
-    material.enable_emission_color_texture = False
-    material.enable_transmission_weight_texture = False
+    material.emissive_color = (0.0, 0.0, 0.0)
+    material.emissive_intensity = 0.0
+    material.opacity = 1.0
+    material.enable_base_texture = False
+    material.enable_orm_texture = False
+    material.enable_normal_texture = False
+    material.enable_emissive_texture = False
+    material.enable_transmission_texture = False
 
 
 CASES = (
@@ -184,12 +184,12 @@ def difference_image(golden: bytes, actual: bytes, scale: float = 4.0) -> bytes:
     return bytes(result)
 
 
-def render(renderer: object, output: Path, spp: int) -> bytes:
-    renderer.app.reset_accumulation()
-    frames = renderer.step_until_accumulated()
-    if frames <= 0 or not renderer.app.accumulation_completed:
+def render(engine: object, output: Path, spp: int) -> bytes:
+    engine.reset_accumulation()
+    frames = engine.step_until_accumulated()
+    if frames <= 0 or not engine.accumulation_completed:
         raise RuntimeError(f"reference accumulation did not complete (frames={frames}, spp={spp})")
-    framebuffer = renderer.get_framebuffer()
+    framebuffer = engine.read_ldr_framebuffer()
     pixels = bytes(framebuffer.pixels)
     write_rgba8_png(output, framebuffer.width, framebuffer.height, pixels)
     return pixels
@@ -221,21 +221,21 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="caustica-white-furnace-") as temp_dir:
         hdr_path = Path(temp_dir) / "constant_white.hdr"
         write_constant_hdr(hdr_path)
-        with caustica.Renderer(
+        with caustica.EngineApp.create(
             width=args.width,
             height=args.height,
             headless=True,
             scene=make_scene_json(hdr_path),
             realtime=False,
             accumulation_target=args.spp,
-        ) as renderer:
-            if not renderer.scene_ready and not renderer.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
+        ) as engine:
+            if not engine.is_scene_ready and not engine.wait_until_ready(timeout_seconds=120.0, warmup_frames=4):
                 raise RuntimeError("white-furnace scene did not become ready")
 
-            renderer.set_camera((0.0, 0.5, 3.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
-            renderer.set_camera_fov(35.0)
-            renderer.app.set_reference_mode(spp=args.spp, oidn=False)
-            settings = renderer.settings
+            engine.set_camera_pos_dir_up((0.0, 0.5, 3.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
+            engine.set_camera_vertical_fov(math.radians(35.0))
+            engine.set_reference_mode(spp=args.spp, oidn=False)
+            settings = engine.settings
             settings.bounce_count = 8
             settings.use_nee = True
             settings.use_restir_di = False
@@ -250,21 +250,21 @@ def main() -> int:
 
             # Builtin materials live in the runtime material cache rather than
             # Scene.materials, so use the cache-backed ID lookup.
-            renderer.step_n(2)
-            material = renderer.app.find_material_by_id(0)
+            engine.step_n(2)
+            material = engine.find_material(0)
             if material is None:
                 raise RuntimeError("Mat_BuiltinSphere was not available as material ID 0")
             configure_common_material(material)
 
             apply_case(material, {})
-            golden = render(renderer, args.output_dir / "golden_unlayered.png", args.spp)
+            golden = render(engine, args.output_dir / "golden_unlayered.png", args.spp)
             indices = sphere_roi(args.width, args.height)
             if not indices:
                 raise RuntimeError("empty sphere ROI")
 
             for name, values in CASES:
                 apply_case(material, values)
-                actual = render(renderer, args.output_dir / f"{name}.png", args.spp)
+                actual = render(engine, args.output_dir / f"{name}.png", args.spp)
                 rmse, mean_absolute, mean_bias = compare_roi(golden, actual, indices)
                 write_rgba8_png(
                     args.output_dir / f"{name}_diff_x4.png",

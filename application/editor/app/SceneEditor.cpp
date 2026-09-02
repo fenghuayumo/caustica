@@ -425,8 +425,8 @@ void SceneEditor::bindCameraControllerSideEffects()
     if (m_app)
         caustica::bindCameraControllerSideEffects(*m_app);
 #if CAUSTICA_WITH_PYTHON
-    if (!m_pythonScripting && m_app)
-        m_pythonScripting = std::make_unique<PythonScripting>(*m_app);
+    if (!m_pythonScripting && m_engine)
+        m_pythonScripting = std::make_unique<PythonScripting>(*m_engine);
 #endif
     m_inputRouter.bind(*this);
 }

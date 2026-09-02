@@ -358,5 +358,5 @@ The canonical Caustica version is stored in the repository root `VERSION` file
 and is shared by the editor executable, native Python extension, and wheel
 metadata.
 
-See the [Python API reference](../py_caustica.md) and
-[Python examples](../examples/python/README.md) for renderer usage.
+See the [C++ / Python API reference](../caustica.md) and
+[Python examples](../examples/python/README.md) for EngineApp usage.

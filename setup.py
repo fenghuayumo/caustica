@@ -144,7 +144,7 @@ setup(
     name="caustica",
     version=PROJECT_VERSION,
     description="Python bindings for caustica",
-    long_description=(ROOT / "py_caustica.md").read_text(encoding="utf-8"),
+    long_description=(ROOT / "caustica.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     packages=["caustica"],
     package_dir={"caustica": "python/caustica"},

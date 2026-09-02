@@ -130,19 +130,19 @@ no splats.
 
 ## Embedded scripting
 
-`embedded.py` runs inside `caustica.exe` rather than owning a renderer:
+`embedded.py` runs inside `caustica.exe` rather than owning an EngineApp:
 
 ```shell
 caustica.exe --pythonScript examples/python/embedded.py
-caustica.exe --pythonExpr "import caustica; print(caustica.app().scene_name)"
+caustica.exe --pythonExpr "import caustica; print(caustica.engine().scene_name)"
 ```
 
 Both modes expose the same scene and settings types, but the lifecycle differs:
 
 | Mode | Entry point | Ownership |
 |---|---|---|
-| Extension | `python script.py` | Python creates and closes `caustica.Renderer` |
-| Embedded | `caustica.exe --pythonScript ...` | The running application owns the renderer |
+| Extension | `python script.py` | Python creates and shuts down `caustica.EngineApp` |
+| Embedded | `caustica.exe --pythonScript ...` | The running application owns the EngineApp |
 
 ## Shared modules
 
@@ -150,7 +150,7 @@ These are not executable examples:
 
 | Module | Contents |
 |---|---|
-| `_common.py` | Renderer construction, shared CLI flags, render-mode and denoiser selection, camera framing, output helpers |
+| `_common.py` | EngineApp construction, shared CLI flags, render-mode and denoiser selection, camera framing, output helpers |
 | `_gaussian.py` | 3DGS settings mapping, splat-only scene template, PLY bounds reader |
 | `_colmap.py` | COLMAP sparse-model reader and camera conversion |
 
@@ -159,7 +159,7 @@ the script's directory on `sys.path`, so an embedded script must stand alone.
 
 ## Further reading
 
-Full Python API reference: [py_caustica.md](../../py_caustica.md). To inspect
+Full C++ / Python API reference: [caustica.md](../../caustica.md). To inspect
 the installed module directly:
 
 ```python

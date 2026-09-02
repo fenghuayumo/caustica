@@ -42,7 +42,7 @@ Simulation / policy stack          Caustica
 physics, kinematics, control  →     scene ECS update (poses, joints, attachments)
 sensor rig definition         →     scene JSON cameras + Python camera API
 domain randomization          →     `.material.json` / lights / env maps / scene variants
-batch or online inference     →     headless `caustica.Renderer`, accumulation, PNG/export
+batch or online inference     →     headless `caustica.EngineApp.create`, accumulation, PNG/export
 ```
 
 What fits embodied-AI workflows well:
@@ -53,7 +53,7 @@ What fits embodied-AI workflows well:
 | Consistent object appearance | **OpenPBR** materials + glTF import with per-model `.material.json` overrides |
 | Multi-view / sensor rigs | Multiple scene cameras; runtime camera selection and transform control via Python/C++ |
 | Interactive + batch modes | Real-time path tracing with denoisers; reference accumulation for ground-truth frames |
-| Headless farm rendering | Python `Renderer(..., headless=True)` — no window/swap chain; see `examples/python/render.py` |
+| Headless farm rendering | Python `EngineApp.create(..., headless=True)` — no window/swap chain; see `examples/python/render.py` |
 | Automation & tuning | Python extension (`pip install .`) for offline jobs; embed mode for live parameter edits in the editor |
 | Dynamic environments | Scene graph animation, emissive/analytic lights, environment maps, 3D Gaussian splats |
 
@@ -66,7 +66,8 @@ Recommended starting points:
 * RTXCR skin transport: [docs/rtxcr-skin.md](docs/rtxcr-skin.md)
 * ECS + render proxies: [docs/architecture-render-proxy.md](docs/architecture-render-proxy.md)
 * RHI / render-thread contract: [docs/architecture-rhi-threading.md](docs/architecture-rhi-threading.md)
-* Python batch/headless API: [py_caustica.md](py_caustica.md), `examples/python/render.py`
+* C++ / Python API (`EngineApp`): [caustica.md](caustica.md)
+* Python batch/headless examples: `examples/python/render.py`
 * Minimal C++ host (no editor): `examples/cpp/thin_client` → target `caustica_thin_client`
 
 ## Architecture
@@ -124,7 +125,7 @@ Key code locations:
 * **Scene JSON** workflow for reproducible environments, object placement, lights, and camera rigs
 * **ECS scene graph** (`SceneEntityWorld`) — entities/components map naturally to simulated actors and attachments
 * **`EngineApp` embed path** — one-call bootstrap for custom hosts; official thin client at `examples/cpp/thin_client`
-* **Python extension** — headless and windowed `Renderer`, spawn/despawn, materials/lights/cameras, accumulation for dataset generation
+* **Python extension** — headless and windowed `EngineApp`, spawn/despawn, materials/lights/cameras, accumulation for dataset generation
 * **Reference + real-time modes** — interactive policy/debug preview and high-SPP offline captures from the same scene
 * Asset import for props, robots, and scanned environments: glTF / OBJ / URDF / USD (+ animation channels)
 
@@ -452,7 +453,7 @@ for persistent render-worker configuration.
 .\bin\caustica.exe --backend vulkan --gpu index:1
 ```
 
-Python can enumerate devices without constructing a renderer and can report the
+Python can enumerate devices without constructing an EngineApp and can report the
 adapter ultimately selected by `auto`:
 
 ```python
@@ -461,12 +462,12 @@ import caustica
 for gpu in caustica.enumerate_adapters(vulkan=False):
     print(gpu.index, gpu.name, gpu.type, gpu.luid, gpu.suitable)
 
-with caustica.Renderer(adapter="auto", headless=True) as renderer:
-    print("using", renderer.selected_adapter)
+with caustica.EngineApp.create(adapter="auto", headless=True) as engine:
+    print("using", engine.selected_adapter)
 ```
 
-See [the Python GPU-selection reference](py_caustica.md#gpu-selection) for all
-adapter fields and stable-selector examples.
+See [GPU selection](caustica.md#gpu-selection) for all adapter fields and
+stable-selector examples.
 
 ## Command Line
 
@@ -491,7 +492,7 @@ Rendering overrides and capture-sequence options are listed in [the command-line
 * [RTXCR skin integration](docs/rtxcr-skin.md)
 * [ECS + render proxies](docs/architecture-render-proxy.md)
 * [RHI threading contract](docs/architecture-rhi-threading.md)
-* [Python API reference](py_caustica.md)
+* [C++ / Python API (`EngineApp`)](caustica.md)
 * [Python examples](examples/python/README.md)
 
 ## Contact

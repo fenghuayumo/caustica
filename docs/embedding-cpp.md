@@ -7,7 +7,10 @@ APIs. Hosts should not reach through internal GPU/WR headers or drive
 `WorldRenderer` directly.
 
 **Public API (P0):** prefer `#include <caustica.h>` and stay on the
-allowlist in [public-api.md](public-api.md). The complete in-tree example is
+allowlist in [public-api.md](public-api.md). The combined C++ / Python
+`EngineApp` reference is [caustica.md](../caustica.md) — Python is snake_case
+(`engine.set_scene`, `engine.step_frame`, `engine.spawn_from_file`). The
+complete in-tree C++ example is
 [`examples/cpp/thin_client/Main.cpp`](../examples/cpp/thin_client/Main.cpp)
 (`caustica_thin_client`). The allowlist is a convention, not build-enforced.
 

@@ -4,7 +4,7 @@
 
 #include "Python/PythonBindingsCore.h"
 
-#include <engine/App.h>
+#include <engine/EngineApp.h>
 #include <core/log.h>
 
 #include <nanobind/nanobind.h>
@@ -47,8 +47,8 @@ if not hasattr(sys, "_caustica_capture_stdout"):
 )PY";
 }
 
-PythonScripting::PythonScripting(caustica::App& app)
-    : m_app(app)
+PythonScripting::PythonScripting(caustica::EngineApp& engine)
+    : m_engine(engine)
 {
 }
 
@@ -65,7 +65,7 @@ PythonScripting::~PythonScripting()
         Py_FinalizeEx();
         m_initialized = false;
     }
-    caustica_py::setEmbedApp(nullptr);
+    caustica_py::setEmbedEngine(nullptr);
 }
 
 bool PythonScripting::Initialize()
@@ -73,7 +73,7 @@ bool PythonScripting::Initialize()
     if (m_initialized)
         return true;
 
-    caustica_py::setEmbedApp(&m_app);
+    caustica_py::setEmbedEngine(&m_engine);
 
     if (PyImport_AppendInittab("caustica", PyInit_caustica) != 0)
     {
@@ -224,7 +224,7 @@ std::string PythonScripting::ConsumeOutputLog()
 
 #include <core/log.h>
 
-PythonScripting::PythonScripting(caustica::App& app) : m_app(app) {}
+PythonScripting::PythonScripting(caustica::EngineApp& engine) : m_engine(engine) {}
 PythonScripting::~PythonScripting() {}
 
 bool PythonScripting::Initialize()

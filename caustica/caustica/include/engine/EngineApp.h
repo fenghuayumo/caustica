@@ -15,9 +15,11 @@
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/CameraApi.h>
+#include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneViewState.h>
 #include <core/command_line.h>
+#include <math/math.h>
 #include <render/RenderAppState.h>
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
@@ -27,6 +29,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace caustica
 {
@@ -77,6 +80,19 @@ struct EngineAppDesc
 
     [[nodiscard]] static std::optional<EngineAppDesc> fromArgv(int argc, char const* const* argv);
     bool applyCommandLine(const CommandLineOptions& options);
+};
+
+// Expand `builtin:plane_cube` (and similar) into inline scene JSON. Other
+// values pass through unchanged. EngineApp::create / setScene call this.
+[[nodiscard]] std::string prepareSceneSource(const std::string& scene);
+[[nodiscard]] std::string builtinSceneJson(const std::string& builtinModel = "plane_cube");
+
+struct LdrFramebuffer
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 4;
+    std::vector<uint8_t> pixels;
 };
 
 // Bevy-style embed entry: create → add systems/plugins → run() / stepFrame().
@@ -143,6 +159,10 @@ public:
     void setScene(const std::string& name, bool forceReload = false);
     [[nodiscard]] bool isSceneLoaded() const;
     [[nodiscard]] bool isSceneLoading() const;
+    [[nodiscard]] bool isSceneReady() const;
+    bool waitUntilReady(double timeoutSeconds = 600.0, int warmupFrames = 4);
+    [[nodiscard]] std::string currentSceneName() const;
+    [[nodiscard]] const std::vector<std::string>& availableScenes() const;
     [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
     [[nodiscard]] PathTracerSettings& settings();
     [[nodiscard]] const PathTracerSettings& settings() const;
@@ -151,12 +171,89 @@ public:
     [[nodiscard]] CommandLineOptions& commandLine();
     [[nodiscard]] const CommandLineOptions& commandLine() const;
 
+    bool setCameraPosDirUp(const math::float3& pos, const math::float3& dir, const math::float3& up);
     bool setCameraPosDirUp(const std::string& value);
+    [[nodiscard]] std::string currentCameraPosDirUp() const;
     void setCameraVerticalFOV(float radians);
+    [[nodiscard]] float cameraVerticalFOV() const;
     void setCameraIntrinsics(float fx, float fy, float cx, float cy, float width, float height);
+    void clearCameraIntrinsics();
+    [[nodiscard]] uint32_t sceneCameraCount() const;
+    [[nodiscard]] uint32_t selectedCameraIndex() const;
+    void setSelectedCameraIndex(uint32_t index);
+    void saveCurrentCamera();
+    void loadCurrentCamera();
+
+    Handle<ScenePrefabAsset> load(const std::filesystem::path& path);
+    ecs::Entity spawn(
+        const Handle<ScenePrefabAsset>& prefab,
+        const SceneApplyCallbacks& callbacks = {});
+    ecs::Entity spawnFromFile(
+        const std::filesystem::path& path,
+        const SceneApplyCallbacks& callbacks = {});
+    ecs::Entity spawnFromSource(
+        const std::string& source,
+        const SceneApplyCallbacks& callbacks = {});
+    bool despawn(ecs::Entity entity);
+    ecs::Entity spawnDirectionalLight(
+        scene::DirectionalLightComponent component, const std::string& name = {});
+    ecs::Entity spawnSpotLight(
+        scene::SpotLightComponent component, const std::string& name = {});
+    ecs::Entity spawnPointLight(
+        scene::PointLightComponent component, const std::string& name = {});
+    ecs::Entity spawnRectLight(
+        scene::RectLightComponent component, const std::string& name = {});
+    ecs::Entity spawnEnvironmentLight(
+        scene::EnvironmentLightComponent component, const std::string& name = {});
+
+    bool loadGaussianSplatFile(
+        const std::filesystem::path& fileName, bool convertRdfToRub = true);
+    [[nodiscard]] uint32_t gaussianSplatCount() const;
+    [[nodiscard]] uint32_t gaussianSplatObjectCount() const;
+    [[nodiscard]] const std::string& gaussianSplatFileName() const;
+
+    [[nodiscard]] ecs::Entity findEntity(
+        const std::filesystem::path& path, ecs::Entity context = ecs::NullEntity) const;
+    [[nodiscard]] std::shared_ptr<Material> findMaterial(int materialID) const;
+
+    [[nodiscard]] std::vector<dm::float3> getMeshVertices(ecs::Entity entity);
+    [[nodiscard]] std::vector<dm::float3> getMeshVerticesWorld(ecs::Entity entity);
+    void setMeshVertices(
+        ecs::Entity entity,
+        const std::vector<dm::float3>& vertices,
+        const MeshDeformOptions& options = {});
+    void setMeshVerticesWorld(
+        ecs::Entity entity,
+        const std::vector<dm::float3>& vertices,
+        const MeshDeformOptions& options = {});
+    void requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation = true);
+    void requestFullAccelRebuild();
+    uint32_t precacheRtFeaturePresets(bool showProgress = true);
+
+    void setEnvMapOverrideSource(const std::string& path);
+    [[nodiscard]] double sceneTime() const;
+    void setSceneTime(double seconds);
+
+    void setRealtimeMode(bool standaloneDenoiser = true, int realtimeAA = 2);
+    void setReferenceMode(
+        int spp = 0,
+        bool oidn = false,
+        int oidnQuality = 1,
+        int oidnPasses = 1,
+        int oidnPrefilter = 1);
+    bool prepareAnimationFrame(
+        double sceneTime, bool importedAnimations = true, bool keyframes = true);
+
     [[nodiscard]] bool accumulationCompleted() const;
+    [[nodiscard]] int accumulationSampleIndex() const;
+    [[nodiscard]] math::uint2 renderSize() const;
+    [[nodiscard]] float avgTimePerFrame() const;
+    [[nodiscard]] std::string fpsInfo() const;
+    [[nodiscard]] std::string resolutionInfo() const;
     [[nodiscard]] caustica::rhi::Texture* ldrColorTexture() const;
     [[nodiscard]] uint32_t frameIndex() const;
+    bool saveScreenshot(const std::filesystem::path& path);
+    [[nodiscard]] std::optional<LdrFramebuffer> readLdrFramebuffer();
 
 private:
     EngineApp() = default;

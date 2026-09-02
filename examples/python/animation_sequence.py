@@ -24,7 +24,7 @@ from _common import (
     apply_realtime_mode,
     apply_reference_mode,
     import_caustica,
-    make_renderer,
+    make_engine,
     resolve_output_path,
     resolve_scene_arg,
     save_screenshot,
@@ -63,26 +63,26 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     dt = 1.0 / args.fps
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=resolve_scene_arg(args.scene),
         realtime=not is_reference,
         headless=True,
         accumulation_target=args.spp if is_reference else 1,
-    ) as renderer:
-        settings = renderer.settings
+    ) as engine:
+        settings = engine.settings
         if is_reference:
-            mode_label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=True)
+            mode_label = apply_reference_mode(engine, caustica, spp=args.spp, oidn=True)
             # Realtime cache prewarming would be discarded at every time step.
             settings.accumulation_prewarm_realtime_caches = False
         else:
             settings.enable_animations = True
             settings.enable_keyframes = True
-            mode_label = apply_realtime_mode(renderer.app, caustica, args.denoiser)
+            mode_label = apply_realtime_mode(engine, caustica, args.denoiser)
             settings.accumulation_target = 1
             settings.reset_realtime_caches = True
-            renderer.app.scene_time = args.start_time
+            engine.scene_time = args.start_time
 
         print(f"[caustica] {mode_label}: {args.frames} frame(s) -> {out_dir}")
         started = time.perf_counter()
@@ -90,23 +90,23 @@ def main() -> int:
         for index in range(args.frames):
             scene_time = args.start_time + index * dt
             if is_reference:
-                if not renderer.prepare_animation_frame(scene_time):
+                if not engine.prepare_animation_frame(scene_time):
                     raise SystemExit(f"Failed to prepare animation frame {index}")
-                engine_frames = renderer.render_reference_frame(spp=args.spp, oidn=True)
-                if not renderer.app.accumulation_completed:
+                engine_frames = engine.render_reference_frame(spp=args.spp, oidn=True)
+                if not engine.accumulation_completed:
                     raise SystemExit(
                         f"Reference accumulation did not complete for frame {index} "
                         f"after {engine_frames} engine frames"
                     )
-                detail = f" sample={renderer.app.accumulation_sample_index}"
+                detail = f" sample={engine.accumulation_sample_index}"
             else:
                 # A zero delta on the first frame seeds temporal history.
-                if not renderer.render_realtime_frame(0.0 if index == 0 else dt):
+                if not engine.render_realtime_frame(0.0 if index == 0 else dt):
                     raise SystemExit(f"Realtime render failed for frame {index}")
                 engine_frames = 1
                 detail = ""
 
-            saved = save_screenshot(renderer, out_dir / f"frame_{index:06d}.png")
+            saved = save_screenshot(engine, out_dir / f"frame_{index:06d}.png")
             print(
                 f"[caustica] frame={index:06d} time={scene_time:.6f}s "
                 f"engine_frames={engine_frames}{detail} saved={saved.name}"

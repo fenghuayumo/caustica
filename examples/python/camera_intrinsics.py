@@ -20,7 +20,7 @@ from pathlib import Path
 from _common import (
     add_device_args,
     import_caustica,
-    make_renderer,
+    make_engine,
     normalize,
     resolve_output_path,
     save_screenshot,
@@ -82,17 +82,17 @@ def look_at(position, target, up=(0.0, 1.0, 0.0)):
     return forward, true_up
 
 
-def render_case(renderer, args, cx: float, cy: float, out_path: Path) -> Path:
+def render_case(engine, args, cx: float, cy: float, out_path: Path) -> Path:
     direction, up = look_at(CAMERA_POSITION, LOOK_AT)
-    renderer.set_camera(CAMERA_POSITION, direction, up)
-    renderer.set_camera_intrinsics(
+    engine.set_camera_pos_dir_up(CAMERA_POSITION, direction, up)
+    engine.set_camera_intrinsics(
         args.fx, args.fy, cx, cy, float(args.width), float(args.height)
     )
     print(f"[caustica] intrinsics fx={args.fx:.1f} fy={args.fy:.1f} cx={cx:.1f} cy={cy:.1f}")
 
-    renderer.settings.reset_accumulation = True
-    frames = renderer.step_until_accumulated()
-    saved = save_screenshot(renderer, out_path)
+    engine.settings.reset_accumulation = True
+    frames = engine.step_until_accumulated()
+    saved = save_screenshot(engine, out_path)
     print(f"[caustica] Saved {saved} ({frames} frames)")
     return saved
 
@@ -118,21 +118,21 @@ def main() -> int:
     caustica = import_caustica()
     out_dir = resolve_output_path(args.out_dir)
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=build_scene_json(),
         realtime=False,
         headless=True,
         accumulation_target=args.spp,
-    ) as renderer:
-        renderer.app.set_reference_mode(spp=args.spp, oidn=False)
-        renderer.settings.bounce_count = 4
-        renderer.settings.enable_tone_mapping = True
+    ) as engine:
+        engine.set_reference_mode(spp=args.spp, oidn=False)
+        engine.settings.bounce_count = 4
+        engine.settings.enable_tone_mapping = True
 
-        render_case(renderer, args, args.cx, args.cy, out_dir / "intrinsics_centered.png")
+        render_case(engine, args, args.cx, args.cy, out_dir / "intrinsics_centered.png")
         render_case(
-            renderer, args, args.cx_offset, args.cy_offset, out_dir / "intrinsics_offset.png"
+            engine, args, args.cx_offset, args.cy_offset, out_dir / "intrinsics_offset.png"
         )
 
     print("\nCompare the two images: the offset principal point shifts the projection.")

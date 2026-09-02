@@ -40,7 +40,7 @@ def count_shader_bins(shader_api: str) -> int:
 
 def precompile_one(caustica, *, scene: str, shader_api: str, mode: str, frames: int) -> None:
     realtime = mode == "realtime"
-    renderer = caustica.Renderer(
+    engine = caustica.EngineApp.create(
         width=64,
         height=64,
         headless=True,
@@ -51,7 +51,7 @@ def precompile_one(caustica, *, scene: str, shader_api: str, mode: str, frames: 
     )
 
     try:
-        settings = renderer.settings
+        settings = engine.settings
         settings.realtime_mode = realtime
         settings.accumulation_target = 1
         settings.reset_accumulation = True
@@ -59,9 +59,9 @@ def precompile_one(caustica, *, scene: str, shader_api: str, mode: str, frames: 
             settings.realtime_aa = int(caustica.RealtimeAA.Off)
         if hasattr(settings, "accumulation_prewarm_realtime_caches"):
             settings.accumulation_prewarm_realtime_caches = False
-        renderer.step_n(max(1, frames))
+        engine.step_n(max(1, frames))
     finally:
-        renderer.close()
+        engine.shutdown()
 
 
 def precompile(shader_api: str, scenes: list[str], modes: list[str], frames: int) -> None:

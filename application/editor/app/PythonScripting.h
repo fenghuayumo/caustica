@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-namespace caustica { class App; }
+namespace caustica { class EngineApp; }
 
 class PythonScripting
 {
 public:
-    explicit PythonScripting(caustica::App& app);
+    explicit PythonScripting(caustica::EngineApp& engine);
     ~PythonScripting();
 
     PythonScripting(const PythonScripting&)            = delete;
@@ -39,8 +39,8 @@ private:
 
     bool RunPendingLocked(const PendingScript& script);
 
-    caustica::App& m_app;
-    bool           m_initialized = false;
+    caustica::EngineApp& m_engine;
+    bool                 m_initialized = false;
 
     std::mutex                 m_mutex;
     std::vector<PendingScript> m_queue;

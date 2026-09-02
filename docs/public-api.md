@@ -7,14 +7,15 @@ below. Prefer a single include:
 #include <caustica.h>
 ```
 
-Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
+Host API for C++ and Python (same `EngineApp` operations): [caustica.md](../caustica.md).
+C++ schedule / system-parameter walkthrough: [embedding-cpp.md](embedding-cpp.md).
 
 ## Allowlist
 
 | Header | Role |
 | --- | --- |
 | `caustica.h` | Umbrella include (preferred) |
-| `engine/EngineApp.h` | Create / run / stepFrame / setScene / camera / settings |
+| `engine/EngineApp.h` | Create / run / stepFrame / setScene / camera / spawn / settings / screenshot |
 | `engine/EntryPoint.h` | `initializeAppPlatform`, `runEngineApp` |
 | `engine/AppSchedules.h` | `AppSchedule`, `Query`, `Res` / `ResMut`, `SystemContext` |
 | `engine/EntityWorld.h` | System-param scene graph (`spawn` / `spawnNamed`, `emplace`, transform, `findEntity`, `setVisible`) |
@@ -35,7 +36,11 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 
 Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`,
 `Query<>`, `math` / `dm::` types, `PathTracerSettings` via `EngineApp::settings()`,
-`Handle` / `MeshHandle` / `MaterialHandle`.
+`Handle` / `MeshHandle` / `MaterialHandle`, `LdrFramebuffer`.
+
+Python (`import caustica`) is the same `EngineApp` surface with snake_case names
+(`step_frame`, `set_scene`, `spawn_from_file`). `GpuDevice` injects an existing
+GPU into `EngineApp.create(device=...)`. Full tables: [caustica.md](../caustica.md).
 
 Simulation systems run concurrently when their parameter lists prove they cannot conflict — you
 never declare access by hand and there is no `addSystem` overload that accepts it. `Query` /

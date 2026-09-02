@@ -4,7 +4,7 @@ Every example in this folder imports ``caustica`` as a normally installed
 package. If the import fails, fix the install (``python -m pip install .`` from
 the repository root) rather than patching ``sys.path`` in an example script.
 
-This module is not an executable example. It holds the renderer setup, argument
+This module is not an executable example. It holds the EngineApp setup, argument
 parsing, denoiser selection, camera framing and output helpers that would
 otherwise be copy-pasted into every script.
 
@@ -15,6 +15,7 @@ otherwise be copy-pasted into every script.
 from __future__ import annotations
 
 import argparse
+import math
 import time
 from pathlib import Path
 
@@ -161,11 +162,11 @@ def validate_positive(args: argparse.Namespace, *names: str) -> None:
 
 
 # --------------------------------------------------------------------------
-# Renderer construction
+# EngineApp construction
 # --------------------------------------------------------------------------
 
 
-def make_renderer(
+def make_engine(
     caustica,
     args: argparse.Namespace,
     *,
@@ -174,8 +175,8 @@ def make_renderer(
     headless: bool | None = None,
     accumulation_target: int = 1,
 ):
-    """Create a Renderer from the flags added by :func:`add_device_args`."""
-    return caustica.Renderer(
+    """Create an EngineApp from the flags added by :func:`add_device_args`."""
+    return caustica.EngineApp.create(
         width=args.width,
         height=args.height,
         headless=getattr(args, "headless", True) if headless is None else headless,
@@ -188,9 +189,9 @@ def make_renderer(
 
 
 def apply_common_settings(
-    renderer, caustica, *, bounces: int = 8, tone_mapping: bool = True, nee: bool = True
+    engine, caustica, *, bounces: int = 8, tone_mapping: bool = True, nee: bool = True
 ) -> None:
-    settings = renderer.settings
+    settings = engine.settings
     settings.bounce_count = bounces
     settings.use_nee = nee
     settings.enable_tone_mapping = tone_mapping
@@ -202,35 +203,35 @@ def apply_common_settings(
 
 
 def apply_reference_mode(
-    renderer, caustica, *, spp: int, oidn: bool = True, gpu: bool = True
+    engine, caustica, *, spp: int, oidn: bool = True, gpu: bool = True
 ) -> str:
     """Configure reference accumulation, optionally with OIDN. Returns a label."""
-    renderer.app.set_reference_mode(
+    engine.set_reference_mode(
         spp=spp,
         oidn=oidn,
         oidn_quality=int(caustica.OidnQuality.High),
         oidn_passes=int(caustica.OidnPasses.AlbedoNormal),
         oidn_prefilter=int(caustica.OidnPrefilter.Accurate),
     )
-    renderer.settings.oidn_use_gpu = gpu
+    engine.settings.oidn_use_gpu = gpu
     if oidn:
-        renderer.settings.oidn_apply()
+        engine.settings.oidn_apply()
     return f"reference {spp} spp" + (" + OIDN" if oidn else "")
 
 
-def apply_realtime_mode(app, caustica, requested: str = "auto") -> str:
+def apply_realtime_mode(engine, caustica, requested: str = "auto") -> str:
     """Select a realtime denoiser / AA path, falling back when unsupported.
 
-    ``app`` is a ``caustica.App`` (``renderer.app`` in extension mode). Returns a
-    label describing the path that was actually selected, which may differ from
-    ``requested`` when the GPU or driver does not support DLSS.
+    ``engine`` is a ``caustica.EngineApp``. Returns a label describing the path
+    that was actually selected, which may differ from ``requested`` when the GPU
+    or driver does not support DLSS.
     """
     if requested not in REALTIME_DENOISERS:
         raise SystemExit(
             f"unknown denoiser {requested!r}; choose from {', '.join(REALTIME_DENOISERS)}"
         )
 
-    settings = app.settings
+    settings = engine.settings
     denoiser = "nrd" if requested == "auto" else requested
 
     if denoiser == "dlss-rr" and not settings.is_dlss_rr_supported:
@@ -241,7 +242,7 @@ def apply_realtime_mode(app, caustica, requested: str = "auto") -> str:
         denoiser = "nrd"
 
     if denoiser == "dlss-rr":
-        app.set_realtime_mode(
+        engine.set_realtime_mode(
             standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.DLSS_RR)
         )
         settings.dlss_mode = int(caustica.DLSSMode.Balanced)
@@ -249,23 +250,23 @@ def apply_realtime_mode(app, caustica, requested: str = "auto") -> str:
         settings.disable_restirs_with_dlss_rr = True
         return "realtime DLSS-RR"
     if denoiser == "dlss":
-        app.set_realtime_mode(
+        engine.set_realtime_mode(
             standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.DLSS)
         )
         settings.dlss_mode = int(caustica.DLSSMode.Balanced)
         return "realtime DLSS"
     if denoiser == "nrd":
-        app.set_realtime_mode(
+        engine.set_realtime_mode(
             standalone_denoiser=True, realtime_aa=int(caustica.RealtimeAA.TAA)
         )
         return "realtime NRD + TAA"
     if denoiser == "taa":
-        app.set_realtime_mode(
+        engine.set_realtime_mode(
             standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.TAA)
         )
         return "realtime TAA"
 
-    app.set_realtime_mode(standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.Off))
+    engine.set_realtime_mode(standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.Off))
     return "realtime without denoising"
 
 
@@ -293,16 +294,17 @@ def bounds_to_center_radius(
     return center, radius  # type: ignore[return-value]
 
 
-def scene_bounds_center_radius(renderer) -> tuple[tuple[float, float, float], float] | None:
-    return bounds_to_center_radius(renderer.get_scene_bounds())
+def scene_bounds_center_radius(engine) -> tuple[tuple[float, float, float], float] | None:
+    scene = engine.scene
+    return bounds_to_center_radius(None if scene is None else scene.bounds)
 
 
 def frame_bounds(
-    renderer,
+    engine,
     center: tuple[float, float, float],
     radius: float,
     *,
-    fov: float = 45.0,
+    fov_degrees: float = 45.0,
 ) -> None:
     """Place the camera so a sphere of ``radius`` around ``center`` is in frame."""
     camera_pos = (center[0], center[1] + radius * 0.15, center[2] + radius * 3.1)
@@ -311,8 +313,8 @@ def frame_bounds(
         center[1] - camera_pos[1],
         center[2] - camera_pos[2],
     )
-    renderer.set_camera(camera_pos, camera_dir, (0.0, 1.0, 0.0))
-    renderer.set_camera_fov(fov)
+    engine.set_camera_pos_dir_up(camera_pos, camera_dir, (0.0, 1.0, 0.0))
+    engine.set_camera_vertical_fov(math.radians(fov_degrees))
 
 
 # --------------------------------------------------------------------------
@@ -320,21 +322,21 @@ def frame_bounds(
 # --------------------------------------------------------------------------
 
 
-def save_screenshot(renderer, path: str | Path, *, launch_cwd: Path | None = None) -> Path:
+def save_screenshot(engine, path: str | Path, *, launch_cwd: Path | None = None) -> Path:
     out = resolve_output_path(path, launch_cwd)
     out.parent.mkdir(parents=True, exist_ok=True)
-    if not renderer.save_screenshot(str(out)):
+    if not engine.save_screenshot(str(out)):
         raise RuntimeError(f"failed to save screenshot: {out}")
     return out
 
 
 def render_reference_to(
-    renderer, path: str | Path, *, launch_cwd: Path | None = None, label: str = ""
+    engine, path: str | Path, *, launch_cwd: Path | None = None, label: str = ""
 ) -> Path:
     """Accumulate until the reference target is reached, then save a screenshot."""
     started = time.perf_counter()
-    frames = renderer.step_until_accumulated()
-    out = save_screenshot(renderer, path, launch_cwd=launch_cwd)
+    frames = engine.step_until_accumulated()
+    out = save_screenshot(engine, path, launch_cwd=launch_cwd)
     suffix = f" [{label}]" if label else ""
     print(
         f"[caustica] Saved {out} after {frames} engine frame(s) "
@@ -343,8 +345,8 @@ def render_reference_to(
     return out
 
 
-def run_window_loop(renderer, on_frame=None) -> None:
-    """Drive a windowed Renderer until the window closes or Ctrl+C.
+def run_window_loop(engine, on_frame=None) -> None:
+    """Drive a windowed EngineApp until the window closes or Ctrl+C.
 
     ``on_frame`` is called with the elapsed wall-clock seconds before each step,
     which lets animated examples drive per-frame scene edits without writing
@@ -359,7 +361,7 @@ def run_window_loop(renderer, on_frame=None) -> None:
         while True:
             if on_frame is not None:
                 on_frame(time.monotonic() - started)
-            if not renderer.step(-1.0):
+            if not engine.step_frame(-1.0):
                 break
             frames += 1
             time.sleep(0.001)

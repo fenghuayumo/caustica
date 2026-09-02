@@ -37,7 +37,7 @@ _PLY_TYPES: dict[str, tuple[str, int]] = {
 def create_splat_only_scene(name: str = "caustica_splat_only") -> str:
     """Write a scene containing only a hidden dummy mesh and a default camera.
 
-    3DGS content is appended afterwards with ``renderer.load_gaussian_splats``.
+    3DGS content is appended afterwards with ``engine.load_gaussian_splat_file``.
     """
     scene = {
         "entities": [
@@ -298,7 +298,6 @@ def apply_gaussian_settings(caustica, settings, args: argparse.Namespace) -> Non
 def _apply_shadow_settings(caustica, settings, args: argparse.Namespace, shadow_mode: str) -> None:
     enabled = shadow_mode != "disabled"
     settings.gaussian_splat_shadows = enabled
-    settings.gaussian_splat_hybrid_shadows = enabled
     settings.gaussian_splat_shadows_mode = int(
         {
             "disabled": caustica.GaussianSplatShadowMode.Disabled,
@@ -324,9 +323,9 @@ def _apply_shadow_settings(caustica, settings, args: argparse.Namespace, shadow_
         settings.gaussian_splat_emission_max_proxy_count = args.emission_max_proxies
 
 
-def rebuild_acceleration_structures(renderer, warmup_frames: int = 8) -> None:
+def rebuild_acceleration_structures(engine, warmup_frames: int = 8) -> None:
     """Rebuild splat acceleration structures and let the rebuild settle."""
-    renderer.app.request_accel_rebuild()
+    engine.request_full_accel_rebuild()
     warmup = max(warmup_frames, 1)
     print(f"[caustica] Rebuilding 3DGS acceleration structures ({warmup} warmup frames) ...")
-    renderer.step_n(warmup)
+    engine.step_n(warmup)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import tempfile
 import traceback
@@ -38,23 +39,23 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="caustica-rtxcr-skin-") as temp_dir:
         hdr_path = Path(temp_dir) / "constant_white.hdr"
         write_constant_hdr(hdr_path)
-        with caustica.Renderer(
+        with caustica.EngineApp.create(
             width=args.width,
             height=args.height,
             headless=True,
             scene=make_scene_json(hdr_path),
             realtime=False,
             accumulation_target=args.spp,
-        ) as renderer:
-            if not renderer.scene_ready and not renderer.wait_until_ready(
+        ) as engine:
+            if not engine.is_scene_ready and not engine.wait_until_ready(
                 timeout_seconds=120.0, warmup_frames=4
             ):
                 raise RuntimeError("RTXCR skin scene did not become ready")
 
-            renderer.set_camera((0.0, 0.5, 3.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
-            renderer.set_camera_fov(35.0)
-            renderer.app.set_reference_mode(spp=args.spp, oidn=False)
-            settings = renderer.settings
+            engine.set_camera_pos_dir_up((0.0, 0.5, 3.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))
+            engine.set_camera_vertical_fov(math.radians(35.0))
+            engine.set_reference_mode(spp=args.spp, oidn=False)
+            settings = engine.settings
             settings.bounce_count = 8
             settings.use_nee = True
             settings.use_restir_di = False
@@ -67,25 +68,25 @@ def main() -> int:
             settings.environment_map.tint_color = (1.0, 1.0, 1.0)
             settings.environment_map.intensity = 0.25
 
-            renderer.step_n(2)
-            material = renderer.app.find_material_by_id(0)
+            engine.step_n(2)
+            material = engine.find_material(0)
             if material is None:
                 raise RuntimeError("builtin sphere material ID 0 was unavailable")
             configure_common_material(material)
             material.base_color = (0.72, 0.28, 0.20)
-            material.specular_roughness = 0.35
+            material.roughness = 0.35
             material.subsurface_color = (1.0, 0.48, 0.32)
             material.subsurface_radius = 0.5
             material.subsurface_radius_scale = (1.0, 0.5, 0.25)
-            material.subsurface_scatter_anisotropy = 0.2
+            material.subsurface_anisotropy = 0.2
 
             material.subsurface_weight = 0.0
             material.mark_dirty()
-            baseline = render(renderer, args.output_dir / "skin_off.png", args.spp)
+            baseline = render(engine, args.output_dir / "skin_off.png", args.spp)
 
             material.subsurface_weight = 1.0
             material.mark_dirty()
-            skin = render(renderer, args.output_dir / "skin_on.png", args.spp)
+            skin = render(engine, args.output_dir / "skin_on.png", args.spp)
 
             indices = sphere_roi(args.width, args.height)
             _, mean_absolute, _ = compare_roi(baseline, skin, indices)

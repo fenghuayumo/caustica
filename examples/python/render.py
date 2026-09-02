@@ -15,6 +15,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import math
 import time
 from pathlib import Path
 
@@ -27,7 +28,7 @@ from _common import (
     apply_reference_mode,
     frame_bounds,
     import_caustica,
-    make_renderer,
+    make_engine,
     render_reference_to,
     require_input_file,
     resolve_scene_arg,
@@ -109,22 +110,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def apply_scene_edits(renderer, args: argparse.Namespace) -> None:
+def apply_scene_edits(engine, args: argparse.Namespace) -> None:
     if args.spawn:
         spawn_path = require_input_file(args.spawn, "Spawn asset")
-        entity = renderer.app.spawn_from_file(str(spawn_path))
+        entity = engine.spawn_from_file(str(spawn_path))
         if entity is None:
             raise SystemExit(f"spawn_from_file failed: {spawn_path}")
         entity.translation = tuple(args.spawn_position)
-        renderer.step_n(1)
+        engine.step_n(1)
         print(f"[caustica] Spawned {entity.name}: {spawn_path}")
         if args.camera_pos is None:
-            framing = scene_bounds_center_radius(renderer)
+            framing = scene_bounds_center_radius(engine)
             if framing is not None:
-                frame_bounds(renderer, *framing)
+                frame_bounds(engine, *framing)
 
     for name, red, green, blue in args.material or []:
-        material = renderer.app.scene.find_material(name)
+        scene = engine.scene
+        material = None if scene is None else scene.find_material(name)
         if material is None:
             print(f"[caustica] WARNING: material not found: {name}")
             continue
@@ -134,15 +136,15 @@ def apply_scene_edits(renderer, args: argparse.Namespace) -> None:
     if bool(args.camera_pos) != bool(args.camera_dir):
         raise SystemExit("--camera-pos and --camera-dir must be provided together")
     if args.camera_pos and args.camera_dir:
-        renderer.set_camera(
+        engine.set_camera_pos_dir_up(
             tuple(args.camera_pos), tuple(args.camera_dir), tuple(args.camera_up)
         )
     if args.fov is not None:
-        renderer.set_camera_fov(args.fov)
+        engine.set_camera_vertical_fov(math.radians(args.fov))
 
 
-def inspect_framebuffer(renderer) -> None:
-    framebuffer = renderer.get_framebuffer()
+def inspect_framebuffer(engine) -> None:
+    framebuffer = engine.read_ldr_framebuffer()
     pixels = framebuffer.pixels
     print(
         "[caustica] Framebuffer "
@@ -161,15 +163,15 @@ def main() -> int:
     is_reference = args.mode == "reference"
     is_windowed = args.mode == "window"
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=resolve_scene_arg(args.scene),
         realtime=not is_reference,
         headless=not is_windowed,
         accumulation_target=args.spp if is_reference else 1,
-    ) as renderer:
-        apply_common_settings(renderer, caustica, bounces=args.bounces)
+    ) as engine:
+        apply_common_settings(engine, caustica, bounces=args.bounces)
         tone_mapper = {
             "linear": caustica.ToneMapOperator.Linear,
             "reinhard": caustica.ToneMapOperator.Reinhard,
@@ -178,43 +180,43 @@ def main() -> int:
             "soft-shoulder": caustica.ToneMapOperator.IdentitySoftShoulder,
             "agx": caustica.ToneMapOperator.AgX,
         }[args.tone_mapper]
-        renderer.settings.tone_mapping_params.tone_map_operator = tone_mapper
+        engine.settings.tone_mapping_params.tone_map_operator = tone_mapper
         if args.camera_lut:
             lut_path = require_input_file(args.camera_lut, "Camera LUT")
-            tone_params = renderer.settings.tone_mapping_params
+            tone_params = engine.settings.tone_mapping_params
             tone_params.auto_exposure = False
             tone_params.camera_lut_after_tone_map = True
             tone_params.load_camera_lut(str(lut_path))
             print(f"[caustica] Camera LUT: {lut_path}")
         mode_label = (
-            apply_reference_mode(renderer, caustica, spp=args.spp, oidn=args.oidn)
+            apply_reference_mode(engine, caustica, spp=args.spp, oidn=args.oidn)
             if is_reference
-            else apply_realtime_mode(renderer.app, caustica, args.denoiser)
+            else apply_realtime_mode(engine, caustica, args.denoiser)
         )
-        apply_scene_edits(renderer, args)
+        apply_scene_edits(engine, args)
 
-        print(f"[caustica] Scene: {renderer.app.scene_name}")
+        print(f"[caustica] Scene: {engine.scene_name}")
         print(f"[caustica] Mode : {mode_label}")
 
         if is_windowed:
-            run_window_loop(renderer)
+            run_window_loop(engine)
             return 0
 
         if is_reference:
             if args.inspect_framebuffer:
-                renderer.step_until_accumulated()
-                inspect_framebuffer(renderer)
-                save_screenshot(renderer, args.out, launch_cwd=launch_cwd)
+                engine.step_until_accumulated()
+                inspect_framebuffer(engine)
+                save_screenshot(engine, args.out, launch_cwd=launch_cwd)
             else:
-                render_reference_to(renderer, args.out, launch_cwd=launch_cwd, label=mode_label)
+                render_reference_to(engine, args.out, launch_cwd=launch_cwd, label=mode_label)
             return 0
 
         started = time.perf_counter()
-        if not renderer.step_n(args.frames):
+        if not engine.step_n(args.frames):
             raise SystemExit("realtime frame stepping failed")
         if args.inspect_framebuffer:
-            inspect_framebuffer(renderer)
-        saved = save_screenshot(renderer, args.out, launch_cwd=launch_cwd)
+            inspect_framebuffer(engine)
+        saved = save_screenshot(engine, args.out, launch_cwd=launch_cwd)
         print(
             f"[caustica] Saved {saved} after {args.frames} frame(s) "
             f"in {time.perf_counter() - started:.2f}s"

@@ -1,6 +1,7 @@
 #if CAUSTICA_WITH_PYTHON
 
 #include "PythonBindingsCore.h"
+#include "PythonEngineApp.h"
 
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
@@ -9,6 +10,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/operators.h>
 
+#include <engine/EngineApp.h>
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
@@ -63,7 +65,6 @@ using caustica::render::RenderAppState;
 // 1:1 to ints already used by the underlying Sample / OIDN / Streamline UI.
 namespace py_enums
 {
-    enum class PathTracerMode : int { Realtime = 0, Reference = 1 };
     enum class RealtimeAA     : int { Off = 0, TAA = 1, DLSS = 2, DLSS_RR = 3 };
     enum class DLSSMode       : int { Off = 0, MaxPerformance = 1, Balanced = 2, MaxQuality = 3, UltraPerformance = 4, UltraQuality = 5, DLAA = 6 };
     enum class DLSSFGMode     : int { Off = 0, On = 1, Auto = 2 };
@@ -112,20 +113,6 @@ namespace
         self.useSpecularGlossModel = false;
         if (self.specularColor.x == 0.f && self.specularColor.y == 0.f && self.specularColor.z == 0.f)
             self.specularColor = float3(1.f);
-        self.gpuDataDirty = true;
-    }
-
-    void SetOpenPBRTransmissionWeightFromPython(StandardMaterial& self, float value)
-    {
-        self.transmissionFactor = value;
-        self.enableTransmission = self.transmissionFactor > 0.f || self.diffuseTransmissionFactor > 0.f;
-        self.gpuDataDirty = true;
-    }
-
-    void SetOpenPBRDiffuseTransmissionWeightFromPython(StandardMaterial& self, float value)
-    {
-        self.diffuseTransmissionFactor = value;
-        self.enableTransmission = self.transmissionFactor > 0.f || self.diffuseTransmissionFactor > 0.f;
         self.gpuDataDirty = true;
     }
 
@@ -280,7 +267,7 @@ namespace
             return nullptr;
 
         // Scene-only lookup: StandardMaterial::gpuDataIndex only.
-        // Prefer App.find_material_by_id / caustica::findMaterial (cache-backed pick id).
+        // Prefer EngineApp.find_material / caustica::findMaterial (cache-backed pick id).
         for (const auto& mat : scene->getMaterials())
         {
             const auto pt = StandardMaterial::safeCast(mat);
@@ -526,6 +513,19 @@ namespace
         return Float3ToTuple(bbox->diagonal());
     }
 
+    App& RequirePyApp(caustica_py::PyEngineApp& self)
+    {
+        App* app = self.tryApp();
+        if (!app)
+            throw std::runtime_error("caustica.EngineApp: engine is closed");
+        return *app;
+    }
+
+    Scene* RequirePyScene(caustica_py::PyEngineApp& self)
+    {
+        return caustica::activeScene(RequirePyApp(self)).get();
+    }
+
     nb::object MaterialTexturePath(const StandardMaterial& material, StandardMaterialTextureSlot slot)
     {
         const StandardMaterialTexture& texture = material.getTexture(slot);
@@ -566,17 +566,17 @@ namespace caustica_py
 
 namespace
 {
-    caustica::App* g_embedApp = nullptr;
+    caustica::EngineApp* g_embedEngine = nullptr;
 }
 
-void setEmbedApp(caustica::App* app)
+void setEmbedEngine(caustica::EngineApp* engine)
 {
-    g_embedApp = app;
+    g_embedEngine = engine;
 }
 
-caustica::App* embedApp()
+caustica::EngineApp* embedEngine()
 {
-    return g_embedApp;
+    return g_embedEngine;
 }
 
 void RegisterCoreBindings(nb::module_& m)
@@ -594,14 +594,6 @@ void RegisterCoreBindings(nb::module_& m)
     // All enums use `is_arithmetic()` so users can write `int(value)` /
     // `value | other` and Python -> C++ implicit conversion to the underlying
     // int field works seamlessly.
-
-    // --- Path tracer mode (Reference vs Realtime) --------------------------
-    nb::enum_<PathTracerMode>(m, "PathTracerMode",
-        "Selects between accumulating reference rendering and a realtime path tracer.",
-        nb::is_arithmetic())
-        .value("Realtime",  PathTracerMode::Realtime,  "Realtime mode - 1 SPP per frame, denoiser, DLSS, RTXDI.")
-        .value("Reference", PathTracerMode::Reference, "Reference / accumulation mode - converges to ground truth.")
-        .export_values();
 
     nb::enum_<ToneMapperOperator>(m, "ToneMapOperator",
         "Tone-mapping curve applied when Settings.enable_tone_mapping is true.",
@@ -802,32 +794,15 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("emissive_color",
             [](StandardMaterial& self) { return Float3ToTuple(self.emissiveColor); },
             [](StandardMaterial& self, nb::object v) { self.emissiveColor = ToFloat3(v); self.gpuDataDirty = true; })
-        .def_prop_rw("emission_color",
-            [](StandardMaterial& self) { return Float3ToTuple(self.emissiveColor); },
-            [](StandardMaterial& self, nb::object v) { self.emissiveColor = ToFloat3(v); self.gpuDataDirty = true; },
-            "OpenPBR alias for emissive_color.")
-
         .def_prop_rw("emissive_intensity",
             [](StandardMaterial& self) { return self.emissiveIntensity; },
             [](StandardMaterial& self, float v) { self.emissiveIntensity = v; self.gpuDataDirty = true; })
-        .def_prop_rw("emission_luminance",
-            [](StandardMaterial& self) { return self.emissiveIntensity; },
-            [](StandardMaterial& self, float v) { self.emissiveIntensity = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for emissive_intensity.")
         .def_prop_rw("metalness",
             [](StandardMaterial& self) { return self.metalness; },
             [](StandardMaterial& self, float v) { self.metalness = v; self.gpuDataDirty = true; })
-        .def_prop_rw("base_metalness",
-            [](StandardMaterial& self) { return self.metalness; },
-            [](StandardMaterial& self, float v) { self.metalness = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for metalness.")
         .def_prop_rw("roughness",
             [](StandardMaterial& self) { return self.roughness; },
             [](StandardMaterial& self, float v) { self.roughness = v; self.gpuDataDirty = true; })
-        .def_prop_rw("specular_roughness",
-            [](StandardMaterial& self) { return self.roughness; },
-            [](StandardMaterial& self, float v) { self.roughness = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for roughness.")
         .def_prop_rw("material_model",
             [](StandardMaterial& self) { return self.materialModel; },
             [](StandardMaterial& self, const std::string& v) { SetMaterialModelFromPython(self, v); },
@@ -844,10 +819,6 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("anisotropy",
             [](StandardMaterial& self) { return self.anisotropy; },
             [](StandardMaterial& self, float v) { self.anisotropy = v; self.gpuDataDirty = true; })
-        .def_prop_rw("specular_roughness_anisotropy",
-            [](StandardMaterial& self) { return self.anisotropy; },
-            [](StandardMaterial& self, float v) { self.anisotropy = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for anisotropy.")
         .def_prop_rw("fuzz_weight",
             [](StandardMaterial& self) { return self.fuzzWeight; },
             [](StandardMaterial& self, float v) { self.fuzzWeight = v; self.gpuDataDirty = true; })
@@ -884,17 +855,10 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("subsurface_radius",
             [](StandardMaterial& self) { return self.subsurfaceRadius; },
             [](StandardMaterial& self, float v) { self.subsurfaceRadius = v; self.gpuDataDirty = true; })
-        .def_prop_rw("subsurface_scale",
-            [](StandardMaterial& self) { return self.subsurfaceRadiusScale.x; },
-            [](StandardMaterial& self, float v) { self.subsurfaceRadiusScale = dm::float3(v); self.gpuDataDirty = true; },
-            "Legacy scalar alias; setting it applies the same scale to RGB.")
         .def_prop_rw("subsurface_radius_scale",
             [](StandardMaterial& self) { return Float3ToTuple(self.subsurfaceRadiusScale); },
             [](StandardMaterial& self, nb::object v) { self.subsurfaceRadiusScale = ToFloat3(v); self.gpuDataDirty = true; })
         .def_prop_rw("subsurface_anisotropy",
-            [](StandardMaterial& self) { return self.subsurfaceAnisotropy; },
-            [](StandardMaterial& self, float v) { self.subsurfaceAnisotropy = v; self.gpuDataDirty = true; })
-        .def_prop_rw("subsurface_scatter_anisotropy",
             [](StandardMaterial& self) { return self.subsurfaceAnisotropy; },
             [](StandardMaterial& self, float v) { self.subsurfaceAnisotropy = v; self.gpuDataDirty = true; })
         .def_prop_rw("thin_film_weight",
@@ -927,48 +891,24 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("opacity",
             [](StandardMaterial& self) { return self.opacity; },
             [](StandardMaterial& self, float v) { self.opacity = v; self.gpuDataDirty = true; })
-        .def_prop_rw("geometry_opacity",
-            [](StandardMaterial& self) { return self.opacity; },
-            [](StandardMaterial& self, float v) { self.opacity = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for opacity.")
         .def_prop_rw("transmission_factor",
             [](StandardMaterial& self) { return self.transmissionFactor; },
             [](StandardMaterial& self, float v) { self.transmissionFactor = v; self.gpuDataDirty = true; })
-        .def_prop_rw("transmission_weight",
-            [](StandardMaterial& self) { return self.transmissionFactor; },
-            [](StandardMaterial& self, float v) { SetOpenPBRTransmissionWeightFromPython(self, v); },
-            "OpenPBR alias for transmission_factor; toggles enable_transmission from the weight.")
         .def_prop_rw("diffuse_transmission_factor",
             [](StandardMaterial& self) { return self.diffuseTransmissionFactor; },
             [](StandardMaterial& self, float v) { self.diffuseTransmissionFactor = v; self.gpuDataDirty = true; })
-        .def_prop_rw("transmission_diffuse_weight",
-            [](StandardMaterial& self) { return self.diffuseTransmissionFactor; },
-            [](StandardMaterial& self, float v) { SetOpenPBRDiffuseTransmissionWeightFromPython(self, v); },
-            "OpenPBR alias for diffuse_transmission_factor; toggles enable_transmission from the weight.")
         .def_prop_rw("normal_texture_scale",
             [](StandardMaterial& self) { return self.normalTextureScale; },
             [](StandardMaterial& self, float v) { self.normalTextureScale = v; self.gpuDataDirty = true; })
-        .def_prop_rw("geometry_normal_scale",
-            [](StandardMaterial& self) { return self.normalTextureScale; },
-            [](StandardMaterial& self, float v) { self.normalTextureScale = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for normal_texture_scale.")
         .def_prop_rw("coat_normal_scale",
             [](StandardMaterial& self) { return self.coatNormalTextureScale; },
             [](StandardMaterial& self, float v) { self.coatNormalTextureScale = v; self.gpuDataDirty = true; })
         .def_prop_rw("ior",
             [](StandardMaterial& self) { return self.IoR; },
             [](StandardMaterial& self, float v) { self.IoR = v; self.gpuDataDirty = true; })
-        .def_prop_rw("specular_ior",
-            [](StandardMaterial& self) { return self.IoR; },
-            [](StandardMaterial& self, float v) { self.IoR = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for ior.")
         .def_prop_rw("alpha_cutoff",
             [](StandardMaterial& self) { return self.alphaCutoff; },
             [](StandardMaterial& self, float v) { self.alphaCutoff = v; self.gpuDataDirty = true; })
-        .def_prop_rw("geometry_alpha_cutoff",
-            [](StandardMaterial& self) { return self.alphaCutoff; },
-            [](StandardMaterial& self, float v) { self.alphaCutoff = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for alpha_cutoff.")
 
         .def_prop_rw("volume_attenuation_distance",
             [](StandardMaterial& self) { return self.volumeAttenuationDistance; },
@@ -986,20 +926,12 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("enable_alpha_testing",
             [](StandardMaterial& self) { return self.enableAlphaTesting; },
             [](StandardMaterial& self, bool v) { self.enableAlphaTesting = v; self.gpuDataDirty = true; })
-        .def_prop_rw("geometry_enable_alpha_test",
-            [](StandardMaterial& self) { return self.enableAlphaTesting; },
-            [](StandardMaterial& self, bool v) { self.enableAlphaTesting = v; self.gpuDataDirty = true; },
-            "OpenPBR UI alias for enable_alpha_testing.")
         .def_prop_rw("enable_transmission",
             [](StandardMaterial& self) { return self.enableTransmission; },
             [](StandardMaterial& self, bool v) { self.enableTransmission = v; self.gpuDataDirty = true; })
         .def_prop_rw("thin_surface",
             [](StandardMaterial& self) { return self.thinSurface; },
             [](StandardMaterial& self, bool v) { self.thinSurface = v; self.gpuDataDirty = true; })
-        .def_prop_rw("geometry_thin_walled",
-            [](StandardMaterial& self) { return self.thinSurface; },
-            [](StandardMaterial& self, bool v) { self.thinSurface = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for thin_surface.")
         .def_prop_rw("exclude_from_nee",
             [](StandardMaterial& self) { return self.excludeFromNEE; },
             [](StandardMaterial& self, bool v) { self.excludeFromNEE = v; self.gpuDataDirty = true; })
@@ -1022,41 +954,21 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("enable_base_texture",
             [](StandardMaterial& self) { return self.enableBaseTexture; },
             [](StandardMaterial& self, bool v) { self.enableBaseTexture = v; self.gpuDataDirty = true; })
-        .def_prop_rw("enable_base_color_texture",
-            [](StandardMaterial& self) { return self.enableBaseTexture; },
-            [](StandardMaterial& self, bool v) { self.enableBaseTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for enable_base_texture.")
         .def_prop_rw("enable_orm_texture",
             [](StandardMaterial& self) { return self.enableOcclusionRoughnessMetallicTexture; },
             [](StandardMaterial& self, bool v) { self.enableOcclusionRoughnessMetallicTexture = v; self.gpuDataDirty = true; })
-        .def_prop_rw("enable_base_metalness_specular_roughness_texture",
-            [](StandardMaterial& self) { return self.enableOcclusionRoughnessMetallicTexture; },
-            [](StandardMaterial& self, bool v) { self.enableOcclusionRoughnessMetallicTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for enable_orm_texture.")
         .def_prop_rw("enable_normal_texture",
             [](StandardMaterial& self) { return self.enableNormalTexture; },
             [](StandardMaterial& self, bool v) { self.enableNormalTexture = v; self.gpuDataDirty = true; })
-        .def_prop_rw("enable_geometry_normal_texture",
-            [](StandardMaterial& self) { return self.enableNormalTexture; },
-            [](StandardMaterial& self, bool v) { self.enableNormalTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for enable_normal_texture.")
         .def_prop_rw("enable_coat_normal_texture",
             [](StandardMaterial& self) { return self.enableCoatNormalTexture; },
             [](StandardMaterial& self, bool v) { self.enableCoatNormalTexture = v; self.gpuDataDirty = true; })
         .def_prop_rw("enable_emissive_texture",
             [](StandardMaterial& self) { return self.enableEmissiveTexture; },
             [](StandardMaterial& self, bool v) { self.enableEmissiveTexture = v; self.gpuDataDirty = true; })
-        .def_prop_rw("enable_emission_color_texture",
-            [](StandardMaterial& self) { return self.enableEmissiveTexture; },
-            [](StandardMaterial& self, bool v) { self.enableEmissiveTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for enable_emissive_texture.")
         .def_prop_rw("enable_transmission_texture",
             [](StandardMaterial& self) { return self.enableTransmissionTexture; },
             [](StandardMaterial& self, bool v) { self.enableTransmissionTexture = v; self.gpuDataDirty = true; })
-        .def_prop_rw("enable_transmission_weight_texture",
-            [](StandardMaterial& self) { return self.enableTransmissionTexture; },
-            [](StandardMaterial& self, bool v) { self.enableTransmissionTexture = v; self.gpuDataDirty = true; },
-            "OpenPBR alias for enable_transmission_texture.")
 
         .def_prop_ro("base_texture_path",
             [](StandardMaterial& self) { return MaterialTexturePath(self, StandardMaterialTextureSlot::Base); })
@@ -1433,7 +1345,7 @@ void RegisterCoreBindings(nb::module_& m)
         .def("find_material_by_id", [](Scene& self, int materialId) {
                 return FindSceneMaterialById(&self, materialId);
             }, nb::arg("material_id"),
-            "Look up by gpuDataIndex only. Prefer App.find_material_by_id (cache-backed).")
+            "Look up by gpuDataIndex only. Prefer EngineApp.find_material (cache-backed).")
 
         .def("get_lights", [](Scene& self) {
                 return GetSceneLights(&self);
@@ -1456,93 +1368,6 @@ void RegisterCoreBindings(nb::module_& m)
             }, nb::arg("name"),
             "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
-        .def("create_directional_light",
-            [](Scene& self, nb::object color, float irradiance, float angularSize, const std::string& name) {
-                const std::string lightName = MakeUniqueLightName(&self, name, "DirectionalLight");
-                scene::DirectionalLightComponent component;
-                component.color = ToFloat3(color);
-                component.irradiance = irradiance;
-                component.angularSize = angularSize;
-                return PyEntityFromEntity(&self,
-                    self.attachDirectionalLightToRoot(std::move(component), lightName));
-            },
-            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
-            nb::arg("irradiance") = 1.f,
-            nb::arg("angular_size") = 0.f,
-            nb::arg("name") = std::string(),
-            "Create a directional light under the scene root and return its SceneEntity.")
-        .def("create_point_light",
-            [](Scene& self, nb::object color, float intensity, float radius, float range, const std::string& name) {
-                const std::string lightName = MakeUniqueLightName(&self, name, "PointLight");
-                scene::PointLightComponent component;
-                component.color = ToFloat3(color);
-                component.intensity = intensity;
-                component.radius = radius;
-                component.range = range;
-                return PyEntityFromEntity(&self,
-                    self.attachPointLightToRoot(std::move(component), lightName));
-            },
-            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
-            nb::arg("intensity") = 1.f,
-            nb::arg("radius") = 0.f,
-            nb::arg("range") = 0.f,
-            nb::arg("name") = std::string(),
-            "Create a point light under the scene root and return its SceneEntity.")
-        .def("create_spot_light",
-            [](Scene& self, nb::object color, float intensity, float radius, float range,
-               float innerAngle, float outerAngle, const std::string& name) {
-                const std::string lightName = MakeUniqueLightName(&self, name, "SpotLight");
-                scene::SpotLightComponent component;
-                component.color = ToFloat3(color);
-                component.intensity = intensity;
-                component.radius = radius;
-                component.range = range;
-                component.innerAngle = innerAngle;
-                component.outerAngle = outerAngle;
-                return PyEntityFromEntity(&self,
-                    self.attachSpotLightToRoot(std::move(component), lightName));
-            },
-            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
-            nb::arg("intensity") = 1.f,
-            nb::arg("radius") = 0.f,
-            nb::arg("range") = 0.f,
-            nb::arg("inner_angle") = 180.f,
-            nb::arg("outer_angle") = 180.f,
-            nb::arg("name") = std::string(),
-            "Create a spot light under the scene root and return its SceneEntity.")
-        .def("create_rect_light",
-            [](Scene& self, nb::object color, float intensity, float width, float height, const std::string& name) {
-                const std::string lightName = MakeUniqueLightName(&self, name, "RectLight");
-                scene::RectLightComponent component;
-                component.color = ToFloat3(color);
-                component.intensity = intensity;
-                component.width = width;
-                component.height = height;
-                return PyEntityFromEntity(&self,
-                    self.attachRectLightToRoot(std::move(component), lightName));
-            },
-            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
-            nb::arg("intensity") = 1.f,
-            nb::arg("width") = 1.f,
-            nb::arg("height") = 1.f,
-            nb::arg("name") = std::string(),
-            "Create a one-sided rectangular area light under the scene root and return its SceneEntity.")
-        .def("create_environment_light",
-            [](Scene& self, nb::object color, const std::string& path, float rotation, const std::string& name) {
-                const std::string lightName = MakeUniqueLightName(&self, name, "EnvironmentLight");
-                scene::EnvironmentLightComponent component;
-                component.color = ToFloat3(color);
-                component.path = path;
-                component.rotation = rotation;
-                return PyEntityFromEntity(&self,
-                    self.attachEnvironmentLightToRoot(std::move(component), lightName));
-            },
-            nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
-            nb::arg("path") = std::string(),
-            nb::arg("rotation") = 0.f,
-            nb::arg("name") = std::string(),
-            "Create an environment light under the scene root and return its SceneEntity.")
-
         .def_prop_ro("material_count", [](Scene& self) {
                 return GetSceneMaterials(&self).size();
             }, "Number of StandardMaterial instances in this scene.")
@@ -1556,24 +1381,13 @@ void RegisterCoreBindings(nb::module_& m)
                 return self.getCameraEntities().size();
             }, "Number of camera entities in this scene.")
 
-        .def("get_bounds", [](Scene& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(&self));
-            },
-            "Return this scene's world-space ((min.xyz), (max.xyz)) AABB, or None.")
-        .def("get_scene_bounds", [](Scene& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(&self));
-            },
-            "Alias for get_bounds().")
-
         .def_prop_ro("bounds", [](Scene& self) {
                 return SceneBoundsTuple(SceneBoundsFromScene(&self));
             },
             "World-space axis-aligned bounding box that covers every renderable\n"
             "leaf in the scene (mesh instances, lights, splats, ...).\n"
             "Returns ``((min_x, min_y, min_z), (max_x, max_y, max_z))`` or\n"
-            "``None`` when the scene is empty / not refreshed yet.\n"
-            "The AABB is recomputed by the engine after every scene load and\n"
-            "after each ``Renderer.load_mesh_file`` call.")
+            "``None`` when the scene is empty / not refreshed yet.")
         .def_prop_ro("bounds_center", [](Scene& self) {
                 return SceneBoundsCenter(SceneBoundsFromScene(&self));
             },
@@ -1602,14 +1416,11 @@ void RegisterCoreBindings(nb::module_& m)
             [](EnvironmentMapRuntimeParameters& s) { return Float3ToTuple(s.RotationXYZ); },
             [](EnvironmentMapRuntimeParameters& s, nb::object v) { s.RotationXYZ = ToFloat3(v); })
         .def_rw("enabled", &EnvironmentMapRuntimeParameters::enabled)
-        .def_rw("visible_to_camera", &EnvironmentMapRuntimeParameters::VisibleToCamera)
-        .def_prop_rw("hide_source",
-            [](EnvironmentMapRuntimeParameters& s) { return !s.VisibleToCamera; },
-            [](EnvironmentMapRuntimeParameters& s, bool hide) { s.VisibleToCamera = !hide; });
+        .def_rw("visible_to_camera", &EnvironmentMapRuntimeParameters::VisibleToCamera);
 
     nb::class_<ToneMappingParameters>(m, "ToneMappingParams",
         "Tone-mapping and exposure settings. Access the live instance through\n"
-        "``renderer.settings.tone_mapping_params``.")
+        "``engine.settings.tone_mapping_params``.")
         .def(nb::init<>())
         .def_rw("exposure_mode", &ToneMappingParameters::exposureMode)
         .def_rw("tone_map_operator", &ToneMappingParameters::toneMapOperator)
@@ -1668,23 +1479,7 @@ void RegisterCoreBindings(nb::module_& m)
                         s.ResetRealtimeCaches = true;
                 }
             },
-                "True for realtime mode, False for reference / accumulation mode.\n"
-                "See `settings.path_tracer_mode` for an enum-flavored version.")
-        .def_prop_rw("path_tracer_mode",
-            [](PathTracerSettings& s) -> int { return s.RealtimeMode ? 0 /*Realtime*/ : 1 /*Reference*/; },
-            [](PathTracerSettings& s, int mode) {
-                bool wasRealtime = s.RealtimeMode;
-                s.RealtimeMode = (mode == 0);
-                if (wasRealtime != s.RealtimeMode)
-                {
-                    s.ResetAccumulation = true;
-                    if (s.RealtimeMode)
-                        s.ResetRealtimeCaches = true;
-                }
-            },
-            "Convenience wrapper around `realtime_mode`.\n"
-            "Set to caustica.PathTracerMode.Reference or .Realtime.")
-
+                "True for realtime mode, False for reference / accumulation mode.")
         .def_rw("realtime_samples_per_pixel",    &PathTracerSettings::RealtimeSamplesPerPixel)
         .def_rw("accumulation_target",           &PathTracerSettings::AccumulationTarget)
         .def_rw("reset_accumulation",            &PathTracerSettings::ResetAccumulation)
@@ -1741,7 +1536,6 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("gaussian_splat_primary_method", &PathTracerSettings::GaussianSplatPrimaryMethod,
                 "Primary color path (caustica.GaussianSplatPrimaryMethod): GS=3DGS, GUT=3DGUT.")
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
-        .def_rw("gaussian_splat_hybrid_shadows", &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,
                 "Mesh shadow mode (caustica.GaussianSplatShadowMode). Orthogonal to primary 3DGS/3DGUT.")
         .def_rw("gaussian_splat_sorting_mode",   &PathTracerSettings::GaussianSplatSortingMode,
@@ -1879,335 +1673,322 @@ void RegisterCoreBindings(nb::module_& m)
                 nb::rv_policy::reference_internal,
                 "EnvironmentMapParams structure (intensity, tint, rotation, enabled, visible_to_camera).")
         ;
+}
 
-    // --- Sample (top-level renderer access) -------------------------------
-    nb::class_<App>(m, "Sample",
-        "caustica renderer instance. In embed mode use caustica.app(); in extension\n"
-        "mode use Renderer.app to retrieve the underlying instance.")
-        .def_prop_ro("settings", [](App& self) -> PathTracerSettings* {
-                return caustica::settings(self);
-            }, nb::rv_policy::reference,
-            "Live `settings` mirror of the current UI state.")
-        .def_prop_ro("scene", [](App& self) {
-                return caustica::activeScene(self);
-            }, "Current loaded `Scene`, or None before a scene is available.")
+void BindEngineApp(nb::class_<PyEngineApp>& cls)
+{
 
-        .def_prop_ro("scene_name",  [](App& self) { return caustica::currentSceneName(self); })
-        .def_prop_ro("available_scenes", [](App& self) { return caustica::availableScenes(self); })
+    cls
+        .def_prop_ro("valid", &PyEngineApp::isValid)
+        .def("shutdown", &PyEngineApp::shutdown)
+        .def("run", [](PyEngineApp& self) { self.engine().run(); })
+        .def("request_exit", [](PyEngineApp& self) { self.engine().requestExit(); })
+        .def("step_frame", &PyEngineApp::step,
+             nb::arg("dt") = -1.0f,
+             "Advance one frame. dt < 0 uses the engine clock (1/60 in headless).")
+        .def("step_n", &PyEngineApp::stepN, nb::arg("frames"),
+             "Python sugar: call step_frame() N times.")
+        .def("step_until_accumulated", &PyEngineApp::stepUntilAccumulated,
+             nb::arg("max_frames") = 0,
+             "Python sugar: step until accumulation_completed.")
+        .def("wait_until_ready",
+             [](PyEngineApp& self, double timeoutSeconds, int warmupFrames) {
+                 return self.engine().waitUntilReady(timeoutSeconds, warmupFrames);
+             },
+             nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4)
 
-        .def("get_scene", [](App& self) {
-                return caustica::activeScene(self);
-            }, "Return the current loaded Scene, matching the C++ scene() entry point.")
+        .def_prop_ro("is_scene_loaded", [](PyEngineApp& self) { return self.engine().isSceneLoaded(); })
+        .def_prop_ro("is_scene_loading", [](PyEngineApp& self) { return self.engine().isSceneLoading(); })
+        .def_prop_ro("is_scene_ready", [](PyEngineApp& self) { return self.engine().isSceneReady(); })
+        .def("set_scene",
+             [](PyEngineApp& self, const std::string& name, bool forceReload) {
+                 self.engine().setScene(name, forceReload);
+             },
+             nb::arg("scene_name"), nb::arg("force_reload") = false)
 
-        .def("set_scene", [](App& self, const std::string& name, bool forceReload)
-            {
-                caustica::setCurrentScene(self, name, forceReload);
-            },
-            nb::arg("scene_name"), nb::arg("force_reload") = false,
-            "Switch to a different scene file from caustica.Sample.available_scenes.")
+        .def_prop_ro("settings",
+             [](PyEngineApp& self) -> PathTracerSettings* { return &self.engine().settings(); },
+             nb::rv_policy::reference,
+             "Live PathTracerSettings (same object as C++ EngineApp::settings()).")
+        .def_prop_ro("scene",
+             [](PyEngineApp& self) { return caustica::activeScene(RequirePyApp(self)); },
+             "Read-only Scene view, or None before a scene is available.")
+        .def_prop_ro("scene_name", [](PyEngineApp& self) { return self.engine().currentSceneName(); })
+        .def_prop_ro("available_scenes", [](PyEngineApp& self) { return self.engine().availableScenes(); })
 
-        .def("load_gaussian_splats", [](App& self, const std::string& fileName, bool convertRdfToRub)
-            {
-                return caustica::loadGaussianSplatFile(self, fileName, convertRdfToRub);
-            },
-            nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true,
-            "load a 3DGS .ply file and rasterize it over the current scene.")
+        .def("load_gaussian_splat_file",
+             [](PyEngineApp& self, const std::string& fileName, bool convertRdfToRub) {
+                 return self.engine().loadGaussianSplatFile(fileName, convertRdfToRub);
+             },
+             nb::arg("file_name"), nb::arg("convert_rdf_to_rub") = true)
+        .def_prop_ro("gaussian_splat_count", [](PyEngineApp& self) { return self.engine().gaussianSplatCount(); })
+        .def_prop_ro("gaussian_splat_object_count", [](PyEngineApp& self) { return self.engine().gaussianSplatObjectCount(); })
+        .def_prop_ro("gaussian_splat_file_name", [](PyEngineApp& self) { return self.engine().gaussianSplatFileName(); })
 
-        .def_prop_ro("gaussian_splat_count", [](App& self) { return caustica::gaussianSplatCount(self); })
-        .def_prop_ro("gaussian_splat_object_count", [](App& self) { return caustica::gaussianSplatObjectCount(self); })
-        .def_prop_ro("gaussian_splat_file_name", [](App& self) { return caustica::gaussianSplatFileName(self); })
+        .def("find_entity", [](PyEngineApp& self, const std::string& path) {
+                return FindSceneEntity(RequirePyScene(self), path);
+            }, nb::arg("path"))
+        .def("find_material", [](PyEngineApp& self, int materialId) {
+                return StandardMaterial::safeCast(self.engine().findMaterial(materialId));
+            }, nb::arg("material_id"))
 
-        .def("get_materials", [](App& self) {
-                return GetSceneMaterials(caustica::activeScene(self).get());
-            }, "Compatibility alias for `sample.scene.get_materials()`.")
-
-        .def("find_material", [](App& self, const std::string& name) -> std::shared_ptr<StandardMaterial> {
-                return FindSceneMaterial(caustica::activeScene(self).get(), name);
-            }, nb::arg("name"), "Compatibility alias for `sample.scene.find_material(name)`.")
-
-        .def("find_material_by_id", [](App& self, int materialId) -> std::shared_ptr<StandardMaterial> {
-                return StandardMaterial::safeCast(caustica::findMaterial(self, materialId));
-            }, nb::arg("material_id"),
-            "Resolve by path-tracer pick id (gpuDataIndex). Prefer over scene.find_material_by_id.")
-
-        .def("get_lights", [](App& self) {
-                return GetSceneLights(caustica::activeScene(self).get());
-            }, "Compatibility alias for `sample.scene.get_lights()`.")
-
-        .def("get_scene_bounds", [](App& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(caustica::activeScene(self)));
-            },
-            "Compatibility alias for `sample.scene.get_scene_bounds()`.")
-
-        .def_prop_ro("scene_bounds", [](App& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(caustica::activeScene(self)));
-            },
-            "Shortcut for `sample.scene.bounds`. Returns the world-space\n"
-            "((min.xyz), (max.xyz)) AABB or `None` if no scene is loaded.")
-        .def_prop_ro("scene_bounds_center", [](App& self) {
-                return SceneBoundsCenter(SceneBoundsFromScene(caustica::activeScene(self)));
-            }, "Shortcut for `sample.scene.bounds_center` (or `None`).")
-        .def_prop_ro("scene_bounds_size", [](App& self) {
-                return SceneBoundsSize(SceneBoundsFromScene(caustica::activeScene(self)));
-            }, "Shortcut for `sample.scene.bounds_size` (or `None`).")
-
-        .def("find_light", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneLight(caustica::activeScene(self).get(), name);
-            }, nb::arg("name"), "Compatibility alias for `sample.scene.find_light(name)`.")
-        .def("find_entity", [](App& self, const std::string& path) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneEntity(caustica::activeScene(self).get(), path);
-            }, nb::arg("path"), "Compatibility alias for `sample.scene.find_entity(path)`.")
-
-        .def("get_mesh_entities", [](App& self) {
-                return GetSceneMeshEntities(caustica::activeScene(self).get());
-            }, "Compatibility alias for `sample.scene.get_mesh_entities()`.")
-        .def("find_mesh_entity", [](App& self, const std::string& name) -> std::shared_ptr<PySceneEntity> {
-                return FindSceneMeshEntity(caustica::activeScene(self).get(), name);
-            }, nb::arg("name"), "Compatibility alias for `sample.scene.find_mesh_entity(name)`.")
-
-        .def("set_environment_map", [](App& self, const std::string& path) {
-                caustica::setEnvMapOverrideSource(self, path);
+        .def("set_env_map_override_source", [](PyEngineApp& self, const std::string& path) {
+                self.engine().setEnvMapOverrideSource(path);
             }, nb::arg("path"))
 
-        .def("get_camera_pos_dir_up", [](App& self) {
-                return caustica::currentCameraPosDirUp(self);
-            }, "Returns a comma-separated string of pos.xyz, dir.xyz, up.xyz.")
-
-        .def("set_camera_pos_dir_up", [](App& self, const std::string& v) {
-                return caustica::setCurrentCameraPosDirUp(self, v);
-            }, nb::arg("pos_dir_up"))
-
-        .def("set_camera_fov", [](App& self, float fov) {
-                caustica::setCameraVerticalFOV(self, caustica::math::radians(fov));
-            },
-            nb::arg("vertical_fov_degrees"))
-
+        .def("set_camera_pos_dir_up",
+             [](PyEngineApp& self, nb::object pos, nb::object dir, nb::object up) {
+                 return self.engine().setCameraPosDirUp(ToFloat3(pos), ToFloat3(dir), ToFloat3(up));
+             },
+             nb::arg("position"), nb::arg("direction"),
+             nb::arg("up") = nb::make_tuple(0.0f, 1.0f, 0.0f))
+        .def_prop_ro("current_camera_pos_dir_up", [](PyEngineApp& self) {
+                return self.engine().currentCameraPosDirUp();
+            })
+        .def("set_camera_vertical_fov", [](PyEngineApp& self, float radians) {
+                self.engine().setCameraVerticalFOV(radians);
+            }, nb::arg("radians"))
+        .def_prop_ro("camera_vertical_fov", [](PyEngineApp& self) {
+                return self.engine().cameraVerticalFOV();
+            })
         .def("set_camera_intrinsics",
-            [](App& self, float fx, float fy, float cx, float cy, float width, float height) {
-                caustica::setCameraIntrinsics(self, fx, fy, cx, cy, width, height);
-            },
-            nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"), nb::arg("width"), nb::arg("height"))
-
-        .def("clear_camera_intrinsics", [](App& self) {
-                caustica::clearCameraIntrinsics(self);
-            }, "Clear pixel-space intrinsics and restore the FOV-based projection.")
-
-        .def("get_camera_fov", [](App& self) { return caustica::cameraVerticalFOV(self); })
-
-        .def_prop_ro("scene_camera_count", [](App& self) {
-                return caustica::sceneCameraCount(self);
-            }, "Number of scene cameras available for selection.")
+             [](PyEngineApp& self, float fx, float fy, float cx, float cy, float width, float height) {
+                 self.engine().setCameraIntrinsics(fx, fy, cx, cy, width, height);
+             },
+             nb::arg("fx"), nb::arg("fy"), nb::arg("cx"), nb::arg("cy"),
+             nb::arg("width"), nb::arg("height"))
+        .def("clear_camera_intrinsics", [](PyEngineApp& self) { self.engine().clearCameraIntrinsics(); })
+        .def_prop_ro("scene_camera_count", [](PyEngineApp& self) { return self.engine().sceneCameraCount(); })
         .def_prop_rw("selected_camera_index",
-            [](App& self) -> unsigned int { return caustica::selectedCameraIndex(self); },
-            [](App& self, unsigned int index) { caustica::selectedCameraIndex(self) = index; },
-            "Active scene-camera index (0 .. scene_camera_count-1).")
-        .def("get_cameras", [](App& self) {
-                return GetSceneCameras(caustica::activeScene(self).get());
-            }, "Compatibility alias for `sample.scene.get_cameras()`.")
+             [](PyEngineApp& self) { return self.engine().selectedCameraIndex(); },
+             [](PyEngineApp& self, unsigned int index) { self.engine().setSelectedCameraIndex(index); })
+        .def("save_current_camera", [](PyEngineApp& self) { self.engine().saveCurrentCamera(); })
+        .def("load_current_camera", [](PyEngineApp& self) { self.engine().loadCurrentCamera(); })
 
-        .def("save_current_camera",  [](App& self) { caustica::saveCurrentCamera(self); })
-        .def("load_current_camera",  [](App& self) { caustica::loadCurrentCamera(self); })
+        .def("load", [](PyEngineApp& self, const std::string& path) {
+                return self.engine().load(path);
+            }, nb::arg("path"))
+        .def("spawn", [](PyEngineApp& self, const Handle<ScenePrefabAsset>& prefab) {
+                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawn(prefab));
+            }, nb::arg("prefab"))
+        .def("spawn_from_file", [](PyEngineApp& self, const std::string& path) {
+                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawnFromFile(path));
+            }, nb::arg("path"))
+        .def("spawn_from_source", [](PyEngineApp& self, const std::string& source) {
+                return PyEntityFromEntity(RequirePyScene(self), self.engine().spawnFromSource(source));
+            }, nb::arg("source"))
+        .def("despawn", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return self.engine().despawn(EntityFromPy(entity));
+            }, nb::arg("entity"))
 
-        .def("load", [](App& self, const std::string& path) {
-                return caustica::load(self, path);
-            },
-            nb::arg("path"),
-            "assets.load: import a mesh/prefab file into a ScenePrefab handle (no spawn).")
-        .def("spawn", [](App& self, const Handle<ScenePrefabAsset>& prefab) {
-                auto scene = caustica::activeScene(self);
-                return PyEntityFromEntity(scene.get(), caustica::spawn(self, prefab));
-            },
-            nb::arg("prefab"),
-            "Spawn a previously loaded ScenePrefab into the active scene. Returns root SceneEntity.")
-        .def("spawn_from_file", [](App& self, const std::string& path) {
-                auto scene = caustica::activeScene(self);
-                return PyEntityFromEntity(scene.get(), caustica::spawnFromFile(self, path));
-            },
-            nb::arg("path"),
-            "load + spawn a mesh/prefab file (.gltf/.glb/.obj/.urdf/.usd*/.prefab.json). Returns root SceneEntity.")
-        .def("load_mesh_file", [](App& self, const std::string& fileName) {
-                return caustica::spawnFromFile(self, fileName) != ecs::NullEntity;
-            },
-            nb::arg("file_name"),
-            "Append a mesh file (.gltf, .glb, .obj, .urdf, or .usd/.usda/.usdc) to the current scene.")
-        .def("despawn", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
-                return caustica::despawn(self, EntityFromPy(entity));
-            },
-            nb::arg("entity"),
-            "Remove a scene entity (and children) via the engine despawn path.")
+        .def("spawn_directional_light",
+             [](PyEngineApp& self, nb::object color, float irradiance, float angularSize, const std::string& name) {
+                 scene::DirectionalLightComponent component;
+                 component.color = ToFloat3(color);
+                 component.irradiance = irradiance;
+                 component.angularSize = angularSize;
+                 Scene* scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, name, "DirectionalLight");
+                 return PyEntityFromEntity(scene, self.engine().spawnDirectionalLight(std::move(component), lightName));
+             },
+             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+             nb::arg("irradiance") = 1.f, nb::arg("angular_size") = 0.f, nb::arg("name") = std::string())
+        .def("spawn_point_light",
+             [](PyEngineApp& self, nb::object color, float intensity, float radius, float range, const std::string& name) {
+                 scene::PointLightComponent component;
+                 component.color = ToFloat3(color);
+                 component.intensity = intensity;
+                 component.radius = radius;
+                 component.range = range;
+                 Scene* scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, name, "PointLight");
+                 return PyEntityFromEntity(scene, self.engine().spawnPointLight(std::move(component), lightName));
+             },
+             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+             nb::arg("intensity") = 1.f, nb::arg("radius") = 0.f, nb::arg("range") = 0.f,
+             nb::arg("name") = std::string())
+        .def("spawn_spot_light",
+             [](PyEngineApp& self, nb::object color, float intensity, float radius, float range,
+                float innerAngle, float outerAngle, const std::string& name) {
+                 scene::SpotLightComponent component;
+                 component.color = ToFloat3(color);
+                 component.intensity = intensity;
+                 component.radius = radius;
+                 component.range = range;
+                 component.innerAngle = innerAngle;
+                 component.outerAngle = outerAngle;
+                 Scene* scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, name, "SpotLight");
+                 return PyEntityFromEntity(scene, self.engine().spawnSpotLight(std::move(component), lightName));
+             },
+             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+             nb::arg("intensity") = 1.f, nb::arg("radius") = 0.f, nb::arg("range") = 0.f,
+             nb::arg("inner_angle") = 180.f, nb::arg("outer_angle") = 180.f, nb::arg("name") = std::string())
+        .def("spawn_rect_light",
+             [](PyEngineApp& self, nb::object color, float intensity, float width, float height, const std::string& name) {
+                 scene::RectLightComponent component;
+                 component.color = ToFloat3(color);
+                 component.intensity = intensity;
+                 component.width = width;
+                 component.height = height;
+                 Scene* scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, name, "RectLight");
+                 return PyEntityFromEntity(scene, self.engine().spawnRectLight(std::move(component), lightName));
+             },
+             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+             nb::arg("intensity") = 1.f, nb::arg("width") = 1.f, nb::arg("height") = 1.f,
+             nb::arg("name") = std::string())
+        .def("spawn_environment_light",
+             [](PyEngineApp& self, nb::object color, const std::string& path, float rotation, const std::string& name) {
+                 scene::EnvironmentLightComponent component;
+                 component.color = ToFloat3(color);
+                 component.path = path;
+                 component.rotation = rotation;
+                 Scene* scene = RequirePyScene(self);
+                 const std::string lightName = MakeUniqueLightName(scene, name, "EnvironmentLight");
+                 return PyEntityFromEntity(scene, self.engine().spawnEnvironmentLight(std::move(component), lightName));
+             },
+             nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
+             nb::arg("path") = std::string(), nb::arg("rotation") = 0.f, nb::arg("name") = std::string())
 
-        .def("get_mesh_vertices", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
-                return Float3VectorToList(
-                    caustica::getMeshVertices(self, EntityFromPy(entity)));
-            }, nb::arg("entity"),
-            "Return unique mesh positions for a SceneEntity in object space.")
+        .def("get_mesh_vertices", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return Float3VectorToList(self.engine().getMeshVertices(EntityFromPy(entity)));
+            }, nb::arg("entity"))
         .def("set_mesh_vertices",
-            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                caustica::setMeshVertices(
-                    self,
-                    EntityFromPy(entity),
-                    ToFloat3Vector(vertices),
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-            },
-            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Replace object-space positions for a SceneEntity mesh.")
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
+                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 self.engine().setMeshVertices(
+                     EntityFromPy(entity),
+                     ToFloat3Vector(vertices),
+                     { .recomputeNormals = recomputeNormals,
+                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
+             },
+             nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh",
-            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity handle = EntityFromPy(entity);
-                std::vector<float3> vertices = caustica::getMeshVertices(self, handle);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                caustica::setMeshVertices(
-                    self,
-                    handle,
-                    vertices,
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-                return vertices.size();
-            },
-            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true,
-            "Apply callback(i, (x,y,z)) to each unique object-space vertex on a SceneEntity.")
-        .def("get_mesh_vertices_world", [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
-                return Float3VectorToList(
-                    caustica::getMeshVerticesWorld(self, EntityFromPy(entity)));
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
+                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 const ecs::Entity handle = EntityFromPy(entity);
+                 std::vector<float3> vertices = self.engine().getMeshVertices(handle);
+                 for (size_t i = 0; i < vertices.size(); ++i)
+                 {
+                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                     if (!updated.is_none())
+                         vertices[i] = ToFloat3(updated);
+                 }
+                 self.engine().setMeshVertices(
+                     handle, vertices,
+                     { .recomputeNormals = recomputeNormals,
+                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
+                 return vertices.size();
+             },
+             nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+             nb::arg("rebuild_acceleration_structure") = true)
+        .def("get_mesh_vertices_world", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                return Float3VectorToList(self.engine().getMeshVerticesWorld(EntityFromPy(entity)));
             }, nb::arg("entity"))
         .def("set_mesh_vertices_world",
-            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                caustica::setMeshVerticesWorld(
-                    self,
-                    EntityFromPy(entity),
-                    ToFloat3Vector(vertices),
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-            },
-            nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
+                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 self.engine().setMeshVerticesWorld(
+                     EntityFromPy(entity),
+                     ToFloat3Vector(vertices),
+                     { .recomputeNormals = recomputeNormals,
+                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
+             },
+             nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
+             nb::arg("rebuild_acceleration_structure") = true)
         .def("deform_mesh_world",
-            [](App& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
-               bool recomputeNormals, bool rebuildAccelerationStructure) {
-                const ecs::Entity handle = EntityFromPy(entity);
-                std::vector<float3> vertices = caustica::getMeshVerticesWorld(self, handle);
-                for (size_t i = 0; i < vertices.size(); ++i)
-                {
-                    nb::object updated = callback(i, Float3ToTuple(vertices[i]));
-                    if (!updated.is_none())
-                        vertices[i] = ToFloat3(updated);
-                }
-                caustica::setMeshVerticesWorld(
-                    self,
-                    handle,
-                    vertices,
-                    { .recomputeNormals = recomputeNormals,
-                      .rebuildAccelerationStructure = rebuildAccelerationStructure });
-                return vertices.size();
-            },
-            nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
-            nb::arg("rebuild_acceleration_structure") = true)
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
+                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 const ecs::Entity handle = EntityFromPy(entity);
+                 std::vector<float3> vertices = self.engine().getMeshVerticesWorld(handle);
+                 for (size_t i = 0; i < vertices.size(); ++i)
+                 {
+                     nb::object updated = callback(i, Float3ToTuple(vertices[i]));
+                     if (!updated.is_none())
+                         vertices[i] = ToFloat3(updated);
+                 }
+                 self.engine().setMeshVerticesWorld(
+                     handle, vertices,
+                     { .recomputeNormals = recomputeNormals,
+                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
+                 return vertices.size();
+             },
+             nb::arg("entity"), nb::arg("callback"), nb::arg("recompute_normals") = true,
+             nb::arg("rebuild_acceleration_structure") = true)
 
-        .def("request_shader_reload",  [](App& self) {
-                self.resource<RenderAppState>().runtime.Invalidation.ShaderReloadRequested = true;
+        .def("request_shader_reload", [](PyEngineApp& self) {
+                self.engine().renderAppState().runtime.Invalidation.ShaderReloadRequested = true;
             })
-        .def("request_accel_rebuild",  [](App& self) {
-                self.resource<RenderAppState>().runtime.Invalidation.AccelerationStructRebuildRequested = true;
+        .def("request_full_accel_rebuild", [](PyEngineApp& self) {
+                self.engine().requestFullAccelRebuild();
             })
         .def("request_mesh_accel_rebuild",
-            [](App& self, const std::shared_ptr<PySceneEntity>& entity) {
-                caustica::requestMeshAccelRebuild(self, EntityFromPy(entity));
-            },
-            nb::arg("entity"),
-            "Request a BLAS rebuild for the mesh on one SceneEntity.")
-        .def("reset_accumulation",     [](App& self) {
-                if (auto* s = caustica::settings(self))
-                    s->ResetAccumulation = true;
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
+                 self.engine().requestMeshAccelRebuild(EntityFromPy(entity));
+             }, nb::arg("entity"))
+        .def("precache_rt_feature_presets",
+             [](PyEngineApp& self, bool showProgress) {
+                 return self.engine().precacheRtFeaturePresets(showProgress);
+             }, nb::arg("show_progress") = true)
+        .def("reset_accumulation", [](PyEngineApp& self) {
+                self.engine().settings().ResetAccumulation = true;
             })
-        .def("reset_realtime_caches",  [](App& self) {
-                if (auto* s = caustica::settings(self))
-                    s->ResetRealtimeCaches = true;
+        .def("reset_realtime_caches", [](PyEngineApp& self) {
+                self.engine().settings().ResetRealtimeCaches = true;
             })
+        .def("set_realtime_mode",
+             [](PyEngineApp& self, bool standaloneDenoiser, int realtimeAA) {
+                 self.engine().setRealtimeMode(standaloneDenoiser, realtimeAA);
+             },
+             nb::arg("standalone_denoiser") = true, nb::arg("realtime_aa") = 2)
+        .def("set_reference_mode",
+             [](PyEngineApp& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter) {
+                 self.engine().setReferenceMode(spp, oidn, oidnQuality, oidnPasses, oidnPrefilter);
+             },
+             nb::arg("spp") = 0, nb::arg("oidn") = false,
+             nb::arg("oidn_quality") = 1, nb::arg("oidn_passes") = 1, nb::arg("oidn_prefilter") = 1)
+        .def("prepare_animation_frame",
+             [](PyEngineApp& self, double sceneTime, bool importedAnimations, bool keyframes) {
+                 return self.engine().prepareAnimationFrame(sceneTime, importedAnimations, keyframes);
+             },
+             nb::arg("time_seconds"), nb::arg("imported_animations") = true, nb::arg("keyframes") = true)
+        .def("render_reference_frame", &PyEngineApp::renderReferenceFrame,
+             nb::arg("spp") = 64, nb::arg("oidn") = true, nb::arg("max_frames") = 0)
+        .def("render_realtime_frame", &PyEngineApp::renderRealtimeFrame,
+             nb::arg("dt") = 1.0f / 60.0f)
+        .def("save_screenshot",
+             [](PyEngineApp& self, const std::string& path) {
+                 return self.engine().saveScreenshot(path);
+             }, nb::arg("output_path"))
 
-        .def("set_realtime_mode", [](App& self, bool standaloneDenoiser, int realtimeAA)
-            {
-                PathTracerSettings& settings = *caustica::settings(self);
-                if (!settings.RealtimeMode)
-                {
-                    settings.ResetAccumulation = true;
-                    settings.ResetRealtimeCaches = true;
-                }
-                settings.RealtimeMode      = true;
-                settings.StandaloneDenoiser = standaloneDenoiser;
-                settings.RealtimeAA         = realtimeAA;
-            },
-            nb::arg("standalone_denoiser") = true,
-            nb::arg("realtime_aa") = 2 /*DLSS*/,
-            "Switch to realtime path tracing.\n"
-            "Args:\n"
-            "    standalone_denoiser: enable NRD (no effect with DLSS-RR)\n"
-            "    realtime_aa        : 0=Off, 1=TAA, 2=DLSS, 3=DLSS-RR")
-
-        .def("set_reference_mode", [](App& self, int spp, bool oidn, int oidnQuality, int oidnPasses, int oidnPrefilter)
-            {
-                PathTracerSettings& settings = *caustica::settings(self);
-                if (settings.RealtimeMode)
-                    settings.ResetAccumulation = true;
-                settings.RealtimeMode             = false;
-                if (spp > 0)
-                    settings.AccumulationTarget   = spp;
-                settings.ReferenceOIDNDenoiser    = oidn;
-                settings.ReferenceOIDNQuality     = oidnQuality;
-                settings.ReferenceOIDNPasses      = oidnPasses;
-                settings.ReferenceOIDNPrefilter   = oidnPrefilter;
-                settings.ReferenceOIDNDenoiserChanged = true;
-            },
-            nb::arg("spp") = 0,
-            nb::arg("oidn") = false,
-            nb::arg("oidn_quality")   = 1 /*Balanced*/,
-            nb::arg("oidn_passes")    = 1 /*Albedo*/,
-            nb::arg("oidn_prefilter") = 1 /*Fast*/,
-            "Switch to reference / accumulation rendering.\n"
-            "Args:\n"
-            "    spp           : reference SPP target (0 to keep current).\n"
-            "    oidn          : run OIDN once accumulation hits the SPP target.\n"
-            "    oidn_quality  : caustica.OidnQuality (0=Fast, 1=Balanced, 2=High)\n"
-            "    oidn_passes   : caustica.OidnPasses (0=ColorOnly, 1=Albedo, 2=AlbedoNormal)\n"
-            "    oidn_prefilter: caustica.OidnPrefilter (0=None, 1=Fast, 2=Accurate)")
-
-        .def_prop_ro("accumulation_completed",
-            [](App& self) { return caustica::accumulationCompleted(self); })
-        .def_prop_ro("accumulation_sample_index",
-            [](App& self) { return caustica::accumulationSampleIndex(self); })
+        .def_prop_ro("accumulation_completed", [](PyEngineApp& self) { return self.engine().accumulationCompleted(); })
+        .def_prop_ro("accumulation_sample_index", [](PyEngineApp& self) { return self.engine().accumulationSampleIndex(); })
         .def_prop_rw("scene_time",
-            [](App& self) { return caustica::sceneTime(self); },
-            [](App& self, double value) {
-                if (!std::isfinite(value))
-                    throw std::runtime_error("scene_time must be finite");
-                caustica::setSceneTime(self, value);
-            },
-            "Imported-animation clock in seconds. Setting it changes the clock; use\n"
-            "Renderer.prepare_animation_frame() to evaluate and freeze a reference pose.")
-        .def_prop_ro("fps_info",
-            [](App& self) { return caustica::fpsInfo(self); })
-        .def_prop_ro("resolution_info",
-            [](App& self) { return caustica::resolutionInfo(self); })
-        .def_prop_ro("avg_time_per_frame",
-            [](App& self) { return caustica::avgTimePerFrame(self); })
-        .def_prop_ro("render_size",
-            [](App& self) {
-                const auto size = caustica::renderSize(self);
+             [](PyEngineApp& self) { return self.engine().sceneTime(); },
+             [](PyEngineApp& self, double value) {
+                 if (!std::isfinite(value))
+                     throw std::runtime_error("scene_time must be finite");
+                 self.engine().setSceneTime(value);
+             })
+        .def_prop_ro("fps_info", [](PyEngineApp& self) { return self.engine().fpsInfo(); })
+        .def_prop_ro("resolution_info", [](PyEngineApp& self) { return self.engine().resolutionInfo(); })
+        .def_prop_ro("avg_time_per_frame", [](PyEngineApp& self) { return self.engine().avgTimePerFrame(); })
+        .def_prop_ro("frame_index", [](PyEngineApp& self) { return self.engine().frameIndex(); })
+        .def_prop_ro("render_size", [](PyEngineApp& self) {
+                const auto size = self.engine().renderSize();
                 return nb::make_tuple(size.x, size.y);
-            },
-            "Current path-tracer render resolution as (width, height).")
-        ;
+            })
+
+        .def("__enter__", [](PyEngineApp& self) -> PyEngineApp* { return &self; },
+             nb::rv_policy::reference)
+        .def("__exit__", [](PyEngineApp& self, nb::object, nb::object, nb::object) -> bool {
+             self.shutdown();
+             return false;
+         }, nb::arg().none(), nb::arg().none(), nb::arg().none());
 }
+
 
 } // namespace caustica_py
 

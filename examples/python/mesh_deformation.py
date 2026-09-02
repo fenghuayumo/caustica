@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Deform CPU mesh vertices from Python and rebuild the acceleration structures.
 
-``app.deform_mesh`` hands every vertex of a mesh entity to a Python callback and
+``engine.deform_mesh`` hands every vertex of a mesh entity to a Python callback and
 writes the results back, optionally recomputing normals and rebuilding the ray
 tracing acceleration structures so the change is visible to reflections and
 shadows. This is the hook for driving geometry from simulation or learned
@@ -27,7 +27,7 @@ from _common import (
     apply_common_settings,
     apply_realtime_mode,
     import_caustica,
-    make_renderer,
+    make_engine,
     resolve_output_path,
     resolve_scene_arg,
     run_window_loop,
@@ -75,19 +75,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def find_target_mesh(app, mesh_name: str):
+def find_target_mesh(engine, mesh_name: str):
+    scene = engine.scene
+    if scene is None:
+        raise SystemExit("No scene loaded.")
     if mesh_name:
-        entity = app.find_mesh_entity(mesh_name)
+        entity = scene.find_mesh_entity(mesh_name)
         if entity is not None:
             return entity
         print(f"[caustica] Mesh {mesh_name!r} not found; picking the densest mesh instead.")
 
-    entities = app.get_mesh_entities()
+    entities = scene.get_mesh_entities()
     if not entities:
         raise SystemExit("No deformable mesh entity found in the loaded scene.")
     # Vertex count is a better proxy than the entity name: deforming a
     # four-vertex ground plane technically works but shows nothing.
-    return max(entities, key=lambda entity: len(app.get_mesh_vertices(entity)))
+    return max(entities, key=lambda entity: len(engine.get_mesh_vertices(entity)))
 
 
 def mesh_center(vertices) -> tuple[float, float, float]:
@@ -119,8 +122,8 @@ def make_deform_callback(base_vertices, center, mode: str, amplitude: float, t: 
     return {"wave": wave, "breathe": breathe, "sway": sway}[mode]
 
 
-def deform(app, entity, base_vertices, center, args: argparse.Namespace, t: float) -> None:
-    app.deform_mesh(
+def deform(engine, entity, base_vertices, center, args: argparse.Namespace, t: float) -> None:
+    engine.deform_mesh(
         entity=entity,
         callback=make_deform_callback(base_vertices, center, args.deform_mode, args.amplitude, t),
         recompute_normals=args.recompute_normals,
@@ -128,7 +131,7 @@ def deform(app, entity, base_vertices, center, args: argparse.Namespace, t: floa
     )
 
 
-def render_sequence(renderer, entity, base_vertices, center, args, launch_cwd: Path) -> None:
+def render_sequence(engine, entity, base_vertices, center, args, launch_cwd: Path) -> None:
     out_dir = resolve_output_path(args.out_dir, launch_cwd)
     steps = max(args.spp_per_frame, 1)
     print(f"[caustica] Rendering {args.frames} animation frames -> {out_dir}")
@@ -136,10 +139,10 @@ def render_sequence(renderer, entity, base_vertices, center, args, launch_cwd: P
     started = time.perf_counter()
     for frame in range(args.frames):
         t = (frame / max(args.frames - 1, 1)) * math.pi * 2.0 * args.speed
-        deform(renderer.app, entity, base_vertices, center, args, t)
-        renderer.settings.reset_accumulation = True
-        renderer.step_n(steps)
-        saved = save_screenshot(renderer, out_dir / f"frame_{frame:04d}.png")
+        deform(engine, entity, base_vertices, center, args, t)
+        engine.settings.reset_accumulation = True
+        engine.step_n(steps)
+        saved = save_screenshot(engine, out_dir / f"frame_{frame:04d}.png")
         print(f"[caustica] Saved: {saved}")
 
     print(
@@ -159,28 +162,27 @@ def main() -> int:
     print(f"[caustica] Scene : {scene}")
     print(f"[caustica] Mode  : {'headless sequence' if args.headless else 'windowed animation'}")
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=scene,
         realtime=True,
         accumulation_target=max(args.spp_per_frame, 1),
-    ) as renderer:
-        app = renderer.app
-        print(f"[caustica] Loaded scene: {app.scene_name}")
+    ) as engine:
+        print(f"[caustica] Loaded scene: {engine.scene_name}")
 
-        apply_realtime_mode(app, caustica, "off")
-        apply_common_settings(renderer, caustica, bounces=args.bounces)
-        settings = renderer.settings
+        apply_realtime_mode(engine, caustica, "off")
+        apply_common_settings(engine, caustica, bounces=args.bounces)
+        settings = engine.settings
         settings.accumulation_target = max(args.spp_per_frame, 1)
         settings.accumulation_prewarm_realtime_caches = False
         # Imported animation channels would fight the per-frame vertex writes.
         settings.enable_animations = False
-        if app.gaussian_splat_object_count > 0:
+        if engine.gaussian_splat_object_count > 0:
             settings.enable_gaussian_splats = True
 
-        entity = find_target_mesh(app, args.mesh_name)
-        base_vertices = list(app.get_mesh_vertices(entity))
+        entity = find_target_mesh(engine, args.mesh_name)
+        base_vertices = list(engine.get_mesh_vertices(entity))
         if not base_vertices:
             raise SystemExit(f"Mesh entity {entity.name!r} has no readable CPU vertex cache.")
         center = mesh_center(base_vertices)
@@ -191,13 +193,13 @@ def main() -> int:
         )
 
         if args.headless:
-            render_sequence(renderer, entity, base_vertices, center, args, launch_cwd)
+            render_sequence(engine, entity, base_vertices, center, args, launch_cwd)
         else:
             def on_frame(elapsed: float) -> None:
-                deform(app, entity, base_vertices, center, args, elapsed * args.speed)
-                renderer.settings.reset_accumulation = True
+                deform(engine, entity, base_vertices, center, args, elapsed * args.speed)
+                engine.settings.reset_accumulation = True
 
-            run_window_loop(renderer, on_frame)
+            run_window_loop(engine, on_frame)
 
     return 0
 

@@ -4,7 +4,7 @@ list(FILTER shaders EXCLUDE REGEX "/caustica/(include|src|backend)/")
 
 # All render module sources are now in causticaEngine (see caustica/caustica/CMakeLists.txt)
 
-file(GLOB caustica_python_sources
+file(GLOB caustica_python_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Python/*.h"
 )

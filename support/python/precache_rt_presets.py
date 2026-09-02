@@ -31,7 +31,7 @@ def precache(*, shader_api: str, scene: str, frames_before: int) -> int:
     configure_import_path()
     import caustica  # type: ignore
 
-    renderer = caustica.Renderer(
+    engine = caustica.EngineApp.create(
         width=64,
         height=64,
         headless=True,
@@ -42,12 +42,12 @@ def precache(*, shader_api: str, scene: str, frames_before: int) -> int:
     )
     try:
         # Establish scene extract + hit-group set before CreateStateObject.
-        renderer.step_n(max(1, frames_before))
-        ready = int(renderer.precache_rt_feature_presets(show_progress=True))
+        engine.step_n(max(1, frames_before))
+        ready = int(engine.precache_rt_feature_presets(show_progress=True))
         print(f"[caustica] RT preset precache ready={ready}")
         return 0 if ready > 0 else 1
     finally:
-        renderer.close()
+        engine.shutdown()
 
 
 def parse_args() -> argparse.Namespace:

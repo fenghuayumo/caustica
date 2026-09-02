@@ -80,6 +80,20 @@ bool setCurrentCameraPosDirUp(App& app, const std::string& val)
     return cameraController(app)->setFromPosDirUpString(val);
 }
 
+bool setCurrentCameraPosDirUp(
+    App& app,
+    const math::float3& pos,
+    const math::float3& dir,
+    const math::float3& up)
+{
+    auto* camera = cameraController(app);
+    if (!camera)
+        return false;
+    camera->camera().lookTo(pos, dir, up);
+    camera->markCameraChanged();
+    return true;
+}
+
 void setCameraVerticalFOV(App& app, float cameraFOV)
 {
     assert(cameraController(app));

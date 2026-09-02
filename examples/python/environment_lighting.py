@@ -2,7 +2,7 @@
 """Light a scene with an HDRI environment map or the procedural sky.
 
 Two things are worth copying out of this example. First, the environment source
-is selected with ``app.set_environment_map`` using either a path or one of the
+is selected with ``engine.set_env_map_override_source`` using either a path or one of the
 ``==PROCEDURAL_SKY*==`` tokens. Second, ``settings.environment_map`` exposes the
 intensity, tint, rotation and visibility of whichever source is active, and
 those can be changed between frames without reloading the scene.
@@ -32,7 +32,7 @@ from _common import (
     apply_realtime_mode,
     apply_reference_mode,
     import_caustica,
-    make_renderer,
+    make_engine,
     render_reference_to,
     resolve_output_path,
     run_window_loop,
@@ -40,8 +40,8 @@ from _common import (
 
 DEFAULT_HDRI = "env/20060807_wells6_hd.hdr"
 
-# Environment source tokens understood by App.set_environment_map. Anything else
-# is treated as a file path.
+# Environment source tokens understood by EngineApp.set_env_map_override_source.
+# Anything else is treated as a file path.
 SCENE_DEFAULT_ENV = "==SCENE_DEFAULT=="
 PROC_SKY = "==PROCEDURAL_SKY=="
 PROC_SKY_MORNING = "==PROCEDURAL_SKY_MORNING=="
@@ -180,12 +180,12 @@ def build_scene_json(env_path: str) -> str:
     return json.dumps(scene, indent=2)
 
 
-def make_subjects_reflective(renderer) -> None:
+def make_subjects_reflective(engine) -> None:
     """Give the three builtin meshes materials that reveal the environment."""
-    scene = renderer.app.scene
+    scene = engine.scene
     if scene is None:
         return
-    renderer.step_n(1)
+    engine.step_n(1)
 
     for material in scene.get_materials():
         name = material.name.lower()
@@ -202,36 +202,35 @@ def make_subjects_reflective(renderer) -> None:
             material.roughness = 0.04
             material.metalness = 1.0
 
-    renderer.settings.reset_accumulation = True
-    renderer.step_n(1)
+    engine.settings.reset_accumulation = True
+    engine.step_n(1)
 
 
-def apply_case(renderer, case: EnvCase, scene_hdri: str) -> None:
-    app = renderer.app
+def apply_case(engine, case: EnvCase, scene_hdri: str) -> None:
     if case.env_source.startswith("==PROCEDURAL_SKY"):
-        app.set_environment_map(case.env_source)
+        engine.set_env_map_override_source(case.env_source)
     else:
         # Point the scene's EnvironmentLight at the file and re-read it. Passing a
-        # bare filename to set_environment_map would resolve it against the
+        # bare filename to set_env_map_override_source would resolve it against the
         # installed module directory rather than this repository.
         resolved = resolve_hdri(case.env_source)
         if resolved != scene_hdri:
-            sky = app.scene.find_light("Sky")
+            sky = engine.scene.find_light("Sky")
             if sky is not None:
                 sky.environment_path = resolved
-        app.set_environment_map(SCENE_DEFAULT_ENV)
+        engine.set_env_map_override_source(SCENE_DEFAULT_ENV)
 
-    env = renderer.settings.environment_map
+    env = engine.settings.environment_map
     env.enabled = True
     env.intensity = case.intensity
     env.tint_color = case.tint_color
     env.rotation_xyz = case.rotation_xyz
     env.visible_to_camera = case.visible_to_camera
-    renderer.settings.reset_accumulation = True
+    engine.settings.reset_accumulation = True
 
     if case.warmup_frames:
         print(f"[caustica]   baking environment for {case.warmup_frames} frame(s) ...")
-        renderer.step_n(case.warmup_frames)
+        engine.step_n(case.warmup_frames)
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,27 +269,27 @@ def main() -> int:
     print(f"[caustica] HDRI  : {scene_hdri}")
     print(f"[caustica] Cases : {len(cases)} ({'headless' if args.headless else 'windowed'})")
 
-    with make_renderer(
+    with make_engine(
         caustica,
         args,
         scene=build_scene_json(scene_hdri),
         realtime=not args.headless,
         accumulation_target=args.spp,
-    ) as renderer:
+    ) as engine:
         if args.headless:
-            label = apply_reference_mode(renderer, caustica, spp=args.spp, oidn=False)
+            label = apply_reference_mode(engine, caustica, spp=args.spp, oidn=False)
         else:
-            label = apply_realtime_mode(renderer.app, caustica, "off")
-        apply_common_settings(renderer, caustica, bounces=args.bounces)
-        make_subjects_reflective(renderer)
+            label = apply_realtime_mode(engine, caustica, "off")
+        apply_common_settings(engine, caustica, bounces=args.bounces)
+        make_subjects_reflective(engine)
 
         for index, case in enumerate(cases, start=1):
             print(f"\n[caustica] Case {index}/{len(cases)}: {case.name} -- {case.notes}")
-            apply_case(renderer, case, scene_hdri)
+            apply_case(engine, case, scene_hdri)
             if args.headless:
-                render_reference_to(renderer, out_dir / f"{case.name}.png", label=label)
+                render_reference_to(engine, out_dir / f"{case.name}.png", label=label)
             else:
-                run_window_loop(renderer)
+                run_window_loop(engine)
                 break
 
     return 0

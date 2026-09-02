@@ -78,15 +78,15 @@ def customize_scene(app) -> None:
     environment.rotation_xyz = (0.0, 35.0, 0.0)
     environment.enabled = True
     environment.visible_to_camera = True
-    app.set_camera_fov(55.0)
+    engine.set_camera_vertical_fov(math.radians(55.0))
 
 
 def main() -> None:
     if caustica.MODE != "embed":
         raise RuntimeError("embedded.py must be run by caustica.exe --pythonScript")
-    app = caustica.app()
-    customize_scene(app)
-    mode = configure_realtime(app)
+    engine = caustica.engine()
+    customize_scene(engine)
+    mode = configure_realtime(engine)
     caustica.log_info(f"Embedded customization complete; realtime mode={mode}")
 
 
