@@ -399,19 +399,9 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
     settings.ToneMappingParams.toneMapOperator = defaults.toneMapOperator;
     if (proxy.toneMapOperator)
     {
-        const std::string& op = *proxy.toneMapOperator;
-        if (op == "Linear") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Linear;
-        else if (op == "Reinhard") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Reinhard;
-        else if (op == "ReinhardModified") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::ReinhardModified;
-        else if (op == "HejiHableAlu") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HejiHableAlu;
-        else if (op == "HableUc2") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::HableUc2;
-        else if (op == "Aces") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::Aces;
-        else if (op == "PbrNeutral" || op == "KhronosPbrNeutral" || op == "Khronos PBR Neutral" || op == "Neutral")
-            settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::PbrNeutral;
-        else if (op == "IdentitySoftShoulder" || op == "Identity + Soft Shoulder")
-            settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::IdentitySoftShoulder;
-        else if (op == "AgX") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::AgX;
-        else if (op == "CameraLut") settings.ToneMappingParams.toneMapOperator = ToneMapperOperator::CameraLut;
+        ToneMapperOperator parsed = defaults.toneMapOperator;
+        if (tryParseToneMapOperator(*proxy.toneMapOperator, parsed))
+            settings.ToneMappingParams.toneMapOperator = parsed;
     }
     settings.ToneMappingParams.exposureCompensation =
         proxy.exposureCompensation.value_or(defaults.exposureCompensation);

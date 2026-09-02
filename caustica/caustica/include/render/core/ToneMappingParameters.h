@@ -4,6 +4,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <math/math.h>
@@ -15,6 +16,67 @@ using caustica::math::float4;
 using caustica::math::float3x4;
 
 #include <shaders/render/toneMapper/ToneMapping_cb.h>
+
+// Scene JSON / camera metadata use these ids. UI labels are separate
+// (tonemapOperatorToString) and must not be written back to the camera —
+// display names like "Reinhard Modified" fail to parse and snap to Aces.
+inline const char* toneMapOperatorId(ToneMapperOperator op)
+{
+    switch (op)
+    {
+    case ToneMapperOperator::Linear:               return "Linear";
+    case ToneMapperOperator::Reinhard:             return "Reinhard";
+    case ToneMapperOperator::ReinhardModified:     return "ReinhardModified";
+    case ToneMapperOperator::HejiHableAlu:         return "HejiHableAlu";
+    case ToneMapperOperator::HableUc2:             return "HableUc2";
+    case ToneMapperOperator::Aces:                 return "Aces";
+    case ToneMapperOperator::PbrNeutral:           return "PbrNeutral";
+    case ToneMapperOperator::IdentitySoftShoulder: return "IdentitySoftShoulder";
+    case ToneMapperOperator::AgX:                  return "AgX";
+    case ToneMapperOperator::CameraLut:            return "CameraLut";
+    }
+    return "Aces";
+}
+
+inline bool tryParseToneMapOperator(std::string_view name, ToneMapperOperator& out)
+{
+    if (name == "Linear") { out = ToneMapperOperator::Linear; return true; }
+    if (name == "Reinhard") { out = ToneMapperOperator::Reinhard; return true; }
+    if (name == "ReinhardModified" || name == "Reinhard Modified")
+    {
+        out = ToneMapperOperator::ReinhardModified;
+        return true;
+    }
+    if (name == "HejiHableAlu" || name == "Heji Hable ALU")
+    {
+        out = ToneMapperOperator::HejiHableAlu;
+        return true;
+    }
+    if (name == "HableUc2" || name == "Hable UC2")
+    {
+        out = ToneMapperOperator::HableUc2;
+        return true;
+    }
+    if (name == "Aces") { out = ToneMapperOperator::Aces; return true; }
+    if (name == "PbrNeutral" || name == "KhronosPbrNeutral"
+        || name == "Khronos PBR Neutral" || name == "Neutral")
+    {
+        out = ToneMapperOperator::PbrNeutral;
+        return true;
+    }
+    if (name == "IdentitySoftShoulder" || name == "Identity + Soft Shoulder")
+    {
+        out = ToneMapperOperator::IdentitySoftShoulder;
+        return true;
+    }
+    if (name == "AgX") { out = ToneMapperOperator::AgX; return true; }
+    if (name == "CameraLut" || name == "Camera LUT")
+    {
+        out = ToneMapperOperator::CameraLut;
+        return true;
+    }
+    return false;
+}
 
 enum class ExposureMode : uint32_t
 {

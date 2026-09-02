@@ -59,7 +59,7 @@ void syncToneMappingToActiveSceneCamera(SceneEditor& sceneEditor, const ToneMapp
         return;
 
     perspective->enableAutoExposure = params.autoExposure;
-    perspective->toneMapOperator = tonemapOperatorToString.at(params.toneMapOperator);
+    perspective->toneMapOperator = toneMapOperatorId(params.toneMapOperator);
     perspective->exposureCompensation = params.exposureCompensation;
     perspective->exposureValue = params.exposureValue;
     perspective->exposureValueMin = params.exposureValueMin;
