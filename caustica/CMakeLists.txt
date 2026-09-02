@@ -137,7 +137,11 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
                 --shader-api ${caustica_pt_precompile_api}
                 --global-preset coverage
         )
-        if (NOT WIN32)
+        # Release packages must not embed DXC debug information in every PT
+        # library. Keep it for normal Windows development builds, but strip it
+        # on every distribution build (and on Linux, where it has always been
+        # disabled) to keep shader packs shippable.
+        if (NOT WIN32 OR CAUSTICA_DISTRIBUTION_BUILD)
             list(APPEND caustica_pt_precompile_cmds --no-debug-info)
         endif()
         if (CAUSTICA_VERIFY_PT_SHADERS)
@@ -147,6 +151,10 @@ if (CAUSTICA_PRECOMPILE_PT_SHADERS)
                     --shader-api ${caustica_pt_precompile_api}
                     --global-preset coverage
             )
+            # Must match the cook's -Zi setting or d3d12 hashes will all miss.
+            if (NOT WIN32 OR CAUSTICA_DISTRIBUTION_BUILD)
+                list(APPEND caustica_pt_precompile_cmds --no-debug-info)
+            endif()
         endif()
         add_custom_target(causticaPathTracerShaders
             ${caustica_pt_precompile_cmds}

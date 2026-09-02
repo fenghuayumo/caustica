@@ -5,6 +5,7 @@
 
 #include <engine/App.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
 #include <render/AppDiagnostics.h>
 #include <imgui.h>
@@ -13,6 +14,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <string>
+#include <vector>
 
 using namespace caustica;
 using namespace caustica::editor;
@@ -67,6 +70,22 @@ void EditorUI::BuildMainMenuBar()
             && caustica::isSceneSwitchBusy(*m_sceneEditor.app());
         if (ImGui::MenuItem("Open Scene...", "Ctrl+O", false, !sceneBusy))
             m_sceneEditor.requestOpenSceneFromDialog();
+
+        App* app = m_sceneEditor.app();
+        if (app)
+        {
+            const std::vector<std::string>& scenes = caustica::availableScenes(*app);
+            if (!scenes.empty() && ImGui::BeginMenu("Scenes", !sceneBusy))
+            {
+                const std::string current = caustica::currentSceneName(*app);
+                for (const std::string& scene : scenes)
+                {
+                    if (ImGui::MenuItem(scene.c_str(), nullptr, scene == current, !sceneBusy))
+                        caustica::setCurrentScene(*app, scene);
+                }
+                ImGui::EndMenu();
+            }
+        }
 
         const bool canSave = m_sceneEditor.canSaveScene();
         const bool canSaveAs = m_sceneEditor.app()

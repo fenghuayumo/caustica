@@ -43,6 +43,17 @@ std::filesystem::path discoverAssetPackRoot(
 // True when dir looks like a caustica asset pack (pack.json or known folders).
 bool isAssetPackDirectory(const std::filesystem::path& dir);
 
+// True when pack.json declares "kind": "builtin" (the minimal shipped payload).
+bool isBuiltinAssetPack(const std::filesystem::path& dir);
+
+// Walk up from a scene file or directory to the pack that contains it
+// (pack.json, or an Assets/ folder). Empty if none is found.
+std::filesystem::path findAssetPackContaining(const std::filesystem::path& fileOrDir);
+
+// Media root for pack-relative paths in a scene.json (models/, materials/, env/).
+// Prefers the pack that contains the scene file; falls back to getAssetPackRoot().
+std::filesystem::path mediaRootForScene(const std::filesystem::path& sceneFileOrDir);
+
 // --- Directory search ---
 
 // Searches upward from 'startPath' for a directory 'dirname'.

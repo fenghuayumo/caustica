@@ -195,7 +195,7 @@ bool GpuRenderSubsystem::finalizeBind(const scene::SceneRenderData& renderData)
                 *m_gpuSharedCaches->renderDevice,
                 renderData.staticData().materialSnapshots,
                 scenePath,
-                getLocalPath(c_AssetsFolder));
+                mediaRootForScene(scenePath));
         }
     }
     return m_gpuSharedCaches && m_gpuSharedCaches->renderDevice

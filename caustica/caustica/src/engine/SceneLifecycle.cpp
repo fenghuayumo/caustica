@@ -543,7 +543,7 @@ void onSceneLoaded(App& app)
         return;
     }
 
-    const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
+    const std::filesystem::path assetsRoot = mediaRootForScene(currentScenePath(app));
     if (render::WorldRenderer* wrResource = worldRenderer(app))
         wrResource->lightingPasses().refreshEnvironmentMapMediaList(assetsRoot, currentScenePath(app));
 

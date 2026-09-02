@@ -373,6 +373,25 @@ void PTPipelineVariant::rebuildShaderTableOnly()
             else
                 ++failed;
         }
+
+        // A scene can legitimately have no ray-traceable geometry (for example
+        // immediately after switching to an empty scene). Some DXR drivers
+        // still require a non-empty hit-group table when dispatching against an
+        // empty TLAS; submitting a zero-record table can trigger a GPU TDR.
+        // The frozen unique set always contains the ubershader fallback.
+        if (perSubInstanceHitGroup.empty())
+        {
+            const auto& uniqueHitGroups = baker->getUniqueHitGroups();
+            if (uniqueHitGroups.empty()
+                || newTable->addHitGroup(uniqueHitGroups.begin()->second.getExportName().c_str()) < 0)
+            {
+                ++failed;
+            }
+            else
+            {
+                ++added;
+            }
+        }
         if (failed > 0)
         {
             caustica::error(

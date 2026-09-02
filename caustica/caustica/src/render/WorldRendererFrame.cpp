@@ -520,7 +520,7 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             materialResources = m_context->frameScene->staticData().materialSnapshots;
         m_context->scenePasses.lighting.materials()->createRenderPassesAndLoadMaterials(
             m_bindlessLayout, m_context->renderDevice, materialResources,
-            m_context->sessionScenePath, getLocalPath(c_AssetsFolder));
+            m_context->sessionScenePath, mediaRootForScene(m_context->sessionScenePath));
         if (coldInit)
             m_context->diagnostics.progressInitializingRenderer.Set(5);
         if (m_context->scenePasses.lighting.opacityMaps())

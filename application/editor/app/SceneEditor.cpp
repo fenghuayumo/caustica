@@ -578,7 +578,7 @@ void SceneEditor::onSceneLoadedEarly()
     if (m_game == nullptr || !m_app)
         return;
 
-    const std::filesystem::path assetsRoot = getLocalPath(c_AssetsFolder);
+    const std::filesystem::path assetsRoot = mediaRootForScene(caustica::currentScenePath(*m_app));
     m_game->sceneLoaded(caustica::currentScenePath(*m_app), assetsRoot);
 }
 
@@ -936,10 +936,22 @@ bool SceneEditor::openSceneFromDialog()
 
     caustica::sceneSwitchTrace("Open Scene: showing file dialog");
     std::string picked;
+    const std::filesystem::path currentPath = caustica::currentScenePath(*m_app);
+    if (!currentPath.empty() && !caustica::isInlineScenePath(currentPath))
+        picked = currentPath.string();
+
+    std::string initialDir;
+    const std::filesystem::path packRoot = caustica::getAssetPackRoot();
+    if (std::filesystem::is_directory(packRoot / caustica::c_ScenesSubFolder))
+        initialDir = (packRoot / caustica::c_ScenesSubFolder).string();
+    else if (std::filesystem::is_directory(packRoot))
+        initialDir = packRoot.string();
+
     if (!caustica::FileDialog(
             true,
             "Scene files (*.scene.json;*.json)\0*.scene.json;*.json\0All files\0*.*\0",
-            picked))
+            picked,
+            initialDir.empty() ? nullptr : initialDir.c_str()))
     {
         caustica::sceneSwitchTrace("Open Scene: cancelled");
         return false;

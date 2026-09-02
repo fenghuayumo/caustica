@@ -20,18 +20,22 @@ namespace fs = std::filesystem;
 namespace caustica
 {
 
-bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName)
+bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName, const char* initialDir)
 {
 #ifdef _WIN32
     OPENFILENAMEA ofn;
     CHAR chars[PATH_MAX] = "";
     ZeroMemory(&ofn, sizeof(ofn));
 
+    if (!fileName.empty() && fileName.size() < ARRAYSIZE(chars))
+        strncpy_s(chars, fileName.c_str(), _TRUNCATE);
+
     ofn.lStructSize = sizeof(OPENFILENAME);
     ofn.hwndOwner = GetForegroundWindow();
     ofn.lpstrFilter = pFilters;
     ofn.lpstrFile = chars;
     ofn.nMaxFile = ARRAYSIZE(chars);
+    ofn.lpstrInitialDir = (initialDir && initialDir[0] != '\0') ? initialDir : nullptr;
     ofn.Flags = OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
     if (bOpen)
         ofn.Flags |= OFN_FILEMUSTEXIST;
@@ -48,6 +52,7 @@ bool FileDialog(bool bOpen, const char* pFilters, std::string& fileName)
     }
     return false;
 #else
+    (void)initialDir;
     char chars[PATH_MAX] = { 0 };
     std::string app = "zenity --file-selection";
     if (!bOpen)

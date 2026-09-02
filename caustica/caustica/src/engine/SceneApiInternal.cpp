@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <render/core/PathTracerSettings.h>
@@ -61,6 +62,39 @@ void sceneSwitchTrace(const char* fmt, ...)
     return sessionManager(const_cast<App&>(app));
 }
 
+void retargetAssetPackForSceneRequest(App& app, const std::string& sceneName)
+{
+    if (sceneName.empty())
+        return;
+
+    std::filesystem::path scenePath(sceneName);
+    if (!scenePath.is_absolute() && !std::filesystem::exists(scenePath))
+        return;
+
+    std::error_code ec;
+    if (!scenePath.is_absolute())
+        scenePath = std::filesystem::absolute(scenePath, ec);
+    if (ec)
+        return;
+
+    const std::filesystem::path pack = findAssetPackContaining(scenePath);
+    if (pack.empty())
+        return;
+
+    const std::filesystem::path current = getAssetPackRoot();
+    std::error_code eqEc;
+    if (!current.empty() && std::filesystem::equivalent(pack, current, eqEc) && !eqEc)
+        return;
+
+    sceneSwitchTrace("retarget asset pack '%s' -> '%s' (scene '%s')",
+        current.generic_string().c_str(),
+        pack.generic_string().c_str(),
+        sceneName.c_str());
+    setAssetPackRootOverride(pack);
+    if (::SceneManager* manager = sessionManager(app))
+        manager->discoverAvailableScenes(pack);
+}
+
 void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
 {
     ::SceneManager* manager = sessionManager(app);
@@ -71,6 +105,8 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         sceneSwitchTrace("applySceneSwitch: missing manager/settings/viewState");
         return;
     }
+
+    retargetAssetPackForSceneRequest(app, sceneName);
 
     if (isSceneSwitchBusy(app))
     {
@@ -85,6 +121,10 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
             sceneName.c_str(), forceReload ? 1 : 0);
         return;
     }
+
+    // Relative names resolve against the current pack; pin the pack that actually
+    // contains the resolved scene.json so later getLocalPath("Assets") matches.
+    retargetAssetPackForSceneRequest(app, manager->getCurrentScenePath().string());
 
     cfg->ResetAccumulation = true;
     cfg->ResetRealtimeCaches = true;

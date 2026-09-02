@@ -2,6 +2,8 @@
 #include "core/vfs/VFS.h"
 
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <string>
 
@@ -127,6 +129,60 @@ bool isAssetPackDirectory(const std::filesystem::path& dir)
     return false;
 }
 
+bool isBuiltinAssetPack(const std::filesystem::path& dir)
+{
+    const std::filesystem::path manifest = dir / c_AssetPackManifest;
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(manifest, ec) || ec)
+        return false;
+
+    std::ifstream in(manifest);
+    if (!in)
+        return false;
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::size_t kind = text.find("\"kind\"");
+    if (kind == std::string::npos)
+        return false;
+    const std::size_t colon = text.find(':', kind);
+    if (colon == std::string::npos)
+        return false;
+    const std::size_t builtin = text.find("\"builtin\"", colon);
+    if (builtin == std::string::npos)
+        return false;
+    const std::size_t nextKey = text.find('"', colon + 1);
+    return nextKey == builtin;
+}
+
+std::filesystem::path findAssetPackContaining(const std::filesystem::path& fileOrDir)
+{
+    if (fileOrDir.empty())
+        return {};
+
+    std::error_code ec;
+    std::filesystem::path cursor = fileOrDir;
+    if (std::filesystem::is_regular_file(cursor, ec))
+        cursor = cursor.parent_path();
+    cursor = std::filesystem::absolute(cursor, ec);
+    if (ec)
+        return {};
+
+    while (!cursor.empty())
+    {
+        if (isAssetPackDirectory(cursor))
+            return cursor.lexically_normal();
+
+        const std::filesystem::path nested = cursor / c_AssetsFolder;
+        if (isAssetPackDirectory(nested))
+            return std::filesystem::absolute(nested).lexically_normal();
+
+        const std::filesystem::path parent = cursor.parent_path();
+        if (parent == cursor)
+            break;
+        cursor = parent;
+    }
+    return {};
+}
+
 std::filesystem::path discoverAssetPackRoot(
     const std::filesystem::path& runtimeDirectory,
     const std::filesystem::path& resourceRoot)
@@ -144,6 +200,8 @@ std::filesystem::path discoverAssetPackRoot(
         getDirectoryWithExecutable().parent_path(),
     };
 
+    // Startup pack only. Once a scene.json is opened, applySceneSwitch retargets
+    // this to the pack that contains that file (models/materials are pack-relative).
     for (const std::filesystem::path& base : bases)
     {
         if (base.empty())
@@ -264,15 +322,26 @@ std::filesystem::path resolveMediaRelativePath(
     return std::filesystem::absolute(localPath);
 }
 
+std::filesystem::path mediaRootForScene(const std::filesystem::path& sceneFileOrDir)
+{
+    const std::filesystem::path pack = findAssetPackContaining(sceneFileOrDir);
+    if (!pack.empty())
+        return pack;
+    return getAssetPackRoot();
+}
+
 std::filesystem::path resolveSceneMediaPath(
     const std::filesystem::path& localPath,
     const std::filesystem::path& sceneDirectory,
     const std::filesystem::path& mediaPath)
 {
-    const std::filesystem::path assetsRoot = mediaPath.empty()
-        ? getAssetPackRoot()
-        : mediaPath;
-    return resolveMediaRelativePath(localPath, { assetsRoot, sceneDirectory });
+    // Pack-relative refs (models/..., materials/...) resolve from the pack that
+    // contains the scene.json, not from the exe-adjacent startup Assets/.
+    const std::filesystem::path scenePack = findAssetPackContaining(sceneDirectory);
+    const std::filesystem::path assetsRoot = !mediaPath.empty()
+        ? mediaPath
+        : (!scenePack.empty() ? scenePack : getAssetPackRoot());
+    return resolveMediaRelativePath(localPath, { scenePack, assetsRoot, sceneDirectory });
 }
 
 } // namespace caustica
