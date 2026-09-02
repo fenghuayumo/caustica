@@ -222,8 +222,8 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 | SceneSettings / GameSettings / GaussianSplat | Value payloads on ECS; GPU splat passes keyed by entity in `SceneGaussianSplatPasses` |
 | Scene API modules | Split from god-facade: `AppResources` / `SceneQuery` / `SceneSpawn` / `SceneTransform` / `MeshDeformApi` / `CameraApi` / `SceneLifecycle` / `RenderSessionApi` / `RenderFrameApi` (include the focused header you need) |
 | Scene query path | Apps and editor use `entityWorld` / `SceneQuery` / lifecycle — not `Scene*` or `gpu->sceneManager()->getScene()`. `internal/ActiveSceneAccess` (`activeScene`) is engine-internal |
-| `EditorPlugin` | Composes `DefaultPlugins` (shared bootstrap + `ActiveScene`) |
-| Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are `Plugin` structs (via `registerSceneSchedules`) |
+| `EditorPlugin` | Editor delta on top of `EngineApp`'s default runtime plugins |
+| Scene plugins | `CameraPlugin` / `RenderExtractPlugin` / … are installed by `EngineApp` |
 | Camera wrappers | Interactive side effects live on `CameraController::bindSideEffects` |
 
 ## File map

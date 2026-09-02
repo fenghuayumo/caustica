@@ -1,10 +1,10 @@
 # Embedding Caustica from C++
 
-`EngineApp` is the supported high-level entry point for a C++ host. It owns or
-accepts the graphics device, installs the default engine plugins, runs the
+`EngineApp` is the supported high-level entry point for a C++ host. It owns the
+graphics device (or borrows one), installs the default runtime plugins, runs the
 application schedules, and exposes focused scene, camera, and render-session
-APIs. New hosts should not assemble `DefaultPlugins`, reach through
-internal GPU/WR headers, or drive `WorldRenderer` directly.
+APIs. Hosts should not reach through internal GPU/WR headers or drive
+`WorldRenderer` directly.
 
 **Public API (P0):** prefer `#include <caustica.h>` and stay on the
 allowlist in [public-api.md](public-api.md). The complete in-tree example is

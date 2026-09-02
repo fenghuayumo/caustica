@@ -1,6 +1,6 @@
 #include <engine/EngineApp.h>
 #include <backend/GpuSurface.h>
-#include <engine/DefaultPlugins.h>
+#include <engine/internal/DefaultPlugins.h>
 #include <engine/EntryPoint.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneStartup.h>
@@ -233,7 +233,7 @@ bool EngineApp::initialize(EngineAppDesc desc)
 
     const std::string preferredScene = m_desc.scene.empty() ? std::string("default.scene.json") : m_desc.scene;
 
-    m_app = std::make_unique<App>(m_device, m_desc.headless ? nullptr : m_window, m_surface);
+    m_app.reset(new App(m_device, m_desc.headless ? nullptr : m_window, m_surface));
     m_app->insertResourceRef(m_viewState);
     m_app->insertResourceRef(m_diagnostics);
     m_app->insertResourceRef(m_renderAppState);

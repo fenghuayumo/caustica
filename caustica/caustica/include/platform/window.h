@@ -52,8 +52,8 @@ struct WindowDesc
 // Owns the native window handle (GLFWwindow*, HWND, etc.) and tracks all
 // window state: visibility, focus, size, position, DPI scale.
 //
-// Events (close, resize, focus, iconify, move) are dispatched through the
-// EventCallback or overridable virtual methods.
+// Input/window events are allocated and posted through EventCallback during
+// poll. App queues them and dispatches in First (ProcessEventQueue).
 // =============================================================================
 class Window
 {

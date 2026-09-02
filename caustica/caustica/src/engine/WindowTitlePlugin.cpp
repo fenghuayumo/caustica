@@ -14,8 +14,6 @@
 
 #include <string>
 
-extern const char* g_windowTitle;
-
 namespace caustica
 {
 
@@ -25,9 +23,11 @@ void updateWindowTitle(App& app)
     if (!gpuSurface)
         return;
 
-    const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
-        + " " + caustica::kVersionString;
-    gpuSurface->setInformativeWindowTitle(versionedTitle.c_str(), false);
+    std::string name = gpuSurface->applicationName();
+    if (name.empty())
+        name = "caustica";
+    gpuSurface->setInformativeWindowTitle(
+        (name + " " + caustica::kVersionString).c_str(), false);
 }
 
 void WindowTitlePlugin::configureSchedules(App& app)

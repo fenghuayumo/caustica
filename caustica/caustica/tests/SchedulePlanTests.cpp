@@ -1,5 +1,6 @@
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
+#include <engine/internal/AppTest.h>
 #include <engine/SceneTransforms.h>
 #include <engine/ScenePlugins.h>
 #include <engine/SystemLabels.h>
@@ -265,16 +266,16 @@ int main()
     // precise resource access and can overlap a disjoint host system. The
     // static window title belongs to Startup and adds no update barrier.
     {
-        caustica::App app;
+        auto app = caustica::detail::createBareAppForTest();
         caustica::SceneAnimationPlugin animationPlugin;
         caustica::WindowTitlePlugin windowTitlePlugin;
-        animationPlugin.configureSchedules(app);
-        windowTitlePlugin.configureSchedules(app);
-        app.addSystem<HostParallelSystem>(
+        animationPlugin.configureSchedules(*app);
+        windowTitlePlugin.configureSchedules(*app);
+        app->addSystem<HostParallelSystem>(
             AppSchedule::update,
             [](caustica::Query<Velocity>) {});
 
-        const auto& info = app.schedules().planInfo(AppSchedule::update);
+        const auto& info = app->schedules().planInfo(AppSchedule::update);
         passed &= expect(info.systemCount == 3,
             "built-in window title still registered in update");
         passed &= expect(info.exclusiveSystemCount == 1,

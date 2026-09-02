@@ -18,7 +18,7 @@ GpuSurface::GpuSurface(GpuDevice& device, Window* window)
 {
     m_device.attachSurface(this);
     if (m_window)
-        m_windowTitle = m_window->getTitle();
+        m_applicationName = m_window->getTitle();
 }
 
 GpuSurface::~GpuSurface()

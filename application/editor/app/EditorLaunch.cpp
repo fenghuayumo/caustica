@@ -12,12 +12,9 @@
 #include <core/log.h>
 #include <platform/window.h>
 #include <render/passes/debug/Korgi.h>
-#include <caustica/version.h>
 
 #include <memory>
 #include <string>
-
-extern const char* g_windowTitle;
 
 namespace caustica::editor
 {
@@ -126,8 +123,7 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
 
     caustica::EngineAppDesc desc{};
     desc.scene = preferredScene;
-    desc.windowTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
-        + " " + caustica::kVersionString;
+    desc.windowTitle = "caustica";
 
     if (!ProcessEditorStartupCommandLine(argc, argv, desc, editor.editorCmdLine(), preferredScene))
         return nullptr;

@@ -17,8 +17,6 @@ namespace nb = nanobind;
 
 extern "C" PyObject* PyInit_caustica(void);
 
-caustica::App* g_pythonEmbedApp = nullptr;
-
 namespace
 {
     constexpr const char* kStdoutCaptureScript = R"PY(
@@ -67,7 +65,7 @@ PythonScripting::~PythonScripting()
         Py_FinalizeEx();
         m_initialized = false;
     }
-    g_pythonEmbedApp = nullptr;
+    caustica_py::setEmbedApp(nullptr);
 }
 
 bool PythonScripting::Initialize()
@@ -75,7 +73,7 @@ bool PythonScripting::Initialize()
     if (m_initialized)
         return true;
 
-    g_pythonEmbedApp = &m_app;
+    caustica_py::setEmbedApp(&m_app);
 
     if (PyImport_AppendInittab("caustica", PyInit_caustica) != 0)
     {

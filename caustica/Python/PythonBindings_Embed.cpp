@@ -22,9 +22,10 @@ namespace
 {
     App& RequireApp()
     {
-        if (!g_pythonEmbedApp)
+        caustica::App* app = caustica_py::embedApp();
+        if (!app)
             throw std::runtime_error("caustica: no App instance bound (embedded Python host not initialized?)");
-        return *g_pythonEmbedApp;
+        return *app;
     }
 }
 

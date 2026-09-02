@@ -1,4 +1,4 @@
-#include <engine/DefaultPlugins.h>
+#include <engine/internal/DefaultPlugins.h>
 #include <engine/App.h>
 #include <engine/AssetPlugin.h>
 #include <engine/Input.h>

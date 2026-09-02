@@ -5,7 +5,7 @@ namespace caustica
 
 class App;
 
-// Plugin lifecycle:
+// Plugin lifecycle on the EngineApp-owned runtime:
 //   build()                — register resources and owned services
 //   configureSchedules()   — register AppSchedule systems (before default schedules)
 //   configureLateSchedules() — register systems after default + scene runtime schedules

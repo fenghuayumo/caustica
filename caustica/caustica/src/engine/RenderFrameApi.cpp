@@ -37,7 +37,6 @@
 using namespace caustica::math;
 using namespace caustica::render;
 
-const char* g_windowTitle = "caustica";
 FPSLimiter g_FPSLimiter;
 
 namespace

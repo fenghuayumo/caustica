@@ -26,9 +26,15 @@ namespace caustica
 {
 
 class App;
+class EngineApp;
 class GpuDevice;
 class GpuSurface;
 class Window;
+
+namespace detail
+{
+[[nodiscard]] std::unique_ptr<App> createBareAppForTest();
+}
 
 void EnqueueRenderCommand(App& app, std::function<void()> command);
 void EnqueueRenderCommandAndWait(App& app, std::function<void()> command);
@@ -201,19 +207,21 @@ SystemFn makeTypedSystem(F&& system)
 }
 } // namespace detail
 
-// Plugin-driven ECS runtime: schedules, plugins, and the frame loop.
-// Borrows a GpuDevice created by EngineApp (or a host). Does not create GPU.
-//
-// Prefer EngineApp::create for new apps:
-//   auto engine = EngineApp::create({ .scene = "Kitchen/kitchen.json" });
-//   engine->addSystem<MySimLabel>(AppSchedule::update, [](EntityWorld scene, ...) { ... });
-//   engine->run();
+// ENGINE-INTERNAL schedule runtime. EngineApp owns it and is the host entry.
+// Not constructible outside EngineApp (and schedule tests). System parameters
+// (AppSchedule, Res, Query, SystemContext) are in AppSchedules.h.
 class App
 {
-public:
+    friend class EngineApp;
+    friend std::unique_ptr<App> detail::createBareAppForTest();
+
     App();
     App(GpuDevice* gpuDevice, Window* window = nullptr, GpuSurface* surface = nullptr);
+
+public:
     ~App();
+    App(const App&) = delete;
+    App& operator=(const App&) = delete;
 
     template<typename T, typename... Args>
     App& addPlugin(Args&&... args)
@@ -401,6 +409,7 @@ public:
     void waitForRenderThreadIdle();
 
     void addEventObserver(std::function<void(Event&)> handler);
+    // GLFW callbacks enqueue here; ProcessEventQueue in First drains the queue.
     void queueEvent(std::unique_ptr<Event> event);
     void processEventQueue();
 

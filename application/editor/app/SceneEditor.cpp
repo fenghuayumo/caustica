@@ -17,6 +17,7 @@
 #include <engine/EngineApp.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
+#include <engine/ScenePlugins.h>
 #include <core/path_utils.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -29,7 +30,6 @@
 #include <scene/View.h>
 #include <EditorUI.h>
 #include <shaders/PathTracer/PathTracerDebug.hlsli>
-#include <caustica/version.h>
 
 #include "game/GameScene.h"
 
@@ -44,8 +44,6 @@
 using namespace caustica::math;
 using namespace caustica;
 using namespace caustica::render;
-
-extern const char* g_windowTitle;
 
 namespace caustica::editor
 {
@@ -1108,13 +1106,8 @@ void SceneEditor::onAnimateEnd(float /*fElapsedTimeSeconds*/)
 
 void SceneEditor::updateWindowTitle()
 {
-    if (!m_app)
-        return;
-
-    const std::string versionedTitle = std::string(g_windowTitle ? g_windowTitle : "caustica")
-        + " " + caustica::kVersionString;
-    if (GpuSurface* gpuSurface = m_app->getSurface())
-        gpuSurface->setInformativeWindowTitle(versionedTitle.c_str(), false);
+    if (m_app)
+        caustica::updateWindowTitle(*m_app);
 }
 
 void SceneEditor::setSceneTime(double sceneTime)

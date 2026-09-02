@@ -564,6 +564,21 @@ namespace
 namespace caustica_py
 {
 
+namespace
+{
+    caustica::App* g_embedApp = nullptr;
+}
+
+void setEmbedApp(caustica::App* app)
+{
+    g_embedApp = app;
+}
+
+caustica::App* embedApp()
+{
+    return g_embedApp;
+}
+
 void RegisterCoreBindings(nb::module_& m)
 {
     // --- helpers ----------------------------------------------------------

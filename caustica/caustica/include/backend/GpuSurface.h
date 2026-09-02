@@ -54,6 +54,7 @@ public:
 
     void setInformativeWindowTitle(const char* applicationName, bool includeFramerate = true, const char* extraInfo = nullptr);
     [[nodiscard]] const char* windowTitle() const;
+    [[nodiscard]] const std::string& applicationName() const { return m_applicationName; }
 
 private:
     GpuSurface(GpuDevice& device, Window* window);
@@ -64,6 +65,7 @@ private:
     GpuDevice& m_device;
     Window* m_window = nullptr;
     std::vector<ISurfaceObserver*> m_observers;
+    std::string m_applicationName;
     std::string m_windowTitle;
 
     float m_dpiScaleX = 1.f;

@@ -1,10 +1,11 @@
 #pragma once
 
 // Public embedding entry. Prefer #include <caustica.h> in new apps.
-// Contract: docs/public-api.md — do not assemble DefaultPlugins or dig WorldRenderer.
+// Contract: docs/public-api.md
 
 #include <backend/GpuDevice.h>
 #include <engine/App.h>
+#include <engine/AppSchedules.h>
 #include <engine/EntryPoint.h>
 #include <engine/EngineSceneCallbacks.h>
 #include <engine/SceneQuery.h>
@@ -127,6 +128,7 @@ public:
         return *this;
     }
 
+    // Owned schedule runtime. Editor and engine plugins; hosts use EngineApp.
     [[nodiscard]] App& app();
     [[nodiscard]] const App& app() const;
     [[nodiscard]] GpuDevice* device() const;

@@ -2,14 +2,15 @@
 
 // Public C++ embedding surface for Caustica.
 //
-// Prefer this single include in new applications. Do not include
-// engine/internal/*, DefaultPlugins, WorldRenderer, SceneManager,
+// Prefer this single include in new applications. The host entry is EngineApp.
+// Do not include engine/internal/*, WorldRenderer, SceneManager,
 // LoadSession, RenderThread, or GpuSharedCaches from application code.
 //
 // Contract: docs/public-api.md
 // Reference app: examples/cpp/thin_client/Main.cpp
 
 #include <engine/EngineApp.h>
+#include <engine/AppSchedules.h>
 #include <engine/EntityWorld.h>
 #include <engine/Plugin.h>
 #include <engine/MeshDeformApi.h>

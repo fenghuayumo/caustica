@@ -117,6 +117,16 @@ App::~App()
         shutdown();
 }
 
+namespace detail
+{
+
+std::unique_ptr<App> createBareAppForTest()
+{
+    return std::unique_ptr<App>(new App());
+}
+
+} // namespace detail
+
 void App::buildPlugins()
 {
     if (m_pluginsBuilt)

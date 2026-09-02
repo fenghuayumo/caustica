@@ -16,13 +16,12 @@ Walkthrough and lifecycle details: [embedding-cpp.md](embedding-cpp.md).
 | `caustica.h` | Umbrella include (preferred) |
 | `engine/EngineApp.h` | Create / run / stepFrame / setScene / camera / settings |
 | `engine/EntryPoint.h` | `initializeAppPlatform`, `runEngineApp` |
+| `engine/AppSchedules.h` | `AppSchedule`, `Query`, `Res` / `ResMut`, `SystemContext` |
 | `engine/EntityWorld.h` | System-param scene graph (`spawn` / `spawnNamed`, `emplace`, transform, `findEntity`, `setVisible`) |
 | `engine/SceneTransforms.h` | System-param transform writes that keep a system parallel |
 | `engine/Time.h` | `Time` resource (`deltaSeconds`, `elapsedSeconds`, `frameCount`) |
-| `engine/Plugin.h` | `addPlugin` extension point |
+| `engine/Plugin.h` | `addPlugin` extension point (`Plugin::build` takes the owned runtime) |
 | `engine/SystemSets.h` / `engine/SystemLabel.h` | `Simulation` membership + labels |
-| `engine/AppSchedules.h` | Via `App.h`: `AppSchedule`, `Query`, `Res` / `ResMut`, `SystemContext` |
-| `engine/App.h` | Schedule runtime; prefer not to construct `App` yourself |
 | `engine/SceneSpawn.h` | `load` / `spawn` / `spawnFromFile` / `despawn` / spawn lights |
 | `engine/SceneTransform.h` | App-based transform / visibility |
 | `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, `gameSettings` / `importedModels` / `sceneTypeFactory` |
@@ -40,22 +39,22 @@ Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`
 
 Simulation systems run concurrently when their parameter lists prove they cannot conflict — you
 never declare access by hand and there is no `addSystem` overload that accepts it. `Query` /
-`Res` / `ResMut` / `Commands` / `SceneTransforms` all target `App::world()` after the live
-scene is committed (`SceneEntityWorld` borrows that registry). `EntityWorld` and
-`SystemContext&` run exclusively because they reach the whole engine. Keep those two in
-structural, ideally one-shot systems and give per-frame systems narrow parameters —
-`Res<Time>` instead of `SystemContext&` for the clock, `SceneTransforms` instead of
-`EntityWorld` for movement. Scene nodes go through `EntityWorld::spawn`, not
-`Commands.spawn()`. See
+`Res` / `ResMut` / `Commands` / `SceneTransforms` all target the live logic
+registry after the scene is committed (`SceneEntityWorld` borrows that registry).
+`EntityWorld` and `SystemContext&` run exclusively because they reach the whole
+engine. Keep those two in structural, ideally one-shot systems and give per-frame
+systems narrow parameters — `Res<Time>` instead of `SystemContext&` for the clock,
+`SceneTransforms` instead of `EntityWorld` for movement. Scene nodes go through
+`EntityWorld::spawn`, not `Commands.spawn()`. See
 [architecture-render-proxy.md](architecture-render-proxy.md#one-live-logic-world).
 
 ## Not for applications
 
 | Area | Headers / APIs |
 | --- | --- |
-| Bootstrap | `DefaultPlugins`, `ScenePlugins`, `SceneStartup`, `SceneScheduleRegistration` |
+| Bootstrap | `engine/App.h` (owned runtime), `engine/internal/DefaultPlugins.h`, `ScenePlugins`, `SceneStartup` |
 | Threading internals | `RenderThread`, `LoadSession` |
-| GPU digs | `GpuSharedCaches`, `engine/internal/*`, `WorldRenderer`, `SceneManager` |
+| GPU digs | `GpuSharedCaches`, `WorldRenderer`, `SceneManager` |
 | Frame schedule guts | `RenderFrameApi` (`beginFrameScheduled` / `renderScene` / …) |
 | Session guts | `SceneSession`, `SceneGaussianSplatLogic` |
 | Editor / tooling | `Console*`, `SplashScreen`, `CaptureSequencer`, … |

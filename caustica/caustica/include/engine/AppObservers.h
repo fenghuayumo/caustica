@@ -9,8 +9,8 @@ namespace caustica
 
 class Event;
 
-// GLFW delivers stack-allocated events during poll, so observers are invoked
-// immediately. queueEvent() uses the same dispatch path from ProcessEventQueue.
+// Window callbacks enqueue unique_ptr<Event>. App drains them in First
+// (ProcessEventQueue): InputState first, then EventObservers.
 struct EventObservers
 {
     std::vector<std::function<void(Event&)>> handlers;
