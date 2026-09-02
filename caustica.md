@@ -30,7 +30,8 @@ with caustica.EngineApp.create(
 | Topic | Rule |
 | --- | --- |
 | FOV | Vertical field of view is **radians**. |
-| Camera pose | Position / direction / up as `float3` triples. |
+| Cameras | A scene can have many camera entities. `engine.set_camera_*` writes the **active / main** camera; per-camera work is on that `SceneEntity`. See [Camera](#camera). |
+| Camera pose | Position / direction / up as `float3` triples. Aim a camera with `look_to` / `camera_pose`, not `world_pose`. |
 | Scene load | `setScene` starts a load. Call `waitUntilReady` / `wait_until_ready` when you need the scene committed. |
 | Materials | Runtime fields are `metalness`, `roughness`, `emissive_color`, … Scene JSON keys such as `base_metalness` are a file format. |
 
@@ -49,7 +50,7 @@ Schedule internals: [docs/embedding-cpp.md](docs/embedding-cpp.md) · header all
 **[Cookbook](#cookbook)** — copy-paste recipes, then jump to [Reference](#reference) for signatures
 
 - Render: [headless](#headless-reference-render) · [framebuffer](#accumulate-then-read-framebuffer-cpu--numpy) · [window](#windowed-interactive-loop) · [modes](#realtime-vs-reference-helpers)
-- Camera: [pose and FOV](#camera-pose-and-fov)
+- Camera: [pose and FOV](#camera-pose-and-fov) · [reference](#camera)
 - Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets)
 - Look: [materials](#edit-materials) · [textures](#read-and-replace-material-textures) · [lights](#edit-lights) · [unlit](#unlit-receivers-with-shadows)
 - 3DGS: [load](#load-3d-gaussian-splats) · [batch](#3dgs-reference--realtime-batch) · [COLMAP](#colmap-camera-3dgs-alignment)
@@ -62,6 +63,7 @@ Schedule internals: [docs/embedding-cpp.md](docs/embedding-cpp.md) · header all
 - [EngineApp](#engineapp)
 - [Scene](#scene)
 - [SceneEntity](#sceneentity)
+- [Camera](#camera)
 - [Materials](#materials)
 - [Lights](#lights)
 - [Spawn / despawn](#spawn--despawn)
@@ -316,7 +318,7 @@ with caustica.EngineApp.create(adapter=f"luid:{target.luid}", headless=True) as 
 Copy a recipe and jump to [Reference](#reference) for signatures.
 
 - Render: [headless](#headless-reference-render) · [framebuffer](#accumulate-then-read-framebuffer-cpu--numpy) · [window](#windowed-interactive-loop) · [modes](#realtime-vs-reference-helpers)
-- Camera: [pose and FOV](#camera-pose-and-fov)
+- Camera: [pose and FOV](#camera-pose-and-fov) · [reference](#camera)
 - Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets)
 - Look: [materials](#edit-materials) · [textures](#read-and-replace-material-textures) · [lights](#edit-lights) · [unlit](#unlit-receivers-with-shadows)
 - 3DGS: [load](#load-3d-gaussian-splats) · [batch](#3dgs-reference--realtime-batch) · [COLMAP](#colmap-camera-3dgs-alignment)
@@ -426,9 +428,9 @@ C++ equivalent is `engine->run()`, or a host loop calling `stepFrame()` until it
 
 ### Camera pose and FOV
 
-FOV is **radians**. Python triples match C++ `float3`.
+FOV is **radians**. Python triples match C++ `float3`. Full property / function list: [Camera](#camera).
 
-`engine.set_camera_*` always writes the **active / main** camera: the free controller camera when `selected_camera_index == 0`, or the selected scene camera otherwise. Scenes with more than one camera should look the entity up and call methods on it.
+`engine.set_camera_*` always writes the **active / main** camera: the free controller camera when `selected_camera_index == 0`, or the selected scene camera otherwise. A scene can have many cameras; look the entity up and call methods on it.
 
 ```python
 import math
@@ -487,6 +489,21 @@ engine.clear_camera_intrinsics()  # back to symmetric FOV
 ```
 
 On a specific scene camera: `camera.set_intrinsics(...)` / `camera.clear_intrinsics()`.
+
+Switch among named cameras and render each one:
+
+```python
+for name in ("wrist", "third_person", "overview"):
+    cam = engine.scene.find_camera(name)
+    if cam is None:
+        continue
+    cam.activate()
+    engine.reset_accumulation()
+    engine.wait_until_ready()
+    engine.save_screenshot(f"{name}.png")
+
+engine.use_camera(None)  # back to the free / controller camera
+```
 
 ### Load 3D Gaussian splats
 
@@ -965,9 +982,9 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 | `entityWorld()` | `.scene` | Python: `Scene \| None` | Query view. `None` before a scene exists. |
 | `settings()` | `.settings` | `PathTracerSettings` | Live UI/settings object. |
 
-### Camera
+### Active camera
 
-`EngineApp` camera methods write the **active / main** camera (free controller at index `0`, or the selected perspective scene camera). Per-camera optics and pose live on the scene camera `SceneEntity` — see [SceneEntity](#sceneentity). Index `0` is the free camera; `1..N` match `scene.get_cameras()` registration order. `scene.camera_count` counts entities only and does **not** include the free camera; `engine.scene_camera_count` is `camera_count + 1`. Orthographic scene cameras are exposed for inspection but are not selectable by the active-camera API until an orthographic controller path is implemented.
+`EngineApp` camera methods write the **active / main** camera. Per-camera optics, pose, and lookup live on the scene camera `SceneEntity` — full usage: [Camera](#camera). Index `0` is the free camera; `1..N` match `scene.get_cameras()` registration order. `scene.camera_count` counts entities only and does **not** include the free camera; `engine.scene_camera_count` is `camera_count + 1`. Orthographic scene cameras are exposed for inspection but are not selectable by the active-camera API until an orthographic controller path is implemented.
 
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
@@ -1070,7 +1087,7 @@ C++ hosts iterate with `Query` / `EntityWorld::findEntity`. Python exposes a `Sc
 | `find_material_by_id(material_id)` | `Material \| None` | GPU index only. Prefer `EngineApp.find_material`. |
 | `get_lights()` | `list[SceneEntity]` | |
 | `find_light(name)` | `SceneEntity \| None` | |
-| `get_cameras()` | `list[SceneEntity]` | Scene camera entities (not the free camera). |
+| `get_cameras()` | `list[SceneEntity]` | Scene camera entities (not the free camera). See [Camera](#camera). |
 | `find_camera(name)` | `SceneEntity \| None` | Match entity name. |
 | `find_entity(path)` | `SceneEntity \| None` | Name or path. |
 | `get_mesh_entities()` | `list[SceneEntity]` | Mesh-instance entities. |
@@ -1078,7 +1095,7 @@ C++ hosts iterate with `Query` / `EntityWorld::findEntity`. Python exposes a `Sc
 | `material_count` | `int` | |
 | `mesh_count` | `int` | Engine mesh records. |
 | `light_count` | `int` | |
-| `camera_count` | `int` | Scene camera entities only. |
+| `camera_count` | `int` | Scene camera entities only. See [Camera](#camera). |
 | `bounds` | `((min),(max)) \| None` | World AABB of renderable leaves. `None` if empty / not refreshed. |
 | `bounds_center` | `(x,y,z) \| None` | |
 | `bounds_size` | `(x,y,z) \| None` | `max - min`. |
@@ -1098,7 +1115,7 @@ Returned by `engine.load(path)` / C++ `EngineApp::load`.
 
 ## SceneEntity
 
-Python wrapper around `ecs::Entity`. Returned by spawn / find / light helpers. C++ uses `ecs::Entity` plus `EntityWorld` / `SceneTransforms`.
+Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera helpers. C++ uses `ecs::Entity` plus `EntityWorld` / `SceneTransforms`. Camera-only properties and methods are summarized here and documented under [Camera](#camera).
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -1140,6 +1157,180 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light helpers. C
 | `environment_path` | `str` | Environment light HDRI path. |
 
 `MeshHandle`: `valid`, `name`, truthy when valid.
+
+## Camera
+
+A scene can contain many camera entities (wrist, third-person, COLMAP views, …). The path tracer renders **one** of them at a time: the **active / main** camera. When nothing is selected, that is the free / controller camera, which is **not** a scene entity.
+
+Python does not expose a separate `Camera` type. A scene camera is a `SceneEntity` with `is_camera == True`. C++ uses `ecs::Entity` plus [`CameraApi.h`](caustica/caustica/include/engine/CameraApi.h) on the host and `SceneCameraAccess.h` on the scene layer. Author cameras in JSON as `PerspectiveCamera` / `PerspectiveCameraEx` / `OrthographicCamera` — see [docs/scene-json.md](docs/scene-json.md#perspectivecamera--perspectivecameraex).
+
+### Two camera kinds
+
+| Kind | Identity | How to get it | How to drive it |
+| --- | --- | --- | --- |
+| Free / controller | Not a scene node. Selection index `0`. | `engine.active_camera is None` / `engine.active_camera_is_free` | `engine.set_camera_*`, `engine.camera_pose` |
+| Scene camera | Entity with a `CameraComponent` | `scene.get_cameras()`, `scene.find_camera(name)` | Properties / methods on that entity; `activate()` to render it |
+
+Counts are easy to mix up:
+
+| API | Counts |
+| --- | --- |
+| `scene.camera_count` / `scene.get_cameras()` | Scene camera **entities** only |
+| `engine.scene_camera_count` | Entities **+ 1** (the free camera) |
+| `engine.selected_camera_index` | `0` = free camera; `1..N` = `get_cameras()` registration order |
+
+Only **perspective** scene cameras can become the active camera. Orthographic cameras appear in `get_cameras()` for inspection, but `activate()`, `use_camera()`, and `selected_camera_index = i` reject them until an orthographic controller path exists.
+
+Edits on an inactive scene camera stay on the component. They take effect for rendering when that camera is activated.
+
+### Lookup
+
+| Python | C++ | Returns | Notes |
+| --- | --- | --- | --- |
+| `scene.get_cameras()` | `sceneCameraEntities(app)` | list of entities | Registration order. Does not include the free camera. |
+| `scene.find_camera(name)` | `findEntity(app, name)` then check `CameraComponent` | entity / `None` | Match entity **name**. |
+| `scene.camera_count` | `sceneCameraEntities(app).size()` | `int` | Entities only. |
+| `engine.active_camera` | `activeCameraEntity(app)` / `EngineApp::activeCameraEntity()` | entity / `None` | `None` / `NullEntity` when the free camera is selected. |
+| `engine.active_camera_is_free` | `activeCameraIsFree(app)` | `bool` | |
+| `engine.active_camera_name` / `.active_camera_path` | `activeCameraName` / `activeCameraPath` | `str` | Empty for the free camera. |
+| `engine.use_camera(entity)` | `setActiveCamera(app, entity)` | `None` / `bool` | `None` / `NullEntity` returns to the free camera. Python raises if the entity is not a selectable perspective camera. |
+| `engine.use_camera_path(path)` | `setActiveCameraByPath(app, path)` | `None` / `bool` | Hierarchy path, not display name. |
+| `camera.activate()` | `setActiveCamera(app, entity)` | `None` / `bool` | Same as `use_camera(camera)`. |
+| `engine.selected_camera_index` | `selectedCameraIndex` / `setSelectedCameraIndex` | `int` | Out of range or orthographic → C++ `false`, Python raises. |
+
+```python
+print(engine.scene.camera_count)          # entities
+print(engine.scene_camera_count)          # entities + free camera
+print([c.name for c in engine.scene.get_cameras()])
+
+wrist = engine.scene.find_camera("wrist")
+if wrist is None or not wrist.is_camera:
+    raise RuntimeError("missing wrist camera")
+wrist.activate()
+assert engine.active_camera_name == "wrist"
+
+engine.use_camera(None)
+assert engine.active_camera_is_free
+```
+
+```cpp
+const auto& cameras = caustica::sceneCameraEntities(engine->app());
+ecs::Entity wrist = caustica::findEntity(engine->app(), "wrist");
+engine->setActiveCamera(wrist);
+engine->setActiveCamera(ecs::NullEntity); // free camera
+```
+
+### Scene camera properties and methods
+
+These live on the camera `SceneEntity`. C++ equivalents take `App&` plus `ecs::Entity` in `CameraApi.h` (`setSceneCamera*`). Scene-layer helpers without `App` are in `SceneCameraAccess.h`.
+
+Assigning a property that fails validation raises in Python and returns `false` in C++.
+
+| Python | C++ | Type | Notes |
+| --- | --- | --- | --- |
+| `is_camera` | `tryGetCamera` ≠ null | `bool` | Read-only. |
+| `name` / `path` | `getEntityName` / `getEntityPath` | `str` | Read-only identity. |
+| `camera_pose` | `tryGetCameraWorldLookTo` / `setSceneCameraLookTo` | `((x,y,z), (x,y,z), (x,y,z))` | World-space `(position, direction, up)`. Same space as `look_to`. |
+| `look_to(position, direction, up=(0,1,0))` | `setSceneCameraLookTo` | `None` | Aim this camera. Direction is the look axis. |
+| `position` | look-to position | `(x,y,z)` | World position. Cameras keep the current up. |
+| `direction` | look-to direction | `(x,y,z)` | World look axis. Cameras keep the current up. |
+| `vertical_fov` | `sceneCameraVerticalFOV` / `setSceneCameraVerticalFOV` | `float` | **Radians**, open interval `(0, π)`. Assigning **clears** custom pinhole intrinsics. |
+| `z_near` | `setSceneCameraZNear` | `float` | Finite and `> 0`. Must stay `< z_far` when far is set. |
+| `z_far` | `setSceneCameraZFar` | `float \| None` | `None` = infinite far. If set: finite, `> 0`, and `> z_near`. |
+| `aspect_ratio` | `setSceneCameraAspectRatio` | `float \| None` | `None` uses the render target. If set: finite and `> 0`. |
+| `intrinsics` | `tryGetCameraIntrinsics` | `(fx,fy,cx,cy,w,h) \| None` | Read-only. `None` when using symmetric FOV. |
+| `set_intrinsics(fx, fy, cx, cy, width, height)` | `setSceneCameraIntrinsics` | `None` | Off-center pinhole (OpenCV / COLMAP order). Requires finite `fx,fy,width,height > 0`. Overrides `vertical_fov` until cleared. Distortion is not modeled. |
+| `clear_intrinsics()` | `clearSceneCameraIntrinsics` | `None` | Restore symmetric FOV projection. |
+| `activate()` | `setActiveCamera` | `None` | Make this the rendered camera. Perspective only. |
+
+`world_pose` / `set_world_pose` / `set_local_pose` are **entity TRS**, not camera view space. Do not copy a mesh pose onto a camera to aim it.
+
+```python
+import math
+
+cam = engine.scene.find_camera("wrist")
+cam.vertical_fov = math.radians(55.0)
+cam.z_near = 0.01
+cam.z_far = 100.0
+cam.aspect_ratio = None
+cam.look_to((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
+# equivalent:
+cam.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
+cam.set_intrinsics(fx, fy, cx, cy, width, height)
+print(cam.intrinsics)
+cam.clear_intrinsics()
+cam.activate()
+```
+
+### Pose spaces
+
+Two different writes:
+
+| API | Writes | Use for |
+| --- | --- | --- |
+| `look_to` / `camera_pose` / `set_camera_pos_dir_up` | Camera **view space**. The renderer applies a Z-flip. | Aiming a camera |
+| `world_pose` / `set_world_pose` / `local_pose` | Entity TRS (`S * R * T`). **No** Z-flip. | Moving meshes / lights / hierarchy |
+
+Copying `mesh.world_pose` onto a camera points the wrong way. Prefer `look_to(position, direction, up)`.
+
+`position` / `direction` on a camera entity go through look-to (keep current up). On a light, `direction` uses `lookatZ`.
+
+### Active / main camera (`EngineApp`)
+
+These always write the camera that is currently rendered — the free controller at index `0`, or the selected perspective scene camera. They do **not** take an entity argument. To edit a camera that is not active, use the `SceneEntity` surface above.
+
+| Python | C++ | Notes |
+| --- | --- | --- |
+| `set_camera_pos_dir_up(position, direction, up=(0,1,0))` | `setCameraPosDirUp` | View-space look. C++ also has a string overload matching `current_camera_pos_dir_up`. |
+| `current_camera_pos_dir_up` | `currentCameraPosDirUp()` | `pos.xyz,dir.xyz,up.xyz` string. |
+| `camera_pose` / `set_camera_pose(...)` | `currentCameraPose` / `setCameraPose` | Typed `(position, direction, up)`. |
+| `set_camera_vertical_fov(radians)` / `camera_vertical_fov` | `setCameraVerticalFOV` / `cameraVerticalFOV` | Radians. Must be finite and in `(0, π)`. |
+| `set_camera_intrinsics(...)` / `clear_camera_intrinsics()` | `setCameraIntrinsics` / `clearCameraIntrinsics` | Active camera only. |
+| `save_current_camera()` / `load_current_camera()` | `saveCurrentCamera` / `loadCurrentCamera` | Host persistence path (`campos.txt` next to the executable). |
+
+C++ setters return `bool`. Python raises on invalid input or a failed write.
+
+Signatures: [EngineApp → Active camera](#active-camera).
+
+### Validation
+
+| Write | Accepted |
+| --- | --- |
+| Vertical FOV | Finite, `(0, π)` radians |
+| Intrinsics | Finite; `fx, fy, width, height > 0`; `cx, cy` finite (may be off-center) |
+| Pose / look-to | Finite position, direction, up; direction length `> 1e-6` |
+| `z_near` | Finite, `> 0`, and `< z_far` when far is set |
+| `z_far` | `None`, or finite `> 0` and `> z_near` |
+| `aspect_ratio` | `None`, or finite `> 0` |
+| `use_camera` / `activate` / `selected_camera_index` | Free camera, or a **registered perspective** scene camera |
+
+### JSON and settings
+
+Declare cameras in the scene file (`PerspectiveCameraEx` is the usual type). Optional `fx, fy, cx, cy, width, height` override symmetric FOV. `settings.startingCamera` is a **scene-camera** index (`-1` = free flight, `0` = first scene camera), which is **not** the same numbering as `engine.selected_camera_index`. Field list: [docs/scene-json.md](docs/scene-json.md#perspectivecamera--perspectivecameraex).
+
+Depth of field and fly-camera speed are **session** settings, not per-entity optics: `settings.camera_aperture`, `settings.camera_focal_distance`, `settings.camera_move_speed`. A `PerspectiveCameraEx` can override tone-mapping / exposure when it becomes active — see [Camera / firefly / tone map / bloom](#camera--firefly--tone-map--bloom).
+
+There is no public spawn-camera helper yet. Add cameras in scene JSON (or spawn a JSON snippet that contains a camera entity).
+
+### C++ per-entity helpers
+
+```cpp
+#include <caustica.h>
+
+ecs::Entity wrist = caustica::findEntity(engine->app(), "wrist");
+caustica::setSceneCameraVerticalFOV(engine->app(), wrist, dm::radians(55.f));
+caustica::setSceneCameraLookTo(
+    engine->app(), wrist,
+    {0.f, 1.2f, 0.15f}, {0.f, 0.f, 1.f}, {0.f, 1.f, 0.f});
+caustica::setSceneCameraIntrinsics(engine->app(), wrist, fx, fy, cx, cy, width, height);
+caustica::clearSceneCameraIntrinsics(engine->app(), wrist);
+caustica::setSceneCameraZNear(engine->app(), wrist, 0.01f);
+caustica::setSceneCameraZFar(engine->app(), wrist, 100.f);
+caustica::setSceneCameraAspectRatio(engine->app(), wrist, std::nullopt);
+engine->setActiveCamera(wrist);
+```
+
+`CameraPose` is `{ position, direction, up }` in the same look-to space as Python `camera_pose`.
 
 ## Materials
 
@@ -1697,6 +1888,6 @@ help(caustica.EngineApp)
 * [docs/public-api.md](docs/public-api.md) — C++ header allowlist.
 * [docs/embedding-cpp.md](docs/embedding-cpp.md) — C++ lifecycle, `EngineAppDesc`, parallel systems, CMake.
 * [docs/build-and-run.md](docs/build-and-run.md) — build, runtime layout, CLI.
-* [docs/scene-json.md](docs/scene-json.md) — scene files.
+* [docs/scene-json.md](docs/scene-json.md) — scene files, including camera nodes.
 * [docs/openpbr.md](docs/openpbr.md) — materials.
 * [examples/python/README.md](examples/python/README.md) — Python example index.

@@ -205,7 +205,7 @@ Prefer system parameters, then focused application headers:
 | `engine/MeshDeformApi.h` | Vertex reads/deformation and geometry-sequence playback (entity + MeshHandle only). |
 | `MeshHandle` / `MaterialHandle` / `MeshInstanceComponent` | App asset identity; do not dig mesh/material GPU ids. |
 | `findMaterial(app, pickId)` | Path-tracer pick id (`gpuDataIndex`), not dense `materialID`. |
-| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. |
+| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. Host usage: [caustica.md — Camera](../caustica.md#camera). |
 | `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene`. |
 | `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles, `shaderFactory`. |
 | `engine/RenderFrameApi.h` | Accumulation and rendered-frame access. |

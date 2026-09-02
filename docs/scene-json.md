@@ -302,7 +302,7 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 
 ## 相机参数
 
-相机节点同样使用通用 Transform 字段。常用类型是 `PerspectiveCameraEx`。
+相机节点同样使用通用 Transform 字段。常用类型是 `PerspectiveCameraEx`。运行时如何查找、激活、对准多个相机，见 [caustica.md — Camera](../caustica.md#camera)。
 
 ### `PerspectiveCamera` / `PerspectiveCameraEx`
 

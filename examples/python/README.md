@@ -55,6 +55,8 @@ python examples/python/render.py \
 | `environment_lighting.py` | HDRI environment maps and procedural-sky presets |
 | `embedded.py` | Scripting the running editor from inside `caustica.exe` |
 
+Host camera API (multiple scene cameras, `look_to`, FOV, intrinsics): [caustica.md — Camera](../../caustica.md#camera).
+
 ## Camera LUT reference matching
 
 Caustica accepts standard per-channel `LUT_1D_SIZE` and `LUT_3D_SIZE` `.cube` files. Fit the LUT

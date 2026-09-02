@@ -29,7 +29,7 @@ C++ schedule / system-parameter walkthrough: [embedding-cpp.md](embedding-cpp.md
 | `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, `gameSettings` / `importedModels` / `sceneTypeFactory` |
 | `engine/ActiveScene.h` | Name/path/generation metadata only (no `Scene*` digs) |
 | `engine/MeshDeformApi.h` | Entity + MeshHandle deform / geometry sequence |
-| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. `EngineApp` camera methods write the active/main camera; per-entity helpers take `ecs::Entity`. |
+| `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. `EngineApp` camera methods write the active/main camera; per-entity helpers take `ecs::Entity`. Usage: [caustica.md — Camera](../caustica.md#camera). |
 | `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles, `shaderFactory` |
 | `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene` (prefer `EngineApp::setScene`) |
 | `engine/EnqueueRenderCommand.h` | Occasional non-blocking RT work |
