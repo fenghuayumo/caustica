@@ -119,6 +119,8 @@ public:
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
+    void createGraphScratchFallbacks();
+    void publishGraphScratchBindings(rg::GraphBuilder& graph);
     // Render-thread only. Caller must waitForIdle() first.
     void releaseStreamlineTemporalResources();
     void onSceneUnloading();
@@ -225,6 +227,9 @@ private:
     std::unique_ptr<DenoisePass>                m_denoisePass;
     std::unique_ptr<GaussianSplatFramePass>     m_gaussianFramePass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
+    caustica::rhi::TextureHandle                m_scratchFloat1Fallback;
+    caustica::rhi::TextureHandle                m_avgLayerFallback;
+    caustica::rhi::TextureHandle                m_ldrColorScratchFallback;
     caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
     caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
 

@@ -1,6 +1,7 @@
 #include <render/passes/denoisers/DenoisePass.h>
 
 #include <render/FrameGraphContext.h>
+#include <render/PathTraceSceneBindings.h>
 #include <render/PathTracingContext.h>
 #include <render/core/CameraController.h>
 #include <render/core/PostProcessAA.h>
@@ -144,6 +145,7 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
     m_device = ctx.device ? ctx.device : m_device;
     m_renderTargets = ctx.renderTargets;
     m_postProcess = ctx.postProcess;
+    m_sceneBindings = ctx.sceneBindings;
     m_bindingSet = ctx.bindingSet;
     m_bindingLayout = ctx.bindingLayout;
     m_constantBuffer = ctx.constantBuffer;
@@ -169,8 +171,15 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 #endif
 }
 
+void DenoisePass::refreshLiveBindingSet()
+{
+    if (m_sceneBindings && m_sceneBindings->ready())
+        m_bindingSet = m_sceneBindings->bindingSet();
+}
+
 void DenoisePass::denoiseSpecHitT(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_denoisingGuidesPass);
     assert(m_bindingSet);
@@ -180,6 +189,7 @@ void DenoisePass::denoiseSpecHitT(caustica::rhi::CommandList* commandList)
 
 void DenoisePass::computeAvgLayerRadiance(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_denoisingGuidesPass);
     assert(m_context);
@@ -206,6 +216,7 @@ void DenoisePass::prepareGuides(caustica::rhi::CommandList* commandList)
 
 void DenoisePass::stablePlanesDebugViz(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_postProcess);
     assert(m_renderTargets);
@@ -264,6 +275,7 @@ FrameMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings,
 
 void DenoisePass::prepareNrdInputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -351,6 +363,7 @@ void DenoisePass::runNrd(caustica::rhi::CommandList* commandList, int planeIndex
 
 void DenoisePass::mergeNrdOutputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -405,6 +418,7 @@ void DenoisePass::denoiseStablePlane(
 
 void DenoisePass::denoise(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* framebuffer)
 {
+    refreshLiveBindingSet();
     assert(m_context);
 
     if (!m_context->activeSettings().actualUseStandaloneDenoiser())
@@ -421,6 +435,7 @@ void DenoisePass::denoise(caustica::rhi::CommandList* commandList, caustica::rhi
 
 void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -538,6 +553,7 @@ bool DenoisePass::evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bo
 
 void DenoisePass::runDlssUpscale(caustica::rhi::CommandList* commandList, bool reset)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_camera);

@@ -44,6 +44,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/pathTrace/PathTracePass.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/debug/ShaderDebug.h>
 #include <core/log.h>
 #include <algorithm>
@@ -286,6 +287,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
     m_renderBufferPool.setDevice(device);
     m_frameGraph.setRenderTargetPool(&m_renderTargetPool);
     m_frameGraph.setRenderBufferPool(&m_renderBufferPool);
+    createGraphScratchFallbacks();
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     m_nativeDLSS = caustica::render::DLSS::create(device, *m_context->shaderFactory, caustica::getDirectoryWithExecutable().string());
@@ -900,6 +902,11 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         gaussianSplatBuffer = primaryGaussianSplatPass->getSplatBuffer();
     }
 
+    auto scratchOrFallback = [this](const caustica::rhi::TextureHandle& published,
+        const caustica::rhi::TextureHandle& fallback) -> caustica::rhi::Texture* {
+        return published ? published.Get() : fallback.Get();
+    };
+
     // Fixed resources that do not change between binding sets
     caustica::rhi::BindingSetDesc bindingSetDescBase;
     bindingSetDescBase.bindings = {
@@ -912,7 +919,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, geometryDebugBuffer),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, materialDataBuffer),
-        caustica::rhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, caustica::rhi::Format::SRGBA8_UNORM),
+        caustica::rhi::BindingSetItem::Texture_SRV(6,  scratchOrFallback(m_renderTargets->ldrColorScratch, m_ldrColorScratchFallback), caustica::rhi::Format::SRGBA8_UNORM),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
         caustica::rhi::BindingSetItem::Texture_SRV(10, environment->getEnvMapCube()),
@@ -937,7 +944,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_UAV(5, m_renderTargets->screenMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(6, m_renderTargets->depth),
         caustica::rhi::BindingSetItem::Texture_UAV(7, m_renderTargets->specularHitT), 
-        caustica::rhi::BindingSetItem::Texture_UAV(8, m_renderTargets->scratchFloat1), 
+        caustica::rhi::BindingSetItem::Texture_UAV(8, scratchOrFallback(m_renderTargets->scratchFloat1, m_scratchFloat1Fallback)), 
         caustica::rhi::BindingSetItem::Texture_UAV(31, m_renderTargets->denoiserViewspaceZ),
         caustica::rhi::BindingSetItem::Texture_UAV(32, m_renderTargets->denoiserMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(33, m_renderTargets->denoiserNormalRoughness),
@@ -956,7 +963,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_UAV(72, m_renderTargets->rrNormalsAndRoughness),
         caustica::rhi::BindingSetItem::Texture_UAV(73, m_renderTargets->rrSpecMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(74, (m_renderTargets->rrTransparencyLayer!=nullptr)?m_renderTargets->rrTransparencyLayer:m_renderTargets->rrSpecMotionVectors),
-        caustica::rhi::BindingSetItem::Texture_UAV(75, m_renderTargets->denoiserAvgLayerRadianceHalfRes),
+        caustica::rhi::BindingSetItem::Texture_UAV(75, scratchOrFallback(m_renderTargets->denoiserAvgLayerRadianceHalfRes, m_avgLayerFallback)),
 
         ///***
         caustica::rhi::BindingSetItem::Texture_UAV(100, m_renderTargets->baseColor),
@@ -1026,6 +1033,56 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
                     : nullptr);
         }
     }
+}
+
+void caustica::render::WorldRenderer::createGraphScratchFallbacks()
+{
+    caustica::rhi::Device* const device = this->device();
+    if (!device)
+        return;
+
+    caustica::rhi::TextureDesc desc;
+    desc.width = 1;
+    desc.height = 1;
+    desc.dimension = caustica::rhi::TextureDimension::Texture2D;
+    desc.keepInitialState = true;
+    desc.isUAV = true;
+    desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
+
+    desc.format = caustica::rhi::Format::R32_FLOAT;
+    desc.debugName = "scratchFloat1Fallback";
+    m_scratchFloat1Fallback = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+    desc.debugName = "avgLayerFallback";
+    m_avgLayerFallback = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::SRGBA8_UNORM;
+    desc.isTypeless = true;
+    desc.debugName = "ldrColorScratchFallback";
+    m_ldrColorScratchFallback = device->createTexture(desc);
+}
+
+void caustica::render::WorldRenderer::publishGraphScratchBindings(rg::GraphBuilder& graph)
+{
+    if (!m_renderTargets)
+        return;
+
+    bool changed = false;
+    const auto assignIfChanged = [&](rg::TextureHandle handle, caustica::rhi::TextureHandle& dest) {
+        const caustica::rhi::TextureHandle owned = graph.ownedTextureHandle(handle);
+        if (!owned || owned == dest)
+            return;
+        dest = owned;
+        changed = true;
+    };
+
+    assignIfChanged(graph.findTexture(kScratchFloat1Name), m_renderTargets->scratchFloat1);
+    assignIfChanged(graph.findTexture(kAvgLayerRadianceName), m_renderTargets->denoiserAvgLayerRadianceHalfRes);
+    assignIfChanged(graph.findTexture(kLdrColorScratchName), m_renderTargets->ldrColorScratch);
+
+    if (changed || !m_sceneBindings.ready())
+        recreateBindingSet(m_context ? m_context->frameScene : nullptr);
 }
 
 void caustica::render::WorldRenderer::denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const

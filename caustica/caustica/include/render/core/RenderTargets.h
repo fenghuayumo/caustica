@@ -22,7 +22,7 @@ class RenderTargets
 public:
     caustica::rhi::TextureHandle accumulatedRadiance;   // used only in non-realtime mode
     caustica::rhi::TextureHandle ldrColor;              // final, post-tonemapped color
-    caustica::rhi::TextureHandle ldrColorScratch;       // used for ping-ponging post-process stuff vs LdrColor
+    caustica::rhi::TextureHandle ldrColorScratch;       // graph-owned same-frame scratch; published after compile
     caustica::rhi::TextureHandle outputColor;           // raw path tracing output goes here (in both realtime and non-realtime modes); this can be input to TAA/DLSS
     caustica::rhi::TextureHandle processedOutputColor;  // for when post-processing OutputColor (i.e. TAA) (previously ResolvedColor); this is the output of TAA/DLSS in full res, but before tonemapping and without ImGUI
     caustica::rhi::TextureHandle temporalFeedback1;     // used by TAA
@@ -52,7 +52,7 @@ public:
 
     caustica::rhi::BufferHandle  surfaceDataBuffer;
 
-    caustica::rhi::TextureHandle denoiserAvgLayerRadianceHalfRes;
+    caustica::rhi::TextureHandle denoiserAvgLayerRadianceHalfRes; // graph-owned same-frame scratch
 
     caustica::rhi::TextureHandle denoiserDiffRadianceHitDist;       // input to denoiser
     caustica::rhi::TextureHandle denoiserSpecRadianceHitDist;       // input to denoiser
@@ -74,7 +74,7 @@ public:
     caustica::rhi::TextureHandle materialInfo;
 
     caustica::rhi::TextureHandle specularHitT;                      // input for denoisers to be able to resolve spec motion vectors
-    caustica::rhi::TextureHandle scratchFloat1;                     // can be used to ping-pong stuff - 32bit float 1
+    caustica::rhi::TextureHandle scratchFloat1;                     // graph-owned same-frame ping-pong scratch
 
     // === Reflection System render Targets ===
     caustica::rhi::TextureHandle localCubemap;                      // 256x256x6, RGBA16F, ray-traced local environment cubemap

@@ -141,6 +141,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .environment = m_context->scenePasses.lighting.environment().get(),
         .bindingLayout = m_bindingLayout,
         .bindingSet = m_sceneBindings.bindingSet(),
+        .sceneBindings = &m_sceneBindings,
         .descriptorTable = descriptorTable,
         .constantBuffer = m_constantBuffer,
         .ptBuildStablePlanes = rayTracing.pipelineBuildStablePlanes(),
@@ -312,6 +313,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
             telemetryFrame,
             FrameCpuStage::GraphCompile);
         ctx.graph->compile();
+        publishGraphScratchBindings(*ctx.graph);
     }
 
     while (auto timingFrame = ctx.graph->collectCompletedGpuTimings())
@@ -1148,13 +1150,14 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
         [renderTargets](rg::RenderPassContext& passCtx) {
             renderTargets->clear(passCtx.commandList());
         },
-        rg::PassOptions{ .sideEffect = true });
+        {});
 
     if (!ctx.hasScene)
     {
         const rg::TextureHandle outputColor = ctx.graph->importTexture(
             ctx.renderTargets->outputColor,
             rg::TextureAccess::UnorderedAccess);
+        ctx.graph->extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
 
         ctx.graph->addPass(
             "ClearNoSceneOutput",
@@ -1166,8 +1169,7 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
                     passCtx.texture(outputColor),
                     caustica::rhi::AllSubresources,
                     caustica::rhi::Color(1, 1, 0, 0));
-            },
-            rg::PassOptions{ .sideEffect = true, .after = clearFrameTargets });
+            });
     }
 
     return clearFrameTargets;
@@ -1181,6 +1183,7 @@ void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
     const rg::PassHandle frameConstants = registerUploadFrameConstantsPass(ctx, clear);
     const rg::PassHandle lightingReady = registerLightingGraphPasses(ctx, frameConstants);
     const rg::PassHandle rtxdiBeginReady = registerRtxdiBeginFramePass(ctx, lightingReady);
+    (void)registerGaussianSplatAccelBuildPass(ctx, lightingReady);
     const rg::PassHandle pathTracePreReady = registerPathTracePrePass(ctx, rtxdiBeginReady);
     const rg::PassHandle vbufferReady = registerVBufferExportPass(ctx, pathTracePreReady);
 
@@ -1189,9 +1192,7 @@ void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
         : lightingReady;
     const rg::PassHandle lightingEndReady =
         registerPathTraceLightingEndPass(ctx, pathTraceInputsReady);
-    const rg::PassHandle gaussianAccelReady =
-        registerGaussianSplatAccelBuildPass(ctx, lightingEndReady);
-    const rg::PassHandle mainPathTraceReady = registerMainPathTracePass(ctx, gaussianAccelReady);
+    const rg::PassHandle mainPathTraceReady = registerMainPathTracePass(ctx, lightingEndReady);
     const rg::PassHandle rtxdiExecuteReady = registerRtxdiExecutePass(ctx, mainPathTraceReady);
     const rg::PassHandle denoiseGuidesReady = registerDenoiserPreparePass(ctx, rtxdiExecuteReady);
     (void)registerNrdPass(ctx, denoiseGuidesReady);

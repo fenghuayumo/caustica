@@ -1,17 +1,47 @@
 #include <render/passes/pathTrace/PathTraceGraphResources.h>
 
+#include <render/FrameGraphContext.h>
+#include <render/PathTracingContext.h>
+#include <render/core/AccelStructManager.h>
 #include <render/core/RenderTargets.h>
 #include <render/core/PathTracerSettings.h>
+#include <render/passes/gaussian/GaussianSplatPass.h>
+#include <render/SceneGaussianSplatPasses.h>
+#include <render/passes/gaussian/GaussianSplatSceneRuntime.h>
 #include <render/passes/lighting/LightSamplingCache.h>
+#include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/pipeline/FrameGraphPassNames.h>
 
+#include <algorithm>
 #include <cassert>
 
 namespace caustica::render
 {
 
+namespace
+{
+    rg::TextureDesc makeGraphScratchDesc(
+        const char* name,
+        uint32_t width,
+        uint32_t height,
+        rg::Format format,
+        bool typeless = false)
+    {
+        rg::TextureDesc desc{};
+        desc.name = name;
+        desc.width = std::max(1u, width);
+        desc.height = std::max(1u, height);
+        desc.format = format;
+        desc.isUAV = true;
+        desc.isTypeless = typeless;
+        return desc;
+    }
+}
+
 PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, RenderTargets& targets)
 {
+    const uint32_t halfW = (targets.renderSize.x + 1) / 2;
+    const uint32_t halfH = (targets.renderSize.y + 1) / 2;
     return PathTraceGraphTargets{
         .outputColor = graph.importTexture(targets.outputColor, rg::TextureAccess::UnorderedAccess),
         .processedOutputColor = graph.importTexture(targets.processedOutputColor, rg::TextureAccess::UnorderedAccess),
@@ -19,7 +49,11 @@ PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, Rende
         .motionVectors = graph.importTexture(targets.screenMotionVectors, rg::TextureAccess::UnorderedAccess),
         .throughput = graph.importTexture(targets.throughput, rg::TextureAccess::UnorderedAccess),
         .specularHitT = graph.importTexture(targets.specularHitT, rg::TextureAccess::UnorderedAccess),
-        .scratchFloat1 = graph.importTexture(targets.scratchFloat1, rg::TextureAccess::UnorderedAccess),
+        .scratchFloat1 = graph.createTexture(makeGraphScratchDesc(
+            kScratchFloat1Name,
+            targets.renderSize.x,
+            targets.renderSize.y,
+            rg::Format::R32_FLOAT)),
         .stableRadiance = graph.importTexture(targets.stableRadiance, rg::TextureAccess::UnorderedAccess),
         .stablePlanesHeader = graph.importTexture(targets.stablePlanesHeader, rg::TextureAccess::UnorderedAccess),
         .stablePlanesBuffer = graph.importBuffer(targets.stablePlanesBuffer, rg::BufferAccess::UnorderedAccess),
@@ -31,9 +65,11 @@ PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, Rende
         .denoiserDisocclusionThresholdMix = graph.importTexture(
             targets.denoiserDisocclusionThresholdMix,
             rg::TextureAccess::UnorderedAccess),
-        .denoiserAvgLayerRadianceHalfRes = graph.importTexture(
-            targets.denoiserAvgLayerRadianceHalfRes,
-            rg::TextureAccess::UnorderedAccess),
+        .denoiserAvgLayerRadianceHalfRes = graph.createTexture(makeGraphScratchDesc(
+            kAvgLayerRadianceName,
+            halfW,
+            halfH,
+            rg::Format::RGBA16_FLOAT)),
         .baseColor = graph.importTexture(targets.baseColor, rg::TextureAccess::UnorderedAccess),
         .specNormal = graph.importTexture(targets.specNormal, rg::TextureAccess::UnorderedAccess),
         .roughnessMetal = graph.importTexture(targets.roughnessMetal, rg::TextureAccess::UnorderedAccess),
@@ -50,12 +86,73 @@ PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, Rende
     };
 }
 
-void extractPathTraceGraphOutputs(rg::GraphBuilder& graph, const PathTraceGraphTargets& handles)
+PathTraceScheduleInputs importPathTraceScheduleInputs(const FrameGraphContext& ctx)
 {
-    graph.extractTexture(handles.outputColor, rg::TextureAccess::UnorderedAccess);
-    graph.extractTexture(handles.processedOutputColor, rg::TextureAccess::UnorderedAccess);
-    graph.extractTexture(handles.depth, rg::TextureAccess::UnorderedAccess);
-    graph.extractTexture(handles.motionVectors, rg::TextureAccess::UnorderedAccess);
+    PathTraceScheduleInputs inputs{};
+    if (!ctx.graph)
+        return inputs;
+
+    if (ctx.environment != nullptr)
+    {
+        if (auto cube = ctx.environment->getEnvMapCube())
+            inputs.envCube = ctx.graph->importTexture(cube, rg::TextureAccess::ShaderResource);
+    }
+    if (ctx.lightSampling != nullptr)
+    {
+        if (auto buffer = ctx.lightSampling->getLightBuffer())
+            inputs.lightBuffer = ctx.graph->importBuffer(buffer, rg::BufferAccess::ShaderResource);
+    }
+    if (ctx.subInstanceDataBuffer)
+        inputs.subInstance = ctx.graph->importBuffer(ctx.subInstanceDataBuffer, rg::BufferAccess::ShaderResource);
+    if (ctx.constantBuffer)
+        inputs.constants = ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::ConstantBuffer);
+    if (ctx.lightSampling != nullptr)
+    {
+        if (auto texture = ctx.lightSampling->getFeedbackTotalWeight())
+            inputs.feedbackTotalWeight =
+                ctx.graph->importTexture(texture, rg::TextureAccess::UnorderedAccess);
+        if (auto texture = ctx.lightSampling->getFeedbackCandidates())
+            inputs.feedbackCandidates =
+                ctx.graph->importTexture(texture, rg::TextureAccess::UnorderedAccess);
+    }
+    if (ctx.accelStructs != nullptr)
+    {
+        if (auto sceneAS = ctx.accelStructs->getTopLevelAS())
+            inputs.sceneAS = ctx.graph->importAccelStruct(sceneAS, rg::AccelStructAccess::ShaderResource);
+    }
+    if (ctx.pathTracingContext != nullptr && ctx.gaussianScenePasses != nullptr)
+    {
+        const GaussianSplatBinding binding = getPrimaryGaussianSplatBinding(
+            ctx.pathTracingContext->frameGaussianSplats(),
+            *ctx.gaussianScenePasses);
+        if (binding.splatPass != nullptr && binding.splatPass->getTopLevelAS() != nullptr)
+        {
+            inputs.gaussianAS = ctx.graph->importAccelStruct(
+                binding.splatPass->getTopLevelAS(),
+                rg::AccelStructAccess::ShaderResource);
+        }
+    }
+    return inputs;
+}
+
+void declarePathTraceScheduleReads(rg::PassBuilder& setup, const PathTraceScheduleInputs& inputs)
+{
+    if (inputs.envCube.isValid())
+        setup.read(inputs.envCube, rg::TextureAccess::ShaderResource);
+    if (inputs.lightBuffer.isValid())
+        setup.read(inputs.lightBuffer, rg::BufferAccess::ShaderResource);
+    if (inputs.subInstance.isValid())
+        setup.read(inputs.subInstance, rg::BufferAccess::ShaderResource);
+    if (inputs.constants.isValid())
+        setup.read(inputs.constants, rg::BufferAccess::ConstantBuffer);
+    if (inputs.feedbackTotalWeight.isValid())
+        setup.read(inputs.feedbackTotalWeight, rg::TextureAccess::UnorderedAccess);
+    if (inputs.feedbackCandidates.isValid())
+        setup.read(inputs.feedbackCandidates, rg::TextureAccess::UnorderedAccess);
+    if (inputs.sceneAS.isValid())
+        setup.read(inputs.sceneAS, rg::AccelStructAccess::ShaderResource);
+    if (inputs.gaussianAS.isValid())
+        setup.read(inputs.gaussianAS, rg::AccelStructAccess::ShaderResource);
 }
 
 void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)

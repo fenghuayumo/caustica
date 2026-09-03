@@ -46,13 +46,9 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
         return after;
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
-    extractPathTraceGraphOutputs(*ctx.graph, handles);
     DenoisePass* const denoise = ctx.denoise;
 
-    rg::PassOptions specHitPassOptions{};
-    specHitPassOptions.after = after;
-
-    const rg::PassHandle specHitPass = ctx.graph->addPass(
+    ctx.graph->addPass(
         kDenoiseSpecHitTPass,
         [handles](rg::PassBuilder& setup) {
             setup.write(handles.depth, rg::TextureAccess::UnorderedAccess);
@@ -62,10 +58,7 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
         [denoise](rg::RenderPassContext& passCtx) {
             denoise->denoiseSpecHitT(passCtx.commandList());
         },
-        specHitPassOptions);
-
-    rg::PassOptions avgLayerPassOptions{};
-    avgLayerPassOptions.after = specHitPass;
+        rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
 
     rg::PassHandle guidesReady = ctx.graph->addPass(
         kAvgLayerRadiancePass,
@@ -75,13 +68,10 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
         [denoise](rg::RenderPassContext& passCtx) {
             denoise->computeAvgLayerRadiance(passCtx.commandList());
         },
-        avgLayerPassOptions);
+        rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
 
     if (needsStablePlanesDebugViz(*ctx.settings))
     {
-        rg::PassOptions debugVizPassOptions{};
-        debugVizPassOptions.after = guidesReady;
-
         guidesReady = ctx.graph->addPass(
             kStablePlanesDebugVizPass,
             [handles](rg::PassBuilder& setup) {
@@ -89,8 +79,7 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
             },
             [denoise](rg::RenderPassContext& passCtx) {
                 denoise->stablePlanesDebugViz(passCtx.commandList());
-            },
-            debugVizPassOptions);
+            });
     }
 
     return guidesReady;
@@ -157,9 +146,6 @@ namespace
         handles.specularHitT = graph.importTexture(
             targets.specularHitT, rg::TextureAccess::ShaderResource);
 
-        graph.extractTexture(handles.outputColor, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(handles.outDiff, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(handles.outSpec, rg::TextureAccess::UnorderedAccess);
         return handles;
     }
 
@@ -235,9 +221,7 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
         static_cast<int>(cStablePlaneCount));
 
     // Highest plane first (initializes outputColor from stable radiance), then lower planes
-    // accumulate. Within/across planes, resource edges (guides / outDiff / outputColor) order
-    // Prepare → Run → Merge; only the first Prepare needs an explicit external edge.
-    bool firstPrepare = true;
+    // accumulate. Resource edges (specularHitT / outDiff / outputColor) order Prepare → Run → Merge.
     rg::PassHandle nrdReady = guidesReady;
 
     for (int pass = maxPassCount - 1; pass >= 0; --pass)
@@ -252,12 +236,6 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
             *ctx.renderTargets,
             planeIndex);
 
-        rg::PassOptions prepareOptions{};
-        if (firstPrepare)
-        {
-            prepareOptions.after = guidesReady;
-            firstPrepare = false;
-        }
         ctx.graph->addPass(
             nrdPreparePassName(planeIndex),
             [handles, initWithStableRadiance](rg::PassBuilder& setup) {
@@ -265,8 +243,7 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
             },
             [denoise, planeIndex](rg::RenderPassContext& passCtx) {
                 denoise->prepareNrdInputs(passCtx.commandList(), planeIndex);
-            },
-            prepareOptions);
+            });
 
         ctx.graph->addPass(
             nrdRunPassName(planeIndex),
@@ -393,8 +370,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         targets.combinedHistoryClampRelax,
         rg::TextureAccess::ShaderResource);
 
-    ctx.graph->extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
-    ctx.graph->extractTexture(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+    // History leaves the graph; current-frame color is consumed by later in-graph passes.
     ctx.graph->extractTexture(accumulatedRadiance, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(temporalFeedback1, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(temporalFeedback2, rg::TextureAccess::UnorderedAccess);

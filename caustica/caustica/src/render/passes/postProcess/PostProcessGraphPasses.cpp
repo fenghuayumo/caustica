@@ -1,6 +1,8 @@
 #include <render/FrameGraphPasses.h>
 
 #include <render/FrameGraphContext.h>
+#include <render/PathTraceSceneBindings.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/core/FullscreenBlitPass.h>
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RenderTargets.h>
@@ -10,6 +12,7 @@
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <shaders/FrameConstantBuffer.h>
 
+#include <algorithm>
 #include <cassert>
 
 namespace caustica::render
@@ -76,7 +79,7 @@ namespace
         assert(ctx.graph);
         PTPipelineVariant* const pipeline = ctx.ptEdgeDetection;
         const dm::uint2 displaySize = ctx.extractedView->displaySize;
-        const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+        PathTraceSceneBindings* const sceneBindings = ctx.sceneBindings;
         caustica::rhi::DescriptorTable* const descriptorTable = ctx.descriptorTable;
         const float threshold = ctx.settings->PostProcessEdgeDetectionThreshold;
 
@@ -100,8 +103,10 @@ namespace
             [ldrColor](rg::PassBuilder& setup) {
                 setup.write(ldrColor, rg::TextureAccess::UnorderedAccess);
             },
-            [pipeline, displaySize, bindingSet, descriptorTable,
+            [pipeline, displaySize, sceneBindings, descriptorTable,
              threshold](rg::RenderPassContext& passCtx) {
+                const caustica::rhi::BindingSetHandle bindingSet =
+                    sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
                 assert(pipeline);
                 if (!pipeline->hasPipeline() || !pipeline->getShaderTable())
                     return;
@@ -143,13 +148,14 @@ void registerPostProcess(FrameGraphContext ctx)
     const rg::TextureHandle ldrColor = ctx.graph->importTexture(
         targets.ldrColor,
         caustica::rhi::ResourceStates::ShaderResource);
-    const rg::TextureHandle ldrColorScratch = ctx.graph->importTexture(
-        targets.ldrColorScratch,
-        caustica::rhi::ResourceStates::Common);
-    ctx.graph->extractTexture(processedOutputColor, rg::TextureAccess::UnorderedAccess);
-    ctx.graph->extractTexture(ldrColor, rg::TextureAccess::ShaderResource);
-    ctx.graph->extractTexture(ldrColorScratch, rg::TextureAccess::ShaderResource);
-
+    rg::TextureDesc ldrScratchDesc{};
+    ldrScratchDesc.name = kLdrColorScratchName;
+    ldrScratchDesc.width = std::max(1u, ctx.displaySize.x);
+    ldrScratchDesc.height = std::max(1u, ctx.displaySize.y);
+    ldrScratchDesc.format = rg::Format::RGBA8_UNORM_SRGB;
+    ldrScratchDesc.isUAV = true;
+    ldrScratchDesc.isTypeless = true;
+    const rg::TextureHandle ldrColorScratch = ctx.graph->createTexture(ldrScratchDesc);
     registerAerialPerspectivePass(processedOutputColor, ctx);
 
     BloomPass* bloomPass = ctx.bloom;

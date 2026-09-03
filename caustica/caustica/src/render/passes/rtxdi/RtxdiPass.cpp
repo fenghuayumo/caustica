@@ -5,6 +5,7 @@
 
 #include <render/FrameGraphPasses.h>
 #include <render/FrameGraphContext.h>
+#include <render/PathTraceSceneBindings.h>
 #include <render/passes/rtxdi/RtxdiResources.h>
 #include <render/passes/rtxdi/RtxdiGraphResources.h>
 #include <render/passes/rtxdi/PrepareLightsPass.h>
@@ -789,7 +790,7 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 		return after;
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
-	const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+	PathTraceSceneBindings* const sceneBindings = ctx.sceneBindings;
 	rg::GraphBuilder* const graph = ctx.graph;
 	rg::PassHandle previousPass = after;
 
@@ -803,15 +804,11 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 	auto addRtxdiBeginStage = [graph, &previousPass](
 		const char* name, auto declareAccess, auto execute)
 	{
-		rg::PassOptions passOptions{};
-		passOptions.sideEffect = true;
-		passOptions.after = previousPass;
-
 		previousPass = graph->addPass(
 			name,
 			std::move(declareAccess),
 			std::move(execute),
-			passOptions);
+			rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
 	};
 
 	if (usingLightSampling)
@@ -855,7 +852,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->presampleLights(passCtx.commandList(), bindingSet);
 			});
@@ -865,7 +864,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->presampleEnvMap(passCtx.commandList(), bindingSet);
 			});
@@ -875,7 +876,9 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 			[rtxdiResources](rg::PassBuilder& setup) {
 				declareRtxdiPresampleAccess(setup, rtxdiResources);
 			},
-			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->presampleReGIR(passCtx.commandList(), bindingSet);
 			});
@@ -907,28 +910,25 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 	// Keep parity with RtxdiPass::executeFrame (fused DI+GI final shading).
 	static constexpr bool enableFusedDIGIFinal = true;
 	const bool useFusedDIGIFinal = useDI && useGI && enableFusedDIGIFinal;
-	const caustica::rhi::BindingSetHandle bindingSet = ctx.bindingSet;
+	PathTraceSceneBindings* const sceneBindings = ctx.sceneBindings;
 	rg::GraphBuilder* const graph = ctx.graph;
+	const PathTraceScheduleInputs schedule = importPathTraceScheduleInputs(ctx);
 
 	rg::PassHandle previousPass = after;
 
 	auto addRtxdiExecuteStage = [graph, &previousPass](
 		const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)
 	{
-		rg::PassOptions passOptions{};
-		passOptions.sideEffect = true;
-		passOptions.after = previousPass;
-
 		previousPass = graph->addPass(
 			name,
 			std::move(declareAccess),
-			std::move(execute),
-			passOptions);
+			std::move(execute));
 	};
 
-	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, useGI, usePT]() {
-		return [rtxdiResources, pathTraceTargets, useGI, usePT](rg::PassBuilder& setup) {
+	const auto makeExecuteAccess = [rtxdiResources, pathTraceTargets, schedule, useGI, usePT]() {
+		return [rtxdiResources, pathTraceTargets, schedule, useGI, usePT](rg::PassBuilder& setup) {
 			declareRtxdiExecuteAccess(setup, rtxdiResources, pathTraceTargets, useGI, usePT);
+			declarePathTraceScheduleReads(setup, schedule);
 		};
 	};
 
@@ -937,7 +937,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiDIPass,
 			makeExecuteAccess(),
-			[rtxdiPass, bindingSet, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->execute(passCtx.commandList(), bindingSet, useFusedDIGIFinal);
 			});
@@ -948,7 +950,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiGIPass,
 			makeExecuteAccess(),
-			[rtxdiPass, bindingSet, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings, useFusedDIGIFinal](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->executeGI(passCtx.commandList(), bindingSet, useFusedDIGIFinal);
 			});
@@ -959,7 +963,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiFusedDIGIFinalPass,
 			makeExecuteAccess(),
-			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->executeFusedDIGIFinal(passCtx.commandList(), bindingSet);
 			});
@@ -970,7 +976,9 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 		addRtxdiExecuteStage(
 			kRtxdiPTPass,
 			makeExecuteAccess(),
-			[rtxdiPass, bindingSet](rg::RenderPassContext& passCtx) {
+			[rtxdiPass, sceneBindings](rg::RenderPassContext& passCtx) {
+				const caustica::rhi::BindingSetHandle bindingSet =
+					sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
 				if (rtxdiPass)
 					rtxdiPass->executePT(passCtx.commandList(), bindingSet);
 			});

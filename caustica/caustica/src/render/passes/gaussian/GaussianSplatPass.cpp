@@ -874,6 +874,7 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
                 ? m_stochasticDepthBuffer.Get()
                 : (stochasticToLdr ? m_stochasticLdrDepthBuffer.Get() : m_stochasticProcessedDepthBuffer.Get()))
             : nullptr,
+        .topLevelAS = m_accelBuilder.getTopLevelAS(),
         .sortMode = settings.sortingMode,
         .distanceStageCulling =
             settings.frustumCulling == GaussianSplatFrustumCulling::AtDistanceStage,

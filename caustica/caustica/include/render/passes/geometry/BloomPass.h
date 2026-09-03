@@ -52,6 +52,31 @@ namespace caustica::render
             float sigmaInPixels,
             float blendFactor);
 
+        void executeDownscale1(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ICompositeView& compositeView,
+            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest);
+        void executeDownscale2(
+            caustica::rhi::CommandList* commandList,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest);
+        void executeBlur(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ICompositeView& compositeView,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest,
+            caustica::rhi::Buffer* constants,
+            bool horizontal,
+            float sigmaInPixels);
+        void executeComposite(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ICompositeView& compositeView,
+            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            caustica::rhi::Texture* source,
+            float blendFactor);
+
     public:
         BloomPass(
             caustica::rhi::Device* device,

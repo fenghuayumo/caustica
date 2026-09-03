@@ -4,12 +4,15 @@
 #include <render/graph/TransientResourceAllocator.h>
 #include <core/task/TaskRuntime.h>
 
+#include <array>
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <string>
 #include <numeric>
 #include <vector>
 
@@ -18,14 +21,19 @@ namespace caustica::rg
 
 namespace
 {
-    bool isValid(TextureHandle handle, size_t textureCount)
+    bool isValid(TextureHandle handle, size_t textureCount, uint32_t generation)
     {
-        return handle.isValid() && handle.index < textureCount;
+        return handle.isValid() && handle.generation == generation && handle.index < textureCount;
     }
 
-    bool isValid(BufferHandle handle, size_t bufferCount)
+    bool isValid(BufferHandle handle, size_t bufferCount, uint32_t generation)
     {
-        return handle.isValid() && handle.index < bufferCount;
+        return handle.isValid() && handle.generation == generation && handle.index < bufferCount;
+    }
+
+    bool isValid(AccelStructHandle handle, size_t accelCount, uint32_t generation)
+    {
+        return handle.isValid() && handle.generation == generation && handle.index < accelCount;
     }
 
 }
@@ -35,12 +43,16 @@ PassBuilder::PassBuilder(
     TextureAccessList& textureReads,
     TextureAccessList& textureWrites,
     BufferAccessList& bufferReads,
-    BufferAccessList& bufferWrites)
+    BufferAccessList& bufferWrites,
+    AccelStructAccessList& accelStructReads,
+    AccelStructAccessList& accelStructWrites)
     : m_graph(&graph)
     , m_textureReads(&textureReads)
     , m_textureWrites(&textureWrites)
     , m_bufferReads(&bufferReads)
     , m_bufferWrites(&bufferWrites)
+    , m_accelStructReads(&accelStructReads)
+    , m_accelStructWrites(&accelStructWrites)
 {
 }
 
@@ -62,6 +74,16 @@ void PassBuilder::read(BufferHandle buffer, BufferAccess access)
 void PassBuilder::write(BufferHandle buffer, BufferAccess access)
 {
     m_bufferWrites->emplace_back(buffer, access);
+}
+
+void PassBuilder::read(AccelStructHandle accel, AccelStructAccess access)
+{
+    m_accelStructReads->emplace_back(accel, access);
+}
+
+void PassBuilder::write(AccelStructHandle accel, AccelStructAccess access)
+{
+    m_accelStructWrites->emplace_back(accel, access);
 }
 
 TextureHandle PassBuilder::createTexture(const TextureDesc& desc)
@@ -92,6 +114,12 @@ caustica::rhi::Buffer* RenderPassContext::buffer(BufferHandle handle) const
 {
     assert(m_graph);
     return m_graph->resolveBuffer(handle);
+}
+
+caustica::rhi::rt::AccelStruct* RenderPassContext::accelStruct(AccelStructHandle handle) const
+{
+    assert(m_graph);
+    return m_graph->resolveAccelStruct(handle);
 }
 
 caustica::rhi::ResourceStates GraphBuilder::accessToState(TextureAccess access)
@@ -142,6 +170,38 @@ caustica::rhi::ResourceStates GraphBuilder::accessToState(BufferAccess access)
     }
 }
 
+caustica::rhi::ResourceStates GraphBuilder::accessToState(AccelStructAccess access)
+{
+    switch (access)
+    {
+    case AccelStructAccess::Build:
+        return caustica::rhi::ResourceStates::AccelStructWrite;
+    case AccelStructAccess::ShaderResource:
+    default:
+        return caustica::rhi::ResourceStates::AccelStructRead;
+    }
+}
+
+TextureHandle GraphBuilder::makeTextureHandle(uint32_t index) const
+{
+    return TextureHandle{ index, m_handleGeneration };
+}
+
+BufferHandle GraphBuilder::makeBufferHandle(uint32_t index) const
+{
+    return BufferHandle{ index, m_handleGeneration };
+}
+
+AccelStructHandle GraphBuilder::makeAccelStructHandle(uint32_t index) const
+{
+    return AccelStructHandle{ index, m_handleGeneration };
+}
+
+PassHandle GraphBuilder::makePassHandle(uint32_t index) const
+{
+    return PassHandle{ index, m_handleGeneration };
+}
+
 void GraphBuilder::setDevice(caustica::rhi::Device* device)
 {
     if (m_device != device)
@@ -150,6 +210,7 @@ void GraphBuilder::setDevice(caustica::rhi::Device* device)
         m_transientHeapPool.clear();
         m_persistentTransients = {};
         m_compiledPlanCache.clear();
+        m_compiledPlanCacheOrder.clear();
         m_activeCachedPlan = nullptr;
         m_gpuTimingSlots = {};
         m_activeGpuTimingSlot = -1;
@@ -178,12 +239,40 @@ const std::vector<std::vector<uint32_t>>& GraphBuilder::compiledWaves() const
     return m_activeCachedPlan ? m_activeCachedPlan->waves : m_compiledWaves;
 }
 
+const std::vector<caustica::rhi::CommandQueue>& GraphBuilder::compiledWaveQueues() const
+{
+    return m_activeCachedPlan ? m_activeCachedPlan->waveQueues : m_compiledWaveQueues;
+}
+
+const std::vector<std::vector<uint32_t>>& GraphBuilder::compiledWaveWaits() const
+{
+    return m_activeCachedPlan ? m_activeCachedPlan->waveWaits : m_compiledWaveWaits;
+}
+
+ResourceOwnership GraphBuilder::textureOwnership(TextureHandle handle) const
+{
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return ResourceOwnership::External;
+    return m_textures[handle.index].lifetime == ResourceLifetime::Transient
+        ? ResourceOwnership::Graph
+        : ResourceOwnership::External;
+}
+
+ResourceOwnership GraphBuilder::bufferOwnership(BufferHandle handle) const
+{
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
+        return ResourceOwnership::External;
+    return m_buffers[handle.index].lifetime == ResourceLifetime::Transient
+        ? ResourceOwnership::Graph
+        : ResourceOwnership::External;
+}
+
 PassHandle GraphBuilder::findPass(const std::string_view name) const
 {
     for (uint32_t i = 0; i < static_cast<uint32_t>(m_passes.size()); ++i)
     {
         if (m_passes[i].name == name)
-            return PassHandle{ i };
+            return makePassHandle(i);
     }
     return {};
 }
@@ -205,9 +294,9 @@ TextureHandle GraphBuilder::importTexture(caustica::rhi::Texture* texture, caust
     assert(texture);
 
     if (const auto existing = m_importIndexByTexture.find(texture); existing != m_importIndexByTexture.end())
-        return TextureHandle{ existing->second };
+        return makeTextureHandle(existing->second);
 
-    const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
+    const TextureHandle handle = makeTextureHandle(static_cast<uint32_t>(m_textures.size()));
     GraphTexture imported{};
     imported.texture = texture;
     imported.currentState = initialState;
@@ -227,9 +316,9 @@ BufferHandle GraphBuilder::importBuffer(caustica::rhi::Buffer* buffer, caustica:
     assert(buffer);
 
     if (const auto existing = m_importIndexByBuffer.find(buffer); existing != m_importIndexByBuffer.end())
-        return BufferHandle{ existing->second };
+        return makeBufferHandle(existing->second);
 
-    const BufferHandle handle{ static_cast<uint32_t>(m_buffers.size()) };
+    const BufferHandle handle = makeBufferHandle(static_cast<uint32_t>(m_buffers.size()));
     GraphBuffer imported{};
     imported.buffer = buffer;
     imported.currentState = initialState;
@@ -242,6 +331,32 @@ BufferHandle GraphBuilder::importBuffer(caustica::rhi::Buffer* buffer, caustica:
 BufferHandle GraphBuilder::importBuffer(caustica::rhi::Buffer* buffer, BufferAccess initialAccess)
 {
     return importBuffer(buffer, accessToState(initialAccess));
+}
+
+AccelStructHandle GraphBuilder::importAccelStruct(
+    caustica::rhi::rt::AccelStruct* accel,
+    caustica::rhi::ResourceStates initialState)
+{
+    assert(accel);
+
+    if (const auto existing = m_importIndexByAccelStruct.find(accel); existing != m_importIndexByAccelStruct.end())
+        return makeAccelStructHandle(existing->second);
+
+    const AccelStructHandle handle = makeAccelStructHandle(static_cast<uint32_t>(m_accelStructs.size()));
+    GraphAccelStruct imported{};
+    imported.accel = accel;
+    imported.currentState = initialState;
+    imported.lifetime = ResourceLifetime::Imported;
+    m_accelStructs.push_back(imported);
+    m_importIndexByAccelStruct.emplace(accel, handle.index);
+    return handle;
+}
+
+AccelStructHandle GraphBuilder::importAccelStruct(
+    caustica::rhi::rt::AccelStruct* accel,
+    AccelStructAccess initialAccess)
+{
+    return importAccelStruct(accel, accessToState(initialAccess));
 }
 
 caustica::rhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc& desc, bool isVirtual) const
@@ -269,15 +384,42 @@ caustica::rhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc
 
 TextureHandle GraphBuilder::createTexture(const TextureDesc& desc)
 {
-    assert(m_device);
+    if (!desc.name.empty())
+    {
+        if (const auto existing = m_createIndexByName.find(desc.name); existing != m_createIndexByName.end())
+        {
+            assert(existing->second < m_textures.size());
+            assert(m_textures[existing->second].lifetime == ResourceLifetime::Transient);
+            return makeTextureHandle(existing->second);
+        }
+    }
 
-    const TextureHandle handle{ static_cast<uint32_t>(m_textures.size()) };
+    const TextureHandle handle = makeTextureHandle(static_cast<uint32_t>(m_textures.size()));
     GraphTexture resource{};
     resource.currentState = caustica::rhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
     resource.desc = desc;
     m_textures.push_back(resource);
+    if (!desc.name.empty())
+        m_createIndexByName.emplace(desc.name, handle.index);
     return handle;
+}
+
+TextureHandle GraphBuilder::findTexture(const std::string_view name) const
+{
+    if (name.empty())
+        return {};
+    const auto existing = m_createIndexByName.find(std::string(name));
+    if (existing == m_createIndexByName.end())
+        return {};
+    return makeTextureHandle(existing->second);
+}
+
+caustica::rhi::TextureHandle GraphBuilder::ownedTextureHandle(TextureHandle handle) const
+{
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return {};
+    return m_textures[handle.index].owned;
 }
 
 caustica::rhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& desc, bool isVirtual) const
@@ -305,9 +447,7 @@ caustica::rhi::BufferHandle GraphBuilder::createNativeBuffer(const BufferDesc& d
 
 BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
 {
-    assert(m_device);
-
-    const BufferHandle handle{ static_cast<uint32_t>(m_buffers.size()) };
+    const BufferHandle handle = makeBufferHandle(static_cast<uint32_t>(m_buffers.size()));
     GraphBuffer resource{};
     resource.currentState = caustica::rhi::ResourceStates::Common;
     resource.lifetime = ResourceLifetime::Transient;
@@ -318,8 +458,8 @@ BufferHandle GraphBuilder::createBuffer(const BufferDesc& desc)
 
 void GraphBuilder::extractTexture(TextureHandle handle, caustica::rhi::ResourceStates finalState)
 {
-    assert(isValid(handle, m_textures.size()) && "RenderGraph extract references invalid texture handle");
-    if (!isValid(handle, m_textures.size()))
+    assert(isValid(handle, m_textures.size(), m_handleGeneration) && "RenderGraph extract references invalid texture handle");
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
         return;
     m_textures[handle.index].finalState = finalState;
 }
@@ -331,8 +471,8 @@ void GraphBuilder::extractTexture(TextureHandle handle, TextureAccess finalAcces
 
 void GraphBuilder::extractBuffer(BufferHandle handle, caustica::rhi::ResourceStates finalState)
 {
-    assert(isValid(handle, m_buffers.size()) && "RenderGraph extract references invalid buffer handle");
-    if (!isValid(handle, m_buffers.size()))
+    assert(isValid(handle, m_buffers.size(), m_handleGeneration) && "RenderGraph extract references invalid buffer handle");
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
         return;
     m_buffers[handle.index].finalState = finalState;
 }
@@ -354,6 +494,8 @@ PassHandle GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn
     pass.textureWrites.clear();
     pass.bufferReads.clear();
     pass.bufferWrites.clear();
+    pass.accelStructReads.clear();
+    pass.accelStructWrites.clear();
     if (pass.name != name)
         pass.measuredRecordingCost = 0.0;
     pass.name.assign(name);
@@ -370,14 +512,16 @@ PassHandle GraphBuilder::addPass(std::string_view name, SetupFn setup, ExecuteFn
             pass.textureReads,
             pass.textureWrites,
             pass.bufferReads,
-            pass.bufferWrites);
+            pass.bufferWrites,
+            pass.accelStructReads,
+            pass.accelStructWrites);
         setup(builder);
     }
 
     m_passNames.push_back(pass.name);
     m_passes.push_back(std::move(pass));
     m_compiled = false;
-    return PassHandle{ static_cast<uint32_t>(passIndex) };
+    return makePassHandle(static_cast<uint32_t>(passIndex));
 }
 
 uint64_t GraphBuilder::compiledPlanKey() const
@@ -403,6 +547,7 @@ uint64_t GraphBuilder::compiledPlanKey() const
     mixValue(m_passes.size());
     mixValue(m_textures.size());
     mixValue(m_buffers.size());
+    mixValue(m_accelStructs.size());
     for (const GraphTexture& texture : m_textures)
     {
         mixValue(texture.lifetime);
@@ -437,6 +582,7 @@ uint64_t GraphBuilder::compiledPlanKey() const
         mixValue(pass.options.serialOnPrimary);
         mixValue(pass.options.recordingCost);
         mixValue(pass.options.after.index);
+        mixValue(pass.options.queue);
         const auto mixAccesses = [&](const auto& accesses) {
             mixValue(accesses.size());
             for (const auto& [handle, access] : accesses)
@@ -449,8 +595,49 @@ uint64_t GraphBuilder::compiledPlanKey() const
         mixAccesses(pass.textureWrites);
         mixAccesses(pass.bufferReads);
         mixAccesses(pass.bufferWrites);
+        mixAccesses(pass.accelStructReads);
+        mixAccesses(pass.accelStructWrites);
     }
     return hash;
+}
+
+void GraphBuilder::evictOldestCompiledPlanIfNeeded()
+{
+    while (m_compiledPlanCache.size() >= kCompiledPlanCacheLimit && !m_compiledPlanCacheOrder.empty())
+    {
+        const uint64_t oldest = m_compiledPlanCacheOrder.front();
+        m_compiledPlanCacheOrder.erase(m_compiledPlanCacheOrder.begin());
+        if (m_activeCachedPlan != nullptr)
+        {
+            const auto active = m_compiledPlanCache.find(oldest);
+            if (active != m_compiledPlanCache.end() && m_activeCachedPlan == &active->second)
+                m_activeCachedPlan = nullptr;
+        }
+        m_compiledPlanCache.erase(oldest);
+    }
+}
+
+caustica::rhi::CommandQueue GraphBuilder::passQueue(uint32_t passIndex) const
+{
+    if (passIndex >= m_passes.size())
+        return caustica::rhi::CommandQueue::Graphics;
+    const Pass& pass = m_passes[passIndex];
+    if (pass.options.serialOnPrimary)
+        return caustica::rhi::CommandQueue::Graphics;
+    return pass.options.queue;
+}
+
+caustica::rhi::CommandQueue GraphBuilder::resolveQueue(caustica::rhi::CommandQueue queue) const
+{
+    if (queue == caustica::rhi::CommandQueue::Graphics || !m_device)
+        return caustica::rhi::CommandQueue::Graphics;
+    if (queue == caustica::rhi::CommandQueue::Compute
+        && !m_device->queryFeatureSupport(caustica::rhi::Feature::ComputeQueue))
+        return caustica::rhi::CommandQueue::Graphics;
+    if (queue == caustica::rhi::CommandQueue::Copy
+        && !m_device->queryFeatureSupport(caustica::rhi::Feature::CopyQueue))
+        return caustica::rhi::CommandQueue::Graphics;
+    return queue;
 }
 
 void GraphBuilder::compile()
@@ -460,7 +647,10 @@ void GraphBuilder::compile()
         pass.active = false;
     m_compiledPassOrder.clear();
     m_compiledWaves.clear();
+    m_compiledWaveQueues.clear();
+    m_compiledWaveWaits.clear();
     m_lastCompileCacheHit = false;
+    m_lastCompileHadCycle = false;
 
     const uint64_t planKey = compiledPlanKey();
     if (const auto cached = m_compiledPlanCache.find(planKey);
@@ -514,8 +704,10 @@ void GraphBuilder::compile()
     std::vector<bool> referencedBuffers(m_buffers.size(), false);
     std::vector<int32_t> lastTextureWriter(m_textures.size(), -1);
     std::vector<int32_t> lastBufferWriter(m_buffers.size(), -1);
+    std::vector<int32_t> lastAccelWriter(m_accelStructs.size(), -1);
     std::vector<std::vector<uint32_t>> lastTextureReaders(m_textures.size());
     std::vector<std::vector<uint32_t>> lastBufferReaders(m_buffers.size());
+    std::vector<std::vector<uint32_t>> lastAccelReaders(m_accelStructs.size());
 
     const auto addDependency = [&](uint32_t before, uint32_t after) {
         if (before == after)
@@ -538,8 +730,8 @@ void GraphBuilder::compile()
         for (const auto& [handle, access] : pass.textureReads)
         {
             (void)access;
-            assert(isValid(handle, m_textures.size()) && "RenderGraph pass read references invalid texture handle");
-            if (!isValid(handle, m_textures.size()))
+            assert(isValid(handle, m_textures.size(), m_handleGeneration) && "RenderGraph pass read references invalid texture handle");
+            if (!isValid(handle, m_textures.size(), m_handleGeneration))
                 continue;
 
             if (lastTextureWriter[handle.index] >= 0)
@@ -549,8 +741,8 @@ void GraphBuilder::compile()
         for (const auto& [handle, access] : pass.textureWrites)
         {
             (void)access;
-            assert(isValid(handle, m_textures.size()) && "RenderGraph pass write references invalid texture handle");
-            if (!isValid(handle, m_textures.size()))
+            assert(isValid(handle, m_textures.size(), m_handleGeneration) && "RenderGraph pass write references invalid texture handle");
+            if (!isValid(handle, m_textures.size(), m_handleGeneration))
                 continue;
 
             // WAR: writers wait for prior readers in the same resource.
@@ -565,8 +757,8 @@ void GraphBuilder::compile()
         for (const auto& [handle, access] : pass.bufferReads)
         {
             (void)access;
-            assert(isValid(handle, m_buffers.size()) && "RenderGraph pass read references invalid buffer handle");
-            if (!isValid(handle, m_buffers.size()))
+            assert(isValid(handle, m_buffers.size(), m_handleGeneration) && "RenderGraph pass read references invalid buffer handle");
+            if (!isValid(handle, m_buffers.size(), m_handleGeneration))
                 continue;
 
             if (lastBufferWriter[handle.index] >= 0)
@@ -576,8 +768,8 @@ void GraphBuilder::compile()
         for (const auto& [handle, access] : pass.bufferWrites)
         {
             (void)access;
-            assert(isValid(handle, m_buffers.size()) && "RenderGraph pass write references invalid buffer handle");
-            if (!isValid(handle, m_buffers.size()))
+            assert(isValid(handle, m_buffers.size(), m_handleGeneration) && "RenderGraph pass write references invalid buffer handle");
+            if (!isValid(handle, m_buffers.size(), m_handleGeneration))
                 continue;
 
             for (const uint32_t reader : lastBufferReaders[handle.index])
@@ -587,6 +779,34 @@ void GraphBuilder::compile()
             if (lastBufferWriter[handle.index] >= 0)
                 addDependency(static_cast<uint32_t>(lastBufferWriter[handle.index]), passIndex);
             lastBufferWriter[handle.index] = static_cast<int32_t>(passIndex);
+        }
+        for (const auto& [handle, access] : pass.accelStructReads)
+        {
+            (void)access;
+            assert(isValid(handle, m_accelStructs.size(), m_handleGeneration)
+                && "RenderGraph pass read references invalid accel struct handle");
+            if (!isValid(handle, m_accelStructs.size(), m_handleGeneration))
+                continue;
+
+            if (lastAccelWriter[handle.index] >= 0)
+                addDependency(static_cast<uint32_t>(lastAccelWriter[handle.index]), passIndex);
+            lastAccelReaders[handle.index].push_back(passIndex);
+        }
+        for (const auto& [handle, access] : pass.accelStructWrites)
+        {
+            (void)access;
+            assert(isValid(handle, m_accelStructs.size(), m_handleGeneration)
+                && "RenderGraph pass write references invalid accel struct handle");
+            if (!isValid(handle, m_accelStructs.size(), m_handleGeneration))
+                continue;
+
+            for (const uint32_t reader : lastAccelReaders[handle.index])
+                addDependency(reader, passIndex);
+            lastAccelReaders[handle.index].clear();
+
+            if (lastAccelWriter[handle.index] >= 0)
+                addDependency(static_cast<uint32_t>(lastAccelWriter[handle.index]), passIndex);
+            lastAccelWriter[handle.index] = static_cast<int32_t>(passIndex);
         }
     }
 
@@ -613,7 +833,7 @@ void GraphBuilder::compile()
     for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
     {
         const Pass& pass = m_passes[passIndex];
-        if (!pass.options.enabled || !pass.options.after.isValid())
+        if (!pass.options.enabled || !isHandleCurrent(pass.options.after))
             continue;
 
         assert(pass.options.after.index < m_passes.size()
@@ -660,28 +880,28 @@ void GraphBuilder::compile()
         for (const auto& [handle, access] : pass.textureReads)
         {
             (void)access;
-            if (isValid(handle, m_textures.size()))
+            if (isValid(handle, m_textures.size(), m_handleGeneration))
                 referenced[handle.index] = true;
         }
 
         for (const auto& [handle, access] : pass.textureWrites)
         {
             (void)access;
-            if (isValid(handle, m_textures.size()))
+            if (isValid(handle, m_textures.size(), m_handleGeneration))
                 referenced[handle.index] = true;
         }
 
         for (const auto& [handle, access] : pass.bufferReads)
         {
             (void)access;
-            if (isValid(handle, m_buffers.size()))
+            if (isValid(handle, m_buffers.size(), m_handleGeneration))
                 referencedBuffers[handle.index] = true;
         }
 
         for (const auto& [handle, access] : pass.bufferWrites)
         {
             (void)access;
-            if (isValid(handle, m_buffers.size()))
+            if (isValid(handle, m_buffers.size(), m_handleGeneration))
                 referencedBuffers[handle.index] = true;
         }
     }
@@ -697,16 +917,16 @@ void GraphBuilder::compile()
 
     if (m_compiledPassOrder.size() != neededPassCount)
     {
-        assert(false && "RenderGraph dependency cycle detected");
+        // Flattening to registration order can emit the wrong GPU sequence.
+        m_lastCompileHadCycle = true;
         m_compiledPassOrder.clear();
         m_compiledWaves.clear();
-        for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
-        {
-            if (needed[passIndex])
-                m_compiledPassOrder.push_back(passIndex);
-        }
-        for (const uint32_t passIndex : m_compiledPassOrder)
-            m_compiledWaves.push_back({ passIndex });
+        m_compiledWaveQueues.clear();
+        m_compiledWaveWaits.clear();
+        for (Pass& pass : m_passes)
+            pass.active = false;
+        m_compiled = false;
+        return;
     }
 
     for (size_t i = 0; i < m_textures.size(); ++i)
@@ -739,12 +959,17 @@ void GraphBuilder::compile()
         plan.activePasses.push_back(pass.active);
     plan.passOrder = m_compiledPassOrder;
     plan.waves = m_compiledWaves;
+    plan.waveQueues = m_compiledWaveQueues;
+    plan.waveWaits = m_compiledWaveWaits;
     plan.referencedTextures = referenced;
     plan.referencedBuffers = referencedBuffers;
     plan.textureLifetimes = textureLifetimes;
     plan.bufferLifetimes = bufferLifetimes;
-    if (m_compiledPlanCache.size() >= 16)
-        m_compiledPlanCache.erase(m_compiledPlanCache.begin());
+    if (m_compiledPlanCache.find(planKey) == m_compiledPlanCache.end())
+    {
+        evictOldestCompiledPlanIfNeeded();
+        m_compiledPlanCacheOrder.push_back(planKey);
+    }
     m_compiledPlanCache.insert_or_assign(planKey, std::move(plan));
 
     allocateTransientResources(referenced, referencedBuffers, textureLifetimes, bufferLifetimes);
@@ -766,7 +991,7 @@ void GraphBuilder::computeTransientLifetimes(
         const int32_t order = static_cast<int32_t>(waveIndex);
 
         const auto touchTexture = [&](TextureHandle handle) {
-            if (!isValid(handle, m_textures.size()))
+            if (!isValid(handle, m_textures.size(), m_handleGeneration))
                 return;
             if (m_textures[handle.index].lifetime != ResourceLifetime::Transient)
                 return;
@@ -777,7 +1002,7 @@ void GraphBuilder::computeTransientLifetimes(
         };
 
         const auto touchBuffer = [&](BufferHandle handle) {
-            if (!isValid(handle, m_buffers.size()))
+            if (!isValid(handle, m_buffers.size(), m_handleGeneration))
                 return;
             if (m_buffers[handle.index].lifetime != ResourceLifetime::Transient)
                 return;
@@ -843,7 +1068,6 @@ void GraphBuilder::allocateTransientResources(
         return;
     }
 
-    assert(m_device && "RenderGraph transient resources require an RHI device");
     if (!m_device)
         return;
 
@@ -963,7 +1187,7 @@ void GraphBuilder::transitionTexture(caustica::rhi::CommandList* commandList, Te
 
 void GraphBuilder::transitionTexture(caustica::rhi::CommandList* commandList, TextureHandle handle, caustica::rhi::ResourceStates targetState)
 {
-    if (!isValid(handle, m_textures.size()))
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
         return;
 
     GraphTexture& resource = m_textures[handle.index];
@@ -984,7 +1208,7 @@ void GraphBuilder::transitionBuffer(caustica::rhi::CommandList* commandList, Buf
 
 void GraphBuilder::transitionBuffer(caustica::rhi::CommandList* commandList, BufferHandle handle, caustica::rhi::ResourceStates targetState)
 {
-    if (!isValid(handle, m_buffers.size()))
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
         return;
 
     GraphBuffer& resource = m_buffers[handle.index];
@@ -1000,7 +1224,7 @@ void GraphBuilder::transitionBuffer(caustica::rhi::CommandList* commandList, Buf
 
 void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::CommandList* commandList, TextureHandle handle)
 {
-    if (!isValid(handle, m_textures.size()))
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
         return;
 
     for (TextureAliasingBarrier& barrier : m_textureAliasingBarriers)
@@ -1008,7 +1232,7 @@ void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::CommandList* comman
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        caustica::rhi::Texture* before = isValid(barrier.before, m_textures.size())
+        caustica::rhi::Texture* before = isValid(barrier.before, m_textures.size(), m_handleGeneration)
             ? m_textures[barrier.before.index].texture
             : nullptr;
         caustica::rhi::Texture* after = m_textures[handle.index].texture;
@@ -1023,7 +1247,7 @@ void GraphBuilder::emitTextureAliasingBarrier(caustica::rhi::CommandList* comman
 
 void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::CommandList* commandList, BufferHandle handle)
 {
-    if (!isValid(handle, m_buffers.size()))
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
         return;
 
     for (BufferAliasingBarrier& barrier : m_bufferAliasingBarriers)
@@ -1031,7 +1255,7 @@ void GraphBuilder::emitBufferAliasingBarrier(caustica::rhi::CommandList* command
         if (barrier.emitted || barrier.after.index != handle.index)
             continue;
 
-        caustica::rhi::Buffer* before = isValid(barrier.before, m_buffers.size())
+        caustica::rhi::Buffer* before = isValid(barrier.before, m_buffers.size(), m_handleGeneration)
             ? m_buffers[barrier.before.index].buffer
             : nullptr;
         caustica::rhi::Buffer* after = m_buffers[handle.index].buffer;
@@ -1048,28 +1272,41 @@ void GraphBuilder::syncPassEndStates(const Pass& pass)
 {
     for (const auto& [handle, access] : pass.textureWrites)
     {
-        if (isValid(handle, m_textures.size()))
+        if (isValid(handle, m_textures.size(), m_handleGeneration))
             m_textures[handle.index].currentState = accessToState(access);
     }
 
     for (const auto& [handle, access] : pass.textureReads)
     {
-        if (!isValid(handle, m_textures.size()) || passUsesTextureAsWrite(pass, handle))
+        if (!isValid(handle, m_textures.size(), m_handleGeneration) || passUsesTextureAsWrite(pass, handle))
             continue;
         m_textures[handle.index].currentState = accessToState(access);
     }
 
     for (const auto& [handle, access] : pass.bufferWrites)
     {
-        if (isValid(handle, m_buffers.size()))
+        if (isValid(handle, m_buffers.size(), m_handleGeneration))
             m_buffers[handle.index].currentState = accessToState(access);
     }
 
     for (const auto& [handle, access] : pass.bufferReads)
     {
-        if (!isValid(handle, m_buffers.size()) || passUsesBufferAsWrite(pass, handle))
+        if (!isValid(handle, m_buffers.size(), m_handleGeneration) || passUsesBufferAsWrite(pass, handle))
             continue;
         m_buffers[handle.index].currentState = accessToState(access);
+    }
+
+    for (const auto& [handle, access] : pass.accelStructWrites)
+    {
+        if (isValid(handle, m_accelStructs.size(), m_handleGeneration))
+            m_accelStructs[handle.index].currentState = accessToState(access);
+    }
+
+    for (const auto& [handle, access] : pass.accelStructReads)
+    {
+        if (!isValid(handle, m_accelStructs.size(), m_handleGeneration) || passUsesAccelStructAsWrite(pass, handle))
+            continue;
+        m_accelStructs[handle.index].currentState = accessToState(access);
     }
 }
 
@@ -1095,6 +1332,34 @@ bool GraphBuilder::passUsesBufferAsWrite(const Pass& pass, BufferHandle handle)
     return false;
 }
 
+bool GraphBuilder::passUsesAccelStructAsWrite(const Pass& pass, AccelStructHandle handle)
+{
+    for (const auto& [writeHandle, access] : pass.accelStructWrites)
+    {
+        if (writeHandle.index == handle.index)
+            return true;
+        (void)access;
+    }
+    return false;
+}
+
+void GraphBuilder::transitionAccelStruct(
+    caustica::rhi::CommandList* commandList,
+    AccelStructHandle handle,
+    AccelStructAccess access)
+{
+    if (!isValid(handle, m_accelStructs.size(), m_handleGeneration))
+        return;
+    GraphAccelStruct& resource = m_accelStructs[handle.index];
+    if (!resource.accel)
+        return;
+    const caustica::rhi::ResourceStates target = accessToState(access);
+    if (resource.currentState == target)
+        return;
+    commandList->setAccelStructState(resource.accel, target);
+    resource.currentState = target;
+}
+
 void GraphBuilder::transitionExtractedResources(caustica::rhi::CommandList* commandList)
 {
     bool hasTransitions = false;
@@ -1106,7 +1371,7 @@ void GraphBuilder::transitionExtractedResources(caustica::rhi::CommandList* comm
             continue;
 
         const caustica::rhi::ResourceStates before = resource.currentState;
-        transitionTexture(commandList, TextureHandle{ static_cast<uint32_t>(i) }, *resource.finalState);
+        transitionTexture(commandList, makeTextureHandle(static_cast<uint32_t>(i)), *resource.finalState);
         hasTransitions = hasTransitions || before != resource.currentState;
     }
 
@@ -1117,7 +1382,7 @@ void GraphBuilder::transitionExtractedResources(caustica::rhi::CommandList* comm
             continue;
 
         const caustica::rhi::ResourceStates before = resource.currentState;
-        transitionBuffer(commandList, BufferHandle{ static_cast<uint32_t>(i) }, *resource.finalState);
+        transitionBuffer(commandList, makeBufferHandle(static_cast<uint32_t>(i)), *resource.finalState);
         hasTransitions = hasTransitions || before != resource.currentState;
     }
 
@@ -1132,6 +1397,8 @@ void GraphBuilder::buildCompiledWaves(
 {
     m_compiledPassOrder.clear();
     m_compiledWaves.clear();
+    m_compiledWaveQueues.clear();
+    m_compiledWaveWaits.clear();
 
     std::vector<uint32_t> indegree(m_passes.size(), 0);
     for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
@@ -1146,55 +1413,69 @@ void GraphBuilder::buildCompiledWaves(
     }
 
     std::vector<bool> emitted(m_passes.size(), false);
+    std::vector<uint32_t> passWave(m_passes.size(), UINT32_MAX);
+
+    const auto emitWave = [&](caustica::rhi::CommandQueue queue, const std::vector<uint32_t>& wave) {
+        if (wave.empty())
+            return;
+
+        std::vector<uint32_t> waits;
+        const uint32_t waveIndex = static_cast<uint32_t>(m_compiledWaves.size());
+        for (const uint32_t passIndex : wave)
+        {
+            for (const uint32_t dependency : incoming[passIndex])
+            {
+                if (!needed[dependency] || passWave[dependency] == UINT32_MAX)
+                    continue;
+                if (passQueue(dependency) == queue)
+                    continue;
+                if (std::find(waits.begin(), waits.end(), passWave[dependency]) == waits.end())
+                    waits.push_back(passWave[dependency]);
+            }
+            passWave[passIndex] = waveIndex;
+            emitted[passIndex] = true;
+            m_compiledPassOrder.push_back(passIndex);
+            for (const uint32_t dependent : outgoing[passIndex])
+            {
+                if (needed[dependent] && indegree[dependent] > 0)
+                    --indegree[dependent];
+            }
+        }
+
+        m_compiledWaves.push_back(wave);
+        m_compiledWaveQueues.push_back(queue);
+        m_compiledWaveWaits.push_back(std::move(waits));
+    };
+
     for (;;)
     {
-        std::vector<uint32_t> wave;
-        wave.reserve(8);
+        std::array<std::vector<uint32_t>, size_t(caustica::rhi::CommandQueue::Count)> byQueue{};
+        std::vector<uint32_t> serialSolo;
         for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
         {
             if (!needed[passIndex] || emitted[passIndex] || indegree[passIndex] != 0)
                 continue;
-            wave.push_back(passIndex);
+            if (m_passes[passIndex].options.serialOnPrimary)
+                serialSolo.push_back(passIndex);
+            else
+                byQueue[size_t(passQueue(passIndex))].push_back(passIndex);
         }
 
-        if (wave.empty())
+        const bool anyQueue =
+            !byQueue[size_t(caustica::rhi::CommandQueue::Graphics)].empty()
+            || !byQueue[size_t(caustica::rhi::CommandQueue::Compute)].empty()
+            || !byQueue[size_t(caustica::rhi::CommandQueue::Copy)].empty();
+        if (serialSolo.empty() && !anyQueue)
             break;
 
-        // serialOnPrimary passes never share a parallel wave.
-        std::vector<uint32_t> parallelEligible;
-        for (const uint32_t passIndex : wave)
-        {
-            if (m_passes[passIndex].options.serialOnPrimary)
-            {
-                m_compiledWaves.push_back({ passIndex });
-                m_compiledPassOrder.push_back(passIndex);
-                emitted[passIndex] = true;
-                for (const uint32_t dependent : outgoing[passIndex])
-                {
-                    if (needed[dependent] && indegree[dependent] > 0)
-                        --indegree[dependent];
-                }
-            }
-            else
-            {
-                parallelEligible.push_back(passIndex);
-            }
-        }
-
-        if (!parallelEligible.empty())
-        {
-            m_compiledWaves.push_back(parallelEligible);
-            for (const uint32_t passIndex : parallelEligible)
-            {
-                m_compiledPassOrder.push_back(passIndex);
-                emitted[passIndex] = true;
-                for (const uint32_t dependent : outgoing[passIndex])
-                {
-                    if (needed[dependent] && indegree[dependent] > 0)
-                        --indegree[dependent];
-                }
-            }
-        }
+        // Submit async queues first so they can overlap later graphics recording.
+        emitWave(caustica::rhi::CommandQueue::Copy, byQueue[size_t(caustica::rhi::CommandQueue::Copy)]);
+        emitWave(caustica::rhi::CommandQueue::Compute, byQueue[size_t(caustica::rhi::CommandQueue::Compute)]);
+        if (!serialSolo.empty())
+            emitWave(caustica::rhi::CommandQueue::Graphics, { serialSolo.front() });
+        emitWave(
+            caustica::rhi::CommandQueue::Graphics,
+            byQueue[size_t(caustica::rhi::CommandQueue::Graphics)]);
     }
 }
 
@@ -1235,7 +1516,7 @@ void GraphBuilder::recordPass(
     }
 
     const auto transitionTex = [&](TextureHandle handle, TextureAccess access) {
-        if (!isValid(handle, m_textures.size()))
+        if (!isValid(handle, m_textures.size(), m_handleGeneration))
             return;
         GraphTexture& resource = m_textures[handle.index];
         if (!resource.texture)
@@ -1250,7 +1531,7 @@ void GraphBuilder::recordPass(
         current = target;
     };
     const auto transitionBuf = [&](BufferHandle handle, BufferAccess access) {
-        if (!isValid(handle, m_buffers.size()))
+        if (!isValid(handle, m_buffers.size(), m_handleGeneration))
             return;
         GraphBuffer& resource = m_buffers[handle.index];
         if (!resource.buffer)
@@ -1273,8 +1554,14 @@ void GraphBuilder::recordPass(
         transitionBuf(handle, access);
     for (const auto& [handle, access] : pass.bufferWrites)
         transitionBuf(handle, access);
+    for (const auto& [handle, access] : pass.accelStructReads)
+        transitionAccelStruct(commandList, handle, access);
+    for (const auto& [handle, access] : pass.accelStructWrites)
+        transitionAccelStruct(commandList, handle, access);
 
-    if (!pass.textureReads.empty() || !pass.textureWrites.empty() || !pass.bufferReads.empty() || !pass.bufferWrites.empty())
+    if (!pass.textureReads.empty() || !pass.textureWrites.empty()
+        || !pass.bufferReads.empty() || !pass.bufferWrites.empty()
+        || !pass.accelStructReads.empty() || !pass.accelStructWrites.empty())
         commandList->commitBarriers();
 
     // Volatile CBs are per command-list open session (ADR 0001 R2 binder).
@@ -1376,7 +1663,10 @@ uint32_t GraphBuilder::executeWaveParallel(
     // WARNING: flush closes the primary and clears volatile CB address maps on
     // that list — later primary passes must writeBuffer those CBs again.
     if (frameCtx.primaryOpen())
-        frameCtx.flushPrimary();
+    {
+        m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] = frameCtx.flushPrimary();
+        m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
+    }
 
     if (m_parallelTextureStateScratch.size() < jobCount)
         m_parallelTextureStateScratch.resize(jobCount);
@@ -1453,7 +1743,8 @@ uint32_t GraphBuilder::executeWaveParallel(
         1);
     caustica::task::wait(jobs);
 
-    frameCtx.submitForks();
+    m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] = frameCtx.submitForks();
+    m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
     for (auto batchIt = batchBegin; batchIt != batchEnd; ++batchIt)
         batchIt->commandList = nullptr;
 
@@ -1468,6 +1759,70 @@ uint32_t GraphBuilder::executeWaveParallel(
     return jobCount;
 }
 
+void GraphBuilder::applyWaveWaits(
+    caustica::rhi::FrameCommandContext& frameCtx,
+    caustica::rhi::CommandQueue consumer,
+    const std::vector<uint32_t>& waitWaves)
+{
+    if (!m_device || waitWaves.empty())
+        return;
+
+    const auto& queues = compiledWaveQueues();
+    for (const uint32_t waitWave : waitWaves)
+    {
+        if (waitWave >= queues.size())
+            continue;
+        const caustica::rhi::CommandQueue producer = resolveQueue(queues[waitWave]);
+        if (producer == consumer)
+            continue;
+
+        if (!m_queueSubmitted[size_t(producer)]
+            && producer == caustica::rhi::CommandQueue::Graphics
+            && frameCtx.primaryOpen())
+        {
+            m_lastQueueInstance[size_t(producer)] = frameCtx.flushPrimary();
+            m_queueSubmitted[size_t(producer)] = 1;
+        }
+
+        if (!m_queueSubmitted[size_t(producer)])
+            continue;
+
+        if (consumer == caustica::rhi::CommandQueue::Graphics && frameCtx.primaryOpen())
+        {
+            m_lastQueueInstance[size_t(consumer)] = frameCtx.flushPrimary();
+            m_queueSubmitted[size_t(consumer)] = 1;
+        }
+
+        m_device->queueWaitForCommandList(
+            consumer,
+            producer,
+            m_lastQueueInstance[size_t(producer)]);
+    }
+}
+
+uint64_t GraphBuilder::executeWaveAsync(
+    caustica::rhi::FrameCommandContext& frameCtx,
+    caustica::rhi::CommandQueue queue,
+    const std::vector<uint32_t>& wave)
+{
+    caustica::rhi::CommandListHandle list = frameCtx.pool().acquire(queue);
+    if (!list || !list->open())
+    {
+        if (list)
+            frameCtx.pool().release(std::move(list));
+        executeWaveSerial(frameCtx.primary(), wave);
+        return 0;
+    }
+
+    executeWaveSerial(list.Get(), wave);
+    list->close();
+    const uint64_t instance = m_device
+        ? m_device->executeCommandList(list, queue)
+        : 0;
+    frameCtx.pool().release(std::move(list));
+    return instance;
+}
+
 void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, ExecuteParams params)
 {
     caustica::rhi::CommandList* primary = frameCtx.primary();
@@ -1476,11 +1831,35 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     if (!m_compiled)
         compile();
     m_lastParallelBatchCount = 0;
+    m_lastQueueInstance = {};
+    m_queueSubmitted = {};
 
-    for (const std::vector<uint32_t>& wave : compiledWaves())
+    const auto& waves = compiledWaves();
+    const auto& waveQueues = compiledWaveQueues();
+    const auto& waveWaits = compiledWaveWaits();
+
+    for (size_t waveIndex = 0; waveIndex < waves.size(); ++waveIndex)
     {
+        const std::vector<uint32_t>& wave = waves[waveIndex];
         if (wave.empty())
             continue;
+
+        const caustica::rhi::CommandQueue requested =
+            waveIndex < waveQueues.size() ? waveQueues[waveIndex] : caustica::rhi::CommandQueue::Graphics;
+        const caustica::rhi::CommandQueue queue = resolveQueue(requested);
+        if (waveIndex < waveWaits.size())
+            applyWaveWaits(frameCtx, queue, waveWaits[waveIndex]);
+
+        if (queue != caustica::rhi::CommandQueue::Graphics)
+        {
+            const uint64_t instance = executeWaveAsync(frameCtx, queue, wave);
+            if (instance != 0)
+            {
+                m_lastQueueInstance[size_t(queue)] = instance;
+                m_queueSubmitted[size_t(queue)] = 1;
+            }
+            continue;
+        }
 
         const bool forceSerial = !params.parallelWaves || wave.size() == 1;
         bool hasSerialPass = false;
@@ -1494,12 +1873,30 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
         }
 
         if (forceSerial || hasSerialPass)
-            executeWaveSerial(primary, wave);
+            executeWaveSerial(frameCtx.primary(), wave);
         else
             m_lastParallelBatchCount += executeWaveParallel(frameCtx, wave, params);
     }
 
-    transitionExtractedResources(primary);
+    if (m_device)
+    {
+        for (uint8_t queue = 1; queue < uint8_t(caustica::rhi::CommandQueue::Count); ++queue)
+        {
+            if (!m_queueSubmitted[queue])
+                continue;
+            if (frameCtx.primaryOpen())
+            {
+                m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] = frameCtx.flushPrimary();
+                m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
+            }
+            m_device->queueWaitForCommandList(
+                caustica::rhi::CommandQueue::Graphics,
+                caustica::rhi::CommandQueue(queue),
+                m_lastQueueInstance[queue]);
+        }
+    }
+
+    transitionExtractedResources(frameCtx.primary());
 
     if (m_activeGpuTimingSlot >= 0)
     {
@@ -1608,6 +2005,10 @@ void GraphBuilder::reset()
     releaseTransientResources();
     m_textures.clear();
     m_buffers.clear();
+    m_accelStructs.clear();
+    ++m_handleGeneration;
+    if (m_handleGeneration == 0)
+        m_handleGeneration = 1;
     // Stable graphs reuse the storage owned by the same pass index. Do not use a
     // LIFO pool here: exchanging capacities between unrelated passes causes
     // avoidable reallocations when their access-list shapes differ.
@@ -1620,43 +2021,89 @@ void GraphBuilder::reset()
         pass.textureWrites.clear();
         pass.bufferReads.clear();
         pass.bufferWrites.clear();
+        pass.accelStructReads.clear();
+        pass.accelStructWrites.clear();
     }
     m_compiledPassOrder.clear();
     m_compiledWaves.clear();
+    m_compiledWaveQueues.clear();
+    m_compiledWaveWaits.clear();
     m_passNames.clear();
     m_importIndexByTexture.clear();
     m_importIndexByBuffer.clear();
+    m_importIndexByAccelStruct.clear();
+    m_createIndexByName.clear();
     m_transientStats = {};
     m_volatileConstants.clear();
+    m_lastCompileHadCycle = false;
+    m_lastQueueInstance = {};
+    m_queueSubmitted = {};
     m_compiled = false;
 }
 
 caustica::rhi::Texture* GraphBuilder::resolveTexture(TextureHandle handle) const
 {
-    if (!isValid(handle, m_textures.size()))
+    assert((!handle.isValid() || isHandleCurrent(handle)) && "RenderGraph texture handle is stale after reset()");
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
         return nullptr;
     return m_textures[handle.index].texture;
 }
 
 caustica::rhi::Buffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
 {
-    if (!isValid(handle, m_buffers.size()))
+    assert((!handle.isValid() || isHandleCurrent(handle)) && "RenderGraph buffer handle is stale after reset()");
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
         return nullptr;
     return m_buffers[handle.index].buffer;
 }
 
+caustica::rhi::rt::AccelStruct* GraphBuilder::resolveAccelStruct(AccelStructHandle handle) const
+{
+    assert((!handle.isValid() || isHandleCurrent(handle)) && "RenderGraph accel-struct handle is stale after reset()");
+    if (!isValid(handle, m_accelStructs.size(), m_handleGeneration))
+        return nullptr;
+    return m_accelStructs[handle.index].accel;
+}
+
 caustica::rhi::ResourceStates GraphBuilder::textureState(TextureHandle handle) const
 {
-    if (!isValid(handle, m_textures.size()))
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
         return caustica::rhi::ResourceStates::Common;
     return m_textures[handle.index].currentState;
 }
 
 caustica::rhi::ResourceStates GraphBuilder::bufferState(BufferHandle handle) const
 {
-    if (!isValid(handle, m_buffers.size()))
+    if (!isValid(handle, m_buffers.size(), m_handleGeneration))
         return caustica::rhi::ResourceStates::Common;
     return m_buffers[handle.index].currentState;
+}
+
+caustica::rhi::ResourceStates GraphBuilder::accelStructState(AccelStructHandle handle) const
+{
+    if (!isValid(handle, m_accelStructs.size(), m_handleGeneration))
+        return caustica::rhi::ResourceStates::AccelStructRead;
+    return m_accelStructs[handle.index].currentState;
+}
+
+bool GraphBuilder::isHandleCurrent(TextureHandle handle) const
+{
+    return isValid(handle, m_textures.size(), m_handleGeneration);
+}
+
+bool GraphBuilder::isHandleCurrent(BufferHandle handle) const
+{
+    return isValid(handle, m_buffers.size(), m_handleGeneration);
+}
+
+bool GraphBuilder::isHandleCurrent(AccelStructHandle handle) const
+{
+    return isValid(handle, m_accelStructs.size(), m_handleGeneration);
+}
+
+bool GraphBuilder::isHandleCurrent(PassHandle handle) const
+{
+    return handle.isValid() && handle.generation == m_handleGeneration && handle.index < m_passes.size();
 }
 
 } // namespace caustica::rg

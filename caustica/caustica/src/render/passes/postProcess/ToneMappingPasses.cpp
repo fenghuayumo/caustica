@@ -394,7 +394,6 @@ void ToneMappingPass::registerGraphPass(
     const caustica::rg::BufferHandle constantsBuffer = graph.importBuffer(
         m_ToneMappingCB,
         caustica::rg::BufferAccess::ConstantBuffer);
-    graph.extractBuffer(constantsBuffer, caustica::rg::BufferAccess::ConstantBuffer);
 
     graph.addPass(
         "ToneMapping",

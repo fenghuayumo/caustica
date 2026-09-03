@@ -31,6 +31,7 @@ namespace caustica::render
 {
 
 class PathTracingContext;
+class PathTraceSceneBindings;
 class TemporalAntiAliasingPass;
 struct FrameGraphContext;
 
@@ -80,8 +81,11 @@ private:
     bool evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bool reset);
 #endif
 
+    void refreshLiveBindingSet();
+
     PathTracingContext* m_context = nullptr;
     caustica::rhi::Device* m_device = nullptr;
+    PathTraceSceneBindings* m_sceneBindings = nullptr;
 
     // Per-frame snapshot filled by bindFrame from FrameGraphContext.
     RenderTargets* m_renderTargets = nullptr;

@@ -248,8 +248,10 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
     {
         rg::BufferHandle splatBuffer;
         rg::BufferHandle aabbBuffer;
+        rg::AccelStructHandle topLevelAS;
     };
     std::vector<GaussianSplatAccelGraphHandles> accelResources;
+    bool importedAS = false;
     for (const GaussianSplatGraphResources& resources :
         ctx.gaussian->prepareGraphResources(GaussianSplatRenderTarget::OutputColor))
     {
@@ -257,18 +259,29 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
         {
             continue;
         }
-        accelResources.push_back(GaussianSplatAccelGraphHandles{
+        GaussianSplatAccelGraphHandles handles{
             .splatBuffer = ctx.graph->importBuffer(resources.splatBuffer, rg::BufferAccess::CopyDest),
             .aabbBuffer = ctx.graph->importBuffer(
                 resources.splatAabbBuffer,
                 rg::BufferAccess::AccelStructBuildInput),
-        });
+        };
+        if (resources.topLevelAS != nullptr)
+        {
+            handles.topLevelAS = ctx.graph->importAccelStruct(
+                resources.topLevelAS,
+                rg::AccelStructAccess::Build);
+            importedAS = true;
+        }
+        accelResources.push_back(handles);
     }
 
     rg::PassOptions passOptions{};
-    // AS handles are not graph resources yet; sideEffect keeps the build alive for PT bindings.
-    passOptions.sideEffect = true;
-    passOptions.after = after;
+    // First frames may not have a TLAS yet; keep the build alive until PT can import it.
+    if (!importedAS)
+    {
+        passOptions.sideEffect = true;
+        passOptions.after = after;
+    }
     GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
     return ctx.graph->addPass(
@@ -278,6 +291,8 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
             {
                 setup.write(item.splatBuffer, rg::BufferAccess::CopyDest);
                 setup.write(item.aabbBuffer, rg::BufferAccess::AccelStructBuildInput);
+                if (item.topLevelAS.isValid())
+                    setup.write(item.topLevelAS, rg::AccelStructAccess::Build);
             }
         },
         [gaussian](rg::RenderPassContext& passCtx) {

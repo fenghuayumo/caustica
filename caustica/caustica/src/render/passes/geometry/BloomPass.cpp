@@ -119,6 +119,122 @@ void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::Framebuffer* fr
     perViewData.psoColorFormat = colorFormat;
 }
 
+void BloomPass::executeDownscale1(
+    caustica::rhi::CommandList* commandList,
+    const ICompositeView& compositeView,
+    const std::shared_ptr<FramebufferFactory>& framebufferFactory,
+    caustica::rhi::Texture* source,
+    caustica::rhi::Texture* dest)
+{
+    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
+    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+    const caustica::rhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
+    const caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+    const caustica::rhi::Rect& scissorRect = viewportState.scissorRects[0];
+    const caustica::rhi::FramebufferHandle destFb = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(dest));
+
+    const dm::box2 uvSrcRect = box2(
+        float2(
+            float(scissorRect.minX) / float(fbinfo.width),
+            float(scissorRect.minY) / float(fbinfo.height)),
+        float2(
+            float(scissorRect.maxX) / float(fbinfo.width),
+            float(scissorRect.maxY) / float(fbinfo.height)));
+
+    caustica::render::BlitParameters blitParams;
+    blitParams.targetFramebuffer = destFb;
+    blitParams.sourceTexture = source;
+    blitParams.sourceBox = uvSrcRect;
+    m_renderDevice.blit().blitTexture(commandList, blitParams, nullptr);
+}
+
+void BloomPass::executeDownscale2(
+    caustica::rhi::CommandList* commandList,
+    caustica::rhi::Texture* source,
+    caustica::rhi::Texture* dest)
+{
+    const caustica::rhi::FramebufferHandle destFb = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(dest));
+    caustica::render::BlitParameters blitParams;
+    blitParams.targetFramebuffer = destFb;
+    blitParams.sourceTexture = source;
+    m_renderDevice.blit().blitTexture(commandList, blitParams, nullptr);
+}
+
+void BloomPass::executeBlur(
+    caustica::rhi::CommandList* commandList,
+    const ICompositeView& compositeView,
+    caustica::rhi::Texture* source,
+    caustica::rhi::Texture* dest,
+    caustica::rhi::Buffer* constants,
+    bool horizontal,
+    float sigmaInPixels)
+{
+    const float effectiveSigma = clamp(sigmaInPixels * 0.25f, 1.f, 100.f);
+    const caustica::rhi::FramebufferHandle destFb = m_device->createFramebuffer(
+        caustica::rhi::FramebufferDesc().addColorAttachment(dest));
+    ensureBlurPso(0, destFb);
+
+    caustica::rhi::BindingSetDesc bindingSetDesc;
+    bindingSetDesc.bindings = {
+        caustica::rhi::BindingSetItem::ConstantBuffer(0, constants),
+        caustica::rhi::BindingSetItem::Sampler(0, m_renderDevice.samplers().linearClamp()),
+        caustica::rhi::BindingSetItem::Texture_SRV(0, source),
+    };
+    const caustica::rhi::BindingSetHandle bindingSet =
+        m_device->createBindingSet(bindingSetDesc, m_BloomBlurBindingLayout);
+
+    BloomConstants bloom = {};
+    bloom.pixstep.x = horizontal ? 1.f / dest->getDesc().width : 0.f;
+    bloom.pixstep.y = horizontal ? 0.f : 1.f / dest->getDesc().height;
+    bloom.argumentScale = -1.f / (2 * effectiveSigma * effectiveSigma);
+    bloom.normalizationScale = 1.f / (sqrtf(2 * PI_f) * effectiveSigma);
+    bloom.numSamples = ::round(effectiveSigma * 4.f);
+    commandList->writeBuffer(constants, &bloom, sizeof(bloom));
+
+    caustica::rhi::GraphicsState state;
+    state.pipeline = m_PerViewData[0].bloomBlurPso;
+    const caustica::rhi::Viewport viewport(
+        float(dest->getDesc().width),
+        float(dest->getDesc().height));
+    state.viewport.addViewport(viewport);
+    state.viewport.addScissorRect(caustica::rhi::Rect(viewport));
+    state.framebuffer = destFb;
+    state.bindings = { bindingSet };
+    commandList->setGraphicsState(state);
+
+    caustica::rhi::DrawArguments fullscreenquadargs;
+    fullscreenquadargs.instanceCount = 1;
+    fullscreenquadargs.vertexCount = 4;
+    commandList->draw(fullscreenquadargs);
+    (void)compositeView;
+}
+
+void BloomPass::executeComposite(
+    caustica::rhi::CommandList* commandList,
+    const ICompositeView& compositeView,
+    const std::shared_ptr<FramebufferFactory>& framebufferFactory,
+    caustica::rhi::Texture* source,
+    float blendFactor)
+{
+    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
+    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+    const caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+
+    caustica::render::BlitParameters blitParams;
+    blitParams.targetFramebuffer = framebuffer;
+    blitParams.targetViewport = viewportState.viewports[0];
+    blitParams.sourceTexture = source;
+    blitParams.blendState.setBlendEnable(true)
+        .setSrcBlend(caustica::rhi::BlendFactor::ConstantColor)
+        .setDestBlend(caustica::rhi::BlendFactor::InvConstantColor)
+        .setSrcBlendAlpha(caustica::rhi::BlendFactor::Zero)
+        .setDestBlendAlpha(caustica::rhi::BlendFactor::One);
+    blitParams.blendConstantColor = caustica::rhi::Color(blendFactor);
+    m_renderDevice.blit().blitTexture(commandList, blitParams, nullptr);
+}
+
 void BloomPass::renderInternal(
     caustica::rhi::CommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
@@ -321,59 +437,101 @@ void BloomPass::registerGraphPass(
     float blendFactor,
     bool enabled)
 {
-    struct BloomGraphPassData
-    {
-        rg::TextureHandle outputColor{};
-        rg::TextureHandle downscale1{};
-        rg::TextureHandle downscale2{};
-        rg::TextureHandle pass1Blur{};
-        rg::TextureHandle pass2Blur{};
-        caustica::PlanarView view;
-    };
+    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
+    uint32_t mip1W = 0;
+    uint32_t mip1H = 0;
+    uint32_t mip2W = 0;
+    uint32_t mip2H = 0;
+    const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
+    computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
 
-    auto passData = std::make_shared<BloomGraphPassData>();
-    passData->outputColor = processedOutputColor;
-    passData->view = std::move(compositeView);
+    const rg::TextureHandle downscale1 =
+        graph.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));
+    const rg::TextureHandle downscale2 =
+        graph.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom src mip2"));
+    const rg::TextureHandle pass1Blur =
+        graph.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass1"));
+    const rg::TextureHandle pass2Blur =
+        graph.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass2"));
+    const rg::TextureHandle outputColor = processedOutputColor;
+    const caustica::rg::PassOptions enabledOption{ .enabled = enabled };
 
     graph.addPass(
-        "Bloom",
-        [passData, framebufferFactory](caustica::rg::PassBuilder& setup) {
-            const IView* view = passData->view.getChildView(ViewType::PLANAR, 0);
-            uint32_t mip1W = 0;
-            uint32_t mip1H = 0;
-            uint32_t mip2W = 0;
-            uint32_t mip2H = 0;
-            const rg::Format colorFormat = bloomColorFormat(framebufferFactory, passData->view);
-            computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
-
-            passData->downscale1 = setup.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));
-            passData->downscale2 = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom src mip2"));
-            passData->pass1Blur = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass1"));
-            passData->pass2Blur = setup.createTexture(makeBloomMipDesc(mip2W, mip2H, colorFormat, "bloom accumulation pass2"));
-
-            setup.read(passData->outputColor, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(passData->downscale1, caustica::rg::TextureAccess::RenderTarget);
-            setup.read(passData->downscale1, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(passData->downscale2, caustica::rg::TextureAccess::RenderTarget);
-            setup.read(passData->downscale2, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(passData->pass1Blur, caustica::rg::TextureAccess::RenderTarget);
-            setup.read(passData->pass1Blur, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(passData->pass2Blur, caustica::rg::TextureAccess::RenderTarget);
-            setup.read(passData->pass2Blur, caustica::rg::TextureAccess::ShaderResource);
-            setup.write(passData->outputColor, caustica::rg::TextureAccess::RenderTarget);
+        "BloomDownscale1",
+        [outputColor, downscale1](caustica::rg::PassBuilder& setup) {
+            setup.read(outputColor, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(downscale1, caustica::rg::TextureAccess::RenderTarget);
         },
-        [this, passData, framebufferFactory, sigmaInPixels, blendFactor](caustica::rg::RenderPassContext& ctx) {
-            renderInternal(
+        [this, framebufferFactory, compositeView, outputColor, downscale1](caustica::rg::RenderPassContext& ctx) {
+            executeDownscale1(
                 ctx.commandList(),
+                compositeView,
                 framebufferFactory,
-                passData->view,
-                ctx.texture(passData->outputColor),
-                ctx.texture(passData->downscale1),
-                ctx.texture(passData->downscale2),
-                ctx.texture(passData->pass1Blur),
-                ctx.texture(passData->pass2Blur),
-                sigmaInPixels,
+                ctx.texture(outputColor),
+                ctx.texture(downscale1));
+        },
+        enabledOption);
+
+    graph.addPass(
+        "BloomDownscale2",
+        [downscale1, downscale2](caustica::rg::PassBuilder& setup) {
+            setup.read(downscale1, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(downscale2, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, downscale1, downscale2](caustica::rg::RenderPassContext& ctx) {
+            executeDownscale2(ctx.commandList(), ctx.texture(downscale1), ctx.texture(downscale2));
+        },
+        enabledOption);
+
+    graph.addPass(
+        "BloomBlur1",
+        [downscale2, pass1Blur](caustica::rg::PassBuilder& setup) {
+            setup.read(downscale2, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(pass1Blur, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, compositeView, downscale2, pass1Blur, sigmaInPixels](caustica::rg::RenderPassContext& ctx) {
+            executeBlur(
+                ctx.commandList(),
+                compositeView,
+                ctx.texture(downscale2),
+                ctx.texture(pass1Blur),
+                m_BloomHBlurCB,
+                true,
+                sigmaInPixels);
+        },
+        enabledOption);
+
+    graph.addPass(
+        "BloomBlur2",
+        [pass1Blur, pass2Blur](caustica::rg::PassBuilder& setup) {
+            setup.read(pass1Blur, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(pass2Blur, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, compositeView, pass1Blur, pass2Blur, sigmaInPixels](caustica::rg::RenderPassContext& ctx) {
+            executeBlur(
+                ctx.commandList(),
+                compositeView,
+                ctx.texture(pass1Blur),
+                ctx.texture(pass2Blur),
+                m_BloomVBlurCB,
+                false,
+                sigmaInPixels);
+        },
+        enabledOption);
+
+    graph.addPass(
+        "BloomComposite",
+        [pass2Blur, outputColor](caustica::rg::PassBuilder& setup) {
+            setup.read(pass2Blur, caustica::rg::TextureAccess::ShaderResource);
+            setup.write(outputColor, caustica::rg::TextureAccess::RenderTarget);
+        },
+        [this, framebufferFactory, compositeView, pass2Blur, blendFactor](caustica::rg::RenderPassContext& ctx) {
+            executeComposite(
+                ctx.commandList(),
+                compositeView,
+                framebufferFactory,
+                ctx.texture(pass2Blur),
                 blendFactor);
         },
-        caustica::rg::PassOptions{ .enabled = enabled });
+        enabledOption);
 }

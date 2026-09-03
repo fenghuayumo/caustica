@@ -46,6 +46,7 @@ namespace caustica::render
 class BloomPass;
 class DenoisePass;
 class DLSS;
+class PathTraceSceneBindings;
 class FullscreenBlitPass;
 class GaussianSplatFramePass;
 class PathTracePass;
@@ -81,6 +82,7 @@ struct FrameGraphContext
 
     caustica::rhi::BindingLayoutHandle bindingLayout;
     caustica::rhi::BindingSetHandle bindingSet;
+    PathTraceSceneBindings* sceneBindings = nullptr;
     caustica::rhi::DescriptorTable* descriptorTable = nullptr;
     caustica::rhi::BufferHandle constantBuffer;
 
