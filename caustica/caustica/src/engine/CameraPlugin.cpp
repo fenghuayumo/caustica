@@ -97,7 +97,7 @@ void updateCamera(App& app, float elapsedTimeSeconds)
         setGaussianSplatTemporalReset(app, true);
     }
 
-    // Logic-thread CameraController PlanarView is logic-side only (gizmo / 3DGS CPU pick).
+    // Logic-thread CameraController ViewInfo is logic-side only (gizmo / 3DGS CPU pick).
     if (GpuSurface* gpuSurface = app.getSurface(); gpuSurface && app.getGpuDevice() && !app.getGpuDevice()->isHeadless())
     {
         int width = 0;

@@ -436,7 +436,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         const auto taaParams = makeTemporalAAParameters(ctx);
         const bool feedbackIsValid = computeTemporalFeedbackValid(ctx);
         const bool stochasticSplats = ctx.settings->EnableGaussianSplats && ctx.settings->GaussianSplatSortingMode == 1;
-        const ICompositeView* const compositeView = ctx.compositeView;
+        const ViewInfo* const view = ctx.view;
         int* const gaussianSampleIndex = ctx.gaussianSplatTemporalSampleIndex;
         bool* const gaussianTemporalReset = ctx.gaussianSplatTemporalReset;
 
@@ -453,9 +453,9 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                 setup.write(temporalFeedback1, rg::TextureAccess::UnorderedAccess);
                 setup.write(temporalFeedback2, rg::TextureAccess::UnorderedAccess);
             },
-            [temporalAAPass, taaParams, feedbackIsValid, stochasticSplats, compositeView,
+            [temporalAAPass, taaParams, feedbackIsValid, stochasticSplats, view,
              gaussianSampleIndex, gaussianTemporalReset](rg::RenderPassContext& passCtx) {
-                const ICompositeView& taaView = *compositeView;
+                const ViewInfo& taaView = *view;
                 temporalAAPass->temporalResolve(
                     passCtx.commandList(),
                     taaParams,
@@ -524,7 +524,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         const float accumulationWeight = (accumulationSampleIndex < ctx.settings->AccumulationTarget)
             ? (1.f / float(std::max(0, accumulationSampleIndex) + 1))
             : 0.0f;
-        const IView* const view = ctx.view;
+        const ViewInfo* const view = ctx.view;
 
         denoiseReady = ctx.graph->addPass(
             "Accumulation",

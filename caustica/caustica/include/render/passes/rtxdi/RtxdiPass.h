@@ -27,7 +27,7 @@ namespace caustica
 	class ShaderFactory;
 	namespace render { class RenderDevice; }
 	struct ShaderMacro;
-	class PlanarView;
+	class ViewInfo;
 }
 
 #include <render/passes/rtxdi/RtxdiUserSettings.h>

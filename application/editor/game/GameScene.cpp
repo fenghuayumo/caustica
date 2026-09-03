@@ -541,7 +541,7 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
     }
 }
 
-void GameScene::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize)
+void GameScene::StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & displaySize)
 {
     // collect toggles
     struct BigButton

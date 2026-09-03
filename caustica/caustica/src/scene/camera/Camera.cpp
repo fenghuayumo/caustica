@@ -393,7 +393,7 @@ void ThirdPersonCamera::setRotation(float yaw, float pitch)
     m_Pitch = pitch;
 }
 
-void ThirdPersonCamera::setView(const caustica::PlanarView& view)
+void ThirdPersonCamera::setView(const caustica::ViewInfo& view)
 {
     m_ProjectionMatrix = view.getProjectionMatrix(false);
     m_InverseProjectionMatrix = view.getInverseProjectionMatrix(false);

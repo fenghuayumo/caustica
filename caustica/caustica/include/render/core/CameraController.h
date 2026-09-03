@@ -46,10 +46,10 @@ public:
     FirstPersonCamera& camera() { return m_camera; }
     [[nodiscard]] const FirstPersonCamera& camera() const { return m_camera; }
 
-    std::shared_ptr<PlanarView>& view() { return m_view; }
-    std::shared_ptr<PlanarView>& viewPrevious() { return m_viewPrevious; }
-    [[nodiscard]] const std::shared_ptr<PlanarView>& view() const { return m_view; }
-    [[nodiscard]] const std::shared_ptr<PlanarView>& viewPrevious() const { return m_viewPrevious; }
+    std::shared_ptr<ViewInfo>& view() { return m_view; }
+    std::shared_ptr<ViewInfo>& viewPrevious() { return m_viewPrevious; }
+    [[nodiscard]] const std::shared_ptr<ViewInfo>& view() const { return m_view; }
+    [[nodiscard]] const std::shared_ptr<ViewInfo>& viewPrevious() const { return m_viewPrevious; }
 
     void ensureViews(dm::uint2 renderSize);
 
@@ -107,8 +107,8 @@ public:
 
 private:
     FirstPersonCamera               m_camera;
-    std::shared_ptr<PlanarView>     m_view;
-    std::shared_ptr<PlanarView>     m_viewPrevious;
+    std::shared_ptr<ViewInfo>     m_view;
+    std::shared_ptr<ViewInfo>     m_viewPrevious;
 
     float                           m_verticalFOV = 60.0f;
     float                           m_zNear       = 0.001f;

@@ -13,7 +13,7 @@ class RenderTargets;
 
 namespace caustica
 {
-    class PlanarView;
+    class ViewInfo;
     class ShaderFactory;
 }
 
@@ -30,8 +30,8 @@ public:
         caustica::rhi::CommandList* commandList,
         const RenderTargets& renderTargets,
         int pass,
-        const caustica::PlanarView& view, 
-        const caustica::PlanarView& viewPrev,
+        const caustica::ViewInfo& view, 
+        const caustica::ViewInfo& viewPrev,
         uint32_t frameIndex,
         float disocclusionThreshold,
         float disocclusionThresholdAlternate,

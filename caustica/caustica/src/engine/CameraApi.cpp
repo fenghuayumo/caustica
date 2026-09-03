@@ -190,13 +190,13 @@ void markCameraChanged(App& app)
         camera->markCameraChanged();
 }
 
-const std::shared_ptr<PlanarView>& currentView(const App& app)
+const std::shared_ptr<ViewInfo>& currentView(const App& app)
 {
     assert(cameraController(app));
     return cameraController(app)->view();
 }
 
-const PlanarView& view(const App& app)
+const ViewInfo& view(const App& app)
 {
     assert(cameraController(app));
     return *cameraController(app)->view();

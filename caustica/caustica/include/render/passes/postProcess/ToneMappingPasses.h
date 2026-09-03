@@ -18,8 +18,7 @@ namespace caustica
 {
     class ShaderFactory;
     class FramebufferFactory;
-    class ICompositeView;
-    class PlanarView;
+    class ViewInfo;
 }
 
 #ifndef TONEMAPPING_AUTOEXPOSURE_CPU
@@ -151,7 +150,7 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory,
         caustica::render::RenderDevice& renderDevice,
         std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
-        const caustica::ICompositeView& compositeView,
+        const caustica::ViewInfo& compositeView,
         caustica::rhi::TextureHandle sourceTexture
         );
 
@@ -159,7 +158,7 @@ public:
 
     // note - if enable == false, it still does autoexposure (if enabled) and everything else, but the output is just passthrough
     bool render(caustica::rhi::CommandList* commandList,
-        const caustica::ICompositeView& compositeView,
+        const caustica::ViewInfo& compositeView,
         caustica::rhi::Texture* sourceTexture,
         caustica::rhi::Buffer* constantsBuffer,
         bool enabled);
@@ -169,7 +168,7 @@ public:
         caustica::rg::GraphBuilder& graph,
         caustica::rg::TextureHandle sourceColor,
         caustica::rg::TextureHandle outputLdrColor,
-        caustica::PlanarView compositeView,
+        caustica::ViewInfo compositeView,
         bool enabled,
         bool* outCommandListWasClosed = nullptr);
 

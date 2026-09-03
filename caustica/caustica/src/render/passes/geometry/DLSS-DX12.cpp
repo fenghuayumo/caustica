@@ -147,7 +147,7 @@ public:
     bool evaluate(
         caustica::rhi::CommandList* commandList,
         const EvaluateParameters& params,
-        const caustica::PlanarView& view) override
+        const caustica::ViewInfo& view) override
     {
         if (!m_dlssInitialized && !m_rayReconstructionInitialized)
             return false;

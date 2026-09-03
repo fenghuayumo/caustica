@@ -55,14 +55,14 @@ public:
 
     virtual void tagResourcesGeneral(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView* view,
+        const caustica::ViewInfo* view,
         caustica::rhi::Texture* motionVectors,
         caustica::rhi::Texture* depth,
         caustica::rhi::Texture* finalColorHudless) override;
 
     virtual void tagResourcesDLSSNIS(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView* view,
+        const caustica::ViewInfo* view,
         caustica::rhi::Texture* output,
         caustica::rhi::Texture* input) override;
 
@@ -73,7 +73,7 @@ public:
 
     virtual void tagResourcesDeepDVC(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView* view,
+        const caustica::ViewInfo* view,
         caustica::rhi::Texture* output) override;
 
     virtual void unTagResourcesDeepDVC() override;
@@ -85,7 +85,7 @@ public:
     //   documentation for more detail.
     virtual void tagResourcesDLSSRR(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView* view,
+        const caustica::ViewInfo* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
         caustica::rhi::Texture* inputColor,

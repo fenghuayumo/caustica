@@ -5,7 +5,7 @@
 
 namespace caustica
 {
-    class PlanarView;
+    class ViewInfo;
 }
 
 namespace demo
@@ -20,7 +20,7 @@ namespace demo
         virtual ~PropComponentBase() { }
 
         virtual void            Tick(double gameTime, float animationTime, float deltaTime) = 0;
-        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) { return ScreenGUISel{}; }
+        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & mousePos, const float2 & displaySize) { return ScreenGUISel{}; }
 
         static std::shared_ptr<PropComponentBase> create(class PropBase & prop, const Json::Value & loadData);
 

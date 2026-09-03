@@ -130,7 +130,7 @@ bool uploadGaussianSplatScene(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
-    const caustica::IView& splatView,
+    const caustica::ViewInfo& splatView,
     caustica::rhi::rt::AccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
@@ -173,7 +173,7 @@ bool rasterGaussianSplatScene(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
-    const caustica::IView& splatView)
+    const caustica::ViewInfo& splatView)
 {
     bool renderedAny = false;
     for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)

@@ -31,8 +31,7 @@ namespace caustica
 class AccelStructManager;
 class BindingCache;
 class CameraController;
-class ICompositeView;
-class IView;
+class ViewInfo;
 }
 
 namespace caustica::rg
@@ -118,8 +117,7 @@ struct FrameGraphContext
     uint64_t frameIndex = 0;
     int accumulationSampleIndex = 0;
     bool accumulationCompleted = false;
-    const caustica::IView* view = nullptr;
-    const caustica::ICompositeView* compositeView = nullptr;
+    const caustica::ViewInfo* view = nullptr;
 
     bool hasScene = true;
     bool aaReset = false;

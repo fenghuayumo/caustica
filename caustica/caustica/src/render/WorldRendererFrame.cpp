@@ -86,7 +86,8 @@ void caustica::render::WorldRenderer::populateFrameView(ExtractedFrameView& view
     view.renderSize = m_renderSize;
     view.displayAspectRatio = m_displayAspectRatio;
 
-    view.postProcessView = *m_context->camera.view();
+    view.main = *m_context->camera.view();
+    view.postProcessView = view.main;
     ViewportDesc windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     view.postProcessView.setViewport(windowViewport);
     view.postProcessView.updateCache();
@@ -171,8 +172,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .frameIndex = m_frameIndex,
         .accumulationSampleIndex = m_accumulationSampleIndex,
         .accumulationCompleted = m_accumulationCompleted,
-        .view = m_context->camera.view().get(),
-        .compositeView = m_context->camera.view().get(),
+        .view = &ctx.view.main,
         .hasScene = m_context->hasFrameScene(),
         .aaReset = aaReset,
         .commandListWasClosed = &ctx.commandListWasClosed,
@@ -951,9 +951,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         lighting.environment()->getImportanceSampling()->getShaderParams();
 
     PlanarViewConstants view;
-    m_context->camera.view()->fillPlanarViewConstants(view);
+    fillViewConstants(view, *m_context->camera.view());
     PlanarViewConstants previousView;
-    m_context->camera.viewPrevious()->fillPlanarViewConstants(previousView);
+    fillViewConstants(previousView, *m_context->camera.viewPrevious());
     constants.view = FromPlanarViewConstants(view);
     constants.previousView = FromPlanarViewConstants(previousView);
 

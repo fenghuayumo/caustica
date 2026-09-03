@@ -12,7 +12,7 @@ using namespace caustica::math;
 
 namespace caustica
 {
-    class IView;
+    class ViewInfo;
     class ShaderFactory;
 }
 
@@ -70,7 +70,7 @@ public:
         caustica::rhi::CommandList* commandList,
         caustica::rhi::Texture* color,
         caustica::rhi::Texture* depth,
-        const caustica::IView& view,
+        const caustica::ViewInfo& view,
         uint width,
         uint height,
         const float3& environmentTint,

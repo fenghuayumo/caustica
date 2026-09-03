@@ -15,7 +15,8 @@ struct ExtractedFrameView
     dm::uint2 displaySize{};
     dm::uint2 renderSize{};
     float displayAspectRatio = 1.0f;
-    caustica::PlanarView postProcessView;
+    caustica::ViewInfo main;
+    caustica::ViewInfo postProcessView;
 };
 
 // Single per-frame render-thread context. Passes and pipeline plugins read only this.

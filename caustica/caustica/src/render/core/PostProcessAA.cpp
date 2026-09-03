@@ -36,7 +36,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
     if (useStreamlineThisFrame)
     {
         {
-            affine3 viewReprojection = camera.view()->getChildView(ViewType::PLANAR, 0)->getInverseViewMatrix()
+            affine3 viewReprojection = camera.view()->getInverseViewMatrix()
                 * camera.viewPrevious()->getViewMatrix();
             float4x4 reprojectionMatrix = inverse(camera.view()->getProjectionMatrix(false))
                 * affineToHomogeneous(viewReprojection)
@@ -91,14 +91,14 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
 
         params.gpuDevice->getStreamline().tagResourcesGeneral(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             renderTargets->screenMotionVectors,
             renderTargets->depth,
             renderTargets->preUIColor);
 
         params.gpuDevice->getStreamline().tagResourcesDLSSNIS(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             renderTargets->processedOutputColor,
             renderTargets->outputColor);
 
@@ -131,7 +131,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         static bool useSpecHitT = false;
         params.gpuDevice->getStreamline().tagResourcesDLSSRR(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             (int2)params.renderSize,
             (int2)params.displaySize,
             renderTargets->outputColor,

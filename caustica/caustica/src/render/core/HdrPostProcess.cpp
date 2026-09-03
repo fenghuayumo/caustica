@@ -19,7 +19,7 @@ void hdrPostProcess(CameraController& camera, HdrPostProcessParams& params)
         return;
     }
 
-    PlanarView fullscreenView = *camera.view();
+    ViewInfo fullscreenView = *camera.view();
     ViewportDesc windowViewport(float(params.displaySize.x), float(params.displaySize.y));
     fullscreenView.setViewport(windowViewport);
     fullscreenView.updateCache();

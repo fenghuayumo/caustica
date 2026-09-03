@@ -389,7 +389,7 @@ void PropBase::GUI(float indent, bool & gameCameraAttached, caustica::FirstPerso
 #endif
 }
 
-ScreenGUISel PropBase::StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize)
+ScreenGUISel PropBase::StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & mousePos, const float2 & displaySize)
 {
     ScreenGUISel sel{};
     for (auto& comp : m_components)

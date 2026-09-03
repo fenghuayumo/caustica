@@ -36,7 +36,7 @@ namespace
             ctx.renderTargets->depth,
             rg::TextureAccess::ShaderResource);
         const dm::uint2 displaySize = ctx.extractedView->displaySize;
-        const caustica::PlanarView postProcessView = ctx.extractedView->postProcessView;
+        const caustica::ViewInfo postProcessView = ctx.extractedView->postProcessView;
         const auto tintColor = ctx.settings->EnvironmentMapParams.TintColor;
         const float intensity = ctx.settings->EnvironmentMapParams.Intensity;
         const auto rotation = ctx.settings->EnvironmentMapParams.RotationXYZ;

@@ -147,7 +147,7 @@ protected:
     {
     }
 
-    ScreenGUISel StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize) override
+    ScreenGUISel StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & mousePos, const float2 & displaySize) override
     {
         ScreenGUISel sel;
 

@@ -35,7 +35,7 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
     caustica::rhi::Device* device,
     std::shared_ptr<ShaderFactory> shaderFactory, 
     caustica::render::RenderDevice& renderDevice,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     const CreateParameters& params)
     : m_renderDevice(renderDevice)
     , m_FrameIndex(0)
@@ -182,47 +182,40 @@ TemporalAntiAliasingPass::TemporalAntiAliasingPass(
 
 void TemporalAntiAliasingPass::renderMotionVectors(
     caustica::rhi::CommandList* commandList,
-    const ICompositeView& compositeView,
-    const ICompositeView& compositeViewPrevious,
+    const ViewInfo& compositeView,
+    const ViewInfo& compositeViewPrevious,
     dm::float3 preViewTranslationDifference)
 {
-    assert(compositeView.getNumChildViews(ViewType::PLANAR) == compositeViewPrevious.getNumChildViews(ViewType::PLANAR));
     assert(m_MotionVectorsPso);
 
     commandList->beginMarker("motionVectors");
 
-    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
-    {
-        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-        const IView* viewPrevious = compositeViewPrevious.getChildView(ViewType::PLANAR, viewIndex);
+    const ViewInfo& view = compositeView;
+    const ViewInfo& viewPrevious = compositeViewPrevious;
+    const ViewportStateDesc viewportState = view.getViewportState();
+    assert(viewportState.viewports.size() == 1);
 
-        const ViewportStateDesc viewportState = view->getViewportState();
-        
-        // This pass only works for planar, single-viewport views
-        assert(viewportState.viewports.size() == 1);
+    const ViewportDesc& inputViewport = viewportState.viewports[0];
 
-        const ViewportDesc& inputViewport = viewportState.viewports[0];
+    TemporalAntiAliasingConstants taaConstants = {};
+    affine3 viewReprojection = inverse(view.getViewMatrix()) * translation(-preViewTranslationDifference) * viewPrevious.getViewMatrix();
+    taaConstants.reprojectionMatrix = inverse(view.getProjectionMatrix(false)) * affineToHomogeneous(viewReprojection) * viewPrevious.getProjectionMatrix(false);
+    taaConstants.inputViewOrigin = float2(inputViewport.minX, inputViewport.minY);
+    taaConstants.inputViewSize = float2(inputViewport.width(), inputViewport.height());
+    taaConstants.stencilMask = m_StencilMask;
+    commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
 
-        TemporalAntiAliasingConstants taaConstants = {};
-        affine3 viewReprojection = inverse(view->getViewMatrix()) * translation(-preViewTranslationDifference) * viewPrevious->getViewMatrix();
-        taaConstants.reprojectionMatrix = inverse(view->getProjectionMatrix(false)) * affineToHomogeneous(viewReprojection) * viewPrevious->getProjectionMatrix(false);
-        taaConstants.inputViewOrigin = float2(inputViewport.minX, inputViewport.minY);
-        taaConstants.inputViewSize = float2(inputViewport.width(), inputViewport.height());
-        taaConstants.stencilMask = m_StencilMask;
-        commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
+    caustica::rhi::GraphicsState state;
+    state.pipeline = m_MotionVectorsPso;
+    state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(view);
+    state.bindings = { m_MotionVectorsBindingSet};
+    state.viewport = toRhi(viewportState);
+    commandList->setGraphicsState(state);
 
-        caustica::rhi::GraphicsState state;
-        state.pipeline = m_MotionVectorsPso;
-        state.framebuffer = m_MotionVectorsFramebufferFactory->getFramebuffer(*view);
-        state.bindings = { m_MotionVectorsBindingSet};
-        state.viewport = toRhi(viewportState);
-        commandList->setGraphicsState(state);
-
-        caustica::rhi::DrawArguments args;
-        args.instanceCount = 1;
-        args.vertexCount = 4;
-        commandList->draw(args);
-    }
+    caustica::rhi::DrawArguments args;
+    args.instanceCount = 1;
+    args.vertexCount = 4;
+    commandList->draw(args);
 
     commandList->endMarker();
 }
@@ -231,47 +224,41 @@ void TemporalAntiAliasingPass::temporalResolve(
     caustica::rhi::CommandList* commandList,
     const TemporalAntiAliasingParameters& params,
     bool feedbackIsValid,
-    const ICompositeView& compositeViewInput,
-    const ICompositeView& compositeViewOutput)
+    const ViewInfo& compositeViewInput,
+    const ViewInfo& compositeViewOutput)
 {
-    assert(compositeViewInput.getNumChildViews(ViewType::PLANAR) == compositeViewOutput.getNumChildViews(ViewType::PLANAR));
-    
     commandList->beginMarker("TemporalAA");
 
-    for (uint viewIndex = 0; viewIndex < compositeViewInput.getNumChildViews(ViewType::PLANAR); viewIndex++)
-    {
-        const IView* viewInput = compositeViewInput.getChildView(ViewType::PLANAR, viewIndex);
-        const IView* viewOutput = compositeViewOutput.getChildView(ViewType::PLANAR, viewIndex);
+    const ViewInfo& viewInput = compositeViewInput;
+    const ViewInfo& viewOutput = compositeViewOutput;
+    const ViewportDesc viewportInput = viewInput.getViewportState().viewports[0];
+    const ViewportDesc viewportOutput = viewOutput.getViewportState().viewports[0];
 
-        const ViewportDesc viewportInput = viewInput->getViewportState().viewports[0];
-        const ViewportDesc viewportOutput = viewOutput->getViewportState().viewports[0];
-        
-        TemporalAntiAliasingConstants taaConstants = {};
-        taaConstants.inputViewOrigin = float2(viewportInput.minX, viewportInput.minY);
-        taaConstants.inputViewSize = float2(viewportInput.width(), viewportInput.height());
-        taaConstants.outputViewOrigin = float2(viewportOutput.minX, viewportOutput.minY);
-        taaConstants.outputViewSize = float2(viewportOutput.width(), viewportOutput.height());
-        taaConstants.inputPixelOffset = viewInput->getPixelOffset();
-        taaConstants.outputTextureSizeInv = 1.0f / m_ResolvedColorSize;
-        taaConstants.inputOverOutputViewSize = taaConstants.inputViewSize / taaConstants.outputViewSize;
-        taaConstants.outputOverInputViewSize = taaConstants.outputViewSize / taaConstants.inputViewSize;
-        taaConstants.clampingFactor = params.enableHistoryClamping ? params.clampingFactor : -1.f;
-        taaConstants.newFrameWeight = feedbackIsValid ? params.newFrameWeight : 1.f;
-        taaConstants.pqC = dm::clamp(params.maxRadiance, 1e-4f, 1e8f);
-        taaConstants.invPqC = 1.f / taaConstants.pqC;
-        taaConstants.useHistoryClampRelax = (params.useHistoryClampRelax && m_HasHistoryClampRelaxTexture) ? 1 : 0;
-        commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
+    TemporalAntiAliasingConstants taaConstants = {};
+    taaConstants.inputViewOrigin = float2(viewportInput.minX, viewportInput.minY);
+    taaConstants.inputViewSize = float2(viewportInput.width(), viewportInput.height());
+    taaConstants.outputViewOrigin = float2(viewportOutput.minX, viewportOutput.minY);
+    taaConstants.outputViewSize = float2(viewportOutput.width(), viewportOutput.height());
+    taaConstants.inputPixelOffset = viewInput.getPixelOffset();
+    taaConstants.outputTextureSizeInv = 1.0f / m_ResolvedColorSize;
+    taaConstants.inputOverOutputViewSize = taaConstants.inputViewSize / taaConstants.outputViewSize;
+    taaConstants.outputOverInputViewSize = taaConstants.outputViewSize / taaConstants.inputViewSize;
+    taaConstants.clampingFactor = params.enableHistoryClamping ? params.clampingFactor : -1.f;
+    taaConstants.newFrameWeight = feedbackIsValid ? params.newFrameWeight : 1.f;
+    taaConstants.pqC = dm::clamp(params.maxRadiance, 1e-4f, 1e8f);
+    taaConstants.invPqC = 1.f / taaConstants.pqC;
+    taaConstants.useHistoryClampRelax = (params.useHistoryClampRelax && m_HasHistoryClampRelaxTexture) ? 1 : 0;
+    commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
 
-        int2 viewportSize = int2(taaConstants.outputViewSize);
-        int2 gridSize = (viewportSize + 15) / 16;
+    int2 viewportSize = int2(taaConstants.outputViewSize);
+    int2 gridSize = (viewportSize + 15) / 16;
 
-        caustica::rhi::ComputeState state;
-        state.pipeline = m_ResolvePso;
-        state.bindings = { m_ResolveBindingSet };
-        commandList->setComputeState(state);
+    caustica::rhi::ComputeState state;
+    state.pipeline = m_ResolvePso;
+    state.bindings = { m_ResolveBindingSet };
+    commandList->setComputeState(state);
 
-        commandList->dispatch(gridSize.x, gridSize.y, 1);
-    }
+    commandList->dispatch(gridSize.x, gridSize.y, 1);
 
     commandList->endMarker();
 }

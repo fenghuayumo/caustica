@@ -883,7 +883,7 @@ GaussianSplatGraphResources GaussianSplatPass::graphResources(const GaussianSpla
 
 bool GaussianSplatPass::upload(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView& view,
+    const caustica::ViewInfo& view,
     caustica::rhi::rt::AccelStruct* meshTopLevelAS,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
@@ -944,7 +944,7 @@ bool GaussianSplatPass::upload(
     }
 
     PlanarViewConstants planarView = {};
-    view.fillPlanarViewConstants(planarView);
+    fillViewConstants(planarView, view);
 
     GaussianSplatConstants constants = {};
     constants.view = FromPlanarViewConstants(planarView);
@@ -1082,7 +1082,7 @@ void GaussianSplatPass::sort(caustica::rhi::CommandList* commandList)
 
 bool GaussianSplatPass::raster(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView& view)
+    const caustica::ViewInfo& view)
 {
     if (!m_framePrepared)
         return false;

@@ -292,7 +292,7 @@ void GaussianSplatFramePass::executeUpload(
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
 
-    caustica::PlanarView splatView = *m_context->camera.view();
+    caustica::ViewInfo splatView = *m_context->camera.view();
     if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
@@ -367,7 +367,7 @@ void GaussianSplatFramePass::executeRaster(
     assert(m_context);
     assert(m_scenePasses);
 
-    caustica::PlanarView splatView = *m_context->camera.view();
+    caustica::ViewInfo splatView = *m_context->camera.view();
     if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
@@ -411,7 +411,7 @@ void GaussianSplatFramePass::executeAccumulate(caustica::rhi::CommandList* comma
 
     const float accumulationWeight = 1.0f / float(*m_temporalSampleIndex + 1);
 
-    caustica::PlanarView splatView = *m_context->camera.view();
+    caustica::ViewInfo splatView = *m_context->camera.view();
     splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
     splatView.setPixelOffset(dm::float2::zero());
     splatView.updateCache();

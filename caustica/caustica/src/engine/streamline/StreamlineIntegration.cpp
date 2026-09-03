@@ -1283,7 +1283,7 @@ static void GetSLResource(
     caustica::rhi::CommandList* commandList,
     sl::Resource& slResource,
     caustica::rhi::Texture* inputTex,
-    const caustica::IView* view)
+    const caustica::ViewInfo* view)
 {
     if (commandList == nullptr)
     {
@@ -1344,7 +1344,7 @@ static void GetSLResource(
 
 void StreamlineIntegration::tagResourcesGeneral(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* motionVectors,
     caustica::rhi::Texture* depth,
     caustica::rhi::Texture* finalColorHudless)
@@ -1374,7 +1374,7 @@ void StreamlineIntegration::tagResourcesGeneral(
 
 void StreamlineIntegration::tagResourcesDLSSNIS(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* Output,
     caustica::rhi::Texture* Input)
 {
@@ -1422,7 +1422,7 @@ void StreamlineIntegration::tagResourcesDLSSFG(
 
 void StreamlineIntegration::tagResourcesDeepDVC(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* Output)
 {
     if (!m_slInitialized)
@@ -1453,7 +1453,7 @@ void StreamlineIntegration::unTagResourcesDeepDVC()
 
 void StreamlineIntegration::tagResourcesDLSSRR(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     dm::int2 renderSize,
     dm::int2 displaySize,
     caustica::rhi::Texture* inputColor,

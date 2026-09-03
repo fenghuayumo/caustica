@@ -9,7 +9,7 @@ namespace caustica
 {
 
 class GpuDevice;
-class IView;
+class ViewInfo;
 
 class StreamlineInterface
 {
@@ -330,14 +330,14 @@ public:
 
     virtual void tagResourcesGeneral(
         caustica::rhi::CommandList* commandList,
-        const IView* view,
+        const ViewInfo* view,
         caustica::rhi::Texture* motionVectors,
         caustica::rhi::Texture* depth,
         caustica::rhi::Texture* finalColorHudless) = 0;
 
     virtual void tagResourcesDLSSNIS(
         caustica::rhi::CommandList* commandList,
-        const IView* view,
+        const ViewInfo* view,
         caustica::rhi::Texture* output,
         caustica::rhi::Texture* input) = 0;
 
@@ -348,7 +348,7 @@ public:
 
     virtual void tagResourcesDeepDVC(
         caustica::rhi::CommandList* commandList,
-        const IView* view,
+        const ViewInfo* view,
         caustica::rhi::Texture* output) = 0;
 
     virtual void unTagResourcesDeepDVC() = 0;
@@ -360,7 +360,7 @@ public:
 	//   documentation for more detail.
     virtual void tagResourcesDLSSRR(
         caustica::rhi::CommandList* commandList,
-        const IView* view,
+        const ViewInfo* view,
         dm::int2 renderSize,
         dm::int2 displaySize,
         caustica::rhi::Texture* inputColor,

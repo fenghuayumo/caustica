@@ -20,7 +20,7 @@
 namespace caustica
 {
     class FramebufferFactory;
-    class IView;
+    class ViewInfo;
     class ShaderFactory;
 }
 
@@ -158,14 +158,14 @@ public:
 
     bool upload(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView& view,
+        const caustica::ViewInfo& view,
         caustica::rhi::rt::AccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
     void sort(caustica::rhi::CommandList* commandList);
     bool raster(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView& view);
+        const caustica::ViewInfo& view);
 
     [[nodiscard]] bool hasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }

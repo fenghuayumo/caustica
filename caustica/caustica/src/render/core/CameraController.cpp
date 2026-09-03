@@ -36,8 +36,8 @@ namespace
 
 CameraController::CameraController()
 {
-    m_view = std::make_shared<PlanarView>();
-    m_viewPrevious = std::make_shared<PlanarView>();
+    m_view = std::make_shared<ViewInfo>();
+    m_viewPrevious = std::make_shared<ViewInfo>();
 
     setupDefaultCamera();
 
@@ -50,9 +50,9 @@ CameraController::CameraController()
 void CameraController::ensureViews(dm::uint2 renderSize)
 {
     if (!m_view)
-        m_view = std::make_shared<PlanarView>();
+        m_view = std::make_shared<ViewInfo>();
     if (!m_viewPrevious)
-        m_viewPrevious = std::make_shared<PlanarView>();
+        m_viewPrevious = std::make_shared<ViewInfo>();
 
     const ViewportDesc viewport(float(renderSize.x), float(renderSize.y));
     m_view->setViewport(viewport);

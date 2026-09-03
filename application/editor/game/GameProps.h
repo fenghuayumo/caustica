@@ -37,7 +37,7 @@ namespace demo
                                 getModels() const                       { return m_models; }
 
         virtual void            GUI(float indent, bool & gameCameraAttached, caustica::FirstPersonCamera & gameCamera);
-        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & mousePos, const float2 & displaySize);
+        virtual ScreenGUISel    StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & mousePos, const float2 & displaySize);
 
         caustica::scene::SceneEntityWorld* EntityWorld() const;
 

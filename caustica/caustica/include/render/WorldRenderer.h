@@ -54,8 +54,6 @@ struct PathTracerConstants;
 namespace caustica
 {
 class GpuDevice;
-class ICompositeView;
-class IView;
 class Scene;
 struct GpuSharedCaches;
 namespace scene

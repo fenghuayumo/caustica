@@ -384,7 +384,7 @@ const float* GetSnapValues(const EditorUIState& editorUI)
     }
 }
 
-void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const PlanarView& view, float outMatrix[16])
+void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const ViewInfo& view, float outMatrix[16])
 {
     App* app = ctx.sceneEditor.app();
     if (app && view.isReverseDepth())

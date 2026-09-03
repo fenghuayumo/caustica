@@ -11,7 +11,7 @@ namespace caustica
 {
     class ShaderFactory;
     class FramebufferFactory;
-    class ICompositeView;
+    class ViewInfo;
 }
 
 namespace caustica::render
@@ -64,21 +64,21 @@ namespace caustica::render
             caustica::rhi::Device* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             caustica::render::RenderDevice& renderDevice,
-            const caustica::ICompositeView& compositeView,
+            const caustica::ViewInfo& compositeView,
             const CreateParameters& params);
 
         void renderMotionVectors(
             caustica::rhi::CommandList* commandList,
-            const caustica::ICompositeView& compositeView,
-            const caustica::ICompositeView& compositeViewPrevious,
+            const caustica::ViewInfo& compositeView,
+            const caustica::ViewInfo& compositeViewPrevious,
             dm::float3 preViewTranslationDifference = dm::float3::zero());
 
         void temporalResolve(
             caustica::rhi::CommandList* commandList,
             const TemporalAntiAliasingParameters& params,
             bool feedbackIsValid,
-            const caustica::ICompositeView& compositeViewInput,
-            const caustica::ICompositeView& compositeViewOutput);
+            const caustica::ViewInfo& compositeViewInput,
+            const caustica::ViewInfo& compositeViewOutput);
 
         void advanceFrame();
         void setJitter(TemporalAntiAliasingJitter jitter);

@@ -15,7 +15,7 @@ namespace caustica
 {
 
 class App;
-class PlanarView;
+class ViewInfo;
 
 struct CameraPose
 {
@@ -46,8 +46,8 @@ bool setActiveCameraByPath(App& app, const std::string& path);
 [[nodiscard]] FirstPersonCamera& currentCamera(App& app);
 [[nodiscard]] const FirstPersonCamera& currentCamera(const App& app);
 void markCameraChanged(App& app);
-[[nodiscard]] const std::shared_ptr<PlanarView>& currentView(const App& app);
-[[nodiscard]] const PlanarView& view(const App& app);
+[[nodiscard]] const std::shared_ptr<ViewInfo>& currentView(const App& app);
+[[nodiscard]] const ViewInfo& view(const App& app);
 
 [[nodiscard]] std::string currentCameraPosDirUp(const App& app);
 [[nodiscard]] CameraPose currentCameraPose(const App& app);

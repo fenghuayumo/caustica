@@ -309,7 +309,7 @@ void ProceduralSky::applyAerialPerspective(
     caustica::rhi::CommandList* commandList,
     caustica::rhi::Texture* color,
     caustica::rhi::Texture* depth,
-    const caustica::IView& view,
+    const caustica::ViewInfo& view,
     uint width,
     uint height,
     const float3& environmentTint,
@@ -320,7 +320,7 @@ void ProceduralSky::applyAerialPerspective(
         return;
 
     AerialPerspectiveConstants constants = {};
-    view.fillPlanarViewConstants(constants.View);
+    fillViewConstants(constants.View, view);
     constants.Atmosphere = m_lastConstants.Atmosphere;
     constants.SunDir = m_lastConstants.SunDir;
     constants.CameraHeightKm = m_lastConstants.CameraHeightKm;

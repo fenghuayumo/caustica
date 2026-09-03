@@ -43,10 +43,10 @@ namespace
         return desc;
     }
 
-    void computeBloomMipSizes(const IView* view,
+    void computeBloomMipSizes(const ViewInfo& view,
         uint32_t& mip1Width, uint32_t& mip1Height, uint32_t& mip2Width, uint32_t& mip2Height)
     {
-        const ScissorDesc viewExtent = view->getViewExtent();
+        const ScissorDesc viewExtent = view.getViewExtent();
         const int viewportWidth = viewExtent.maxX - viewExtent.minX;
         const int viewportHeight = viewExtent.maxY - viewExtent.minY;
 
@@ -57,10 +57,9 @@ namespace
     }
 
     rg::Format bloomColorFormat(const std::shared_ptr<FramebufferFactory>& framebufferFactory,
-        const ICompositeView& compositeView)
+        const ViewInfo& view)
     {
-        const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
-        const caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+        const caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(view);
         const caustica::rhi::Format nativeFormat = framebuffer->getFramebufferInfo().colorFormats[0];
         return rg::fromNativeFormat(nativeFormat);
     }
@@ -71,7 +70,7 @@ BloomPass::BloomPass(
     const std::shared_ptr<ShaderFactory>& shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<FramebufferFactory> framebufferFactory,
-    const ICompositeView& compositeView)
+    const ViewInfo& compositeView)
     : m_renderDevice(renderDevice)
     , m_FramebufferFactory(std::move(framebufferFactory))
     , m_device(device)
@@ -97,7 +96,7 @@ BloomPass::BloomPass(
     };
     m_BloomBlurBindingLayout = device->createBindingLayout(layoutDesc);
 
-    m_PerViewData.resize(compositeView.getNumChildViews(ViewType::PLANAR));
+    m_PerViewData.resize(1);
 }
 
 void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::Framebuffer* framebuffer)
@@ -121,15 +120,15 @@ void BloomPass::ensureBlurPso(uint32_t viewIndex, caustica::rhi::Framebuffer* fr
 
 void BloomPass::executeDownscale1(
     caustica::rhi::CommandList* commandList,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     caustica::rhi::Texture* source,
     caustica::rhi::Texture* dest)
 {
-    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
-    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
+    const ViewInfo& view = compositeView;
+    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(view);
     const caustica::rhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
-    const caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+    const caustica::rhi::ViewportState viewportState = toRhi(view.getViewportState());
     const caustica::rhi::Rect& scissorRect = viewportState.scissorRects[0];
     const caustica::rhi::FramebufferHandle destFb = m_device->createFramebuffer(
         caustica::rhi::FramebufferDesc().addColorAttachment(dest));
@@ -164,7 +163,7 @@ void BloomPass::executeDownscale2(
 
 void BloomPass::executeBlur(
     caustica::rhi::CommandList* commandList,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     caustica::rhi::Texture* source,
     caustica::rhi::Texture* dest,
     caustica::rhi::Buffer* constants,
@@ -213,14 +212,14 @@ void BloomPass::executeBlur(
 
 void BloomPass::executeComposite(
     caustica::rhi::CommandList* commandList,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
     caustica::rhi::Texture* source,
     float blendFactor)
 {
-    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
-    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
-    const caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+    const ViewInfo& view = compositeView;
+    caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(view);
+    const caustica::rhi::ViewportState viewportState = toRhi(view.getViewportState());
 
     caustica::render::BlitParameters blitParams;
     blitParams.targetFramebuffer = framebuffer;
@@ -238,7 +237,7 @@ void BloomPass::executeComposite(
 void BloomPass::renderInternal(
     caustica::rhi::CommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     caustica::rhi::Texture* sourceDestTexture,
     caustica::rhi::Texture* textureDownscale1,
     caustica::rhi::Texture* textureDownscale2,
@@ -264,13 +263,12 @@ void BloomPass::renderInternal(
     const caustica::rhi::FramebufferHandle framebufferPass2Blur = m_device->createFramebuffer(
         caustica::rhi::FramebufferDesc().addColorAttachment(texturePass2Blur));
 
-    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
     {
-        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
-        caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(*view);
-        ensureBlurPso(viewIndex, framebufferPass1Blur);
+        const ViewInfo& view = compositeView;
+        caustica::rhi::Framebuffer* framebuffer = framebufferFactory->getFramebuffer(view);
+        ensureBlurPso(0, framebufferPass1Blur);
 
-        caustica::rhi::ViewportState viewportState = toRhi(view->getViewportState());
+        caustica::rhi::ViewportState viewportState = toRhi(view.getViewportState());
         const caustica::rhi::Rect& scissorRect = viewportState.scissorRects[0];
         const caustica::rhi::FramebufferInfoEx& fbinfo = framebuffer->getFramebufferInfo();
 
@@ -323,7 +321,7 @@ void BloomPass::renderInternal(
             caustica::rhi::Viewport viewport;
 
             caustica::rhi::GraphicsState state;
-            state.pipeline = m_PerViewData[viewIndex].bloomBlurPso;
+            state.pipeline = m_PerViewData[0].bloomBlurPso;
             viewport = caustica::rhi::Viewport(float(texturePass1Blur->getDesc().width), float(texturePass1Blur->getDesc().height));
             state.viewport.addViewport(viewport);
             state.viewport.addScissorRect(caustica::rhi::Rect(viewport));
@@ -382,18 +380,17 @@ void BloomPass::renderInternal(
 void BloomPass::render(
     caustica::rhi::CommandList* commandList,
     const std::shared_ptr<FramebufferFactory>& framebufferFactory,
-    const ICompositeView& compositeView,
+    const ViewInfo& compositeView,
     caustica::rhi::Texture* sourceDestTexture,
     float sigmaInPixels,
     float blendFactor)
 {
-    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
     uint32_t mip1W = 0;
     uint32_t mip1H = 0;
     uint32_t mip2W = 0;
     uint32_t mip2H = 0;
     const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
-    computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
+    computeBloomMipSizes(compositeView, mip1W, mip1H, mip2W, mip2H);
 
     caustica::rhi::TextureDesc nativeDesc;
     nativeDesc.format = rg::toNativeFormat(colorFormat);
@@ -432,18 +429,17 @@ void BloomPass::registerGraphPass(
     caustica::rg::GraphBuilder& graph,
     caustica::rg::TextureHandle processedOutputColor,
     const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-    caustica::PlanarView compositeView,
+    caustica::ViewInfo compositeView,
     float sigmaInPixels,
     float blendFactor,
     bool enabled)
 {
-    const IView* view = compositeView.getChildView(ViewType::PLANAR, 0);
     uint32_t mip1W = 0;
     uint32_t mip1H = 0;
     uint32_t mip2W = 0;
     uint32_t mip2H = 0;
     const rg::Format colorFormat = bloomColorFormat(framebufferFactory, compositeView);
-    computeBloomMipSizes(view, mip1W, mip1H, mip2W, mip2H);
+    computeBloomMipSizes(compositeView, mip1W, mip1H, mip2W, mip2H);
 
     const rg::TextureHandle downscale1 =
         graph.createTexture(makeBloomMipDesc(mip1W, mip1H, colorFormat, "bloom src mip1"));

@@ -11,7 +11,7 @@
 
 namespace caustica
 {
-    class PlanarView;
+    class ViewInfo;
 }
 
 namespace caustica
@@ -171,7 +171,7 @@ namespace caustica
         float getMaxDistance() const { return m_MaxDistance; }
         void setMaxDistance(float value) { m_MaxDistance = value; }
 
-        void setView(const PlanarView& view);
+        void setView(const ViewInfo& view);
 
         void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
         void lookTo(dm::float3 cameraPos, dm::float3 cameraDir,
