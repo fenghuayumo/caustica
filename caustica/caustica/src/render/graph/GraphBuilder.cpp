@@ -691,6 +691,84 @@ caustica::rhi::CommandQueue GraphBuilder::resolveQueue(caustica::rhi::CommandQue
     return queue;
 }
 
+bool GraphBuilder::textureAccessLegalOnQueue(
+    TextureAccess access,
+    caustica::rhi::CommandQueue queue)
+{
+    switch (queue)
+    {
+    case caustica::rhi::CommandQueue::Copy:
+        return access == TextureAccess::CopySource || access == TextureAccess::CopyDest;
+    case caustica::rhi::CommandQueue::Compute:
+        return access != TextureAccess::RenderTarget && access != TextureAccess::DepthWrite;
+    default:
+        return true;
+    }
+}
+
+bool GraphBuilder::bufferAccessLegalOnQueue(
+    BufferAccess access,
+    caustica::rhi::CommandQueue queue)
+{
+    if (queue != caustica::rhi::CommandQueue::Copy)
+        return true;
+    return access == BufferAccess::CopySource || access == BufferAccess::CopyDest;
+}
+
+bool GraphBuilder::accelStructAccessLegalOnQueue(
+    AccelStructAccess access,
+    caustica::rhi::CommandQueue queue)
+{
+    (void)access;
+    return queue != caustica::rhi::CommandQueue::Copy;
+}
+
+bool GraphBuilder::passAccessLegalOnQueue(const Pass& pass, caustica::rhi::CommandQueue queue) const
+{
+    for (const auto& [handle, access] : pass.textureReads)
+    {
+        (void)handle;
+        if (!textureAccessLegalOnQueue(access, queue))
+            return false;
+    }
+    for (const auto& [handle, access] : pass.textureWrites)
+    {
+        (void)handle;
+        if (!textureAccessLegalOnQueue(access, queue))
+            return false;
+    }
+    for (const auto& [handle, access] : pass.bufferReads)
+    {
+        (void)handle;
+        if (!bufferAccessLegalOnQueue(access, queue))
+            return false;
+    }
+    for (const auto& [handle, access] : pass.bufferWrites)
+    {
+        (void)handle;
+        if (!bufferAccessLegalOnQueue(access, queue))
+            return false;
+    }
+    if (queue == caustica::rhi::CommandQueue::Copy
+        && (!pass.accelStructReads.empty() || !pass.accelStructWrites.empty()))
+        return false;
+    return true;
+}
+
+void GraphBuilder::recordCompileQueueAccessErrors()
+{
+    m_lastCompileHadInvalidQueueAccess = false;
+    for (uint32_t passIndex = 0; passIndex < static_cast<uint32_t>(m_passes.size()); ++passIndex)
+    {
+        const Pass& pass = m_passes[passIndex];
+        if (!pass.options.enabled)
+            continue;
+        const caustica::rhi::CommandQueue queue = resolveQueue(passQueue(passIndex));
+        if (!passAccessLegalOnQueue(pass, queue))
+            m_lastCompileHadInvalidQueueAccess = true;
+    }
+}
+
 void GraphBuilder::compile()
 {
     m_activeCachedPlan = nullptr;
@@ -702,6 +780,7 @@ void GraphBuilder::compile()
     m_compiledWaveWaits.clear();
     m_lastCompileCacheHit = false;
     m_lastCompileHadCycle = false;
+    m_lastCompileHadInvalidQueueAccess = false;
 
     const uint64_t planKey = compiledPlanKey();
     if (const auto cached = m_compiledPlanCache.find(planKey);
@@ -745,6 +824,7 @@ void GraphBuilder::compile()
         }
         m_lastCompileCacheHit = true;
         m_compiled = true;
+        recordCompileQueueAccessErrors();
         return;
     }
 
@@ -1026,6 +1106,7 @@ void GraphBuilder::compile()
     allocateTransientResources(referenced, referencedBuffers, textureLifetimes, bufferLifetimes);
     capturePersistentTransientResources(planKey);
     m_compiled = true;
+    recordCompileQueueAccessErrors();
 }
 
 void GraphBuilder::computeTransientLifetimes(
@@ -1040,6 +1121,10 @@ void GraphBuilder::computeTransientLifetimes(
     for (size_t waveIndex = 0; waveIndex < m_compiledWaves.size(); ++waveIndex)
     {
         const int32_t order = static_cast<int32_t>(waveIndex);
+        const uint8_t queueBit = commandQueueBit(
+            waveIndex < m_compiledWaveQueues.size()
+                ? resolveQueue(m_compiledWaveQueues[waveIndex])
+                : caustica::rhi::CommandQueue::Graphics);
 
         const auto touchTexture = [&](TextureHandle handle) {
             if (!isValid(handle, m_textures.size(), m_handleGeneration))
@@ -1050,6 +1135,7 @@ void GraphBuilder::computeTransientLifetimes(
             TransientLifetime& lifetime = textureLifetimes[handle.index];
             lifetime.firstPassOrder = std::min(lifetime.firstPassOrder, order);
             lifetime.lastPassOrder = std::max(lifetime.lastPassOrder, order);
+            lifetime.queueMask |= queueBit;
         };
 
         const auto touchBuffer = [&](BufferHandle handle) {
@@ -1061,6 +1147,7 @@ void GraphBuilder::computeTransientLifetimes(
             TransientLifetime& lifetime = bufferLifetimes[handle.index];
             lifetime.firstPassOrder = std::min(lifetime.firstPassOrder, order);
             lifetime.lastPassOrder = std::max(lifetime.lastPassOrder, order);
+            lifetime.queueMask |= queueBit;
         };
 
         for (const uint32_t passIndex : m_compiledWaves[waveIndex])
@@ -1670,6 +1757,7 @@ uint32_t GraphBuilder::executeWaveParallel(
     if (activePasses.size() < 2 || totalCost < minCost)
     {
         executeWaveSerial(frameCtx.primary(), wave);
+        m_primaryClean = false;
         return 0;
     }
 
@@ -1684,6 +1772,7 @@ uint32_t GraphBuilder::executeWaveParallel(
     if (jobCount < 2)
     {
         executeWaveSerial(frameCtx.primary(), wave);
+        m_primaryClean = false;
         return 0;
     }
 
@@ -1713,10 +1802,14 @@ uint32_t GraphBuilder::executeWaveParallel(
     // before submitting forks so GPU order matches the compiled wave order.
     // WARNING: flush closes the primary and clears volatile CB address maps on
     // that list — later primary passes must writeBuffer those CBs again.
-    if (frameCtx.primaryOpen())
+    // Skip a clean (just flushed, empty) primary: submitting it would consume
+    // any cross-queue wait staged by applyWaveWaits before submitForks, which
+    // is the submission that actually needs to carry it.
+    if (frameCtx.primaryOpen() && !m_primaryClean)
     {
         m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] = frameCtx.flushPrimary();
         m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
+        m_primaryClean = true;
     }
 
     if (m_parallelTextureStateScratch.size() < jobCount)
@@ -1823,25 +1916,50 @@ void GraphBuilder::applyWaveWaits(
     {
         if (waitWave >= queues.size())
             continue;
-        const caustica::rhi::CommandQueue producer = resolveQueue(queues[waitWave]);
+        // Prefer the queue the producer wave actually executed on: an async
+        // wave whose list failed to open falls back to the graphics primary.
+        caustica::rhi::CommandQueue producer = caustica::rhi::CommandQueue::Graphics;
+        if (waitWave < m_executedWaveQueues.size()
+            && m_executedWaveQueues[waitWave] < uint8_t(caustica::rhi::CommandQueue::Count))
+        {
+            producer = caustica::rhi::CommandQueue(m_executedWaveQueues[waitWave]);
+        }
+        else
+        {
+            producer = resolveQueue(queues[waitWave]);
+        }
         if (producer == consumer)
             continue;
 
-        if (!m_queueSubmitted[size_t(producer)]
-            && producer == caustica::rhi::CommandQueue::Graphics
-            && frameCtx.primaryOpen())
+        // A clean primary cannot contain work this consumer depends on; skip
+        // the submission so the staged wait rides the next real graphics
+        // submission instead of being consumed by an empty one.
+        // Graphics producers must flush any work recorded since the last
+        // submission, even when the queue already submitted forks: the wait
+        // only covers m_lastQueueInstance, so unsubmitted primary work would
+        // race the consumer.
+        if (producer == caustica::rhi::CommandQueue::Graphics
+            && frameCtx.primaryOpen()
+            && !m_primaryClean)
         {
             m_lastQueueInstance[size_t(producer)] = frameCtx.flushPrimary();
             m_queueSubmitted[size_t(producer)] = 1;
+            m_primaryClean = true;
         }
 
         if (!m_queueSubmitted[size_t(producer)])
             continue;
 
-        if (consumer == caustica::rhi::CommandQueue::Graphics && frameCtx.primaryOpen())
+        // Earlier primary work never depends on this producer (its waits were
+        // applied when its own wave executed); flushing keeps it overlapping
+        // with the async producer instead of joining early.
+        if (consumer == caustica::rhi::CommandQueue::Graphics
+            && frameCtx.primaryOpen()
+            && !m_primaryClean)
         {
             m_lastQueueInstance[size_t(consumer)] = frameCtx.flushPrimary();
             m_queueSubmitted[size_t(consumer)] = 1;
+            m_primaryClean = true;
         }
 
         // Everything the graphics queue submits after this wait is ordered
@@ -1860,17 +1978,98 @@ void GraphBuilder::applyWaveWaits(
     }
 }
 
+void GraphBuilder::applyFrameBoundaryWaits(caustica::rhi::FrameCommandContext& frameCtx)
+{
+    if (!m_device)
+        return;
+
+    std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> thisUses{};
+    thisUses[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
+    for (const caustica::rhi::CommandQueue requested : compiledWaveQueues())
+        thisUses[size_t(resolveQueue(requested))] = 1;
+
+    bool prevHadAsync = false;
+    bool thisHasAsync = false;
+    for (uint8_t queue = 1; queue < uint8_t(caustica::rhi::CommandQueue::Count); ++queue)
+    {
+        prevHadAsync = prevHadAsync || m_prevFrameQueueSubmitted[queue] != 0;
+        thisHasAsync = thisHasAsync || thisUses[queue] != 0;
+    }
+    if (!prevHadAsync && !thisHasAsync)
+        return;
+
+    const uint64_t prevGraphics = std::max(
+        m_prevFrameQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)],
+        frameCtx.lastSubmitInstance());
+
+    const auto wait = [&](caustica::rhi::CommandQueue consumer,
+        caustica::rhi::CommandQueue producer,
+        uint64_t instance) {
+        if (consumer == producer || instance == 0)
+            return;
+        m_device->queueWaitForCommandList(consumer, producer, instance);
+        if (consumer == caustica::rhi::CommandQueue::Graphics)
+        {
+            uint64_t& waited = m_graphicsWaitedInstance[size_t(producer)];
+            waited = std::max(waited, instance);
+        }
+    };
+
+    // This frame's async queues cannot race last frame's graphics writes
+    // (imported history / present targets).
+    if (thisHasAsync && prevGraphics != 0)
+    {
+        for (uint8_t queue = 1; queue < uint8_t(caustica::rhi::CommandQueue::Count); ++queue)
+        {
+            if (thisUses[queue])
+                wait(caustica::rhi::CommandQueue(queue), caustica::rhi::CommandQueue::Graphics, prevGraphics);
+        }
+    }
+
+    // Last frame's async producers: join to graphics (covers a leaked wait)
+    // and to any async consumer this frame (copy→compute history, etc.).
+    for (uint8_t producer = 1; producer < uint8_t(caustica::rhi::CommandQueue::Count); ++producer)
+    {
+        if (!m_prevFrameQueueSubmitted[producer])
+            continue;
+        const uint64_t instance = m_prevFrameQueueInstance[producer];
+        if (instance == 0)
+            continue;
+        wait(caustica::rhi::CommandQueue::Graphics, caustica::rhi::CommandQueue(producer), instance);
+        if (!thisHasAsync)
+            continue;
+        for (uint8_t consumer = 1; consumer < uint8_t(caustica::rhi::CommandQueue::Count); ++consumer)
+        {
+            if (thisUses[consumer])
+                wait(caustica::rhi::CommandQueue(consumer), caustica::rhi::CommandQueue(producer), instance);
+        }
+    }
+}
+
 uint64_t GraphBuilder::executeWaveAsync(
     caustica::rhi::FrameCommandContext& frameCtx,
     caustica::rhi::CommandQueue queue,
-    const std::vector<uint32_t>& wave)
+    const std::vector<uint32_t>& wave,
+    caustica::rhi::CommandQueue& executedQueue)
 {
     caustica::rhi::CommandListHandle list = frameCtx.pool().acquire(queue);
     if (!list || !list->open())
     {
         if (list)
             frameCtx.pool().release(std::move(list));
+
+        // Fallback: record on the graphics primary, then flush it so later
+        // waves waiting on this one stay ordered (they resolve the producer
+        // queue through m_executedWaveQueues). Leaving the work unsubmitted
+        // here would let a subsequent async wave run ahead of it.
         executeWaveSerial(frameCtx.primary(), wave);
+        executedQueue = caustica::rhi::CommandQueue::Graphics;
+        if (frameCtx.primaryOpen())
+        {
+            const uint64_t instance = frameCtx.flushPrimary();
+            m_primaryClean = true;
+            return instance;
+        }
         return 0;
     }
 
@@ -1880,6 +2079,7 @@ uint64_t GraphBuilder::executeWaveAsync(
         ? m_device->executeCommandList(list, queue)
         : 0;
     frameCtx.pool().release(std::move(list));
+    executedQueue = queue;
     return instance;
 }
 
@@ -1898,6 +2098,11 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     const auto& waves = compiledWaves();
     const auto& waveQueues = compiledWaveQueues();
     const auto& waveWaits = compiledWaveWaits();
+    m_executedWaveQueues.assign(waves.size(), uint8_t(caustica::rhi::CommandQueue::Count));
+    // The caller may have recorded frame setup (timers, blits) on the primary
+    // before execute(); treat it as carrying work until the first flush.
+    m_primaryClean = false;
+    applyFrameBoundaryWaits(frameCtx);
 
     for (size_t waveIndex = 0; waveIndex < waves.size(); ++waveIndex)
     {
@@ -1913,14 +2118,18 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
 
         if (queue != caustica::rhi::CommandQueue::Graphics)
         {
-            const uint64_t instance = executeWaveAsync(frameCtx, queue, wave);
+            caustica::rhi::CommandQueue executedQueue = queue;
+            const uint64_t instance = executeWaveAsync(frameCtx, queue, wave, executedQueue);
+            m_executedWaveQueues[waveIndex] = uint8_t(executedQueue);
             if (instance != 0)
             {
-                m_lastQueueInstance[size_t(queue)] = instance;
-                m_queueSubmitted[size_t(queue)] = 1;
+                m_lastQueueInstance[size_t(executedQueue)] = instance;
+                m_queueSubmitted[size_t(executedQueue)] = 1;
             }
             continue;
         }
+
+        m_executedWaveQueues[waveIndex] = uint8_t(caustica::rhi::CommandQueue::Graphics);
 
         const bool forceSerial = !params.parallelWaves || wave.size() == 1;
         bool hasSerialPass = false;
@@ -1934,9 +2143,14 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
         }
 
         if (forceSerial || hasSerialPass)
+        {
             executeWaveSerial(frameCtx.primary(), wave);
+            m_primaryClean = false;
+        }
         else
+        {
             m_lastParallelBatchCount += executeWaveParallel(frameCtx, wave, params);
+        }
     }
 
     if (m_device)
@@ -1950,11 +2164,12 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
             if (!m_queueSubmitted[queue]
                 || m_graphicsWaitedInstance[queue] >= m_lastQueueInstance[queue])
                 continue;
-            if (frameCtx.primaryOpen())
+            if (frameCtx.primaryOpen() && !m_primaryClean)
             {
                 m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] =
                     frameCtx.flushPrimary();
                 m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
+                m_primaryClean = true;
             }
             m_device->queueWaitForCommandList(
                 caustica::rhi::CommandQueue::Graphics,
@@ -1964,6 +2179,10 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     }
 
     transitionExtractedResources(frameCtx.primary());
+    m_primaryClean = false;
+
+    m_prevFrameQueueInstance = m_lastQueueInstance;
+    m_prevFrameQueueSubmitted = m_queueSubmitted;
 
     if (m_activeGpuTimingSlot >= 0)
     {
@@ -2103,6 +2322,7 @@ void GraphBuilder::reset()
     m_transientStats = {};
     m_volatileConstants.clear();
     m_lastCompileHadCycle = false;
+    m_lastCompileHadInvalidQueueAccess = false;
     m_lastQueueInstance = {};
     m_queueSubmitted = {};
     m_compiled = false;

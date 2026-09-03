@@ -1,4 +1,5 @@
 #include <render/graph/GraphBuilder.h>
+#include <render/graph/TransientResourceAllocator.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -312,6 +313,69 @@ int main()
             "accel-struct RAW order was not preserved");
         passed &= expect(asGraph.compiledWaves().size() >= 2,
             "accel-struct producer and consumer shared a wave");
+    }
+
+    {
+        using caustica::rhi::CommandQueue;
+        const uint8_t graphics = caustica::rg::commandQueueBit(CommandQueue::Graphics);
+        const uint8_t compute = caustica::rg::commandQueueBit(CommandQueue::Compute);
+        const uint8_t copy = caustica::rg::commandQueueBit(CommandQueue::Copy);
+        passed &= expect(caustica::rg::canAliasTransientQueues(compute, compute),
+            "same-queue compute transients should be allowed to alias");
+        passed &= expect(!caustica::rg::canAliasTransientQueues(compute, graphics),
+            "compute and graphics transients must not alias");
+        passed &= expect(!caustica::rg::canAliasTransientQueues(copy, compute),
+            "copy and compute transients must not alias");
+        passed &= expect(!caustica::rg::canAliasTransientQueues(uint8_t(compute | graphics), compute),
+            "a multi-queue lifetime must not alias onto a single-queue slot");
+        passed &= expect(!caustica::rg::isSingleQueueMask(0),
+            "empty queue mask is not a single queue");
+    }
+
+    {
+        using caustica::rhi::CommandQueue;
+        passed &= expect(
+            caustica::rg::GraphBuilder::textureAccessLegalOnQueue(
+                caustica::rg::TextureAccess::CopyDest, CommandQueue::Copy)
+                && !caustica::rg::GraphBuilder::textureAccessLegalOnQueue(
+                    caustica::rg::TextureAccess::ShaderResource, CommandQueue::Copy)
+                && !caustica::rg::GraphBuilder::textureAccessLegalOnQueue(
+                    caustica::rg::TextureAccess::RenderTarget, CommandQueue::Compute)
+                && caustica::rg::GraphBuilder::textureAccessLegalOnQueue(
+                    caustica::rg::TextureAccess::UnorderedAccess, CommandQueue::Compute),
+            "copy/compute texture access rules were not applied");
+        passed &= expect(
+            caustica::rg::GraphBuilder::bufferAccessLegalOnQueue(
+                caustica::rg::BufferAccess::CopyDest, CommandQueue::Copy)
+                && !caustica::rg::GraphBuilder::bufferAccessLegalOnQueue(
+                    caustica::rg::BufferAccess::ShaderResource, CommandQueue::Copy)
+                && caustica::rg::GraphBuilder::bufferAccessLegalOnQueue(
+                    caustica::rg::BufferAccess::ShaderResource, CommandQueue::Compute),
+            "copy buffer access rules were not applied");
+        passed &= expect(
+            !caustica::rg::GraphBuilder::accelStructAccessLegalOnQueue(
+                caustica::rg::AccelStructAccess::Build, CommandQueue::Copy)
+                && caustica::rg::GraphBuilder::accelStructAccessLegalOnQueue(
+                    caustica::rg::AccelStructAccess::ShaderResource, CommandQueue::Compute),
+            "copy queue must not declare accel-struct access");
+
+        // No device → resolveQueue folds Copy to Graphics, so compile stays valid.
+        caustica::rg::GraphBuilder fallbackGraph;
+        const auto tex = fallbackGraph.importTexture(
+            fakeTexture(0x6000), caustica::rg::TextureAccess::ShaderResource);
+        fallbackGraph.addPass(
+            "CopyWithSrv",
+            [tex](caustica::rg::PassBuilder& setup) {
+                setup.read(tex, caustica::rg::TextureAccess::ShaderResource);
+            },
+            {},
+            caustica::rg::PassOptions{
+                .sideEffect = true,
+                .queue = CommandQueue::Copy,
+            });
+        fallbackGraph.compile();
+        passed &= expect(!fallbackGraph.lastCompileHadInvalidQueueAccess(),
+            "copy+SRV without a copy queue should resolve to graphics, not fail compile");
     }
 
     {

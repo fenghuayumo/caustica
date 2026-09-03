@@ -57,6 +57,9 @@ namespace caustica::rhi
         [[nodiscard]] CommandListHandle primaryHandle() const { return m_primary; }
         [[nodiscard]] CommandList* primary() const { return m_primary.Get(); }
         [[nodiscard]] bool primaryOpen() const { return m_primaryOpen; }
+        // Latest graphics submit from flushPrimary / submitForks / endFrame.
+        // Survives beginPrimary so the next graph execute can wait on it.
+        [[nodiscard]] uint64_t lastSubmitInstance() const { return m_lastSubmitInstance; }
 
         // close -> execute -> open (init sync-points). Does not waitForIdle.
         uint64_t flushPrimary();
@@ -77,6 +80,7 @@ namespace caustica::rhi
         CommandQueue m_queue = CommandQueue::Graphics;
         CommandListHandle m_primary;
         bool m_primaryOpen = false;
+        uint64_t m_lastSubmitInstance = 0;
 
         struct ForkEntry
         {

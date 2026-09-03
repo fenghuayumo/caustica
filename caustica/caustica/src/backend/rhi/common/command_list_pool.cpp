@@ -102,6 +102,8 @@ namespace caustica::rhi
         m_primary->close();
         m_primaryOpen = false;
         const uint64_t instance = m_pool->device()->executeCommandList(m_primary, m_queue);
+        if (instance != 0)
+            m_lastSubmitInstance = instance;
         if (m_primary->open())
             m_primaryOpen = true;
         return instance;
@@ -154,6 +156,8 @@ namespace caustica::rhi
         uint64_t instance = 0;
         if (!toExecute.empty())
             instance = m_pool->device()->executeCommandLists(toExecute.data(), toExecute.size(), m_queue);
+        if (instance != 0)
+            m_lastSubmitInstance = instance;
 
         for (auto& entry : m_forks)
         {
@@ -173,6 +177,8 @@ namespace caustica::rhi
             m_primary->close();
             m_primaryOpen = false;
             instance = m_pool->device()->executeCommandList(m_primary, m_queue);
+            if (instance != 0)
+                m_lastSubmitInstance = instance;
         }
 
         return instance;

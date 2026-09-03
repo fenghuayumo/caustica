@@ -108,10 +108,11 @@ namespace caustica::rhi::vulkan
 
         for (size_t i = 0; i < m_WaitSemaphores.size(); i++)
         {
-            waitStageArray[i] = vk::PipelineStageFlagBits::eTopOfPipe;
+            waitStageArray[i] = vk::PipelineStageFlagBits::eAllCommands;
         }
 
-        m_LastSubmittedID++;
+        const uint64_t submissionID = m_LastSubmittedID + 1;
+        const size_t inFlightBefore = m_CommandBuffersInFlight.size();
 
         for (size_t i = 0; i < numCmd; i++)
         {
@@ -124,12 +125,12 @@ namespace caustica::rhi::vulkan
             for (const auto& buffer : commandBuffer->referencedStagingBuffers)
             {
                 buffer->lastUseQueue = m_QueueID;
-                buffer->lastUseCommandListID = m_LastSubmittedID;
+                buffer->lastUseCommandListID = submissionID;
             }
         }
         
         m_SignalSemaphores.push_back(trackingSemaphore);
-        m_SignalSemaphoreValues.push_back(m_LastSubmittedID);
+        m_SignalSemaphoreValues.push_back(submissionID);
 
         auto timelineSemaphoreInfo = vk::TimelineSemaphoreSubmitInfo()
             .setSignalSemaphoreValueCount(uint32_t(m_SignalSemaphoreValues.size()))
@@ -157,8 +158,16 @@ namespace caustica::rhi::vulkan
         catch (vk::DeviceLostError&)
         {
             m_Context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
+            while (m_CommandBuffersInFlight.size() > inFlightBefore)
+                m_CommandBuffersInFlight.pop_back();
+            m_WaitSemaphores.clear();
+            m_WaitSemaphoreValues.clear();
+            m_SignalSemaphores.clear();
+            m_SignalSemaphoreValues.clear();
+            return 0;
         }
 
+        m_LastSubmittedID = submissionID;
         m_WaitSemaphores.clear();
         m_WaitSemaphoreValues.clear();
         m_SignalSemaphores.clear();

@@ -135,8 +135,16 @@ namespace caustica::rhi::d3d12
                 query->fence = nullptr;
             }
 
-            uint64_t frequency;
-            getQueue(CommandQueue::Graphics)->queue->GetTimestampFrequency(&frequency);
+            uint64_t frequency = 0;
+            Queue* timestampQueue = getQueue(query->queue);
+            if (!timestampQueue)
+                timestampQueue = getQueue(CommandQueue::Graphics);
+            if (!timestampQueue || !timestampQueue->queue)
+            {
+                m_Context.error("getTimerQueryTime: timestamp queue is missing");
+                return 0.f;
+            }
+            timestampQueue->queue->GetTimestampFrequency(&frequency);
 
             D3D12_RANGE bufferReadRange = {
                 query->beginQueryIndex * sizeof(uint64_t),

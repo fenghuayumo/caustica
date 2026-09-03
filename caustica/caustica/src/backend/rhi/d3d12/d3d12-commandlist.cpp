@@ -406,6 +406,7 @@ namespace caustica::rhi::d3d12
             it->resolved = false;
             it->fence = pQueue->fence;
             it->fenceCounter = instance->submittedInstance;
+            it->queue = m_Desc.queueType;
         }
 
         m_StateTracker.commandListSubmitted();

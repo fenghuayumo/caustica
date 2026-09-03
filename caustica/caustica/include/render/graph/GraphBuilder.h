@@ -247,6 +247,18 @@ public:
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
     [[nodiscard]] bool lastCompileCacheHit() const { return m_lastCompileCacheHit; }
     [[nodiscard]] bool lastCompileHadCycle() const { return m_lastCompileHadCycle; }
+    [[nodiscard]] bool lastCompileHadInvalidQueueAccess() const { return m_lastCompileHadInvalidQueueAccess; }
+
+    // Declared access vs queue. Compile records a flag; it does not rewrite the pass.
+    [[nodiscard]] static bool textureAccessLegalOnQueue(
+        TextureAccess access,
+        caustica::rhi::CommandQueue queue);
+    [[nodiscard]] static bool bufferAccessLegalOnQueue(
+        BufferAccess access,
+        caustica::rhi::CommandQueue queue);
+    [[nodiscard]] static bool accelStructAccessLegalOnQueue(
+        AccelStructAccess access,
+        caustica::rhi::CommandQueue queue);
     [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
     [[nodiscard]] ResourceOwnership textureOwnership(TextureHandle handle) const;
     [[nodiscard]] ResourceOwnership bufferOwnership(BufferHandle handle) const;
@@ -348,6 +360,11 @@ private:
     {
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
+        // Bit per CommandQueue of every wave touching the resource. Aliasing
+        // two transients is only safe when all their waves share one queue:
+        // aliasing barriers sync within the acquiring queue only, and aliased
+        // resources never carry graph edges that would insert a queue wait.
+        uint8_t queueMask = 0;
     };
 
     void computeTransientLifetimes(
@@ -398,10 +415,14 @@ private:
         caustica::rhi::FrameCommandContext& frameCtx,
         caustica::rhi::CommandQueue consumer,
         const std::vector<uint32_t>& waitWaves);
+    void applyFrameBoundaryWaits(caustica::rhi::FrameCommandContext& frameCtx);
+    void recordCompileQueueAccessErrors();
+    [[nodiscard]] bool passAccessLegalOnQueue(const Pass& pass, caustica::rhi::CommandQueue queue) const;
     uint64_t executeWaveAsync(
         caustica::rhi::FrameCommandContext& frameCtx,
         caustica::rhi::CommandQueue queue,
-        const std::vector<uint32_t>& wave);
+        const std::vector<uint32_t>& wave,
+        caustica::rhi::CommandQueue& executedQueue);
 
     struct CompiledPlan
     {
@@ -492,12 +513,25 @@ private:
     int32_t m_activeGpuTimingSlot = -1;
     bool m_lastCompileCacheHit = false;
     bool m_lastCompileHadCycle = false;
+    bool m_lastCompileHadInvalidQueueAccess = false;
     uint32_t m_lastParallelBatchCount = 0;
     std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_lastQueueInstance{};
     std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> m_queueSubmitted{};
+    // Actual execution queue per compiled wave (execute-time reality, which can
+    // differ from the declared wave queue when an async list fails to open).
+    std::vector<uint8_t> m_executedWaveQueues;
+    // True when the open primary cannot contain recorded work (freshly opened
+    // by flushPrimary). Prevents empty submissions from consuming cross-queue
+    // timeline waits that must ride the next real graphics submission.
+    bool m_primaryClean = false;
     // Highest async instance the graphics queue actually waited on this frame.
     // The final join can be skipped only while this covers m_lastQueueInstance.
     std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_graphicsWaitedInstance{};
+    // Survive reset() so the next execute can order imported history against
+    // last frame's async / graphics producers (Vulkan same-queue FIFO is not
+    // enough when the consumer is on another queue).
+    std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_prevFrameQueueInstance{};
+    std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> m_prevFrameQueueSubmitted{};
 };
 
 } // namespace caustica::rg

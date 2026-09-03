@@ -250,6 +250,53 @@ primary. `execute(FrameCommandContext&, ExecuteParams)`:
 Passes that close/execute/wait mid-body (e.g. ToneMapping auto-exposure) must
 set `PassOptions::serialOnPrimary = true`.
 
+### Multi-queue contract
+
+Device compute/copy queues are opt-in (`DeviceParams.enableComputeQueue` /
+`enableCopyQueue`). `resolveQueue` folds missing queues back to Graphics at
+both compile (lifetimes / access checks) and execute.
+
+**Transient aliasing** is same-queue only. `TransientLifetime::queueMask`
+records every resolved queue that touches a resource. The allocator reuses a
+slot or heap range only when both lifetimes are a single matching queue bit.
+Aliasing barriers (`RESOURCE_BARRIER_TYPE_ALIASING` / Vulkan global memory
+barrier) order the acquiring queue only; aliased resources have no graph edge
+and therefore no `queueWaitForCommandList`. Cross-queue reuse would be a
+data race.
+
+**Cross-queue waits** must ride a submit that actually records the consumer:
+
+- `m_primaryClean` skips empty `flushPrimary` so a staged Vulkan timeline
+  wait is not consumed by a no-op list. D3D12 `ID3D12CommandQueue::Wait`
+  gates later `ExecuteCommandLists` on that queue; Vulkan waits gate only
+  the submit that carries them.
+- An async wave that cannot open a list records on the graphics primary,
+  flushes immediately, and is remembered as a Graphics producer via
+  `m_executedWaveQueues`.
+- `endFrame` must still submit the open primary after `execute`. A wait
+  staged for graphics at the end of `execute` (final async join, or extract)
+  is otherwise left for the next frame's first graphics submit.
+
+**Frame boundary (imported history).** Same-queue submits are FIFO. Cross-queue
+cross-frame is not: frame N compute writing an imported history texture does
+not automatically gate frame N+1 copy/compute that re-imports it. `execute`
+starts with `applyFrameBoundaryWaits`:
+
+- this frame's async queues wait for the previous graphics submit
+  (`FrameCommandContext::lastSubmitInstance`, including last `endFrame`);
+- leftover last-frame async instances join to graphics and to this frame's
+  async queues.
+
+D3D12 queue `Wait` already sticks to later work; the extra waits are the
+Vulkan timeline contract. Present/acquire is **not** the graph's ordering
+mechanism.
+
+**Copy-queue access.** Copy waves may only declare `CopySource` / `CopyDest`.
+Volatile constant-buffer `writeBuffer` is a per-list address update, not a
+GPU copy — keep those writes on graphics (`VolatileConstantBinder`). Compile
+records `lastCompileHadInvalidQueueAccess` when a resolved queue cannot
+perform a declared access; it does not rewrite the pass.
+
 ### Volatile constant buffers
 
 NVRHI tracks volatile CB GPU addresses **per command-list open session**.
