@@ -2,6 +2,7 @@
 #include <engine/AppObservers.h>
 #include <engine/AppResources.h>
 #include <engine/Input.h>
+#include <engine/internal/ActiveSceneAccess.h>
 #include <engine/internal/GpuRenderScheduleRegistration.h>
 #include <engine/internal/WorldRendererAccess.h>
 #include <engine/SceneQuery.h>
@@ -20,6 +21,7 @@
 #include <render/AppDiagnostics.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/WorldRenderer.h>
+#include <scene/Scene.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 
 #if CAUSTICA_WITH_STREAMLINE
@@ -339,6 +341,12 @@ void App::shutdown()
 
     m_started = false;
     m_schedules.clear();
+    // Detach the active scene from the live ECS world before clearing it.
+    // Scene shared_ptrs may outlive the App (Python bindings keep them in
+    // PyScene / PySceneEntity); without this, ~SceneEntityWorld would
+    // dereference a dangling ecs::World pointer after the App is destroyed.
+    if (std::shared_ptr<Scene> scene = activeScene(*this))
+        scene->detachLiveEcs();
     m_world.clear();
     m_defaultSchedulesRegistered = false;
     m_gpuRenderSchedulesRegistered = false;

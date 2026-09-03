@@ -9,6 +9,7 @@
 #include <entt/entity/registry.hpp>
 
 #include <functional>
+#include <algorithm>
 #include <iterator>
 #include <stdexcept>
 #include <typeindex>
@@ -16,6 +17,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace caustica::ecs
 {
@@ -23,6 +25,36 @@ namespace caustica::ecs
 class World
 {
 public:
+    // Observer for objects that hold a borrowed World pointer (e.g.
+    // SceneEntityWorld). World destruction detaches every observer first so
+    // survivors never dereference a dangling pointer.
+    class BorrowObserver
+    {
+    public:
+        virtual ~BorrowObserver() = default;
+        virtual void detachFromWorld(const World* world) = 0;
+    };
+
+    void addBorrowObserver(BorrowObserver* observer)
+    {
+        m_borrowObservers.push_back(observer);
+    }
+
+    void removeBorrowObserver(BorrowObserver* observer)
+    {
+        const auto it = std::find(m_borrowObservers.begin(), m_borrowObservers.end(), observer);
+        if (it != m_borrowObservers.end())
+            m_borrowObservers.erase(it);
+    }
+
+    ~World()
+    {
+        // Copy: detachFromWorld may remove itself from the list.
+        auto observers = m_borrowObservers;
+        for (BorrowObserver* observer : observers)
+            observer->detachFromWorld(this);
+    }
+
     Entity spawn()
     {
         return m_registry.create();
@@ -286,6 +318,7 @@ public:
 private:
     entt::registry m_registry;
     std::unordered_map<std::type_index, void*> m_resourceRefs;
+    std::vector<BorrowObserver*> m_borrowObservers;
     bool m_changeDetectionEnabled = false;
 };
 

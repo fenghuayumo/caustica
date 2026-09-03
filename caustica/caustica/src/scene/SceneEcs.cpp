@@ -280,10 +280,13 @@ SceneEntityWorld::SceneEntityWorld()
 SceneEntityWorld::SceneEntityWorld(ecs::World& liveWorld)
     : m_world(&liveWorld)
 {
+    liveWorld.addBorrowObserver(this);
 }
 
 SceneEntityWorld::~SceneEntityWorld()
 {
+    if (m_world)
+        m_world->removeBorrowObserver(this);
     if (!m_owned)
         resetScene();
 }
@@ -319,6 +322,9 @@ void SceneEntityWorld::adoptInto(ecs::World& liveWorld, SceneTypeFactory* factor
     if (m_world == &liveWorld)
         return;
 
+    if (m_world)
+        m_world->removeBorrowObserver(this);
+
     const ecs::Entity sourceRoot = m_root;
     SceneEntityWorld dest(liveWorld);
     if (ecs::isValid(sourceRoot) && m_world && m_world->isAlive(sourceRoot))
@@ -336,10 +342,12 @@ void SceneEntityWorld::adoptInto(ecs::World& liveWorld, SceneTypeFactory* factor
     dest.m_GeometryCount = 0;
     dest.m_MaxGeometryCountPerMesh = 0;
     dest.m_GeometryInstancesCount = 0;
+    liveWorld.removeBorrowObserver(&dest);
     dest.m_root = ecs::NullEntity;
     dest.m_world = nullptr;
 
     m_world = &liveWorld;
+    m_world->addBorrowObserver(this);
     m_owned.reset();
 
     m_structureDirty = true;

@@ -387,7 +387,7 @@ void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
 
 // ECS scene world: entity hierarchy + resource tracking (meshes, lights, cameras, ...).
-class SceneEntityWorld : public SceneResources
+class SceneEntityWorld : public SceneResources, public ecs::World::BorrowObserver
 {
 public:
     // Scratch / tests / async pending Scene: owns a registry.
@@ -395,6 +395,14 @@ public:
     // Live scene: borrows App::m_world so Query / Res / Commands share one registry.
     explicit SceneEntityWorld(ecs::World& liveWorld);
     ~SceneEntityWorld() override;
+
+    // ecs::World::BorrowObserver — nulls the borrowed pointer when the World
+    // is destroyed so ~SceneEntityWorld never touches a dangling pointer.
+    void detachFromWorld(const ecs::World* world) override
+    {
+        if (m_world == world)
+            m_world = nullptr;
+    }
 
     SceneEntityWorld(const SceneEntityWorld&) = delete;
     SceneEntityWorld& operator=(const SceneEntityWorld&) = delete;

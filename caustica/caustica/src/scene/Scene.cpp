@@ -825,6 +825,19 @@ void Scene::adoptLiveEcs(ecs::World& liveWorld)
     m_EntityWorld->adoptInto(liveWorld, m_SceneTypeFactory.get());
 }
 
+void Scene::detachLiveEcs()
+{
+    // Must run while the borrowed ecs::World is still alive (App::shutdown).
+    // resetScene() detaches the graph from the live registry; replacing the
+    // entity world afterwards guarantees the destructor never touches the
+    // borrowed world again even if this Scene outlives the App.
+    if (!m_EntityWorld)
+        return;
+    if (!m_EntityWorld->ownsRegistry())
+        m_EntityWorld->resetScene();
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+}
+
 bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
 {
     // Model import is always serial: texture and typed-asset registration are

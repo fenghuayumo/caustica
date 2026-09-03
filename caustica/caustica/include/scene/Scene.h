@@ -225,6 +225,12 @@ namespace caustica
 
         // Bind the live scene graph to App::m_world after async load (logic thread).
         void adoptLiveEcs(ecs::World& liveWorld);
+        // Unbind from the borrowed live ECS world while that world is still
+        // alive. The scene graph is cleared from the live registry, then the
+        // entity world is replaced with a fresh owned registry so a surviving
+        // shared_ptr<Scene> (e.g. held by Python bindings) never destroys a
+        // SceneEntityWorld whose borrowed world pointer has gone stale.
+        void detachLiveEcs();
         [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
         [[nodiscard]] dm::box3 getSceneBounds() const;
 
