@@ -1,6 +1,7 @@
 #include "common/ImGuiManager.h"
 #include "common/EditorTheme.h"
 #include "common/IconsMaterialSymbols.h"
+#include "common/RecentScenes.h"
 
 #include <imgui/imgui_renderer.h>
 #include <core/vfs/VFS.h>
@@ -89,6 +90,7 @@ ImGuiManager::ImGuiManager(EditorUIData&           uiData,
         m_uiData.editor.Viewport.RequestResetDockLayout = true;
 
     LoadEditorThemePreference();
+    loadRecentScenes();
     applyTheme(1.0f);
 }
 

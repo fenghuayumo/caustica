@@ -1,6 +1,7 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "common/RecentScenes.h"
 #include "common/TransformGizmo.h"
 
 #include <engine/App.h>
@@ -14,7 +15,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <vector>
 
 using namespace caustica;
@@ -57,6 +60,11 @@ void ApplyDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& size)
     ImGui::DockBuilderFinish(dockspaceId);
 }
 
+std::filesystem::path scenePathFromString(const std::string& scene)
+{
+    return std::filesystem::path(scene);
+}
+
 } // namespace
 
 void EditorUI::BuildMainMenuBar()
@@ -72,16 +80,24 @@ void EditorUI::BuildMainMenuBar()
             m_sceneEditor.requestOpenSceneFromDialog();
 
         App* app = m_sceneEditor.app();
-        if (app)
+        if (app && !recentScenes().empty())
         {
-            const std::vector<std::string>& scenes = caustica::availableScenes(*app);
-            if (!scenes.empty() && ImGui::BeginMenu("Scenes", !sceneBusy))
+            const std::string current = caustica::currentScenePath(*app).generic_string();
+            if (ImGui::BeginMenu("Recent Scenes", !sceneBusy))
             {
-                const std::string current = caustica::currentSceneName(*app);
-                for (const std::string& scene : scenes)
+                for (const std::string& scene : recentScenes())
                 {
-                    if (ImGui::MenuItem(scene.c_str(), nullptr, scene == current, !sceneBusy))
+                    const std::filesystem::path path = scenePathFromString(scene);
+                    std::error_code ec;
+                    const bool sceneAvailable = std::filesystem::exists(path, ec);
+                    if (ImGui::MenuItem(
+                            recentSceneDisplayName(path).c_str(),
+                            nullptr,
+                            scene == current,
+                            !sceneBusy && sceneAvailable))
+                    {
                         caustica::setCurrentScene(*app, scene);
+                    }
                 }
                 ImGui::EndMenu();
             }

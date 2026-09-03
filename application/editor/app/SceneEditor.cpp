@@ -2,6 +2,7 @@
 
 #include "SceneContentEditor.h"
 #include "common/LocalConfig.h"
+#include "common/RecentScenes.h"
 #include "common/CaptureScriptManager.h"
 #include "common/TransformGizmo.h"
 #include "ui/RenderSettingsConsole.h"
@@ -704,6 +705,8 @@ void SceneEditor::syncLoadedSceneSystems()
     if (scenePath.empty() || caustica::isInlineScenePath(scenePath))
         return;
 
+    addRecentScene(scenePath);
+
     Json::Value document;
     if (caustica::json::loadFromFile(scenePath, document))
     {
@@ -1061,6 +1064,7 @@ bool SceneEditor::saveSceneAsFromDialog()
 
     const std::string sceneName = path.filename().generic_string();
     caustica::retargetCurrentScene(*m_app, sceneName, path);
+    addRecentScene(path);
 
     m_editorState.loadedSceneName = sceneName;
     caustica::info("Saved scene as '%s'", path.generic_string().c_str());
