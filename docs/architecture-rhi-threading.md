@@ -206,7 +206,15 @@ frameCtx.endFrame(); // leftover forks + close/execute primary
 submit before later graphics recording. A consumer on another queue records a
 `waitWaves` edge; `execute` turns that into
 `Device::queueWaitForCommandList`. DX11 (no compute/copy queue) falls back to
-Graphics.
+Graphics. After all waves, `execute` joins leftover async queues back to
+graphics unless a graphics wait inserted during the frame already covers that
+queue's latest submitted instance (extract / present still get a join whenever
+trailing async work was never consumed by graphics).
+
+Public HDR / LDR / depth identity is `FrameSlots` (seeded once per frame
+with write version 0). `read()` / `write()` resolve those handles to the
+latest version, so register functions do not re-import or sync public
+images. Feature switches stay `if`s in `registerDefaultFrameGraphPasses`.
 
 Resource ownership: `createTexture` / `createBuffer` are **graph-owned**
 transients (aliased at compile). A second `createTexture` with the same
@@ -214,7 +222,11 @@ non-empty name returns the first handle so multiple register functions can
 declare one scratch. `importTexture` / `importBuffer` / `importAccelStruct`
 are **external** (history, present, vendor, TLAS). `extract` is only for
 resources that must outlive `execute()`. Handles carry a generation;
-`reset()` invalidates the previous frame's handles.
+`reset()` invalidates the previous frame's handles. Texture handles also
+carry a sequential **write version**: `write()` / `readWrite()` produce
+`latest+1`. Version 0 is identity and binds to the current latest; a
+non-zero handle is a pinned `write()` result (`currentTexture()` if it
+went stale). `generation` is still only the `reset()` epoch.
 
 `serialOnPrimary` passes never share a wave and always run on the graphics
 primary. `execute(FrameCommandContext&, ExecuteParams)`:

@@ -55,7 +55,7 @@ namespace caustica::render
         void executeDownscale1(
             caustica::rhi::CommandList* commandList,
             const caustica::ViewInfo& compositeView,
-            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            caustica::FramebufferFactory* framebufferFactory,
             caustica::rhi::Texture* source,
             caustica::rhi::Texture* dest);
         void executeDownscale2(
@@ -73,7 +73,7 @@ namespace caustica::render
         void executeComposite(
             caustica::rhi::CommandList* commandList,
             const caustica::ViewInfo& compositeView,
-            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
+            caustica::FramebufferFactory* framebufferFactory,
             caustica::rhi::Texture* source,
             float blendFactor);
 
@@ -96,8 +96,8 @@ namespace caustica::render
         void registerGraphPass(
             caustica::rg::GraphBuilder& graph,
             caustica::rg::TextureHandle processedOutputColor,
-            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-            caustica::ViewInfo compositeView,
+            caustica::FramebufferFactory* framebufferFactory,
+            const caustica::ViewInfo& compositeView,
             float sigmaInPixels,
             float blendFactor,
             bool enabled);

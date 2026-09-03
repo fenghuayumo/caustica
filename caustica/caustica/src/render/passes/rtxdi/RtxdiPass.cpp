@@ -774,25 +774,42 @@ void RtxdiPass::executeFrame(
 namespace caustica::render
 {
 
-rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx)
 {
 	assert(ctx.graph);
 	assert(ctx.renderTargets);
 	assert(ctx.settings);
-	assert(after.isValid());
 
 	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
-		return after;
+		return {};
 
 	RtxdiPass* rtxdiPass = ctx.rtxdi;
 	RtxdiGraphResources rtxdiResources{};
 	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
-		return after;
+		return {};
+
+	// Inputs the RTXDI shaders sample through binding sets. Declare them so the
+	// resource-edge scheduler keeps UploadSubInstanceData (Copy queue) and
+	// EnvMapUpdate (Compute queue) ahead of the Compute-queue begin stages.
+	if (ctx.environment != nullptr)
+	{
+		if (auto cube = ctx.environment->getEnvMapCube())
+			rtxdiResources.envCube = ctx.graph->importTexture(cube, rg::TextureAccess::ShaderResource);
+		if (const auto& importance = ctx.environment->getImportanceSampling())
+		{
+			if (auto map = importance->getRadianceAndImportanceMap())
+				rtxdiResources.radianceImportance =
+					ctx.graph->importTexture(map, rg::TextureAccess::ShaderResource);
+		}
+	}
+	if (ctx.subInstanceDataBuffer)
+		rtxdiResources.subInstanceData =
+			ctx.graph->importBuffer(ctx.subInstanceDataBuffer, rg::BufferAccess::ShaderResource);
 
 	const bool usingLightSampling = ctx.settings->actualUseReSTIRDI();
 	PathTraceSceneBindings* const sceneBindings = ctx.sceneBindings;
 	rg::GraphBuilder* const graph = ctx.graph;
-	rg::PassHandle previousPass = after;
+	rg::PassHandle previousPass{};
 
 	rg::BufferHandle rtxdiConstants{};
 	if (rtxdiPass != nullptr)
@@ -846,6 +863,7 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 				if (rtxdiPass)
 					rtxdiPass->generatePdfMips(passCtx.commandList());
 			});
+		rtxdiResources.localLightPdf = graph->currentTexture(rtxdiResources.localLightPdf);
 
 		addRtxdiBeginStage(
 			kRtxdiPresampleLightsPass,
@@ -887,20 +905,19 @@ rg::PassHandle registerRtxdiBeginFramePass(FrameGraphContext ctx, rg::PassHandle
 	return previousPass;
 }
 
-rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx)
 {
 	assert(ctx.graph);
 	assert(ctx.renderTargets);
 	assert(ctx.settings);
-	assert(after.isValid());
 
 	if (!ctx.hasScene || !ctx.settings->actualUseRTXDIPasses())
-		return after;
+		return {};
 
 	RtxdiPass* rtxdiPass = ctx.rtxdi;
 	RtxdiGraphResources rtxdiResources{};
 	if (!tryImportRtxdiGraphResources(*ctx.graph, rtxdiPass, rtxdiResources))
-		return after;
+		return {};
 
 	const PathTraceGraphTargets pathTraceTargets = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
 
@@ -914,7 +931,7 @@ rg::PassHandle registerRtxdiExecutePass(FrameGraphContext ctx, rg::PassHandle af
 	rg::GraphBuilder* const graph = ctx.graph;
 	const PathTraceScheduleInputs schedule = importPathTraceScheduleInputs(ctx);
 
-	rg::PassHandle previousPass = after;
+	rg::PassHandle previousPass{};
 
 	auto addRtxdiExecuteStage = [graph, &previousPass](
 		const char* name, rg::GraphBuilder::SetupFn declareAccess, rg::GraphBuilder::ExecuteFn execute)

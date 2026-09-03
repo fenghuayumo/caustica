@@ -244,16 +244,15 @@ void PathTracePass::mainPass(
     }
 }
 
-rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(after.isValid());
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
-        return after;
+        return {};
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     const PathTraceScheduleInputs schedule = importPathTraceScheduleInputs(ctx);
@@ -263,7 +262,7 @@ rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx, rg::PassHandle af
     const dm::uint2 renderSize = ctx.renderSize;
     PTPipelineVariant* const pipeline = ctx.ptBuildStablePlanes;
 
-    return ctx.graph->addPass(
+    const rg::PassHandle ready = ctx.graph->addPass(
         "PathTracePrePass",
         [handles, schedule](rg::PassBuilder& setup) {
             declarePathTracePrePassAccess(setup, handles);
@@ -281,18 +280,18 @@ rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx, rg::PassHandle af
                 renderSize,
                 pipeline);
         });
+    return ready;
 }
 
-rg::PassHandle registerVBufferExportPass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerVBufferExportPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(after.isValid());
 
     if (!ctx.hasScene || !ctx.settings->RealtimeMode)
-        return after;
+        return {};
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     PathTracePass* const pathTrace = ctx.pathTrace;
@@ -301,7 +300,7 @@ rg::PassHandle registerVBufferExportPass(FrameGraphContext ctx, rg::PassHandle a
     const dm::uint2 renderSize = ctx.renderSize;
     const caustica::rhi::ComputePipelineHandle exportVBufferPSO = ctx.exportVBufferPSO;
 
-    return ctx.graph->addPass(
+    const rg::PassHandle ready = ctx.graph->addPass(
         kVBufferExportPass,
         [handles](rg::PassBuilder& setup) {
             declareVBufferExportAccess(setup, handles);
@@ -316,18 +315,18 @@ rg::PassHandle registerVBufferExportPass(FrameGraphContext ctx, rg::PassHandle a
                 renderSize,
                 exportVBufferPSO);
         });
+    return ready;
 }
 
-rg::PassHandle registerPathTraceLightingEndPass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerPathTraceLightingEndPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.renderTargets);
     assert(ctx.settings);
     assert(ctx.bindingCache);
-    assert(after.isValid());
 
     if (!ctx.hasScene || !needsPathTraceLightingEndPass(*ctx.settings))
-        return after;
+        return {};
 
     const PathTraceLightingEndTargets handles = importPathTraceLightingEndTargets(
         *ctx.graph,
@@ -342,7 +341,7 @@ rg::PassHandle registerPathTraceLightingEndPass(FrameGraphContext ctx, rg::PassH
     caustica::rhi::Texture* const depthBuffer = ctx.renderTargets->depth;
     caustica::rhi::Texture* const motionVectors = ctx.renderTargets->screenMotionVectors;
 
-    return ctx.graph->addPass(
+    const rg::PassHandle ready = ctx.graph->addPass(
         kPathTraceLightingEndPass,
         [handles](rg::PassBuilder& setup) {
             declarePathTraceLightingEndAccess(setup, handles);
@@ -368,18 +367,18 @@ rg::PassHandle registerPathTraceLightingEndPass(FrameGraphContext ctx, rg::PassH
             };
             caustica::updateLightingEnd(lightingEndParams);
         });
+    return ready;
 }
 
-rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.pathTrace);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return after;
+        return {};
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
     const PathTraceScheduleInputs schedule = importPathTraceScheduleInputs(ctx);
@@ -392,7 +391,7 @@ rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx, rg::PassHandle a
     const dm::uint2 renderSize = ctx.renderSize;
     const uint32_t samplesPerPixel = ctx.settings->actualSamplesPerPixel();
 
-    return ctx.graph->addPass(
+    const rg::PassHandle ready = ctx.graph->addPass(
         kMainPathTracePass,
         [handles, schedule](rg::PassBuilder& setup) {
             declareMainPathTraceAccess(setup, handles);
@@ -412,6 +411,7 @@ rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx, rg::PassHandle a
                 pipeline,
                 samplesPerPixel);
         });
+    return ready;
 }
 
 } // namespace caustica::render

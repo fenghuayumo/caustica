@@ -44,6 +44,16 @@ void declareRtxdiPrepareLightsAccess(
     rg::PassBuilder& setup,
     const RtxdiGraphResources& rtxdiResources)
 {
+    // PrepareLights reads t_SubInstanceData / t_EnvironmentMapImportanceMap /
+    // t_EnvironmentMap through its binding set. Later RTXDI stages read
+    // lightDataBuffer / localLightPdf written here, so this edge also orders
+    // them behind the Copy/Compute lighting producers.
+    if (rtxdiResources.subInstanceData.isValid())
+        setup.read(rtxdiResources.subInstanceData, rg::BufferAccess::ShaderResource);
+    if (rtxdiResources.envCube.isValid())
+        setup.read(rtxdiResources.envCube, rg::TextureAccess::ShaderResource);
+    if (rtxdiResources.radianceImportance.isValid())
+        setup.read(rtxdiResources.radianceImportance, rg::TextureAccess::ShaderResource);
     setup.write(rtxdiResources.lightDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(rtxdiResources.risLightDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(rtxdiResources.localLightPdf, rg::TextureAccess::UnorderedAccess);

@@ -12,12 +12,11 @@
 namespace caustica::render
 {
 
-rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.graph);
     assert(ctx.targetFramebuffer);
     assert(ctx.renderTargets);
-    assert(after.isValid());
 
     caustica::rhi::Framebuffer* framebuffer = ctx.targetFramebuffer;
     const auto& fbinfo = framebuffer->getFramebufferInfo();
@@ -33,7 +32,7 @@ rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHa
 
     rg::BufferHandle debugLineCapture{};
     rg::BufferHandle debugLineDisplay{};
-    rg::PassHandle debugReady = after;
+    rg::PassHandle debugReady{};
 
     if (showDebugLines || copyDebugFeedback)
     {
@@ -56,9 +55,7 @@ rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHa
         const rg::TextureHandle targetColorHandle = ctx.graph->importTexture(
             targetColor,
             rg::TextureAccess::RenderTarget);
-        const rg::TextureHandle depth = ctx.graph->importTexture(
-            ctx.renderTargets->depth,
-            rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle depth = slots.depth;
         const rg::BufferHandle constantBuffer = ctx.graph->importBuffer(
             ctx.constantBuffer,
             rg::BufferAccess::ConstantBuffer);
@@ -122,7 +119,7 @@ rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHa
 
                 commandList->endMarker();
             },
-            rg::PassOptions{ .sideEffect = true, .after = after });
+            rg::PassOptions{ .sideEffect = true });
     }
 
     if (copyDebugFeedback)
@@ -172,10 +169,7 @@ rg::PassHandle registerDebugOverlayGraphPasses(FrameGraphContext ctx, rg::PassHa
                     passCtx.buffer(debugDeltaPathTreeGpu), 0,
                     sizeof(DeltaTreeVizPathVertex) * cDeltaTreeVizMaxVertices);
             },
-            rg::PassOptions{
-                .sideEffect = true,
-                .after = debugReady,
-            });
+            rg::PassOptions{ .sideEffect = true });
     }
 
     return debugReady;

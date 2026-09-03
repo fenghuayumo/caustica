@@ -1128,14 +1128,30 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
 namespace caustica::render
 {
 
-rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
+void seedFrameSlots(FrameSlots& slots, FrameGraphContext ctx)
+{
+    assert(ctx.graph);
+    assert(ctx.renderTargets);
+    const auto identity = [](rg::TextureHandle handle) {
+        handle.version = 0;
+        return handle;
+    };
+    slots.outputColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->outputColor, rg::TextureAccess::UnorderedAccess));
+    slots.hdrColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->processedOutputColor, rg::TextureAccess::UnorderedAccess));
+    slots.ldrColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->ldrColor, rg::TextureAccess::ShaderResource));
+    slots.depth = identity(ctx.graph->importTexture(
+        ctx.renderTargets->depth, rg::TextureAccess::UnorderedAccess));
+}
+
+rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx, FrameSlots& slots)
 {
     if (!ctx.graph || !ctx.renderTargets)
         return {};
 
-    const rg::TextureHandle depth = ctx.graph->importTexture(
-        ctx.renderTargets->depth,
-        rg::TextureAccess::UnorderedAccess);
+    const rg::TextureHandle depth = slots.depth;
     const rg::TextureHandle combinedHistoryClampRelax = ctx.graph->importTexture(
         ctx.renderTargets->combinedHistoryClampRelax,
         rg::TextureAccess::UnorderedAccess);
@@ -1154,9 +1170,7 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
 
     if (!ctx.hasScene)
     {
-        const rg::TextureHandle outputColor = ctx.graph->importTexture(
-            ctx.renderTargets->outputColor,
-            rg::TextureAccess::UnorderedAccess);
+        const rg::TextureHandle outputColor = slots.outputColor;
         ctx.graph->extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
 
         ctx.graph->addPass(
@@ -1178,31 +1192,31 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.settings);
+    assert(ctx.graph);
+    assert(ctx.renderTargets);
 
-    const rg::PassHandle clear = registerClearFrameTargetsPass(ctx);
-    const rg::PassHandle frameConstants = registerUploadFrameConstantsPass(ctx, clear);
-    const rg::PassHandle lightingReady = registerLightingGraphPasses(ctx, frameConstants);
-    const rg::PassHandle rtxdiBeginReady = registerRtxdiBeginFramePass(ctx, lightingReady);
-    (void)registerGaussianSplatAccelBuildPass(ctx, lightingReady);
-    const rg::PassHandle pathTracePreReady = registerPathTracePrePass(ctx, rtxdiBeginReady);
-    const rg::PassHandle vbufferReady = registerVBufferExportPass(ctx, pathTracePreReady);
+    FrameSlots slots{};
+    seedFrameSlots(slots, ctx);
 
-    const rg::PassHandle pathTraceInputsReady = ctx.settings->RealtimeMode
-        ? vbufferReady
-        : lightingReady;
-    const rg::PassHandle lightingEndReady =
-        registerPathTraceLightingEndPass(ctx, pathTraceInputsReady);
-    const rg::PassHandle mainPathTraceReady = registerMainPathTracePass(ctx, lightingEndReady);
-    const rg::PassHandle rtxdiExecuteReady = registerRtxdiExecutePass(ctx, mainPathTraceReady);
-    const rg::PassHandle denoiseGuidesReady = registerDenoiserPreparePass(ctx, rtxdiExecuteReady);
-    (void)registerNrdPass(ctx, denoiseGuidesReady);
-    (void)registerGaussianSplatPreAAPass(ctx);
-    (void)registerDenoiseAAPass(ctx);
+    registerClearFrameTargetsPass(ctx, slots);
+    registerUploadFrameConstantsPass(ctx);
+    registerLightingGraphPasses(ctx);
+    registerRtxdiBeginFramePass(ctx);
+    registerGaussianSplatAccelBuildPass(ctx);
+    registerPathTracePrePass(ctx);
+    registerVBufferExportPass(ctx);
+    registerPathTraceLightingEndPass(ctx);
+    registerMainPathTracePass(ctx);
+    registerRtxdiExecutePass(ctx);
+    registerDenoiserPreparePass(ctx);
+    registerNrdPass(ctx);
+    registerGaussianSplatPreAAPass(ctx, slots);
+    registerDenoiseAAPass(ctx, slots);
     if (ctx.settings->GaussianSplatApplyToneMapping)
-        (void)registerGaussianSplatCompositePass(ctx);
-    registerPostProcessGraphPasses(ctx);
-    const rg::PassHandle blitReady = registerCompositeGraphPasses(ctx);
-    (void)registerDebugOverlayGraphPasses(ctx, blitReady);
+        registerGaussianSplatCompositePass(ctx, slots);
+    registerPostProcessGraphPasses(ctx, slots);
+    registerCompositeGraphPasses(ctx, slots);
+    registerDebugOverlayGraphPasses(ctx, slots);
 }
 
 } // namespace caustica::render

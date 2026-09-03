@@ -21,6 +21,11 @@ caustica::rhi::Texture* fakeTexture(uintptr_t id)
     return reinterpret_cast<caustica::rhi::Texture*>(id);
 }
 
+caustica::rhi::Buffer* fakeBuffer(uintptr_t id)
+{
+    return reinterpret_cast<caustica::rhi::Buffer*>(id);
+}
+
 bool passBefore(
     const std::vector<uint32_t>& order,
     caustica::rg::PassHandle earlier,
@@ -107,7 +112,7 @@ int main()
 
     {
         caustica::rg::GraphBuilder depGraph;
-        const auto tex = depGraph.importTexture(
+        auto tex = depGraph.importTexture(
             fakeTexture(0x2000), caustica::rg::TextureAccess::UnorderedAccess);
         const auto writer = depGraph.addPass(
             "RawWriter",
@@ -115,6 +120,7 @@ int main()
                 setup.write(tex, caustica::rg::TextureAccess::UnorderedAccess);
             },
             {});
+        tex = depGraph.currentTexture(tex);
         const auto reader = depGraph.addPass(
             "RawReader",
             [tex](caustica::rg::PassBuilder& setup) {
@@ -157,7 +163,7 @@ int main()
 
     {
         caustica::rg::GraphBuilder queueGraph;
-        const auto tex = queueGraph.importTexture(
+        auto tex = queueGraph.importTexture(
             fakeTexture(0x3000), caustica::rg::TextureAccess::UnorderedAccess);
         const auto compute = queueGraph.addPass(
             "ComputeWrite",
@@ -169,6 +175,7 @@ int main()
                 .sideEffect = true,
                 .queue = caustica::rhi::CommandQueue::Compute,
             });
+        tex = queueGraph.currentTexture(tex);
         const auto graphics = queueGraph.addPass(
             "GraphicsRead",
             [tex](caustica::rg::PassBuilder& setup) {
@@ -190,6 +197,51 @@ int main()
             queueGraph.compiledWaveWaits().size() >= 2
                 && !queueGraph.compiledWaveWaits()[1].empty(),
             "graphics consumer did not wait on the compute producer wave");
+    }
+
+    {
+        // Declared binding-set inputs must form cross-queue edges even when the
+        // consumer has no declared write dependency (RTXDI PrepareLights reads
+        // SubInstanceData uploaded on the Copy queue).
+        caustica::rg::GraphBuilder crossQueueGraph;
+        const auto subInstance = crossQueueGraph.importBuffer(
+            fakeBuffer(0x5000), caustica::rg::BufferAccess::CopyDest);
+        const auto upload = crossQueueGraph.addPass(
+            "CopyUpload",
+            [subInstance](caustica::rg::PassBuilder& setup) {
+                setup.write(subInstance, caustica::rg::BufferAccess::CopyDest);
+            },
+            {},
+            caustica::rg::PassOptions{
+                .sideEffect = true,
+                .queue = caustica::rhi::CommandQueue::Copy,
+            });
+        const auto consumer = crossQueueGraph.addPass(
+            "ComputeConsume",
+            [subInstance](caustica::rg::PassBuilder& setup) {
+                setup.read(subInstance, caustica::rg::BufferAccess::ShaderResource);
+            },
+            {},
+            caustica::rg::PassOptions{
+                .sideEffect = true,
+                .queue = caustica::rhi::CommandQueue::Compute,
+            });
+        crossQueueGraph.compile();
+
+        passed &= expect(passBefore(crossQueueGraph.compiledPassOrder(), upload, consumer),
+            "copy upload was not scheduled before the compute consumer");
+        const auto& waits = crossQueueGraph.compiledWaveWaits();
+        bool computeWaitsOnCopy = false;
+        const auto& queues = crossQueueGraph.compiledWaveQueues();
+        for (size_t waveIndex = 0; waveIndex < waits.size(); ++waveIndex)
+        {
+            if (waveIndex >= queues.size()
+                || queues[waveIndex] != caustica::rhi::CommandQueue::Compute)
+                continue;
+            computeWaitsOnCopy = computeWaitsOnCopy || !waits[waveIndex].empty();
+        }
+        passed &= expect(computeWaitsOnCopy,
+            "compute consumer did not wait on the copy producer wave");
     }
 
     {
@@ -260,6 +312,58 @@ int main()
             "accel-struct RAW order was not preserved");
         passed &= expect(asGraph.compiledWaves().size() >= 2,
             "accel-struct producer and consumer shared a wave");
+    }
+
+    {
+        caustica::rg::GraphBuilder versionGraph;
+        auto tex = versionGraph.importTexture(
+            fakeTexture(0x4000), caustica::rg::TextureAccess::UnorderedAccess);
+        passed &= expect(tex.version == 0, "imported texture should start at version 0");
+        caustica::rg::TextureHandle produced{};
+        versionGraph.addPass(
+            "VersionWrite",
+            [tex, &produced](caustica::rg::PassBuilder& setup) {
+                produced = setup.write(tex, caustica::rg::TextureAccess::UnorderedAccess);
+            },
+            {},
+            caustica::rg::PassOptions{ .sideEffect = true });
+        passed &= expect(produced.version == 1, "write() did not produce version 1");
+        passed &= expect(versionGraph.currentTexture(tex).version == 1,
+            "currentTexture did not track the latest write version");
+        versionGraph.addPass(
+            "VersionReadWrite",
+            [produced](caustica::rg::PassBuilder& setup) {
+                setup.readWrite(produced, caustica::rg::TextureAccess::UnorderedAccess);
+            },
+            {},
+            caustica::rg::PassOptions{ .sideEffect = true });
+        passed &= expect(versionGraph.currentTexture(tex).version == 2,
+            "readWrite() did not produce version 2");
+
+        caustica::rg::GraphBuilder identityGraph;
+        auto identity = identityGraph.importTexture(
+            fakeTexture(0x4100), caustica::rg::TextureAccess::UnorderedAccess);
+        identity.version = 0;
+        const auto identityWriter = identityGraph.addPass(
+            "IdentityWrite",
+            [identity](caustica::rg::PassBuilder& setup) {
+                setup.write(identity, caustica::rg::TextureAccess::UnorderedAccess);
+            },
+            {},
+            caustica::rg::PassOptions{ .sideEffect = true });
+        const auto identityReader = identityGraph.addPass(
+            "IdentityRead",
+            [identity](caustica::rg::PassBuilder& setup) {
+                setup.read(identity, caustica::rg::TextureAccess::ShaderResource);
+            },
+            {},
+            caustica::rg::PassOptions{ .sideEffect = true });
+        identityGraph.compile();
+        passed &= expect(
+            passBefore(identityGraph.compiledPassOrder(), identityWriter, identityReader),
+            "identity handle (version 0) did not form a RAW edge after write");
+        passed &= expect(identityGraph.currentTexture(identity).version == 1,
+            "identity write should still advance latestVersion");
     }
 
     return passed ? 0 : 1;

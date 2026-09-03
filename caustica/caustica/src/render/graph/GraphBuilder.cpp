@@ -58,12 +58,23 @@ PassBuilder::PassBuilder(
 
 void PassBuilder::read(TextureHandle texture, TextureAccess access)
 {
+    assert(m_graph);
+    m_graph->validateTextureRead(texture);
     m_textureReads->emplace_back(texture, access);
 }
 
-void PassBuilder::write(TextureHandle texture, TextureAccess access)
+TextureHandle PassBuilder::write(TextureHandle texture, TextureAccess access)
 {
+    assert(m_graph);
+    texture = m_graph->advanceTextureWrite(texture);
     m_textureWrites->emplace_back(texture, access);
+    return texture;
+}
+
+TextureHandle PassBuilder::readWrite(TextureHandle texture, TextureAccess access)
+{
+    read(texture, access);
+    return write(texture, access);
 }
 
 void PassBuilder::read(BufferHandle buffer, BufferAccess access)
@@ -184,7 +195,47 @@ caustica::rhi::ResourceStates GraphBuilder::accessToState(AccelStructAccess acce
 
 TextureHandle GraphBuilder::makeTextureHandle(uint32_t index) const
 {
-    return TextureHandle{ index, m_handleGeneration };
+    TextureHandle handle{ index, m_handleGeneration };
+    if (index < m_textures.size())
+        handle.version = m_textures[index].latestVersion;
+    return handle;
+}
+
+void GraphBuilder::validateTextureRead(TextureHandle& handle) const
+{
+    assert(isValid(handle, m_textures.size(), m_handleGeneration)
+        && "RenderGraph read references invalid texture handle");
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return;
+    // Version 0 is an identity handle (FrameSlots / import at seed). Bind it to
+    // whatever the latest write is so consumers do not need syncFrameSlots.
+    if (handle.version == 0)
+    {
+        handle.version = m_textures[handle.index].latestVersion;
+        return;
+    }
+    assert(handle.version == m_textures[handle.index].latestVersion
+        && "stale pinned texture read: use write() result or currentTexture()");
+}
+
+TextureHandle GraphBuilder::advanceTextureWrite(TextureHandle handle)
+{
+    assert(isValid(handle, m_textures.size(), m_handleGeneration)
+        && "RenderGraph write references invalid texture handle");
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return {};
+    GraphTexture& resource = m_textures[handle.index];
+    handle.version = resource.latestVersion + 1;
+    resource.latestVersion = handle.version;
+    return handle;
+}
+
+TextureHandle GraphBuilder::currentTexture(TextureHandle handle) const
+{
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return {};
+    handle.version = m_textures[handle.index].latestVersion;
+    return handle;
 }
 
 BufferHandle GraphBuilder::makeBufferHandle(uint32_t index) const
@@ -1793,6 +1844,15 @@ void GraphBuilder::applyWaveWaits(
             m_queueSubmitted[size_t(consumer)] = 1;
         }
 
+        // Everything the graphics queue submits after this wait is ordered
+        // behind `instance`; the end-of-frame join only needs to cover work
+        // submitted later on the producer queue.
+        if (consumer == caustica::rhi::CommandQueue::Graphics)
+        {
+            uint64_t& waited = m_graphicsWaitedInstance[size_t(producer)];
+            waited = std::max(waited, m_lastQueueInstance[size_t(producer)]);
+        }
+
         m_device->queueWaitForCommandList(
             consumer,
             producer,
@@ -1833,6 +1893,7 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
     m_lastParallelBatchCount = 0;
     m_lastQueueInstance = {};
     m_queueSubmitted = {};
+    m_graphicsWaitedInstance = {};
 
     const auto& waves = compiledWaves();
     const auto& waveQueues = compiledWaveQueues();
@@ -1880,13 +1941,19 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
 
     if (m_device)
     {
+        // Join leftover async queues for present / extract / readback, but skip
+        // a queue when a graphics wait inserted during execute already covers
+        // its latest submitted instance (the graphics timeline stays ordered
+        // behind that wait, so a second join would only stall the queue).
         for (uint8_t queue = 1; queue < uint8_t(caustica::rhi::CommandQueue::Count); ++queue)
         {
-            if (!m_queueSubmitted[queue])
+            if (!m_queueSubmitted[queue]
+                || m_graphicsWaitedInstance[queue] >= m_lastQueueInstance[queue])
                 continue;
             if (frameCtx.primaryOpen())
             {
-                m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] = frameCtx.flushPrimary();
+                m_lastQueueInstance[size_t(caustica::rhi::CommandQueue::Graphics)] =
+                    frameCtx.flushPrimary();
                 m_queueSubmitted[size_t(caustica::rhi::CommandQueue::Graphics)] = 1;
             }
             m_device->queueWaitForCommandList(

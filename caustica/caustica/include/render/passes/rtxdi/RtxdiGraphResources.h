@@ -18,6 +18,13 @@ struct RtxdiGraphResources
     rg::BufferHandle giReservoirBuffer;
     rg::BufferHandle ptReservoirBuffer;
     rg::TextureHandle localLightPdf;
+    // Binding-set inputs sampled by the RTXDI shaders but invisible to the
+    // descriptor table. Declaring them orders UploadSubInstanceData (Copy) and
+    // EnvMapUpdate (Compute) before the Compute-queue begin stages and restores
+    // the UAV -> SRV transitions.
+    rg::BufferHandle subInstanceData;
+    rg::TextureHandle envCube;
+    rg::TextureHandle radianceImportance;
 };
 
 [[nodiscard]] bool tryImportRtxdiGraphResources(

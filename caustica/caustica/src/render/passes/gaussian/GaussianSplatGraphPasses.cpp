@@ -99,7 +99,7 @@ namespace
             return {};
         GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
-        const rg::PassHandle uploadPass = ctx.graph->addPass(
+        ctx.graph->addPass(
             uploadPassName,
             [resources](rg::PassBuilder& setup) {
                 for (const GaussianSplatGraphHandles& item : resources)
@@ -115,7 +115,7 @@ namespace
             },
             rg::PassOptions{ .sideEffect = true });
 
-        const rg::PassHandle sortPass = ctx.graph->addPass(
+        ctx.graph->addPass(
             sortPassName,
             [resources](rg::PassBuilder& setup) {
                 for (const GaussianSplatGraphHandles& item : resources)
@@ -139,25 +139,24 @@ namespace
             [gaussian](rg::RenderPassContext& passCtx) {
                 gaussian->executeSort(passCtx.commandList());
             },
-            rg::PassOptions{ .sideEffect = true, .after = uploadPass });
+            rg::PassOptions{ .sideEffect = true });
 
         const bool referenceGammaCompositing =
             renderTarget == GaussianSplatRenderTarget::ProcessedOutputColor
             && ctx.settings->GaussianSplatSortingMode == 0
             && ctx.settings->GaussianSplatReferenceGammaCompositing;
-        rg::PassHandle rasterPredecessor = sortPass;
         if (referenceGammaCompositing)
         {
-            rasterPredecessor = ctx.graph->addPass(
+            (void)ctx.graph->addPass(
                 encodePassName,
                 [colorTarget](rg::PassBuilder& setup) {
-                    setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
-                    setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
+                    setup.readWrite(colorTarget, rg::TextureAccess::UnorderedAccess);
                 },
                 [gaussian](rg::RenderPassContext& passCtx) {
                     gaussian->executeColorSpaceConversion(passCtx.commandList(), false);
                 },
-                rg::PassOptions{ .sideEffect = true, .after = sortPass });
+                rg::PassOptions{ .sideEffect = true });
+            colorTarget = ctx.graph->currentTexture(colorTarget);
         }
 
         const rg::PassHandle rasterPass = ctx.graph->addPass(
@@ -181,27 +180,27 @@ namespace
             [gaussian, renderTarget](rg::RenderPassContext& passCtx) {
                 gaussian->executeRaster(passCtx.commandList(), renderTarget);
             },
-            rg::PassOptions{ .sideEffect = true, .after = rasterPredecessor });
+            rg::PassOptions{ .sideEffect = true });
 
         rg::PassHandle ready = rasterPass;
         if (referenceGammaCompositing)
         {
+            colorTarget = ctx.graph->currentTexture(colorTarget);
             ready = ctx.graph->addPass(
                 decodePassName,
                 [colorTarget](rg::PassBuilder& setup) {
-                    setup.read(colorTarget, rg::TextureAccess::UnorderedAccess);
-                    setup.write(colorTarget, rg::TextureAccess::UnorderedAccess);
+                    setup.readWrite(colorTarget, rg::TextureAccess::UnorderedAccess);
                 },
                 [gaussian](rg::RenderPassContext& passCtx) {
                     gaussian->executeColorSpaceConversion(passCtx.commandList(), true);
                 },
-                rg::PassOptions{ .sideEffect = true, .after = rasterPass });
+                rg::PassOptions{ .sideEffect = true });
         }
         return ready;
     }
 }
 
-rg::PassHandle registerGaussianSplatPreAAPass(FrameGraphContext ctx)
+rg::PassHandle registerGaussianSplatPreAAPass(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.graph);
     assert(ctx.gaussian);
@@ -211,39 +210,31 @@ rg::PassHandle registerGaussianSplatPreAAPass(FrameGraphContext ctx)
     if (!needsTemporalGaussianSplatsBeforeAA(*ctx.settings))
         return {};
 
-    RenderTargets& targets = *ctx.renderTargets;
-
-    const rg::TextureHandle outputColor = ctx.graph->importTexture(
-        targets.outputColor,
-        rg::TextureAccess::UnorderedAccess);
-    const rg::TextureHandle depth = ctx.graph->importTexture(
-        targets.depth,
-        rg::TextureAccess::ShaderResource);
-
-    return registerGaussianSplatRenderStages(
+    const rg::PassHandle ready = registerGaussianSplatRenderStages(
         ctx,
         GaussianSplatRenderTarget::OutputColor,
-        outputColor,
-        depth,
+        slots.outputColor,
+        slots.depth,
         "GaussianSplatsStochasticUpload",
         "GaussianSplatsStochasticSort",
         "GaussianSplatsStochastic",
         "GaussianSplatsStochasticLinearToSrgb",
         "GaussianSplatsStochasticSrgbToLinear");
+    return ready;
 }
 
-rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.gaussian);
     assert(ctx.settings);
-    assert(after.isValid());
 
     if (!needsGaussianSplatAccelBuild(*ctx.settings))
-        return after;
+        return {};
 
-    // AABB buffers are the AS build inputs. The explicit edge still carries MainPathTrace
-    // readiness (LightingEnd / VBuffer) until TLAS/BLAS are first-class graph resources.
+    // AABB buffers are the AS build inputs. The TLAS write -> PathTrace read
+    // edge orders this pass ahead of MainPathTrace; it has no other in-graph
+    // producer dependency, so it can run in the first graphics wave.
     struct GaussianSplatAccelGraphHandles
     {
         rg::BufferHandle splatBuffer;
@@ -278,10 +269,7 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
     rg::PassOptions passOptions{};
     // First frames may not have a TLAS yet; keep the build alive until PT can import it.
     if (!importedAS)
-    {
         passOptions.sideEffect = true;
-        passOptions.after = after;
-    }
     GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
     return ctx.graph->addPass(
@@ -301,7 +289,7 @@ rg::PassHandle registerGaussianSplatAccelBuildPass(FrameGraphContext ctx, rg::Pa
         passOptions);
 }
 
-rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
+rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.graph);
     assert(ctx.gaussian);
@@ -311,19 +299,13 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
     if (!needsGaussianSplatsCompositePass(*ctx.settings))
         return {};
 
-    RenderTargets& targets = *ctx.renderTargets;
-
     const GaussianSplatRenderTarget renderTarget = ctx.settings->GaussianSplatApplyToneMapping
         ? GaussianSplatRenderTarget::ProcessedOutputColor
         : GaussianSplatRenderTarget::LdrColor;
-    const rg::TextureHandle colorTarget = ctx.graph->importTexture(
-        renderTarget == GaussianSplatRenderTarget::LdrColor ? targets.ldrColor : targets.processedOutputColor,
-        renderTarget == GaussianSplatRenderTarget::LdrColor
-            ? rg::TextureAccess::RenderTarget
-            : rg::TextureAccess::UnorderedAccess);
-    const rg::TextureHandle depth = ctx.graph->importTexture(
-        targets.depth,
-        rg::TextureAccess::ShaderResource);
+    rg::TextureHandle colorTarget = renderTarget == GaussianSplatRenderTarget::LdrColor
+        ? slots.ldrColor
+        : slots.hdrColor;
+    const rg::TextureHandle depth = slots.depth;
 
     const rg::PassHandle compositeReady = registerGaussianSplatRenderStages(
         ctx,
@@ -337,6 +319,7 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
         "GaussianSplatsCompositeSrgbToLinear");
     if (!compositeReady.isValid())
         return {};
+    colorTarget = ctx.graph->currentTexture(colorTarget);
 
     if (!needsGaussianSplatTemporalAccumulate(*ctx.settings))
         return compositeReady;
@@ -354,7 +337,7 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
         rg::TextureAccess::UnorderedAccess);
     GaussianSplatFramePass* const gaussian = ctx.gaussian;
 
-    const rg::PassHandle copyCurrentPass = ctx.graph->addPass(
+    ctx.graph->addPass(
         "GaussianSplatsCopyCurrent",
         [colorTarget, currentColor](rg::PassBuilder& setup) {
             setup.read(colorTarget, rg::TextureAccess::CopySource);
@@ -365,12 +348,9 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
                 passCtx.texture(currentColor), caustica::rhi::TextureSlice(),
                 passCtx.texture(colorTarget), caustica::rhi::TextureSlice());
         },
-        rg::PassOptions{
-            .sideEffect = true,
-            .after = compositeReady,
-        });
+        rg::PassOptions{ .sideEffect = true });
 
-    return ctx.graph->addPass(
+    const rg::PassHandle ready = ctx.graph->addPass(
         "GaussianSplatsAccumulate",
         [colorTarget, currentColor, accumulatedColor](rg::PassBuilder& setup) {
             setup.read(currentColor, rg::TextureAccess::ShaderResource);
@@ -381,10 +361,8 @@ rg::PassHandle registerGaussianSplatCompositePass(FrameGraphContext ctx)
         [gaussian](rg::RenderPassContext& passCtx) {
             gaussian->executeAccumulate(passCtx.commandList());
         },
-        rg::PassOptions{
-            .sideEffect = true,
-            .after = copyCurrentPass,
-        });
+        rg::PassOptions{ .sideEffect = true });
+    return ready;
 }
 
 } // namespace caustica::render

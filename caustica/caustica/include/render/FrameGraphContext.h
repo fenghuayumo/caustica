@@ -53,10 +53,11 @@ class PathTracingContext;
 class SceneGaussianSplatPasses;
 class TemporalAntiAliasingPass;
 
-// Registration-only parameter bag (UE RDG AllocParameters style).
-// Fill once per frame in WorldRenderer::makeFrameGraphContext. Execute lambdas
-// must capture only the pointers, handles and immutable values they consume;
-// never capture this entire context or references to registration locals.
+// Registration-only parameter bag (device, settings, pass objects).
+// Public image identity lives on FrameSlots, not here. Fill once per frame in
+// WorldRenderer::makeFrameGraphContext. Execute lambdas must capture only the
+// pointers, handles and immutable values they consume; never capture this
+// entire context or references to registration locals.
 struct FrameGraphContext
 {
     rg::GraphBuilder* graph = nullptr;

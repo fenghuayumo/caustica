@@ -15,12 +15,11 @@
 namespace caustica::render
 {
 
-rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(after.isValid());
     if (!ctx.constantBuffer || !ctx.frameConstants)
-        return after;
+        return {};
 
     const rg::BufferHandle constants =
         ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
@@ -41,21 +40,23 @@ rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassH
                 sizeof(FrameConstants));
         },
         rg::PassOptions{
-            .sideEffect = true,
+            // No sideEffect: with no declared reader this upload is safely
+            // dead-code eliminated — VolatileConstantBinder rewrites the CB on
+            // every command list, and declaring readers (path-trace schedule
+            // inputs) keeps it ordered on the Copy queue.
             .queue = caustica::rhi::CommandQueue::Copy,
         });
 }
 
-rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return after;
+        return {};
 
     // EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData via resource edges.
-    rg::PassHandle previous = after;
+    rg::PassHandle previous{};
     {
         rg::TextureHandle envCube{};
         rg::TextureHandle radianceImportance{};

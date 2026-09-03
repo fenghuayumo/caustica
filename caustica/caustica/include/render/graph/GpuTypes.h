@@ -62,6 +62,9 @@ struct TextureHandle
 {
     uint32_t index = UINT32_MAX;
     uint32_t generation = 0;
+    // Sequential write version. 0 = identity (import / FrameSlots): read/write
+    // resolve to the current latest. Non-zero is a pinned write() result.
+    uint32_t version = 0;
 
     [[nodiscard]] bool isValid() const { return index != UINT32_MAX; }
 };

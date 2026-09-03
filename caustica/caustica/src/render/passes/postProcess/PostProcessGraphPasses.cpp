@@ -9,6 +9,7 @@
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
+#include <render/passes/lighting/distant/ProceduralSky.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <shaders/FrameConstantBuffer.h>
 
@@ -21,7 +22,7 @@ namespace caustica::render
 namespace
 {
     void registerAerialPerspectivePass(
-        rg::TextureHandle processedOutputColor,
+        FrameSlots& slots,
         FrameGraphContext ctx)
     {
         auto environment = ctx.environment;
@@ -32,29 +33,28 @@ namespace
         if (!sky || !sky->isAerialPerspectiveEnabled())
             return;
 
-        const rg::TextureHandle depth = ctx.graph->importTexture(
-            ctx.renderTargets->depth,
-            rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle depth = slots.depth;
         const dm::uint2 displaySize = ctx.extractedView->displaySize;
-        const caustica::ViewInfo postProcessView = ctx.extractedView->postProcessView;
+        const caustica::ViewInfo* const postProcessView = &ctx.extractedView->postProcessView;
         const auto tintColor = ctx.settings->EnvironmentMapParams.TintColor;
         const float intensity = ctx.settings->EnvironmentMapParams.Intensity;
         const auto rotation = ctx.settings->EnvironmentMapParams.RotationXYZ;
 
+        const rg::TextureHandle processedOutputColor = slots.hdrColor;
+        ProceduralSky* const skyPtr = sky.get();
         ctx.graph->addPass(
             "SkyAerialPerspective",
             [processedOutputColor, depth](rg::PassBuilder& setup) {
-                setup.read(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+                setup.readWrite(processedOutputColor, rg::TextureAccess::UnorderedAccess);
                 setup.read(depth, rg::TextureAccess::ShaderResource);
-                setup.write(processedOutputColor, rg::TextureAccess::UnorderedAccess);
             },
-            [processedOutputColor, depth, sky, displaySize, postProcessView,
+            [processedOutputColor, depth, skyPtr, displaySize, postProcessView,
              tintColor, intensity, rotation](rg::RenderPassContext& passCtx) {
-                sky->applyAerialPerspective(
+                skyPtr->applyAerialPerspective(
                     passCtx.commandList(),
                     passCtx.texture(processedOutputColor),
                     passCtx.texture(depth),
-                    postProcessView,
+                    *postProcessView,
                     displaySize.x,
                     displaySize.y,
                     tintColor,
@@ -130,7 +130,7 @@ namespace
     }
 }
 
-void registerPostProcess(FrameGraphContext ctx)
+void registerPostProcess(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.extractedView);
     assert(ctx.renderTargets);
@@ -140,14 +140,6 @@ void registerPostProcess(FrameGraphContext ctx)
     ToneMappingPass* toneMappingPass = ctx.toneMapping;
     assert(toneMappingPass);
 
-    RenderTargets& targets = *ctx.renderTargets;
-
-    const rg::TextureHandle processedOutputColor = ctx.graph->importTexture(
-        targets.processedOutputColor,
-        caustica::rhi::ResourceStates::UnorderedAccess);
-    const rg::TextureHandle ldrColor = ctx.graph->importTexture(
-        targets.ldrColor,
-        caustica::rhi::ResourceStates::ShaderResource);
     rg::TextureDesc ldrScratchDesc{};
     ldrScratchDesc.name = kLdrColorScratchName;
     ldrScratchDesc.width = std::max(1u, ctx.displaySize.x);
@@ -156,15 +148,15 @@ void registerPostProcess(FrameGraphContext ctx)
     ldrScratchDesc.isUAV = true;
     ldrScratchDesc.isTypeless = true;
     const rg::TextureHandle ldrColorScratch = ctx.graph->createTexture(ldrScratchDesc);
-    registerAerialPerspectivePass(processedOutputColor, ctx);
+    registerAerialPerspectivePass(slots, ctx);
 
     BloomPass* bloomPass = ctx.bloom;
     if (bloomPass != nullptr)
     {
         bloomPass->registerGraphPass(
             *ctx.graph,
-            processedOutputColor,
-            targets.processedOutputFramebuffer,
+            slots.hdrColor,
+            ctx.renderTargets->processedOutputFramebuffer.get(),
             ctx.extractedView->postProcessView,
             ctx.settings->BloomRadius,
             ctx.settings->BloomIntensity,
@@ -173,8 +165,8 @@ void registerPostProcess(FrameGraphContext ctx)
 
     toneMappingPass->registerGraphPass(
         *ctx.graph,
-        processedOutputColor,
-        ldrColor,
+        slots.hdrColor,
+        slots.ldrColor,
         ctx.extractedView->postProcessView,
         ctx.settings->EnableToneMapping,
         ctx.commandListWasClosed);
@@ -182,16 +174,16 @@ void registerPostProcess(FrameGraphContext ctx)
     // Preserve the photographed/display-referred Gaussian appearance while
     // keeping mesh lighting in the normal HDR tone-mapping path.
     if (!ctx.settings->GaussianSplatApplyToneMapping)
-        (void)registerGaussianSplatCompositePass(ctx);
+        (void)registerGaussianSplatCompositePass(ctx, slots);
 
     registerEdgeDetectionGraphPasses(
-        ldrColor,
+        slots.ldrColor,
         ldrColorScratch,
         ctx,
         ctx.settings->PostProcessEdgeDetection && ctx.ptEdgeDetection != nullptr);
 }
 
-rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
+rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.targetFramebuffer);
     assert(ctx.bindingCache);
@@ -199,9 +191,7 @@ rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
     assert(ctx.renderTargets);
     assert(ctx.graph);
 
-    const rg::TextureHandle ldrColor = ctx.graph->importTexture(
-        ctx.renderTargets->ldrColor,
-        caustica::rhi::ResourceStates::ShaderResource);
+    const rg::TextureHandle ldrColor = slots.ldrColor;
 
     caustica::rhi::Texture* targetColor = ctx.targetFramebuffer->getDesc().colorAttachments[0].texture;
     assert(targetColor);
@@ -226,9 +216,9 @@ rg::PassHandle registerCompositeGraphPasses(FrameGraphContext ctx)
         rg::PassOptions{ .sideEffect = true });
 }
 
-void registerPostProcessGraphPasses(FrameGraphContext ctx)
+void registerPostProcessGraphPasses(FrameGraphContext ctx, FrameSlots& slots)
 {
-    registerPostProcess(ctx);
+    registerPostProcess(ctx, slots);
 }
 
 } // namespace caustica::render

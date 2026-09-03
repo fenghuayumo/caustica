@@ -127,7 +127,12 @@ public:
         AccelStructAccessList& accelStructWrites);
 
     void read(TextureHandle texture, TextureAccess access = TextureAccess::ShaderResource);
-    void write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
+    // Produces latest+1. A captured handle is rebased so sequential writes work;
+    // the returned handle is the version later reads must use.
+    TextureHandle write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
+    // Same-pass RMW. The incoming handle must be current; a version-0 identity
+    // handle (FrameSlots / fresh import) resolves to the latest version first.
+    TextureHandle readWrite(TextureHandle texture, TextureAccess access = TextureAccess::UnorderedAccess);
     void read(BufferHandle buffer, BufferAccess access = BufferAccess::ShaderResource);
     void write(BufferHandle buffer, BufferAccess access = BufferAccess::UnorderedAccess);
     void read(AccelStructHandle accel, AccelStructAccess access = AccelStructAccess::ShaderResource);
@@ -189,6 +194,8 @@ public:
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
     [[nodiscard]] TextureHandle findTexture(std::string_view name) const;
+    // Rebase a handle to the resource's latest write version (after another pass wrote it).
+    [[nodiscard]] TextureHandle currentTexture(TextureHandle handle) const;
     [[nodiscard]] caustica::rhi::TextureHandle ownedTextureHandle(TextureHandle handle) const;
 
     // Keep the resource alive after execute() (present, next-frame history,
@@ -267,6 +274,7 @@ private:
         ResourceLifetime lifetime = ResourceLifetime::Imported;
         TextureDesc desc;
         caustica::rhi::TextureHandle owned;
+        uint32_t latestVersion = 0;
     };
 
     struct GraphBuffer
@@ -328,6 +336,8 @@ private:
     static caustica::rhi::ResourceStates accessToState(AccelStructAccess access);
 
     [[nodiscard]] TextureHandle makeTextureHandle(uint32_t index) const;
+    void validateTextureRead(TextureHandle& handle) const;
+    TextureHandle advanceTextureWrite(TextureHandle handle);
     [[nodiscard]] BufferHandle makeBufferHandle(uint32_t index) const;
     [[nodiscard]] AccelStructHandle makeAccelStructHandle(uint32_t index) const;
     [[nodiscard]] PassHandle makePassHandle(uint32_t index) const;
@@ -485,6 +495,9 @@ private:
     uint32_t m_lastParallelBatchCount = 0;
     std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_lastQueueInstance{};
     std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> m_queueSubmitted{};
+    // Highest async instance the graphics queue actually waited on this frame.
+    // The final join can be skipped only while this covers m_lastQueueInstance.
+    std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_graphicsWaitedInstance{};
 };
 
 } // namespace caustica::rg
