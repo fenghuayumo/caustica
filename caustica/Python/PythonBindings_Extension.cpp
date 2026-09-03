@@ -9,6 +9,8 @@
 
 #include <caustica/version.h>
 
+#include <core/crash_log.h>
+
 #include <engine/EngineApp.h>
 #include <engine/SensorApi.h>
 #include <backend/GpuDevice.h>
@@ -91,6 +93,9 @@ namespace
 
 NB_MODULE(caustica, m)
 {
+    // Symbolized crash logs (next to this .pyd) for SEH faults during host runs.
+    caustica::installUnhandledExceptionLogger();
+
     m.doc() = "caustica Python extension - snake_case projection of C++ EngineApp.";
     m.attr("__version__") = CAUSTICA_VERSION_STRING;
 
