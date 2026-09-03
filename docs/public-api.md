@@ -31,6 +31,7 @@ C++ schedule / system-parameter walkthrough: [embedding-cpp.md](embedding-cpp.md
 | `engine/MeshDeformApi.h` | Entity + MeshHandle deform / geometry sequence |
 | `engine/CameraApi.h` | Camera selection, pose, FOV, intrinsics, scene camera entities. `EngineApp` camera methods write the active/main camera; per-entity helpers take `ecs::Entity`. Usage: [caustica.md — Camera](../caustica.md#camera). |
 | `engine/SensorApi.h` | RenderProduct / AOV capture (`SensorOutput`): RGB, linear depth, camera-space normal, instance/semantic IDs, motion vectors. Multiple cameras at one physical time. Usage: [caustica.md — Sensor output](../caustica.md#sensor-output--aov). |
+| `physics/Physics.h`, `physics/PhysicsPlugin.h` | Optional fixed-step rigid-body boundary and PhysX plugin; no render dependency. |
 | `engine/RenderSessionApi.h` | Accumulation, sizes, env map, screenshots, picking, lighting/material handles, `shaderFactory` |
 | `engine/SceneLifecycle.h` | `setCurrentScene` / `retargetCurrentScene` (prefer `EngineApp::setScene`) |
 | `engine/EnqueueRenderCommand.h` | Occasional non-blocking RT work |
@@ -39,6 +40,23 @@ C++ schedule / system-parameter walkthrough: [embedding-cpp.md](embedding-cpp.md
 Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`,
 `Query<>`, `math` / `dm::` types, `PathTracerSettings` via `EngineApp::settings()`,
 `Handle` / `MeshHandle` / `MaterialHandle`, `LdrFramebuffer`, `SensorOutput`, `Aov`.
+
+### Optional PhysX module
+
+Configure PhysX only for hosts that need real-time rigid-body simulation:
+
+```powershell
+git submodule update --init --recursive External/PhysX
+cmake -S . -B build -DCAUSTICA_WITH_PHYSX=ON
+```
+
+The repository pins NVIDIA PhysX 5.5.1 as `External/PhysX`; CMake builds its
+CPU static libraries only when the option is enabled. Link the opt-in
+`causPhysics` target and add `physics::PhysicsPlugin` before
+`finishStartup()` (or the first `stepFrame`). Add `RigidBodyComponent`,
+`ColliderComponent`, and the usual `LocalTransformComponent` to the same ECS
+entity. `SemanticLabelComponent` remains unchanged, so the rendered
+`instance_id` / `semantic_id` AOVs continue to identify that entity.
 
 Python (`import caustica`) is the same `EngineApp` surface with snake_case names
 (`step_frame`, `set_scene`, `spawn_from_file`). `GpuDevice` injects an existing

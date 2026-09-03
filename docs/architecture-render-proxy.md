@@ -244,3 +244,18 @@ Logic→RT work shares one `Affinity::Render` domain queue (RenderThread pumps i
 ## Why not a “render ECS”
 
 A second EnTT world on the render thread would add sync cost without helping path tracing, and it is not how we fixed `Query` / `Commands` targeting different registries. Flat proxy arrays match bindless / light-buffer upload and match UE’s `F*SceneProxy` model. Keep ECS where queries and composition pay off (one live logic World); keep proxies where the GPU thread needs stable, read-only packets.
+
+## Optional physics backends
+
+Physics is a logic-side, opt-in plugin. `physics::PhysicsPlugin` runs its
+backend at a fixed cadence in `update`, then writes body poses to
+`LocalTransformComponent` before `TransformPropagate` in `PostUpdate`. The
+ordinary Extract stage consequently produces the same `MeshInstanceRenderProxy`
+and snapshot as it does for animation; neither the render thread nor sensor
+readback accesses a PhysX object.
+
+`RigidBodyComponent` and `ColliderComponent` are SDK-neutral ECS components.
+The PhysX implementation is selected only with `CAUSTICA_WITH_PHYSX=ON` and is
+linked privately into `causPhysics`; a default build has neither PhysX headers
+nor libraries. Semantic labels remain on their ECS entity, so `instance_id` and
+`semantic_id` remain stable through simulation, rendering, and AOV capture.

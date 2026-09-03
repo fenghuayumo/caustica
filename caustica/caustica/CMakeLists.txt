@@ -470,6 +470,23 @@ else()
     target_compile_definitions(causScene PUBLIC CAUSTICA_WITH_OPENUSD=0)
 endif()
 
+# ── causPhysics ───────────────────────────────────────────────────────────
+# The SDK-neutral ECS bridge is always available; PhysX is a private optional
+# dependency so pure-render applications do not carry its SDK or runtime.
+file(GLOB_RECURSE caus_physics_headers include/physics/*.h)
+file(GLOB_RECURSE caus_physics_sources src/physics/*.cpp)
+add_library(causPhysics STATIC ${caus_physics_headers} ${caus_physics_sources})
+caus_configure_static(causPhysics)
+target_link_libraries(causPhysics PUBLIC causScene causEcs)
+target_compile_definitions(causPhysics PUBLIC CAUSTICA_WITH_PHYSX=$<BOOL:${CAUSTICA_WITH_PHYSX}>)
+if (CAUSTICA_WITH_PHYSX)
+    target_link_libraries(causPhysics PRIVATE
+        PhysX
+        PhysXCommon
+        PhysXFoundation
+        PhysXExtensions)
+endif()
+
 # ── causRender ────────────────────────────────────────────────────────────
 # Render passes, world renderer, GPU utilities, path tracer, post-processing,
 # denoising (denoisers/nrd + OIDN), RTXDI, Gaussian splatting, GPU sort, debugging.
