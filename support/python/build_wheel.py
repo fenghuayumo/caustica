@@ -134,6 +134,8 @@ def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) 
     for path in source_root.rglob("*"):
         if not path.is_file():
             continue
+        if path.suffix.lower() in {".pdb", ".ildb"}:
+            continue
         rel = path.relative_to(source_root).as_posix()
         files.append((f"ShaderBin/{rel}", path))
     if dynamic_shaders == "none":
