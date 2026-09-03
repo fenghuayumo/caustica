@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cmath>
+#include <chrono>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -431,9 +432,27 @@ bool ProceduralSky::update(
     }
     else if (m_animateSun)
     {
-        // free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
+        // Free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
+        // Advances on a wall clock so pure-static scenes (no skeletal/imported
+        // animation entities) still get a moving sun. Frozen when
+        // forceInstantUpdate (offline accumulation / scrubbing) so lighting
+        // stays stable while accumulating samples.
+        const double wallNow = std::chrono::duration<double>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        float animDt = 0.0f;
+        if (!forceInstantUpdate)
+        {
+            if (m_wallTimeValid)
+                animDt = (float)caustica::math::clamp(wallNow - m_lastWallTime, 0.0, 0.3);
+            m_lastWallTime = wallNow;
+            m_wallTimeValid = true;
+        }
+        else
+        {
+            m_wallTimeValid = false;
+        }
         const float daysPerSecond = m_sunAnimSpeed / 60.0f;
-        m_sunAnimPhase = (float)std::fmod(m_sunAnimPhase + deltaTime * daysPerSecond + 1.0, 1.0);
+        m_sunAnimPhase = (float)std::fmod(m_sunAnimPhase + animDt * daysPerSecond + 1.0, 1.0);
         const float dayAngle = m_sunAnimPhase * 2.0f * PI_f;
         m_sunElevationDeg = std::sin(dayAngle) * m_sunAnimMaxElevation;
         m_sunAzimuthDeg = WrapDegrees360(m_noonAzimuthDeg + std::cos(dayAngle) * 90.0f);

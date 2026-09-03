@@ -83,6 +83,8 @@ private:
     void dispatchLutPasses(caustica::rhi::CommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
 
     double m_lastSceneTime = 0.0;
+    double m_lastWallTime = 0.0;
+    bool m_wallTimeValid = false;
 
     caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;
