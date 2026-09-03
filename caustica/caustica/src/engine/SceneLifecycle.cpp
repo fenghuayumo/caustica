@@ -451,6 +451,7 @@ void registerLoadedSceneAssets(App& app, ::SceneManager& manager)
 void abortLoadSession(SceneViewState& vs)
 {
     vs.loadSession.reset();
+    vs.deferredRealtimeAA.reset();
     vs.sceneGpuSuspended.store(false, std::memory_order_release);
     task::bumpLoadGeneration();
     if (vs.progressLoading.Active())
@@ -608,6 +609,26 @@ void onSceneLoaded(App& app)
     syncLoadProgress(*vs);
     detail::sceneSwitchTrace("onSceneLoaded: LoadSession GpuStreaming textures=%zu meshes=%zu",
         texturesPending, vs->loadSession.meshTotal);
+}
+
+// Scene switches downgrade DLSS/DLSS-RR to TAA while AS/material GPU resources are
+// torn down (see applySceneSwitch). Once the new scene is committed and rendering
+// resumes, restore the user's AA mode; WorldRenderer detects the change and
+// re-initializes DLSS/Streamline against the freshly loaded scene.
+void restoreDeferredRealtimeAA(App& app, SceneViewState& vs)
+{
+    if (!vs.deferredRealtimeAA)
+        return;
+
+    PathTracerSettings* cfg = settings(app);
+    const int deferred = *vs.deferredRealtimeAA;
+    vs.deferredRealtimeAA.reset();
+    if (!cfg || deferred < 2 || cfg->RealtimeAA != 1)
+        return;
+
+    cfg->RealtimeAA = deferred;
+    cfg->ResetAccumulation = true;
+    detail::sceneSwitchTrace("LoadSession: restored RealtimeAA=%d after scene switch", deferred);
 }
 
 void tickLoadSession(App& app)
@@ -775,6 +796,7 @@ void tickLoadSession(App& app)
 
         vs->sceneGpuSuspended.store(false, std::memory_order_release);
         session.phase = LoadSessionPhase::Ready;
+        restoreDeferredRealtimeAA(app, *vs);
         syncLoadProgress(*vs);
         return;
     }

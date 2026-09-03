@@ -130,8 +130,13 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
     cfg->ResetRealtimeCaches = true;
     // Keep DLSS/DLSS-RR off across the switch so Streamline is not recreated
     // against torn-down AS/material buffers on the first post-load frame.
+    // Remember the requested mode and restore it once the new scene is ready
+    // (see tickLoadSession / restoreDeferredRealtimeAA).
     if (cfg->RealtimeAA >= 2)
+    {
+        vs->deferredRealtimeAA = cfg->RealtimeAA;
         cfg->RealtimeAA = 1;
+    }
 
     manager->setAsyncLoadingEnabled(true);
 

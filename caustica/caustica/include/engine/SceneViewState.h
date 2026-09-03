@@ -49,6 +49,11 @@ struct SceneViewState
     };
     std::optional<PendingSceneSwitch> pendingSceneSwitch;
 
+    // AA mode deferred across a scene switch. applySceneSwitch downgrades
+    // DLSS/DLSS-RR to TAA while scene GPU resources are torn down; the original
+    // mode is restored once the new scene finishes loading (see tickLoadSession).
+    std::optional<int> deferredRealtimeAA;
+
     int sceneSwitchTestFramesUntilSwitch = 0;
     size_t sceneSwitchTestSceneIndex = 0;
     int sceneSwitchTestSwitchesDone = 0;
