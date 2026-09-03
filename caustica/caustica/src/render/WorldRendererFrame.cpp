@@ -566,12 +566,18 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             return;
         }
         m_frameCommands->beginPrimary();
-        createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
+        const bool renderPassesCreated = createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
         m_frameCommands->endFrame();
         caustica::info("WorldRenderer: needNewPasses graphics fence (post createRenderPasses)");
         if (!waitGraphicsQueueFence("post createRenderPasses", /*runGc=*/false))
         {
             caustica::error("WorldRenderer: post-createRenderPasses graphics fence failed");
+            ctx.aborted = true;
+            return;
+        }
+        if (!renderPassesCreated)
+        {
+            caustica::error("WorldRenderer: render pass creation failed; aborting frame");
             ctx.aborted = true;
             return;
         }

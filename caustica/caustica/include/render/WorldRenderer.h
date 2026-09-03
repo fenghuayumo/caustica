@@ -203,7 +203,7 @@ private:
     // Falls back to waitForIdle only if EventQuery create fails. runGc retires destroyed resources.
     [[nodiscard]] bool waitGraphicsQueueFence(const char* reason, bool runGc = false);
 
-    void createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
+    [[nodiscard]] bool createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
     void createPostProcessRenderPasses();
     void preUpdatePathTracing(bool resetAccum, caustica::rhi::CommandListHandle commandList);
     void postUpdatePathTracing();

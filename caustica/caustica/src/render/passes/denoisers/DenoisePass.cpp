@@ -245,17 +245,34 @@ void DenoisePass::ensureNrdIntegrations()
     if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
+    const nrd::Denoiser denoiserMethod = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
+        ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
+        : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
+
     for (int i = 0; i < std::size(m_nrd); i++)
     {
+        // Rebuild whenever the requested method changed, even if the one-shot
+        // NRDModeChanged flag was dropped by an extract-ring fallback frame.
+        // Without this check the old-method NRD instance would be fed the
+        // other method's settings struct (mismatched pipelines/dispatches).
+        if (m_nrd[i] != nullptr && m_nrd[i]->getDenoiser() != denoiserMethod)
+        {
+            m_nrd[i] = nullptr;
+            m_context->activeSettings().ResetRealtimeCaches = true;
+        }
+
         if (m_nrd[i] != nullptr)
             continue;
 
-        nrd::Denoiser denoiserMethod = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
-            ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
-            : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
-
         m_nrd[i] = std::make_unique<NrdIntegration>(m_device, denoiserMethod);
-        m_nrd[i]->initialize(m_renderSize.x, m_renderSize.y, *m_context->shaderFactory);
+        if (!m_nrd[i]->initialize(m_renderSize.x, m_renderSize.y, *m_context->shaderFactory))
+        {
+            caustica::error(
+                "DenoisePass: NRD integration init failed (size %ux%u); denoiser disabled this frame",
+                m_renderSize.x,
+                m_renderSize.y);
+            m_nrd[i] = nullptr;
+        }
     }
 }
 
@@ -410,6 +427,15 @@ void DenoisePass::denoiseStablePlane(
     assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(passNames)));
 
     commandList->beginMarker(passNames[planeIndex]);
+
+    // A partially initialized (or recreated) integration must never reach the
+    // command list; NRD dereferences its instance unconditionally.
+    if (m_nrd[planeIndex] == nullptr || !m_nrd[planeIndex]->isAvailable())
+    {
+        commandList->endMarker();
+        return;
+    }
+
     prepareNrdInputs(commandList, planeIndex);
     runNrd(commandList, planeIndex);
     mergeNrdOutputs(commandList, planeIndex);

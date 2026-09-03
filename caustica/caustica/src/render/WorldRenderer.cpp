@@ -566,7 +566,7 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
     return ret;
 }
 
-void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList )
+bool caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList )
 {
     (void)exposureResetRequired;
     m_context->bindingCache.clear();
@@ -591,7 +591,10 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
     createPostProcessRenderPasses();
 
     if (!createPTPipeline())
-        { assert(false); }
+    {
+        caustica::error("WorldRenderer: failed to create path-tracing export pipeline");
+        return false;
+    }
 
     const uint2 screenResolution = {
         m_renderTargets->outputColor->getDesc().width,
@@ -615,6 +618,8 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
         m_renderTargets,
         m_shaderDebug,
         m_bindingLayout);
+
+    return true;
 }
 
 bool caustica::render::WorldRenderer::createPTPipeline()

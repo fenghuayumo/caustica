@@ -213,6 +213,17 @@ bool ToneMappingPass::render(
     // Formerly set when AE closed the primary list mid-pass (removed in ADR 0002 S1).
     constexpr bool commandListWasClosed = false;
 
+    if (!m_ToneMapPso)
+    {
+        static bool psoFailureReported = false;
+        if (!psoFailureReported)
+        {
+            psoFailureReported = true;
+            caustica::error("ToneMappingPass: tone-map PSO unavailable (shader/PSO creation failed); skipping tone mapping.");
+        }
+        return false;
+    }
+
     for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
     {
         PerViewData& viewData = m_PerView[viewIndex];
@@ -226,7 +237,7 @@ bool ToneMappingPass::render(
         }
     }
 
-    if(m_AutoExposure) 
+    if(m_AutoExposure && m_LuminancePso)
     {
 		commandList->beginMarker("Luminance");
 		for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
@@ -262,6 +273,7 @@ bool ToneMappingPass::render(
             generateMips(commandList, 1u);
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
+            if (m_CaptureLumPso)
             {
                 caustica::rhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
                         caustica::rhi::BindingSetItem::Texture_SRV(0, viewData.luminanceTexture),
