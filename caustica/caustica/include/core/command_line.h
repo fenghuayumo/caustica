@@ -36,7 +36,7 @@ struct CommandLineOptions
     int UseNEE = 1;
     int NEEType = 2;
     int UseReSTIRDI = false;
-    int UseReSTIRGI = true;
+    int UseReSTIRGI = false;
     int UseReSTIRPT = false;
     int RealtimeSamplesPerPixel = 1;
     int ReferenceSamplesPerPixel = 4096;
