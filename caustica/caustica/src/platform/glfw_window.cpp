@@ -6,9 +6,10 @@
 #include <events/mouse_event.h>
 #include <events/application_event.h>
 
+#include <core/log.h>
+
 #include <GLFW/glfw3.h>
 #include <algorithm>
-#include <cstdio>
 
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -71,6 +72,19 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
     m_Title = desc.Title;
     m_VSync = desc.VSync;
 
+    // Streamline DLSS-RR needs a real HWND. Windowed EngineApp / Python
+    // create the GLFW window before GpuDevice::createInstance, so GLFW
+    // must be initialized here rather than later in the device path.
+    glfwSetErrorCallback(glfwErrorCallback);
+#if !defined(_WIN32) && defined(GLFW_PLATFORM) && defined(GLFW_PLATFORM_X11)
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+#endif
+    if (!glfwInit())
+    {
+        caustica::error("[GlfwWindow] glfwInit failed");
+        return false;
+    }
+
     // Window hints
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -93,7 +107,7 @@ bool GlfwWindow::initialise(const WindowDesc& desc)
 
     if (!m_Window)
     {
-        fprintf(stderr, "[GlfwWindow] Failed to create GLFW window\n");
+        caustica::error("[GlfwWindow] Failed to create GLFW window");
         return false;
     }
     // store this pointer for GLFW callbacks
@@ -290,7 +304,7 @@ void GlfwWindow::setEventCallback(const EventCallbackFn& callback)
 // ---------------------------------------------------------------------------
 void GlfwWindow::glfwErrorCallback(int error, const char* description)
 {
-    fprintf(stderr, "GLFW error [%d]: %s\n", error, description);
+    caustica::error("GLFW error [%d]: %s", error, description ? description : "");
 }
 
 void GlfwWindow::glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

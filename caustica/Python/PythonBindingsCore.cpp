@@ -361,44 +361,71 @@ namespace
     }
 
 
-    std::vector<std::shared_ptr<StandardMaterial>> GetSceneMaterials(const Scene* scene)
+    const App* SceneOwnerApp(const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
+    {
+        return owner && owner->engine && owner->engine->isValid()
+            ? &owner->engine->app()
+            : nullptr;
+    }
+
+    std::vector<std::shared_ptr<StandardMaterial>> GetSceneMaterials(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
     {
         std::vector<std::shared_ptr<StandardMaterial>> result;
         if (!scene)
             return result;
 
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            if (auto pt = StandardMaterial::safeCast(mat))
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            if (auto pt = StandardMaterial::safeCast(linked))
                 result.push_back(pt);
         }
         return result;
     }
 
-    std::shared_ptr<StandardMaterial> FindSceneMaterial(const Scene* scene, const std::string& name)
+    std::shared_ptr<StandardMaterial> FindSceneMaterial(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& name)
     {
         if (!scene)
             return nullptr;
 
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            auto pt = StandardMaterial::safeCast(mat);
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            auto pt = StandardMaterial::safeCast(linked);
             if (pt && (pt->name == name || pt->uniqueName == name))
                 return pt;
         }
         return nullptr;
     }
 
-    std::shared_ptr<StandardMaterial> FindSceneMaterialById(const Scene* scene, int materialId)
+    std::shared_ptr<StandardMaterial> FindSceneMaterialById(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        int materialId)
     {
         if (!scene || materialId < 0)
             return nullptr;
 
         // Scene-only lookup: StandardMaterial::gpuDataIndex only.
         // Prefer EngineApp.find_material / caustica::findMaterial (cache-backed pick id).
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            const auto pt = StandardMaterial::safeCast(mat);
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            const auto pt = StandardMaterial::safeCast(linked);
             if (pt && int(pt->gpuDataIndex) == materialId)
                 return pt;
         }
@@ -1930,15 +1957,15 @@ void RegisterCoreBindings(nb::module_& m)
         "Loaded caustica scene. Materials, lights, and SceneEntity lookup live here.\n"
         "Prefer Sample.find_entity / get_mesh_entities over digging engine MeshInfo.")
         .def("get_materials", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get());
+                return GetSceneMaterials(self.scene.get(), self.owner);
             }, "Return every StandardMaterial in this scene.")
 
         .def("find_material", [](PyScene& self, const std::string& name) {
-                return FindSceneMaterial(self.scene.get(), name);
+                return FindSceneMaterial(self.scene.get(), self.owner, name);
             }, nb::arg("name"), "Look up a material by Name or uniqueName.")
 
         .def("find_material_by_id", [](PyScene& self, int materialId) {
-                return FindSceneMaterialById(self.scene.get(), materialId);
+                return FindSceneMaterialById(self.scene.get(), self.owner, materialId);
             }, nb::arg("material_id"),
             "Look up by gpuDataIndex only. Prefer EngineApp.find_material (cache-backed).")
 
@@ -1967,7 +1994,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
         .def_prop_ro("material_count", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get()).size();
+                return GetSceneMaterials(self.scene.get(), self.owner).size();
             }, "Number of StandardMaterial instances in this scene.")
         .def_prop_ro("mesh_count", [](PyScene& self) {
                 return self.scene ? self.scene->getMeshes().size() : 0;
@@ -1996,7 +2023,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Diagonal extent (max - min) of `Scene.bounds`, or ``None`` for an empty scene.")
 
         .def("__repr__", [](PyScene& self) {
-                const auto materialCount = GetSceneMaterials(self.scene.get()).size();
+                const auto materialCount = GetSceneMaterials(self.scene.get(), self.owner).size();
                 const auto lightCount = self.scene ? self.scene->getLightEntities().size() : 0;
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
