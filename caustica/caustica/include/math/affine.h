@@ -455,7 +455,9 @@ namespace caustica::math
 		vector<T, 3> lookNormalized = normalize(look);
 		vector<T, 3> left = normalize(orthogonal(lookNormalized));
 		vector<T, 3> up = cross(lookNormalized, left);
-		return affine<T, 3>::from_cols(-left, up, -lookNormalized, vector<T, 3>::zero());
+		// affine::transformVector uses row-vector multiplication (v * m).  The
+		// look direction therefore lives in row 2, not column 2.
+		return affine<T, 3>(-left, up, -lookNormalized, vector<T, 3>::zero());
 	}
 
 	template<typename T>
@@ -464,7 +466,7 @@ namespace caustica::math
 		vector<T, 3> lookNormalized = normalize(look);
 		vector<T, 3> left = normalize(cross(up, lookNormalized));
 		vector<T, 3> trueUp = cross(lookNormalized, left);
-		return affine<T, 3>::from_cols(-left, trueUp, -lookNormalized, vector<T, 3>::zero());
+		return affine<T, 3>(-left, trueUp, -lookNormalized, vector<T, 3>::zero());
 	}
 
 	template<typename T>
