@@ -200,6 +200,12 @@ NB_MODULE(caustica, m)
         "One rendered output. rgb is LDR RGBA8. depth is linear |view Z|. segmentation aliases instance_id.")
         .def_prop_ro("width", [](const PyFrame& self) { return self.sensor.width; })
         .def_prop_ro("height", [](const PyFrame& self) { return self.sensor.height; })
+        .def_prop_ro("geometry_width", [](const PyFrame& self) { return self.sensor.geometryWidth; })
+        .def_prop_ro("geometry_height", [](const PyFrame& self) { return self.sensor.geometryHeight; })
+        .def_prop_ro("material_width", [](const PyFrame& self) { return self.sensor.materialWidth; })
+        .def_prop_ro("material_height", [](const PyFrame& self) { return self.sensor.materialHeight; })
+        .def_prop_ro("guide_width", [](const PyFrame& self) { return self.sensor.guideWidth; })
+        .def_prop_ro("guide_height", [](const PyFrame& self) { return self.sensor.guideHeight; })
         .def_prop_ro("channels", [](const PyFrame&) { return 4; })
         .def_prop_ro("pixels", [](const PyFrame& self) {
                 return nb::bytes(self.sensor.rgb.data(), self.sensor.rgb.size());
@@ -218,6 +224,18 @@ NB_MODULE(caustica, m)
             "Alias of instance_id.")
         .def_prop_ro("motion_vector", [](const PyFrame& self) { return caustica_py::sensorMotionVectorNumpy(self.sensor); },
             "NumPy (H, W, 2) float32 screen-space motion in pixels.")
+        .def_prop_ro("diffuse", [](const PyFrame& self) { return caustica_py::sensorDiffuseNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 first-hit linear diffuse albedo.")
+        .def_prop_ro("roughness", [](const PyFrame& self) { return caustica_py::sensorRoughnessNumpy(self.sensor); },
+            "NumPy (H, W) float32 first-hit perceptual roughness.")
+        .def_prop_ro("specular", [](const PyFrame& self) { return caustica_py::sensorSpecularNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 first-hit specular F0.")
+        .def_prop_ro("metallic", [](const PyFrame& self) { return caustica_py::sensorMetallicNumpy(self.sensor); },
+            "NumPy (H, W) float32 first-hit metalness.")
+        .def_prop_ro("throughput", [](const PyFrame& self) { return caustica_py::sensorThroughputNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 primary path throughput.")
+        .def_prop_ro("guide_diffuse", [](const PyFrame& self) { return caustica_py::sensorGuideDiffuseNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 denoiser diffuse-albedo guide.")
         .def("__repr__", [](const PyFrame& self) {
             return std::string("<caustica.Frame ")
                 + std::to_string(self.sensor.width) + "x" + std::to_string(self.sensor.height) + ">";

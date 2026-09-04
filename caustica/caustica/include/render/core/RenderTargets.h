@@ -41,6 +41,8 @@ public:
     caustica::rhi::TextureHandle screenMotionVectors;   // screen space motion vectors, exported by path tracer, used by RTXDI, TAA and others
     caustica::rhi::TextureHandle sensorNormalDepth;     // xyz camera-space normal, w = linear |view Z| meters
     caustica::rhi::TextureHandle sensorIds;             // RG32UINT: R = instance_id, G = semantic_id
+    caustica::rhi::TextureHandle sensorMaterial;        // xyz diffuse albedo, w = roughness
+    caustica::rhi::TextureHandle sensorSpecular;        // xyz specular F0, w = metalness
 
     caustica::rhi::TextureHandle denoiserViewspaceZ;
     caustica::rhi::TextureHandle denoiserMotionVectors;

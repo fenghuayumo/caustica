@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <utility>
 
@@ -39,6 +40,20 @@ std::string NormalizeAovToken(std::string name)
             ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
     }
     return name;
+}
+
+float ReadR11G11B10FloatChannel(uint32_t packed, uint32_t channel)
+{
+    uint16_t halfBits = 0;
+    switch (channel)
+    {
+    case 0: halfBits = uint16_t((packed << 4) & 0x7FF0); break;
+    case 1: halfBits = uint16_t((packed >> 7) & 0x7FF0); break;
+    default: halfBits = uint16_t((packed >> 17) & 0x7FE0); break;
+    }
+
+    const float value = float16ToFloat32(float16_t{ halfBits });
+    return std::isfinite(value) ? std::max(value, 0.0f) : 0.0f;
 }
 
 void RequestSensorReset(App& app)
@@ -291,6 +306,8 @@ bool FillGeometryAovs(
                 output.width = width;
                 output.height = height;
             }
+            output.geometryWidth = width;
+            output.geometryHeight = height;
             if (wantDepth)
                 output.aovs |= uint32_t(Aov::Depth);
             if (wantNormal)
@@ -334,6 +351,8 @@ bool FillGeometryAovs(
                 output.width = width;
                 output.height = height;
             }
+            output.geometryWidth = width;
+            output.geometryHeight = height;
             if (wantInstance)
                 output.aovs |= uint32_t(Aov::InstanceId);
             if (wantSemantic)
@@ -373,7 +392,182 @@ bool FillGeometryAovs(
                 output.width = width;
                 output.height = height;
             }
+            output.geometryWidth = width;
+            output.geometryHeight = height;
             output.aovs |= uint32_t(Aov::MotionVector);
+        }
+    }
+
+    return output.aovs != 0u;
+}
+
+bool FillMaterialAovs(
+    App& app,
+    caustica::rhi::Device* device,
+    uint32_t requested,
+    SensorOutput& output)
+{
+    render::WorldRenderer* renderer = worldRenderer(app);
+    RenderTargets* targets = renderer ? renderer->getRenderTargets() : nullptr;
+    if (!targets)
+        return false;
+
+    const bool wantDiffuse = hasAov(requested, Aov::Diffuse);
+    const bool wantRoughness = hasAov(requested, Aov::Roughness);
+    const bool wantSpecular = hasAov(requested, Aov::Specular);
+    const bool wantMetallic = hasAov(requested, Aov::Metallic);
+    const bool wantThroughput = hasAov(requested, Aov::Throughput);
+    const bool wantGuideDiffuse = hasAov(requested, Aov::GuideDiffuse);
+
+    if (wantDiffuse || wantRoughness)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t bpp = 0;
+        if (CopyTexturePacked(
+                device, nullptr, targets->sensorMaterial,
+                caustica::rhi::ResourceStates::UnorderedAccess, false,
+                bytes, width, height, bpp)
+            && bpp == 8)
+        {
+            const size_t pixels = size_t(width) * size_t(height);
+            if (wantDiffuse)
+                output.diffuse.resize(pixels * 3u, 0.f);
+            if (wantRoughness)
+                output.roughness.resize(pixels, 0.f);
+            const auto* src = reinterpret_cast<const math::float16_t4*>(bytes.data());
+            for (size_t i = 0; i < pixels; ++i)
+            {
+                const math::float4 value = math::float16ToFloat32x4(src[i]);
+                if (wantDiffuse)
+                {
+                    output.diffuse[i * 3u + 0] = value.x;
+                    output.diffuse[i * 3u + 1] = value.y;
+                    output.diffuse[i * 3u + 2] = value.z;
+                }
+                if (wantRoughness)
+                    output.roughness[i] = value.w;
+            }
+            if (output.width == 0 || output.height == 0)
+            {
+                output.width = width;
+                output.height = height;
+            }
+            output.materialWidth = width;
+            output.materialHeight = height;
+            if (wantDiffuse)
+                output.aovs |= uint32_t(Aov::Diffuse);
+            if (wantRoughness)
+                output.aovs |= uint32_t(Aov::Roughness);
+        }
+    }
+
+    if (wantSpecular || wantMetallic)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t bpp = 0;
+        if (CopyTexturePacked(
+                device, nullptr, targets->sensorSpecular,
+                caustica::rhi::ResourceStates::UnorderedAccess, false,
+                bytes, width, height, bpp)
+            && bpp == 8)
+        {
+            const size_t pixels = size_t(width) * size_t(height);
+            if (wantSpecular)
+                output.specular.resize(pixels * 3u, 0.f);
+            if (wantMetallic)
+                output.metallic.resize(pixels, 0.f);
+            const auto* src = reinterpret_cast<const math::float16_t4*>(bytes.data());
+            for (size_t i = 0; i < pixels; ++i)
+            {
+                const math::float4 value = math::float16ToFloat32x4(src[i]);
+                if (wantSpecular)
+                {
+                    output.specular[i * 3u + 0] = value.x;
+                    output.specular[i * 3u + 1] = value.y;
+                    output.specular[i * 3u + 2] = value.z;
+                }
+                if (wantMetallic)
+                    output.metallic[i] = value.w;
+            }
+            if (output.width == 0 || output.height == 0)
+            {
+                output.width = width;
+                output.height = height;
+            }
+            output.materialWidth = width;
+            output.materialHeight = height;
+            if (wantSpecular)
+                output.aovs |= uint32_t(Aov::Specular);
+            if (wantMetallic)
+                output.aovs |= uint32_t(Aov::Metallic);
+        }
+    }
+
+    if (wantThroughput)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t bpp = 0;
+        if (CopyTexturePacked(
+                device, nullptr, targets->throughput,
+                caustica::rhi::ResourceStates::UnorderedAccess, false,
+                bytes, width, height, bpp)
+            && bpp == 4)
+        {
+            const size_t pixels = size_t(width) * size_t(height);
+            output.throughput.resize(pixels * 3u, 0.f);
+            const auto* src = reinterpret_cast<const uint32_t*>(bytes.data());
+            for (size_t i = 0; i < pixels; ++i)
+            {
+                output.throughput[i * 3u + 0] = ReadR11G11B10FloatChannel(src[i], 0);
+                output.throughput[i * 3u + 1] = ReadR11G11B10FloatChannel(src[i], 1);
+                output.throughput[i * 3u + 2] = ReadR11G11B10FloatChannel(src[i], 2);
+            }
+            if (output.width == 0 || output.height == 0)
+            {
+                output.width = width;
+                output.height = height;
+            }
+            output.materialWidth = width;
+            output.materialHeight = height;
+            output.aovs |= uint32_t(Aov::Throughput);
+        }
+    }
+
+    if (wantGuideDiffuse)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t bpp = 0;
+        if (CopyTexturePacked(
+                device, nullptr, targets->rrDiffuseAlbedo,
+                caustica::rhi::ResourceStates::UnorderedAccess, false,
+                bytes, width, height, bpp)
+            && bpp == 4)
+        {
+            const size_t pixels = size_t(width) * size_t(height);
+            output.guideDiffuse.resize(pixels * 3u, 0.f);
+            const auto* src = reinterpret_cast<const uint32_t*>(bytes.data());
+            for (size_t i = 0; i < pixels; ++i)
+            {
+                output.guideDiffuse[i * 3u + 0] = ReadR11G11B10FloatChannel(src[i], 0);
+                output.guideDiffuse[i * 3u + 1] = ReadR11G11B10FloatChannel(src[i], 1);
+                output.guideDiffuse[i * 3u + 2] = ReadR11G11B10FloatChannel(src[i], 2);
+            }
+            if (output.width == 0 || output.height == 0)
+            {
+                output.width = width;
+                output.height = height;
+            }
+            output.guideWidth = width;
+            output.guideHeight = height;
+            output.aovs |= uint32_t(Aov::GuideDiffuse);
         }
     }
 
@@ -435,6 +629,7 @@ SensorOutput ReadCurrentView(App& app, const RenderProductDesc& product)
     if (hasAov(product.aovs, Aov::Rgb))
         FillRgb(app, device, renderDevice, output);
     FillGeometryAovs(app, device, product.aovs, output);
+    FillMaterialAovs(app, device, product.aovs, output);
     return output;
 }
 
@@ -458,6 +653,18 @@ uint32_t parseAovMask(const std::vector<std::string>& names)
             mask |= uint32_t(Aov::SemanticId);
         else if (name == "motion" || name == "motion_vector" || name == "motion_vectors")
             mask |= uint32_t(Aov::MotionVector);
+        else if (name == "diffuse" || name == "diffuse_albedo" || name == "albedo")
+            mask |= uint32_t(Aov::Diffuse);
+        else if (name == "roughness")
+            mask |= uint32_t(Aov::Roughness);
+        else if (name == "specular" || name == "specular_albedo" || name == "specular_f0")
+            mask |= uint32_t(Aov::Specular);
+        else if (name == "metallic" || name == "metalness")
+            mask |= uint32_t(Aov::Metallic);
+        else if (name == "throughput")
+            mask |= uint32_t(Aov::Throughput);
+        else if (name == "guide_diffuse" || name == "denoiser_diffuse" || name == "denoiser_albedo")
+            mask |= uint32_t(Aov::GuideDiffuse);
         else if (name == "all")
             mask |= uint32_t(Aov::All);
     }
@@ -474,6 +681,12 @@ std::string aovName(Aov aov)
     case Aov::InstanceId: return "instance_id";
     case Aov::SemanticId: return "semantic_id";
     case Aov::MotionVector: return "motion_vector";
+    case Aov::Diffuse: return "diffuse";
+    case Aov::Roughness: return "roughness";
+    case Aov::Specular: return "specular";
+    case Aov::Metallic: return "metallic";
+    case Aov::Throughput: return "throughput";
+    case Aov::GuideDiffuse: return "guide_diffuse";
     case Aov::None: return "none";
     default: return "all";
     }

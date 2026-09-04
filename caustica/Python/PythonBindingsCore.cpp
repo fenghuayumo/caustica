@@ -837,12 +837,10 @@ caustica::EngineApp* embedEngine()
 namespace
 {
 
-bool SensorShape(const caustica::SensorOutput& output, uint32_t channels, size_t count, uint32_t& width, uint32_t& height)
+bool SensorShapeForSize(size_t count, uint32_t channels, uint32_t& width, uint32_t& height)
 {
     if (count == 0 || channels == 0)
         return false;
-    width = output.width;
-    height = output.height;
     const size_t pixels = count / channels;
     if (channels != 0 && count % channels != 0)
         return false;
@@ -855,6 +853,18 @@ bool SensorShape(const caustica::SensorOutput& output, uint32_t channels, size_t
         return height != 0;
     }
     return false;
+}
+
+bool SensorShape(
+    const caustica::SensorOutput& output,
+    uint32_t channels,
+    size_t count,
+    uint32_t& width,
+    uint32_t& height)
+{
+    width = output.width;
+    height = output.height;
+    return SensorShapeForSize(count, channels, width, height);
 }
 
 } // namespace
@@ -875,7 +885,9 @@ nb::object sensorDepthNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.depth.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.depth.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.depth);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
@@ -887,7 +899,9 @@ nb::object sensorNormalNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 3, output.normal.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.normal.size(), 3, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.normal);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
@@ -899,7 +913,9 @@ nb::object sensorInstanceIdNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.instanceId.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.instanceId.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<uint32_t>(output.instanceId);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
@@ -911,7 +927,9 @@ nb::object sensorSemanticIdNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.semanticId.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.semanticId.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<uint32_t>(output.semanticId);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
@@ -923,12 +941,98 @@ nb::object sensorMotionVectorNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 2, output.motionVector.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.motionVector.size(), 2, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.motionVector);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
     return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 2>, nb::c_contig, nb::device::cpu>(
         data->data(), { height, width, 2 }, owner));
+}
+
+nb::object sensorDiffuseNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.diffuse.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.diffuse);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorRoughnessNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.roughness.size(), 1, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.roughness);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorSpecularNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.specular.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.specular);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorMetallicNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.metallic.size(), 1, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.metallic);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorThroughputNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.throughput.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.throughput);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorGuideDiffuseNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.guideWidth ? output.guideWidth : output.width;
+    height = output.guideHeight ? output.guideHeight : output.height;
+    if (!SensorShapeForSize(output.guideDiffuse.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.guideDiffuse);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
 }
 
 void RegisterCoreBindings(nb::module_& m)
@@ -1127,17 +1231,39 @@ void RegisterCoreBindings(nb::module_& m)
         .value("instance_id", Aov::InstanceId)
         .value("semantic_id", Aov::SemanticId)
         .value("motion_vector", Aov::MotionVector)
+        .value("diffuse", Aov::Diffuse)
+        .value("roughness", Aov::Roughness)
+        .value("specular", Aov::Specular)
+        .value("metallic", Aov::Metallic)
+        .value("throughput", Aov::Throughput)
+        .value("guide_diffuse", Aov::GuideDiffuse)
         .value("segmentation", Aov::Segmentation)
         .value("all", Aov::All)
         .def("__or__", [](Aov a, Aov b) { return uint32_t(a) | uint32_t(b); })
         .def("__or__", [](Aov a, uint32_t b) { return uint32_t(a) | b; })
         .def("__ror__", [](Aov a, uint32_t b) { return uint32_t(a) | b; });
 
+    nb::enum_<DebugViewType>(m, "DebugViewType",
+        "Path-tracer / denoiser debug visualization. Overlays the selected buffer on the back buffer.",
+        nb::is_arithmetic())
+        .value("Disabled", DebugViewType::Disabled)
+        .value("DenoiserGuide_Albedo", DebugViewType::DenoiserGuide_Albedo)
+        .value("FirstHit_Diffuse", DebugViewType::FirstHit_Diffuse)
+        .value("FirstHit_Specular", DebugViewType::FirstHit_Specular)
+        .value("FirstHit_Roughness", DebugViewType::FirstHit_Roughness)
+        .export_values();
+
     nb::class_<SensorOutput>(m, "SensorOutput",
         "One captured camera + AOV set. Empty arrays mean the AOV was not requested.")
         .def_ro("name", &SensorOutput::name)
         .def_ro("width", &SensorOutput::width)
         .def_ro("height", &SensorOutput::height)
+        .def_ro("geometry_width", &SensorOutput::geometryWidth)
+        .def_ro("geometry_height", &SensorOutput::geometryHeight)
+        .def_ro("material_width", &SensorOutput::materialWidth)
+        .def_ro("material_height", &SensorOutput::materialHeight)
+        .def_ro("guide_width", &SensorOutput::guideWidth)
+        .def_ro("guide_height", &SensorOutput::guideHeight)
         .def_ro("aovs", &SensorOutput::aovs)
         .def_prop_ro("rgb", [](const SensorOutput& self) { return sensorRgbNumpy(self); },
             "NumPy (H, W, 4) uint8 RGBA, or None.")
@@ -1153,6 +1279,18 @@ void RegisterCoreBindings(nb::module_& m)
             "Alias of instance_id.")
         .def_prop_ro("motion_vector", [](const SensorOutput& self) { return sensorMotionVectorNumpy(self); },
             "NumPy (H, W, 2) float32 screen-space motion in pixels.")
+        .def_prop_ro("diffuse", [](const SensorOutput& self) { return sensorDiffuseNumpy(self); },
+            "NumPy (H, W, 3) float32 first-hit linear diffuse albedo.")
+        .def_prop_ro("roughness", [](const SensorOutput& self) { return sensorRoughnessNumpy(self); },
+            "NumPy (H, W) float32 first-hit perceptual roughness.")
+        .def_prop_ro("specular", [](const SensorOutput& self) { return sensorSpecularNumpy(self); },
+            "NumPy (H, W, 3) float32 first-hit specular F0.")
+        .def_prop_ro("metallic", [](const SensorOutput& self) { return sensorMetallicNumpy(self); },
+            "NumPy (H, W) float32 first-hit metalness.")
+        .def_prop_ro("throughput", [](const SensorOutput& self) { return sensorThroughputNumpy(self); },
+            "NumPy (H, W, 3) float32 primary path throughput.")
+        .def_prop_ro("guide_diffuse", [](const SensorOutput& self) { return sensorGuideDiffuseNumpy(self); },
+            "NumPy (H, W, 3) float32 denoiser diffuse-albedo guide.")
         .def("__repr__", [](const SensorOutput& self) {
             return std::string("<caustica.SensorOutput '") + self.name + "' "
                 + std::to_string(self.width) + "x" + std::to_string(self.height) + ">";
@@ -2109,6 +2247,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("accumulation_target",           &PathTracerSettings::AccumulationTarget)
         .def_rw("reset_accumulation",            &PathTracerSettings::ResetAccumulation)
         .def_rw("reset_realtime_caches",         &PathTracerSettings::ResetRealtimeCaches)
+        .def_rw("freeze_realtime_noise_seed",    &PathTracerSettings::DbgFreezeRealtimeNoiseSeed,
+            "Freeze realtime camera jitter and noise sequences for diagnostics.")
         .def_rw("accumulation_aa",               &PathTracerSettings::AccumulationAA)
         .def_rw("accumulation_prewarm_realtime_caches", &PathTracerSettings::AccumulationPreWarmRealtimeCaches)
 
@@ -2260,6 +2400,14 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("dlss_rr_micro_jitter",          &PathTracerSettings::DLSSRRMicroJitter)
         .def_rw("dlss_rr_brightness_clamp_k",    &PathTracerSettings::DLSSRRBrightnessClampK)
         .def_rw("disable_restirs_with_dlss_rr",  &PathTracerSettings::DisableReSTIRsWithDLSSRR)
+
+        .def_prop_rw("debug_view",
+            [](PathTracerSettings& s) { return int(s.DebugView); },
+            [](PathTracerSettings& s, int v) {
+                s.DebugView = DebugViewType(std::clamp(v, 0, int(DebugViewType::MaxCount)));
+                s.ResetAccumulation = true;
+            },
+            "DebugViewType integer. FirstHit_Diffuse and DenoiserGuide_Albedo dump albedo overlays.")
 
         // Reflex (low latency)
         .def_rw("reflex_mode",                   &PathTracerSettings::ReflexMode,

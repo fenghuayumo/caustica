@@ -1354,8 +1354,15 @@ RGB, linear depth, camera-space normals, stable instance/semantic IDs, and motio
 | Semantic ID | uint32 `H×W` | **0 = unlabeled / miss** |
 | Motion | float32 `H×W×2` | Screen-space pixel motion |
 | Segmentation | | Alias of instance ID |
+| Diffuse | float32 `H×W×3` | First-hit linear diffuse albedo at material-AOV resolution |
+| Roughness | float32 `H×W` | First-hit perceptual roughness at material-AOV resolution |
+| Specular | float32 `H×W×3` | First-hit specular F0 at material-AOV resolution |
+| Metallic | float32 `H×W` | First-hit metalness at material-AOV resolution |
+| Throughput | float32 `H×W×3` | Primary path throughput at material-AOV resolution |
+| Guide diffuse | float32 `H×W×3` | DLSS-RR / denoiser diffuse-albedo guide at its native resolution |
 
 `depth == 0` means a camera-ray miss (including the environment); it is not a far-plane value. `normal`, `instance_id`, and `semantic_id` are also zero on a miss.
+With an upscaler, RGB uses the display resolution while geometry/material/guide AOVs use the renderer's internal resolution. Use `geometry_width`, `geometry_height`, `material_width`, `material_height`, `guide_width`, and `guide_height` for those arrays; `width` and `height` describe RGB.
 
 Motion uses the current camera view minus that camera's previous captured view, in pixels. Caustica keeps history **per camera entity**, so switching between wrist, third-person, and stereo cameras does not leak one camera's history into another. The first captured frame for a camera has zero camera motion; object motion remains available when the renderer has a previous transform.
 
@@ -1628,6 +1635,7 @@ C++ members are PascalCase on `PathTracerSettings` (`EnableGaussianSplats`, …)
 | `ResetRealtimeCaches` | `reset_realtime_caches` | `bool` | ReSTIR / temporal history. |
 | `AccumulationAA` | `accumulation_aa` | `bool` |  |
 | `AccumulationPreWarmRealtimeCaches` | `accumulation_prewarm_realtime_caches` | `bool` |  |
+| `DbgFreezeRealtimeNoiseSeed` | `freeze_realtime_noise_seed` | `bool` | Freeze camera jitter / realtime noise sequences for A/B and AOV diagnostics. |
 | `BounceCount` | `bounce_count` | `int` |  |
 | `DiffuseBounceCount` | `diffuse_bounce_count` | `int` |  |
 | `EnableRussianRoulette` | `enable_russian_roulette` | `bool` |  |
@@ -1770,7 +1778,7 @@ Arithmetic: `int(enum_value)` works and enum values can be assigned to int-backe
 | `OidnQuality` | `Fast=0`, `Balanced=1`, `High=2` |
 | `TextureSlot` | `Base`, `ORM` / `OcclusionRoughnessMetallic`, `Normal`, `CoatNormal`, `Emissive`, `Transmission` |
 | `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment` |
-| `Aov` | `none`, `rgb`, `depth`, `normal`, `instance_id`, `semantic_id`, `motion_vector`, `segmentation` (= instance_id), `all` |
+| `Aov` | `none`, `rgb`, `depth`, `normal`, `instance_id`, `semantic_id`, `motion_vector`, `diffuse`, `roughness`, `specular`, `metallic`, `throughput`, `guide_diffuse`, `segmentation` (= instance_id), `all` |
 | `GaussianSplatSortMode` | `GpuSort=0`, `StochasticSplats=1` |
 | `GaussianSplatPrimaryMethod` | `GS=0` (3DGS), `GUT=1` (3DGUT) |
 | `GaussianSplatStorageFormat` | `Float32=0`, `Float16=1`, `Uint8=2` |

@@ -83,6 +83,8 @@ PathTraceGraphTargets importPathTraceGraphTargets(rg::GraphBuilder& graph, Rende
             rg::TextureAccess::UnorderedAccess),
         .sensorNormalDepth = graph.importTexture(targets.sensorNormalDepth, rg::TextureAccess::UnorderedAccess),
         .sensorIds = graph.importTexture(targets.sensorIds, rg::TextureAccess::UnorderedAccess),
+        .sensorMaterial = graph.importTexture(targets.sensorMaterial, rg::TextureAccess::UnorderedAccess),
+        .sensorSpecular = graph.importTexture(targets.sensorSpecular, rg::TextureAccess::UnorderedAccess),
     };
 }
 
@@ -181,6 +183,8 @@ void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTa
     setup.write(handles.surfaceDataBuffer, rg::BufferAccess::UnorderedAccess);
     setup.write(handles.sensorNormalDepth, rg::TextureAccess::UnorderedAccess);
     setup.write(handles.sensorIds, rg::TextureAccess::UnorderedAccess);
+    setup.write(handles.sensorMaterial, rg::TextureAccess::UnorderedAccess);
+    setup.write(handles.sensorSpecular, rg::TextureAccess::UnorderedAccess);
 }
 
 PathTraceLightingEndTargets importPathTraceLightingEndTargets(

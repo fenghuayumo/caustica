@@ -53,6 +53,8 @@ RWTexture2D<float4>                     u_SSRResult                     : regist
 // Sensor / AOV outputs for robotics (linear view-Z meters, camera-space normal, stable IDs)
 RWTexture2D<float4>                     u_SensorNormalDepth             : register(u88); // xyz camera-space normal, w = |view Z|
 RWTexture2D<uint2>                      u_SensorIds                     : register(u89); // x = instance_id, y = semantic_id
+RWTexture2D<float4>                     u_SensorMaterial                : register(u90); // xyz diffuse albedo, w = roughness
+RWTexture2D<float4>                     u_SensorSpecular                : register(u91); // xyz specular F0, w = metalness
 
 // Ambient occlusion output consumed by deferred lighting
 Texture2D<float>                        t_GTAOOutput                    : register(t86);

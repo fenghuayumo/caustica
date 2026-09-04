@@ -402,7 +402,9 @@ void ApplyCameraExposureToSettings(const CameraRenderProxy& proxy, PathTracerSet
     ToneMappingParameters defaults;
     settings.ToneMappingParams.autoExposure =
         proxy.enableAutoExposure.value_or(defaults.autoExposure);
-    settings.ToneMappingParams.toneMapOperator = defaults.toneMapOperator;
+    // Do not snap to Aces when the camera has no operator. RTXPT only copies
+    // exposure fields here; an unspecified operator must keep the live
+    // Settings / Python value (typically Linear for sequence compares).
     if (proxy.toneMapOperator)
     {
         ToneMapperOperator parsed = defaults.toneMapOperator;

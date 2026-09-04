@@ -76,6 +76,12 @@ void RenderTargets::init(
     sensorIds = device->createTexture(desc);
 
     desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+    desc.debugName = "sensorMaterial";
+    sensorMaterial = device->createTexture(desc);
+    desc.debugName = "sensorSpecular";
+    sensorSpecular = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
     desc.debugName = "denoiserMotionVectors";
     denoiserMotionVectors = device->createTexture(desc);
 
