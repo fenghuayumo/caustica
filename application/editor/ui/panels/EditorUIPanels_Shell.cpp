@@ -1,6 +1,7 @@
 #include "ui/EditorUIInternal.h"
 
 #include "SceneEditor.h"
+#include "common/IconsMaterialSymbols.h"
 #include "common/RecentScenes.h"
 #include "common/TransformGizmo.h"
 
@@ -25,6 +26,235 @@ using namespace caustica::editor;
 
 namespace caustica::editor
 {
+
+namespace
+{
+
+// AOV debug view names — must match DebugViewType.hlsli order.
+constexpr const char* kDebugViewNames[] = {
+    "Lit (Disabled)",
+    "DominantStablePlaneIndex",
+    "StablePlane_VirtualRayLength",
+    "StablePlane_MotionVectors",
+    "StablePlane_Normals",
+    "StablePlane_Roughness",
+    "StablePlane_SpecAvg",
+    "StablePlane_DiffBSDFEstimate",
+    "StablePlane_DiffRadiance",
+    "StablePlane_SpecBSDFEstimate",
+    "StablePlane_SpecRadiance",
+    "StablePlane_RelaxedDisocclusion",
+    "StablePlane_DiffRadianceDenoised",
+    "StablePlane_SpecRadianceDenoised",
+    "StablePlane_CombinedRadianceDenoised",
+    "StablePlane_ViewZ",
+    "StablePlane_Throughput",
+    "StablePlane_DenoiserValidation",
+    "StableRadiance",
+    "DenoiserGuide_Depth",
+    "DenoiserGuide_Roughness",
+    "DenoiserGuide_Albedo",
+    "DenoiserGuide_SpecAlbedo",
+    "DenoiserGuide_Normal",
+    "DenoiserGuide_MotionVectors",
+    "DenoiserGuide_SpecMotionVectors",
+    "DenoiserGuide_SpecHitT",
+    "DenoiserGuide_LayerWeights",
+    "DenoiserGuide_PrimaryLayer",
+    "FirstHit_Barycentrics",
+    "FirstHit_FaceNormal",
+    "FirstHit_GeometryNormal",
+    "FirstHit_ShadingNormal",
+    "FirstHit_ShadingTangent",
+    "FirstHit_ShadingBitangent",
+    "FirstHit_FrontFacing",
+    "FirstHit_ThinSurface",
+    "FirstHit_Diffuse",
+    "FirstHit_Specular",
+    "FirstHit_Roughness",
+    "FirstHit_Metallic",
+    "FirstHit_ShaderID",
+    "FirstHit_MaterialID",
+    "VBufferMotionVectors",
+    "VBufferDepth",
+    "SecondarySurfacePosition",
+    "SecondarySurfaceRadiance",
+    "ReSTIRGIOutput",
+    "ReSTIRDIInitialOutput",
+    "ReSTIRDITemporalOutput",
+    "ReSTIRDISpatialOutput",
+    "ReSTIRDIFinalOutput",
+    "ReSTIRDIFinalContribution",
+    "ReGIRIndirectOutput",
+};
+constexpr int kDebugViewCount = (int)std::size(kDebugViewNames);
+static_assert(kDebugViewCount == (int)DebugViewType::MaxCount,
+    "kDebugViewNames must match DebugViewType enum order");
+
+// Short display label for the viewport button.
+const char* DebugViewShortLabel(DebugViewType view)
+{
+    constexpr const char* shortLabels[] = {
+        "Lit",              // Disabled
+        "StablePlane",
+        "RayLen", "Motion", "Normal", "Roughness",
+        "SpecAvg", "DiffBSDF", "DiffRad", "SpecBSDF", "SpecRad",
+        "Disoccl", "DiffDenoised", "SpecDenoised", "Combined",
+        "ViewZ", "Throughput", "Validation",
+        "StableRadiance",
+        "Guide_Depth", "Guide_Roughness", "Guide_Albedo", "Guide_SpecAlbedo",
+        "Guide_Normal", "Guide_Motion", "Guide_SpecMotion", "Guide_SpecHitT",
+        "Guide_LayerW", "Guide_PrimLayer",
+        "Barycentrics", "FaceNormal", "GeoNormal", "ShadeNormal",
+        "Tangent", "Bitangent", "FrontFacing", "ThinSurface",
+        "Diffuse", "Specular", "Roughness", "Metallic",
+        "ShaderID", "MaterialID",
+        "VBufMotion", "VBufDepth",
+        "SecPosition", "SecRadiance", "ReSTIRGI",
+        "ReSTIRD Init", "ReSTIRD Temp", "ReSTIRD Spatial", "ReSTIRD Final",
+        "ReSTIRD Contrib", "ReGIR Indirect",
+    };
+    const int idx = (int)view;
+    return (idx >= 0 && idx < (int)std::size(shortLabels)) ? shortLabels[idx] : "???";
+}
+
+} // namespace
+
+void EditorUI::BuildViewportAOVSelector(const ImVec2& origin, float height)
+{
+#if ENABLE_DEBUG_VIZUALISATIONS
+    const DebugViewType currentView = m_settings.DebugView;
+    const char* currentLabel = DebugViewShortLabel(currentView);
+    const bool viewActive = currentView != DebugViewType::Disabled;
+
+    char visible[80];
+    std::snprintf(
+        visible,
+        sizeof(visible),
+        "%s  %s  %s",
+        ICON_MS_LAYERS,
+        currentLabel,
+        ICON_MS_ARROW_DROP_DOWN);
+    char label[96];
+    std::snprintf(label, sizeof(label), "%s##ViewportViewMode", visible);
+
+    const ImVec2 textSize = ImGui::CalcTextSize(visible);
+    const float padX = 10.f;
+    const float width = textSize.x + padX * 2.f;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(
+        origin,
+        ImVec2(origin.x + width, origin.y + height),
+        viewActive ? IM_COL32(64, 102, 158, 230) : IM_COL32(22, 24, 28, 210),
+        6.f);
+    dl->AddRect(
+        origin,
+        ImVec2(origin.x + width, origin.y + height),
+        IM_COL32(255, 255, 255, 24),
+        6.f,
+        0,
+        1.0f);
+
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padX, 0.f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.f, 1.f, 1.f, 0.08f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.f, 1.f, 1.f, 0.14f));
+    if (viewActive)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.82f, 0.90f, 1.0f, 1.0f));
+
+    const bool openPopup = ImGui::Button(label, ImVec2(width, height));
+
+    if (viewActive)
+        ImGui::PopStyleColor();
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
+
+    // Show tooltip with the full name when abbreviated.
+    if (ImGui::IsItemHovered())
+    {
+        if (viewActive)
+            ImGui::SetTooltip("View Mode: %s\nClick to change debug/AOV buffer", currentLabel);
+        else
+            ImGui::SetTooltip("View Mode: Lit (default render)\nClick to select debug/AOV buffer");
+    }
+
+    if (openPopup)
+        ImGui::OpenPopup("##ViewportDebugViewPopup");
+
+    // Categorized dropdown popup.
+    if (ImGui::BeginPopup("##ViewportDebugViewPopup"))
+    {
+        auto& vp = m_editorUI.Viewport;
+        vp.OverlayHovered = true;
+
+        // Viewport menu intentionally stays compact: the default render plus
+        // the two most useful debug groups. The full list (denoiser guides,
+        // stable planes, ReSTIR) remains in Post Process > Debug switches.
+        if (ImGui::Selectable(DebugViewShortLabel(DebugViewType::Disabled),
+                currentView == DebugViewType::Disabled))
+        {
+            m_settings.DebugView = DebugViewType::Disabled;
+            m_settings.ResetAccumulation = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SeparatorText("First Hit");
+        constexpr DebugViewType firstHitViews[] = {
+            DebugViewType::FirstHit_Barycentrics,
+            DebugViewType::FirstHit_FaceNormal,
+            DebugViewType::FirstHit_GeometryNormal,
+            DebugViewType::FirstHit_ShadingNormal,
+            DebugViewType::FirstHit_ShadingTangent,
+            DebugViewType::FirstHit_ShadingBitangent,
+            DebugViewType::FirstHit_FrontFacing,
+            DebugViewType::FirstHit_ThinSurface,
+            DebugViewType::FirstHit_Diffuse,
+            DebugViewType::FirstHit_Specular,
+            DebugViewType::FirstHit_Roughness,
+            DebugViewType::FirstHit_Metallic,
+            DebugViewType::FirstHit_ShaderID,
+            DebugViewType::FirstHit_MaterialID,
+        };
+        for (auto v : firstHitViews)
+        {
+            if (ImGui::Selectable(DebugViewShortLabel(v), currentView == v))
+            {
+                m_settings.DebugView = v;
+                m_settings.ResetAccumulation = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+
+        ImGui::SeparatorText("V-Buffer");
+        constexpr DebugViewType vBufferViews[] = {
+            DebugViewType::VBufferMotionVectors,
+            DebugViewType::VBufferDepth,
+        };
+        for (auto v : vBufferViews)
+        {
+            if (ImGui::Selectable(DebugViewShortLabel(v), currentView == v))
+            {
+                m_settings.DebugView = v;
+                m_settings.ResetAccumulation = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+
+        ImGui::EndPopup();
+    }
+
+    // The button + popup eat viewport hover so camera doesn't rotate when clicking it.
+    if (ImGui::IsItemHovered() || ImGui::IsPopupOpen("##ViewportDebugViewPopup"))
+    {
+        auto& vp = m_editorUI.Viewport;
+        vp.Hovered = false;
+        vp.OverlayHovered = true;
+    }
+#endif // ENABLE_DEBUG_VIZUALISATIONS
+}
 
 namespace
 {
@@ -443,6 +673,12 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
             vp.Hovered = false;
             vp.OverlayHovered = true;
         }
+
+        // AOV / Debug view selector — same row as the gizmo toolbar.
+        constexpr float kViewModeGap = 6.f;
+        BuildViewportAOVSelector(
+            ImVec2(canvasPos.x + kToolbarPad + toolbarW + kViewModeGap, canvasPos.y + kToolbarPad),
+            toolbarH);
     }
 
     TryOpenSceneCreatePopupOnRightClick(

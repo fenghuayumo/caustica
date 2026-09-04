@@ -1,5 +1,6 @@
 #include "ui/EditorUIInternal.h"
 #include <engine/RenderSessionApi.h>
+#include <engine/RenderTextureDebugApi.h>
 #include <engine/App.h>
 
 #include "SceneEditor.h"
@@ -287,6 +288,7 @@ void EditorUI::buildUI(void)
     BuildMaterialEditorPanel(layout);
     BuildPostProcessPanel(layout);
     BuildDeltaTreeExplorerPanel(layout);
+    BuildTextureVisWindow();
     if (m_editorUI.Viewport.ShowHierarchy)
         BuildHierarchyPanel(layout);
     BuildGameStandalonePanel(layout);
@@ -334,3 +336,89 @@ bool EditorUI::CheckboxUInt32(const char* label, uint32_t* v)
 }
 
 } // namespace caustica::editor
+
+// Texture debug vis window (driven by the `vis <name>` console command or the
+// in-window combo). Resolves the selected RenderTargets texture by name every
+// frame, so a render-target recreate simply clears the view until the next
+// frame publishes a fresh pointer.
+void EditorUI::BuildTextureVisWindow()
+{
+    if (!m_editorUI.ShowTextureVisWindow)
+        return;
+
+    if (!ImGui::Begin("Texture Debug View", &m_editorUI.ShowTextureVisWindow))
+    {
+        ImGui::End();
+        return;
+    }
+
+    App* app = m_sceneEditor.app();
+    if (!app)
+    {
+        ImGui::TextDisabled("Renderer not available.");
+        ImGui::End();
+        return;
+    }
+
+    // Texture picker (mouse-driven alternative to the console command).
+    {
+        const uint32_t count = caustica::debugViewTextureCount(*app);
+        const char* preview = m_editorUI.TextureVisSelection.empty()
+            ? "<select texture>"
+            : m_editorUI.TextureVisSelection.c_str();
+        if (ImGui::BeginCombo("##TextureVisPick", preview))
+        {
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                const char* name = nullptr;
+                if (!caustica::debugViewTextureInfo(*app, i, &name, nullptr) || !name)
+                    continue;
+                const bool selected = m_editorUI.TextureVisSelection == name;
+                if (ImGui::Selectable(name, selected))
+                    m_editorUI.TextureVisSelection = name;
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("('vis <name>' in console)");
+    }
+
+    if (m_editorUI.TextureVisSelection.empty())
+    {
+        ImGui::TextDisabled("Select a texture to visualize.");
+        ImGui::End();
+        return;
+    }
+
+    caustica::rhi::Texture* texture =
+        caustica::findDebugViewTexture(*app, m_editorUI.TextureVisSelection);
+    if (!texture)
+    {
+        ImGui::TextDisabled("'%s' is not available this frame.",
+            m_editorUI.TextureVisSelection.c_str());
+        ImGui::End();
+        return;
+    }
+
+    const caustica::rhi::TextureDesc& desc = texture->getDesc();
+    ImGui::TextUnformatted(m_editorUI.TextureVisSelection.c_str());
+    ImGui::TextDisabled("%u x %u  mip %u", desc.width, desc.height, desc.mipLevels);
+
+    // Aspect-fit into the remaining content region.
+    const ImVec2 avail = ImGui::GetContentRegionAvail();
+    const float aspect = (desc.height > 0)
+        ? (float(desc.width) / float(desc.height))
+        : 1.f;
+    ImVec2 size = avail;
+    if (avail.x / avail.y > aspect)
+        size.x = avail.y * aspect;
+    else
+        size.y = avail.x / aspect;
+    size.x = std::max(1.f, size.x);
+    size.y = std::max(1.f, size.y);
+
+    ImGui::Image(ImTextureRef(texture), size);
+    ImGui::End();
+}

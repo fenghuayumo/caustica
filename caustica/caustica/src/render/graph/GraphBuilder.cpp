@@ -2336,6 +2336,19 @@ caustica::rhi::Texture* GraphBuilder::resolveTexture(TextureHandle handle) const
     return m_textures[handle.index].texture;
 }
 
+std::vector<GraphBuilder::NamedTexture> GraphBuilder::namedTextureSnapshot() const
+{
+    std::vector<NamedTexture> snapshot;
+    snapshot.reserve(m_textures.size());
+    for (const GraphTexture& entry : m_textures)
+    {
+        if (entry.desc.name.empty() || entry.texture == nullptr)
+            continue;
+        snapshot.push_back(NamedTexture{ entry.desc.name, entry.texture });
+    }
+    return snapshot;
+}
+
 caustica::rhi::Buffer* GraphBuilder::resolveBuffer(BufferHandle handle) const
 {
     assert((!handle.isValid() || isHandleCurrent(handle)) && "RenderGraph buffer handle is stale after reset()");

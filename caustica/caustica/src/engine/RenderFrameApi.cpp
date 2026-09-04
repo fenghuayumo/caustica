@@ -10,6 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/RenderTextureDebugApi.h>
 #include <engine/Time.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
@@ -557,3 +558,25 @@ double& sceneTimeRef(App& app)
 }
 
 } // namespace caustica
+
+uint32_t caustica::debugViewTextureCount(const App& app)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->debugViewTextureCount() : 0;
+}
+
+bool caustica::debugViewTextureInfo(
+    const App& app,
+    uint32_t index,
+    const char** outName,
+    rhi::Texture** outTexture)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->debugViewTextureInfo(index, outName, outTexture) : false;
+}
+
+caustica::rhi::Texture* caustica::findDebugViewTexture(const App& app, std::string_view name)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->findDebugViewTexture(name) : nullptr;
+}

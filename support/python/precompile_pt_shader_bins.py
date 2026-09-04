@@ -130,7 +130,9 @@ def base_global_macro_map() -> dict[str, str]:
     # so --force can overwrite the pre-OpenPBR ClosestHit bins still referenced at runtime.
     return {
         # "CAUSTICA_STANDARD_MATERIAL_DATA_BYTES": STANDARD_MATERIAL_DATA_BYTES,
-        "ENABLE_DEBUG_SURFACE_VIZ": "0",
+        # Runtime-gated by g_Const.debug.debugViewType. Keep in sync with
+        # PtPipelineFeaturePresets.cpp::fillBaseMacros.
+        "ENABLE_DEBUG_SURFACE_VIZ": "1",
         "ENABLE_DEBUG_LINES_VIZ": "0",
         "USE_NVAPI_HIT_OBJECT_EXTENSION": "0",
         "USE_NVAPI_REORDER_THREADS": "0",

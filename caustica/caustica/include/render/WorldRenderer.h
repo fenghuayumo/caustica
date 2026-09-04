@@ -27,6 +27,7 @@
 #include <render/ecs/RenderFrameContext.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/RenderBufferPool.h>
+#include <render/graph/GraphBuilder.h>
 #include <render/PathTracingFrameContext.h>
 
 #include <chrono>
@@ -35,6 +36,10 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <vector>
 #include <string>
 #include <vector>
 
@@ -137,6 +142,21 @@ public:
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
+    // Debug texture vis (editor `vis <name>` console command / texture viewer).
+    // Merges canonical RenderTargets textures with the last frame graph's
+    // named textures (rg::TextureDesc::name), so new graph passes that name
+    // their createTexture() targets are `vis`-able automatically.
+    [[nodiscard]] uint32_t debugViewTextureCount() const;
+    [[nodiscard]] bool debugViewTextureInfo(
+        uint32_t index, const char** outName, caustica::rhi::Texture** outTexture) const;
+    [[nodiscard]] caustica::rhi::Texture* findDebugViewTexture(std::string_view name) const;
+    struct DebugNamedTexture
+    {
+        std::string name;
+        caustica::rhi::Texture* texture = nullptr;
+    };
+    [[nodiscard]] std::vector<DebugNamedTexture> debugTextureList() const;
+
     [[nodiscard]] bool hasSceneBindingSet() const { return m_sceneBindings.ready(); }
 
     // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
@@ -219,6 +239,9 @@ private:
     rg::RenderTargetPool         m_renderTargetPool;
     rg::RenderBufferPool         m_renderBufferPool;
     RenderFrameContext           m_renderFrameCtx{};
+    // Last executed frame's named graph textures, for editor texture vis.
+    mutable std::mutex                               m_debugTextureSnapshotMutex;
+    std::vector<rg::GraphBuilder::NamedTexture>      m_debugTextureSnapshot;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<PathTracePass>              m_pathTracePass;

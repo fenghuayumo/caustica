@@ -50,6 +50,9 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cctype>
+#include <iterator>
+#include <string_view>
 #include <string>
 #include <assets/loader/ShaderFactory.h>
 #include <render/gpuSort/GPUSort.h>
@@ -271,6 +274,8 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(87));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(88));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(89));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(90));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(91));
 
     m_bindingLayout = gpuDevice->createBindingLayout(globalBindingLayoutDesc);
 }
@@ -1019,6 +1024,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(88, m_renderTargets->sensorNormalDepth));
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(89, m_renderTargets->sensorIds));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(90, m_renderTargets->sensorMaterial));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(91, m_renderTargets->sensorSpecular));
 
         caustica::rhi::BindingSetHandle bindingSet =
             device()->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -1527,3 +1534,133 @@ void caustica::render::WorldRenderer::nativeDLSSPreRender()
 }
 #endif
 
+
+
+// ----------------------------------------------------------------------------
+// Debug texture vis (editor `vis <name>` console command / texture viewer).
+// Merges two sources:
+//   1. Canonical RenderTargets textures (frame-persistent members).
+//   2. The last executed frame graph's named textures — any pass that names its
+//      rg::createTexture() targets becomes `vis <name>`-able automatically.
+// The graph snapshot is captured after graph->execute() on the render thread
+// and read from the UI thread; a small mutex keeps the pointer vector stable.
+// Note: transient pooled textures may be aliased by later same-frame passes,
+// so a vis'd scratch texture can legitimately show post-alias content.
+// ----------------------------------------------------------------------------
+namespace caustica::render
+{
+namespace
+{
+struct DebugViewTextureEntry
+{
+    const char* name;
+    caustica::rhi::TextureHandle RenderTargets::* handle;
+};
+
+constexpr DebugViewTextureEntry kDebugViewTextures[] = {
+    { "outputColor", &RenderTargets::outputColor },
+    { "processedOutputColor", &RenderTargets::processedOutputColor },
+    { "accumulatedRadiance", &RenderTargets::accumulatedRadiance },
+    { "ldrColor", &RenderTargets::ldrColor },
+    { "depth", &RenderTargets::depth },
+    { "screenMotionVectors", &RenderTargets::screenMotionVectors },
+    { "baseColor", &RenderTargets::baseColor },
+    { "specNormal", &RenderTargets::specNormal },
+    { "roughnessMetal", &RenderTargets::roughnessMetal },
+    { "materialInfo", &RenderTargets::materialInfo },
+    { "specularHitT", &RenderTargets::specularHitT },
+    { "throughput", &RenderTargets::throughput },
+    { "sensorNormalDepth", &RenderTargets::sensorNormalDepth },
+    { "sensorMaterial", &RenderTargets::sensorMaterial },
+    { "sensorSpecular", &RenderTargets::sensorSpecular },
+    { "sensorIds", &RenderTargets::sensorIds },
+    { "denoiserViewspaceZ", &RenderTargets::denoiserViewspaceZ },
+    { "denoiserMotionVectors", &RenderTargets::denoiserMotionVectors },
+    { "denoiserNormalRoughness", &RenderTargets::denoiserNormalRoughness },
+    { "denoiserDiffRadianceHitDist", &RenderTargets::denoiserDiffRadianceHitDist },
+    { "denoiserSpecRadianceHitDist", &RenderTargets::denoiserSpecRadianceHitDist },
+    { "denoiserOutValidation", &RenderTargets::denoiserOutValidation },
+    { "stableRadiance", &RenderTargets::stableRadiance },
+    { "secondarySurfacePositionNormal", &RenderTargets::secondarySurfacePositionNormal },
+    { "secondarySurfaceRadiance", &RenderTargets::secondarySurfaceRadiance },
+    { "ssrResult", &RenderTargets::ssrResult },
+    { "combinedHistoryClampRelax", &RenderTargets::combinedHistoryClampRelax },
+    { "rrDiffuseAlbedo", &RenderTargets::rrDiffuseAlbedo },
+    { "rrSpecAlbedo", &RenderTargets::rrSpecAlbedo },
+    { "rrNormalsAndRoughness", &RenderTargets::rrNormalsAndRoughness },
+    { "rrSpecMotionVectors", &RenderTargets::rrSpecMotionVectors },
+};
+
+bool DebugNameIEquals(std::string_view a, std::string_view b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i])))
+            return false;
+    return true;
+}
+
+} // namespace
+
+std::vector<WorldRenderer::DebugNamedTexture> WorldRenderer::debugTextureList() const
+{
+    std::vector<DebugNamedTexture> list;
+    if (m_renderTargets != nullptr)
+    {
+        for (const DebugViewTextureEntry& entry : kDebugViewTextures)
+        {
+            const caustica::rhi::TextureHandle& handle = m_renderTargets.get()->*entry.handle;
+            if (handle)
+                list.push_back({ entry.name, handle.Get() });
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+    for (const rg::GraphBuilder::NamedTexture& named : m_debugTextureSnapshot)
+    {
+        if (named.texture == nullptr)
+            continue;
+        bool duplicate = false;
+        for (const DebugNamedTexture& existing : list)
+        {
+            if (DebugNameIEquals(existing.name, named.name))
+            {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate)
+            list.push_back({ named.name, named.texture });
+    }
+    return list;
+}
+
+uint32_t WorldRenderer::debugViewTextureCount() const
+{
+    return static_cast<uint32_t>(debugTextureList().size());
+}
+
+bool WorldRenderer::debugViewTextureInfo(
+    uint32_t index, const char** outName, caustica::rhi::Texture** outTexture) const
+{
+    const std::vector<DebugNamedTexture> list = debugTextureList();
+    if (index >= list.size())
+        return false;
+    if (outName)
+        *outName = list[index].name.c_str();
+    if (outTexture)
+        *outTexture = list[index].texture;
+    return true;
+}
+
+caustica::rhi::Texture* WorldRenderer::findDebugViewTexture(std::string_view name) const
+{
+    for (const DebugNamedTexture& entry : debugTextureList())
+        if (DebugNameIEquals(entry.name, name))
+            return entry.texture;
+    return nullptr;
+}
+
+} // namespace caustica::render

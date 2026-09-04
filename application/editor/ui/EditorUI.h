@@ -105,6 +105,7 @@ private:
     void BuildInspectorPanel(const PanelLayout& layout);
     void BuildMaterialEditorPanel(const PanelLayout& layout);
     void BuildDeltaTreeExplorerPanel(const PanelLayout& layout);
+    void BuildTextureVisWindow();
     void BuildHierarchyPanel(const PanelLayout& layout);
     void BuildGameStandalonePanel(const PanelLayout& layout);
     void BuildTimelinePanel(const PanelLayout& layout);
@@ -113,6 +114,7 @@ private:
     void BuildStatusBar();
     void BuildDockSpace();
     void BuildViewportPanel(const PanelLayout& layout);
+    void BuildViewportAOVSelector(const ImVec2& origin, float height);
     void UpdateMaterialPickerCursor();
 
 public:

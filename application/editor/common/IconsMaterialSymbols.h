@@ -31,6 +31,8 @@
 #define ICON_MS_ADD                   "\xee\x85\x85" // U+e145
 #define ICON_MS_SAVE                  "\xee\x85\xa1" // U+e161
 #define ICON_MS_ARROW_SELECTOR_TOOL   "\xef\xa0\xaf" // U+f82f
+#define ICON_MS_LAYERS                "\xee\x94\xbb" // U+e53b  stacked layers (view / AOV)
+#define ICON_MS_ARROW_DROP_DOWN       "\xee\x97\x85" // U+e5c5
 
 // Console Log / Output Log toolbar
 #define ICON_MS_DELETE_SWEEP          "\xee\x85\xac" // U+e16c  clear log

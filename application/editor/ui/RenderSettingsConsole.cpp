@@ -6,6 +6,8 @@
 #include <core/console/ConsoleInterpreter.h>
 #include <core/console/ConsoleObjects.h>
 #include <core/log.h>
+#include <engine/App.h>
+#include <engine/RenderTextureDebugApi.h>
 
 #include <algorithm>
 #include <cctype>
@@ -69,6 +71,7 @@ std::string Lower(std::string_view value)
 struct Registry
 {
     EditorUIData* active = nullptr;
+    std::function<App*()> appProvider;
     bool initialized = false;
 };
 
@@ -225,6 +228,82 @@ void AddAction(
             return { false, "No active editor render settings." };
         action(*current.active);
         return { true, nameString + " executed" };
+    };
+    caustica::console::registerCommand(desc);
+}
+
+// UE-style `vis <name>` — display a named render-target texture in the editor
+// texture viewer window.
+//   vis            -> list available texture names
+//   vis <name>     -> show <name> in the viewer (e.g. vis depth, vis baseColor)
+//   vis off        -> close the viewer
+void AddVisCommand()
+{
+    caustica::console::CommandDesc desc;
+    desc.name = "vis";
+    desc.description =
+        "Visualize a render-target texture in the editor.\n"
+        "  vis          list available textures\n"
+        "  vis <name>   show <name> (e.g. vis depth, vis baseColor)\n"
+        "  vis off      close the viewer";
+    desc.on_execute = [](const caustica::console::Command::Args& args)
+        -> caustica::console::Command::Result
+    {
+        Registry& current = GetRegistry();
+        EditorUIData* ui = current.active;
+        if (!ui)
+            return { false, "No active editor render settings." };
+
+        App* app = current.appProvider ? current.appProvider() : nullptr;
+        if (!app)
+            return { false, "Renderer not available." };
+
+        // No args: list available texture names.
+        if (args.empty())
+        {
+            std::string output = "Available textures:\n";
+            const uint32_t count = caustica::debugViewTextureCount(*app);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                const char* name = nullptr;
+                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && name)
+                    output += std::string("  ") + name + "\n";
+            }
+            return { true, output };
+        }
+
+        const std::string& name = args[0];
+        if (Lower(name) == "off" || Lower(name) == "none")
+        {
+            ui->editor.ShowTextureVisWindow = false;
+            ui->editor.TextureVisSelection.clear();
+            return { true, "Texture vis closed." };
+        }
+
+        if (!caustica::findDebugViewTexture(*app, name))
+            return { false, "Unknown texture '" + name + "'. Run 'vis' for the list." };
+
+        ui->editor.TextureVisSelection = name;
+        ui->editor.ShowTextureVisWindow = true;
+        return { true, "Visualizing '" + name + "'." };
+    };
+    desc.on_suggest = [](std::string_view, size_t)
+        -> std::vector<std::string>
+    {
+        std::vector<std::string> suggestions;
+        Registry& current = GetRegistry();
+        if (App* app = current.appProvider ? current.appProvider() : nullptr)
+        {
+            const uint32_t count = caustica::debugViewTextureCount(*app);
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                const char* name = nullptr;
+                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && name)
+                    suggestions.push_back(name);
+            }
+        }
+        suggestions.push_back("off");
+        return suggestions;
     };
     caustica::console::registerCommand(desc);
 }
@@ -529,6 +608,8 @@ void InitializeEntries()
     };
     caustica::console::registerBoundVariable<std::string>(profile);
 
+    AddVisCommand();
+
 #undef SETTING_ACCESS
 }
 
@@ -542,10 +623,23 @@ RenderSettingsConsoleBinding::RenderSettingsConsoleBinding(EditorUIData& ui)
     InitializeEntries();
 }
 
+RenderSettingsConsoleBinding::RenderSettingsConsoleBinding(
+    EditorUIData& ui,
+    std::function<App*()> appProvider)
+    : m_ui(&ui)
+    , m_appProvider(std::move(appProvider))
+    , m_interpreter(std::make_shared<caustica::console::Interpreter>())
+{
+    GetRegistry().active = &ui;
+    GetRegistry().appProvider = m_appProvider;
+    InitializeEntries();
+}
+
 RenderSettingsConsoleBinding::~RenderSettingsConsoleBinding()
 {
     if (GetRegistry().active == m_ui)
         GetRegistry().active = nullptr;
+    GetRegistry().appProvider = nullptr;
 }
 
 bool RenderSettingsConsoleBinding::execute(

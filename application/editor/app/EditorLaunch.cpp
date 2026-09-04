@@ -149,7 +149,9 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
     editor.bindEngine(*engine);
 
     InitializeEditorUIDataFromCommandLine(editor.uiData(), editor.cmdLine());
-    editor.setConsole(std::make_unique<RenderSettingsConsoleBinding>(editor.uiData()));
+    editor.setConsole(std::make_unique<RenderSettingsConsoleBinding>(
+        editor.uiData(),
+        [&editor]() -> caustica::App* { return editor.app(); }));
     ApplyConsoleSets(editor, true);
 
     const bool automatedRun = editor.cmdLine().nonInteractive

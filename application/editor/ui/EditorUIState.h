@@ -55,6 +55,10 @@ struct EditorWindowState
     bool ShowConsole = false;
     // UE-style overlay command bar (toggle with `). Separate from the Console log panel.
     bool ShowCommandBar = false;
+    // Texture debug vis (`vis <name>` console command). Holds the selected
+    // RenderTargets texture name; resolved to a GPU texture each UI frame.
+    bool ShowTextureVisWindow = false;
+    std::string TextureVisSelection;
     bool ShowSceneTweakerWindow = false;
     bool ShowDeltaTree = false;
     bool ShowMaterialEditor = true;

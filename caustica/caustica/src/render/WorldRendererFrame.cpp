@@ -257,6 +257,19 @@ void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
     if (ctx.frame.aborted)
         return;
 
+    // Debug overlay composites AFTER the graph's final blit, directly onto the
+    // presented framebuffer (editor viewport FB or swapchain). Recording it
+    // earlier gets overwritten by the graph-owned tone-mapping write to ldrColor.
+    if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
+    {
+        caustica::rhi::Framebuffer* presentFb = ctx.frame.framebuffer;
+        m_shaderDebug->endFrameAndOutput(
+            m_frameCommands->primary(),
+            presentFb,
+            m_renderTargets->depth,
+            presentFb->getFramebufferInfo().getViewport());
+    }
+
     framePassFinalize(ctx.frame);
 }
 
@@ -285,18 +298,6 @@ FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameCo
 
     ctx.commandListWasClosed = false;
     ctx.graphBuilt = true;
-
-    caustica::rhi::Framebuffer* framebuffer = ctx.frame.framebuffer;
-    const auto& fbinfo = framebuffer->getFramebufferInfo();
-
-    if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
-    {
-        m_shaderDebug->endFrameAndOutput(
-            m_frameCommands->primary(),
-            m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.view.postProcessView),
-            m_renderTargets->depth,
-            fbinfo.getViewport());
-    }
 
     return makeFrameGraphContext(ctx);
 }
@@ -365,6 +366,13 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         ctx.graph->lastCompileCacheHit());
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();
+
+    // Debug texture vis: publish this frame's named graph textures for the
+    // editor `vis` command / texture viewer (UI thread reads the snapshot).
+    {
+        std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+        m_debugTextureSnapshot = ctx.graph->namedTextureSnapshot();
+    }
 
     // ToneMapping / ReferenceOIDN may close+reopen primary mid-graph; they rewrite
     // FrameConstants before later passes. A final rewrite covers any leftover use.
@@ -453,17 +461,18 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         return;
     }
 
-    const bool environmentLightPresent = std::any_of(
+    const bool distantLightPresent = std::any_of(
         m_context->frameLights().begin(),
         m_context->frameLights().end(),
         [](const scene::LightRenderProxy& light) {
-            return scene::tryGetEnvironmentLightData(light.data) != nullptr;
+            return scene::tryGetEnvironmentLightData(light.data) != nullptr
+                || scene::tryGetDirectionalLightData(light.data) != nullptr;
         });
     caustica::syncEnvMapSceneParams(
         m_context->activeSettings(),
         m_context->scenePasses.lighting.envMapSceneParams(),
         c_envMapRadianceScale,
-        environmentLightPresent);
+        distantLightPresent);
 
     if (m_context->scenePasses.rayTracing.consumeShaderReloadRequest())
     {

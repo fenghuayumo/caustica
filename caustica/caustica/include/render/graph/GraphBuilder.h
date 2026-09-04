@@ -194,6 +194,15 @@ public:
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
     [[nodiscard]] TextureHandle findTexture(std::string_view name) const;
+    // Debug texture vis: name + resolved device pointer for every named graph
+    // texture of the last compiled/ executed frame. Empty names are skipped;
+    // transient pooled entries may alias later passes in the same frame.
+    struct NamedTexture
+    {
+        std::string name;
+        caustica::rhi::Texture* texture = nullptr;
+    };
+    [[nodiscard]] std::vector<NamedTexture> namedTextureSnapshot() const;
     // Rebase a handle to the resource's latest write version (after another pass wrote it).
     [[nodiscard]] TextureHandle currentTexture(TextureHandle handle) const;
     [[nodiscard]] caustica::rhi::TextureHandle ownedTextureHandle(TextureHandle handle) const;

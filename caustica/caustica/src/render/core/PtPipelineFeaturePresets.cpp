@@ -54,7 +54,9 @@ void fillBaseMacros(std::vector<caustica::ShaderMacro>& macros)
     // When enabling this, also uncomment the matching entry in
     // support/python/precompile_pt_shader_bins.py and recook with --force.
     // macros.push_back({ "CAUSTICA_STANDARD_MATERIAL_DATA_BYTES", std::to_string(sizeof(StandardMaterialData)) });
-    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ", "0" });
+    // Runtime-gated by g_Const.debug.debugViewType (early-out when Disabled).
+    // Keep in sync with support/python/precompile_pt_shader_bins.py.
+    macros.push_back({ "ENABLE_DEBUG_SURFACE_VIZ", "1" });
     macros.push_back({ "ENABLE_DEBUG_LINES_VIZ", "0" });
     macros.push_back({ "USE_NVAPI_HIT_OBJECT_EXTENSION", "0" });
     macros.push_back({ "USE_NVAPI_REORDER_THREADS", "0" });
