@@ -95,6 +95,7 @@ namespace Bridge
     // There's a relatively high cost to this when used in large shaders just due to register allocation required for alphaTest, even if all geometries are opaque.
     // Consider simplifying alpha testing - perhaps splitting it up from the main geometry path, load it with fewer indirections or something like that.
     static float3 traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug);
+    static float3 traceVisibilityRayImpl(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug, uint rayFlags, out bool hitCullableBackface);
 
     // Opaque closest-hit query used by RTXCR subsurface projection and
     // transmission rays. The caller decides whether back faces are culled.

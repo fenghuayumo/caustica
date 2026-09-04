@@ -234,6 +234,9 @@ struct StandardMaterial : public StandardMaterialBase
     // The mesh will not be part of NEE.
     bool                    excludeFromNEE                      = false;
 
+    // Asset-specific visibility override for closed double-sided shells.
+    bool                    cullVisibilityBackfaces             = false;
+
     // will not propagate dominant stable plane when doing path space decomposition
     bool                    psdExclude                          = true;
     // for path space decomposition: -1 means no dominant; 0 usually means transmission, 1 usually means reflection, 2 usually means clearcoat reflection - must match corresponding BSDFSample::getDeltaLobeIndex()!

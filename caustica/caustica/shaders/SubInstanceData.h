@@ -14,7 +14,8 @@ struct SubInstanceData  // could have been called GeometryInstanceData but that'
 {
     static const int Flags_AlphaTested      	= (1<<16);
     static const int Flags_ExcludeFromNEE    	= (1<<17);
-    static const int Flags_Dummy0               = (1<<18); // free up to (1<<23)
+    static const int Flags_CullVisibilityBackface = (1<<18);
+    static const int Flags_Dummy0               = (1<<19); // free up to (1<<23)
 
     static const int Flags_AlphaOffsetMask      = (0xFF000000);
     static const int Flags_AlphaOffsetOffset    = (24);

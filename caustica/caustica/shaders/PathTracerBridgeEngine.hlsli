@@ -1242,14 +1242,11 @@ bool Bridge::AlphaTestVisibilityRay(uint instanceID, uint instanceIndex, uint ge
 
 // There's a relatively high cost to this when used in large shaders just due to register allocation required for alphaTest, even if all geometries are opaque.
 // Consider simplifying alpha testing - perhaps splitting it up from the main geometry path, load it with fewer indirections or something like that.
-float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug)
+float3 Bridge::traceVisibilityRayImpl(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug, uint rayFlags, out bool hitCullableBackface)
 {
     CAUSTICA_RayQuery(RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
-    // Match RTXCR's default character path: shadow rays only test front faces.
-    // Closed thin geometry such as spectacle rims otherwise contributes both
-    // sides to visibility and produces the unnaturally dense bands visible on
-    // the cheeks and lower eyelids.
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xff, ray);
+    rayQuery.TraceRayInline(SceneBVH, rayFlags, 0xff, ray);
+    hitCullableBackface = false;
 
     float3 transmittance = float3(1, 1, 1);
     uint insideTransparentMaterialID = 0xFFFFFFFFu;
@@ -1268,6 +1265,14 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
 
             bool excludeFromNEE = (subInstanceData.FlagsAndAlphaInfo & SubInstanceData::Flags_ExcludeFromNEE) != 0;
             if (excludeFromNEE)
+                continue;
+
+            // Special asset-specific double-shell geometry can hide from a
+            // back-facing boundary. Unlike the generic RTXPT visibility path,
+            // skip only these tagged boundaries; leave all other closed or
+            // imperfectly wound meshes double-sided.
+            if ((subInstanceData.FlagsAndAlphaInfo & SubInstanceData::Flags_CullVisibilityBackface) != 0
+                && !rayQuery.CandidateTriangleFrontFace())
                 continue;
 
             [branch]if (AlphaTestImpl(subInstanceData, candidatePrimitiveIndex, candidateBarycentrics))
@@ -1325,7 +1330,21 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
 #endif
 
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        const uint committedInstanceID = rayQuery.CommittedInstanceID();
+        const uint committedGeometryIndex = rayQuery.CommittedGeometryIndex();
+        SubInstanceData committedSubInstanceData = t_SubInstanceData[committedInstanceID + committedGeometryIndex];
+
+        if (rayFlags == RAY_FLAG_NONE
+            && (committedSubInstanceData.FlagsAndAlphaInfo & SubInstanceData::Flags_CullVisibilityBackface) != 0
+            && !rayQuery.CommittedTriangleFrontFace())
+        {
+            hitCullableBackface = true;
+            return float3(1, 1, 1);
+        }
+
         return float3(0, 0, 0);
+    }
 
     if (insideTransparentMaterialID != 0xFFFFFFFFu && insideTransparentMaterialID < g_Const.MaterialCount)
     {
@@ -1364,6 +1383,23 @@ float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int 
     }
 
     return transmittance;
+}
+
+float3 Bridge::traceVisibilityRay(RayDesc ray, const RayCone rayCone, const int pathVertexIndex, DebugContext debug)
+{
+    // RTXPT visibility is intentionally double-sided. Culling globally turns
+    // unclosed volumetrics into unbounded absorbers and lets imperfect opaque
+    // wound meshes leak light, so only the tagged Claire frame may request a
+    // front-face-only retry after its back-facing shell is the first hit.
+    bool hitCullableBackface = false;
+    float3 transmittance = Bridge::traceVisibilityRayImpl(
+        ray, rayCone, pathVertexIndex, debug, RAY_FLAG_NONE, hitCullableBackface);
+
+    if (!hitCullableBackface)
+        return transmittance;
+
+    return Bridge::traceVisibilityRayImpl(
+        ray, rayCone, pathVertexIndex, debug, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, hitCullableBackface);
 }
 
 bool Bridge::traceSubsurfaceRay(RayDesc ray, const bool cullBackFaces,
@@ -1469,6 +1505,8 @@ void Bridge::ExportSurfaceInit(uint2 pixelPos)
     u_SpecularHitT[pixelPos] = 0;           // it is common for this to be missing
     u_SensorNormalDepth[pixelPos] = 0;
     u_SensorIds[pixelPos] = 0;
+    u_SensorMaterial[pixelPos] = 0;
+    u_SensorSpecular[pixelPos] = 0;
     
     // u_MotionVectors[pixelPos] = float4( 0, 0, 0, 0 );   // this should not be strictly necessary as we already know from u_Depth[] that the signal is invalid
     // DebugPixel( pixelPos.xy, float4( 0.0.xxx, 1 ) ); 
@@ -1493,6 +1531,13 @@ void Bridge::ExportSurface(const PathState path, PathTracer::SurfaceData surface
     if (normalLen > 1e-8)
         normalV /= normalLen;
     u_SensorNormalDepth[pixelPos] = float4(normalV, abs(viewZ));
+
+    u_SensorMaterial[pixelPos] = float4(
+        surfaceData.bsdf.data.Diffuse(),
+        surfaceData.bsdf.data.Roughness());
+    u_SensorSpecular[pixelPos] = float4(
+        surfaceData.bsdf.data.Specular(),
+        surfaceData.bsdf.data.Metallic());
 
     uint2 ids = uint2(0, 0);
     if (surfaceData.instanceIndex != 0xFFFFFFFFu)
@@ -1528,6 +1573,8 @@ void Bridge::ExportNonSurface(const PathState path, float3 virtualWorldPos, floa
     // the sensor contract: depth == 0 and ids == 0 for a miss.
     u_SensorNormalDepth[pixelPos] = 0;
     u_SensorIds[pixelPos] = 0;
+    u_SensorMaterial[pixelPos] = 0;
+    u_SensorSpecular[pixelPos] = 0;
 
     //DebugPixel( pixelPos.xy, float4( 0, 0, 0.2, 1 ) );
 

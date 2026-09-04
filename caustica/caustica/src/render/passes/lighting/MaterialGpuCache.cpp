@@ -1542,6 +1542,12 @@ int MaterialGpuCache::ensureMaterialsFromScene(
             standardMaterial = importFromEngineMaterial(material);
 
         standardMaterial->runtimeMaterialGpuCache = this;
+        // RTXCR relies on front-face visibility for Claire's closed spectacle
+        // frame, but that behavior must not leak into the generic shadow-ray
+        // path (unclosed glass and imperfectly wound opaque meshes otherwise
+        // become either infinitely absorptive or leaky).
+        standardMaterial->cullVisibilityBackfaces =
+            standardMaterial->modelName == "glass_frame";
 
         m_materials.push_back(standardMaterial);
         m_materialsById[material.id] = standardMaterial;
@@ -1874,6 +1880,8 @@ void UpdateSubInstanceData(SubInstanceData& ret,
 
     if (material.excludeFromNEE)
         ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_ExcludeFromNEE;
+    if (material.cullVisibilityBackfaces)
+        ret.FlagsAndAlphaInfo |= SubInstanceData::Flags_CullVisibilityBackface;
 
     uint globalGeometryIndex = mesh.geometries[0].globalGeometryIndex + meshGeometryIndex;
     uint globalMaterialIndex = material.gpuDataIndex;
