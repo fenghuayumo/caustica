@@ -336,9 +336,9 @@ bool NrdIntegration::isAvailable() const
     return m_initialized;
 }
 
-static inline void MatrixToNrd(float* dest, const dm::float4x4& m)
+static inline void MatrixToNrd(float* dest, const math::float4x4& m)
 {
-    dm::float4x4 tm = dm::transpose(m);
+    math::float4x4 tm = math::transpose(m);
     memcpy(dest, &m, sizeof(m));
 }
 
@@ -363,13 +363,13 @@ void NrdIntegration::runDenoiserPasses(
     }
 
     nrd::CommonSettings commonSettings;
-    MatrixToNrd(commonSettings.worldToViewMatrix, dm::affineToHomogeneous(view.getViewMatrix()));           //MatrixToNrd(commonSettings.worldToViewRotationMatrix, dm::affineToHomogeneous(view.getViewMatrix()));
-    MatrixToNrd(commonSettings.worldToViewMatrixPrev, dm::affineToHomogeneous(viewPrev.getViewMatrix()));   //MatrixToNrd(commonSettings.worldToViewRotationMatrixPrev, dm::affineToHomogeneous(viewPrev.getViewMatrix()));
+    MatrixToNrd(commonSettings.worldToViewMatrix, math::affineToHomogeneous(view.getViewMatrix()));           //MatrixToNrd(commonSettings.worldToViewRotationMatrix, math::affineToHomogeneous(view.getViewMatrix()));
+    MatrixToNrd(commonSettings.worldToViewMatrixPrev, math::affineToHomogeneous(viewPrev.getViewMatrix()));   //MatrixToNrd(commonSettings.worldToViewRotationMatrixPrev, math::affineToHomogeneous(viewPrev.getViewMatrix()));
     MatrixToNrd(commonSettings.viewToClipMatrix, view.getProjectionMatrix(false));
     MatrixToNrd(commonSettings.viewToClipMatrixPrev, viewPrev.getProjectionMatrix(false));
 
-    dm::float2 pixelOffset = view.getPixelOffset();
-    dm::float2 prevPixelOffset = viewPrev.getPixelOffset();
+    math::float2 pixelOffset = view.getPixelOffset();
+    math::float2 prevPixelOffset = viewPrev.getPixelOffset();
     commonSettings.isMotionVectorInWorldSpace = false;
     commonSettings.motionVectorScale[0] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.getViewExtent().width());
     commonSettings.motionVectorScale[1] = (commonSettings.isMotionVectorInWorldSpace)?(1.f):(1.f / view.getViewExtent().height());

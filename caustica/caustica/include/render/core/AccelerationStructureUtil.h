@@ -71,8 +71,8 @@ namespace bvh
         }
 
         const uint64_t vertexStart = positionRange.byteOffset
-            + uint64_t(mesh.vertexOffset + geometry.vertexOffsetInMesh) * sizeof(dm::float3);
-        const uint64_t vertexEnd = vertexStart + uint64_t(geometry.numVertices) * sizeof(dm::float3);
+            + uint64_t(mesh.vertexOffset + geometry.vertexOffsetInMesh) * sizeof(math::float3);
+        const uint64_t vertexEnd = vertexStart + uint64_t(geometry.numVertices) * sizeof(math::float3);
         const uint64_t positionRangeEnd = positionRange.byteOffset + positionRange.byteSize;
         if (vertexEnd > vertexBufferDesc.byteSize || vertexEnd > positionRangeEnd)
         {
@@ -137,10 +137,10 @@ namespace bvh
             triangles.indexFormat = caustica::rhi::Format::R32_UINT;
             triangles.indexCount = geometry->numIndices;
             triangles.vertexBuffer = meshGpu.vertexBuffer;
-            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(dm::float3)
+            triangles.vertexOffset = (mesh.vertexOffset + geometry->vertexOffsetInMesh) * sizeof(math::float3)
                 + meshGpu.vertexBufferRange(caustica::VertexAttribute::Position).byteOffset;
             triangles.vertexFormat = caustica::rhi::Format::RGB32_FLOAT;
-            triangles.vertexStride = sizeof(dm::float3);
+            triangles.vertexStride = sizeof(math::float3);
             triangles.vertexCount = geometry->numVertices;
 
             MaterialGpuCache::RayTracingState materialState = {};

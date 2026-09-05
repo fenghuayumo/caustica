@@ -46,7 +46,7 @@ PhysicsPose makeWorldPose(
     const scene::GlobalTransformComponent& global)
 {
     PhysicsPose pose{ local.translation, local.rotation };
-    dm::double3 ignoredScale;
+    math::double3 ignoredScale;
     decomposeAffine<double>(global.transform, &pose.translation, &pose.rotation, &ignoredScale);
     return pose;
 }
@@ -57,7 +57,7 @@ bool writeLocalPoseFromWorld(
     scene::LocalTransformComponent& local,
     const PhysicsPose& pose)
 {
-    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    math::daffine3 parentToWorld = math::daffine3::identity();
     if (const auto* parent = world.tryGet<scene::ParentComponent>(entity);
         parent && ecs::isValid(parent->parent))
     {
@@ -67,13 +67,13 @@ bool writeLocalPoseFromWorld(
         parentToWorld = parentGlobal->transform;
     }
 
-    const dm::daffine3 desiredWorld =
-        dm::scaling(local.scaling) * pose.rotation.toAffine() * dm::translation(pose.translation);
+    const math::daffine3 desiredWorld =
+        math::scaling(local.scaling) * pose.rotation.toAffine() * math::translation(pose.translation);
     // Scene transforms are row-vector based: world = local * parent.
-    const dm::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
-    dm::double3 translation;
-    dm::dquat rotation;
-    dm::double3 scaling;
+    const math::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
+    math::double3 translation;
+    math::dquat rotation;
+    math::double3 scaling;
     decomposeAffine<double>(localToParent, &translation, &rotation, &scaling);
     if (any(local.translation != translation) || any(local.rotation != rotation) || any(local.scaling != scaling))
     {
@@ -94,15 +94,15 @@ PhysicsPose interpolate(const PhysicsPose& from, const PhysicsPose& to, float al
     result.translation = from.translation * (1.0 - t) + to.translation * t;
     // Normalized lerp is robust for the short intervals between rigid-body
     // ticks. Canonicalize the sign first because q and -q are identical.
-    dm::dquat target = to.rotation;
-    if (dm::dot(from.rotation, target) < 0.0)
+    math::dquat target = to.rotation;
+    if (math::dot(from.rotation, target) < 0.0)
         target = -target;
     const double w = from.rotation.w * (1.0 - t) + target.w * t;
     const double x = from.rotation.x * (1.0 - t) + target.x * t;
     const double y = from.rotation.y * (1.0 - t) + target.y * t;
     const double z = from.rotation.z * (1.0 - t) + target.z * t;
     const double length = std::sqrt(w * w + x * x + y * y + z * z);
-    result.rotation = length > 0.0 ? dm::dquat(w / length, x / length, y / length, z / length) : dm::dquat::identity();
+    result.rotation = length > 0.0 ? math::dquat(w / length, x / length, y / length, z / length) : math::dquat::identity();
     return result;
 }
 

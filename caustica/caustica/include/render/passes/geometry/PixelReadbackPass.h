@@ -35,10 +35,10 @@ namespace caustica::render
             uint32_t arraySlice = 0,
             uint32_t mipLevel = 0);
 
-        void capture(caustica::rhi::CommandList* commandList, dm::uint2 pixelPosition);
+        void capture(caustica::rhi::CommandList* commandList, math::uint2 pixelPosition);
 
-        dm::float4 readFloats();
-        dm::uint4 readUInts();
-        dm::int4 readInts();
+        math::float4 readFloats();
+        math::uint4 readUInts();
+        math::int4 readInts();
     };
 }

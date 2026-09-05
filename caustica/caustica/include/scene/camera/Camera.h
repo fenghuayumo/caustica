@@ -33,25 +33,25 @@ namespace caustica
         void setMoveSpeed(float value) { m_MoveSpeed = value; }
         void setRotateSpeed(float value) { m_RotateSpeed = value; }
 
-        [[nodiscard]] const dm::affine3& getWorldToViewMatrix() const { return m_MatWorldToView; }
-        [[nodiscard]] const dm::affine3& getTranslatedWorldToViewMatrix() const { return m_MatTranslatedWorldToView; }
-        [[nodiscard]] const dm::float3& getPosition() const { return m_CameraPos; }
-        [[nodiscard]] const dm::float3& getDir() const { return m_CameraDir; }
-        [[nodiscard]] const dm::float3& getUp() const { return m_CameraUp; }
+        [[nodiscard]] const math::affine3& getWorldToViewMatrix() const { return m_MatWorldToView; }
+        [[nodiscard]] const math::affine3& getTranslatedWorldToViewMatrix() const { return m_MatTranslatedWorldToView; }
+        [[nodiscard]] const math::float3& getPosition() const { return m_CameraPos; }
+        [[nodiscard]] const math::float3& getDir() const { return m_CameraDir; }
+        [[nodiscard]] const math::float3& getUp() const { return m_CameraUp; }
 
     protected:
         // This can be useful for derived classes while not necessarily public, i.e., in a third person
         // camera class, public clients cannot direct the gaze point.
-        void baseLookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void baseLookAt(math::float3 cameraPos, math::float3 cameraTarget, math::float3 cameraUp = math::float3{ 0.f, 1.f, 0.f });
         void updateWorldToView();
 
-        dm::affine3 m_MatWorldToView = dm::affine3::identity();
-        dm::affine3 m_MatTranslatedWorldToView = dm::affine3::identity();
+        math::affine3 m_MatWorldToView = math::affine3::identity();
+        math::affine3 m_MatTranslatedWorldToView = math::affine3::identity();
 
-        dm::float3 m_CameraPos   = 0.f;   // in worldspace
-        dm::float3 m_CameraDir   = dm::float3(1.f, 0.f, 0.f); // normalized
-        dm::float3 m_CameraUp    = dm::float3(0.f, 1.f, 0.f); // normalized
-        dm::float3 m_CameraRight = dm::float3(0.f, 0.f, 1.f); // normalized
+        math::float3 m_CameraPos   = 0.f;   // in worldspace
+        math::float3 m_CameraDir   = math::float3(1.f, 0.f, 0.f); // normalized
+        math::float3 m_CameraUp    = math::float3(0.f, 1.f, 0.f); // normalized
+        math::float3 m_CameraRight = math::float3(0.f, 0.f, 1.f); // normalized
 
         float m_MoveSpeed = 1.f;      // movement speed in units/second
         float m_RotateSpeed = .005f;  // mouse sensitivity in radians/pixel
@@ -67,22 +67,22 @@ namespace caustica
         void animate(float deltaT) override;
         void animateSmooth(float deltaT);
 
-        void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
-        void lookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void lookAt(math::float3 cameraPos, math::float3 cameraTarget, math::float3 cameraUp = math::float3{ 0.f, 1.f, 0.f });
+        void lookTo(math::float3 cameraPos, math::float3 cameraDir, math::float3 cameraUp = math::float3{ 0.f, 1.f, 0.f });
 
         // Clears WASD/QE/roll keys so releasing RMB fly-mode cannot leave stuck motion.
         void clearFlyKeyboardState();
 
     private:
-        std::pair<bool, dm::affine3> animateRoll(dm::affine3 initialRotation);
-        std::pair<bool, dm::float3> animateTranslation(float deltaT);
-        void updateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation);
+        std::pair<bool, math::affine3> animateRoll(math::affine3 initialRotation);
+        std::pair<bool, math::float3> animateTranslation(float deltaT);
+        void updateCamera(math::float3 cameraMoveVec, math::affine3 cameraRotation);
 
-        dm::float2 m_MousePos = 0.f;
-        dm::float2 m_MousePosPrev = 0.f;
-        dm::float2 m_MouseMotionAccumulator = 0.f;
-        dm::float3 m_CameraMovePrev = 0.f;
-        dm::float3 m_CameraMoveDamp = 0.f;
+        math::float2 m_MousePos = 0.f;
+        math::float2 m_MousePosPrev = 0.f;
+        math::float2 m_MouseMotionAccumulator = 0.f;
+        math::float3 m_CameraMovePrev = 0.f;
+        math::float3 m_CameraMoveDamp = 0.f;
         bool m_IsDragging = false;
         bool m_IsPanning = false;
 
@@ -158,8 +158,8 @@ namespace caustica
         void joystickUpdate(int axis, float value) override;
         void animate(float deltaT) override;
 
-        dm::float3 getTargetPosition() const { return m_TargetPos; }
-        void setTargetPosition(dm::float3 position) { m_TargetPos = position; }
+        math::float3 getTargetPosition() const { return m_TargetPos; }
+        void setTargetPosition(math::float3 position) { m_TargetPos = position; }
 
         float getDistance() const { return m_Distance; }
         void setDistance(float distance) { m_Distance = distance; }
@@ -173,21 +173,21 @@ namespace caustica
 
         void setView(const ViewInfo& view);
 
-        void lookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
-        void lookTo(dm::float3 cameraPos, dm::float3 cameraDir,
+        void lookAt(math::float3 cameraPos, math::float3 cameraTarget);
+        void lookTo(math::float3 cameraPos, math::float3 cameraDir,
             std::optional<float> targetDistance = std::optional<float>());
         
     private:
-        void animateOrbit(float deltaT, dm::float2 mouseMove);
-        void animateTranslation(const dm::float3x3& viewMatrix);
+        void animateOrbit(float deltaT, math::float2 mouseMove);
+        void animateTranslation(const math::float3x3& viewMatrix);
 
         // View parameters to derive translation amounts
-        dm::float4x4 m_ProjectionMatrix = dm::float4x4::identity();
-        dm::float4x4 m_InverseProjectionMatrix = dm::float4x4::identity();
-        dm::float2 m_ViewportSize = dm::float2::zero();
+        math::float4x4 m_ProjectionMatrix = math::float4x4::identity();
+        math::float4x4 m_InverseProjectionMatrix = math::float4x4::identity();
+        math::float2 m_ViewportSize = math::float2::zero();
 
-        dm::float2 m_MousePos = 0.f;
-        dm::float2 m_MousePosPrev = 0.f;
+        math::float2 m_MousePos = 0.f;
+        math::float2 m_MousePosPrev = 0.f;
         
         enum class MouseState {
             Idle,
@@ -197,7 +197,7 @@ namespace caustica
         
         MouseState m_MouseState = MouseState::Idle;
 
-        dm::float3 m_TargetPos = 0.f;
+        math::float3 m_TargetPos = 0.f;
         float m_Distance = 30.f;
         
         float m_MinDistance = 0.f;

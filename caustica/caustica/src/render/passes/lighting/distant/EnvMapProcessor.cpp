@@ -337,9 +337,9 @@ void EnvMapProcessor::initBuffers(uint cubeDim)
 bool isnear(EMB_DirectionalLight const & a, EMB_DirectionalLight const & b)
 {
     return 
-        dm::isnear( a.AngularSize, b.AngularSize ) &&
-        dm::all(dm::isnear( a.ColorIntensity, b.ColorIntensity )) &&
-        dm::all(dm::isnear( a.Direction, b.Direction ));
+        math::isnear( a.AngularSize, b.AngularSize ) &&
+        math::all(math::isnear( a.ColorIntensity, b.ColorIntensity )) &&
+        math::all(math::isnear( a.Direction, b.Direction ));
 }
 
 int EnvMapProcessor::getTargetCubeResolution() const
@@ -526,8 +526,8 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
 
             commandList->setComputeState(state);
 
-            const dm::uint  threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
-            const dm::uint2 dispatchSize = dm::uint2((m_cubeDim/2 + threads - 1) / threads, (m_cubeDim/2 + threads - 1) / threads);
+            const math::uint  threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
+            const math::uint2 dispatchSize = math::uint2((m_cubeDim/2 + threads - 1) / threads, (m_cubeDim/2 + threads - 1) / threads);
             assert( m_cubeDim % EMB_NUM_COMPUTE_THREADS_PER_DIM == 0 ); // if not, shaders need fixing!
             //commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
             commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
@@ -565,8 +565,8 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
 
             uint destinationRes = m_cubemap->getDesc().width >> i;
 
-            const dm::uint  threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
-            const dm::uint2 dispatchSize = dm::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
+            const math::uint  threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
+            const math::uint2 dispatchSize = math::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
             //commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
             commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
 
@@ -597,8 +597,8 @@ bool EnvMapProcessor::update(caustica::rhi::CommandList* commandList, caustica::
 
             uint destinationRes = m_cubemapBC6HScratch->getDesc().width;
 
-            const dm::uint  threads = 8;
-            const dm::uint2 dispatchSize = dm::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
+            const math::uint  threads = 8;
+            const math::uint2 dispatchSize = math::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
             //commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
             commandList->dispatch(dispatchSize.x, dispatchSize.y, 6); // <- 6 cubemap faces! :)
         }
@@ -694,7 +694,7 @@ bool EnvMapProcessor::generateBRDFLUT(caustica::rhi::CommandList* commandList, c
     commandList->setComputeState(state);
     
     const uint threads = 8;
-    const dm::uint2 dispatchSize = dm::uint2(div_ceil(c_BRDFLUTSize, threads), div_ceil(c_BRDFLUTSize, threads));
+    const math::uint2 dispatchSize = math::uint2(div_ceil(c_BRDFLUTSize, threads), div_ceil(c_BRDFLUTSize, threads));
     commandList->dispatch(dispatchSize.x, dispatchSize.y, 1);
         
     m_brdfLUTGenerated = true;
@@ -750,7 +750,7 @@ void EnvMapProcessor::ggxPrefilterCubemap(caustica::rhi::CommandList* commandLis
         commandList->setPushConstants(&consts, sizeof(consts));
         
         const uint threads = CUBEMAP_PROCESS_THREADS;
-        const dm::uint2 dispatchSize = dm::uint2(div_ceil(dstMipSize,threads),div_ceil(dstMipSize, threads));
+        const math::uint2 dispatchSize = math::uint2(div_ceil(dstMipSize,threads),div_ceil(dstMipSize, threads));
         commandList->dispatch(dispatchSize.x, dispatchSize.y, 6);
         
         // UAV barrier between mips
@@ -831,8 +831,8 @@ void EnvMapProcessor::generateCubemapMips(caustica::rhi::CommandList* commandLis
         
         uint destinationRes = baseSize >> i;
         
-        const dm::uint threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
-        const dm::uint2 dispatchSize = dm::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
+        const math::uint threads = EMB_NUM_COMPUTE_THREADS_PER_DIM;
+        const math::uint2 dispatchSize = math::uint2((destinationRes + threads - 1) / threads, (destinationRes + threads - 1) / threads);
         commandList->dispatch(dispatchSize.x, dispatchSize.y, 6);
     }
 }

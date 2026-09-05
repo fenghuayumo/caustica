@@ -65,8 +65,8 @@ namespace demo
         const std::string& getModelName() const { return m_modelType->getModelName(); }
         [[nodiscard]] caustica::ecs::Entity getRootEntity() const { return m_entity; }
 
-        void setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
-        void setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
+        void setTransform(const math::double3& translation, const math::dquat& rotation, const math::double3& scaling);
+        void setTransform(const math::float3& translation, const math::quat& rotation, const math::float3& scaling);
 
         void updateLightFromControllers(double gameTime);
 

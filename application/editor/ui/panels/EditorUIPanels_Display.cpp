@@ -206,7 +206,7 @@ void EditorUI::BuildDisplayPerformancePanel(const PanelLayout& layout)
                         "Frame Rate Cap",
                         &fpsLimitIndex,
                         "Disabled\0" /* " 1 \0" */ "2 FPS\0 5 FPS\0 10 FPS\0 15 FPS\0 30 FPS\0 60 FPS\0 120 FPS\0\0"))
-                    m_settings.FPSLimiter = fpsOptions[dm::clamp(fpsLimitIndex, 0, (int)fpsOptions.size() - 1)];
+                    m_settings.FPSLimiter = fpsOptions[math::clamp(fpsLimitIndex, 0, (int)fpsOptions.size() - 1)];
             }
 
         }

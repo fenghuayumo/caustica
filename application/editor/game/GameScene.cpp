@@ -445,7 +445,7 @@ void GameScene::Tick(float deltaTime, bool globalAnimationEnabled)
     if (m_timeLoopEnable && m_gameTime < m_timeLoopFrom)
         m_gameTime = m_timeLoopFrom;
 
-    m_playSpeed = dm::clamp(m_playSpeed, 0, 5);
+    m_playSpeed = math::clamp(m_playSpeed, 0, 5);
     float playSpeedK = GetPlaySpeedK(m_playSpeed);
 
     m_lastTickGlobalAnimationEnabled = globalAnimationEnabled;
@@ -500,18 +500,18 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
                 // transform = attachedObject->GetRootNode()->GetLocalToWorldTransformFloat(); // we can't do this because these have not yet been updated
                 auto* ew = attachedProp->EntityWorld();
                 caustica::ecs::Entity propEntity = attachedProp->GetEntity();
-                dm::daffine3 transformD = dm::daffine3::identity();
+                math::daffine3 transformD = math::daffine3::identity();
                 if (ew && propEntity != caustica::ecs::NullEntity)
                 {
                     auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(propEntity);
                     if (ltc)
                     {
-                        transformD = dm::scaling(ltc->scaling);
+                        transformD = math::scaling(ltc->scaling);
                         transformD *= ltc->rotation.toAffine();
-                        transformD *= dm::translation(ltc->translation);
+                        transformD *= math::translation(ltc->translation);
                     }
                 }
-                transform = dm::affine3(transformD);
+                transform = math::affine3(transformD);
             }
 
             renderCamera.lookTo( transform.transformPoint(m_gameCamera.getPosition()), transform.transformVector(m_gameCamera.getDir()), transform.transformVector(m_gameCamera.getUp()));
@@ -525,7 +525,7 @@ void GameScene::TickCamera(float deltaTime, caustica::FirstPersonCamera & render
     
     if (m_camRecEnabled && isActive())
     {
-        m_camRecTimeToNextKeyframe = dm::clamp(m_camRecTimeToNextKeyframe-deltaTime, -m_camRecKeyframeStep, m_camRecKeyframeStep);
+        m_camRecTimeToNextKeyframe = math::clamp(m_camRecTimeToNextKeyframe-deltaTime, -m_camRecKeyframeStep, m_camRecKeyframeStep);
 
         if (m_camRecTimeToNextKeyframe <= 0)
         {

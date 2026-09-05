@@ -59,7 +59,7 @@ void caustica::render::createLightingRenderPasses(
     const std::shared_ptr<ShaderDebug>& shaderDebug,
     caustica::rhi::BindingLayoutHandle bindlessLayout,
     caustica::rhi::CommandListHandle initializeCommandList,
-    dm::uint2 screenResolution)
+    math::uint2 screenResolution)
 {
     if (context.scenePasses.lighting.environment() == nullptr)
         context.scenePasses.lighting.environment() = std::make_shared<EnvMapProcessor>(device, context.textureCache, false);

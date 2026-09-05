@@ -1,7 +1,7 @@
 #pragma once
 
 namespace caustica::math {}
-namespace dm = caustica::math;
+namespace math = caustica::math;
 
 #include "basics.h"
 #include "vector.h"

@@ -188,7 +188,7 @@ float2 ViewInfo::getPixelOffset() const
     return m_pixelOffset;
 }
 
-bool ViewInfo::isBoxVisible(const dm::box3& bbox) const
+bool ViewInfo::isBoxVisible(const math::box3& bbox) const
 {
     ensureCacheIsValid();
     return m_viewFrustum.intersectsWith(bbox);

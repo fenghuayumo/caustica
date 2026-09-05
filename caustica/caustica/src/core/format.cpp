@@ -73,7 +73,7 @@ namespace
     }
 }
 
-bool parseFloat3Consume(std::string& s, dm::float3& out)
+bool parseFloat3Consume(std::string& s, math::float3& out)
 {
     const char* begin = s.data();
     const char* p = begin;

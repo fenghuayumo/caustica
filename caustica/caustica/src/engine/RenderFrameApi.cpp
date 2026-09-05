@@ -58,8 +58,8 @@ namespace
         if (keys.size() < 2)
             return true;
 
-        const dm::float4 a = keys.front().value;
-        const dm::float4 b = keys.back().value;
+        const math::float4 a = keys.front().value;
+        const math::float4 b = keys.back().value;
         if (channel.attribute == AnimationAttribute::Rotation)
         {
             const float aLength2 = dot(a, a);
@@ -72,8 +72,8 @@ namespace
             return normalizedDot >= 1.f - 1e-5f;
         }
 
-        const dm::float4 delta = abs(a - b);
-        const dm::float4 scale = max(max(abs(a), abs(b)), dm::float4(1.f));
+        const math::float4 delta = abs(a - b);
+        const math::float4 scale = max(max(abs(a), abs(b)), math::float4(1.f));
         return all(delta <= scale * 1e-5f);
     }
 
@@ -568,7 +568,7 @@ uint32_t caustica::debugViewTextureCount(const App& app)
 bool caustica::debugViewTextureInfo(
     const App& app,
     uint32_t index,
-    const char** outName,
+    std::string* outName,
     rhi::Texture** outTexture)
 {
     const render::WorldRenderer* wr = worldRenderer(app);

@@ -30,7 +30,7 @@ struct RenderPickState
 {
     // Cursor position in display/window pixels (not path-trace renderSize).
     // WorldRenderer maps to render pixels after DLSS settles for the frame.
-    dm::uint2 Position = { 0, 0 };
+    math::uint2 Position = { 0, 0 };
     bool MaterialRequested = false;
     bool InstanceRequested = false;
     // Monotonic request identities keep feedback from an older in-flight frame

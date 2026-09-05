@@ -563,7 +563,7 @@ void ToneMappingPass::updateWhiteBalanceTransform()
 	//Calculate color transform for the current white point. 
 	m_WhiteBalanceTransform = m_WhiteBalance ?
 		calculateWhiteBalanceTransformRGB_Rec709(m_WhitePoint) :
-		dm::float3x3::identity();
+		math::float3x3::identity();
 
 	//Calculate source illuminant, i.e. the color that transform to a pure white (1, 1, 1) output at the current color settings.
 	m_SourceWhite = inverse(m_WhiteBalanceTransform) * float3(1, 1, 1);

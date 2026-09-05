@@ -30,19 +30,19 @@ public:
     // see sl_consts.h for documentation
     struct Constants 
     {
-        dm::float4x4 cameraViewToClip;
-        dm::float4x4 clipToCameraView;
-        dm::float4x4 clipToLensClip;
-        dm::float4x4 clipToPrevClip;
-        dm::float4x4 prevClipToClip;
+        math::float4x4 cameraViewToClip;
+        math::float4x4 clipToCameraView;
+        math::float4x4 clipToLensClip;
+        math::float4x4 clipToPrevClip;
+        math::float4x4 prevClipToClip;
 
-        dm::float2 jitterOffset;
-        dm::float2 mvecScale;
-        dm::float2 cameraPinholeOffset;
-        dm::float3 cameraPos;
-        dm::float3 cameraUp;
-        dm::float3 cameraRight;
-        dm::float3 cameraFwd;
+        math::float2 jitterOffset;
+        math::float2 mvecScale;
+        math::float2 cameraPinholeOffset;
+        math::float3 cameraPos;
+        math::float3 cameraUp;
+        math::float3 cameraRight;
+        math::float3 cameraFwd;
 
         float cameraNear = kInvalidFloat;
         float cameraFar = kInvalidFloat;
@@ -105,9 +105,9 @@ public:
     };
     struct DLSSSettings
     {
-        dm::int2 optimalRenderSize;
-        dm::int2 minRenderSize;
-        dm::int2 maxRenderSize;
+        math::int2 optimalRenderSize;
+        math::int2 minRenderSize;
+        math::int2 maxRenderSize;
         float sharpness;
     };
     virtual void setDLSSOptions(const DLSSOptions& options) = 0;
@@ -309,8 +309,8 @@ public:
         bool indicatorInvertAxisX = false;
         bool indicatorInvertAxisY = false;
         DLSSRRNormalRoughnessMode normalRoughnessMode = DLSSRRNormalRoughnessMode::eUnpacked;
-        dm::float4x4 worldToCameraView;
-        dm::float4x4 cameraViewToWorld;
+        math::float4x4 worldToCameraView;
+        math::float4x4 cameraViewToWorld;
         bool alphaUpscalingEnabled = false;
 
         DLSSRRPreset preset = DLSSRRPreset::eDefault;
@@ -361,8 +361,8 @@ public:
     virtual void tagResourcesDLSSRR(
         caustica::rhi::CommandList* commandList,
         const ViewInfo* view,
-        dm::int2 renderSize,
-        dm::int2 displaySize,
+        math::int2 renderSize,
+        math::int2 displaySize,
         caustica::rhi::Texture* inputColor,
         caustica::rhi::Texture* diffuseAlbedo,
         caustica::rhi::Texture* specAlbedo,

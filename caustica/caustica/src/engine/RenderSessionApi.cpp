@@ -89,7 +89,7 @@ std::string resolutionInfo(const App& app)
         return "uninitialized";
     const auto rs = wr->getRenderSize();
     const auto ds = wr->getDisplaySize();
-    if (dm::all(rs == ds))
+    if (math::all(rs == ds))
         return std::to_string(rs.x) + "x" + std::to_string(rs.y);
     return std::to_string(rs.x) + "x" + std::to_string(rs.y)
         + "->" + std::to_string(ds.x) + "x" + std::to_string(ds.y);

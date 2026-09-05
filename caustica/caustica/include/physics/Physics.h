@@ -40,15 +40,15 @@ struct RigidBodyComponent
     RigidBodyType type = RigidBodyType::Dynamic;
     float mass = 1.0f;
     bool gravity = true;
-    dm::float3 linearVelocity = 0.f;
-    dm::float3 angularVelocity = 0.f;
+    math::float3 linearVelocity = 0.f;
+    math::float3 angularVelocity = 0.f;
 };
 
 struct ColliderComponent
 {
     ColliderShape shape = ColliderShape::Box;
     // Full box dimensions, sphere radius in x, capsule radius/height in x/y.
-    dm::float3 dimensions = dm::float3(1.f);
+    math::float3 dimensions = math::float3(1.f);
     float staticFriction = 0.5f;
     float dynamicFriction = 0.5f;
     float restitution = 0.f;
@@ -57,8 +57,8 @@ struct ColliderComponent
 
 struct PhysicsPose
 {
-    dm::double3 translation = 0.0;
-    dm::dquat rotation = dm::dquat::identity();
+    math::double3 translation = 0.0;
+    math::dquat rotation = math::dquat::identity();
 };
 
 // Snapshot of the authoring data used to create an actor. It makes an ECS

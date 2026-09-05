@@ -17,9 +17,9 @@ namespace caustica::animation
     struct Keyframe
     {
         float time = 0.f;
-        dm::float4 value = 0.f;
-        dm::float4 inTangent = 0.f;
-        dm::float4 outTangent = 0.f;
+        math::float4 value = 0.f;
+        math::float4 inTangent = 0.f;
+        math::float4 outTangent = 0.f;
     };
 
     enum class InterpolationMode
@@ -31,7 +31,7 @@ namespace caustica::animation
         HermiteSpline
     };
 
-    dm::float4 interpolate(InterpolationMode mode, 
+    math::float4 interpolate(InterpolationMode mode, 
         const Keyframe& a, const Keyframe& b,
         const Keyframe& c, const Keyframe& d, float t, float dt);
 
@@ -45,7 +45,7 @@ namespace caustica::animation
         Sampler() = default;
         virtual ~Sampler() = default;
 
-        std::optional<dm::float4> evaluate(float time, bool extrapolateLastValues = false) const;
+        std::optional<math::float4> evaluate(float time, bool extrapolateLastValues = false) const;
 
         [[nodiscard]] std::vector<Keyframe>& getKeyframes() { return m_Keyframes; }
         [[nodiscard]] const std::vector<Keyframe>& getKeyframes() const { return m_Keyframes; }
@@ -78,7 +78,7 @@ namespace caustica::animation
             return m_Tracks[name];
         }
 
-        std::optional<dm::float4> evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
+        std::optional<math::float4> evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
 
         void addTrack(const std::string& name, const std::shared_ptr<Sampler>& track);
 

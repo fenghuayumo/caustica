@@ -27,12 +27,12 @@ struct BlitParameters
 {
     caustica::rhi::Framebuffer* targetFramebuffer = nullptr;
     caustica::rhi::Viewport targetViewport;
-    dm::box2 targetBox = dm::box2(0.f, 1.f);
+    math::box2 targetBox = math::box2(0.f, 1.f);
 
     caustica::rhi::Texture* sourceTexture = nullptr;
     uint32_t sourceArraySlice = 0;
     uint32_t sourceMip = 0;
-    dm::box2 sourceBox = dm::box2(0.f, 1.f);
+    math::box2 sourceBox = math::box2(0.f, 1.f);
     caustica::rhi::Format sourceFormat = caustica::rhi::Format::UNKNOWN;
 
     BlitSampler sampler = BlitSampler::Linear;

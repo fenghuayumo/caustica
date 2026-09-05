@@ -769,19 +769,19 @@ std::shared_ptr<Material> EngineApp::findMaterial(int materialID) const
     return m_app ? caustica::findMaterial(*m_app, materialID) : nullptr;
 }
 
-std::vector<dm::float3> EngineApp::getMeshVertices(ecs::Entity entity)
+std::vector<math::float3> EngineApp::getMeshVertices(ecs::Entity entity)
 {
-    return m_app ? caustica::getMeshVertices(*m_app, entity) : std::vector<dm::float3>{};
+    return m_app ? caustica::getMeshVertices(*m_app, entity) : std::vector<math::float3>{};
 }
 
-std::vector<dm::float3> EngineApp::getMeshVerticesWorld(ecs::Entity entity)
+std::vector<math::float3> EngineApp::getMeshVerticesWorld(ecs::Entity entity)
 {
-    return m_app ? caustica::getMeshVerticesWorld(*m_app, entity) : std::vector<dm::float3>{};
+    return m_app ? caustica::getMeshVerticesWorld(*m_app, entity) : std::vector<math::float3>{};
 }
 
 void EngineApp::setMeshVertices(
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options)
 {
     if (m_app)
@@ -790,7 +790,7 @@ void EngineApp::setMeshVertices(
 
 void EngineApp::setMeshVerticesWorld(
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options)
 {
     if (m_app)

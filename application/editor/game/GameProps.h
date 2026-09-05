@@ -24,8 +24,8 @@ namespace demo
         virtual void            PostLoadSetup();
         virtual Json::Value     Save();
 
-        virtual void            setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling);
-        virtual void            setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling);
+        virtual void            setTransform(const math::double3& translation, const math::dquat& rotation, const math::double3& scaling);
+        virtual void            setTransform(const math::float3& translation, const math::quat& rotation, const math::float3& scaling);
 
         const Pose &            GetDefaultCameraPose() const            { return m_defaultCameraPose; }
 
@@ -42,7 +42,7 @@ namespace demo
         caustica::scene::SceneEntityWorld* EntityWorld() const;
 
     protected:
-        std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation = dm::quat::identity(), const dm::float3& scaling = dm::float3(1,1,1) );
+        std::shared_ptr<ModelInstance> CreateAndAttachModel( const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const math::float3& translation, const math::quat& rotation = math::quat::identity(), const math::float3& scaling = math::float3(1,1,1) );
         
     protected:
         class GameScene & m_gameScene;
@@ -52,9 +52,9 @@ namespace demo
         
         Pose                        m_defaultCameraPose;
 
-        float3                      m_referenceForward  = dm::float3(1.f, 0.f, 0.f);
-        float3                      m_referenceUp       = dm::float3(0.f, 1.f, 0.f);
-        float3                      m_referenceRight    = dm::float3(0.f, 0.f, 1.f);
+        float3                      m_referenceForward  = math::float3(1.f, 0.f, 0.f);
+        float3                      m_referenceUp       = math::float3(0.f, 1.f, 0.f);
+        float3                      m_referenceRight    = math::float3(0.f, 0.f, 1.f);
 
         std::filesystem::path       m_storagePath;
 

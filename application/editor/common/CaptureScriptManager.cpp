@@ -72,7 +72,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
     ImGui::TextColored(categoryColor, "Options");
 
     if (ImGui::Combo("capture type", &settings.Type, "SimpleScreenshot\0SequenceCapture\0Benchmark\00" ))
-        settings.Type = dm::clamp(settings.Type, 0, 0 );
+        settings.Type = math::clamp(settings.Type, 0, 0 );
 
     if (settings.Type == 0)
     {
@@ -82,7 +82,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
             UI_SCOPED_DISABLE(!settings.ResetAndWarmup);
             ImGui::SameLine();
             ImGui::PushItemWidth(-90.0f * currentScale);
-            ImGui::InputInt("delay frames", &settings.ResetAndWarmupFrames); settings.ResetAndWarmupFrames = dm::clamp(settings.ResetAndWarmupFrames, 0, 10000);
+            ImGui::InputInt("delay frames", &settings.ResetAndWarmupFrames); settings.ResetAndWarmupFrames = math::clamp(settings.ResetAndWarmupFrames, 0, 10000);
             ImGui::PopItemWidth();
         }
     }
@@ -93,7 +93,7 @@ void CaptureScriptManager::ScriptMainUI(const ImVec4 & warnColor, const ImVec4 &
     //     UI_SCOPED_DISABLE(!m_screenshotMiniSequence);
     //     ImGui::SameLine();
     //     ImGui::PushItemWidth(-90.0f * currentScale);
-    //     ImGui::InputInt("length", &m_screenshotMiniSequenceFrames); m_screenshotMiniSequenceFrames = dm::clamp(m_screenshotMiniSequenceFrames, 1, 999);
+    //     ImGui::InputInt("length", &m_screenshotMiniSequenceFrames); m_screenshotMiniSequenceFrames = math::clamp(m_screenshotMiniSequenceFrames, 1, 999);
     //     ImGui::PopItemWidth();
     // }
 

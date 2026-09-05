@@ -343,8 +343,8 @@ void LightSamplingCache::createRenderPasses(std::shared_ptr<caustica::ShaderFact
         m_NEE_AT_FeedbackCandidatesBlended = m_device->createTexture(miniDesc);
 
         {
-            m_localSamplingBufferWidth  = dm::div_ceil(renderResolution.x, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
-            m_localSamplingBufferHeight = dm::div_ceil(renderResolution.y, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            m_localSamplingBufferWidth  = math::div_ceil(renderResolution.x, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            m_localSamplingBufferHeight = math::div_ceil(renderResolution.y, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
             m_localSamplingBufferWidth  += 1;   // add border to accommodate for jitter offset for the local sampling buffers
             m_localSamplingBufferHeight += 1;   // add border to accommodate for jitter offset for the local sampling buffers
             // m_localSamplingBufferDepth          = CAUSTICA_LIGHTING_LOCAL_PROXY_COUNT
@@ -471,7 +471,7 @@ static PolymorphicLightInfoFull ConvertRectLightTriangle(
     const auto& rect = *rectData;
     const double halfWidth = std::max(0.f, rect.width) * 0.5;
     const double halfHeight = std::max(0.f, rect.height) * 0.5;
-    const dm::double3 localCorners[4] = {
+    const math::double3 localCorners[4] = {
         { -halfWidth, -halfHeight, 0.0 },
         { -halfWidth,  halfHeight, 0.0 },
         {  halfWidth,  halfHeight, 0.0 },
@@ -520,12 +520,12 @@ static PolymorphicLightInfoFull ConvertLightProxy(
             packLightColor(flux, polymorphic);
             polymorphic.Center = lightPos;
             polymorphic.Direction1 = NDirToOctUnorm32(lightDir);
-            polymorphic.Direction2 = fp32ToFp16(dm::radians(abs(spot.outerAngle)));
-            polymorphic.Direction2 |= fp32ToFp16(dm::radians(spot.innerAngle)) << 16;
+            polymorphic.Direction2 = fp32ToFp16(math::radians(abs(spot.outerAngle)));
+            polymorphic.Direction2 |= fp32ToFp16(math::radians(spot.innerAngle)) << 16;
         }
         else
         {
-            float projectedArea = dm::PI_f * (spot.radius * spot.radius);
+            float projectedArea = math::PI_f * (spot.radius * spot.radius);
             float3 radiance = proxy.color * spot.intensity / projectedArea;
             float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
@@ -537,7 +537,7 @@ static PolymorphicLightInfoFull ConvertLightProxy(
             {
                 polymorphic.ColorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
                 polymorphicEx.PrimaryAxis = NDirToOctUnorm32(lightDir);
-                polymorphicEx.CosConeAngleAndSoftness = fp32ToFp16(cosf(dm::radians(abs(spot.outerAngle))));
+                polymorphicEx.CosConeAngleAndSoftness = fp32ToFp16(cosf(math::radians(abs(spot.outerAngle))));
                 polymorphicEx.CosConeAngleAndSoftness |= fp32ToFp16(softness) << 16;
             }
             packLightColor(radiance, polymorphic);
@@ -552,11 +552,11 @@ static PolymorphicLightInfoFull ConvertLightProxy(
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift;
             packLightColor(flux, polymorphic);
             polymorphic.Center = lightPos;
-            polymorphic.Direction2 = fp32ToFp16(dm::PI_f) | fp32ToFp16(0.0f) << 16;
+            polymorphic.Direction2 = fp32ToFp16(math::PI_f) | fp32ToFp16(0.0f) << 16;
         }
         else
         {
-            float projectedArea = dm::PI_f * (point.radius * point.radius);
+            float projectedArea = math::PI_f * (point.radius * point.radius);
             float3 radiance = proxy.color * point.intensity / projectedArea;
             polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
             packLightColor(radiance, polymorphic);
@@ -582,7 +582,7 @@ static float TransformRadiusScale(const float4x4& transform)
     const float3 row0 = float3(transform.row0.x, transform.row0.y, transform.row0.z);
     const float3 row1 = float3(transform.row1.x, transform.row1.y, transform.row1.z);
     const float3 row2 = float3(transform.row2.x, transform.row2.y, transform.row2.z);
-    return std::max(1e-4f, std::max(dm::length(row0), std::max(dm::length(row1), dm::length(row2))));
+    return std::max(1e-4f, std::max(math::length(row0), std::max(math::length(row1), math::length(row2))));
 }
 
 static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
@@ -978,12 +978,12 @@ void LightSamplingCache::updateFrustumConsts(LightSamplingCacheConstants & outCo
         frustPlanes[i] = normalizePlane(frustPlanes[i]);
 
     // compute far plane with inverted near plane pushed away by DISTANT_LIGHT_DISTANCE
-    frustPlanes[5] = dm::float4(-frustPlanes[4].xyz(), -frustPlanes[4].w - DISTANT_LIGHT_DISTANCE);
+    frustPlanes[5] = math::float4(-frustPlanes[4].xyz(), -frustPlanes[4].w - DISTANT_LIGHT_DISTANCE);
 
     // backup for debugging and sanity check and write to const buffer
     for (int i = 0; i < 6; i++)
     {
-        float dist = dm::dot(frustPlanes[i].xyz(), settings.CameraPosition + settings.CameraDirection * float(DISTANT_LIGHT_DISTANCE * 0.001f) ) - frustPlanes[i].w;
+        float dist = math::dot(frustPlanes[i].xyz(), settings.CameraPosition + settings.CameraDirection * float(DISTANT_LIGHT_DISTANCE * 0.001f) ) - frustPlanes[i].w;
         assert( dist > 0 );
         if (m_dbgFreezeFrustumUpdates)
             frustPlanes[i] = m_dbgFrozenFrustum[i];
@@ -1026,7 +1026,7 @@ void LightSamplingCache::updateLocalJitter()
         m_localJitterF[0] = fmodf(m_localJitterF[0] + a1, 1.0f);
         m_localJitterF[1] = fmodf(m_localJitterF[1] + a2, 1.0f);
 
-        m_localJitter = dm::clamp(uint2(m_localJitterF * (float)CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), uint2(0, 0), uint2(CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1));
+        m_localJitter = math::clamp(uint2(m_localJitterF * (float)CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), uint2(0, 0), uint2(CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1, CAUSTICA_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1));
     }
 }
 
@@ -1063,8 +1063,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
 
     bool lastFrameLocalSamplesAvailable = m_currentCtrlBuff.LastFrameTemporalFeedbackAvailable; // if last frame had temporal feedback, it will have had built local (tile) sampling
 
-    m_currentSettings.GlobalTemporalFeedbackWeight  = dm::clamp(m_currentSettings.GlobalTemporalFeedbackWeight, 0.0f, 0.95f);
-    m_currentSettings.LocalToGlobalSampleRatio      = dm::clamp(m_currentSettings.LocalToGlobalSampleRatio, 0.0f, 1.0f);
+    m_currentSettings.GlobalTemporalFeedbackWeight  = math::clamp(m_currentSettings.GlobalTemporalFeedbackWeight, 0.0f, 0.95f);
+    m_currentSettings.LocalToGlobalSampleRatio      = math::clamp(m_currentSettings.LocalToGlobalSampleRatio, 0.0f, 1.0f);
     if (m_currentSettings.ImportanceSamplingType != 2)  // no feedback needed if not using NEE_AT
     {
         m_currentSettings.GlobalTemporalFeedbackWeight = 0.0f;
@@ -1184,8 +1184,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
         // we can do this early although we might have to move it to a later location if doing multiple global updates per frame (unlikely?)
         RAII_SCOPE(commandList->beginMarker("ResetLightProxyCounters"); , commandList->endMarker(); );
 
-        const dm::uint  items = ctrlBuff.TotalLightCount;
-        const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
+        const math::uint  items = ctrlBuff.TotalLightCount;
+        const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
         m_resetLightProxyCounters.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
     }
 
@@ -1299,8 +1299,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
     {
         RAII_SCOPE(commandList->beginMarker("ComputeWeights"); , commandList->endMarker(); );
 
-        const dm::uint  items = ctrlBuff.TotalLightCount;
-        const dm::uint  itemsPerGroup = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
+        const math::uint  items = ctrlBuff.TotalLightCount;
+        const math::uint  itemsPerGroup = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
 
         commandList->setBufferState(m_historyRemapCurrentToPastBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
         commandList->setBufferState(m_historyRemapPastToCurrentBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
@@ -1315,8 +1315,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
     {
         RAII_SCOPE(commandList->beginMarker("ComputeProxyCounts"); , commandList->endMarker(); );
 
-        const dm::uint  items = ctrlBuff.TotalLightCount;
-        const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
+        const math::uint  items = ctrlBuff.TotalLightCount;
+        const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
         m_computeProxyCounts.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
 
         commandList->setBufferState(m_perLightProxyCounters, caustica::rhi::ResourceStates::UnorderedAccess);
@@ -1339,8 +1339,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
         {
             RAII_SCOPE(commandList->beginMarker("CreateProxyJobs"); , commandList->endMarker(); );
 
-            const dm::uint  items = ctrlBuff.TotalLightCount;
-            const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
+            const math::uint  items = ctrlBuff.TotalLightCount;
+            const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
             m_createProxyJobs.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
 
             commandList->setBufferState(m_controlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);   // because we've written into u_controlBuffer[0].ProxyBuildTaskCount
@@ -1351,9 +1351,9 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
     {
         RAII_SCOPE(commandList->beginMarker("ExecuteProxyJobs"); , commandList->endMarker(); );
 
-        const dm::uint  items = LLB_MAX_PROXY_PROC_TASKS; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
-        const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
-        const dm::uint  dispatchCountX = div_ceil(items, itemsPerGroup); assert(dispatchCountX<=65535); // more than this triggers EXECUTION WARNING #1296: OVERSIZED_DISPATCH
+        const math::uint  items = LLB_MAX_PROXY_PROC_TASKS; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
+        const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
+        const math::uint  dispatchCountX = div_ceil(items, itemsPerGroup); assert(dispatchCountX<=65535); // more than this triggers EXECUTION WARNING #1296: OVERSIZED_DISPATCH
         m_executeProxyJobs.execute(commandList, dispatchCountX, 1, 1, bindingSet);
 
         commandList->setBufferState(m_lightSamplingProxies, caustica::rhi::ResourceStates::UnorderedAccess);    // because we've filled it up
@@ -1365,8 +1365,8 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
 
         commandList->setBufferState(m_controlBuffer, caustica::rhi::ResourceStates::UnorderedAccess);
 
-        const dm::uint  items = CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
-        const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
+        const math::uint  items = CAUSTICA_LIGHTING_MAX_SAMPLING_PROXIES; // this one is updated on GPU so it's not correct here so let's just brute force to max, compute shader will skip...
+        const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS;
         m_debugDrawLights.execute(commandList, div_ceil(items, itemsPerGroup), 1, 1, bindingSet);
     }
 
@@ -1416,7 +1416,7 @@ void LightSamplingCache::updateEnd(caustica::rhi::CommandList * commandList, cau
     caustica::rhi::BindingSetHandle bindingSet = bindingCache.getOrCreateBindingSet(bindingSetDesc, m_commonBindingLayout);
     caustica::rhi::BindingSetVector bindings = { bindingSet };
 
-    const dm::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS_2D;
+    const math::uint  itemsPerGroup = LLB_NUM_COMPUTE_THREADS_2D;
 
     {
         RAII_SCOPE(commandList->beginMarker("ProcessFeedbackHistoryP1a"); , commandList->endMarker(); );

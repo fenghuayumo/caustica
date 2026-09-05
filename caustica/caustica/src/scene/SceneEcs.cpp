@@ -41,12 +41,12 @@ SceneContentFlags getMeshContentFlags(const MeshInfo& mesh)
     return flags;
 }
 
-dm::box3 getMeshLocalBounds(const MeshInfo& mesh)
+math::box3 getMeshLocalBounds(const MeshInfo& mesh)
 {
     return mesh.objectSpaceBounds;
 }
 
-bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const dm::float4& value)
+bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const math::float4& value)
 {
     if (mesh.geometries.size() == 1 && mesh.geometries[0]->material)
         return mesh.geometries[0]->material->setProperty(propName, value);
@@ -121,11 +121,11 @@ SceneContentFlags GetLeafContent(ecs::World& world, ecs::Entity entity)
     return content ? content->leafContent : SceneContentFlags::None;
 }
 
-dm::box3 GetLeafBounds(ecs::World& world, ecs::Entity entity, const dm::affine3& globalTransform)
+math::box3 GetLeafBounds(ecs::World& world, ecs::Entity entity, const math::affine3& globalTransform)
 {
     const auto* localBounds = world.get<LocalBoundsComponent>(entity);
     if (!localBounds || localBounds->bounds.isempty())
-        return dm::box3::empty();
+        return math::box3::empty();
 
     return localBounds->bounds * globalTransform;
 }
@@ -133,7 +133,7 @@ dm::box3 GetLeafBounds(ecs::World& world, ecs::Entity entity, const dm::affine3&
 void RefreshEntityHierarchy(
     ecs::World& world,
     ecs::Entity entity,
-    const dm::daffine3* parentGlobal,
+    const math::daffine3* parentGlobal,
     PreviousTransformPolicy previousPolicy)
 {
     auto* local = world.get<LocalTransformComponent>(entity);
@@ -160,14 +160,14 @@ void RefreshEntityHierarchy(
         global->transform = local->transform;
     }
 
-    const dm::affine3 previousFloat = global->transformFloat;
-    global->transformFloat = dm::affine3(global->transform);
+    const math::affine3 previousFloat = global->transformFloat;
+    global->transformFloat = math::affine3(global->transform);
     // Extract patches mesh proxies via Changed<GlobalTransformComponent>. Mutating
     // fields in-place does not mark the component; notify when the global pose moves.
     if (std::memcmp(&previousFloat, &global->transformFloat, sizeof(previousFloat)) != 0)
         world.notifyComponentChanged<GlobalTransformComponent>(entity);
 
-    dm::box3 subgraphBounds = GetLeafBounds(world, entity, global->transformFloat);
+    math::box3 subgraphBounds = GetLeafBounds(world, entity, global->transformFloat);
     SceneContentFlags leafContent = GetLeafContent(world, entity);
     SceneContentFlags subgraphContent = leafContent;
 
@@ -1048,9 +1048,9 @@ bool SceneEntityWorld::setParent(ecs::Entity entity, ecs::Entity parent)
 
 void SceneEntityWorld::setLocalTransform(
     ecs::Entity entity,
-    const dm::double3* translation,
-    const dm::dquat* rotation,
-    const dm::double3* scaling)
+    const math::double3* translation,
+    const math::dquat* rotation,
+    const math::double3* scaling)
 {
     if (!m_world->isAlive(entity))
         return;
@@ -1068,8 +1068,8 @@ void SceneEntityWorld::setLocalTransform(
     if (rotation)
     {
         // q and -q are the same orientation; avoid thrashing on sign flips.
-        const double align = dm::dot(local->rotation, *rotation);
-        const dm::dquat canonical = (align < 0.0) ? -(*rotation) : *rotation;
+        const double align = math::dot(local->rotation, *rotation);
+        const math::dquat canonical = (align < 0.0) ? -(*rotation) : *rotation;
         if (any(canonical != local->rotation))
         {
             local->rotation = canonical;
@@ -1091,17 +1091,17 @@ void SceneEntityWorld::setLocalTransform(
     m_world->events<TransformChangedEvent>().send(TransformChangedEvent{ entity });
 }
 
-void SceneEntityWorld::setTranslation(ecs::Entity entity, const dm::double3& translation)
+void SceneEntityWorld::setTranslation(ecs::Entity entity, const math::double3& translation)
 {
     setLocalTransform(entity, &translation, nullptr, nullptr);
 }
 
-void SceneEntityWorld::setRotation(ecs::Entity entity, const dm::dquat& rotation)
+void SceneEntityWorld::setRotation(ecs::Entity entity, const math::dquat& rotation)
 {
     setLocalTransform(entity, nullptr, &rotation, nullptr);
 }
 
-void SceneEntityWorld::setScaling(ecs::Entity entity, const dm::double3& scaling)
+void SceneEntityWorld::setScaling(ecs::Entity entity, const math::double3& scaling)
 {
     setLocalTransform(entity, nullptr, nullptr, &scaling);
 }
@@ -1142,7 +1142,7 @@ void SceneEntityWorld::rebuildPathsFromRoot()
 void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
 {
     SceneContentFlags leafContent = SceneContentFlags::None;
-    dm::box3 localBounds = dm::box3::empty();
+    math::box3 localBounds = math::box3::empty();
 
     if (auto* mesh = m_world->get<MeshInstanceComponent>(entity))
     {
@@ -1172,9 +1172,9 @@ void SceneEntityWorld::updateLeafContentAndBounds(ecs::Entity entity)
             {
                 const float halfWidth = std::max(0.f, rect->width) * 0.5f;
                 const float halfHeight = std::max(0.f, rect->height) * 0.5f;
-                localBounds = dm::box3(
-                    dm::float3(-halfWidth, -halfHeight, -1e-3f),
-                    dm::float3(halfWidth, halfHeight, 1e-3f));
+                localBounds = math::box3(
+                    math::float3(-halfWidth, -halfHeight, -1e-3f),
+                    math::float3(halfWidth, halfHeight, 1e-3f));
             }
         }
     }

@@ -24,10 +24,10 @@ struct LightRenderProxy;
 [[nodiscard]] int getLightType(const EnvironmentLightComponent&);
 [[nodiscard]] SceneContentFlags getLightContentFlags();
 
-[[nodiscard]] dm::double3 getLightPosition(const dm::daffine3& globalTransform);
-[[nodiscard]] dm::double3 getLightDirection(const dm::daffine3& globalTransform);
-void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position);
-void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction);
+[[nodiscard]] math::double3 getLightPosition(const math::daffine3& globalTransform);
+[[nodiscard]] math::double3 getLightDirection(const math::daffine3& globalTransform);
+void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const math::double3& position);
+void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const math::double3& direction);
 [[nodiscard]] bool isInfiniteLight(const LightData& data);
 [[nodiscard]] bool isInfiniteLight(const LightRenderProxy& proxy);
 
@@ -38,14 +38,14 @@ void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const d
 [[nodiscard]] LightData toLightData(const EnvironmentLightComponent& component);
 
 void fillLightConstants(
-    dm::float3 color, const LightData& data, const dm::daffine3& globalTransform, LightConstants& lightConstants);
+    math::float3 color, const LightData& data, const math::daffine3& globalTransform, LightConstants& lightConstants);
 void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightConstants);
 [[nodiscard]] bool tryFillLightConstants(
-    const ecs::World& world, ecs::Entity entity, const dm::daffine3& globalTransform, LightConstants& lightConstants);
+    const ecs::World& world, ecs::Entity entity, const math::daffine3& globalTransform, LightConstants& lightConstants);
 
 [[nodiscard]] bool hasAnyLightComponent(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] bool setLightProperty(
-    ecs::World& world, ecs::Entity entity, const std::string& propName, const dm::float4& value);
+    ecs::World& world, ecs::Entity entity, const std::string& propName, const math::float4& value);
 
 [[nodiscard]] DirectionalLightComponent* tryGetDirectionalLight(ecs::World& world, ecs::Entity entity);
 [[nodiscard]] SpotLightComponent* tryGetSpotLight(ecs::World& world, ecs::Entity entity);

@@ -80,7 +80,7 @@ void EditorUI::BuildRenderSettingsOverview(const PanelLayout& layout)
             if (SettingsInputInt("Samples / Pixel", &m_settings.RealtimeSamplesPerPixel))
             {
                 m_settings.RealtimeSamplesPerPixel =
-                    dm::clamp(m_settings.RealtimeSamplesPerPixel, 1, 64);
+                    math::clamp(m_settings.RealtimeSamplesPerPixel, 1, 64);
                 m_settings.ResetAccumulation = true;
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && restirActive)
@@ -91,14 +91,14 @@ void EditorUI::BuildRenderSettingsOverview(const PanelLayout& layout)
             if (SettingsInputInt("Target Samples", &m_settings.AccumulationTarget))
             {
                 m_settings.AccumulationTarget =
-                    dm::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024);
+                    math::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024);
                 m_settings.ResetAccumulation = true;
             }
         }
 
         if (SettingsInputInt("Max Bounces", &m_settings.BounceCount))
         {
-            m_settings.BounceCount = dm::clamp(m_settings.BounceCount, 0, MAX_BOUNCE_COUNT);
+            m_settings.BounceCount = math::clamp(m_settings.BounceCount, 0, MAX_BOUNCE_COUNT);
             m_settings.ResetAccumulation = true;
         }
 
@@ -119,7 +119,7 @@ void EditorUI::BuildRenderSettingsOverview(const PanelLayout& layout)
             const bool dlssRRAvailable = false;
 #endif
             const char* labels[] = { "Disabled", "TAA", "DLSS", "DLSS-RR" };
-            m_settings.RealtimeAA = dm::clamp(m_settings.RealtimeAA, 0, 3);
+            m_settings.RealtimeAA = math::clamp(m_settings.RealtimeAA, 0, 3);
             if (SettingsBeginCombo("Method", labels[m_settings.RealtimeAA]))
             {
                 for (int i = 0; i < IM_ARRAYSIZE(labels); ++i)
@@ -194,7 +194,7 @@ void EditorUI::BuildAdvancedRenderSettings(const PanelLayout& layout)
         RESET_ON_CHANGE(SettingsInputInt(
             "Diffuse Bounces", &m_settings.DiffuseBounceCount));
         m_settings.DiffuseBounceCount =
-            dm::clamp(m_settings.DiffuseBounceCount, 0, MAX_BOUNCE_COUNT);
+            math::clamp(m_settings.DiffuseBounceCount, 0, MAX_BOUNCE_COUNT);
 
         bool& fireflyEnabled = m_settings.RealtimeMode
             ? m_settings.RealtimeFireflyFilterEnabled
@@ -213,7 +213,7 @@ void EditorUI::BuildAdvancedRenderSettings(const PanelLayout& layout)
             &m_settings.NestedDielectricsQuality,
             "Off\0Fast\0Quality\0\0"));
         m_settings.NestedDielectricsQuality =
-            dm::clamp(m_settings.NestedDielectricsQuality, 0, 2);
+            math::clamp(m_settings.NestedDielectricsQuality, 0, 2);
     }
 
     if (ImGui::CollapsingHeader("Advanced Lighting"))
@@ -228,9 +228,9 @@ void EditorUI::BuildAdvancedRenderSettings(const PanelLayout& layout)
             RESET_ON_CHANGE(SettingsInputInt(
                 "Candidate Samples", &m_settings.NEECandidateSamples));
             RESET_ON_CHANGE(SettingsInputInt("Full Samples", &m_settings.NEEFullSamples));
-            m_settings.NEECandidateSamples = dm::clamp(
+            m_settings.NEECandidateSamples = math::clamp(
                 m_settings.NEECandidateSamples, 1, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
-            m_settings.NEEFullSamples = dm::clamp(
+            m_settings.NEEFullSamples = math::clamp(
                 m_settings.NEEFullSamples, 0, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
         }
 

@@ -15,7 +15,7 @@ namespace caustica::render
 struct GaussianSplatBinding
 {
     const GaussianSplatPass* splatPass = nullptr;
-    dm::float4x4             objectToWorld = dm::float4x4::identity();
+    math::float4x4             objectToWorld = math::float4x4::identity();
 };
 
 struct GaussianSplatFrameInputs
@@ -25,7 +25,7 @@ struct GaussianSplatFrameInputs
     int sampleIndex = 0;
     int temporalSampleIndex = 0;
     GaussianSplatRenderTarget renderTarget = GaussianSplatRenderTarget::ProcessedOutputColor;
-    dm::float2 displaySize = dm::float2(0.0f, 0.0f);
+    math::float2 displaySize = math::float2(0.0f, 0.0f);
     std::span<const scene::LightRenderProxy> lights = {};
 };
 
@@ -39,7 +39,7 @@ void fillGaussianSplatShadowConstants(
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex,
-    const dm::float3& shadowDirectionToLight);
+    const math::float3& shadowDirectionToLight);
 
 bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings);
 bool needsTemporalGaussianSplatsBeforeAA(const PathTracerSettings& settings);
@@ -49,6 +49,6 @@ bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings);
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs);
 
-dm::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights);
+math::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights);
 
 } // namespace caustica::render

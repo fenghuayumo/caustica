@@ -1157,13 +1157,13 @@ void caustica::render::WorldRenderer::syncCameraViews()
     m_context->camera.updateViews(makeCameraUpdateParams());
     // Stable primary-hit pick: disable TAA/DLSS jitter for the pick frame.
     if (m_context->activeRuntime().Picking.hasActivePickRequest())
-        m_context->camera.view()->setPixelOffset(dm::float2::zero());
+        m_context->camera.view()->setPixelOffset(math::float2::zero());
 }
 
-dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
+math::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
     if (m_context->activeRuntime().Picking.hasActivePickRequest())
-        return dm::float2::zero();
+        return math::float2::zero();
     return m_context->camera.computeJitter(makeCameraUpdateParams());
 }
 
@@ -1417,8 +1417,8 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
                     {
-                        m_recommendedDLSSSettings.optimalRenderSize.x = dm::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.x, m_recommendedDLSSSettings.maxRenderSize.x);
-                        m_recommendedDLSSSettings.optimalRenderSize.y = dm::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.y, m_recommendedDLSSSettings.maxRenderSize.y);
+                        m_recommendedDLSSSettings.optimalRenderSize.x = math::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.x, m_recommendedDLSSSettings.maxRenderSize.x);
+                        m_recommendedDLSSSettings.optimalRenderSize.y = math::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.y, m_recommendedDLSSSettings.maxRenderSize.y);
                     }
 
                     if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
@@ -1643,13 +1643,13 @@ uint32_t WorldRenderer::debugViewTextureCount() const
 }
 
 bool WorldRenderer::debugViewTextureInfo(
-    uint32_t index, const char** outName, caustica::rhi::Texture** outTexture) const
+    uint32_t index, std::string* outName, caustica::rhi::Texture** outTexture) const
 {
     const std::vector<DebugNamedTexture> list = debugTextureList();
     if (index >= list.size())
         return false;
     if (outName)
-        *outName = list[index].name.c_str();
+        *outName = list[index].name;
     if (outTexture)
         *outTexture = list[index].texture;
     return true;

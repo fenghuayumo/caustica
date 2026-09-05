@@ -33,9 +33,9 @@ public:
 
     bool setLocalTransform(
         ecs::Entity entity,
-        const std::optional<dm::double3>& translation = std::nullopt,
-        const std::optional<dm::dquat>& rotation = std::nullopt,
-        const std::optional<dm::double3>& scaling = std::nullopt)
+        const std::optional<math::double3>& translation = std::nullopt,
+        const std::optional<math::dquat>& rotation = std::nullopt,
+        const std::optional<math::double3>& scaling = std::nullopt)
     {
         if (!m_world || !ecs::isValid(entity) || !m_world->isAlive(entity))
             return false;
@@ -53,8 +53,8 @@ public:
         if (rotation)
         {
             // q and -q are the same orientation; avoid thrashing on sign flips.
-            const double align = dm::dot(local->rotation, *rotation);
-            const dm::dquat canonical = (align < 0.0) ? -(*rotation) : *rotation;
+            const double align = math::dot(local->rotation, *rotation);
+            const math::dquat canonical = (align < 0.0) ? -(*rotation) : *rotation;
             if (any(canonical != local->rotation))
             {
                 local->rotation = canonical;
@@ -78,17 +78,17 @@ public:
         return true;
     }
 
-    bool setTranslation(ecs::Entity entity, const dm::double3& translation)
+    bool setTranslation(ecs::Entity entity, const math::double3& translation)
     {
         return setLocalTransform(entity, translation, std::nullopt, std::nullopt);
     }
 
-    bool setRotation(ecs::Entity entity, const dm::dquat& rotation)
+    bool setRotation(ecs::Entity entity, const math::dquat& rotation)
     {
         return setLocalTransform(entity, std::nullopt, rotation, std::nullopt);
     }
 
-    bool setScaling(ecs::Entity entity, const dm::double3& scaling)
+    bool setScaling(ecs::Entity entity, const math::double3& scaling)
     {
         return setLocalTransform(entity, std::nullopt, std::nullopt, scaling);
     }

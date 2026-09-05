@@ -112,8 +112,8 @@ void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType
 
     commandList->setComputeState(state);
 
-    const dm::uint  threads = NUM_COMPUTE_THREADS_PER_DIM;
-    const dm::uint2 dispatchSize = dm::uint2((width + threads - 1) / threads, (height + threads - 1) / threads);
+    const math::uint  threads = NUM_COMPUTE_THREADS_PER_DIM;
+    const math::uint2 dispatchSize = math::uint2((width + threads - 1) / threads, (height + threads - 1) / threads);
     commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
     commandList->dispatch(dispatchSize.x, dispatchSize.y);
 }

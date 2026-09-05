@@ -192,7 +192,7 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
 		            ImGui::PushItemWidth(layout.defItemWidth);
        
 		            RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Number of Build Samples", (int*)&m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples));
-		            m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = dm::clamp(m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 128u);
+		            m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = math::clamp(m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 128u);
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Cell Size", &m_settings.RTXDI.regir.regirDynamicParameters.regirCellSize, 0.1f, 2.f));
                     RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::SliderFloat("Sampling Jitter", &m_settings.RTXDI.regir.regirDynamicParameters.regirSamplingJitter, 0.f, 1.f));
 
@@ -237,15 +237,15 @@ void EditorUI::BuildRTXDIPanel(const PanelLayout& layout)
                         RAII_SCOPE(ImGui::Indent(layout.indent); , ImGui::Unindent(layout.indent); );
 
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("ReGir", (int*)&m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples));
-                        m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = dm::clamp(m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 32u);
+                        m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples = math::clamp(m_settings.RTXDI.regir.regirDynamicParameters.regirNumBuildSamples, 0u, 32u);
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Local Light", (int*)&m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryLocalLightSamples));
-		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryLocalLightSamples = dm::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryLocalLightSamples, 0u, 32u);
+		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryLocalLightSamples = math::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryLocalLightSamples, 0u, 32u);
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("BRDF", (int*)&m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryBrdfSamples));
-		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryBrdfSamples = dm::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryBrdfSamples, 0u, 32u);
+		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryBrdfSamples = math::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryBrdfSamples, 0u, 32u);
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Infinite Light", (int*)&m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples));
-		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples = dm::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples, 0u, 32u);
+		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples = math::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples, 0u, 32u);
                         RTXDI_RESTIR_RESET_ON_CHANGE(ImGui::InputInt("Environment Light", (int*)&m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples));
-		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples = dm::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples, 0u, 32u);
+		                m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples = math::clamp(m_settings.RTXDI.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples, 0u, 32u);
                     }
                     RTXDI_RESTIR_RESET_ON_CHANGE(CheckboxUInt32("Initial visibility test", &m_settings.RTXDI.restirDI.initialSamplingParams.enableInitialVisibility));
     
@@ -371,10 +371,10 @@ void EditorUI::BuildStablePlanesPanel(const PanelLayout& layout)
             {
                 ImGui::InputInt("Active stable planes", &m_settings.StablePlanesActiveCount);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("How many stable planes to allow - 1 is just standard denoising");
-                m_settings.StablePlanesActiveCount = dm::clamp(m_settings.StablePlanesActiveCount, 1, (int)cStablePlaneCount);
+                m_settings.StablePlanesActiveCount = math::clamp(m_settings.StablePlanesActiveCount, 1, (int)cStablePlaneCount);
                 ImGui::InputInt("Max stable plane vertex depth", &m_settings.StablePlanesMaxVertexDepth);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("How deep the stable part of path tracing can go");
-                m_settings.StablePlanesMaxVertexDepth = dm::clamp(m_settings.StablePlanesMaxVertexDepth, 2, (int)cStablePlaneMaxVertexIndex);
+                m_settings.StablePlanesMaxVertexDepth = math::clamp(m_settings.StablePlanesMaxVertexDepth, 2, (int)cStablePlaneMaxVertexIndex);
                 ImGui::SliderFloat("Path split stop threshold", &m_settings.StablePlanesSplitStopThreshold, 0.0f, 2.0f);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stops splitting if more than this threshold throughput will be on a non-taken branch.\nActual threshold is this value divided by vertexIndex.");
                 ImGui::Checkbox("Primary Surface Replacement", &m_settings.AllowPrimarySurfaceReplacement);
@@ -408,7 +408,7 @@ void EditorUI::BuildStandaloneDenoiserPanel(const PanelLayout& layout)
             ImGui::Separator();
 
             m_settings.NRDModeChanged = ImGui::Combo("Denoiser Mode", (int*)&m_settings.NRDMethod, "REBLUR\0RELAX\0\0");
-            m_settings.NRDMethod = dm::clamp(m_settings.NRDMethod, (NrdConfig::DenoiserMethod)0, (NrdConfig::DenoiserMethod)1);
+            m_settings.NRDMethod = math::clamp(m_settings.NRDMethod, (NrdConfig::DenoiserMethod)0, (NrdConfig::DenoiserMethod)1);
 
             if (ImGui::CollapsingHeader("Advanced settings"))
             {

@@ -90,25 +90,25 @@ struct SceneRootResource
 
 struct LocalTransformComponent
 {
-    dm::double3 translation = 0.0;
-    dm::dquat rotation = dm::dquat::identity();
-    dm::double3 scaling = 1.0;
-    dm::daffine3 transform = dm::daffine3::identity();
+    math::double3 translation = 0.0;
+    math::dquat rotation = math::dquat::identity();
+    math::double3 scaling = 1.0;
+    math::daffine3 transform = math::daffine3::identity();
     bool hasLocalTransform = false;
 
     // Recomputes the cached matrix after translation / rotation / scaling change.
     void compose()
     {
-        transform = dm::scaling(scaling);
+        transform = math::scaling(scaling);
         transform *= rotation.toAffine();
-        transform *= dm::translation(translation);
+        transform *= math::translation(translation);
     }
 
     // Authoring helper for Bundle spawn / system code.
     [[nodiscard]] static LocalTransformComponent fromTRS(
-        const dm::double3& translation,
-        const dm::dquat& rotation = dm::dquat::identity(),
-        const dm::double3& scaling = dm::double3(1.0))
+        const math::double3& translation,
+        const math::dquat& rotation = math::dquat::identity(),
+        const math::double3& scaling = math::double3(1.0))
     {
         LocalTransformComponent local{};
         local.translation = translation;
@@ -122,20 +122,20 @@ struct LocalTransformComponent
 
 struct GlobalTransformComponent
 {
-    dm::daffine3 transform = dm::daffine3::identity();
-    dm::affine3 transformFloat = dm::affine3::identity();
-    dm::daffine3 previousTransform = dm::daffine3::identity();
-    dm::affine3 previousTransformFloat = dm::affine3::identity();
+    math::daffine3 transform = math::daffine3::identity();
+    math::affine3 transformFloat = math::affine3::identity();
+    math::daffine3 previousTransform = math::daffine3::identity();
+    math::affine3 previousTransformFloat = math::affine3::identity();
 };
 
 struct LocalBoundsComponent
 {
-    dm::box3 bounds = dm::box3::empty();
+    math::box3 bounds = math::box3::empty();
 };
 
 struct BoundsComponent
 {
-    dm::box3 globalBounds = dm::box3::empty();
+    math::box3 globalBounds = math::box3::empty();
 };
 
 struct SceneContentComponent
@@ -213,7 +213,7 @@ struct RectLightData
 
 struct EnvironmentLightData
 {
-    dm::float3 radianceScale = dm::float3(1.f);
+    math::float3 radianceScale = math::float3(1.f);
     int textureIndex = -1;
     float rotation = 0.f;
     std::string path;
@@ -225,7 +225,7 @@ using LightData = std::variant<DirectionalLightData, SpotLightData, PointLightDa
 struct DirectionalLightComponent
 {
     bool enabled = true;
-    dm::float3 color = dm::colors::white;
+    math::float3 color = math::colors::white;
     float irradiance = 1.f;
     float angularSize = 0.f;
 };
@@ -233,7 +233,7 @@ struct DirectionalLightComponent
 struct SpotLightComponent
 {
     bool enabled = true;
-    dm::float3 color = dm::colors::white;
+    math::float3 color = math::colors::white;
     std::vector<std::string> proxies;
     float intensity = 1.f;
     float radius = 0.f;
@@ -245,7 +245,7 @@ struct SpotLightComponent
 struct PointLightComponent
 {
     bool enabled = true;
-    dm::float3 color = dm::colors::white;
+    math::float3 color = math::colors::white;
     std::vector<std::string> proxies;
     float intensity = 1.f;
     float radius = 0.f;
@@ -255,7 +255,7 @@ struct PointLightComponent
 struct RectLightComponent
 {
     bool enabled = true;
-    dm::float3 color = dm::colors::white;
+    math::float3 color = math::colors::white;
     float intensity = 1.f;
     float width = 1.f;
     float height = 1.f;
@@ -264,8 +264,8 @@ struct RectLightComponent
 struct EnvironmentLightComponent
 {
     bool enabled = true;
-    dm::float3 color = dm::colors::white;
-    dm::float3 radianceScale = dm::float3(1.f);
+    math::float3 color = math::colors::white;
+    math::float3 radianceScale = math::float3(1.f);
     int textureIndex = -1;
     float rotation = 0.f;
     std::string path;
@@ -380,8 +380,8 @@ enum class PreviousTransformPolicy
 void updateHierarchy(ecs::World& world, PreviousTransformPolicy previousPolicy);
 
 [[nodiscard]] SceneContentFlags getMeshContentFlags(const MeshInfo& mesh);
-[[nodiscard]] dm::box3 getMeshLocalBounds(const MeshInfo& mesh);
-[[nodiscard]] bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const dm::float4& value);
+[[nodiscard]] math::box3 getMeshLocalBounds(const MeshInfo& mesh);
+[[nodiscard]] bool setMeshProperty(MeshInfo& mesh, const std::string& propName, const math::float4& value);
 void initializeMeshInstanceComponent(MeshInstanceComponent& component, const std::shared_ptr<MeshInfo>& mesh);
 [[nodiscard]] std::shared_ptr<MeshInfo> createSkinnedMeshFromPrototype(
     SceneTypeFactory& factory, const std::shared_ptr<MeshInfo>& prototypeMesh);
@@ -444,12 +444,12 @@ public:
     }
 
     void setLocalTransform(ecs::Entity entity,
-        const dm::double3* translation,
-        const dm::dquat* rotation,
-        const dm::double3* scaling);
-    void setTranslation(ecs::Entity entity, const dm::double3& translation);
-    void setRotation(ecs::Entity entity, const dm::dquat& rotation);
-    void setScaling(ecs::Entity entity, const dm::double3& scaling);
+        const math::double3* translation,
+        const math::dquat* rotation,
+        const math::double3* scaling);
+    void setTranslation(ecs::Entity entity, const math::double3& translation);
+    void setRotation(ecs::Entity entity, const math::dquat& rotation);
+    void setScaling(ecs::Entity entity, const math::double3& scaling);
     void setPath(ecs::Entity entity, const std::filesystem::path& path);
     void rebuildPathsFromRoot();
 

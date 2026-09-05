@@ -94,10 +94,10 @@ private:
     caustica::rhi::BindingLayoutHandle m_bindingLayout;
     caustica::rhi::BufferHandle m_constantBuffer;
     caustica::rhi::CommandList* m_commandList = nullptr;
-    dm::uint2 m_renderSize{};
-    dm::uint2 m_displaySize{};
+    math::uint2 m_renderSize{};
+    math::uint2 m_displaySize{};
     float m_displayAspectRatio = 1.f;
-    dm::float2 m_cameraJitter{};
+    math::float2 m_cameraJitter{};
     uint32_t m_sampleIndex = 0;
     uint64_t m_frameIndex = 0;
     int m_accumulationSampleIndex = 0;

@@ -214,16 +214,16 @@ void ComputeVertexNormals(
     }
 }
 
-dm::float3 MeshDisplayColor(const UsdPrim& prim)
+math::float3 MeshDisplayColor(const UsdPrim& prim)
 {
     UsdGeomPrimvar pv = UsdGeomGprim(prim).GetDisplayColorPrimvar();
     if (pv && pv.HasValue())
     {
         VtArray<GfVec3f> vals;
         if (pv.Get(&vals) && !vals.empty())
-            return dm::float3(vals[0][0], vals[0][1], vals[0][2]);
+            return math::float3(vals[0][0], vals[0][1], vals[0][2]);
     }
-    return dm::float3(0.75f);
+    return math::float3(0.75f);
 }
 
 bool XformHasSamples(const UsdPrim& prim)
@@ -327,9 +327,9 @@ ecs::Entity EnsurePathEntity(
 
 void ApplyRestTransform(scene::SceneEntityWorld& world, ecs::Entity entity, const float* trs10)
 {
-    const dm::double3 translation(trs10[0], trs10[1], trs10[2]);
-    const dm::dquat rotation = dm::dquat::fromXYZW(dm::double4(trs10[3], trs10[4], trs10[5], trs10[6]));
-    const dm::double3 scaling(trs10[7], trs10[8], trs10[9]);
+    const math::double3 translation(trs10[0], trs10[1], trs10[2]);
+    const math::dquat rotation = math::dquat::fromXYZW(math::double4(trs10[3], trs10[4], trs10[5], trs10[6]));
+    const math::double3 scaling(trs10[7], trs10[8], trs10[9]);
     world.setLocalTransform(entity, &translation, &rotation, &scaling);
 }
 
@@ -354,17 +354,17 @@ void AppendTransformChannels(
         const float* k = trs.data() + i * 10;
         animation::Keyframe tKf;
         tKf.time = times[i];
-        tKf.value = dm::float4(k[0], k[1], k[2], 0.f);
+        tKf.value = math::float4(k[0], k[1], k[2], 0.f);
         translation->addKeyframe(tKf);
 
         animation::Keyframe rKf;
         rKf.time = times[i];
-        rKf.value = dm::float4(k[3], k[4], k[5], k[6]);
+        rKf.value = math::float4(k[3], k[4], k[5], k[6]);
         rotation->addKeyframe(rKf);
 
         animation::Keyframe sKf;
         sKf.time = times[i];
-        sKf.value = dm::float4(k[7], k[8], k[9], 0.f);
+        sKf.value = math::float4(k[7], k[8], k[9], 0.f);
         scaling->addKeyframe(sKf);
     }
 
@@ -376,7 +376,7 @@ void AppendTransformChannels(
 std::shared_ptr<MeshInfo> BuildMesh(
     SceneTypeFactory& factory,
     const std::string& name,
-    const dm::float3& color,
+    const math::float3& color,
     const std::vector<float>& positions,
     const std::vector<float>& normals,
     const std::vector<uint32_t>& indices,
@@ -391,17 +391,17 @@ std::shared_ptr<MeshInfo> BuildMesh(
     buffers.positionData.resize(vertexCount);
     buffers.normalData.resize(vertexCount);
     buffers.tangentData.resize(vertexCount);
-    buffers.texcoord1Data.resize(vertexCount, dm::float2(0.f));
+    buffers.texcoord1Data.resize(vertexCount, math::float2(0.f));
     buffers.indexData = indices;
 
-    mesh->objectSpaceBounds = dm::box3::empty();
+    mesh->objectSpaceBounds = math::box3::empty();
     for (size_t i = 0; i < vertexCount; ++i)
     {
-        const dm::float3 p(positions[i * 3 + 0], positions[i * 3 + 1], positions[i * 3 + 2]);
-        const dm::float3 n(normals[i * 3 + 0], normals[i * 3 + 1], normals[i * 3 + 2]);
+        const math::float3 p(positions[i * 3 + 0], positions[i * 3 + 1], positions[i * 3 + 2]);
+        const math::float3 n(normals[i * 3 + 0], normals[i * 3 + 1], normals[i * 3 + 2]);
         buffers.positionData[i] = p;
-        buffers.normalData[i] = dm::vectorToSnorm8(n);
-        buffers.tangentData[i] = dm::vectorToSnorm8(dm::float4(1.f, 0.f, 0.f, 1.f));
+        buffers.normalData[i] = math::vectorToSnorm8(n);
+        buffers.tangentData[i] = math::vectorToSnorm8(math::float4(1.f, 0.f, 0.f, 1.f));
         mesh->objectSpaceBounds |= p;
         if (keepDeformationIndices)
             mesh->DeformationSourcePositionIndices.push_back(uint32_t(i));

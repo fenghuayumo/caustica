@@ -116,7 +116,7 @@ int main()
         passed &= expect(rotated && rotated->hasLocalTransform, "xyz rotation was not applied");
         passed &= expect(
             rotated && std::abs(rotated->rotation.w - 1.0) < 1e-6,
-            "3-element rotation should default w to 1 like Donut");
+            "3-element rotation should default w to 1 like legacy scenes");
 
         Json::Value entities = parse(R"([{"id":"cube","name":"Cube","components":{}}])");
         caustica::scene::patchEntityTransforms(entities, world);
@@ -282,7 +282,7 @@ int main()
         world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
             sun, caustica::scene::SceneAuthoringIdComponent{ "sun" });
         caustica::scene::DirectionalLightComponent light;
-        light.color = dm::float3(1.f, 0.5f, 0.25f);
+        light.color = math::float3(1.f, 0.5f, 0.25f);
         light.irradiance = 4.f;
         light.angularSize = 1.5f;
         world.world().emplace<caustica::scene::DirectionalLightComponent>(sun, light);
@@ -379,7 +379,7 @@ int main()
         world.refreshHierarchy();
         passed &= expect(
             caustica::scene::setCameraWorldLookTo(
-                world, cam, dm::float3(0.f, 1.5f, 4.f), dm::float3(0.f, 0.f, -1.f), dm::float3(0.f, 1.f, 0.f)),
+                world, cam, math::float3(0.f, 1.5f, 4.f), math::float3(0.f, 0.f, -1.f), math::float3(0.f, 1.f, 0.f)),
             "setCameraWorldLookTo failed");
         caustica::scene::CameraWorldLookTo look;
         passed &= expect(
@@ -394,14 +394,14 @@ int main()
         caustica::scene::SceneEntityWorld world;
         const caustica::ecs::Entity root = world.createEntity("Root");
         const caustica::ecs::Entity child = world.createEntity("Child", root);
-        world.setTranslation(root, dm::double3(4.0, 1.0, -2.0));
-        world.setRotation(root, dm::rotationQuat(dm::double3(0.0, dm::PI_d * 0.5, 0.0)));
+        world.setTranslation(root, math::double3(4.0, 1.0, -2.0));
+        world.setRotation(root, math::rotationQuat(math::double3(0.0, math::PI_d * 0.5, 0.0)));
         world.refreshHierarchy();
 
         caustica::scene::EntityPose desired;
-        desired.position = dm::double3(7.0, 2.0, -3.0);
-        desired.rotation = dm::dquat::identity();
-        desired.scaling = dm::double3(1.0);
+        desired.position = math::double3(7.0, 2.0, -3.0);
+        desired.rotation = math::dquat::identity();
+        desired.scaling = math::double3(1.0);
         passed &= expect(
             caustica::scene::setEntityWorldPose(world, child, desired),
             "setEntityWorldPose failed under a rotated parent");
@@ -465,7 +465,7 @@ int main()
         const caustica::ecs::Entity sun = world.createEntity("Sun", root);
         caustica::scene::DirectionalLightComponent light;
         light.irradiance = 7.f;
-        light.color = dm::float3(0.1f, 0.2f, 0.3f);
+        light.color = math::float3(0.1f, 0.2f, 0.3f);
         world.world().emplace<caustica::scene::DirectionalLightComponent>(sun, light);
         world.rebuildPathsFromRoot();
 
@@ -496,7 +496,7 @@ int main()
             cube, caustica::scene::SceneAuthoringIdComponent{ "Cube" });
         world.world().emplace<caustica::scene::PrefabInstanceComponent>(
             cube, caustica::scene::PrefabInstanceComponent{ "builtin:cube", {} });
-        world.setTranslation(cube, dm::double3(1.0, 0.5, 2.0));
+        world.setTranslation(cube, math::double3(1.0, 0.5, 2.0));
 
         Json::Value document(Json::objectValue);
         caustica::scene::upsertAuthoredEntityNode(document, world, cube);
@@ -507,7 +507,7 @@ int main()
             document["entities"][0]["components"]["PrefabInstance"]["source"].asString() == "builtin:cube",
             "upsert did not write PrefabInstance.source");
 
-        world.setTranslation(cube, dm::double3(3.0, 0.5, 2.0));
+        world.setTranslation(cube, math::double3(3.0, 0.5, 2.0));
         caustica::scene::syncAuthoredEntitiesToDocument(document, world);
         passed &= expect(document["entities"].size() == 1, "sync duplicated the authored entity");
 

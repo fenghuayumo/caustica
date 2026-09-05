@@ -251,14 +251,14 @@ namespace caustica::json
     }
 
     template <>
-    void write<int2>(Json::Value& node, const dm::int2& value)
+    void write<int2>(Json::Value& node, const math::int2& value)
     {
         node.append(value.x);
         node.append(value.y);
     }
 
     template <>
-    void write<int3>(Json::Value& node, const dm::int3& value)
+    void write<int3>(Json::Value& node, const math::int3& value)
     {
         node.append(value.x);
         node.append(value.y);
@@ -266,7 +266,7 @@ namespace caustica::json
     }
 
     template <>
-    void write<int4>(Json::Value& node, const dm::int4& value)
+    void write<int4>(Json::Value& node, const math::int4& value)
     {
         node.append(value.x);
         node.append(value.y);
@@ -281,14 +281,14 @@ namespace caustica::json
     }
 
     template <>
-    void write<uint2>(Json::Value& node, const dm::uint2& value)
+    void write<uint2>(Json::Value& node, const math::uint2& value)
     {
         node.append(value.x);
         node.append(value.y);
     }
 
     template <>
-    void write<uint3>(Json::Value& node, const dm::uint3& value)
+    void write<uint3>(Json::Value& node, const math::uint3& value)
     {
         node.append(value.x);
         node.append(value.y);
@@ -296,7 +296,7 @@ namespace caustica::json
     }
 
     template <>
-    void write<uint4>(Json::Value& node, const dm::uint4& value)
+    void write<uint4>(Json::Value& node, const math::uint4& value)
     {
         node.append(value.x);
         node.append(value.y);
@@ -317,14 +317,14 @@ namespace caustica::json
     }
 
     template <>
-    void write<float2>(Json::Value& node, const dm::float2& value)
+    void write<float2>(Json::Value& node, const math::float2& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));
     }
 
     template <>
-    void write<float3>(Json::Value& node, const dm::float3& value)
+    void write<float3>(Json::Value& node, const math::float3& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));
@@ -332,7 +332,7 @@ namespace caustica::json
     }
 
     template <>
-    void write<float4>(Json::Value& node, const dm::float4& value)
+    void write<float4>(Json::Value& node, const math::float4& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));
@@ -347,14 +347,14 @@ namespace caustica::json
     }
 
     template <>
-    void write<double2>(Json::Value& node, const dm::double2& value)
+    void write<double2>(Json::Value& node, const math::double2& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));
     }
 
     template <>
-    void write<double3>(Json::Value& node, const dm::double3& value)
+    void write<double3>(Json::Value& node, const math::double3& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));
@@ -362,7 +362,7 @@ namespace caustica::json
     }
 
     template <>
-    void write<double4>(Json::Value& node, const dm::double4& value)
+    void write<double4>(Json::Value& node, const math::double4& value)
     {
         node.append(double(value.x));
         node.append(double(value.y));

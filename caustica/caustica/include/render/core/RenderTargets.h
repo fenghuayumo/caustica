@@ -15,7 +15,7 @@ namespace caustica
 
 class RenderTargets
 {
-    const dm::uint m_sampleCount = 1; // no MSAA supported in this sample
+    const math::uint m_sampleCount = 1; // no MSAA supported in this sample
     bool m_useReverseProjection = false;
     int m_backbufferCount = -1;
     caustica::rhi::Device* m_device;
@@ -88,16 +88,16 @@ public:
 
     caustica::rhi::HeapHandle heap;
 
-    dm::uint2 renderSize;// size of render targets pre-DLSS
-    dm::uint2 displaySize; // size of render targets post-DLSS
+    math::uint2 renderSize;// size of render targets pre-DLSS
+    math::uint2 displaySize; // size of render targets post-DLSS
 
     // Framebuffers are used by the bloom and tone mapping passes
     std::shared_ptr<caustica::FramebufferFactory> outputFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> processedOutputFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> ldrFramebuffer;
 
-    void init(caustica::rhi::Device* device, dm::uint2 renderSize, dm::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
-    [[nodiscard]] bool isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount = 1) const;
+    void init(caustica::rhi::Device* device, math::uint2 renderSize, math::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
+    [[nodiscard]] bool isUpdateRequired(math::uint2 renderSize, math::uint2 displaySize, math::uint sampleCount = 1) const;
     void clear(caustica::rhi::CommandList* commandList);
 
     static uint32_t getNumMipLevels(uint32_t width, uint32_t height);

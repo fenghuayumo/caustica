@@ -122,7 +122,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         const int requestedMode = ui.render.settings.GaussianSplatShadowsMode == GAUSSIAN_SPLAT_SHADOWS_DISABLED
             ? GAUSSIAN_SPLAT_SHADOWS_HARD
             : ui.render.settings.GaussianSplatShadowsMode;
-        return dm::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT);
+        return math::clamp(requestedMode, GAUSSIAN_SPLAT_SHADOWS_HARD, GAUSSIAN_SPLAT_SHADOWS_SOFT);
     }
 
     bool GaussianSplatPrimaryMethodCombo(EditorUIData& ui)
@@ -135,7 +135,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
         if (!selectionChanged && !legacyValueMigrated)
             return false;
 
-        primaryMethod = dm::clamp(primaryMethod, 0, 1);
+        primaryMethod = math::clamp(primaryMethod, 0, 1);
         ui.render.settings.GaussianSplatPrimaryMethod = primaryMethod;
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
@@ -161,7 +161,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
                 "Off\0Hard\0Soft\0\0"))
             return false;
 
-        shadowMode = dm::clamp(shadowMode, GAUSSIAN_SPLAT_SHADOWS_DISABLED, GAUSSIAN_SPLAT_SHADOWS_SOFT);
+        shadowMode = math::clamp(shadowMode, GAUSSIAN_SPLAT_SHADOWS_DISABLED, GAUSSIAN_SPLAT_SHADOWS_SOFT);
         ui.render.settings.GaussianSplatShadowsMode = shadowMode;
         ui.render.settings.GaussianSplatShadows = shadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
         if (ImGui::IsItemHovered())
@@ -181,7 +181,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
             "Sorting Method",
             &ui.render.settings.GaussianSplatSortingMode,
             "GPU sort\0Stochastic Splats\0\0");
-        ui.render.settings.GaussianSplatSortingMode = dm::clamp(ui.render.settings.GaussianSplatSortingMode, 0, 1);
+        ui.render.settings.GaussianSplatSortingMode = math::clamp(ui.render.settings.GaussianSplatSortingMode, 0, 1);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("GPU sort uses the existing radix-sort path. Stochastic splats uses stable randomized order plus stochastic opacity accept/reject.");
         return changed;
@@ -190,7 +190,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
     bool GaussianSplatFormatCombo(const char* label, int* value)
     {
         const bool changed = SettingsCombo(label, value, "Float32\0Float16\0Uint8\0\0");
-        *value = dm::clamp(*value, 0, 2);
+        *value = math::clamp(*value, 0, 2);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Storage format used by the 3DGS raster color/alpha and SH buffers in VRAM.");
         return changed;
@@ -205,7 +205,7 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
             "3 (Cubic)\0"
             "4 (Tesseractic)\0"
             "5 (Quintic)\0\0");
-        ui.render.settings.GaussianSplatShadowKernelDegree = dm::clamp(ui.render.settings.GaussianSplatShadowKernelDegree, 0, 5);
+        ui.render.settings.GaussianSplatShadowKernelDegree = math::clamp(ui.render.settings.GaussianSplatShadowKernelDegree, 0, 5);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Kernel degree for Gaussian shadow-ray intersections. Changing it rebuilds Gaussian BLAS proxies.");
         return changed;
@@ -457,12 +457,12 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& e
     ImGui::PopID();
 }
 
-dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation)
+math::float3 QuaternionToEulerDegreesXYZ(const math::dquat& rotation)
     {
         constexpr float rad2deg = 180.0f / 3.14159265f;
-        const dm::double3x3 m = rotation.toMatrix();
+        const math::double3x3 m = rotation.toMatrix();
 
-        const double y = std::asin(dm::clamp(-m.m_data[2], -1.0, 1.0));
+        const double y = std::asin(math::clamp(-m.m_data[2], -1.0, 1.0));
         const double cy = std::cos(y);
 
         double x = 0.0;
@@ -477,20 +477,20 @@ dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation)
             x = std::atan2(-m.m_data[7], m.m_data[4]);
         }
 
-        return dm::float3(
+        return math::float3(
             WrapDegrees(float(x) * rad2deg),
             WrapDegrees(float(y) * rad2deg),
             WrapDegrees(float(z) * rad2deg));
     }
 
-    bool SameRotation(const dm::dquat& a, const dm::dquat& b)
+    bool SameRotation(const math::dquat& a, const math::dquat& b)
     {
-        const double lenA = dm::length(a);
-        const double lenB = dm::length(b);
+        const double lenA = math::length(a);
+        const double lenB = math::length(b);
         if (lenA <= 1e-12 || lenB <= 1e-12)
             return false;
 
-        const double cosine = std::abs(dm::dot(a / lenA, b / lenB));
+        const double cosine = std::abs(math::dot(a / lenA, b / lenB));
         return cosine > 0.999999999;
     }
 
@@ -1011,7 +1011,7 @@ void UpdateTogglableNodes(std::vector<TogglableNode>& togglableNodes, caustica::
             tn.EntityWorld = &entityWorld;
             tn.UIName = name.substr(0, nameLen - tokenLen);
             auto* comp = entityWorld.world().tryGet<caustica::scene::LocalTransformComponent>(e);
-            tn.OriginalTranslation = comp ? comp->translation : dm::double3(0.0);
+            tn.OriginalTranslation = comp ? comp->translation : math::double3(0.0);
             togglableNodes.push_back(tn);
             return &togglableNodes.back();
         }

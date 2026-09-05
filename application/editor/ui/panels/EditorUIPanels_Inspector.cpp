@@ -154,9 +154,9 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
     {
         auto* ltc = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity);
-        dm::double3 translation = ltc ? ltc->translation : dm::double3(0.0);
-        dm::dquat rotation = ltc ? ltc->rotation : dm::dquat::identity();
-        dm::double3 scaling = ltc ? ltc->scaling : dm::double3(1.0);
+        math::double3 translation = ltc ? ltc->translation : math::double3(0.0);
+        math::dquat rotation = ltc ? ltc->rotation : math::dquat::identity();
+        math::double3 scaling = ltc ? ltc->scaling : math::double3(1.0);
         const LocalTransformSnapshot frameBefore = ltc
             ? captureLocalTransform(*ltc)
             : LocalTransformSnapshot{};
@@ -199,7 +199,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         if (TransformVec3Row("pos", "Position", pos, 0.01f, 0.f, 0.f, "%.3f", kResetPos, &lockPos, false, &posEdit))
         {
             beginTransformEdit(posEdit);
-            ew->setTranslation(entity, dm::double3(pos[0], pos[1], pos[2]));
+            ew->setTranslation(entity, math::double3(pos[0], pos[1], pos[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
@@ -230,8 +230,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         if (TransformVec3Row("rot", "Rotation", euler, 0.5f, 0.f, 0.f, "%.2f", kResetRot, &lockRot, false, &rotEdit))
         {
             beginTransformEdit(rotEdit);
-            m_editorUI.InspectorRotationEulerDeg = dm::float3(euler[0], euler[1], euler[2]);
-            const dm::dquat newRotation = dm::rotationQuat(dm::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
+            m_editorUI.InspectorRotationEulerDeg = math::float3(euler[0], euler[1], euler[2]);
+            const math::dquat newRotation = math::rotationQuat(math::double3(euler[0] * deg2rad, euler[1] * deg2rad, euler[2] * deg2rad));
             m_editorUI.InspectorRotationQuat = newRotation;
             ew->setRotation(entity, newRotation);
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
@@ -249,7 +249,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         if (TransformVec3Row("scl", "Scale", scl, 0.01f, 0.001f, 1000.0f, "%.3f", kResetScl, &lockScl, true, &sclEdit))
         {
             beginTransformEdit(sclEdit);
-            ew->setScaling(entity, dm::double3(scl[0], scl[1], scl[2]));
+            ew->setScaling(entity, math::double3(scl[0], scl[1], scl[2]));
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
@@ -295,7 +295,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                     "Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256.f, 0, 262144))
             {
                 m_settings.GaussianSplatEmissionMaxProxyCount =
-                    dm::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
+                    math::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
                 m_settings.ResetAccumulation = true;
             }
             ImGui::EndDisabled();
@@ -322,10 +322,10 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ImGui::Spacing();
             if (auto* pers = caustica::scene::tryGetPerspectiveCameraData(*cameraComp))
             {
-                float fovDeg = dm::degrees(pers->verticalFov);
+                float fovDeg = math::degrees(pers->verticalFov);
                 if (InspectorDragFloat("Vertical FOV", &fovDeg, 0.1f, 1.f, 179.f, "%.1f°"))
                 {
-                    pers->verticalFov = dm::radians(dm::clamp(fovDeg, 1.f, 179.f));
+                    pers->verticalFov = math::radians(math::clamp(fovDeg, 1.f, 179.f));
                     pers->intrinsics.reset();
                     m_settings.ResetAccumulation = true;
                 }

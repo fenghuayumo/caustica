@@ -232,7 +232,7 @@ namespace caustica
         // SceneEntityWorld whose borrowed world pointer has gone stale.
         void detachLiveEcs();
         [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
-        [[nodiscard]] dm::box3 getSceneBounds() const;
+        [[nodiscard]] math::box3 getSceneBounds() const;
 
         [[nodiscard]] const ResourceTracker<Material>& getMaterials() const;
         [[nodiscard]] const ResourceTracker<MeshInfo>& getMeshes() const;

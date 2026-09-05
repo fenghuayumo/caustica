@@ -474,7 +474,7 @@ engine.use_camera(None)
 
 ```cpp
 ecs::Entity wrist = caustica::findEntity(engine->app(), "wrist");
-caustica::setSceneCameraVerticalFOV(engine->app(), wrist, dm::radians(55.f));
+caustica::setSceneCameraVerticalFOV(engine->app(), wrist, math::radians(55.f));
 caustica::setSceneCameraLookTo(
     engine->app(), wrist,
     {0.f, 1.2f, 0.15f}, {0.f, 0.f, 1.f}, {0.f, 1.f, 0.f});
@@ -1327,7 +1327,7 @@ There is no public spawn-camera helper yet. Add cameras in scene JSON (or spawn 
 #include <caustica.h>
 
 ecs::Entity wrist = caustica::findEntity(engine->app(), "wrist");
-caustica::setSceneCameraVerticalFOV(engine->app(), wrist, dm::radians(55.f));
+caustica::setSceneCameraVerticalFOV(engine->app(), wrist, math::radians(55.f));
 caustica::setSceneCameraLookTo(
     engine->app(), wrist,
     {0.f, 1.2f, 0.15f}, {0.f, 0.f, 1.f}, {0.f, 1.f, 0.f});

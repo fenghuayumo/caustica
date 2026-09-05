@@ -52,9 +52,9 @@ namespace caustica::scene
         MeshType meshType = MeshType::Triangles;
         bool hasSkinPrototype = false;
         bool enabled = true;
-        dm::affine3 transformFloat = dm::affine3::identity();
-        dm::affine3 previousTransformFloat = dm::affine3::identity();
-        dm::box3 globalBounds = dm::box3::empty();
+        math::affine3 transformFloat = math::affine3::identity();
+        math::affine3 previousTransformFloat = math::affine3::identity();
+        math::box3 globalBounds = math::box3::empty();
         SceneContentFlags leafContent = SceneContentFlags::None;
         ecs::Entity proxiedAnalyticLight = ecs::NullEntity;
         ecs::Entity parentLightEntity = ecs::NullEntity;
@@ -67,7 +67,7 @@ namespace caustica::scene
         ecs::Entity entity = ecs::NullEntity;
         MeshRenderResourceId meshId;
         MeshRenderResourceId prototypeMeshId;
-        dm::affine3 transformFloat = dm::affine3::identity();
+        math::affine3 transformFloat = math::affine3::identity();
         std::string debugName;
         uint32_t jointMatrixOffset = 0;
         uint32_t jointMatrixCount = 0;
@@ -79,10 +79,10 @@ namespace caustica::scene
     struct LightRenderProxy
     {
         ecs::Entity entity = ecs::NullEntity;
-        dm::float3 color = dm::colors::white;
+        math::float3 color = math::colors::white;
         std::vector<std::string> proxies;
         LightData data;
-        dm::daffine3 transform = dm::daffine3::identity();
+        math::daffine3 transform = math::daffine3::identity();
     };
 
     enum class CameraProjectionKind : uint8_t
@@ -96,7 +96,7 @@ namespace caustica::scene
     {
         ecs::Entity entity = ecs::NullEntity;
         CameraProjectionKind projection = CameraProjectionKind::Perspective;
-        dm::daffine3 transform = dm::daffine3::identity();
+        math::daffine3 transform = math::daffine3::identity();
 
         float zNear = 1.f;
         std::optional<float> zFar;
@@ -111,8 +111,8 @@ namespace caustica::scene
         std::optional<float> exposureValueMin;
         std::optional<float> exposureValueMax;
         bool useCustomIntrinsics = false;
-        dm::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
-        dm::float2 intrinsicsViewport = { 0.f, 0.f };
+        math::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
+        math::float2 intrinsicsViewport = { 0.f, 0.f };
 
         // Orthographic
         float xMag = 1.f;
@@ -127,14 +127,14 @@ namespace caustica::scene
         bool valid = false;
         ecs::Entity sourceEntity = ecs::NullEntity; // NullEntity => free camera (index 0)
         uint32_t selectedCameraIndex = 0;
-        dm::float3 position = { 0.f, 0.f, 0.f };
-        dm::float3 direction = { 0.f, 0.f, -1.f };
-        dm::float3 up = { 0.f, 1.f, 0.f };
-        float verticalFovRadians = dm::radians(60.f);
+        math::float3 position = { 0.f, 0.f, 0.f };
+        math::float3 direction = { 0.f, 0.f, -1.f };
+        math::float3 up = { 0.f, 1.f, 0.f };
+        float verticalFovRadians = math::radians(60.f);
         float zNear = 0.001f;
         bool useCustomIntrinsics = false;
-        dm::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
-        dm::float2 intrinsicsViewport = { 0.f, 0.f };
+        math::float4 intrinsics = { 0.f, 0.f, 0.f, 0.f };
+        math::float2 intrinsicsViewport = { 0.f, 0.f };
     };
 
     // One ECS GaussianSplatComponent + GlobalTransform, extracted for the render world.
@@ -143,7 +143,7 @@ namespace caustica::scene
     {
         ecs::Entity entity = ecs::NullEntity;
         bool enabled = true;
-        dm::affine3 objectToWorld = dm::affine3::identity();
+        math::affine3 objectToWorld = math::affine3::identity();
     };
 
     struct RenderSettingsSnapshot
@@ -171,9 +171,9 @@ namespace caustica::scene
         Handle<ImageAsset> occlusionTexture;
         Handle<ImageAsset> transmissionTexture;
         Handle<ImageAsset> opacityTexture;
-        dm::float3 baseOrDiffuseColor = 1.f;
-        dm::float3 specularColor = 0.f;
-        dm::float3 emissiveColor = 0.f;
+        math::float3 baseOrDiffuseColor = 1.f;
+        math::float3 specularColor = 0.f;
+        math::float3 emissiveColor = 0.f;
         float emissiveIntensity = 1.f;
         float metalness = 0.f;
         float roughness = 0.f;
@@ -182,7 +182,7 @@ namespace caustica::scene
         float transmissionFactor = 0.f;
         float normalTextureScale = 1.f;
         float occlusionStrength = 1.f;
-        dm::float2 normalTextureTransformScale = 1.f;
+        math::float2 normalTextureTransformScale = 1.f;
         bool useSpecularGlossModel = false;
         bool enableBaseOrDiffuseTexture = true;
         bool enableMetalRoughOrSpecularTexture = true;
@@ -204,13 +204,13 @@ namespace caustica::scene
     struct MeshUploadBlob
     {
         std::vector<uint32_t> indexData;
-        std::vector<dm::float3> positionData;
-        std::vector<dm::float2> texcoord1Data;
-        std::vector<dm::float2> texcoord2Data;
+        std::vector<math::float3> positionData;
+        std::vector<math::float2> texcoord1Data;
+        std::vector<math::float2> texcoord2Data;
         std::vector<uint32_t> normalData;
         std::vector<uint32_t> tangentData;
-        std::vector<dm::vector<uint16_t, 4>> jointData;
-        std::vector<dm::float4> weightData;
+        std::vector<math::vector<uint16_t, 4>> jointData;
+        std::vector<math::float4> weightData;
         std::vector<float> radiusData;
     };
 
@@ -224,7 +224,7 @@ namespace caustica::scene
         // geometry so alpha-tested/transmissive primitives are never
         // accidentally baked as opaque in that window.
         MaterialDomain materialDomain = MaterialDomain::Opaque;
-        dm::box3 objectSpaceBounds = dm::box3::empty();
+        math::box3 objectSpaceBounds = math::box3::empty();
         uint32_t indexOffsetInMesh = 0;
         uint32_t vertexOffsetInMesh = 0;
         uint32_t numIndices = 0;
@@ -238,7 +238,7 @@ namespace caustica::scene
         MeshRenderResourceId id;
         std::string debugName;
         MeshType type = MeshType::Triangles;
-        dm::box3 objectSpaceBounds = dm::box3::empty();
+        math::box3 objectSpaceBounds = math::box3::empty();
         uint32_t indexOffset = 0;
         uint32_t vertexOffset = 0;
         uint32_t totalIndices = 0;
@@ -290,7 +290,7 @@ namespace caustica::scene
         // One immutable palette per extracted frame. Scene snapshots share it
         // across the logic cache, frame slot and structure handoff instead of
         // allocating/copying one vector for every skinned proxy at publication.
-        std::shared_ptr<const std::vector<dm::float4x4>> jointPalette;
+        std::shared_ptr<const std::vector<math::float4x4>> jointPalette;
         std::vector<LightRenderProxy> lights;
         std::vector<CameraRenderProxy> cameras;
         std::vector<GaussianSplatRenderProxy> gaussianSplats;
@@ -317,7 +317,7 @@ namespace caustica::scene
         [[nodiscard]] const CameraRenderProxy* findCamera(ecs::Entity entity) const;
         [[nodiscard]] const MeshRenderResourceSnapshot* findMesh(MeshRenderResourceId id) const;
         [[nodiscard]] const MaterialRenderResourceSnapshot* findMaterial(MaterialRenderResourceId id) const;
-        [[nodiscard]] std::span<const dm::float4x4> jointMatrices(
+        [[nodiscard]] std::span<const math::float4x4> jointMatrices(
             const SkinnedMeshRenderProxy& proxy) const;
 
         [[nodiscard]] const SceneStaticPacket& staticData() const { return *m_static; }

@@ -30,7 +30,7 @@ struct GaussianSplatPrepareContext
     std::shared_ptr<::GPUSort> gpuSort;
 };
 
-[[nodiscard]] dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
+[[nodiscard]] math::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
 [[nodiscard]] bool isGaussianSplatProxyActive(
     const scene::GaussianSplatRenderProxy& proxy,
     const SceneGaussianSplatPasses& scenePasses);

@@ -133,7 +133,7 @@ void BloomPass::executeDownscale1(
     const caustica::rhi::FramebufferHandle destFb = m_device->createFramebuffer(
         caustica::rhi::FramebufferDesc().addColorAttachment(dest));
 
-    const dm::box2 uvSrcRect = box2(
+    const math::box2 uvSrcRect = box2(
         float2(
             float(scissorRect.minX) / float(fbinfo.width),
             float(scissorRect.minY) / float(fbinfo.height)),
@@ -293,7 +293,7 @@ void BloomPass::renderInternal(
         {
             commandList->beginMarker("Downscale");
 
-            const dm::box2 uvSrcRect = box2(
+            const math::box2 uvSrcRect = box2(
                 float2(
                     float(scissorRect.minX) / (float)fbinfo.width,
                     float(scissorRect.minY) / (float)fbinfo.height),

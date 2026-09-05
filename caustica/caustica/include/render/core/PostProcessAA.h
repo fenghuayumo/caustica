@@ -29,10 +29,10 @@ struct PostProcessAAParams
     RenderTargets*                          renderTargets = nullptr;
     GpuDevice*                              gpuDevice = nullptr;
 
-    dm::uint2                               renderSize{};
-    dm::uint2                               displaySize{};
+    math::uint2                               renderSize{};
+    math::uint2                               displaySize{};
     float                                   displayAspectRatio = 1.f;
-    dm::float2                              cameraJitter{};
+    math::float2                              cameraJitter{};
 
     uint32_t                                sampleIndex = 0;
     uint64_t                                frameIndex = 0;

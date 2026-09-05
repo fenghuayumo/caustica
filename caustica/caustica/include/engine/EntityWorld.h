@@ -56,21 +56,21 @@ public:
 
     bool setLocalTransform(
         ecs::Entity entity,
-        const std::optional<dm::double3>& translation = std::nullopt,
-        const std::optional<dm::dquat>& rotation = std::nullopt,
-        const std::optional<dm::double3>& scaling = std::nullopt)
+        const std::optional<math::double3>& translation = std::nullopt,
+        const std::optional<math::dquat>& rotation = std::nullopt,
+        const std::optional<math::double3>& scaling = std::nullopt)
     {
         if (!m_world || !ecs::isValid(entity) || !m_world->world().isAlive(entity))
             return false;
 
-        const dm::double3* t = translation ? &*translation : nullptr;
-        const dm::dquat* r = rotation ? &*rotation : nullptr;
-        const dm::double3* s = scaling ? &*scaling : nullptr;
+        const math::double3* t = translation ? &*translation : nullptr;
+        const math::dquat* r = rotation ? &*rotation : nullptr;
+        const math::double3* s = scaling ? &*scaling : nullptr;
         m_world->setLocalTransform(entity, t, r, s);
         return true;
     }
 
-    bool setTranslation(ecs::Entity entity, const dm::double3& translation)
+    bool setTranslation(ecs::Entity entity, const math::double3& translation)
     {
         return setLocalTransform(entity, translation, std::nullopt, std::nullopt);
     }

@@ -552,7 +552,7 @@ bool EnsureMeshGpuBuffers(
     auto& skinnedGpuMap = gpu.skinnedGpuByEntity;
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        const std::span<const dm::float4x4> jointMatrices = renderData.jointMatrices(proxy);
+        const std::span<const math::float4x4> jointMatrices = renderData.jointMatrices(proxy);
         const scene::MeshRenderResourceSnapshot* skinnedMesh = renderData.findMesh(proxy.meshId);
         const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
         if (!skinnedMesh || !prototypeMesh || !proxy.meshId || !proxy.prototypeMeshId)
@@ -629,7 +629,7 @@ bool EnsureMeshGpuBuffers(
             jointBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
             jointBufferDesc.keepInitialState = true;
             jointBufferDesc.canHaveRawViews = true;
-            jointBufferDesc.byteSize = sizeof(dm::float4x4) * std::max<size_t>(1, jointMatrices.size());
+            jointBufferDesc.byteSize = sizeof(math::float4x4) * std::max<size_t>(1, jointMatrices.size());
             skinnedGpu.jointBuffer = gpu.device->createBuffer(jointBufferDesc);
             if (!skinnedGpu.jointBuffer)
             {
@@ -680,7 +680,7 @@ void DispatchSkinnedMeshUpdates(
 
     for (const scene::SkinnedMeshRenderProxy& proxy : renderData.skinnedMeshes)
     {
-        const std::span<const dm::float4x4> jointMatrices = renderData.jointMatrices(proxy);
+        const std::span<const math::float4x4> jointMatrices = renderData.jointMatrices(proxy);
         const scene::MeshRenderResourceSnapshot* prototypeMesh = renderData.findMesh(proxy.prototypeMeshId);
         if (!proxy.needsSkinningUpdate || !renderData.findMesh(proxy.meshId) || !prototypeMesh
             || !proxy.meshId || !proxy.prototypeMeshId)
@@ -753,7 +753,7 @@ void DispatchSkinnedMeshUpdates(
         constants.outputTexCoord2Offset = uint32_t(skinnedBuffers.vertexBufferRange(VertexAttribute::TexCoord2).byteOffset);
         commandList->setPushConstants(&constants, sizeof(constants));
 
-        commandList->dispatch(dm::div_ceil(constants.numVertices, 256));
+        commandList->dispatch(math::div_ceil(constants.numVertices, 256));
         skinnedVertexBuffersWritten.push_back(skinnedBuffers.vertexBuffer);
 
         if (!proxy.debugName.empty())
@@ -800,18 +800,18 @@ void ApplyMeshGpuUploadCommands(
             commandList->writeBuffer(
                 meshGpu.vertexBuffer,
                 command.positions.data(),
-                command.positions.size() * sizeof(dm::float3),
+                command.positions.size() * sizeof(math::float3),
                 meshGpu.vertexBufferRange(VertexAttribute::Position).byteOffset
-                    + vertexOffset * sizeof(dm::float3));
+                    + vertexOffset * sizeof(math::float3));
         }
         if (!command.previousPositions.empty() && meshGpu.hasAttribute(VertexAttribute::PrevPosition))
         {
             commandList->writeBuffer(
                 meshGpu.vertexBuffer,
                 command.previousPositions.data(),
-                command.previousPositions.size() * sizeof(dm::float3),
+                command.previousPositions.size() * sizeof(math::float3),
                 meshGpu.vertexBufferRange(VertexAttribute::PrevPosition).byteOffset
-                    + vertexOffset * sizeof(dm::float3));
+                    + vertexOffset * sizeof(math::float3));
         }
         if (!command.normals.empty() && meshGpu.hasAttribute(VertexAttribute::Normal))
         {

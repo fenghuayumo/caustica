@@ -155,7 +155,7 @@ animation::Keyframe MakeVisibilityKeyframe(float time, bool visible)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(visible ? 1.f : 0.f, 0.f, 0.f, 0.f);
+    keyframe.value = math::float4(visible ? 1.f : 0.f, 0.f, 0.f, 0.f);
     return keyframe;
 }
 
@@ -198,11 +198,11 @@ void EnsureUniqueSampler(scene::AnimationChannelData& channel)
         channel.sampler = std::make_shared<animation::Sampler>(*channel.sampler);
 }
 
-animation::Keyframe MakeKeyframe(float time, const dm::double3& value)
+animation::Keyframe MakeKeyframe(float time, const math::double3& value)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(
+    keyframe.value = math::float4(
         static_cast<float>(value.x),
         static_cast<float>(value.y),
         static_cast<float>(value.z),
@@ -210,11 +210,11 @@ animation::Keyframe MakeKeyframe(float time, const dm::double3& value)
     return keyframe;
 }
 
-animation::Keyframe MakeKeyframe(float time, const dm::dquat& value)
+animation::Keyframe MakeKeyframe(float time, const math::dquat& value)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(
+    keyframe.value = math::float4(
         static_cast<float>(value.x),
         static_cast<float>(value.y),
         static_cast<float>(value.z),
@@ -759,7 +759,7 @@ const char* AnimationAttributeName(const scene::AnimationChannelData& channel)
 
 void WriteAnimationValue(
     Json::Value& destination,
-    const dm::float4& value,
+    const math::float4& value,
     AnimationAttribute attribute)
 {
     if (attribute == AnimationAttribute::Visibility)

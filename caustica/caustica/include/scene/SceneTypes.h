@@ -94,9 +94,9 @@ namespace caustica
         Handle<ImageAsset> occlusionTexture;
         Handle<ImageAsset> transmissionTexture; // see KHR_materials_transmission; undefined on specular-gloss materials
         Handle<ImageAsset> opacityTexture; // for renderers that store opacity or alpha mask separately, overrides baseOrDiffuse.a
-        dm::float3 baseOrDiffuseColor = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
-        dm::float3 specularColor = 0.f; // spec-gloss: specular color
-        dm::float3 emissiveColor = 0.f;
+        math::float3 baseOrDiffuseColor = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
+        math::float3 specularColor = 0.f; // spec-gloss: specular color
+        math::float3 emissiveColor = 0.f;
         float emissiveIntensity = 1.f; // additional multiplier for emissiveColor
         float metalness = 0.f; // metal-rough only
         float roughness = 0.f; // both metal-rough and spec-gloss
@@ -105,7 +105,7 @@ namespace caustica
         float transmissionFactor = 0.f; // see KHR_materials_transmission; undefined on specular-gloss materials
         float normalTextureScale = 1.f;
         float occlusionStrength = 1.f;
-        dm::float2 normalTextureTransformScale = 1.f;
+        math::float2 normalTextureTransformScale = 1.f;
 
         // Toggle between two PBR models: metal-rough and specular-gloss.
         // See the comments on the other fields here.
@@ -115,8 +115,8 @@ namespace caustica
         bool enableSubsurfaceScattering = false;
         struct SubsurfaceParams
         {
-            dm::float3 transmissionColor = 0.5f;
-            dm::float3 scatteringColor = 0.5f;
+            math::float3 transmissionColor = 0.5f;
+            math::float3 scatteringColor = 0.5f;
             float scale = 1.0f;
             float anisotropy = 0.0f;
         } subsurface;
@@ -131,13 +131,13 @@ namespace caustica
                 Chiang = 1,
             };
 
-            dm::float3 baseColor = 1.0f;
+            math::float3 baseColor = 1.0f;
             float melanin = 0.5f;
             float melaninRedness = 0.5f;
             float longitudinalRoughness = 0.25f;
             float azimuthalRoughness = 0.6f;
             float diffuseReflectionWeight = 0.0f;
-            dm::float3 diffuseReflectionTint = 0.0f;
+            math::float3 diffuseReflectionTint = 0.0f;
             float ior = 1.55f;
             float cuticleAngle = 3.0f;
             Model model = Model::FarField;
@@ -160,7 +160,7 @@ namespace caustica
         int materialID = 0; // dense scene-list index (legacy); pick uses StandardMaterial::gpuDataIndex
 
         virtual ~Material() = default;
-        bool setProperty(const std::string& name, const dm::float4& value);
+        bool setProperty(const std::string& name, const math::float4& value);
 
     private:
         // Extract / GPU registry key — not part of the app authoring surface.
@@ -177,15 +177,15 @@ namespace caustica
     struct BufferGroup
     {
         std::vector<uint32_t> indexData;
-        std::vector<dm::float3> positionData;
-        std::vector<dm::float2> texcoord1Data;
-        std::vector<dm::float2> texcoord2Data;
+        std::vector<math::float3> positionData;
+        std::vector<math::float2> texcoord1Data;
+        std::vector<math::float2> texcoord2Data;
         std::vector<uint32_t> normalData;
         std::vector<uint32_t> tangentData;
-        std::vector<dm::vector<uint16_t, 4>> jointData;
-        std::vector<dm::float4> weightData;
+        std::vector<math::vector<uint16_t, 4>> jointData;
+        std::vector<math::float4> weightData;
         std::vector<float> radiusData;
-        std::vector<dm::float4> morphTargetData;
+        std::vector<math::float4> morphTargetData;
     };
 
     enum class MeshGeometryPrimitiveType : uint8_t
@@ -202,7 +202,7 @@ namespace caustica
         friend struct scene::internal::RenderResourceAccess;
 
         std::shared_ptr<Material> material;
-        dm::box3 objectSpaceBounds;
+        math::box3 objectSpaceBounds;
         uint32_t indexOffsetInMesh = 0;
         uint32_t vertexOffsetInMesh = 0;
         uint32_t numIndices = 0;
@@ -241,7 +241,7 @@ namespace caustica
         std::shared_ptr<BufferGroup> buffers;
         std::shared_ptr<MeshInfo> skinPrototype;
         std::vector<std::shared_ptr<MeshGeometry>> geometries;
-        dm::box3 objectSpaceBounds;
+        math::box3 objectSpaceBounds;
         uint32_t indexOffset = 0;
         uint32_t vertexOffset = 0;
         uint32_t totalIndices = 0;

@@ -56,25 +56,25 @@ std::string PropBase::getName() const
     return ew->getEntityName(m_entity);
 }
 
-std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling )
+std::shared_ptr<ModelInstance> PropBase::CreateAndAttachModel(const std::shared_ptr<demo::ModelType> & modelType, const std::string & instanceName, const math::float3& translation, const math::quat& rotation, const math::float3& scaling )
 {
     auto ret = std::make_shared<demo::ModelInstance>(instanceName, modelType, m_entity);
     ret->setTransform(translation, rotation, scaling);
     return ret;
 }
 
-void PropBase::setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
+void PropBase::setTransform(const math::double3& translation, const math::dquat& rotation, const math::double3& scaling)
 {
     auto* ew = EntityWorld();
     if (ew && m_entity != caustica::ecs::NullEntity)
         ew->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 
-void PropBase::setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
+void PropBase::setTransform(const math::float3& translation, const math::quat& rotation, const math::float3& scaling)
 {
-    dm::double3 transD = dm::double3(translation);
-    dm::dquat rotD = dm::dquat(rotation);
-    dm::double3 scalD = dm::double3(scaling);
+    math::double3 transD = math::double3(translation);
+    math::dquat rotD = math::dquat(rotation);
+    math::double3 scalD = math::double3(scaling);
     auto* ew = EntityWorld();
     if (ew && m_entity != caustica::ecs::NullEntity)
         ew->setLocalTransform(m_entity, &transD, &rotD, &scalD);

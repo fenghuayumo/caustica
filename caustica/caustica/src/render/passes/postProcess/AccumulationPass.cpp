@@ -87,8 +87,8 @@ void AccumulationPass::render(
     commandList->setPushConstants(&constants, sizeof(constants));
     
     commandList->dispatch(
-        dm::div_ceil(upscaledView.getViewExtent().width(), 8), 
-        dm::div_ceil(upscaledView.getViewExtent().height(), 8), 
+        math::div_ceil(upscaledView.getViewExtent().width(), 8), 
+        math::div_ceil(upscaledView.getViewExtent().height(), 8), 
         1);
 
     commandList->endMarker();

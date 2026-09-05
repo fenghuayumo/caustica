@@ -86,8 +86,8 @@ public:
     virtual void tagResourcesDLSSRR(
         caustica::rhi::CommandList* commandList,
         const caustica::ViewInfo* view,
-        dm::int2 renderSize,
-        dm::int2 displaySize,
+        math::int2 renderSize,
+        math::int2 displaySize,
         caustica::rhi::Texture* inputColor,
         caustica::rhi::Texture* diffuseAlbedo,
         caustica::rhi::Texture* specAlbedo,

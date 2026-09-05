@@ -95,14 +95,14 @@ protected:
             else
             {
                 float spotPeriod = 0.9f;
-                spotPeriod = dm::saturate(fmodf(animationTime, spotPeriod) / spotPeriod);
+                spotPeriod = math::saturate(fmodf(animationTime, spotPeriod) / spotPeriod);
                 if (spotPeriod < 0.5f)
                     spotLeftI = m_spotLeftIntensity;
                 else
                     spotRightI = m_spotRightIntensity;
                 
                 float blobPeriod = 1.1f;
-                blobPeriod = dm::saturate(fmodf(animationTime, blobPeriod) / blobPeriod);
+                blobPeriod = math::saturate(fmodf(animationTime, blobPeriod) / blobPeriod);
                 blobRotAngle = (blobPeriod-0.5f) * PI_f * 2.0f;
                 blobLeftI = m_blobLeftIntensity;
                 blobRightI = m_blobRightIntensity;

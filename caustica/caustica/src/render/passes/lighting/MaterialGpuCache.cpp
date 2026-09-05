@@ -450,7 +450,7 @@ bool StandardMaterial::read(
     {
         float legacyScale = 1.0f;
         JsonMemberEither(input, "subsurfaceScale", "SubsurfaceScale") >> legacyScale;
-        subsurfaceRadiusScale = dm::float3(legacyScale);
+        subsurfaceRadiusScale = math::float3(legacyScale);
     }
     LOAD_FIELD_EITHER(subsurfaceAnisotropy, "SubsurfaceAnisotropy");
 
@@ -530,10 +530,6 @@ bool StandardMaterial::read(
         input["useEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
     else if (input.isMember("UseEngineEmissiveIntensity"))
         input["UseEngineEmissiveIntensity"] >> useEngineEmissiveIntensity;
-    else if (input.isMember("useDonutEmissiveIntensity"))
-        input["useDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
-    else if (input.isMember("UseDonutEmissiveIntensity"))
-        input["UseDonutEmissiveIntensity"] >> useEngineEmissiveIntensity;
     LOAD_FIELD_EITHER(skipRender, "SkipRender");
 
     auto readOpenPBR = [this](const Json::Value& openPBR)
@@ -544,7 +540,7 @@ bool StandardMaterial::read(
         materialModel = "OpenPBR";
 
         if (!openPBR.isMember("specular_color"))
-            specularColor = dm::float3(1.f);
+            specularColor = math::float3(1.f);
 
         ReadJsonMember(openPBR, "base_weight", baseWeight);
         ReadJsonMember(openPBR, "base_color", baseOrDiffuseColor);
@@ -592,7 +588,7 @@ bool StandardMaterial::read(
             {
                 float scale = 1.0f;
                 legacyScale >> scale;
-                subsurfaceRadiusScale = dm::float3(scale);
+                subsurfaceRadiusScale = math::float3(scale);
             }
         }
         if (!ReadJsonMember(openPBR, "subsurface_scatter_anisotropy", subsurfaceAnisotropy))
@@ -627,7 +623,7 @@ bool StandardMaterial::read(
     {
         const float* specColor = specularColor.data();
         if (specColor[0] == 0.f && specColor[1] == 0.f && specColor[2] == 0.f)
-            specularColor = dm::float3(1.f);
+            specularColor = math::float3(1.f);
     }
     if (!hasExplicitBaseDiffuseRoughness && !explicitlyAuthoredOpenPBR)
         baseDiffuseRoughness = roughness;
@@ -645,7 +641,7 @@ bool StandardMaterial::read(
     coatDarkening = std::clamp(coatDarkening, 0.0f, 1.0f);
     subsurfaceWeight = std::clamp(subsurfaceWeight, 0.0f, 1.0f);
     subsurfaceRadius = std::max(subsurfaceRadius, 0.0f);
-    subsurfaceRadiusScale = dm::max(subsurfaceRadiusScale, dm::float3(0.0f));
+    subsurfaceRadiusScale = math::max(subsurfaceRadiusScale, math::float3(0.0f));
     subsurfaceAnisotropy = std::clamp(subsurfaceAnisotropy, -1.0f, 1.0f);
     thinFilmWeight = std::clamp(thinFilmWeight, 0.0f, 1.0f);
     thinFilmThickness = std::max(thinFilmThickness, 0.0f);
@@ -1178,7 +1174,7 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::importFromEngineMaterial(
     // dielectric F0 by zero and remove skin, cornea, and lens Fresnel entirely.
     standardMaterial->specularColor = material.useSpecularGlossModel
         ? material.specularColor
-        : dm::float3(1.0f);
+        : math::float3(1.0f);
     standardMaterial->emissiveColor = material.emissiveColor;
 
     standardMaterial->emissiveIntensity = material.emissiveIntensity;
@@ -1875,7 +1871,7 @@ void UpdateSubInstanceData(SubInstanceData& ret,
     }
     ret.EmissiveLightMappingOffset = 0xFFFFFFFF;
 
-    uint quantizedAlphaCutoff = (uint)(dm::clamp(alphaCutoff, 0.0f, 1.0f) * 255.0f + 0.5f); assert(quantizedAlphaCutoff < 256);
+    uint quantizedAlphaCutoff = (uint)(math::clamp(alphaCutoff, 0.0f, 1.0f) * 255.0f + 0.5f); assert(quantizedAlphaCutoff < 256);
     ret.FlagsAndAlphaInfo |= (quantizedAlphaCutoff << SubInstanceData::Flags_AlphaOffsetOffset);
 
     if (material.excludeFromNEE)

@@ -34,7 +34,7 @@ namespace
             return;
 
         const rg::TextureHandle depth = slots.depth;
-        const dm::uint2 displaySize = ctx.extractedView->displaySize;
+        const math::uint2 displaySize = ctx.extractedView->displaySize;
         const caustica::ViewInfo* const postProcessView = &ctx.extractedView->postProcessView;
         const auto tintColor = ctx.settings->EnvironmentMapParams.TintColor;
         const float intensity = ctx.settings->EnvironmentMapParams.Intensity;
@@ -78,7 +78,7 @@ namespace
     {
         assert(ctx.graph);
         PTPipelineVariant* const pipeline = ctx.ptEdgeDetection;
-        const dm::uint2 displaySize = ctx.extractedView->displaySize;
+        const math::uint2 displaySize = ctx.extractedView->displaySize;
         PathTraceSceneBindings* const sceneBindings = ctx.sceneBindings;
         caustica::rhi::DescriptorTable* const descriptorTable = ctx.descriptorTable;
         const float threshold = ctx.settings->PostProcessEdgeDetectionThreshold;

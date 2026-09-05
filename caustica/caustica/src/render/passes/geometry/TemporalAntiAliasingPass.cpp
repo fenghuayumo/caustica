@@ -184,7 +184,7 @@ void TemporalAntiAliasingPass::renderMotionVectors(
     caustica::rhi::CommandList* commandList,
     const ViewInfo& compositeView,
     const ViewInfo& compositeViewPrevious,
-    dm::float3 preViewTranslationDifference)
+    math::float3 preViewTranslationDifference)
 {
     assert(m_MotionVectorsPso);
 
@@ -245,7 +245,7 @@ void TemporalAntiAliasingPass::temporalResolve(
     taaConstants.outputOverInputViewSize = taaConstants.outputViewSize / taaConstants.inputViewSize;
     taaConstants.clampingFactor = params.enableHistoryClamping ? params.clampingFactor : -1.f;
     taaConstants.newFrameWeight = feedbackIsValid ? params.newFrameWeight : 1.f;
-    taaConstants.pqC = dm::clamp(params.maxRadiance, 1e-4f, 1e8f);
+    taaConstants.pqC = math::clamp(params.maxRadiance, 1e-4f, 1e8f);
     taaConstants.invPqC = 1.f / taaConstants.pqC;
     taaConstants.useHistoryClampRelax = (params.useHistoryClampRelax && m_HasHistoryClampRelaxTexture) ? 1 : 0;
     commandList->writeBuffer(m_TemporalAntiAliasingCB, &taaConstants, sizeof(taaConstants));
@@ -296,7 +296,7 @@ static float VanDerCorput(size_t base, size_t index)
     return ret;
 }
 
-dm::float2 TemporalAntiAliasingPass::getCurrentPixelOffset()
+math::float2 TemporalAntiAliasingPass::getCurrentPixelOffset()
 {
     switch (m_Jitter)
     {

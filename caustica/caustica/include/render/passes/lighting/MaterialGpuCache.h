@@ -153,9 +153,9 @@ struct StandardMaterial : public StandardMaterialBase
     StandardMaterialTexture emissiveTexture;
     StandardMaterialTexture transmissionTexture;                // see KHR_materials_transmission; undefined on specular-gloss materials
 
-    dm::float3              baseOrDiffuseColor                  = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
-    dm::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
-    dm::float3              emissiveColor                       = 0.f;
+    math::float3              baseOrDiffuseColor                  = 1.f; // metal-rough: base color, spec-gloss: diffuse color (if no texture present)
+    math::float3              specularColor                       = 1.f; // spec-gloss: specular color; OpenPBR: dielectric specular tint
+    math::float3              emissiveColor                       = 0.f;
     
     std::string             materialModel                       = "OpenPBR"; // Serialized as OpenPBR only.
     float                   baseWeight                          = 1.f;
@@ -163,12 +163,12 @@ struct StandardMaterial : public StandardMaterialBase
     float                   specularWeight                      = 1.f;
     float                   anisotropy                          = 0.f; // OpenPBR specular_roughness_anisotropy, range [-1, 1].
     float                   fuzzWeight                          = 0.f;
-    dm::float3              fuzzColor                           = 1.f;
+    math::float3              fuzzColor                           = 1.f;
     float                   fuzzRoughness                       = 0.6f;
 
     // OpenPBR coat
     float                   coatWeight                          = 0.f;
-    dm::float3              coatColor                           = 1.f;
+    math::float3              coatColor                           = 1.f;
     float                   coatRoughness                       = 0.f;
     float                   coatAnisotropy                      = 0.f;
     float                   coatIor                             = 1.6f;
@@ -176,9 +176,9 @@ struct StandardMaterial : public StandardMaterialBase
 
     // OpenPBR subsurface (dense scattering approx via lobe mix + volume sigmaS)
     float                   subsurfaceWeight                    = 0.f;
-    dm::float3              subsurfaceColor                     = 1.f;
+    math::float3              subsurfaceColor                     = 1.f;
     float                   subsurfaceRadius                    = 1.f;
-    dm::float3              subsurfaceRadiusScale               = dm::float3(1.f, 0.5f, 0.25f);
+    math::float3              subsurfaceRadiusScale               = math::float3(1.f, 0.5f, 0.25f);
     float                   subsurfaceAnisotropy                = 0.f;
 
     // OpenPBR thin-film
@@ -187,9 +187,9 @@ struct StandardMaterial : public StandardMaterialBase
     float                   thinFilmIor                         = 1.4f;
 
     // OpenPBR transmission extras
-    dm::float3              transmissionColor                   = 1.f;
+    math::float3              transmissionColor                   = 1.f;
     float                   transmissionDepth                   = 0.f;
-    dm::float3              transmissionScatter                 = 0.f;
+    math::float3              transmissionScatter                 = 0.f;
     float                   transmissionScatterAnisotropy       = 0.f;
     float                   transmissionDispersionScale         = 0.f;
     float                   transmissionDispersionAbbeNumber    = 20.f;
@@ -201,7 +201,7 @@ struct StandardMaterial : public StandardMaterialBase
     float                   transmissionFactor                  = 0.f; // see KHR_materials_transmission; undefined on specular-gloss materials
     float                   diffuseTransmissionFactor           = 0.f; // like specularTransmissionFactor, except using diffuse transmission lobe (roughness ignored)
     float                   normalTextureScale                  = 1.f;
-    dm::float2              normalTextureTransformScale         = 1.f;
+    math::float2              normalTextureTransformScale         = 1.f;
     float                   coatNormalTextureScale              = 1.f;
     float                   IoR                                 = 1.5f; // index of refraction, see KHR_materials_ior
 
@@ -250,7 +250,7 @@ struct StandardMaterial : public StandardMaterialBase
 
     // KHR_materials_volume - see https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_volume#properties
     float                   volumeAttenuationDistance           = FLT_MAX;
-    dm::float3              volumeAttenuationColor              = 1.0f;
+    math::float3              volumeAttenuationColor              = 1.0f;
 
     // Low tessellation geometry often has triangle (flat) normals that differ significantly from shading normals. This causes shading vs shadow discrepancy that exposes triangle edges. 
     // One way to mitigate this (other than having more detailed mesh) is to add additional shadowing falloff to hide the seam. 

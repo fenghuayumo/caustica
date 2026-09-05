@@ -12,8 +12,8 @@ namespace caustica::render
 
 struct ExtractedFrameView
 {
-    dm::uint2 displaySize{};
-    dm::uint2 renderSize{};
+    math::uint2 displaySize{};
+    math::uint2 renderSize{};
     float displayAspectRatio = 1.0f;
     caustica::ViewInfo main;
     caustica::ViewInfo postProcessView;

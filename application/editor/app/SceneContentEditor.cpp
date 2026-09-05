@@ -84,9 +84,9 @@ namespace
         return "Light";
     }
 
-    dm::dquat DefaultSunRotation()
+    math::dquat DefaultSunRotation()
     {
-        return dm::dquat::fromXYZW(dm::double4(-0.23053891, -0.15879166, -0.68904659, 0.66846975));
+        return math::dquat::fromXYZW(math::double4(-0.23053891, -0.15879166, -0.68904659, 0.66846975));
     }
 }
 
@@ -273,10 +273,10 @@ void SceneContentEditor::placeInFrontOfCamera(caustica::ecs::Entity entity, bool
     if (!app || !ew || !ecs::isValid(entity))
         return;
 
-    dm::double3 translation(0.0, snapToGround ? 0.0 : 1.2, 0.0);
+    math::double3 translation(0.0, snapToGround ? 0.0 : 1.2, 0.0);
     const caustica::FirstPersonCamera& camera = caustica::currentCamera(*app);
-    const dm::float3 pos = camera.getPosition() + camera.getDir() * 4.0f;
-    translation = dm::double3(double(pos.x), double(pos.y), double(pos.z));
+    const math::float3 pos = camera.getPosition() + camera.getDir() * 4.0f;
+    translation = math::double3(double(pos.x), double(pos.y), double(pos.z));
     if (snapToGround)
         translation.y = 0.0;
 
@@ -349,7 +349,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     case EditorLightKind::Directional:
     {
         caustica::scene::DirectionalLightComponent light;
-        light.color = dm::float3(1.0f, 0.96f, 0.9f);
+        light.color = math::float3(1.0f, 0.96f, 0.9f);
         light.irradiance = 4.0f;
         light.angularSize = 1.5f;
         entity = caustica::spawnDirectionalLight(*app, std::move(light), id);
@@ -360,7 +360,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     case EditorLightKind::Point:
     {
         caustica::scene::PointLightComponent light;
-        light.color = dm::float3(1.0f, 0.92f, 0.78f);
+        light.color = math::float3(1.0f, 0.92f, 0.78f);
         light.intensity = 40.0f;
         light.radius = 0.05f;
         light.range = 12.0f;
@@ -370,7 +370,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     case EditorLightKind::Spot:
     {
         caustica::scene::SpotLightComponent light;
-        light.color = dm::float3(1.0f, 0.94f, 0.82f);
+        light.color = math::float3(1.0f, 0.94f, 0.82f);
         light.intensity = 55.0f;
         light.radius = 0.04f;
         light.range = 14.0f;
@@ -382,7 +382,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     case EditorLightKind::Rect:
     {
         caustica::scene::RectLightComponent light;
-        light.color = dm::float3(0.95f, 0.97f, 1.0f);
+        light.color = math::float3(0.95f, 0.97f, 1.0f);
         light.intensity = 20.0f;
         light.width = 0.6f;
         light.height = 0.4f;
@@ -392,7 +392,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     case EditorLightKind::Environment:
     {
         caustica::scene::EnvironmentLightComponent light;
-        light.radianceScale = dm::float3(1.0f);
+        light.radianceScale = math::float3(1.0f);
         light.path = c_EnvMapProcSky;
         entity = caustica::spawnEnvironmentLight(*app, std::move(light), id);
         break;
@@ -416,7 +416,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     {
         if (auto* local = ew->world().tryGet<caustica::scene::LocalTransformComponent>(entity))
         {
-            dm::double3 translation = local->translation;
+            math::double3 translation = local->translation;
             translation.y = std::max(translation.y, 1.6);
             ew->setTranslation(entity, translation);
         }

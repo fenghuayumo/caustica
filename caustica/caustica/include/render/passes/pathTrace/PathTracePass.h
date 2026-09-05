@@ -30,8 +30,8 @@ public:
         PathTracingContext* context = nullptr;
         ToneMappingPass* toneMapping = nullptr;
         const RenderTargets* renderTargets = nullptr;
-        dm::uint2 renderSize{};
-        dm::uint2 displaySize{};
+        math::uint2 renderSize{};
+        math::uint2 displaySize{};
         uint32_t sampleIndex = 0;
         uint64_t frameIndex = 0;
     };
@@ -53,21 +53,21 @@ public:
         caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
         caustica::rhi::DescriptorTable* descriptorTable,
-        dm::uint2 viewSize,
+        math::uint2 viewSize,
         PTPipelineVariant* pipeline);
 
     void exportVBuffer(
         caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
         caustica::rhi::DescriptorTable* descriptorTable,
-        dm::uint2 viewSize,
+        math::uint2 viewSize,
         caustica::rhi::ComputePipeline* pipeline);
 
     void mainPass(
         caustica::rhi::CommandList* commandList,
         caustica::rhi::BindingSetHandle bindingSet,
         caustica::rhi::DescriptorTable* descriptorTable,
-        dm::uint2 viewSize,
+        math::uint2 viewSize,
         PTPipelineVariant* pipeline,
         uint32_t samplesPerPixel);
 

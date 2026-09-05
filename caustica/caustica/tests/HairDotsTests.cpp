@@ -17,12 +17,12 @@ bool expect(bool condition, const char* message)
 int main()
 {
     caustica::hair::StrandSegment segment;
-    segment.vertices[0].position = dm::float3(0.f, 0.f, 0.f);
-    segment.vertices[1].position = dm::float3(0.f, 1.f, 0.f);
+    segment.vertices[0].position = math::float3(0.f, 0.f, 0.f);
+    segment.vertices[1].position = math::float3(0.f, 1.f, 0.f);
     segment.vertices[0].radius = 0.01f;
     segment.vertices[1].radius = 0.005f;
-    segment.vertices[0].texcoord = dm::float2(0.f, 0.f);
-    segment.vertices[1].texcoord = dm::float2(0.f, 1.f);
+    segment.vertices[0].texcoord = math::float2(0.f, 0.f);
+    segment.vertices[1].texcoord = math::float2(0.f, 1.f);
 
     caustica::BufferGroup output;
     caustica::hair::appendStaticDots({ segment }, output);
@@ -40,7 +40,7 @@ int main()
     passed &= expect(output.radiusData[0] > output.radiusData[2],
         "tapered endpoint radii were not preserved");
 
-    for (const dm::float3& position : output.positionData)
+    for (const math::float3& position : output.positionData)
         passed &= expect(std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z),
             "DOTS emitted a non-finite position");
 

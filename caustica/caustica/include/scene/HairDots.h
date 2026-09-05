@@ -9,9 +9,9 @@ namespace caustica::hair
 {
     struct StrandVertex
     {
-        dm::float3 position = 0.f;
+        math::float3 position = 0.f;
         float radius = 0.f;
-        dm::float2 texcoord = 0.f;
+        math::float2 texcoord = 0.f;
     };
 
     struct StrandSegment

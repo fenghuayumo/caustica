@@ -703,7 +703,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
     {
-        dm::float4x4 viewProj = m_context->camera.view()->getViewProjectionMatrix();
+        math::float4x4 viewProj = m_context->camera.view()->getViewProjectionMatrix();
         m_shaderDebug->beginFrame(m_frameCommands->primary(), viewProj);
     }
 
@@ -880,7 +880,7 @@ void caustica::render::WorldRenderer::mergeImmediateMaterialPick()
 
     const uint64_t packedPosition =
         m_immediateMaterialPickPosition.load(std::memory_order_relaxed);
-    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+    m_frameRuntimeSnapshot.Picking.Position = math::uint2{
         uint32_t(packedPosition >> 32u),
         uint32_t(packedPosition & 0xffffffffu)};
     m_frameRuntimeSnapshot.Picking.MaterialRequestId = requestId;
@@ -911,7 +911,7 @@ void caustica::render::WorldRenderer::mergeImmediateInstancePick()
 
     const uint64_t packedPosition =
         m_immediateInstancePickPosition.load(std::memory_order_relaxed);
-    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+    m_frameRuntimeSnapshot.Picking.Position = math::uint2{
         uint32_t(packedPosition >> 32u),
         uint32_t(packedPosition & 0xffffffffu)};
     m_frameRuntimeSnapshot.Picking.InstanceRequestId = requestId;
@@ -983,7 +983,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     // this frame's path-trace space only here — after DLSS has settled m_renderSize.
     // Input must not pre-scale with live getRenderSize() (render thread resets it
     // to framebuffer size at the start of every render()).
-    auto displayToRenderPixel = [this](dm::uint2 displayPixel) -> dm::int2 {
+    auto displayToRenderPixel = [this](math::uint2 displayPixel) -> math::int2 {
         if (m_displaySize.x == 0 || m_displaySize.y == 0
             || m_renderSize.x == 0 || m_renderSize.y == 0)
             return { -1, -1 };
@@ -994,14 +994,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return { x, y };
     };
 
-    const dm::uint2 pickDisplayPixel =
+    const math::uint2 pickDisplayPixel =
         m_context->activeRuntime().Picking.hasActivePickRequest()
         ? m_context->activeRuntime().Picking.Position
         : m_context->activeSettings().DebugPixel;
-    const dm::int2 pickPixel = pickActive
+    const math::int2 pickPixel = pickActive
         ? displayToRenderPixel(pickDisplayPixel)
-        : dm::int2{ -1, -1 };
-    const dm::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
+        : math::int2{ -1, -1 };
+    const math::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
 
     constants.debug.pickX = pickPixel.x;
     constants.debug.pickY = pickPixel.y;

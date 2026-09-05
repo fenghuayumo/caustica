@@ -11,8 +11,8 @@ namespace
 {
 using namespace physx;
 
-PxVec3 px(const dm::double3& value) { return PxVec3(float(value.x), float(value.y), float(value.z)); }
-PxQuat px(const dm::dquat& value) { return PxQuat(float(value.x), float(value.y), float(value.z), float(value.w)); }
+PxVec3 px(const math::double3& value) { return PxVec3(float(value.x), float(value.y), float(value.z)); }
+PxQuat px(const math::dquat& value) { return PxQuat(float(value.x), float(value.y), float(value.z), float(value.w)); }
 
 class PhysXBackend final : public PhysicsBackend
 {
@@ -97,8 +97,8 @@ public:
     {
         const auto it = m_actors.find(entity); if (it == m_actors.end()) return false;
         const PxTransform t = it->second->getGlobalPose();
-        out.translation = dm::double3(t.p.x, t.p.y, t.p.z);
-        out.rotation = dm::dquat(t.q.w, t.q.x, t.q.y, t.q.z);
+        out.translation = math::double3(t.p.x, t.p.y, t.p.z);
+        out.rotation = math::dquat(t.q.w, t.q.x, t.q.y, t.q.z);
         return true;
     }
 private:

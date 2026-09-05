@@ -148,7 +148,7 @@ public:
     // their createTexture() targets are `vis`-able automatically.
     [[nodiscard]] uint32_t debugViewTextureCount() const;
     [[nodiscard]] bool debugViewTextureInfo(
-        uint32_t index, const char** outName, caustica::rhi::Texture** outTexture) const;
+        uint32_t index, std::string* outName, caustica::rhi::Texture** outTexture) const;
     [[nodiscard]] caustica::rhi::Texture* findDebugViewTexture(std::string_view name) const;
     struct DebugNamedTexture
     {
@@ -165,8 +165,8 @@ public:
 
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
 
-    dm::uint2 getRenderSize() const { return m_renderSize; }
-    dm::uint2 getDisplaySize() const { return m_displaySize; }
+    math::uint2 getRenderSize() const { return m_renderSize; }
+    math::uint2 getDisplaySize() const { return m_displaySize; }
 
     uint64_t getFrameIndex() const { return m_frameIndex; }
     int getAccumulationSampleIndex() const { return m_accumulationSampleIndex; }
@@ -200,7 +200,7 @@ private:
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
-    [[nodiscard]] dm::float2 computeCameraJitter() const;
+    [[nodiscard]] math::float2 computeCameraJitter() const;
 
     void populateRenderFrameContext(caustica::rhi::Framebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
@@ -275,8 +275,8 @@ private:
     std::unique_ptr<DLSS>                       m_nativeDLSS;
 #endif
 
-    dm::uint2                                   m_renderSize{};
-    dm::uint2                                   m_displaySize{};
+    math::uint2                                   m_renderSize{};
+    math::uint2                                   m_displaySize{};
     float                                       m_displayAspectRatio = 1.0f;
 
     int                                         m_accumulationSampleIndex = 0;

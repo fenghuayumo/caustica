@@ -2,7 +2,7 @@
 
 namespace caustica
 {
-    bool Material::setProperty(const std::string& name, const dm::float4& value)
+    bool Material::setProperty(const std::string& name, const math::float4& value)
     {
 #define FLOAT3_PROPERTY(pname) if (name == #pname) { pname = value.xyz(); return true; }
 #define FLOAT_PROPERTY(pname) if (name == #pname) { pname = value.x; return true; }

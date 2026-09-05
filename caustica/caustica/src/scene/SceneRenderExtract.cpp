@@ -85,14 +85,14 @@ const MaterialRenderResourceSnapshot* SceneRenderData::findMaterial(MaterialRend
         : &scene.materialSnapshots[it->second];
 }
 
-std::span<const dm::float4x4> SceneRenderData::jointMatrices(
+std::span<const math::float4x4> SceneRenderData::jointMatrices(
     const SkinnedMeshRenderProxy& proxy) const
 {
     if (!jointPalette || proxy.jointMatrixCount == 0
         || proxy.jointMatrixOffset > jointPalette->size()
         || proxy.jointMatrixCount > jointPalette->size() - proxy.jointMatrixOffset)
         return {};
-    return std::span<const dm::float4x4>(
+    return std::span<const math::float4x4>(
         jointPalette->data() + proxy.jointMatrixOffset,
         proxy.jointMatrixCount);
 }
@@ -234,7 +234,7 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
     const size_t previousJointCount = out.jointPalette ? out.jointPalette->size() : 0;
     out.skinnedMeshes.clear();
     out.skinnedMeshInstanceEntities.clear();
-    std::shared_ptr<std::vector<dm::float4x4>> jointPalette;
+    std::shared_ptr<std::vector<math::float4x4>> jointPalette;
 
     world.each<SkinnedMeshComponent, MeshInstanceComponent, GlobalTransformComponent>(
         [&](ecs::Entity entity, SkinnedMeshComponent& skinned, MeshInstanceComponent& meshInstance,
@@ -259,14 +259,14 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
 
             if (!jointPalette)
             {
-                jointPalette = std::make_shared<std::vector<dm::float4x4>>();
+                jointPalette = std::make_shared<std::vector<math::float4x4>>();
                 jointPalette->reserve(previousJointCount);
             }
-            const dm::daffine3 worldToRoot = inverse(ownerGlobal.transform);
+            const math::daffine3 worldToRoot = inverse(ownerGlobal.transform);
             proxy.jointMatrixOffset = uint32_t(jointPalette->size());
             proxy.jointMatrixCount = uint32_t(skinned.joints.size());
             jointPalette->resize(jointPalette->size() + skinned.joints.size());
-            dm::float4x4* jointMatrices = jointPalette->data() + proxy.jointMatrixOffset;
+            math::float4x4* jointMatrices = jointPalette->data() + proxy.jointMatrixOffset;
 
             for (size_t i = 0; i < skinned.joints.size(); ++i)
             {
@@ -274,12 +274,12 @@ void ExtractSkinnedMeshes(ecs::World& world, SceneRenderData& out, uint32_t fram
                 const auto* jointGlobal = world.get<GlobalTransformComponent>(joint.jointEntity);
                 if (!jointGlobal)
                 {
-                    jointMatrices[i] = dm::float4x4::identity();
+                    jointMatrices[i] = math::float4x4::identity();
                     continue;
                 }
 
-                const dm::float4x4 jointLocalToRoot =
-                    dm::affineToHomogeneous(dm::affine3(jointGlobal->transform * worldToRoot));
+                const math::float4x4 jointLocalToRoot =
+                    math::affineToHomogeneous(math::affine3(jointGlobal->transform * worldToRoot));
                 jointMatrices[i] = joint.inverseBindMatrix * jointLocalToRoot;
             }
 
@@ -295,7 +295,7 @@ void ExtractLightsFull(ecs::World& world, SceneRenderData& out)
     out.lights.clear();
     out.lightEntities.clear();
 
-    auto extractLight = [&](ecs::Entity entity, dm::float3 color, const std::vector<std::string>& proxies,
+    auto extractLight = [&](ecs::Entity entity, math::float3 color, const std::vector<std::string>& proxies,
                             LightData data, const GlobalTransformComponent& global)
     {
         LightRenderProxy proxy;
@@ -440,7 +440,7 @@ void fillActiveCameraFromFreeController(const CameraController& camera, ActiveCa
 
 void fillActiveCameraFromPerspectiveProxy(const CameraRenderProxy& proxy, uint32_t selectedIndex, ActiveCameraRenderProxy& out)
 {
-    const dm::affine3 viewToWorld = getCameraViewToWorldMatrix(proxy.transform);
+    const math::affine3 viewToWorld = getCameraViewToWorldMatrix(proxy.transform);
     out.sourceEntity = proxy.entity;
     out.selectedCameraIndex = selectedIndex;
     out.position = viewToWorld.m_translation;
@@ -482,8 +482,8 @@ CameraRenderProxy makeCameraRenderProxy(
             if (k.fx > 0.f && k.fy > 0.f && k.width > 0.f && k.height > 0.f)
             {
                 proxy.useCustomIntrinsics = true;
-                proxy.intrinsics = dm::float4(k.fx, k.fy, k.cx, k.cy);
-                proxy.intrinsicsViewport = dm::float2(k.width, k.height);
+                proxy.intrinsics = math::float4(k.fx, k.fy, k.cx, k.cy);
+                proxy.intrinsicsViewport = math::float2(k.width, k.height);
             }
         }
         return proxy;

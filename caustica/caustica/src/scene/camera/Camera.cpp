@@ -93,7 +93,7 @@ void FirstPersonCamera::lookAt(float3 cameraPos, float3 cameraTarget, float3 cam
     m_CameraMovePrev = 0.f;
 }
 
-void FirstPersonCamera::lookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp)
+void FirstPersonCamera::lookTo(math::float3 cameraPos, math::float3 cameraDir, math::float3 cameraUp)
 {
     baseLookAt(cameraPos, cameraPos + cameraDir, cameraUp);
     m_MouseMotionAccumulator = 0.f;
@@ -174,7 +174,7 @@ std::pair<bool, float3> FirstPersonCamera::animateTranslation(float deltaT)
     return std::make_pair(cameraDirty, cameraMoveVec);
 }
 
-void FirstPersonCamera::updateCamera(dm::float3 cameraMoveVec, dm::affine3 cameraRotation)
+void FirstPersonCamera::updateCamera(math::float3 cameraMoveVec, math::affine3 cameraRotation)
 {
     m_CameraPos += cameraMoveVec;
     m_CameraDir = normalize(cameraRotation.transformVector(m_CameraDir));
@@ -421,7 +421,7 @@ void ThirdPersonCamera::animateOrbit(float deltaT, float2 mouseMove)
     m_DeltaPitch = 0;
 }
 
-void ThirdPersonCamera::animateTranslation(const dm::float3x3& viewMatrix)
+void ThirdPersonCamera::animateTranslation(const math::float3x3& viewMatrix)
 {
     // If the view parameters have never been set, we can't translate
     if (m_ViewportSize.x <= 0.f || m_ViewportSize.y <= 0.f)
@@ -492,29 +492,29 @@ void ThirdPersonCamera::animate(float deltaT)
     m_MousePosPrev = m_MousePos;
 }
 
-void ThirdPersonCamera::lookAt(dm::float3 cameraPos, dm::float3 cameraTarget)
+void ThirdPersonCamera::lookAt(math::float3 cameraPos, math::float3 cameraTarget)
 {
-    dm::float3 cameraDir = cameraTarget - cameraPos;
+    math::float3 cameraDir = cameraTarget - cameraPos;
 
     float azimuth, elevation, dirLength;
-    dm::cartesianToSpherical(cameraDir, azimuth, elevation, dirLength);
+    math::cartesianToSpherical(cameraDir, azimuth, elevation, dirLength);
 
     setTargetPosition(cameraTarget);
     setDistance(dirLength);
-    azimuth = -(azimuth + dm::PI_f * 0.5f);
+    azimuth = -(azimuth + math::PI_f * 0.5f);
     setRotation(azimuth, elevation);
 }
 
-void ThirdPersonCamera::lookTo(dm::float3 cameraPos, dm::float3 cameraDir,
+void ThirdPersonCamera::lookTo(math::float3 cameraPos, math::float3 cameraDir,
     std::optional<float> targetDistance)
 {
     float azimuth, elevation, dirLength;
-    dm::cartesianToSpherical(-cameraDir, azimuth, elevation, dirLength);
+    math::cartesianToSpherical(-cameraDir, azimuth, elevation, dirLength);
     cameraDir /= dirLength;
 
     float const distance = targetDistance.value_or(getDistance());
     setTargetPosition(cameraPos + cameraDir * distance);
     setDistance(distance);
-    azimuth = -(azimuth + dm::PI_f * 0.5f);
+    azimuth = -(azimuth + math::PI_f * 0.5f);
     setRotation(azimuth, elevation);
 }

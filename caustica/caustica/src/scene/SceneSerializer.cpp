@@ -80,7 +80,7 @@ ecs::Entity FindEntityByAuthoringId(SceneEntityWorld& world, const std::string& 
     return found;
 }
 
-void WriteDouble3(Json::Value& node, const dm::double3& value)
+void WriteDouble3(Json::Value& node, const math::double3& value)
 {
     Json::Value array(Json::arrayValue);
     caustica::json::write(array, value);
@@ -95,7 +95,7 @@ void WriteTransformComponent(Json::Value& transform, const LocalTransformCompone
     WriteDouble3(transform["translation"], local.translation);
     {
         Json::Value rotation(Json::arrayValue);
-        const dm::double4 xyzw(
+        const math::double4 xyzw(
             local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w);
         caustica::json::write(rotation, xyzw);
         transform["rotation"] = std::move(rotation);
@@ -421,7 +421,7 @@ void applyAuthoringTransform(
 
     if (!transform["translation"].isNull())
     {
-        dm::double3 value = dm::double3::zero();
+        math::double3 value = math::double3::zero();
         transform["translation"] >> value;
         world.setTranslation(entity, value);
     }
@@ -429,8 +429,8 @@ void applyAuthoringTransform(
     const Json::Value& rotation = transform["rotation"];
     if (rotation.isArray() && rotation.size() >= 3)
     {
-        // Donut accepted a 3-element rotation as xyz with w defaulting to 1.
-        dm::double4 value = dm::double4(0.0, 0.0, 0.0, 1.0);
+        // Legacy scenes: a 3-element rotation is xyz with w defaulting to 1.
+        math::double4 value = math::double4(0.0, 0.0, 0.0, 1.0);
         if (rotation.size() >= 4)
             rotation >> value;
         else
@@ -439,18 +439,18 @@ void applyAuthoringTransform(
             value.y = rotation[1].asDouble();
             value.z = rotation[2].asDouble();
         }
-        world.setRotation(entity, dm::dquat::fromXYZW(value));
+        world.setRotation(entity, math::dquat::fromXYZW(value));
     }
     else if (!transform["euler"].isNull())
     {
-        dm::double3 value = dm::double3::zero();
+        math::double3 value = math::double3::zero();
         transform["euler"] >> value;
         world.setRotation(entity, rotationQuat(value));
     }
 
     if (!transform["scale"].isNull())
     {
-        dm::double3 value = dm::double3(1.0);
+        math::double3 value = math::double3(1.0);
         transform["scale"] >> value;
         world.setScaling(entity, value);
     }

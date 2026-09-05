@@ -21,15 +21,15 @@ bool nearlyEqual(double a, double b)
     return std::abs(a - b) <= kTransformEpsilon;
 }
 
-bool nearlyEqual(const dm::double3& a, const dm::double3& b)
+bool nearlyEqual(const math::double3& a, const math::double3& b)
 {
     return nearlyEqual(a.x, b.x) && nearlyEqual(a.y, b.y) && nearlyEqual(a.z, b.z);
 }
 
-bool nearlyEqual(const dm::dquat& a, const dm::dquat& b)
+bool nearlyEqual(const math::dquat& a, const math::dquat& b)
 {
     // q and -q represent the same rotation.
-    return std::abs(std::abs(dm::dot(a, b)) - 1.0) <= 1e-8;
+    return std::abs(std::abs(math::dot(a, b)) - 1.0) <= 1e-8;
 }
 
 } // namespace
@@ -69,10 +69,10 @@ bool applyLocalTransform(SceneEditor& sceneEditor, ecs::Entity entity, const Loc
     if (!entityWorld || !entityWorld->world().isAlive(entity))
         return false;
 
-    const auto finite3 = [](const dm::double3& v) {
+    const auto finite3 = [](const math::double3& v) {
         return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
     };
-    const auto finiteQ = [](const dm::dquat& q) {
+    const auto finiteQ = [](const math::dquat& q) {
         return std::isfinite(q.x) && std::isfinite(q.y) && std::isfinite(q.z) && std::isfinite(q.w);
     };
     if (!finite3(snapshot.translation) || !finiteQ(snapshot.rotation) || !finite3(snapshot.scaling))

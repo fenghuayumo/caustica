@@ -62,14 +62,14 @@ void GaussianSplatFramePass::createTemporalResources(
     colorSpaceLayoutDesc.visibility = caustica::rhi::ShaderType::Compute;
     colorSpaceLayoutDesc.bindings = {
         caustica::rhi::BindingLayoutItem::Texture_UAV(0),
-        caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(dm::uint4)),
+        caustica::rhi::BindingLayoutItem::PushConstants(0, sizeof(math::uint4)),
     };
     m_colorSpaceBindingLayout = device->createBindingLayout(colorSpaceLayoutDesc);
 
     caustica::rhi::BindingSetDesc colorSpaceBindingSetDesc;
     colorSpaceBindingSetDesc.bindings = {
         caustica::rhi::BindingSetItem::Texture_UAV(0, renderTargets->processedOutputColor),
-        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(dm::uint4)),
+        caustica::rhi::BindingSetItem::PushConstants(0, sizeof(math::uint4)),
     };
     m_colorSpaceBindingSet = device->createBindingSet(
         colorSpaceBindingSetDesc,
@@ -182,7 +182,7 @@ GaussianSplatFramePass::prepareGraphResources(GaussianSplatRenderTarget renderTa
         int(m_sampleIndex),
         *m_temporalSampleIndex,
         renderTarget,
-        dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
+        math::float2(float(m_displaySize.x), float(m_displaySize.y)),
         m_context->frameLights(),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
@@ -287,7 +287,7 @@ void GaussianSplatFramePass::executeUpload(
         int(m_sampleIndex),
         *m_temporalSampleIndex,
         renderTarget,
-        dm::float2(float(m_displaySize.x), float(m_displaySize.y)),
+        math::float2(float(m_displaySize.x), float(m_displaySize.y)),
         m_context->frameLights(),
     };
     const GaussianSplatRenderSettings settings = buildGaussianSplatRenderSettings(frameInputs);
@@ -296,7 +296,7 @@ void GaussianSplatFramePass::executeUpload(
     if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
-        splatView.setPixelOffset(dm::float2::zero());
+        splatView.setPixelOffset(math::float2::zero());
     }
     splatView.updateCache();
 
@@ -343,15 +343,15 @@ void GaussianSplatFramePass::executeColorSpaceConversion(
     state.bindings = { m_colorSpaceBindingSet };
     commandList->setComputeState(state);
 
-    const dm::uint4 constants(
+    const math::uint4 constants(
         toLinear ? 1u : 0u,
         m_displaySize.x,
         m_displaySize.y,
         0u);
     commandList->setPushConstants(&constants, sizeof(constants));
     commandList->dispatch(
-        dm::div_ceil(m_displaySize.x, 8u),
-        dm::div_ceil(m_displaySize.y, 8u),
+        math::div_ceil(m_displaySize.x, 8u),
+        math::div_ceil(m_displaySize.y, 8u),
         1);
 
     commandList->endMarker();
@@ -371,7 +371,7 @@ void GaussianSplatFramePass::executeRaster(
     if (renderTarget != GaussianSplatRenderTarget::OutputColor)
     {
         splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
-        splatView.setPixelOffset(dm::float2::zero());
+        splatView.setPixelOffset(math::float2::zero());
     }
     splatView.updateCache();
 
@@ -413,7 +413,7 @@ void GaussianSplatFramePass::executeAccumulate(caustica::rhi::CommandList* comma
 
     caustica::ViewInfo splatView = *m_context->camera.view();
     splatView.setViewport(ViewportDesc(float(m_displaySize.x), float(m_displaySize.y)));
-    splatView.setPixelOffset(dm::float2::zero());
+    splatView.setPixelOffset(math::float2::zero());
     splatView.updateCache();
 
     m_accumulationPass->render(commandList, splatView, splatView, accumulationWeight);

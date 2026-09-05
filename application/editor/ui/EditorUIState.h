@@ -15,7 +15,7 @@ struct TogglableNode
 {
     caustica::ecs::Entity Entity = caustica::ecs::NullEntity;
     caustica::scene::SceneEntityWorld* EntityWorld = nullptr;
-    dm::double3 OriginalTranslation;
+    math::double3 OriginalTranslation;
     std::string UIName;
 
     bool IsSelected() const;
@@ -91,8 +91,8 @@ struct EditorSelectionState
     // Queued on the UI/render thread; applied on the main thread before scene animate.
     caustica::ecs::Entity PendingDeleteEntity = caustica::ecs::NullEntity;
     caustica::ecs::Entity InspectorRotationEntity = caustica::ecs::NullEntity;
-    dm::dquat InspectorRotationQuat = dm::dquat::identity();
-    dm::float3 InspectorRotationEulerDeg = dm::float3(0.0f);
+    math::dquat InspectorRotationQuat = math::dquat::identity();
+    math::float3 InspectorRotationEulerDeg = math::float3(0.0f);
     bool InspectorRotationEulerValid = false;
     bool SelectedGaussianSplat = false;
     std::shared_ptr<std::vector<TogglableNode>> TogglableNodes = nullptr;

@@ -152,7 +152,7 @@ void syncPickPositionFromCursor(SceneEditor& sceneEditor)
         pickY = std::clamp(pickY, 0.0, static_cast<double>(vp.SizeY) - 1.0);
     }
 
-    session.runtime.Picking.Position = dm::uint2{
+    session.runtime.Picking.Position = math::uint2{
         static_cast<uint>(pickX),
         static_cast<uint>(pickY)};
     session.settings.MousePos = session.runtime.Picking.Position;

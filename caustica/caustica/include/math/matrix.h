@@ -827,7 +827,7 @@ namespace caustica::math
 	}
 
 	template <typename T, int rows, int cols>
-	matrix<bool, rows, cols> isnear(matrix<T, rows, cols> const & a, matrix<T, rows, cols> const & b, float epsilon = dm::epsilon)
+	matrix<bool, rows, cols> isnear(matrix<T, rows, cols> const & a, matrix<T, rows, cols> const & b, float epsilon = math::epsilon)
 	{
 		matrix<bool, rows, cols> result;
 		for (int i = 0; i < rows*cols; ++i)
@@ -836,7 +836,7 @@ namespace caustica::math
 	}
 
 	template <typename T, int rows, int cols>
-	matrix<bool, rows, cols> isnear(matrix<T, rows, cols> const & a, T b, float epsilon = dm::epsilon)
+	matrix<bool, rows, cols> isnear(matrix<T, rows, cols> const & a, T b, float epsilon = math::epsilon)
 	{
 		matrix<bool, rows, cols> result;
 		for (int i = 0; i < rows*cols; ++i)
@@ -845,7 +845,7 @@ namespace caustica::math
 	}
 
 	template <typename T, int rows, int cols>
-	matrix<bool, rows, cols> isnear(T a, matrix<T, rows, cols> const & b, float epsilon = dm::epsilon)
+	matrix<bool, rows, cols> isnear(T a, matrix<T, rows, cols> const & b, float epsilon = math::epsilon)
 	{
 		matrix<bool, rows, cols> result;
 		for (int i = 0; i < rows*cols; ++i)

@@ -76,7 +76,7 @@ namespace caustica::math
         return true;
     }
 
-    dm::float3 frustum::getCorner(int index) const
+    math::float3 frustum::getCorner(int index) const
     {
         const plane& a = (index & 1) ? planes[RIGHT_PLANE] : planes[LEFT_PLANE];
         const plane& b = (index & 2) ? planes[TOP_PLANE] : planes[BOTTOM_PLANE];

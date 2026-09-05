@@ -435,8 +435,8 @@ void RtxdiPass::presampleLights(caustica::rhi::CommandListHandle commandList, ca
 		|| lightBufferParams.localLightBufferRegion.numLights == 0)
 		return;
 
-	dm::int3 presampleDispatchSize = {
-		dm::div_ceil(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+	math::int3 presampleDispatchSize = {
+		math::div_ceil(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
 		int(m_ImportanceSamplingContext->GetLocalLightRISBufferSegmentParams().tileCount),
 		1
 	};
@@ -454,8 +454,8 @@ void RtxdiPass::presampleEnvMap(caustica::rhi::CommandListHandle commandList, ca
 	if (!lightBufferParams.environmentLightParams.lightPresent)
 		return;
 
-	dm::int3 presampleDispatchSize = {
-		dm::div_ceil(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+	math::int3 presampleDispatchSize = {
+		math::div_ceil(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
 		int(m_ImportanceSamplingContext->GetEnvironmentLightRISBufferSegmentParams().tileCount),
 		1
 	};
@@ -475,8 +475,8 @@ void RtxdiPass::presampleReGIR(caustica::rhi::CommandListHandle commandList, cau
 		|| reGIRContext.GetReGIRStaticParameters().Mode == caustica::rtxdi_internal::ReGIRMode::Disabled)
 		return;
 
-	dm::int3 worldGridDispatchSize = {
-		dm::div_ceil(reGIRContext.GetReGIRLightSlotCount(), RTXDI_GRID_BUILD_GROUP_SIZE),
+	math::int3 worldGridDispatchSize = {
+		math::div_ceil(reGIRContext.GetReGIRLightSlotCount(), RTXDI_GRID_BUILD_GROUP_SIZE),
 		1,
 		1
 	};
@@ -511,7 +511,7 @@ void RtxdiPass::execute(
 	commandList->beginMarker("ReSTIR DI");
 
 	auto& reSTIRDI = m_ImportanceSamplingContext->GetReSTIRDIContext();
-	dm::int2 dispatchSize = { (int) reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
+	math::int2 dispatchSize = { (int) reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
 	
 	// Not implemented
 	//if (reSTIRDI.GetResamplingMode() == caustica::rtxdi_internal::ReSTIRDI_ResamplingMode::FusedSpatiotemporal)
@@ -545,7 +545,7 @@ void RtxdiPass::execute(
 
         if (!skipFinal)
         {
-            dm::int3 screenSpaceDispatchSize = {
+            math::int3 screenSpaceDispatchSize = {
                 ((int)reSTIRDI.GetStaticParameters().RenderWidth + RTXDI_SCREEN_SPACE_GROUP_SIZE - 1) / RTXDI_SCREEN_SPACE_GROUP_SIZE,
                 ((int)reSTIRDI.GetStaticParameters().RenderHeight + RTXDI_SCREEN_SPACE_GROUP_SIZE - 1) / RTXDI_SCREEN_SPACE_GROUP_SIZE,
                 1 };
@@ -688,7 +688,7 @@ void RtxdiPass::executeGI(caustica::rhi::CommandListHandle commandList, caustica
 
 	auto& reSTIRGI = m_ImportanceSamplingContext->GetReSTIRGIContext();
 
-	dm::int2 dispatchSize = { (int)reSTIRGI.GetStaticParams().RenderWidth, (int)reSTIRGI.GetStaticParams().RenderHeight };
+	math::int2 dispatchSize = { (int)reSTIRGI.GetStaticParams().RenderWidth, (int)reSTIRGI.GetStaticParams().RenderHeight };
 
 	executeRayTracingPass(commandList, m_GITemporalResamplingPass, "Temporal Resampling", dispatchSize, extraBindingSet);
 
@@ -710,7 +710,7 @@ void RtxdiPass::executeGI(caustica::rhi::CommandListHandle commandList, caustica
 void RtxdiPass::executeFusedDIGIFinal(caustica::rhi::CommandListHandle commandList, caustica::rhi::BindingSetHandle extraBindingSet)
 {
 	auto& reSTIRDI = m_ImportanceSamplingContext->GetReSTIRDIContext();
-	dm::int2 dispatchSize = { (int)reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
+	math::int2 dispatchSize = { (int)reSTIRDI.GetStaticParameters().RenderWidth, (int)reSTIRDI.GetStaticParameters().RenderHeight };
 
     executeRayTracingPass(commandList, m_FusedDIGIFinalShadingPass, "Fused DI GI Final Shading", dispatchSize, extraBindingSet);
 }
@@ -720,7 +720,7 @@ void RtxdiPass::executePT(caustica::rhi::CommandListHandle commandList, caustica
     commandList->beginMarker("ReSTIR PT");
 
     auto& reSTIRPT = *m_ReSTIRPTContext;
-    dm::int2 dispatchSize = { (int)reSTIRPT.GetStaticParams().RenderWidth, (int)reSTIRPT.GetStaticParams().RenderHeight };
+    math::int2 dispatchSize = { (int)reSTIRPT.GetStaticParams().RenderWidth, (int)reSTIRPT.GetStaticParams().RenderHeight };
 
     executeRayTracingPass(commandList, m_PTGenerateInitialSamplesPass, "Generate Initial PT Samples", dispatchSize, extraBindingSet);
 
@@ -1010,7 +1010,7 @@ void RtxdiPass::executeComputePass(
 	caustica::rhi::CommandListHandle& commandList,
 	ComputePass& pass,
 	const char* passName,
-	dm::int3 dispatchSize,
+	math::int3 dispatchSize,
 	caustica::rhi::BindingSetHandle extraBindingSet /*= nullptr*/)
 {
 	commandList->beginMarker(passName);
@@ -1026,7 +1026,7 @@ void RtxdiPass::executeRayTracingPass(
 	caustica::rhi::CommandListHandle& commandList, 
 	RayTracingPass& pass, 
 	const char* passName, 
-	dm::int2 dispatchSize, 
+	math::int2 dispatchSize, 
 	caustica::rhi::BindingSet* extraBindingSet /* = nullptr */
 )
 {

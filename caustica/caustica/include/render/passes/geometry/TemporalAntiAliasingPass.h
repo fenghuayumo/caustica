@@ -38,9 +38,9 @@ namespace caustica::render
 
         uint32_t m_FrameIndex;
         uint32_t m_StencilMask;
-        dm::float2 m_ResolvedColorSize;
+        math::float2 m_ResolvedColorSize;
 
-        dm::float2 m_R2Jitter;
+        math::float2 m_R2Jitter;
         TemporalAntiAliasingJitter m_Jitter;
 
         bool m_HasHistoryClampRelaxTexture;
@@ -71,7 +71,7 @@ namespace caustica::render
             caustica::rhi::CommandList* commandList,
             const caustica::ViewInfo& compositeView,
             const caustica::ViewInfo& compositeViewPrevious,
-            dm::float3 preViewTranslationDifference = dm::float3::zero());
+            math::float3 preViewTranslationDifference = math::float3::zero());
 
         void temporalResolve(
             caustica::rhi::CommandList* commandList,
@@ -82,6 +82,6 @@ namespace caustica::render
 
         void advanceFrame();
         void setJitter(TemporalAntiAliasingJitter jitter);
-        dm::float2 getCurrentPixelOffset();
+        math::float2 getCurrentPixelOffset();
     };
 }

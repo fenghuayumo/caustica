@@ -9,9 +9,9 @@
 namespace caustica::render
 {
 
-dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy)
+math::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy)
 {
-    return dm::affineToHomogeneous(proxy.objectToWorld);
+    return math::affineToHomogeneous(proxy.objectToWorld);
 }
 
 bool isGaussianSplatProxyActive(
@@ -108,11 +108,11 @@ void buildGaussianSplatEmissionProxies(
             settings.GaussianSplatTintColor,
             settings.GaussianSplatAlphaCullThreshold);
 
-        const dm::affine3& objectToWorldTransform = proxy.objectToWorld;
+        const math::affine3& objectToWorldTransform = proxy.objectToWorld;
         const float radiusScale = std::max({
-            length(objectToWorldTransform.transformVector(dm::float3(1.0f, 0.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(dm::float3(0.0f, 1.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(dm::float3(0.0f, 0.0f, 1.0f))) });
+            length(objectToWorldTransform.transformVector(math::float3(1.0f, 0.0f, 0.0f))),
+            length(objectToWorldTransform.transformVector(math::float3(0.0f, 1.0f, 0.0f))),
+            length(objectToWorldTransform.transformVector(math::float3(0.0f, 0.0f, 1.0f))) });
 
         const auto& proxies = pass->getEmissionProxies();
         out.reserve(out.size() + proxies.size());

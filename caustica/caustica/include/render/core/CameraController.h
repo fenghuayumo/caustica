@@ -22,7 +22,7 @@ namespace caustica
 
 struct CameraUpdateParams
 {
-    dm::uint2   renderSize          = {};
+    math::uint2   renderSize          = {};
     float       displayAspectRatio  = 1.0f;
     uint32_t    sampleIndex         = 0;
     uint64_t    frameIndex          = 0;
@@ -51,7 +51,7 @@ public:
     [[nodiscard]] const std::shared_ptr<ViewInfo>& view() const { return m_view; }
     [[nodiscard]] const std::shared_ptr<ViewInfo>& viewPrevious() const { return m_viewPrevious; }
 
-    void ensureViews(dm::uint2 renderSize);
+    void ensureViews(math::uint2 renderSize);
 
     void swapViews();
 
@@ -70,8 +70,8 @@ public:
     [[nodiscard]] float zFar() const { return m_zFar; }
 
     [[nodiscard]] bool useCustomIntrinsics() const { return m_useCustomIntrinsics; }
-    [[nodiscard]] dm::float4 intrinsics() const { return m_intrinsics; }
-    [[nodiscard]] dm::float2 intrinsicsViewport() const { return m_intrinsicsViewport; }
+    [[nodiscard]] math::float4 intrinsics() const { return m_intrinsics; }
+    [[nodiscard]] math::float2 intrinsicsViewport() const { return m_intrinsicsViewport; }
 
     void setIntrinsics(float fx, float fy, float cx, float cy, float w, float h);
     void setIntrinsicsInteractive(float fx, float fy, float cx, float cy, float w, float h);
@@ -82,13 +82,13 @@ public:
     void setSelectedCameraIndex(uint32_t index) { m_selectedCameraIndex = index; }
     uint32_t& selectedCameraIndex() { return m_selectedCameraIndex; }
 
-    [[nodiscard]] dm::float2 computeJitter(const CameraUpdateParams& params) const;
+    [[nodiscard]] math::float2 computeJitter(const CameraUpdateParams& params) const;
 
     void updateViews(const CameraUpdateParams& params);
     void syncPreviousViewFromCurrent();
     void setPreviousViewFromCameraProxy(
         const scene::ActiveCameraRenderProxy& camera,
-        dm::uint2 renderSize,
+        math::uint2 renderSize,
         float displayAspectRatio);
 
     void saveToFile(const std::filesystem::path& path, float zNear, float fovYRadians) const;
@@ -114,12 +114,12 @@ private:
     float                           m_zNear       = 0.001f;
     float                           m_zFar        = 100000.0f;
     bool                            m_useCustomIntrinsics = false;
-    dm::float4                      m_intrinsics = dm::float4(0.f);
-    dm::float2                      m_intrinsicsViewport = dm::float2(0.f);
+    math::float4                      m_intrinsics = math::float4(0.f);
+    math::float2                      m_intrinsicsViewport = math::float2(0.f);
 
-    dm::float3                      m_lastPos = { 0, 0, 0 };
-    dm::float3                      m_lastDir = { 0, 0, 0 };
-    dm::float3                      m_lastUp  = { 0, 0, 0 };
+    math::float3                      m_lastPos = { 0, 0, 0 };
+    math::float3                      m_lastDir = { 0, 0, 0 };
+    math::float3                      m_lastUp  = { 0, 0, 0 };
 
     uint32_t                        m_selectedCameraIndex = 0;
 

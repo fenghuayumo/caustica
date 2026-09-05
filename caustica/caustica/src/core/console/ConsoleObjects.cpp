@@ -38,11 +38,11 @@ namespace caustica::console
 	template <> inline VariableType::Type VariableType::isA<bool>() { return TYPE_BOOL; }
 	template <> inline VariableType::Type VariableType::isA<int>() { return TYPE_INT; }
 	template <> inline VariableType::Type VariableType::isA<float>() { return TYPE_FLOAT; }
-	template <> inline VariableType::Type VariableType::isA<dm::int2>() { return TYPE_INT2; }
-	template <> inline VariableType::Type VariableType::isA<dm::int3>() { return TYPE_INT3; }
-	template <> inline VariableType::Type VariableType::isA<dm::float2>() { return TYPE_FLOAT2; }
-	template <> inline VariableType::Type VariableType::isA<dm::float3>() { return TYPE_FLOAT3; }
-	template <> inline VariableType::Type VariableType::isA<dm::float4>() { return TYPE_FLOAT4; }
+	template <> inline VariableType::Type VariableType::isA<math::int2>() { return TYPE_INT2; }
+	template <> inline VariableType::Type VariableType::isA<math::int3>() { return TYPE_INT3; }
+	template <> inline VariableType::Type VariableType::isA<math::float2>() { return TYPE_FLOAT2; }
+	template <> inline VariableType::Type VariableType::isA<math::float3>() { return TYPE_FLOAT3; }
+	template <> inline VariableType::Type VariableType::isA<math::float4>() { return TYPE_FLOAT4; }
 	template <> inline VariableType::Type VariableType::isA<std::string>() { return TYPE_STRING; }
 
 	static char const* asString(VariableType::Type type)
@@ -626,7 +626,7 @@ namespace caustica::console
 	}
 
 	// A specialization of vector_to_string to work around std::to_chars being unavailable for float on clang
-	template <int N> std::string float_vector_to_string(dm::vector<float, N> v)
+	template <int N> std::string float_vector_to_string(math::vector<float, N> v)
 	{
 		std::string result;
 		for (int i = 0; i < N; ++i)
@@ -720,11 +720,11 @@ namespace caustica::console
 	DEFINE_BOUND_VARIABLE_REGISTRATION(bool);
 	DEFINE_BOUND_VARIABLE_REGISTRATION(int);
 	DEFINE_BOUND_VARIABLE_REGISTRATION(float);
-	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::int2);
-	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::int3);
-	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float2);
-	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float3);
-	DEFINE_BOUND_VARIABLE_REGISTRATION(dm::float4);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(math::int2);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(math::int3);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(math::float2);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(math::float3);
+	DEFINE_BOUND_VARIABLE_REGISTRATION(math::float4);
 	DEFINE_BOUND_VARIABLE_REGISTRATION(std::string);
 
 #undef DEFINE_BOUND_VARIABLE_REGISTRATION

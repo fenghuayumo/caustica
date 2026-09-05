@@ -289,7 +289,7 @@ namespace caustica::math
 	// !!! this doesn't match the behavior of isnear() for vectors and matrices -
 	// returns a single result rather than a componentwise result
 	template <typename T, int n>
-	bool isnear(affine<T, n> const & a, affine<T, n> const & b, T epsilon = dm::epsilon)
+	bool isnear(affine<T, n> const & a, affine<T, n> const & b, T epsilon = math::epsilon)
 	{
 		return all(isnear(a.m_linear, b.m_linear, epsilon)) &&
 			   all(isnear(a.m_translation, b.m_translation, epsilon));

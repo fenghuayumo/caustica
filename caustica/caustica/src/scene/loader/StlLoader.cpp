@@ -15,9 +15,9 @@ namespace caustica
 {
 namespace
 {
-    dm::float3 NormalizeOrFallback(dm::float3 value, dm::float3 fallback)
+    math::float3 NormalizeOrFallback(math::float3 value, math::float3 fallback)
     {
-        const float len = dm::length(value);
+        const float len = math::length(value);
         return len > 1e-20f ? value / len : fallback;
     }
 
@@ -49,8 +49,8 @@ namespace
         std::string text(reinterpret_cast<const char*>(data.data()), data.size());
         std::istringstream stream(text);
         std::string token;
-        dm::float3 currentNormal(0.f, 1.f, 0.f);
-        std::vector<dm::float3> faceVertices;
+        math::float3 currentNormal(0.f, 1.f, 0.f);
+        std::vector<math::float3> faceVertices;
         faceVertices.reserve(3);
 
         while (stream >> token)
@@ -62,7 +62,7 @@ namespace
                 stream >> normalKeyword;
                 float nx = 0.f, ny = 0.f, nz = 0.f;
                 stream >> nx >> ny >> nz;
-                currentNormal = NormalizeOrFallback(dm::float3(nx, ny, nz), dm::float3(0.f, 1.f, 0.f));
+                currentNormal = NormalizeOrFallback(math::float3(nx, ny, nz), math::float3(0.f, 1.f, 0.f));
                 faceVertices.clear();
             }
             else if (token == "vertex")
@@ -79,12 +79,12 @@ namespace
                 // Fan-triangulate in case of malformed polygons with >3 vertices.
                 for (size_t i = 1; i + 1 < faceVertices.size(); ++i)
                 {
-                    const dm::float3& p0 = faceVertices[0];
-                    const dm::float3& p1 = faceVertices[i];
-                    const dm::float3& p2 = faceVertices[i + 1];
-                    dm::float3 normal = currentNormal;
-                    if (dm::length(normal) < 1e-20f)
-                        normal = NormalizeOrFallback(dm::cross(p1 - p0, p2 - p0), dm::float3(0.f, 1.f, 0.f));
+                    const math::float3& p0 = faceVertices[0];
+                    const math::float3& p1 = faceVertices[i];
+                    const math::float3& p2 = faceVertices[i + 1];
+                    math::float3 normal = currentNormal;
+                    if (math::length(normal) < 1e-20f)
+                        normal = NormalizeOrFallback(math::cross(p1 - p0, p2 - p0), math::float3(0.f, 1.f, 0.f));
 
                     const uint32_t base = static_cast<uint32_t>(outMesh.positions.size());
                     outMesh.positions.push_back(p0);
@@ -136,13 +136,13 @@ namespace
             std::memcpy(values, data.data() + offset, sizeof(values));
             offset += 50; // 12 floats + 2-byte attribute
 
-            const dm::float3 fileNormal(values[0], values[1], values[2]);
-            const dm::float3 p0(values[3], values[4], values[5]);
-            const dm::float3 p1(values[6], values[7], values[8]);
-            const dm::float3 p2(values[9], values[10], values[11]);
-            const dm::float3 normal = dm::length(fileNormal) > 1e-20f
-                ? NormalizeOrFallback(fileNormal, dm::float3(0.f, 1.f, 0.f))
-                : NormalizeOrFallback(dm::cross(p1 - p0, p2 - p0), dm::float3(0.f, 1.f, 0.f));
+            const math::float3 fileNormal(values[0], values[1], values[2]);
+            const math::float3 p0(values[3], values[4], values[5]);
+            const math::float3 p1(values[6], values[7], values[8]);
+            const math::float3 p2(values[9], values[10], values[11]);
+            const math::float3 normal = math::length(fileNormal) > 1e-20f
+                ? NormalizeOrFallback(fileNormal, math::float3(0.f, 1.f, 0.f))
+                : NormalizeOrFallback(math::cross(p1 - p0, p2 - p0), math::float3(0.f, 1.f, 0.f));
 
             const uint32_t base = static_cast<uint32_t>(outMesh.positions.size());
             outMesh.positions.push_back(p0);

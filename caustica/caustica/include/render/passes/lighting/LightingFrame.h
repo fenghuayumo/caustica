@@ -22,7 +22,7 @@ void createLightingRenderPasses(
     const std::shared_ptr<ShaderDebug>& shaderDebug,
     caustica::rhi::BindingLayoutHandle bindlessLayout,
     caustica::rhi::CommandListHandle initializeCommandList,
-    dm::uint2 screenResolution);
+    math::uint2 screenResolution);
 
 void preUpdateLightingFrame(
     PathTracingContext& context,

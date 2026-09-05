@@ -71,8 +71,8 @@ void ProceduralSky::reloadShaders(std::shared_ptr<caustica::ShaderFactory> shade
 
 float3 ProceduralSky::computeSunDirection(float elevationDeg, float azimuthDeg) const
 {
-    const float elev = dm::radians(dm::clamp(elevationDeg, -89.9f, 89.9f));
-    const float azim = dm::radians(azimuthDeg);
+    const float elev = math::radians(math::clamp(elevationDeg, -89.9f, 89.9f));
+    const float azim = math::radians(azimuthDeg);
     // Sky-local Z-up: elevation from horizon, azimuth from +X toward +Y.
     return normalize(float3(
         std::cos(elev) * std::cos(azim),
@@ -329,13 +329,13 @@ void ProceduralSky::applyAerialPerspective(
     constants.WorldToKilometers = m_worldToKilometers;
     constants.RadianceMultiplier = environmentTint * std::max(environmentIntensity, 0.0f);
     constants.MaxDistanceKm = m_aerialPerspectiveMaxDistanceKm;
-    const affine3 skyToWorld = dm::rotation(dm::radians(environmentRotationDeg));
+    const affine3 skyToWorld = math::rotation(math::radians(environmentRotationDeg));
     constants.AtmosphereBasisXWorld = skyToWorld.transformVector(float3(1.0f, 0.0f, 0.0f));
     constants.AtmosphereBasisYWorld = skyToWorld.transformVector(float3(0.0f, 0.0f, 1.0f));
     constants.AtmosphereBasisZWorld = skyToWorld.transformVector(float3(0.0f, 1.0f, 0.0f));
     constants.OutputSize = uint2(width, height);
     constants.ReverseDepth = view.isReverseDepth() ? 1u : 0u;
-    constants.SampleCount = (uint)dm::clamp(m_aerialPerspectiveSampleCount, 1, 64);
+    constants.SampleCount = (uint)math::clamp(m_aerialPerspectiveSampleCount, 1, 64);
     commandList->writeBuffer(m_aerialPerspectiveConstantBuffer, &constants, sizeof(constants));
 
     caustica::rhi::BindingSetDesc bindingSetDesc;
@@ -376,7 +376,7 @@ bool ProceduralSky::update(
 
     fillEarthAtmosphere(outConstants.Atmosphere);
 
-    outConstants.CameraHeightKm = dm::clamp(
+    outConstants.CameraHeightKm = math::clamp(
         m_cameraHeightKm,
         0.001f,
         m_atmosphereHeightKm - 0.001f);

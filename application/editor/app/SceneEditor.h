@@ -109,14 +109,14 @@ public:
     void requestCreateBuiltinMesh(BuiltinPrimitiveKind kind);
     void requestCreateLight(EditorLightKind kind);
     void requestFullRebuild();
-    std::vector<dm::float3> getMeshVertices(caustica::ecs::Entity entity) const;
+    std::vector<math::float3> getMeshVertices(caustica::ecs::Entity entity) const;
     void setMeshVertices(caustica::ecs::Entity entity,
-        const std::vector<dm::float3>& vertices,
+        const std::vector<math::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
-    std::vector<dm::float3> getMeshVerticesWorld(caustica::ecs::Entity entity);
+    std::vector<math::float3> getMeshVerticesWorld(caustica::ecs::Entity entity);
     void setMeshVerticesWorld(caustica::ecs::Entity entity,
-        const std::vector<dm::float3>& vertices,
+        const std::vector<math::float3>& vertices,
         bool recomputeNormals = true,
         bool rebuildAccelerationStructure = true);
 

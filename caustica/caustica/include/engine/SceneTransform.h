@@ -15,10 +15,10 @@ class App;
 bool setEntityLocalTransform(
     App& app,
     ecs::Entity entity,
-    const std::optional<dm::double3>& translation = std::nullopt,
-    const std::optional<dm::dquat>& rotation = std::nullopt,
-    const std::optional<dm::double3>& scaling = std::nullopt);
-bool setEntityTranslation(App& app, ecs::Entity entity, const dm::double3& translation);
+    const std::optional<math::double3>& translation = std::nullopt,
+    const std::optional<math::dquat>& rotation = std::nullopt,
+    const std::optional<math::double3>& scaling = std::nullopt);
+bool setEntityTranslation(App& app, ecs::Entity entity, const math::double3& translation);
 bool setEntityVisible(App& app, ecs::Entity entity, bool visible);
 
 } // namespace caustica

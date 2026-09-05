@@ -65,7 +65,7 @@ void ResetGizmoDragState()
 
 // Match the layout that worked before DockSpace: caustica/ImGuizmo both consume
 // this buffer as the same row-major affine dump (see commit 5240cfa9).
-void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
+void Affine3ToImGuizmoMatrix(const math::affine3& affine, float matrix[16])
 {
     matrix[0] = affine.m_linear.m00;
     matrix[1] = affine.m_linear.m01;
@@ -85,7 +85,7 @@ void Affine3ToImGuizmoMatrix(const dm::affine3& affine, float matrix[16])
     matrix[15] = 1.f;
 }
 
-void Float4x4ToImGuizmoMatrix(const dm::float4x4& source, float matrix[16])
+void Float4x4ToImGuizmoMatrix(const math::float4x4& source, float matrix[16])
 {
     for (int row = 0; row < 4; ++row)
         for (int col = 0; col < 4; ++col)
@@ -115,7 +115,7 @@ void MultiplyImGuizmoMatrix(const float a[16], const float b[16], float r[16])
     std::memcpy(r, tmp, sizeof(tmp));
 }
 
-bool ProjectWorldWithGizmo(const dm::float3& world, const float viewProj[16], const EditorViewportState& vp, ImVec2& out)
+bool ProjectWorldWithGizmo(const math::float3& world, const float viewProj[16], const EditorViewportState& vp, ImVec2& out)
 {
     // ImGuizmo::worldToPos: row-vector TransformPoint, then Y-flip into the viewport rect.
     const float x = world.x;
@@ -192,11 +192,11 @@ bool ClipSegmentToRect(ImVec2& a, ImVec2& b, ImVec2 min, ImVec2 max)
     }
 }
 
-void BasisFromAxis(const dm::float3& axis, dm::float3& tangent, dm::float3& bitangent)
+void BasisFromAxis(const math::float3& axis, math::float3& tangent, math::float3& bitangent)
 {
-    const dm::float3 n = dm::normalize(axis);
-    tangent = dm::normalize(dm::orthogonal(n));
-    bitangent = dm::normalize(dm::cross(n, tangent));
+    const math::float3 n = math::normalize(axis);
+    tangent = math::normalize(math::orthogonal(n));
+    bitangent = math::normalize(math::cross(n, tangent));
 }
 
 void DashedScreenLine(ImDrawList* drawList, ImVec2 a, ImVec2 b, ImU32 col, float thickness, const EditorViewportState& vp)
@@ -226,8 +226,8 @@ void DashedWorldLine(
     ImDrawList* drawList,
     const float viewProj[16],
     const EditorViewportState& vp,
-    const dm::float3& a,
-    const dm::float3& b,
+    const math::float3& a,
+    const math::float3& b,
     ImU32 col,
     float thickness)
 {
@@ -240,9 +240,9 @@ void DashedWorldCircle(
     ImDrawList* drawList,
     const float viewProj[16],
     const EditorViewportState& vp,
-    const dm::float3& center,
-    const dm::float3& axisX,
-    const dm::float3& axisY,
+    const math::float3& center,
+    const math::float3& axisX,
+    const math::float3& axisY,
     float radius,
     ImU32 col,
     float thickness,
@@ -252,8 +252,8 @@ void DashedWorldCircle(
     bool prevOk = false;
     for (int i = 0; i <= segments; ++i)
     {
-        const float a = (dm::PI_f * 2.f * float(i)) / float(segments);
-        const dm::float3 world = center + axisX * (std::cos(a) * radius) + axisY * (std::sin(a) * radius);
+        const float a = (math::PI_f * 2.f * float(i)) / float(segments);
+        const math::float3 world = center + axisX * (std::cos(a) * radius) + axisY * (std::sin(a) * radius);
         ImVec2 screen;
         const bool ok = ProjectWorldWithGizmo(world, viewProj, vp, screen);
         if (ok && prevOk)
@@ -275,9 +275,9 @@ void DrawViewportLightIcon(ImDrawList* drawList, ImVec2 center, EditorGlyphIcon 
         col);
 }
 
-dm::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
+math::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
 {
-    dm::affine3 result = dm::affine3::identity();
+    math::affine3 result = math::affine3::identity();
     result.m_linear.m00 = matrix[0];
     result.m_linear.m01 = matrix[1];
     result.m_linear.m02 = matrix[2];
@@ -293,14 +293,14 @@ dm::affine3 ImGuizmoMatrixToAffine3(const float matrix[16])
     return result;
 }
 
-dm::daffine3 GetParentGlobalTransform(const caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
+math::daffine3 GetParentGlobalTransform(const caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
 {
     const auto* parentComp = entityWorld.world().tryGet<caustica::scene::ParentComponent>(entity);
     if (!parentComp || !ecs::isValid(parentComp->parent))
-        return dm::daffine3::identity();
+        return math::daffine3::identity();
 
     const auto* parentGlobal = entityWorld.world().tryGet<caustica::scene::GlobalTransformComponent>(parentComp->parent);
-    return parentGlobal ? parentGlobal->transform : dm::daffine3::identity();
+    return parentGlobal ? parentGlobal->transform : math::daffine3::identity();
 }
 
 void ApplyWorldMatrixToLocalTransform(
@@ -308,14 +308,14 @@ void ApplyWorldMatrixToLocalTransform(
     ecs::Entity entity,
     const float worldMatrix[16])
 {
-    const dm::daffine3 parentWorld = GetParentGlobalTransform(entityWorld, entity);
-    const dm::daffine3 newWorld(dm::affine3(ImGuizmoMatrixToAffine3(worldMatrix)));
-    const dm::daffine3 newLocal = newWorld * dm::daffine3(inverse(parentWorld));
+    const math::daffine3 parentWorld = GetParentGlobalTransform(entityWorld, entity);
+    const math::daffine3 newWorld(math::affine3(ImGuizmoMatrixToAffine3(worldMatrix)));
+    const math::daffine3 newLocal = newWorld * math::daffine3(inverse(parentWorld));
 
-    dm::double3 translation;
-    dm::dquat rotation;
-    dm::double3 scaling;
-    dm::decomposeAffine(newLocal, &translation, &rotation, &scaling);
+    math::double3 translation;
+    math::dquat rotation;
+    math::double3 scaling;
+    math::decomposeAffine(newLocal, &translation, &rotation, &scaling);
     entityWorld.setLocalTransform(entity, &translation, &rotation, &scaling);
     // CaptureCurrent: per-frame motion vectors. PreserveExisting (drag-start previous)
     // makes temporal denoise / accumulation flicker while dragging.
@@ -401,7 +401,7 @@ void BuildGizmoProjectionMatrix(const TransformGizmoContext& ctx, const ViewInfo
         const float fov = caustica::cameraVerticalFOV(*app);
         const float zNear = std::max(caustica::cameraZNear(*app), 0.01f);
         const float zFar = std::max(zNear * 10000.f, 1000.f);
-        Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(fov, aspect, zNear, zFar), outMatrix);
+        Float4x4ToImGuizmoMatrix(math::perspProjD3DStyle(fov, aspect, zNear, zFar), outMatrix);
         return;
     }
 
@@ -521,35 +521,35 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
     BuildGizmoProjectionMatrix(ctx, *view, projectionMatrix);
     MultiplyImGuizmoMatrix(viewMatrix, projectionMatrix, viewProj);
 
-    auto line = [&](const dm::float3& a, const dm::float3& b, ImU32 col, float thickness)
+    auto line = [&](const math::float3& a, const math::float3& b, ImU32 col, float thickness)
     {
         DashedWorldLine(drawList, viewProj, vp, a, b, col, thickness);
     };
-    auto circle = [&](const dm::float3& center, const dm::float3& axisX, const dm::float3& axisY,
+    auto circle = [&](const math::float3& center, const math::float3& axisX, const math::float3& axisY,
         float radius, ImU32 col, float thickness)
     {
         DashedWorldCircle(drawList, viewProj, vp, center, axisX, axisY, radius, col, thickness);
     };
-    auto wireSphere = [&](const dm::float3& center, float radius, ImU32 col, float thickness)
+    auto wireSphere = [&](const math::float3& center, float radius, ImU32 col, float thickness)
     {
-        circle(center, dm::float3(1.f, 0.f, 0.f), dm::float3(0.f, 1.f, 0.f), radius, col, thickness);
-        circle(center, dm::float3(1.f, 0.f, 0.f), dm::float3(0.f, 0.f, 1.f), radius, col, thickness);
-        circle(center, dm::float3(0.f, 1.f, 0.f), dm::float3(0.f, 0.f, 1.f), radius, col, thickness);
+        circle(center, math::float3(1.f, 0.f, 0.f), math::float3(0.f, 1.f, 0.f), radius, col, thickness);
+        circle(center, math::float3(1.f, 0.f, 0.f), math::float3(0.f, 0.f, 1.f), radius, col, thickness);
+        circle(center, math::float3(0.f, 1.f, 0.f), math::float3(0.f, 0.f, 1.f), radius, col, thickness);
     };
-    auto cone = [&](const dm::float3& origin, const dm::float3& dir, float length, float halfAngleDeg,
+    auto cone = [&](const math::float3& origin, const math::float3& dir, float length, float halfAngleDeg,
         ImU32 col, float thickness)
     {
         const float clamped = std::clamp(halfAngleDeg, 1.f, 80.f);
-        const float radius = std::tan(dm::radians(clamped)) * length;
-        dm::float3 tangent, bitangent;
+        const float radius = std::tan(math::radians(clamped)) * length;
+        math::float3 tangent, bitangent;
         BasisFromAxis(dir, tangent, bitangent);
-        const dm::float3 end = origin + dir * length;
+        const math::float3 end = origin + dir * length;
         circle(end, tangent, bitangent, radius, col, thickness);
         constexpr int kRays = 4;
         for (int i = 0; i < kRays; ++i)
         {
-            const float a = (dm::PI_f * 2.f * float(i)) / float(kRays);
-            const dm::float3 rim = end + tangent * (std::cos(a) * radius) + bitangent * (std::sin(a) * radius);
+            const float a = (math::PI_f * 2.f * float(i)) / float(kRays);
+            const math::float3 rim = end + tangent * (std::cos(a) * radius) + bitangent * (std::sin(a) * radius);
             line(origin, rim, col, thickness);
         }
     };
@@ -563,7 +563,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
     };
     std::vector<PendingIcon> icons;
 
-    auto queueIcon = [&](const dm::float3& origin, EditorGlyphIcon kind, ImU32 col, bool selected)
+    auto queueIcon = [&](const math::float3& origin, EditorGlyphIcon kind, ImU32 col, bool selected)
     {
         ImVec2 screen;
         if (!ProjectWorldWithGizmo(origin, viewProj, vp, screen))
@@ -589,12 +589,12 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
             if (!light.enabled)
                 return;
             const auto [col, thickness] = style(entity, IM_COL32(255, 206, 92, 210));
-            const dm::float3 origin = global.transformFloat.m_translation;
-            dm::float3 dir = dm::float3(scene::getLightDirection(global.transform));
-            if (dm::length(dir) < 1e-5f)
-                dir = dm::float3(0.f, -1.f, 0.f);
-            dir = dm::normalize(dir);
-            dm::float3 tangent, bitangent;
+            const math::float3 origin = global.transformFloat.m_translation;
+            math::float3 dir = math::float3(scene::getLightDirection(global.transform));
+            if (math::length(dir) < 1e-5f)
+                dir = math::float3(0.f, -1.f, 0.f);
+            dir = math::normalize(dir);
+            math::float3 tangent, bitangent;
             BasisFromAxis(dir, tangent, bitangent);
             const bool selected = ctx.editorUI.SelectedEntity == entity;
             if (selected)
@@ -603,8 +603,8 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
                 constexpr int kRays = 8;
                 for (int i = 0; i < kRays; ++i)
                 {
-                    const float a = (dm::PI_f * 2.f * float(i)) / float(kRays);
-                    const dm::float3 radial = tangent * std::cos(a) + bitangent * std::sin(a);
+                    const float a = (math::PI_f * 2.f * float(i)) / float(kRays);
+                    const math::float3 radial = tangent * std::cos(a) + bitangent * std::sin(a);
                     line(origin + radial * 0.22f, origin + radial * 0.42f, col, thickness);
                 }
                 line(origin, origin + dir * 0.7f, col, thickness);
@@ -619,7 +619,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
                 return;
             const bool selected = ctx.editorUI.SelectedEntity == entity;
             const auto [col, thickness] = style(entity, IM_COL32(255, 176, 82, 210));
-            const dm::float3 origin = global.transformFloat.m_translation;
+            const math::float3 origin = global.transformFloat.m_translation;
             const float coreRadius = std::max(light.radius, 0.18f);
             if (selected)
             {
@@ -637,11 +637,11 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
                 return;
             const bool selected = ctx.editorUI.SelectedEntity == entity;
             const auto [col, thickness] = style(entity, IM_COL32(255, 158, 72, 210));
-            const dm::float3 origin = global.transformFloat.m_translation;
-            dm::float3 dir = dm::float3(scene::getLightDirection(global.transform));
-            if (dm::length(dir) < 1e-5f)
-                dir = dm::float3(0.f, -1.f, 0.f);
-            dir = dm::normalize(dir);
+            const math::float3 origin = global.transformFloat.m_translation;
+            math::float3 dir = math::float3(scene::getLightDirection(global.transform));
+            if (math::length(dir) < 1e-5f)
+                dir = math::float3(0.f, -1.f, 0.f);
+            dir = math::normalize(dir);
             const float fullLen = light.range > 1e-3f ? light.range : 2.5f;
             const float coneLen = std::min(selected ? fullLen : 1.6f, 6.f);
             if (selected)
@@ -661,7 +661,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
             const bool selected = ctx.editorUI.SelectedEntity == entity;
             const auto [col, thickness] = style(entity, IM_COL32(186, 158, 255, 210));
 
-            dm::float3 local[4] = {
+            math::float3 local[4] = {
                 { -0.5f, -0.5f, 0.0f },
                 { -0.5f,  0.5f, 0.0f },
                 {  0.5f,  0.5f, 0.0f },
@@ -677,7 +677,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
                 }
             }
 
-            dm::float3 world[4];
+            math::float3 world[4];
             for (int i = 0; i < 4; ++i)
                 world[i] = global.transformFloat.transformPoint(local[i]);
             line(world[0], world[1], col, thickness);
@@ -685,8 +685,8 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
             line(world[2], world[3], col, thickness);
             line(world[3], world[0], col, thickness);
 
-            const dm::float3 origin = global.transformFloat.m_translation;
-            const dm::float3 tip = global.transformFloat.transformPoint(dm::float3(0.f, 0.f, -0.35f));
+            const math::float3 origin = global.transformFloat.m_translation;
+            const math::float3 tip = global.transformFloat.transformPoint(math::float3(0.f, 0.f, -0.35f));
             line(origin, tip, col, thickness);
             queueIcon(origin, EditorGlyphIcon::RectLight, col, selected);
         });
@@ -960,20 +960,20 @@ namespace
 void BuildImOGuizmoProjectionMatrix(float outMatrix[16])
 {
     // Caustica view space is LHS / D3D-style; keep the widget projection matching.
-    Float4x4ToImGuizmoMatrix(dm::perspProjD3DStyle(dm::PI_f * 0.5f, 1.f, 0.1f, 1000.f), outMatrix);
+    Float4x4ToImGuizmoMatrix(math::perspProjD3DStyle(math::PI_f * 0.5f, 1.f, 0.1f, 1000.f), outMatrix);
 }
 
 bool ApplyImOGuizmoViewMatrix(App& app, const float viewMatrix[16])
 {
-    const dm::affine3 viewAffine = ImGuizmoMatrixToAffine3(viewMatrix);
-    const dm::affine3 invView = inverse(viewAffine);
+    const math::affine3 viewAffine = ImGuizmoMatrixToAffine3(viewMatrix);
+    const math::affine3 invView = inverse(viewAffine);
 
-    const dm::float3 pos = invView.m_translation;
-    const dm::float3 dir = normalize(dm::float3(
+    const math::float3 pos = invView.m_translation;
+    const math::float3 dir = normalize(math::float3(
         viewAffine.m_linear.m02,
         viewAffine.m_linear.m12,
         viewAffine.m_linear.m22));
-    const dm::float3 up = normalize(dm::float3(
+    const math::float3 up = normalize(math::float3(
         viewAffine.m_linear.m01,
         viewAffine.m_linear.m11,
         viewAffine.m_linear.m21));

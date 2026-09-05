@@ -168,13 +168,13 @@ namespace
         pose.position = ToDouble3(position);
         pose.rotation = ToDQuatXYZW(rotation);
         pose.scaling = ToDouble3(scaling);
-        if (!dm::all(dm::isfinite(pose.position))
-            || !dm::all(dm::isfinite(pose.rotation))
-            || !dm::all(dm::isfinite(pose.scaling)))
+        if (!math::all(math::isfinite(pose.position))
+            || !math::all(math::isfinite(pose.rotation))
+            || !math::all(math::isfinite(pose.scaling)))
         {
             throw std::runtime_error("pose values must be finite");
         }
-        const double rotationNorm = dm::length(pose.rotation);
+        const double rotationNorm = math::length(pose.rotation);
         if (!std::isfinite(rotationNorm) || rotationNorm <= 1e-12)
             throw std::runtime_error("pose rotation quaternion must be non-zero");
         pose.rotation /= rotationNorm;
@@ -198,9 +198,9 @@ namespace
             ToFloat3(nb::borrow<nb::object>(pose[0])),
             ToFloat3(nb::borrow<nb::object>(pose[1])),
             ToFloat3(nb::borrow<nb::object>(pose[2])) };
-        if (!dm::all(dm::isfinite(result.position))
-            || !dm::all(dm::isfinite(result.direction))
-            || !dm::all(dm::isfinite(result.up)))
+        if (!math::all(math::isfinite(result.position))
+            || !math::all(math::isfinite(result.direction))
+            || !math::all(math::isfinite(result.up)))
         {
             throw std::runtime_error("camera_pose values must be finite");
         }
@@ -303,7 +303,7 @@ namespace
 
     scene::SceneEntityWorld& RequireEntityWorld(PySceneEntity& entity, const char* property);
 
-    [[nodiscard]] dm::float3* TryMutableLightColor(PySceneEntity& self)
+    [[nodiscard]] math::float3* TryMutableLightColor(PySceneEntity& self)
     {
         scene::SceneEntityWorld* entityWorld = self.entityWorld();
         if (!entityWorld)
@@ -337,7 +337,7 @@ namespace
         return nullptr;
     }
 
-    void SetLightProperty(PySceneEntity& self, const char* property, const dm::float4& value)
+    void SetLightProperty(PySceneEntity& self, const char* property, const math::float4& value)
     {
         scene::SceneEntityWorld& entityWorld = RequireEntityWorld(self, property);
         if (!scene::setLightProperty(entityWorld.world(), self.entity, property, value))
@@ -1622,13 +1622,13 @@ void RegisterCoreBindings(nb::module_& m)
             }, "LightType_* constant, or 0 when this entity is not a light.")
         .def_prop_rw("color",
             [](PySceneEntity& self) {
-                if (const dm::float3* color = TryMutableLightColor(self))
+                if (const math::float3* color = TryMutableLightColor(self))
                     return Float3ToTuple(*color);
-                return Float3ToTuple(dm::float3(1.f));
+                return Float3ToTuple(math::float3(1.f));
             },
             [](PySceneEntity& self, nb::object v) {
-                const dm::float3 color = ToFloat3(v);
-                SetLightProperty(self, "color", dm::float4(color.x, color.y, color.z, 0.f));
+                const math::float3 color = ToFloat3(v);
+                SetLightProperty(self, "color", math::float4(color.x, color.y, color.z, 0.f));
             },
             "Light color when this entity has a light component.")
         .def_prop_rw("intensity",
@@ -1637,7 +1637,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return intensity ? *intensity : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "intensity", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "intensity", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             },
             "Point/spot intensity, or emitted radiance multiplier for a rectangular light.")
         .def_prop_rw("width",
@@ -1647,7 +1647,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->width : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                SetLightProperty(self, "width", dm::float4(value, 0.f, 0.f, 0.f));
+                SetLightProperty(self, "width", math::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight width in local X.")
         .def_prop_rw("height",
             [](PySceneEntity& self) {
@@ -1656,7 +1656,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->height : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                SetLightProperty(self, "height", dm::float4(value, 0.f, 0.f, 0.f));
+                SetLightProperty(self, "height", math::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight height in local Y.")
         .def_prop_rw("irradiance",
             [](PySceneEntity& self) {
@@ -1666,7 +1666,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->irradiance : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "irradiance", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "irradiance", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("angular_size",
             [](PySceneEntity& self) {
@@ -1676,7 +1676,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->angularSize : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "angularSize", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "angularSize", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("radius",
             [](PySceneEntity& self) {
@@ -1690,7 +1690,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "radius", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "radius", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("range",
             [](PySceneEntity& self) {
@@ -1704,7 +1704,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "range", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "range", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("inner_angle",
             [](PySceneEntity& self) {
@@ -1713,7 +1713,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->innerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "innerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "innerAngle", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("outer_angle",
             [](PySceneEntity& self) {
@@ -1722,7 +1722,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->outerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "outerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "outerAngle", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("environment_path",
             [](PySceneEntity& self) {
@@ -1774,7 +1774,7 @@ void RegisterCoreBindings(nb::module_& m)
                     scene::CameraWorldLookTo look;
                     if (!scene::tryGetCameraWorldLookTo(entityWorld, self.entity, look))
                         throw std::runtime_error("direction setter failed: camera pose is unavailable");
-                    const dm::float3 dir = ToFloat3(v);
+                    const math::float3 dir = ToFloat3(v);
                     if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, look.position, dir, look.up))
                         throw std::runtime_error("direction setter failed");
                     return;
@@ -1983,9 +1983,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def("look_to",
             [](PySceneEntity& self, nb::object position, nb::object direction, nb::object up) {
                 RequireCamera(self);
-                const dm::float3 pos = ToFloat3(position);
-                const dm::float3 dir = ToFloat3(direction);
-                const dm::float3 upVec = ToFloat3(up);
+                const math::float3 pos = ToFloat3(position);
+                const math::float3 dir = ToFloat3(direction);
+                const math::float3 upVec = ToFloat3(up);
                 if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, pos, dir, upVec))
                     throw std::runtime_error("look_to failed");
             },

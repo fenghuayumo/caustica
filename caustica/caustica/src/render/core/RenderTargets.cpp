@@ -18,13 +18,12 @@ using namespace caustica::math;
 #include <algorithm>
 #include <cstdint>
 
-using namespace dm;
 using namespace caustica::math;
 
 void RenderTargets::init(
         caustica::rhi::Device* device,
-        dm::uint2 renderSize, 
-        dm::uint2 displaySize,
+        math::uint2 renderSize, 
+        math::uint2 displaySize,
         bool enableMotionVectors,
         bool useReverseProjection,
         int backbufferCount
@@ -354,7 +353,7 @@ void RenderTargets::init(
     }
 }
 
-[[nodiscard]] bool RenderTargets::isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount) const
+[[nodiscard]] bool RenderTargets::isUpdateRequired(math::uint2 renderSize, math::uint2 displaySize, math::uint sampleCount) const
 {
     if (any(renderSize != this->renderSize) || any(displaySize != this->displaySize) || m_sampleCount != sampleCount) return true;
     return false;

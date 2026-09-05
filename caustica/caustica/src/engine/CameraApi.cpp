@@ -32,7 +32,7 @@ bool IsPerspectiveSceneCamera(const App& app, ecs::Entity entity)
 
 bool IsValidVerticalFov(float radians)
 {
-    return std::isfinite(radians) && radians > 0.f && radians < dm::PI_f;
+    return std::isfinite(radians) && radians > 0.f && radians < math::PI_f;
 }
 
 bool IsValidIntrinsics(float fx, float fy, float cx, float cy, float width, float height)
@@ -45,10 +45,10 @@ bool IsValidIntrinsics(float fx, float fy, float cx, float cy, float width, floa
 
 bool IsValidCameraPose(const math::float3& position, const math::float3& direction, const math::float3& up)
 {
-    return dm::all(dm::isfinite(position))
-        && dm::all(dm::isfinite(direction))
-        && dm::all(dm::isfinite(up))
-        && dm::length(direction) > 1e-6f;
+    return math::all(math::isfinite(position))
+        && math::all(math::isfinite(direction))
+        && math::all(math::isfinite(up))
+        && math::length(direction) > 1e-6f;
 }
 
 } // namespace

@@ -113,9 +113,9 @@ struct AccelerationStructureUIData
 
 struct EnvironmentMapRuntimeParameters
 {
-    dm::float3  TintColor = { 1.f, 1.f, 1.f };
+    math::float3  TintColor = { 1.f, 1.f, 1.f };
     float       Intensity = 1.f;
-    dm::float3  RotationXYZ = { 0.f, 0.f, 0.f };
+    math::float3  RotationXYZ = { 0.f, 0.f, 0.f };
     bool        enabled = true;
     bool        VisibleToCamera = true;
 };
@@ -270,8 +270,8 @@ struct PathTracerSettings
     bool                                ShowDebugLines = false;
     // Display/window pixels. Converted to path-trace render pixels in
     // WorldRenderer::framePassPathTrace after this frame's renderSize is known.
-    dm::uint2                  DebugPixel = { 0, 0 };
-    dm::uint2                  MousePos = { 0, 0 };
+    math::uint2                  DebugPixel = { 0, 0 };
+    math::uint2                  MousePos = { 0, 0 };
     float                               DebugLineScale = 0.05f;
 
     bool                                EnableShaderDebug = true;   // see ShaderDebug.hlsli/.h/.cpp
@@ -318,7 +318,7 @@ struct PathTracerSettings
     static constexpr SI::DLSSMode       DLSSModeDefault = SI::DLSSMode::eBalanced;
     SI::DLSSMode                        DLSSMode = DLSSModeDefault;
     SI::DLSSMode                        DLSSLastMode = SI::DLSSMode::eOff;
-    dm::uint2                  DLSSLastDisplaySize = { 0,0 };
+    math::uint2                  DLSSLastDisplaySize = { 0,0 };
     int                                 DLSSLastRealtimeAA = 0;
     bool                                DLSSLodBiasUseOverride = false;
     float                               DLSSLodBiasOverride = 0.f;
@@ -441,7 +441,7 @@ struct PathTracerSettings
     float                               GaussianSplatScale = 1.0f;
     float                               GaussianSplatAlphaScale = 1.0f;
     float                               GaussianSplatBrightness = 1.0f;
-    dm::float3                          GaussianSplatTintColor = dm::float3(1.0f);
+    math::float3                          GaussianSplatTintColor = math::float3(1.0f);
     bool                                GaussianSplatAsEmitter = false;
     float                               GaussianSplatEmissionIntensity = 1.0f;
     int                                 GaussianSplatEmissionMaxProxyCount = 8192;
@@ -449,9 +449,9 @@ struct PathTracerSettings
     float                               GaussianSplatShadowStrength = 0.75f;
     float                               GaussianSplatShadowSoftRadius = 0.08f;
     int                                 GaussianSplatShadowSoftSampleCount = 1;
-    dm::float3                          GaussianSplatTranslation = dm::float3(0.0f);
-    dm::float3                          GaussianSplatRotationEulerDeg = dm::float3(0.0f);
-    dm::float3                          GaussianSplatObjectScale = dm::float3(1.0f);
+    math::float3                          GaussianSplatTranslation = math::float3(0.0f);
+    math::float3                          GaussianSplatRotationEulerDeg = math::float3(0.0f);
+    math::float3                          GaussianSplatObjectScale = math::float3(1.0f);
 
     bool                                DbgFreezeRealtimeNoiseSeed = false;               // stops noise from changing at real-time - useful for reproducing rare bugs
     bool                                DbgDisableSERTerminationHint = false;

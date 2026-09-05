@@ -63,7 +63,7 @@ void updateEnvMapLighting(UpdateLightingParams& params)
     uint32_t dirLightCount = 0;
     {
         const float3 rotationInRadians = radians(params.settings.EnvironmentMapParams.RotationXYZ);
-        const affine3 rotationTransform = dm::rotation(rotationInRadians);
+        const affine3 rotationTransform = math::rotation(rotationInRadians);
         for (const scene::LightRenderProxy& lightProxy : params.sceneData->lights)
         {
             if (!scene::tryGetDirectionalLightData(lightProxy.data))
@@ -182,7 +182,7 @@ void syncEnvMapSceneParams(
         params.ColorMultiplier = settings.EnvironmentMapParams.TintColor * intensity;
 
         const float3 rotationInRadians = radians(settings.EnvironmentMapParams.RotationXYZ);
-        const affine3 rotationTransform = dm::rotation(rotationInRadians);
+        const affine3 rotationTransform = math::rotation(rotationInRadians);
         const affine3 inverseTransform = inverse(rotationTransform);
         affineToColumnMajor(rotationTransform, params.Transform);
         affineToColumnMajor(inverseTransform, params.InvTransform);

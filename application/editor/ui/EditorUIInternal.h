@@ -40,8 +40,8 @@ bool GaussianSplatShadowParticleFormatCombo(EditorUIData& ui);
 void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& entityWorld, ecs::Entity entity, const char* filter);
 void BuildSceneCreatePopup(SceneEditor& sceneEditor, EditorUIData& ui, const char* popupId);
 void TryOpenSceneCreatePopupOnRightClick(const char* popupId, bool areaHovered);
-dm::float3 QuaternionToEulerDegreesXYZ(const dm::dquat& rotation);
-bool SameRotation(const dm::dquat& a, const dm::dquat& b);
+math::float3 QuaternionToEulerDegreesXYZ(const math::dquat& rotation);
+bool SameRotation(const math::dquat& a, const math::dquat& b);
 
 // Colored XYZ transform row (reset / lock / label / axis fields), matching DCC-style inspectors.
 // When lockUniform is non-null and true, editing any axis copies that value to all three (Scale).
