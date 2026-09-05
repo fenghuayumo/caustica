@@ -466,6 +466,13 @@ TextureHandle GraphBuilder::findTexture(const std::string_view name) const
     return makeTextureHandle(existing->second);
 }
 
+const TextureDesc* GraphBuilder::textureDesc(TextureHandle handle) const
+{
+    if (!isValid(handle, m_textures.size(), m_handleGeneration))
+        return nullptr;
+    return &m_textures[handle.index].desc;
+}
+
 caustica::rhi::TextureHandle GraphBuilder::ownedTextureHandle(TextureHandle handle) const
 {
     if (!isValid(handle, m_textures.size(), m_handleGeneration))

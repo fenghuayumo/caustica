@@ -407,6 +407,29 @@ void EditorUI::BuildTextureVisWindow()
     const auto& format = caustica::rhi::getFormatInfo(desc.format);
     ImGui::TextDisabled("%u x %u  %s  mips: %u  layers: %u  samples: %u",
         desc.width, desc.height, format.name, desc.mipLevels, desc.arraySize, desc.sampleCount);
+
+    const bool isFrozen = m_editorUI.TextureVisSelection.rfind("frozen/", 0) == 0;
+    if (isFrozen)
+    {
+        if (ImGui::Button("Discard capture"))
+        {
+            caustica::clearDebugViewTextureCapture(*app);
+            m_editorUI.TextureVisSelection.clear();
+            ImGui::End();
+            return;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("Persistent copy from the captured frame.");
+    }
+    else if (ImGui::Button("Capture this frame"))
+    {
+        const std::string liveName = m_editorUI.TextureVisSelection;
+        caustica::requestDebugViewTextureCapture(*app, liveName);
+        m_editorUI.TextureVisSelection = "frozen/" + liveName;
+        ImGui::End();
+        return;
+    }
+
     if (!desc.isShaderResource || desc.dimension != caustica::rhi::TextureDimension::Texture2D ||
         desc.sampleCount != 1 || desc.format == caustica::rhi::Format::UNKNOWN ||
         format.kind == caustica::rhi::FormatKind::Integer ||
@@ -417,7 +440,9 @@ void EditorUI::BuildTextureVisWindow()
         ImGui::End();
         return;
     }
-    ImGui::TextDisabled("Raw preview; no HDR/depth remapping. Transient contents may be reused.");
+    ImGui::TextDisabled(isFrozen
+        ? "Raw preview; no HDR/depth remapping."
+        : "Raw preview; no HDR/depth remapping. Capture to prevent transient reuse.");
 
     // Aspect-fit into the remaining content region.
     const ImVec2 avail = ImGui::GetContentRegionAvail();

@@ -150,6 +150,8 @@ public:
     [[nodiscard]] bool debugViewTextureInfo(
         uint32_t index, std::string* outName, caustica::rhi::Texture** outTexture) const;
     [[nodiscard]] caustica::rhi::Texture* findDebugViewTexture(std::string_view name) const;
+    void requestDebugViewTextureCapture(std::string_view name);
+    void clearDebugViewTextureCapture();
     struct DebugNamedTexture
     {
         std::string name;
@@ -242,6 +244,10 @@ private:
     // Last executed frame's named graph textures, for editor texture vis.
     mutable std::mutex                               m_debugTextureSnapshotMutex;
     std::vector<rg::GraphBuilder::NamedTexture>      m_debugTextureSnapshot;
+    std::string                                      m_debugTextureCaptureRequest;
+    caustica::rhi::TextureHandle                     m_debugFrozenTexture;
+    std::string                                      m_debugFrozenTextureName;
+    bool                                             m_debugFrozenTextureClearRequested = false;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<PathTracePass>              m_pathTracePass;

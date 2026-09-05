@@ -32,4 +32,12 @@ class App;
 // Case-insensitive lookup by name. Returns nullptr when unknown or unavailable.
 [[nodiscard]] rhi::Texture* findDebugViewTexture(const App& app, std::string_view name);
 
+// Queue a one-frame capture of a named RenderGraph texture. The renderer adds
+// a final copy pass, so the source cannot be aliased before its contents are
+// copied. On success the result is listed as `frozen/<name>`.
+void requestDebugViewTextureCapture(App& app, std::string_view name);
+
+// Drop the persistent texture held by the debug viewer.
+void clearDebugViewTextureCapture(App& app);
+
 } // namespace caustica

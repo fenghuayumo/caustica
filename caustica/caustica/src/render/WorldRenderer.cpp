@@ -1618,6 +1618,8 @@ std::vector<WorldRenderer::DebugNamedTexture> WorldRenderer::debugTextureList() 
     }
 
     std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+    if (m_debugFrozenTexture)
+        list.push_back({ m_debugFrozenTextureName, m_debugFrozenTexture.Get() });
     for (const rg::GraphBuilder::NamedTexture& named : m_debugTextureSnapshot)
     {
         if (named.texture == nullptr)
@@ -1661,6 +1663,21 @@ caustica::rhi::Texture* WorldRenderer::findDebugViewTexture(std::string_view nam
         if (DebugNameIEquals(entry.name, name))
             return entry.texture;
     return nullptr;
+}
+
+void WorldRenderer::requestDebugViewTextureCapture(std::string_view name)
+{
+    std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+    m_debugTextureCaptureRequest.assign(name);
+}
+
+void WorldRenderer::clearDebugViewTextureCapture()
+{
+    std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+    m_debugTextureCaptureRequest.clear();
+    // The UI thread only requests the release. The render thread owns GPU
+    // resource destruction and consumes this at the next frame boundary.
+    m_debugFrozenTextureClearRequested = true;
 }
 
 } // namespace caustica::render

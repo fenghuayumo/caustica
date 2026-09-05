@@ -194,6 +194,10 @@ public:
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
     [[nodiscard]] TextureHandle findTexture(std::string_view name) const;
+    // Description of a graph-created texture. Returns nullptr for an invalid
+    // handle. This is intentionally read-only so tooling can create a
+    // persistent capture with matching copy-compatible properties.
+    [[nodiscard]] const TextureDesc* textureDesc(TextureHandle handle) const;
     // Debug texture vis: name + resolved device pointer for every named graph
     // texture of the last compiled/ executed frame. Empty names are skipped;
     // transient pooled entries may alias later passes in the same frame.

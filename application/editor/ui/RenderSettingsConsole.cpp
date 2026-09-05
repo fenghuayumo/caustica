@@ -236,6 +236,8 @@ void AddAction(
 // texture viewer window.
 //   vis            -> list available texture names
 //   vis <name>     -> show <name> in the viewer (e.g. vis depth, vis baseColor)
+//   vis freeze <name> -> capture a stable copy at the end of this frame
+//   vis unfreeze    -> discard the capture
 //   vis off        -> close the viewer
 void AddVisCommand()
 {
@@ -245,6 +247,8 @@ void AddVisCommand()
         "Visualize a render-target texture in the editor.\n"
         "  vis          list available textures\n"
         "  vis <name>   show <name> (e.g. vis depth, vis baseColor)\n"
+        "  vis freeze <name>  capture a stable frame copy\n"
+        "  vis unfreeze discard the frame copy\n"
         "  vis off      close the viewer";
     desc.on_execute = [](const caustica::console::Command::Args& args)
         -> caustica::console::Command::Result
@@ -273,6 +277,26 @@ void AddVisCommand()
         }
 
         const std::string& name = args[0];
+        if (Lower(name) == "freeze")
+        {
+            if (args.size() < 2)
+                return { false, "Usage: vis freeze <name>." };
+            const std::string& target = args[1];
+            if (!caustica::findDebugViewTexture(*app, target))
+                return { false, "Unknown texture '" + target + "'. Run 'vis' for the list." };
+
+            caustica::requestDebugViewTextureCapture(*app, target);
+            ui->editor.TextureVisSelection = "frozen/" + target;
+            ui->editor.ShowTextureVisWindow = true;
+            return { true, "Capturing '" + target + "' at the end of this frame." };
+        }
+        if (Lower(name) == "unfreeze")
+        {
+            caustica::clearDebugViewTextureCapture(*app);
+            if (ui->editor.TextureVisSelection.rfind("frozen/", 0) == 0)
+                ui->editor.TextureVisSelection.clear();
+            return { true, "Texture capture discarded." };
+        }
         if (Lower(name) == "off" || Lower(name) == "none")
         {
             ui->editor.ShowTextureVisWindow = false;
@@ -302,6 +326,8 @@ void AddVisCommand()
                     suggestions.push_back(name);
             }
         }
+        suggestions.push_back("freeze");
+        suggestions.push_back("unfreeze");
         suggestions.push_back("off");
         return suggestions;
     };

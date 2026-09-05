@@ -308,6 +308,88 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
 
     FrameConstants& constants = m_frameConstants;
     const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    caustica::rhi::TextureHandle capturedTexture;
+    std::string capturedName;
+
+    // A graph texture can use the same physical allocation as a later pass.
+    // Register the copy before compile so its source lifetime extends to this
+    // final pass; copying after execute would capture aliased contents instead.
+    std::string captureRequest;
+    {
+        std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+        captureRequest = m_debugTextureCaptureRequest;
+        if (m_debugFrozenTextureClearRequested)
+        {
+            m_debugFrozenTexture = nullptr;
+            m_debugFrozenTextureName.clear();
+            m_debugFrozenTextureClearRequested = false;
+        }
+    }
+    if (!captureRequest.empty())
+    {
+        rg::TextureHandle source = ctx.graph->currentTexture(ctx.graph->findTexture(captureRequest));
+        caustica::rhi::TextureDesc captureDesc;
+        uint32_t mipLevels = 0;
+        uint32_t arraySize = 0;
+        if (const rg::TextureDesc* sourceDesc = ctx.graph->textureDesc(source))
+        {
+            captureDesc.width = sourceDesc->width;
+            captureDesc.height = sourceDesc->height;
+            captureDesc.depth = sourceDesc->depth;
+            captureDesc.arraySize = sourceDesc->arraySize;
+            captureDesc.mipLevels = sourceDesc->mipLevels;
+            captureDesc.format = rg::toNativeFormat(sourceDesc->format);
+            mipLevels = sourceDesc->mipLevels;
+            arraySize = sourceDesc->arraySize;
+        }
+        else if (caustica::rhi::Texture* liveTexture = findDebugViewTexture(captureRequest))
+        {
+            // RenderTargets are often already imported into the graph. Importing
+            // here returns that same handle, preserving its tracked last writer.
+            source = ctx.graph->currentTexture(ctx.graph->importTexture(
+                liveTexture, rg::TextureAccess::ShaderResource));
+            captureDesc = liveTexture->getDesc();
+            mipLevels = captureDesc.mipLevels;
+            arraySize = captureDesc.arraySize;
+        }
+
+        if (source.isValid() && mipLevels > 0 && arraySize > 0)
+        {
+            captureDesc.debugName = "Texture debug capture: " + captureRequest;
+            captureDesc.isShaderResource = true;
+            captureDesc.initialState = caustica::rhi::ResourceStates::Common;
+            captureDesc.keepInitialState = true;
+            capturedTexture = device()->createTexture(captureDesc);
+
+            if (capturedTexture)
+            {
+                const rg::TextureHandle destination = ctx.graph->importTexture(
+                    capturedTexture, caustica::rhi::ResourceStates::Common);
+                ctx.graph->addPass(
+                    "DebugTextureCapture",
+                    [source, destination](rg::PassBuilder& setup) {
+                        setup.read(source, rg::TextureAccess::CopySource);
+                        setup.write(destination, rg::TextureAccess::CopyDest);
+                    },
+                    [source, destination, mipLevels, arraySize](rg::RenderPassContext& passCtx) {
+                        for (uint32_t arraySlice = 0; arraySlice < arraySize; ++arraySlice)
+                        {
+                            for (uint32_t mip = 0; mip < mipLevels; ++mip)
+                            {
+                                const caustica::rhi::TextureSlice slice =
+                                    caustica::rhi::TextureSlice().setMipLevel(mip).setArraySlice(arraySlice);
+                                passCtx.commandList()->copyTexture(
+                                    passCtx.texture(destination), slice,
+                                    passCtx.texture(source), slice);
+                            }
+                        }
+                    },
+                    rg::PassOptions{ .sideEffect = true, .serialOnPrimary = true });
+                ctx.graph->extractTexture(destination, rg::TextureAccess::ShaderResource);
+                capturedName = "frozen/" + captureRequest;
+            }
+        }
+    }
     {
         ScopedFrameCpuTimer graphCompileTimer(
             &m_context->diagnostics.frameTelemetry,
@@ -357,6 +439,26 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
             .minParallelRecordingCost = uint32_t(std::max(1, settings.RenderGraphMinParallelRecordingCost)),
             .maxParallelRecordingJobs = uint32_t(std::max(0, settings.RenderGraphMaxRecordingJobs)),
         });
+    }
+    if (capturedTexture)
+    {
+        std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+        if (m_debugFrozenTextureClearRequested)
+        {
+            // A discard request can arrive while the graph is recording. Drop
+            // both the prior capture and this just-finished copy on the render
+            // thread instead of briefly publishing a stale frozen view.
+            m_debugFrozenTexture = nullptr;
+            m_debugFrozenTextureName.clear();
+            m_debugFrozenTextureClearRequested = false;
+        }
+        else
+        {
+            m_debugFrozenTexture = capturedTexture;
+            m_debugFrozenTextureName = std::move(capturedName);
+        }
+        if (m_debugTextureCaptureRequest == captureRequest)
+            m_debugTextureCaptureRequest.clear();
     }
     m_context->diagnostics.frameTelemetry.setGraphStats(
         telemetryFrame,

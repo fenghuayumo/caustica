@@ -580,3 +580,15 @@ caustica::rhi::Texture* caustica::findDebugViewTexture(const App& app, std::stri
     const render::WorldRenderer* wr = worldRenderer(app);
     return wr ? wr->findDebugViewTexture(name) : nullptr;
 }
+
+void caustica::requestDebugViewTextureCapture(App& app, std::string_view name)
+{
+    if (render::WorldRenderer* wr = worldRenderer(app))
+        wr->requestDebugViewTextureCapture(name);
+}
+
+void caustica::clearDebugViewTextureCapture(App& app)
+{
+    if (render::WorldRenderer* wr = worldRenderer(app))
+        wr->clearDebugViewTextureCapture();
+}
