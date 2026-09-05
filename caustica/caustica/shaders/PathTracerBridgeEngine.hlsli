@@ -1284,12 +1284,9 @@ float3 Bridge::traceVisibilityRayImpl(RayDesc ray, const RayCone rayCone, const 
 
                     if (IsTransparentShadowMaterial(material))
                     {
-                        // RTXCR assigns perfectly smooth transmissive meshes
-                        // (Claire's spectacle lenses) to an instance mask that
-                        // shadow rays do not trace. Preserve that behavior here
-                        // instead of darkening the face once per lens boundary.
-                        if (material.Roughness <= 1e-4f)
-                            continue;
+                        // Smooth glass still attenuates shadow rays. Asset-specific
+                        // exceptions (e.g. Claire's lenses) use ExcludeFromNEE,
+                        // which is handled above independently of BSDF roughness.
 
                         const float candidateRayT = rayQuery.CandidateTriangleRayT();
                         transmittance *= ComputeTransparentShadowSurfaceTransmittance(subInstanceData, material, candidatePrimitiveIndex, candidateBarycentrics);
