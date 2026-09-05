@@ -38,7 +38,7 @@ C++ schedule / system-parameter walkthrough: [embedding-cpp.md](embedding-cpp.md
 | `engine/EngineSceneCallbacks.h` / `engine/SceneViewState.h` | Optional `EngineAppDesc` hooks |
 
 Transitive types apps may use: `scene::*Component` (`SceneEcs.h`), `ecs::Entity`,
-`Query<>`, `math` / `dm::` types, `PathTracerSettings` via `EngineApp::settings()`,
+`Query<>`, `caustica::math` types, `PathTracerSettings` via `EngineApp::settings()`,
 `Handle` / `MeshHandle` / `MaterialHandle`, `LdrFramebuffer`, `SensorOutput`, `Aov`.
 
 ### Optional PhysX module

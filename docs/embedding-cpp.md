@@ -217,9 +217,9 @@ Bundle spawn example (plain component emplace; Extract/refresh syncs resource li
 scene.spawn(
     caustica::scene::NameComponent{ "Spinner" },
     caustica::scene::LocalTransformComponent::fromTRS(
-        dm::double3{ 2.0, 1.0, 0.0 },
-        dm::dquat::identity(),
-        dm::double3{ 0.5, 0.5, 0.5 }),
+        caustica::math::double3{ 2.0, 1.0, 0.0 },
+        caustica::math::dquat::identity(),
+        caustica::math::double3{ 0.5, 0.5, 0.5 }),
     caustica::scene::PointLightComponent{ .intensity = 5.f });
 ```
 
@@ -234,9 +234,9 @@ if (caustica::ecs::isValid(entity))
     caustica::setEntityLocalTransform(
         app,
         entity,
-        dm::double3{2.0, 1.0, 0.0},
+        caustica::math::double3{2.0, 1.0, 0.0},
         std::nullopt,
-        dm::double3{0.5, 0.5, 0.5});
+        caustica::math::double3{0.5, 0.5, 0.5});
 }
 ```
 
@@ -253,7 +253,7 @@ active).
 
 ```cpp
 engine->setScene("kitchen.scene.json");
-engine->setCameraVerticalFOV(dm::radians(60.f));
+engine->setCameraVerticalFOV(caustica::math::radians(60.f));
 engine->setCameraIntrinsics(fx, fy, cx, cy, imageWidth, imageHeight);
 
 while (!engine->accumulationCompleted())
