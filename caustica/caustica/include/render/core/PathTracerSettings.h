@@ -252,7 +252,7 @@ struct PathTracerSettings
     float                               CameraFocalDistance = 10000.0f;
     float                               CameraMoveSpeed = 1.0f;
     float                               CameraAntiRRSleepJitter = 0.0f;
-    float                               TexLODBias = -1.0f;                 // as small as possible without reducing performance!
+    float                               TexLODBias = -2.0f;                 // matches RTXPT's textured-background antialiasing behavior.
     int                                 NestedDielectricsQuality    = 1;    // 0 - off; 1 - fast; 2 - quality
     bool                                UseFp16Types = true;
     bool                                EnableLDSamplerForBSDF = true;
