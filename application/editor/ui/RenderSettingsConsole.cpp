@@ -265,8 +265,8 @@ void AddVisCommand()
             const uint32_t count = caustica::debugViewTextureCount(*app);
             for (uint32_t i = 0; i < count; ++i)
             {
-                const char* name = nullptr;
-                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && name)
+                std::string name;
+                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && !name.empty())
                     output += std::string("  ") + name + "\n";
             }
             return { true, output };
@@ -297,8 +297,8 @@ void AddVisCommand()
             const uint32_t count = caustica::debugViewTextureCount(*app);
             for (uint32_t i = 0; i < count; ++i)
             {
-                const char* name = nullptr;
-                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && name)
+                std::string name;
+                if (caustica::debugViewTextureInfo(*app, i, &name, nullptr) && !name.empty())
                     suggestions.push_back(name);
             }
         }

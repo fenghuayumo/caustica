@@ -370,11 +370,11 @@ void EditorUI::BuildTextureVisWindow()
         {
             for (uint32_t i = 0; i < count; ++i)
             {
-                const char* name = nullptr;
-                if (!caustica::debugViewTextureInfo(*app, i, &name, nullptr) || !name)
+                std::string name;
+                if (!caustica::debugViewTextureInfo(*app, i, &name, nullptr) || name.empty())
                     continue;
                 const bool selected = m_editorUI.TextureVisSelection == name;
-                if (ImGui::Selectable(name, selected))
+                if (ImGui::Selectable(name.c_str(), selected))
                     m_editorUI.TextureVisSelection = name;
                 if (selected)
                     ImGui::SetItemDefaultFocus();
@@ -404,10 +404,28 @@ void EditorUI::BuildTextureVisWindow()
 
     const caustica::rhi::TextureDesc& desc = texture->getDesc();
     ImGui::TextUnformatted(m_editorUI.TextureVisSelection.c_str());
-    ImGui::TextDisabled("%u x %u  mip %u", desc.width, desc.height, desc.mipLevels);
+    const auto& format = caustica::rhi::getFormatInfo(desc.format);
+    ImGui::TextDisabled("%u x %u  %s  mips: %u  layers: %u  samples: %u",
+        desc.width, desc.height, format.name, desc.mipLevels, desc.arraySize, desc.sampleCount);
+    if (!desc.isShaderResource || desc.dimension != caustica::rhi::TextureDimension::Texture2D ||
+        desc.sampleCount != 1 || desc.format == caustica::rhi::Format::UNKNOWN ||
+        format.kind == caustica::rhi::FormatKind::Integer ||
+        format.kind == caustica::rhi::FormatKind::DepthStencil)
+    {
+        ImGui::TextWrapped("This texture requires a conversion pass before preview. "
+            "Direct preview supports single-sample 2D float/normalized shader resources.");
+        ImGui::End();
+        return;
+    }
+    ImGui::TextDisabled("Raw preview; no HDR/depth remapping. Transient contents may be reused.");
 
     // Aspect-fit into the remaining content region.
     const ImVec2 avail = ImGui::GetContentRegionAvail();
+    if (avail.x <= 0.f || avail.y <= 0.f)
+    {
+        ImGui::End();
+        return;
+    }
     const float aspect = (desc.height > 0)
         ? (float(desc.width) / float(desc.height))
         : 1.f;
