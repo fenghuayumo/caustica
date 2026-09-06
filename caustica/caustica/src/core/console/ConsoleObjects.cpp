@@ -1,6 +1,6 @@
 #include <core/console/ConsoleObjects.h>
 #include <core/log.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 
 #include <cassert>
 #include <atomic>
@@ -58,7 +58,7 @@ namespace caustica::console
 		case VariableType::TYPE_FLOAT3: return "float3";
 		case VariableType::TYPE_FLOAT4: return "float4";
 		case VariableType::TYPE_STRING: return "string";
-		default: 
+		default:
 			return "unknown";
 		}
 	}
@@ -93,7 +93,7 @@ namespace caustica::console
 	}
 
 	static std::atomic_bool g_StartupVariablesLocked = false;
-	
+
 	//
 	// Console Object Dictionary
 	//
@@ -163,7 +163,7 @@ namespace caustica::console
 
 			if (IsValidName(name))
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);				
+				std::lock_guard<std::mutex> lock(m_Mutex);
 				if (auto it = m_Dictionary.find(name); it != m_Dictionary.end())
 				{
 					if (VariableImpl<T>* cvar = (VariableImpl<T>*)it->second->asVariable())
@@ -191,7 +191,7 @@ namespace caustica::console
 					state.type = VariableType::isA<T>(); // force type to be correct
 
 					VariableImpl<T>* cvar = new VariableImpl<T>(value, description, state);
-					m_Dictionary[name] = cvar;					
+					m_Dictionary[name] = cvar;
 					return cvar;
 				}
 			}
@@ -386,7 +386,7 @@ namespace caustica::console
 	{
 	public:
 
-		VariableImpl(T const& data, char const* description, VariableState state) 
+		VariableImpl(T const& data, char const* description, VariableState state)
 			: Variable(description ? description : "", state), m_Data(data), m_DefaultData(data) { }
 
 		virtual Variable* asVariable() override { return this; }
@@ -479,7 +479,7 @@ namespace caustica::console
 			{
 				for (auto const& choice : m_Choices)
 				{
-					if (ds::strcasecmp(std::string(s), choice.first))
+					if (ds::caseInsensitiveEquals(std::string(s), choice.first))
 						return this->setData(choice.second, setby);
 				}
 				if (auto value = ds::parse<T>(s))
@@ -669,7 +669,7 @@ namespace caustica::console
 	template <> std::string VariableImpl<std::string>::getValueAsString() const { return getData(); }
 
 	//
-	// Console Variable Reference 
+	// Console Variable Reference
 	//
 
 #define DEFINE_CVARREF_IMPLEMENTATION(type) \
@@ -840,7 +840,7 @@ namespace caustica::console
 
 		uint32_t lineno = 0;
 		for (std::string linestr; std::getline(inifile, linestr); ++lineno)
-		{		
+		{
 			std::string_view line(linestr);
 
 			// trim comments
@@ -865,7 +865,7 @@ namespace caustica::console
 
 			std::string cvarname(tokens[0]);
 			ds::trim(cvarname);
-			
+
 			std::string_view cvarvalue = tokens[1];
 			ds::trim(cvarvalue);
 

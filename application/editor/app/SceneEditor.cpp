@@ -19,7 +19,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/ScenePlugins.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/json.h>
 #include <core/log.h>
 #include <platform/file_dialog.h>
@@ -1004,8 +1004,8 @@ bool SceneEditor::openSceneFromDialog()
 
     std::string initialDir;
     const std::filesystem::path packRoot = caustica::getAssetPackRoot();
-    if (std::filesystem::is_directory(packRoot / caustica::c_ScenesSubFolder))
-        initialDir = (packRoot / caustica::c_ScenesSubFolder).string();
+    if (std::filesystem::is_directory(packRoot / caustica::kScenesSubFolder))
+        initialDir = (packRoot / caustica::kScenesSubFolder).string();
     else if (std::filesystem::is_directory(packRoot))
         initialDir = packRoot.string();
 

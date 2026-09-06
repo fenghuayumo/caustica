@@ -2,7 +2,7 @@
 #include <assets/loader/ShaderCompilerService.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 #include <ShaderMake/ShaderBlob.h>
 #if CAUSTICA_WITH_AFTERMATH
 #include <backend/AftermathCrashDump.h>
@@ -95,7 +95,7 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticShader(StaticShader shade
     {
         const std::string message = ShaderMake::FormatShaderNotFoundMessage(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()));
         caustica::error("%s", message.c_str());
-        
+
         return nullptr;
     }
 
@@ -142,7 +142,7 @@ caustica::rhi::ShaderLibraryHandle ShaderFactory::createStaticShaderLibrary(Stat
         for (const ShaderMacro& define : *pDefines)
             constants.push_back(ShaderMake::ShaderConstant{ define.name.c_str(), define.definition.c_str() });
     }
-    
+
     const void* permutationBytecode = nullptr;
     size_t permutationSize = 0;
     if (!ShaderMake::FindPermutationInBlob(shader.pBytecode, shader.size, constants.data(), uint32_t(constants.size()), &permutationBytecode, &permutationSize))
@@ -184,7 +184,7 @@ caustica::rhi::ShaderHandle ShaderFactory::createAutoShader(const char* fileName
     caustica::rhi::ShaderHandle shader = createStaticPlatformShader(dxbc, dxil, spirv, pDefines, descCopy);
     if (shader)
         return shader;
-        
+
     return createShader(fileName, entryName, pDefines, desc);
 }
 

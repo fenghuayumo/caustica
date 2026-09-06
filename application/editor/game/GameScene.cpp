@@ -13,8 +13,8 @@
 #include <scene/SceneObjects.h>
 #include <ecs/Entity.h>
 
-#include <core/file_utils.h>
-#include <core/path_utils.h>
+#include <core/FileUtils.h>
+#include <core/PathUtils.h>
 #include <core/format.h>
 #include "SceneEditor.h"
 
@@ -39,11 +39,11 @@ namespace
 {
     std::filesystem::path ResolveGameDataRoot(const std::filesystem::path& sceneFilePath, const std::filesystem::path& mediaPath)
     {
-        const std::filesystem::path sceneDirGamePath = sceneFilePath.parent_path() / c_GameDataSubFolder;
+        const std::filesystem::path sceneDirGamePath = sceneFilePath.parent_path() / kGameDataSubFolder;
         if (std::filesystem::exists(sceneDirGamePath))
             return sceneDirGamePath;
 
-        return mediaPath / std::string(c_GameDataSubFolder);
+        return mediaPath / std::string(kGameDataSubFolder);
     }
 
     std::filesystem::path ResolveGameStoragePath(const std::filesystem::path& mediaGamePath, const std::filesystem::path& sceneFilePath)

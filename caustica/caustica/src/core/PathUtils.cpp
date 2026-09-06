@@ -1,4 +1,4 @@
-#include "core/path_utils.h"
+#include "core/PathUtils.h"
 #include "core/vfs/VFS.h"
 
 #include <cstdlib>
@@ -81,21 +81,21 @@ namespace
     std::filesystem::path g_runtimeDirectoryOverride;
     std::filesystem::path g_assetPackRootOverride;
 
-    std::filesystem::path GetLocalPathBaseOverride()
+    std::filesystem::path getLocalPathBaseOverride()
     {
         std::lock_guard guard(g_localPathBaseMutex);
         return g_localPathBaseOverride;
     }
 
-    std::filesystem::path GetAssetPackRootOverride()
+    std::filesystem::path getAssetPackRootOverride()
     {
         std::lock_guard guard(g_localPathBaseMutex);
         return g_assetPackRootOverride;
     }
 
-    std::filesystem::path EnvAssetPackRoot()
+    std::filesystem::path envAssetPackRoot()
     {
-        const char* value = std::getenv(c_AssetsEnvVar);
+        const char* value = std::getenv(kAssetsEnvVar);
         if (value == nullptr || value[0] == '\0')
             return {};
         std::error_code ec;
@@ -114,24 +114,24 @@ bool isAssetPackDirectory(const std::filesystem::path& dir)
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec) || ec)
         return false;
-    if (std::filesystem::exists(dir / c_AssetPackManifest, ec))
+    if (std::filesystem::exists(dir / kAssetPackManifest, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_ScenesSubFolder, ec))
+    if (std::filesystem::is_directory(dir / kScenesSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_ModelsSubFolder, ec))
+    if (std::filesystem::is_directory(dir / kModelsSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_MaterialsSubFolder, ec))
+    if (std::filesystem::is_directory(dir / kMaterialsSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_EnvMapSubFolder, ec))
+    if (std::filesystem::is_directory(dir / kEnvMapSubFolder, ec))
         return true;
-    if (std::filesystem::is_directory(dir / c_PrefabsSubFolder, ec))
+    if (std::filesystem::is_directory(dir / kPrefabsSubFolder, ec))
         return true;
     return false;
 }
 
 bool isBuiltinAssetPack(const std::filesystem::path& dir)
 {
-    const std::filesystem::path manifest = dir / c_AssetPackManifest;
+    const std::filesystem::path manifest = dir / kAssetPackManifest;
     std::error_code ec;
     if (!std::filesystem::is_regular_file(manifest, ec) || ec)
         return false;
@@ -171,7 +171,7 @@ std::filesystem::path findAssetPackContaining(const std::filesystem::path& fileO
         if (isAssetPackDirectory(cursor))
             return cursor.lexically_normal();
 
-        const std::filesystem::path nested = cursor / c_AssetsFolder;
+        const std::filesystem::path nested = cursor / kAssetsFolder;
         if (isAssetPackDirectory(nested))
             return std::filesystem::absolute(nested).lexically_normal();
 
@@ -187,7 +187,7 @@ std::filesystem::path discoverAssetPackRoot(
     const std::filesystem::path& runtimeDirectory,
     const std::filesystem::path& resourceRoot)
 {
-    const std::filesystem::path envPack = EnvAssetPackRoot();
+    const std::filesystem::path envPack = envAssetPackRoot();
     if (isAssetPackDirectory(envPack))
         return envPack;
 
@@ -206,7 +206,7 @@ std::filesystem::path discoverAssetPackRoot(
     {
         if (base.empty())
             continue;
-        const std::filesystem::path pack = base / c_AssetsFolder;
+        const std::filesystem::path pack = base / kAssetsFolder;
         if (isAssetPackDirectory(pack))
             return std::filesystem::absolute(pack).lexically_normal();
     }
@@ -215,7 +215,7 @@ std::filesystem::path discoverAssetPackRoot(
     {
         if (base.empty())
             continue;
-        const std::filesystem::path builtin = base / c_BuiltinAssetsFolder;
+        const std::filesystem::path builtin = base / kBuiltinAssetsFolder;
         if (isAssetPackDirectory(builtin))
             return std::filesystem::absolute(builtin).lexically_normal();
     }
@@ -226,20 +226,20 @@ std::filesystem::path discoverAssetPackRoot(
     const std::filesystem::path fallbackParent = !resourceRoot.empty()
         ? resourceRoot
         : (!runtimeDirectory.empty() ? runtimeDirectory : getDirectoryWithExecutable());
-    return (fallbackParent / c_AssetsFolder).lexically_normal();
+    return (fallbackParent / kAssetsFolder).lexically_normal();
 }
 
 std::filesystem::path getAssetPackRoot()
 {
-    const std::filesystem::path pinned = GetAssetPackRootOverride();
+    const std::filesystem::path pinned = getAssetPackRootOverride();
     if (!pinned.empty())
         return pinned;
 
-    const std::filesystem::path envPack = EnvAssetPackRoot();
+    const std::filesystem::path envPack = envAssetPackRoot();
     if (isAssetPackDirectory(envPack))
         return envPack;
 
-    return discoverAssetPackRoot(getRuntimeDirectory(), GetLocalPathBaseOverride());
+    return discoverAssetPackRoot(getRuntimeDirectory(), getLocalPathBaseOverride());
 }
 
 void setAssetPackRootOverride(const std::filesystem::path& assetPackRoot)
@@ -252,10 +252,10 @@ void setAssetPackRootOverride(const std::filesystem::path& assetPackRoot)
 
 std::filesystem::path getLocalPath(std::string subfolder)
 {
-    if (subfolder == c_AssetsFolder || subfolder == "Assets")
+    if (subfolder == kAssetsFolder || subfolder == "Assets")
         return getAssetPackRoot();
 
-    const std::filesystem::path baseOverride = GetLocalPathBaseOverride();
+    const std::filesystem::path baseOverride = getLocalPathBaseOverride();
     const std::filesystem::path candidateA = baseOverride.empty()
         ? caustica::getDirectoryWithExecutable() / subfolder
         : baseOverride / subfolder;

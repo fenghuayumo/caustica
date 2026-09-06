@@ -13,11 +13,11 @@
 #include <scene/SceneRenderData.h>
 #include <shaders/PathTracer/PathTracerShared.h>
 
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/format.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/progress.h>
-#include <core/system_utils.h>
+#include <core/SystemUtils.h>
 #include <core/task/TaskRuntime.h>
 #include <core/vfs/VFS.h>
 

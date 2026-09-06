@@ -1,6 +1,6 @@
 #include "common/RecentScenes.h"
 
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 #include <algorithm>
 #include <cctype>

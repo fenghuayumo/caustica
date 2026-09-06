@@ -1,6 +1,6 @@
 #include <platform/file_dialog.h>
 #include <core/log.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 
 #include <filesystem>
 #include <sstream>

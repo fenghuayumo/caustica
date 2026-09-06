@@ -4,12 +4,12 @@
 #include <render/core/RenderDevice.h>
 #include <scene/View.h>
 #include <core/log.h>
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/format.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/progress.h>
 #include <core/Timer.h>
-#include <core/system_utils.h>
+#include <core/SystemUtils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>

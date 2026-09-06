@@ -6,7 +6,7 @@
 #include <EditorUI.h>
 
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <engine/App.h>
 #include <engine/CameraApi.h>
 #include <engine/SceneQuery.h>
@@ -393,7 +393,7 @@ caustica::ecs::Entity SceneContentEditor::createLight(EditorLightKind kind)
     {
         caustica::scene::EnvironmentLightComponent light;
         light.radianceScale = math::float3(1.0f);
-        light.path = c_EnvMapProcSky;
+        light.path = kEnvMapProcSky;
         entity = caustica::spawnEnvironmentLight(*app, std::move(light), id);
         break;
     }

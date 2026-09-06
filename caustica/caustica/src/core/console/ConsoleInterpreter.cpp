@@ -1,6 +1,6 @@
 #include <core/console/ConsoleInterpreter.h>
 #include <core/console/ConsoleObjects.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 #include <core/log.h>
 
 #include <cassert>
@@ -90,7 +90,7 @@ namespace caustica::console
 		{
 			m_Next = m_Stream.front();
 			m_Stream.remove_prefix(1);
-		}	
+		}
 		else
 			m_Eof = true;
 	}
@@ -157,7 +157,7 @@ namespace caustica::console
 	{
 		initializeDefaultCommands();
 	}
-		
+
 	Interpreter::Result Interpreter::execute(
 		std::string_view const cmdline,
 		VariableState::SetBy origin)
@@ -234,9 +234,9 @@ namespace caustica::console
 		{
 			char const* token_start = tokens[0].data();
 			char const* cursor = cmdline.data() + cursor_pos;
-			char const* token_end = tokens[0].data() + tokens[0].size();			
+			char const* token_end = tokens[0].data() + tokens[0].size();
 			if ((tokens.size() == 1) && (token_start <= cursor) && (cursor <= token_end))
-			{		
+			{
 				// user is looking for a command
 				auto names = matchObjectNames(("^" + std::string(token_start, cursor) + ".*").c_str());
 				return {names.begin(), names.end()};

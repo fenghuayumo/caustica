@@ -3,7 +3,7 @@
 
 #include <core/console/ConsoleInterpreter.h>
 #include <core/console/ConsoleObjects.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 
 #include <algorithm>
 #include <deque>
@@ -182,7 +182,7 @@ struct ImGui_Console::LogCaptureState
 	std::deque<LogItem> pending;
 };
 
-ImGui_Console::ImGui_Console(std::shared_ptr<console::Interpreter> interpreter, Options const& options) 
+ImGui_Console::ImGui_Console(std::shared_ptr<console::Interpreter> interpreter, Options const& options)
 	: m_LogCapture(std::make_shared<LogCaptureState>())
 	, m_Options(options)
 	, m_Interpreter(interpreter)

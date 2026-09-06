@@ -15,8 +15,8 @@
 #include <core/ThreadContext.h>
 #include <core/json.h>
 #include <core/log.h>
-#include <core/path_utils.h>
-#include <core/string_utils.h>
+#include <core/PathUtils.h>
+#include <core/StringUtils.h>
 #include <cassert>
 #include <rhi/common/misc.h>
 #include <json/json.h>
@@ -1368,7 +1368,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                     }
 
                     std::string targetName = targetNode.asString();
-                    if (caustica::string_utils::starts_with(targetName, "material:"))
+                    if (caustica::string_utils::startsWith(targetName, "material:"))
                     {
                         targetName = targetName.substr(9);
 

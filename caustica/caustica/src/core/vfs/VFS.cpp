@@ -1,6 +1,6 @@
 #include <core/vfs/VFS.h>
 #include <core/log.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 #include <fstream>
 #include <cassert>
 #include <algorithm>
@@ -287,7 +287,7 @@ bool RootFileSystem::unmount(const std::filesystem::path& path)
 
     for (size_t index = 0; index < m_MountPoints.size(); index++)
     {
-        if (string_utils::strcasecmp(m_MountPoints[index].first, spath))
+        if (string_utils::caseInsensitiveEquals(m_MountPoints[index].first, spath))
         {
             m_MountPoints.erase(m_MountPoints.begin() + index);
             return true;
@@ -303,7 +303,7 @@ bool RootFileSystem::findMountPoint(const std::filesystem::path& path, std::file
 
     for (auto it : m_MountPoints)
     {
-        if (string_utils::strcasencmp(spath, it.first, it.first.size()) && ((spath.length() == it.first.length()) || (spath[it.first.length()] == '/')))
+        if (string_utils::caseInsensitivePrefixEquals(spath, it.first, it.first.size()) && ((spath.length() == it.first.length()) || (spath[it.first.length()] == '/')))
         {
             if (pRelativePath)
             {
@@ -422,7 +422,7 @@ std::string caustica::getFileSearchRegex(const std::filesystem::path& path, cons
 
     std::stringstream regex;
     appendPatternToRegex(normalizedPathStr, regex);
-    if (!caustica::string_utils::ends_with(normalizedPathStr, "/") && !normalizedPath.empty())
+    if (!caustica::string_utils::endsWith(normalizedPathStr, "/") && !normalizedPath.empty())
         regex << '/';
     regex << "[^/]+";
 

@@ -6,7 +6,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneSemanticIds.h>
 #include <core/json.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 #include <cmath>
 #include <cstdio>

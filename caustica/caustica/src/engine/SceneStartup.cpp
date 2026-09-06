@@ -17,7 +17,7 @@
 
 #include <core/command_line.h>
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <render/core/RenderSceneTypeFactory.h>
 #include <render/RenderAppState.h>
 #include <render/WorldRenderer.h>
@@ -130,7 +130,7 @@ void initializeSceneApp(App& app)
     if (bootstrap->refreshEnvMapMediaList)
     {
         worldRenderer->lightingPasses().refreshEnvironmentMapMediaList(
-            getLocalPath(c_AssetsFolder), std::filesystem::path());
+            getLocalPath(kAssetsFolder), std::filesystem::path());
     }
 
     if (bootstrap->applyRenderCli)

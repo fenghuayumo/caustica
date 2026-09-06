@@ -22,7 +22,7 @@
 #include <backend/GpuDevice.h>
 #include <core/command_line.h>
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/vfs/VFS.h>
 #include <cstdarg>
 #include <scene/Scene.h>
@@ -191,7 +191,7 @@ void initializeScene(App& app, const std::string& preferredScene)
             device->getDevice(), descriptorTable, textureLoader, shaderFactory);
     }
 
-    manager->discoverAvailableScenes(getLocalPath(c_AssetsFolder));
+    manager->discoverAvailableScenes(getLocalPath(kAssetsFolder));
 
     std::string sceneArg;
     if (LooksLikeInlineSceneJson(preferredScene))

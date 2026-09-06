@@ -1,9 +1,9 @@
 #include <assets/loader/ShaderCompilerUtils.h>
 #include <assets/loader/ShaderBackend.h>
 #include <assets/loader/ShaderKey.h>
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/format.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/picosha2.h>
 
 #include <backend/GpuDevice.h>

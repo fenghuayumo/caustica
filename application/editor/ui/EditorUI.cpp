@@ -13,7 +13,7 @@
 #include <core/vfs/VFS.h>
 #include <imgui_internal.h>
 #include <platform/window.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <algorithm>
 #include <cstdio>
 #include <render/passes/debug/Korgi.h>
@@ -50,7 +50,7 @@ EditorUI::EditorUI(
 
     // ImGui lifecycle management (fonts, context config, extensions)
     m_imguiManager = std::make_unique<ImGuiManager>(m_ui, cmdLine, NVAPI_SERSupported);
-    m_imguiManager->loadDefaultFont(*this, getLocalPath(c_AssetsFolder));
+    m_imguiManager->loadDefaultFont(*this, getLocalPath(kAssetsFolder));
     m_defaultStyle = ImGui::GetStyle();
 
     // Choose which, if any, hit object extension we can use

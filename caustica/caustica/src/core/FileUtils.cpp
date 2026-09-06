@@ -1,4 +1,4 @@
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/log.h>
 
 #include <fstream>
@@ -94,26 +94,26 @@ std::optional<std::filesystem::file_time_type> getLatestModifiedTimeDirectoryRec
     if (!fs::exists(directory, ec) || !fs::is_directory(directory, ec))
         return std::nullopt;
 
-    std::optional<fs::file_time_type> latest_time;
+    std::optional<fs::file_time_type> latestTime;
 
-    fs::recursive_directory_iterator dir_it(directory, fs::directory_options::skip_permission_denied, ec);
-    fs::recursive_directory_iterator end_it;
+    fs::recursive_directory_iterator directoryIterator(directory, fs::directory_options::skip_permission_denied, ec);
+    fs::recursive_directory_iterator endIterator;
 
-    while (dir_it != end_it && !ec)
+    while (directoryIterator != endIterator && !ec)
     {
-        const auto& entry = *dir_it;
+        const auto& entry = *directoryIterator;
 
         if (entry.is_regular_file(ec))
         {
-            auto ftime = entry.last_write_time(ec);
+            auto fileTime = entry.last_write_time(ec);
             if (!ec)
             {
-                if (!latest_time || ftime > *latest_time)
-                    latest_time = ftime;
+                if (!latestTime || fileTime > *latestTime)
+                    latestTime = fileTime;
             }
         }
 
-        dir_it.increment(ec);
+        directoryIterator.increment(ec);
     }
 
     if (ec)
@@ -123,7 +123,7 @@ std::optional<std::filesystem::file_time_type> getLatestModifiedTimeDirectoryRec
         return std::nullopt;
     }
 
-    return latest_time;
+    return latestTime;
 }
 
 std::optional<std::filesystem::file_time_type> getFileModifiedTime(
@@ -135,7 +135,7 @@ std::optional<std::filesystem::file_time_type> getFileModifiedTime(
     if (!fs::exists(file, ec) || !fs::is_regular_file(file, ec))
         return std::nullopt;
 
-    auto ftime = fs::last_write_time(file, ec);
+    auto fileTime = fs::last_write_time(file, ec);
     if (ec)
     {
         caustica::warning("Failed to get last write time for file '%s', error: %s",
@@ -143,7 +143,7 @@ std::optional<std::filesystem::file_time_type> getFileModifiedTime(
         return std::nullopt;
     }
 
-    return ftime;
+    return fileTime;
 }
 
 } // namespace caustica

@@ -11,9 +11,9 @@
 #include <engine/SceneStartup.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneTypes.h>
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/json.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/log.h>
 #include <platform/window.h>
 #include <render/core/RenderDevice.h>
@@ -79,11 +79,11 @@ std::filesystem::path ResolveDefaultRuntimeDirectory()
 
 std::filesystem::path ResolveDefaultResourceRoot(const std::filesystem::path& runtimeDirectory)
 {
-    if (std::filesystem::exists(runtimeDirectory / c_AssetsFolder))
+    if (std::filesystem::exists(runtimeDirectory / kAssetsFolder))
         return runtimeDirectory;
 
     const std::filesystem::path parentDirectory = runtimeDirectory.parent_path();
-    if (std::filesystem::exists(parentDirectory / c_AssetsFolder))
+    if (std::filesystem::exists(parentDirectory / kAssetsFolder))
         return parentDirectory;
 
     return getDirectoryWithExecutable();

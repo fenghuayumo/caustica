@@ -10,7 +10,7 @@
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <imgui_internal.h>
 
 #include <algorithm>
@@ -961,19 +961,19 @@ std::string TrimTogglable(const std::string text)
 }
 std::string TrimSkyDisplayName(std::string text)
 {
-    if (text == c_EnvMapSceneDefault)
+    if (text == kEnvMapSceneDefault)
         return "default";
-    else if (text == c_EnvMapProcSky)
+    else if (text == kEnvMapProcSky)
         return "sky (manual)";
-    else if (text == c_EnvMapProcSky_Morning)
+    else if (text == kEnvMapProcSkyMorning)
         return "morning";
-    else if (text == c_EnvMapProcSky_Midday)
+    else if (text == kEnvMapProcSkyMidday)
         return "midday";
-    else if (text == c_EnvMapProcSky_Evening)
+    else if (text == kEnvMapProcSkyEvening)
         return "evening";
-    else if (text == c_EnvMapProcSky_Dawn)
+    else if (text == kEnvMapProcSkyDawn)
         return "dawn";
-    else if (text == c_EnvMapProcSky_PitchBlack)
+    else if (text == kEnvMapProcSkyPitchBlack)
         return "pitch black";
     return "unknown";
 }

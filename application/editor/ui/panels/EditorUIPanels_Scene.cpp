@@ -10,7 +10,7 @@
 
 #include <render/core/PathTracerSettings.h>
 #include <core/vfs/VFS.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>

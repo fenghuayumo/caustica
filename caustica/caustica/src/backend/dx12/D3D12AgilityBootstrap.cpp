@@ -1,7 +1,7 @@
 #include <backend/dx12/D3D12AgilityBootstrap.h>
 
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 namespace caustica::dx12
 {

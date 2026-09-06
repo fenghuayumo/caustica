@@ -6,7 +6,7 @@
 #include <backend/GpuDevice.h>
 #include <backend/ShaderUtils.h>
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/vfs/VFS.h>
 #include <render/core/BindingCache.h>
 #include <render/core/BindlessTable.h>

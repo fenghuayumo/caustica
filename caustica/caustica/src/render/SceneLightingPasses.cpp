@@ -1,7 +1,7 @@
 #include <render/SceneLightingPasses.h>
 
 #include <assets/loader/ShaderFactory.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <render/core/ComputePipelineRegistry.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/scene_utils.h>
@@ -19,7 +19,7 @@ void SceneLightingPasses::refreshEnvironmentMapMediaList(const std::filesystem::
 {
     caustica::refreshEnvironmentMapMediaList(
         assetsFolder,
-        c_EnvMapSubFolder,
+        kEnvMapSubFolder,
         currentScenePath,
         m_envMapMediaList,
         m_envMapMediaFolder);
@@ -67,7 +67,7 @@ void SceneLightingPasses::onSceneLoaded(const caustica::scene::SceneRenderData& 
     }
 
     settings.EnvironmentMapParams = EnvironmentMapRuntimeParameters();
-    m_envMapOverride = c_EnvMapSceneDefault;
+    m_envMapOverride = kEnvMapSceneDefault;
 }
 
 void SceneLightingPasses::notifySceneReloaded(size_t geometryCount)

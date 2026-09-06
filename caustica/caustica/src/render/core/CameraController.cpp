@@ -4,9 +4,9 @@
 #include <render/core/PathTracerSettings.h>
 #include <render/WorldRenderer.h>
 #include <scene/SceneRenderData.h>
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/format.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 #include <cmath>
 #include <fstream>

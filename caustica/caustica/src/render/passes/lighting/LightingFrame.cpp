@@ -8,7 +8,7 @@
 #include <render/passes/lighting/LightSamplingCache.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <scene/scene_utils.h>
 
 #include <filesystem>
@@ -90,11 +90,11 @@ void caustica::render::preUpdateLightingFrame(
 
     std::string envMapActualPath = context.scenePasses.lighting.envMapLocalPath();
     if (context.scenePasses.lighting.envMapOverride() != ""
-        && context.scenePasses.lighting.envMapOverride() != c_EnvMapSceneDefault)
+        && context.scenePasses.lighting.envMapOverride() != kEnvMapSceneDefault)
     {
         envMapActualPath = isProceduralSky(context.scenePasses.lighting.envMapOverride().c_str())
             ? context.scenePasses.lighting.envMapOverride()
-            : (std::string(c_EnvMapSubFolder) + "/" + context.scenePasses.lighting.envMapOverride());
+            : (std::string(kEnvMapSubFolder) + "/" + context.scenePasses.lighting.envMapOverride());
     }
 
     if (!envMapActualPath.empty() && !isProceduralSky(envMapActualPath.c_str()))

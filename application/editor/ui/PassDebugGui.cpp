@@ -10,7 +10,7 @@
 #include <render/omm/GpuBakeRhi.h>
 #include <scene/SceneRenderData.h>
 #include <shaders/PathTracer/Config.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/scope.h>
 #include <platform/file_dialog.h>
 #include <imgui.h>
@@ -217,7 +217,7 @@ bool DrawProceduralSkyDebug(ProceduralSky& sky, float indent)
         RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
 
         const bool namedPreset = caustica::isProceduralSky(sky.activePresetType().c_str())
-            && sky.activePresetType() != caustica::c_EnvMapProcSky;
+            && sky.activePresetType() != caustica::kEnvMapProcSky;
         if (namedPreset)
         {
             ImGui::TextWrapped(

@@ -10,12 +10,12 @@
 
 #include <rhi/utils.h>
 
-#include <core/file_utils.h>
+#include <core/FileUtils.h>
 #include <core/format.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/progress.h>
 #include <core/Timer.h>
-#include <core/system_utils.h>
+#include <core/SystemUtils.h>
 #include <core/command_line.h>
 #include <core/scope.h>
 #include <render/core/ScopedPerfMarker.h>
@@ -925,7 +925,7 @@ std::filesystem::path MaterialGpuCache::getMaterialStoragePath(StandardMaterialB
     std::filesystem::path matPath = m_materialsPath;
     if (!material.sharedWithAllScenes)
         matPath = m_materialsSceneSpecializedPath;
-    std::string fileName = material.name + c_MaterialsExtension;
+    std::string fileName = material.name + kMaterialsExtension;
     if (material.modelName != kNoModel)
         fileName = material.modelName + "." + fileName;
     matPath /= fileName;
@@ -1307,7 +1307,7 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
         if (folder.empty())
             return;
 
-        const char* extensions[] = { c_MaterialsExtension, c_MaterialsExtensionAlt };
+        const char* extensions[] = { kMaterialsExtension, kMaterialsExtensionAlt };
         for (const char* extension : extensions)
         {
             MaterialFileCandidate modelAndName;
@@ -1347,7 +1347,7 @@ std::shared_ptr<StandardMaterial> MaterialGpuCache::load(const std::string & mod
     }
     if (actualLoadedFileName=="")
     {
-        caustica::warning("No material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + c_MaterialsExtension).c_str());
+        caustica::warning("No material definition file found '%s' - consider doing Scene->Materials->Advanced->Save All", (modelName + "." + name + kMaterialsExtension).c_str());
         return nullptr;
     }
 
@@ -1381,7 +1381,7 @@ void MaterialGpuCache::applyScenePaths(
         m_sceneDirectory = std::filesystem::path();
     if (!m_sceneDirectory.empty())
     {
-        m_sceneMaterialsPath = m_sceneDirectory / c_MaterialsSubFolder;
+        m_sceneMaterialsPath = m_sceneDirectory / kMaterialsSubFolder;
         std::filesystem::path justName = sceneFilePath.filename().stem();
         if (!justName.empty())
             m_sceneMaterialsSceneSpecializedPath = m_sceneMaterialsPath / justName;
@@ -1394,7 +1394,7 @@ void MaterialGpuCache::applyScenePaths(
 
     m_materialsPath = mediaPath.empty()
         ? std::filesystem::path()
-        : mediaPath / c_MaterialsSubFolder;
+        : mediaPath / kMaterialsSubFolder;
     std::filesystem::path justName = sceneFilePath.filename().stem();
     m_materialsSceneSpecializedPath = m_materialsPath / justName;
 }

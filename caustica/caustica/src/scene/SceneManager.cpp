@@ -4,7 +4,7 @@
 #include <assets/loader/TextureLoader.h>
 #include <scene/Scene.h>
 #include <scene/scene_utils.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 
@@ -61,7 +61,7 @@ void SceneManager::discoverAvailableScenes(const std::filesystem::path& assetsPa
 
     auto isSceneFile = [](const std::filesystem::path& path) {
         const std::string fileName = path.filename().string();
-        if (fileName == caustica::c_AssetPackManifest)
+        if (fileName == caustica::kAssetPackManifest)
             return false;
         if (fileName.size() >= 14 && fileName.compare(fileName.size() - 14, 14, ".material.json") == 0)
             return false;
@@ -86,7 +86,7 @@ void SceneManager::discoverAvailableScenes(const std::filesystem::path& assetsPa
             consider(file.path());
     }
 
-    const std::filesystem::path scenesDir = assetsPath / caustica::c_ScenesSubFolder;
+    const std::filesystem::path scenesDir = assetsPath / caustica::kScenesSubFolder;
     std::error_code ec;
     if (std::filesystem::is_directory(scenesDir, ec))
     {
@@ -144,7 +144,7 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
 
     if (tryExisting(assetsPath / scenePath))
         return result;
-    if (tryExisting(assetsPath / caustica::c_ScenesSubFolder / scenePath))
+    if (tryExisting(assetsPath / caustica::kScenesSubFolder / scenePath))
         return result;
 
     const std::filesystem::path fileName = scenePath.filename();
@@ -157,7 +157,7 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
     else if (!isSceneJson && fileName.extension() == ".json")
         nameCandidates.emplace_back(fileName.stem().string() + ".scene.json");
 
-    const std::filesystem::path scenesDir = assetsPath / caustica::c_ScenesSubFolder;
+    const std::filesystem::path scenesDir = assetsPath / caustica::kScenesSubFolder;
     std::error_code ec;
     if (std::filesystem::is_directory(scenesDir, ec))
     {

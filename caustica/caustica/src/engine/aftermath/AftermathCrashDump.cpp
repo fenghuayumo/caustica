@@ -4,7 +4,7 @@
 #include <backend/AftermathCrashDump.h>
 #include <backend/GpuDevice.h>
 #include <backend/GpuSurface.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 #include <GFSDK_Aftermath_GpuCrashDump.h>
 #include <GFSDK_Aftermath_GpuCrashDumpDecoding.h>

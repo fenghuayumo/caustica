@@ -8,7 +8,7 @@
 #include <scene/SceneObjects.h>
 #include <core/json.h>
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/vfs/VFS.h>
 #include <math/math.h>
 
@@ -396,17 +396,17 @@ std::string canonicalizeEnvSource(std::string source)
     });
 
     if (lower == "procedural:sky" || lower == "procedural:sky:default")
-        return c_EnvMapProcSky;
+        return kEnvMapProcSky;
     if (lower == "procedural:sky:morning")
-        return c_EnvMapProcSky_Morning;
+        return kEnvMapProcSkyMorning;
     if (lower == "procedural:sky:midday")
-        return c_EnvMapProcSky_Midday;
+        return kEnvMapProcSkyMidday;
     if (lower == "procedural:sky:evening")
-        return c_EnvMapProcSky_Evening;
+        return kEnvMapProcSkyEvening;
     if (lower == "procedural:sky:dawn")
-        return c_EnvMapProcSky_Dawn;
+        return kEnvMapProcSkyDawn;
     if (lower == "procedural:sky:pitchblack" || lower == "procedural:sky:pitch-black")
-        return c_EnvMapProcSky_PitchBlack;
+        return kEnvMapProcSkyPitchBlack;
 
     return source;
 }

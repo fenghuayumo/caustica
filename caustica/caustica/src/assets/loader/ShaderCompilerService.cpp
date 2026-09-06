@@ -1,7 +1,7 @@
 #include <assets/loader/ShaderCompilerService.h>
 
 #include <core/log.h>
-#include <core/string_utils.h>
+#include <core/StringUtils.h>
 #include <core/vfs/VFS.h>
 
 #include <cstring>
@@ -50,7 +50,7 @@ std::string ShaderCompilerService::resolveLogicalShaderId(const char* fileName, 
         adjustedName += "_" + std::string(entryName);
 
     std::replace(adjustedName.begin(), adjustedName.end(), '\\', '/');
-    const bool isCausticaShader = caustica::string_utils::starts_with(adjustedName, "caustica/shaders");
+    const bool isCausticaShader = caustica::string_utils::startsWith(adjustedName, "caustica/shaders");
     std::string logicalId = isCausticaShader ? "caustica/" + adjustedName : adjustedName;
     std::transform(logicalId.begin(), logicalId.end(), logicalId.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));

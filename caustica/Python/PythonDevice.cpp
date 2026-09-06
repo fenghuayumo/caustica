@@ -5,7 +5,7 @@
 #include <engine/EntryPoint.h>
 #include <backend/rhi/device_factory.h>
 #include <core/log.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/progress.h>
 #include <rhi/rhi.h>
 

@@ -7,7 +7,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
 #include <engine/LoadSession.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <cstdarg>
@@ -115,7 +115,7 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    if (!manager->beginSceneSwitch(sceneName, getLocalPath(c_AssetsFolder), forceReload))
+    if (!manager->beginSceneSwitch(sceneName, getLocalPath(kAssetsFolder), forceReload))
     {
         sceneSwitchTrace("applySceneSwitch: ignored, same scene '%s' (forceReload=%d)",
             sceneName.c_str(), forceReload ? 1 : 0);

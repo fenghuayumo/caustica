@@ -36,7 +36,7 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <assets/loader/ShaderFactory.h>
 #include <assets/loader/TextureLoader.h>
 #include <backend/GpuDevice.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/log.h>
 #include <scene/View.h>
 #include <shaders/FrameConstantBuffer.h>

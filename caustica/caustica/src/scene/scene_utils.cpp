@@ -1,7 +1,7 @@
 #include "scene/scene_utils.h"
 #include <scene/Scene.h>
 #include <scene/SceneLightAccess.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 
 #include <algorithm>
 #include <cctype>
@@ -120,10 +120,10 @@ void refreshEnvironmentMapMediaList(
 
     const std::filesystem::path sceneEnvFolder = sceneDirectory.empty()
         ? std::filesystem::path()
-        : sceneDirectory / c_EnvMapSubFolder;
+        : sceneDirectory / kEnvMapSubFolder;
     const std::filesystem::path assetsEnvFolder = assetsPath.empty()
         ? std::filesystem::path()
-        : assetsPath / c_EnvMapSubFolder;
+        : assetsPath / kEnvMapSubFolder;
 
     AppendEnvironmentMapsFromFolder(assetsEnvFolder, outMediaList);
     AppendEnvironmentMapsFromFolder(sceneEnvFolder, outMediaList);

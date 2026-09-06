@@ -17,31 +17,31 @@ namespace caustica::string_utils {
 
 	// case-insensitive string comparison
 
-	// note: strcasecmp is a POSIX function and there is no standardized
-	// equivalent as of C++17
-	template <typename T> bool strcasecmp(T const& a, T const& b)
+	// C++ has no standardized case-insensitive comparison
+	// for generic character sequences as of C++17.
+	template <typename T> bool caseInsensitiveEquals(T const& a, T const& b)
 	{
 		return a.size() == b.size() &&
-			std::equal(a.begin(), a.end(), b.begin(), b.end(), 
+			std::equal(a.begin(), a.end(), b.begin(), b.end(),
 				[](char a, char b) { return std::tolower(a) == std::tolower(b); });
 	}
 
-	template <typename T> bool strcasencmp(T const& a, T const& b, size_t n)
+	template <typename T> bool caseInsensitivePrefixEquals(T const& a, T const& b, size_t n)
 	{
 		return a.size()>=n && b.size()>=n &&
 			std::equal(a.begin(), a.begin()+n, b.begin(), b.begin()+n,
 				[](char a, char b) { return std::tolower(a) == std::tolower(b); });
 	}
 
-	inline bool starts_with(std::string_view const& value, std::string_view const& beginning)
+	inline bool startsWith(std::string_view const& value, std::string_view const& beginning)
 	{
 		if (beginning.size() > value.size())
 			return false;
 
 		return std::equal(beginning.begin(), beginning.end(), value.begin());
 	}
-	
-	inline bool ends_with(std::string_view const& value, std::string_view const& ending)
+
+	inline bool endsWith(std::string_view const& value, std::string_view const& ending)
 	{
 		if (ending.size() > value.size())
 			return false;
@@ -71,7 +71,7 @@ namespace caustica::string_utils {
 	inline void rtrim(std::string_view& s)
 	{
 		s.remove_suffix(std::distance(std::find_if(s.rbegin(), s.rend(), [](int ch) {
-			return !isspace(ch); 
+			return !isspace(ch);
 			}).base(), s.end()));
 	}
 
@@ -126,12 +126,12 @@ namespace caustica::string_utils {
 
 	// upper/lower case conversions
 
-	inline void tolower(std::string& s)
+	inline void toLower(std::string& s)
 	{
 		std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
 	}
 
-	inline void toupper(std::string& s)
+	inline void toUpper(std::string& s)
 	{
 		std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
 	}
@@ -163,34 +163,34 @@ namespace caustica::string_utils {
 	}
 
 	// Thread-safe & range-checked strings to number conversions
-	
-	template <typename T> bool istrue(T const& s)
+
+	template <typename T> bool isTrue(T const& s)
 	{
 		namespace ds = caustica::string_utils;
-		return ds::strcasecmp(s, T("true")) || ds::strcasecmp(s, T("on")) || ds::strcasecmp(s, T("yes")) || ds::strcasecmp(s, T("1"));
+		return ds::caseInsensitiveEquals(s, T("true")) || ds::caseInsensitiveEquals(s, T("on")) || ds::caseInsensitiveEquals(s, T("yes")) || ds::caseInsensitiveEquals(s, T("1"));
 	}
 
-	template <typename T> bool isfalse(T const& s)
+	template <typename T> bool isFalse(T const& s)
 	{
 		namespace ds = caustica::string_utils;
-		return ds::strcasecmp(s, T("false")) || ds::strcasecmp(s, T("off")) || ds::strcasecmp(s, T("no")) || ds::strcasecmp(s, T("0"));
+		return ds::caseInsensitiveEquals(s, T("false")) || ds::caseInsensitiveEquals(s, T("off")) || ds::caseInsensitiveEquals(s, T("no")) || ds::caseInsensitiveEquals(s, T("0"));
 	}
 
-	inline std::optional<bool> stob(std::string_view s)
+	inline std::optional<bool> toBool(std::string_view s)
 	{
 		trim(s);
-		if (istrue(s))  return true;
-		if (isfalse(s)) return false;
+		if (isTrue(s))  return true;
+		if (isFalse(s)) return false;
 		return std::nullopt;
 	}
-	
-	template <typename T> T sto_number(std::string const& s) { return (T)std::stoi(s, nullptr, 0); }
+
+	template <typename T> T stringToNumber(std::string const& s) { return (T)std::stoi(s, nullptr, 0); }
 
 
-	template <typename T> std::optional<T> from_string(std::string const& s)
+	template <typename T> std::optional<T> fromString(std::string const& s)
 	{
 		T value;
-		try { value = sto_number<T>(s); }
+		try { value = stringToNumber<T>(s); }
 		catch (std::invalid_argument&) { return std::nullopt; }
 		catch (std::out_of_range&) { return std::nullopt; }
 		return value;
@@ -202,17 +202,17 @@ namespace caustica::string_utils {
 	{
 		namespace ds = caustica::string_utils;
 
-		trim(s);		
-		if (ds::strcasencmp(s, std::string_view("0x"), 2)) 
+		trim(s);
+		if (ds::caseInsensitivePrefixEquals(s, std::string_view("0x"), 2))
 		{
 			// as of C++17, std::from_chars does handle hex, so fall back on strings
-			return from_string<T>(std::string(s));
+			return fromString<T>(std::string(s));
 		}
 		else
 		{
 			// as of C++17, std::from_chars returns an error when parsing integers
 			// with a '+' sign prefix
-			ltrim(s, '+'); 
+			ltrim(s, '+');
 			T value;
 			if (auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), value); ec == std::errc())
 				return value;
@@ -227,12 +227,12 @@ namespace caustica::string_utils {
 	}
 
 
-	template <typename T> std::optional<T> parse_vector(std::string_view s)
+	template <typename T> std::optional<T> parseVector(std::string_view s)
 	{
 		std::regex rx("[\\s+,|:]");
 		std::cregex_token_iterator it{ s.data(), s.data() + s.size(), rx, -1 }, last;
 
-		T value; uint8_t dim = 0; 
+		T value; uint8_t dim = 0;
 		for (; it != last; ++it)
 		{
 			if (it->length() == 0)
@@ -249,19 +249,19 @@ namespace caustica::string_utils {
 		return dim == T::DIM ? value : std::optional<T>();
 	}
 
-	template <typename T> std::optional<T> parse_vector(std::string const& s)
+	template <typename T> std::optional<T> parseVector(std::string const& s)
 	{
 		// for results consistency, fall back on std::string_view parsing
-		return parse_vector<T>(std::string_view(s));
+		return parseVector<T>(std::string_view(s));
 	}
 
 	// number  parsing specializations
 
-	template <> long sto_number(std::string const& s);
-	template <> float sto_number(std::string const& s);
-	template <> double sto_number(std::string const& s);
+	template <> long stringToNumber(std::string const& s);
+	template <> float stringToNumber(std::string const& s);
+	template <> double stringToNumber(std::string const& s);
 
-	template <> std::optional<bool> from_string(std::string const& s);
+	template <> std::optional<bool> fromString(std::string const& s);
 
 	template <> std::optional<bool> parse<bool>(std::string_view s);
 	template <> std::optional<float> parse(std::string_view s);

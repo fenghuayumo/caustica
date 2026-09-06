@@ -15,7 +15,7 @@
 #include <render/core/PathTracerSettings.h>
 #include <shaders/FrameConstantBuffer.h>
 #include <core/vfs/VFS.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <scene/SceneTypes.h>
 #include <scene/SceneEcs.h>
 #include <scene/SceneCameraAccess.h>
@@ -406,7 +406,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
 
             std::string overrideSource = caustica::envMapOverrideSource(*m_sceneEditor.app());
             const std::vector<std::filesystem::path>& envMapMediaList = caustica::envMapMediaList(*m_sceneEditor.app());
-            const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == c_EnvMapSceneDefault
+            const std::string overridePreview = isProceduralSky(overrideSource.c_str()) || overrideSource == kEnvMapSceneDefault
                 ? TrimSkyDisplayName(overrideSource)
                 : overrideSource;
             if (InspectorBeginCombo("Override", overridePreview.c_str()))
@@ -415,19 +415,19 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
                 {
                     std::string itemName;
                     if (i == -7)
-                        itemName = c_EnvMapSceneDefault;
+                        itemName = kEnvMapSceneDefault;
                     else if (i == -6)
-                        itemName = c_EnvMapProcSky;
+                        itemName = kEnvMapProcSky;
                     else if (i == -5)
-                        itemName = c_EnvMapProcSky_Morning;
+                        itemName = kEnvMapProcSkyMorning;
                     else if (i == -4)
-                        itemName = c_EnvMapProcSky_Midday;
+                        itemName = kEnvMapProcSkyMidday;
                     else if (i == -3)
-                        itemName = c_EnvMapProcSky_Evening;
+                        itemName = kEnvMapProcSkyEvening;
                     else if (i == -2)
-                        itemName = c_EnvMapProcSky_Dawn;
+                        itemName = kEnvMapProcSkyDawn;
                     else if (i == -1)
-                        itemName = c_EnvMapProcSky_PitchBlack;
+                        itemName = kEnvMapProcSkyPitchBlack;
                     else
                         itemName = envMapMediaList[i].filename().string();
 

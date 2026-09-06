@@ -28,7 +28,7 @@
 #include <render/WorldRenderer.h>
 #include <assets/loader/TextureLoader.h>
 #include <assets/loader/ShaderMacro.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <backend/GpuDevice.h>
 
 using namespace caustica::render;

@@ -1,6 +1,6 @@
 #include <render/passes/lighting/distant/ProceduralSky.h>
 
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/core/RenderPassConstants.h>
 #include <scene/View.h>
@@ -388,23 +388,23 @@ bool ProceduralSky::update(
     float azimuthTarget = m_sunAzimuthDeg;
     bool usePresetTargets = false;
 
-    if (presetType == c_EnvMapProcSky_Morning)
+    if (presetType == kEnvMapProcSkyMorning)
     {
         elevationTarget = 18.0f; azimuthTarget = 85.0f; usePresetTargets = true;
     }
-    else if (presetType == c_EnvMapProcSky_Midday)
+    else if (presetType == kEnvMapProcSkyMidday)
     {
         elevationTarget = 62.0f; azimuthTarget = 180.0f; usePresetTargets = true;
     }
-    else if (presetType == c_EnvMapProcSky_Evening)
+    else if (presetType == kEnvMapProcSkyEvening)
     {
         elevationTarget = 8.0f; azimuthTarget = 275.0f; usePresetTargets = true;
     }
-    else if (presetType == c_EnvMapProcSky_Dawn)
+    else if (presetType == kEnvMapProcSkyDawn)
     {
         elevationTarget = 2.0f; azimuthTarget = 80.0f; usePresetTargets = true;
     }
-    else if (presetType == c_EnvMapProcSky_PitchBlack)
+    else if (presetType == kEnvMapProcSkyPitchBlack)
     {
         elevationTarget = -25.0f; azimuthTarget = m_sunAzimuthDeg; usePresetTargets = true;
         outConstants.SunIlluminance = 0.0f;

@@ -57,10 +57,10 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <assets/loader/ShaderFactory.h>
 #include <render/gpuSort/GPUSort.h>
 #include <backend/GpuDevice.h>
-#include <core/path_utils.h>
+#include <core/PathUtils.h>
 #include <core/log.h>
 #include <core/progress.h>
-#include <core/system_utils.h>
+#include <core/SystemUtils.h>
 #include <assets/loader/TextureLoader.h>
 #include <render/core/PathTracerSettings.h>
 #include <math/float.h>

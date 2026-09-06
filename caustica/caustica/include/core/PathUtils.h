@@ -87,28 +87,28 @@ std::filesystem::path resolveSceneMediaPath(
     const std::filesystem::path& mediaPath = std::filesystem::path());
 
 // --- Well-known asset folders ---
-inline constexpr const char* c_AssetsFolder             = "Assets";
-inline constexpr const char* c_BuiltinAssetsFolder      = "assets-builtin";
-inline constexpr const char* c_AssetPackManifest        = "pack.json";
-inline constexpr const char* c_ScenesSubFolder          = "scenes";
-inline constexpr const char* c_ModelsSubFolder          = "models";
-inline constexpr const char* c_EnvMapSubFolder          = "env";
-inline constexpr const char* c_MaterialsSubFolder       = "materials";
-inline constexpr const char* c_MaterialsExtension       = ".material.json";
-inline constexpr const char* c_MaterialsExtensionAlt    = ".mat.json";
-inline constexpr const char* c_PrefabsSubFolder         = "prefabs";
-inline constexpr const char* c_PrefabExtension          = ".prefab.json";
-inline constexpr const char* c_GameDataSubFolder        = "game";
-inline constexpr const char* c_AssetsEnvVar             = "CAUSTICA_ASSETS_DIR";
+inline constexpr const char* kAssetsFolder             = "Assets";
+inline constexpr const char* kBuiltinAssetsFolder      = "assets-builtin";
+inline constexpr const char* kAssetPackManifest        = "pack.json";
+inline constexpr const char* kScenesSubFolder          = "scenes";
+inline constexpr const char* kModelsSubFolder          = "models";
+inline constexpr const char* kEnvMapSubFolder          = "env";
+inline constexpr const char* kMaterialsSubFolder       = "materials";
+inline constexpr const char* kMaterialsExtension       = ".material.json";
+inline constexpr const char* kMaterialsExtensionAlt    = ".mat.json";
+inline constexpr const char* kPrefabsSubFolder         = "prefabs";
+inline constexpr const char* kPrefabExtension          = ".prefab.json";
+inline constexpr const char* kGameDataSubFolder        = "game";
+inline constexpr const char* kAssetsEnvVar             = "CAUSTICA_ASSETS_DIR";
 
 // --- Environment map sentinel strings ---
-inline constexpr const char* c_EnvMapProcSky            = "==PROCEDURAL_SKY==";
-inline constexpr const char* c_EnvMapProcSky_Morning    = "==PROCEDURAL_SKY_MORNING==";
-inline constexpr const char* c_EnvMapProcSky_Midday     = "==PROCEDURAL_SKY_MIDDAY==";
-inline constexpr const char* c_EnvMapProcSky_Evening    = "==PROCEDURAL_SKY_EVENING==";
-inline constexpr const char* c_EnvMapProcSky_Dawn       = "==PROCEDURAL_SKY_DAWN==";
-inline constexpr const char* c_EnvMapProcSky_PitchBlack = "==PROCEDURAL_SKY_PITCHBLACK==";
-inline constexpr const char* c_EnvMapSceneDefault       = "==SCENE_DEFAULT==";
+inline constexpr const char* kEnvMapProcSky            = "==PROCEDURAL_SKY==";
+inline constexpr const char* kEnvMapProcSkyMorning    = "==PROCEDURAL_SKY_MORNING==";
+inline constexpr const char* kEnvMapProcSkyMidday     = "==PROCEDURAL_SKY_MIDDAY==";
+inline constexpr const char* kEnvMapProcSkyEvening    = "==PROCEDURAL_SKY_EVENING==";
+inline constexpr const char* kEnvMapProcSkyDawn       = "==PROCEDURAL_SKY_DAWN==";
+inline constexpr const char* kEnvMapProcSkyPitchBlack = "==PROCEDURAL_SKY_PITCHBLACK==";
+inline constexpr const char* kEnvMapSceneDefault       = "==SCENE_DEFAULT==";
 
 inline bool pathEndsWithIgnoreCase(std::string_view value, std::string_view suffix)
 {
@@ -126,20 +126,20 @@ inline bool pathEndsWithIgnoreCase(std::string_view value, std::string_view suff
 
 inline bool isPrefabAssetPath(std::string_view source)
 {
-    return pathEndsWithIgnoreCase(source, c_PrefabExtension);
+    return pathEndsWithIgnoreCase(source, kPrefabExtension);
 }
 
 inline bool isMaterialAssetPath(std::string_view source)
 {
-    return pathEndsWithIgnoreCase(source, c_MaterialsExtension)
-        || pathEndsWithIgnoreCase(source, c_MaterialsExtensionAlt);
+    return pathEndsWithIgnoreCase(source, kMaterialsExtension)
+        || pathEndsWithIgnoreCase(source, kMaterialsExtensionAlt);
 }
 
 inline bool isProceduralSky(const char* str)
 {
     if (str == nullptr) return false;
     for (int i = 0; i < 12; i++)
-        if (str[i] != c_EnvMapProcSky[i]) return false;
+        if (str[i] != kEnvMapProcSky[i]) return false;
     return true;
 }
 
