@@ -118,35 +118,35 @@ namespace
         return true;
     }
 
-    dm::double3 ParseXyz(const std::string& text, dm::double3 fallback = dm::double3(0.0))
+    math::double3 ParseXyz(const std::string& text, math::double3 fallback = math::double3(0.0))
     {
         float values[3] = { float(fallback.x), float(fallback.y), float(fallback.z) };
         ParseFloats(text, values, 3);
-        return dm::double3(values[0], values[1], values[2]);
+        return math::double3(values[0], values[1], values[2]);
     }
 
-    dm::float3 ParseFloat3(const std::string& text, dm::float3 fallback = dm::float3(1.f))
+    math::float3 ParseFloat3(const std::string& text, math::float3 fallback = math::float3(1.f))
     {
         float values[3] = { fallback.x, fallback.y, fallback.z };
         ParseFloats(text, values, 3);
-        return dm::float3(values[0], values[1], values[2]);
+        return math::float3(values[0], values[1], values[2]);
     }
 
-    dm::float4 ParseRgba(const std::string& text, dm::float4 fallback = dm::float4(0.8f, 0.8f, 0.8f, 1.f))
+    math::float4 ParseRgba(const std::string& text, math::float4 fallback = math::float4(0.8f, 0.8f, 0.8f, 1.f))
     {
         float values[4] = { fallback.x, fallback.y, fallback.z, fallback.w };
         ParseFloats(text, values, 4);
-        return dm::float4(values[0], values[1], values[2], values[3]);
+        return math::float4(values[0], values[1], values[2], values[3]);
     }
 
     struct UrdfPose
     {
-        dm::double3 xyz = dm::double3(0.0);
-        dm::double3 rpy = dm::double3(0.0);
+        math::double3 xyz = math::double3(0.0);
+        math::double3 rpy = math::double3(0.0);
 
         [[nodiscard]] bool isIdentity() const
         {
-            return dm::length(xyz) < 1e-12 && dm::length(rpy) < 1e-12;
+            return math::length(xyz) < 1e-12 && math::length(rpy) < 1e-12;
         }
     };
 
@@ -171,7 +171,7 @@ namespace
 
     void ApplyPose(scene::SceneEntityWorld& world, ecs::Entity entity, const UrdfPose& pose)
     {
-        const dm::dquat rotation = dm::rotationQuat(pose.rpy);
+        const math::dquat rotation = math::rotationQuat(pose.rpy);
         world.setLocalTransform(entity, &pose.xyz, &rotation, nullptr);
     }
 
@@ -179,13 +179,13 @@ namespace
     {
         UrdfPose origin;
         std::string meshFilename;
-        dm::float3 meshScale = dm::float3(1.f);
+        math::float3 meshScale = math::float3(1.f);
         enum class GeomType { Mesh, Box, Cylinder, Sphere } geomType = GeomType::Mesh;
-        dm::float3 boxSize = dm::float3(1.f);
+        math::float3 boxSize = math::float3(1.f);
         float cylinderRadius = 0.05f;
         float cylinderLength = 0.1f;
         float sphereRadius = 0.05f;
-        dm::float4 rgba = dm::float4(0.8f, 0.8f, 0.8f, 1.f);
+        math::float4 rgba = math::float4(0.8f, 0.8f, 0.8f, 1.f);
         std::string materialName;
     };
 
@@ -297,7 +297,7 @@ namespace
             if (auto filename = getAttribute(tag, "filename"))
                 visual.meshFilename = *filename;
             if (auto scale = getAttribute(tag, "scale"))
-                visual.meshScale = ParseFloat3(*scale, dm::float3(1.f));
+                visual.meshScale = ParseFloat3(*scale, math::float3(1.f));
         };
         auto parseBox = [&](size_t pos)
         {
@@ -307,7 +307,7 @@ namespace
             const std::string tag = visualXml.substr(pos, end - pos + 1);
             visual.geomType = UrdfVisual::GeomType::Box;
             if (auto size = getAttribute(tag, "size"))
-                visual.boxSize = ParseFloat3(*size, dm::float3(1.f));
+                visual.boxSize = ParseFloat3(*size, math::float3(1.f));
         };
         auto parseCylinder = [&](size_t pos)
         {
@@ -345,7 +345,7 @@ namespace
     void ParseVisualMaterial(
         const std::string& visualXml,
         UrdfVisual& visual,
-        const std::unordered_map<std::string, dm::float4>& namedMaterials)
+        const std::unordered_map<std::string, math::float4>& namedMaterials)
     {
         const auto materialRanges = FindElements(visualXml, "material");
         if (materialRanges.empty())
@@ -377,9 +377,9 @@ namespace
         }
     }
 
-    std::unordered_map<std::string, dm::float4> ParseNamedMaterials(const std::string& robotXml)
+    std::unordered_map<std::string, math::float4> ParseNamedMaterials(const std::string& robotXml)
     {
-        std::unordered_map<std::string, dm::float4> materials;
+        std::unordered_map<std::string, math::float4> materials;
         // Only top-level materials (direct robot children): scan material tags not nested in link.
         // Simpler approach: parse all materials that contain a color child; link-local ones also ok.
         for (const auto& [begin, end] : FindElements(robotXml, "material"))
@@ -405,7 +405,7 @@ namespace
 
     std::vector<UrdfLink> ParseLinks(
         const std::string& robotXml,
-        const std::unordered_map<std::string, dm::float4>& namedMaterials)
+        const std::unordered_map<std::string, math::float4>& namedMaterials)
     {
         std::vector<UrdfLink> links;
         for (const auto& [begin, end] : FindElements(robotXml, "link"))
@@ -520,10 +520,10 @@ namespace
         return {};
     }
 
-    void AppendBox(StlMeshData& mesh, const dm::float3& size)
+    void AppendBox(StlMeshData& mesh, const math::float3& size)
     {
-        const dm::float3 h = size * 0.5f;
-        const dm::float3 corners[8] = {
+        const math::float3 h = size * 0.5f;
+        const math::float3 corners[8] = {
             {-h.x, -h.y, -h.z}, { h.x, -h.y, -h.z}, { h.x,  h.y, -h.z}, {-h.x,  h.y, -h.z},
             {-h.x, -h.y,  h.z}, { h.x, -h.y,  h.z}, { h.x,  h.y,  h.z}, {-h.x,  h.y,  h.z},
         };
@@ -531,7 +531,7 @@ namespace
             {0, 1, 2, 3}, {4, 7, 6, 5}, {0, 4, 5, 1},
             {1, 5, 6, 2}, {2, 6, 7, 3}, {3, 7, 4, 0},
         };
-        const dm::float3 normals[6] = {
+        const math::float3 normals[6] = {
             {0, 0, -1}, {0, 0, 1}, {0, -1, 0}, {1, 0, 0}, {0, 1, 0}, {-1, 0, 0},
         };
 
@@ -559,13 +559,13 @@ namespace
         const uint32_t baseTop = static_cast<uint32_t>(mesh.positions.size());
         mesh.positions.emplace_back(0.f, 0.f, half);
         mesh.normals.emplace_back(0.f, 0.f, 1.f);
-        mesh.bounds |= dm::float3(0.f, 0.f, half);
+        mesh.bounds |= math::float3(0.f, 0.f, half);
 
         const uint32_t ringTop = static_cast<uint32_t>(mesh.positions.size());
         for (int i = 0; i < segments; ++i)
         {
             const float a = (float(i) / float(segments)) * 2.f * kPi;
-            const dm::float3 p(std::cos(a) * radius, std::sin(a) * radius, half);
+            const math::float3 p(std::cos(a) * radius, std::sin(a) * radius, half);
             mesh.positions.push_back(p);
             mesh.normals.emplace_back(0.f, 0.f, 1.f);
             mesh.bounds |= p;
@@ -580,13 +580,13 @@ namespace
         const uint32_t baseBottom = static_cast<uint32_t>(mesh.positions.size());
         mesh.positions.emplace_back(0.f, 0.f, -half);
         mesh.normals.emplace_back(0.f, 0.f, -1.f);
-        mesh.bounds |= dm::float3(0.f, 0.f, -half);
+        mesh.bounds |= math::float3(0.f, 0.f, -half);
 
         const uint32_t ringBottom = static_cast<uint32_t>(mesh.positions.size());
         for (int i = 0; i < segments; ++i)
         {
             const float a = (float(i) / float(segments)) * 2.f * kPi;
-            const dm::float3 p(std::cos(a) * radius, std::sin(a) * radius, -half);
+            const math::float3 p(std::cos(a) * radius, std::sin(a) * radius, -half);
             mesh.positions.push_back(p);
             mesh.normals.emplace_back(0.f, 0.f, -1.f);
             mesh.bounds |= p;
@@ -602,9 +602,9 @@ namespace
         for (int i = 0; i < segments; ++i)
         {
             const float a = (float(i) / float(segments)) * 2.f * kPi;
-            const dm::float3 n(std::cos(a), std::sin(a), 0.f);
-            const dm::float3 top(n.x * radius, n.y * radius, half);
-            const dm::float3 bottom(n.x * radius, n.y * radius, -half);
+            const math::float3 n(std::cos(a), std::sin(a), 0.f);
+            const math::float3 top(n.x * radius, n.y * radius, half);
+            const math::float3 bottom(n.x * radius, n.y * radius, -half);
             mesh.positions.push_back(top);
             mesh.normals.push_back(n);
             mesh.bounds |= top;
@@ -635,11 +635,11 @@ namespace
             {
                 const float u = float(lon) / float(slices);
                 const float theta = u * 2.f * kPi;
-                const dm::float3 n(
+                const math::float3 n(
                     std::sin(phi) * std::cos(theta),
                     std::sin(phi) * std::sin(theta),
                     std::cos(phi));
-                const dm::float3 p = n * radius;
+                const math::float3 p = n * radius;
                 mesh.positions.push_back(p);
                 mesh.normals.push_back(n);
                 mesh.bounds |= p;
@@ -665,22 +665,22 @@ namespace
         }
     }
 
-    void ApplyScale(StlMeshData& mesh, const dm::float3& scale)
+    void ApplyScale(StlMeshData& mesh, const math::float3& scale)
     {
         if (std::abs(scale.x - 1.f) < 1e-8f && std::abs(scale.y - 1.f) < 1e-8f && std::abs(scale.z - 1.f) < 1e-8f)
             return;
 
-        mesh.bounds = dm::box3::empty();
+        mesh.bounds = math::box3::empty();
         for (size_t i = 0; i < mesh.positions.size(); ++i)
         {
             mesh.positions[i] = mesh.positions[i] * scale;
             // Inverse-transpose of diagonal scale for normals.
-            dm::float3 n = mesh.normals[i] / dm::float3(
+            math::float3 n = mesh.normals[i] / math::float3(
                 scale.x != 0.f ? scale.x : 1.f,
                 scale.y != 0.f ? scale.y : 1.f,
                 scale.z != 0.f ? scale.z : 1.f);
-            const float len = dm::length(n);
-            mesh.normals[i] = len > 1e-20f ? n / len : dm::float3(0.f, 1.f, 0.f);
+            const float len = math::length(n);
+            mesh.normals[i] = len > 1e-20f ? n / len : math::float3(0.f, 1.f, 0.f);
             mesh.bounds |= mesh.positions[i];
         }
     }
@@ -738,7 +738,7 @@ namespace
         SceneTypeFactory& factory,
         const std::string& name,
         const StlMeshData& stl,
-        const dm::float4& rgba,
+        const math::float4& rgba,
         const std::filesystem::path& sourcePath)
     {
         auto mesh = std::static_pointer_cast<MeshInfo>(factory.createMesh());
@@ -750,26 +750,26 @@ namespace
         auto& buffers = *mesh->buffers;
         buffers.positionData = stl.positions;
         buffers.indexData = stl.indices;
-        buffers.texcoord1Data.assign(stl.positions.size(), dm::float2(0.f));
+        buffers.texcoord1Data.assign(stl.positions.size(), math::float2(0.f));
         buffers.normalData.resize(stl.positions.size());
         buffers.tangentData.resize(stl.positions.size());
 
         for (size_t i = 0; i < stl.positions.size(); ++i)
         {
-            const dm::float3 n = i < stl.normals.size() ? stl.normals[i] : dm::float3(0.f, 1.f, 0.f);
-            buffers.normalData[i] = dm::vectorToSnorm8(n);
+            const math::float3 n = i < stl.normals.size() ? stl.normals[i] : math::float3(0.f, 1.f, 0.f);
+            buffers.normalData[i] = math::vectorToSnorm8(n);
             // Stable fallback tangent for untextured STL.
-            const dm::float3 axis = std::abs(n.z) < 0.999f ? dm::float3(0.f, 0.f, 1.f) : dm::float3(0.f, 1.f, 0.f);
-            dm::float3 tangent = dm::cross(axis, n);
-            const float tlen = dm::length(tangent);
-            tangent = tlen > 1e-20f ? tangent / tlen : dm::float3(1.f, 0.f, 0.f);
-            buffers.tangentData[i] = dm::vectorToSnorm8(dm::float4(tangent, 1.f));
+            const math::float3 axis = std::abs(n.z) < 0.999f ? math::float3(0.f, 0.f, 1.f) : math::float3(0.f, 1.f, 0.f);
+            math::float3 tangent = math::cross(axis, n);
+            const float tlen = math::length(tangent);
+            tangent = tlen > 1e-20f ? tangent / tlen : math::float3(1.f, 0.f, 0.f);
+            buffers.tangentData[i] = math::vectorToSnorm8(math::float4(tangent, 1.f));
         }
 
         auto material = std::dynamic_pointer_cast<Material>(factory.createMaterial());
         material->name = name + "_mat";
         material->modelFileName = sourcePath.string();
-        material->baseOrDiffuseColor = dm::float3(rgba.x, rgba.y, rgba.z);
+        material->baseOrDiffuseColor = math::float3(rgba.x, rgba.y, rgba.z);
         material->opacity = rgba.w;
         material->roughness = 0.45f;
         material->metalness = 0.05f;

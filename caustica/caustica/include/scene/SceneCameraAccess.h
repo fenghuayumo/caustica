@@ -15,15 +15,15 @@ namespace caustica::scene
 // aiming a camera with EntityPose / world_pose points the wrong way.
 struct CameraWorldLookTo
 {
-    dm::float3 position = { 0.f, 0.f, 0.f };
-    dm::float3 direction = { 0.f, 0.f, -1.f };
-    dm::float3 up = { 0.f, 1.f, 0.f };
+    math::float3 position = { 0.f, 0.f, 0.f };
+    math::float3 direction = { 0.f, 0.f, -1.f };
+    math::float3 up = { 0.f, 1.f, 0.f };
 };
 
 [[nodiscard]] SceneContentFlags getCameraContentFlags();
 
-[[nodiscard]] dm::affine3 getCameraViewToWorldMatrix(const dm::daffine3& globalTransform);
-[[nodiscard]] dm::affine3 getCameraWorldToViewMatrix(const dm::daffine3& globalTransform);
+[[nodiscard]] math::affine3 getCameraViewToWorldMatrix(const math::daffine3& globalTransform);
+[[nodiscard]] math::affine3 getCameraWorldToViewMatrix(const math::daffine3& globalTransform);
 
 [[nodiscard]] bool isPerspectiveCamera(const CameraComponent& component);
 [[nodiscard]] bool isOrthographicCamera(const CameraComponent& component);
@@ -33,7 +33,7 @@ struct CameraWorldLookTo
 [[nodiscard]] const OrthographicCameraData* tryGetOrthographicCameraData(const CameraComponent& component);
 [[nodiscard]] OrthographicCameraData* tryGetOrthographicCameraData(CameraComponent& component);
 
-[[nodiscard]] bool setCameraProperty(CameraComponent& component, const std::string& propName, const dm::float4& value);
+[[nodiscard]] bool setCameraProperty(CameraComponent& component, const std::string& propName, const math::float4& value);
 
 [[nodiscard]] const CameraComponent* tryGetCamera(const ecs::World& world, ecs::Entity entity);
 [[nodiscard]] CameraComponent* tryGetCamera(ecs::World& world, ecs::Entity entity);
@@ -45,9 +45,9 @@ struct CameraWorldLookTo
 bool setCameraWorldLookTo(
     SceneEntityWorld& world,
     ecs::Entity entity,
-    const dm::float3& position,
-    const dm::float3& direction,
-    const dm::float3& up);
+    const math::float3& position,
+    const math::float3& direction,
+    const math::float3& up);
 
 bool setCameraVerticalFov(SceneEntityWorld& world, ecs::Entity entity, float radians);
 [[nodiscard]] float getCameraVerticalFov(const SceneEntityWorld& world, ecs::Entity entity);

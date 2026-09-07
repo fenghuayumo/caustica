@@ -17,7 +17,7 @@ namespace caustica::scene
 namespace
 {
 
-void FillCommonLightConstants(dm::float3 color, LightConstants& lightConstants)
+void FillCommonLightConstants(math::float3 color, LightConstants& lightConstants)
 {
     lightConstants.color = color;
     lightConstants.shadowCascades = int4(-1);
@@ -80,23 +80,23 @@ SceneContentFlags getLightContentFlags()
     return SceneContentFlags::Lights;
 }
 
-dm::double3 getLightPosition(const dm::daffine3& globalTransform)
+math::double3 getLightPosition(const math::daffine3& globalTransform)
 {
     return globalTransform.m_translation;
 }
 
-dm::double3 getLightDirection(const dm::daffine3& globalTransform)
+math::double3 getLightDirection(const math::daffine3& globalTransform)
 {
-    return -normalize(dm::double3(globalTransform.m_linear.row2));
+    return -normalize(math::double3(globalTransform.m_linear.row2));
 }
 
-void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& position)
+void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const math::double3& position)
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<ParentComponent>(entity))
         parentEntity = parent->parent;
 
-    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    math::daffine3 parentToWorld = math::daffine3::identity();
     if (ecs::isValid(parentEntity))
     {
         if (const auto* globalTransform = world.world().get<GlobalTransformComponent>(parentEntity))
@@ -106,25 +106,25 @@ void setLightWorldPosition(SceneEntityWorld& world, ecs::Entity entity, const dm
     world.setTranslation(entity, inverse(parentToWorld).transformPoint(position));
 }
 
-void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const dm::double3& direction)
+void setLightWorldDirection(SceneEntityWorld& world, ecs::Entity entity, const math::double3& direction)
 {
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<ParentComponent>(entity))
         parentEntity = parent->parent;
 
-    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    math::daffine3 parentToWorld = math::daffine3::identity();
     if (ecs::isValid(parentEntity))
     {
         if (const auto* globalTransform = world.world().get<GlobalTransformComponent>(parentEntity))
             parentToWorld = globalTransform->transform;
     }
 
-    const dm::daffine3 desiredWorld = lookatZ(direction);
+    const math::daffine3 desiredWorld = lookatZ(direction);
     // Scene hierarchy composition is row-vector based: world = local * parent.
-    const dm::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
+    const math::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
 
-    dm::dquat rotation;
-    dm::double3 scaling;
+    math::dquat rotation;
+    math::double3 scaling;
     decomposeAffine<double>(localToParent, nullptr, &rotation, &scaling);
     world.setLocalTransform(entity, nullptr, &rotation, &scaling);
 }
@@ -181,7 +181,7 @@ LightData toLightData(const EnvironmentLightComponent& component)
 }
 
 void fillLightConstants(
-    dm::float3 color, const LightData& data, const dm::daffine3& globalTransform, LightConstants& lightConstants)
+    math::float3 color, const LightData& data, const math::daffine3& globalTransform, LightConstants& lightConstants)
 {
     FillCommonLightConstants(color, lightConstants);
 
@@ -193,7 +193,7 @@ void fillLightConstants(
         lightConstants.lightType = LightType_Directional;
         lightConstants.direction = float3(normalize(getLightDirection(globalTransform)));
         const float clampedAngularSize = clamp(directional.angularSize, 0.f, 90.f);
-        lightConstants.angularSizeOrInvRange = dm::radians(clampedAngularSize);
+        lightConstants.angularSizeOrInvRange = math::radians(clampedAngularSize);
         lightConstants.intensity = directional.irradiance;
         break;
     }
@@ -207,8 +207,8 @@ void fillLightConstants(
         lightConstants.angularSizeOrInvRange = (spot.range <= 0.f) ? 0.f : 1.f / spot.range;
         lightConstants.intensity = spot.intensity;
         lightConstants.color = color;
-        lightConstants.innerAngle = dm::radians(spot.innerAngle);
-        lightConstants.outerAngle = dm::radians(spot.outerAngle);
+        lightConstants.innerAngle = math::radians(spot.innerAngle);
+        lightConstants.outerAngle = math::radians(spot.outerAngle);
         break;
     }
     case LightType_Point:
@@ -244,7 +244,7 @@ void fillLightConstants(const LightRenderProxy& proxy, LightConstants& lightCons
 }
 
 bool tryFillLightConstants(
-    const ecs::World& world, ecs::Entity entity, const dm::daffine3& globalTransform, LightConstants& lightConstants)
+    const ecs::World& world, ecs::Entity entity, const math::daffine3& globalTransform, LightConstants& lightConstants)
 {
     if (const auto* directional = tryGetDirectionalLight(world, entity))
     {
@@ -284,7 +284,7 @@ bool hasAnyLightComponent(const ecs::World& world, ecs::Entity entity)
 }
 
 bool setLightProperty(
-    ecs::World& world, ecs::Entity entity, const std::string& propName, const dm::float4& value)
+    ecs::World& world, ecs::Entity entity, const std::string& propName, const math::float4& value)
 {
     if (auto* directional = tryGetDirectionalLight(world, entity))
     {

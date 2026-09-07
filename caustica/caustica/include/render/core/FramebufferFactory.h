@@ -6,7 +6,7 @@
 
 namespace caustica
 {
-    class IView;
+    class ViewInfo;
 
     class FramebufferFactory
     {
@@ -23,7 +23,7 @@ namespace caustica
         caustica::rhi::TextureHandle shadingRateSurface;
 
         virtual caustica::rhi::Framebuffer* getFramebuffer(const caustica::rhi::TextureSubresourceSet& subresources);
-        caustica::rhi::Framebuffer* getFramebuffer(const IView& view);
+        caustica::rhi::Framebuffer* getFramebuffer(const ViewInfo& view);
         caustica::rhi::FramebufferInfo getFramebufferInfo();
     };
 }

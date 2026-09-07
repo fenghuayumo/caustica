@@ -20,7 +20,7 @@
 namespace caustica
 {
     class FramebufferFactory;
-    class IView;
+    class ViewInfo;
     class ShaderFactory;
 }
 
@@ -116,6 +116,7 @@ struct GaussianSplatGraphResources
     caustica::rhi::Buffer* drawIndirectBuffer = nullptr;
     caustica::rhi::Buffer* splatAabbBuffer = nullptr;
     caustica::rhi::Texture* stochasticDepth = nullptr;
+    caustica::rhi::rt::AccelStruct* topLevelAS = nullptr;
     GaussianSplatSortMode sortMode = GaussianSplatSortMode::GpuSort;
     bool distanceStageCulling = false;
 };
@@ -157,14 +158,14 @@ public:
 
     bool upload(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView& view,
+        const caustica::ViewInfo& view,
         caustica::rhi::rt::AccelStruct* meshTopLevelAS,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
     void sort(caustica::rhi::CommandList* commandList);
     bool raster(
         caustica::rhi::CommandList* commandList,
-        const caustica::IView& view);
+        const caustica::ViewInfo& view);
 
     [[nodiscard]] bool hasSplats() const { return m_splatCount > 0; }
     [[nodiscard]] uint32_t getSplatCount() const { return m_splatCount; }

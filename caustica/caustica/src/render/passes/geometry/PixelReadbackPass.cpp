@@ -92,10 +92,10 @@ PixelReadbackPass::PixelReadbackPass(
 }
 
 
-void PixelReadbackPass::capture(caustica::rhi::CommandList* commandList, dm::uint2 pixelPosition)
+void PixelReadbackPass::capture(caustica::rhi::CommandList* commandList, math::uint2 pixelPosition)
 {
     PixelReadbackConstants constants = {};
-    constants.pixelPosition = dm::int2(pixelPosition);
+    constants.pixelPosition = math::int2(pixelPosition);
     commandList->writeBuffer(m_ConstantBuffer, &constants, sizeof(constants));
 
     caustica::rhi::ComputeState state;
@@ -107,7 +107,7 @@ void PixelReadbackPass::capture(caustica::rhi::CommandList* commandList, dm::uin
     commandList->copyBuffer(m_ReadbackBuffer, 0, m_IntermediateBuffer, 0, m_ReadbackBuffer->getDesc().byteSize);
 }
 
-dm::float4 PixelReadbackPass::readFloats()
+math::float4 PixelReadbackPass::readFloats()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);
@@ -118,7 +118,7 @@ dm::float4 PixelReadbackPass::readFloats()
     return values;
 }
 
-dm::uint4 PixelReadbackPass::readUInts()
+math::uint4 PixelReadbackPass::readUInts()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);
@@ -129,7 +129,7 @@ dm::uint4 PixelReadbackPass::readUInts()
     return values;
 }
 
-dm::int4 PixelReadbackPass::readInts()
+math::int4 PixelReadbackPass::readInts()
 {
     void* pData = m_device->mapBuffer(m_ReadbackBuffer, caustica::rhi::CpuAccessMode::Read);
     assert(pData);

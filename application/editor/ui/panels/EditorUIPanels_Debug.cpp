@@ -142,7 +142,7 @@ void EditorUI::buildDeltaTreeViz()
             vertexIndex = deltaVertex.vertexIndex ;
             parentLobe = deltaVertex.getParentLobe();
             
-            float thpLum = dm::luminance(deltaVertex.throughput);
+            float thpLum = math::luminance(deltaVertex.throughput);
 
             char info[1024];
             snprintf(info, sizeof(info), "Vertex: %d, Throughput: %.1f%%", vertexIndex, thpLum*100.0f );
@@ -315,18 +315,18 @@ void EditorUI::buildDeltaTreeViz()
             {
                 float3 worldPos = treeNode.deltaVertex.worldPos;
                 float3 viewVec = worldPos - caustica::currentCamera(*m_sceneEditor.app()).getPosition();
-                float sphereSize = 0.006f + 0.004f * dm::length(viewVec);
+                float sphereSize = 0.006f + 0.004f * math::length(viewVec);
                 float step = 0.15f;
-                viewVec = dm::normalize(viewVec);
-                float3 right = dm::cross(viewVec, caustica::currentCamera(*m_sceneEditor.app()).getUp());
-                float3 up = dm::cross(right, viewVec);
+                viewVec = math::normalize(viewVec);
+                float3 right = math::cross(viewVec, caustica::currentCamera(*m_sceneEditor.app()).getUp());
+                float3 up = math::cross(right, viewVec);
                 float3 prev0 = worldPos;
                 float3 prev1 = worldPos;
                 float3 prev2 = worldPos;
                 for (float s = 0.0f; s < 2.06f; s += step)
                 {
-                    float px = cos(s * dm::PI_f);
-                    float py = sin(s * dm::PI_f);
+                    float px = cos(s * math::PI_f);
+                    float py = sin(s * math::PI_f);
                     float3 sp0 = worldPos + up * py * sphereSize + right * px * sphereSize;
                     float3 sp1 = worldPos + up * py * sphereSize * 0.8f + right * px * sphereSize * 0.8f;
                     float3 sp2 = worldPos + up * py * sphereSize * 0.6f + right * px * sphereSize * 0.6f;

@@ -96,7 +96,7 @@ int main()
 
         passed &= expect(
             caustica::scene::setLightProperty(
-                entityWorld.world(), light, "irradiance", dm::float4(3.f, 0.f, 0.f, 0.f)),
+                entityWorld.world(), light, "irradiance", math::float4(3.f, 0.f, 0.f, 0.f)),
             "setLightProperty rejected a valid directional-light property");
         passed &= expect(entityWorld.hasPendingLightChanges(),
             "setLightProperty did not notify light change detection");

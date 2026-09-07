@@ -226,15 +226,15 @@ public:
         const std::filesystem::path& path, ecs::Entity context = ecs::NullEntity) const;
     [[nodiscard]] std::shared_ptr<Material> findMaterial(int materialID) const;
 
-    [[nodiscard]] std::vector<dm::float3> getMeshVertices(ecs::Entity entity);
-    [[nodiscard]] std::vector<dm::float3> getMeshVerticesWorld(ecs::Entity entity);
+    [[nodiscard]] std::vector<math::float3> getMeshVertices(ecs::Entity entity);
+    [[nodiscard]] std::vector<math::float3> getMeshVerticesWorld(ecs::Entity entity);
     void setMeshVertices(
         ecs::Entity entity,
-        const std::vector<dm::float3>& vertices,
+        const std::vector<math::float3>& vertices,
         const MeshDeformOptions& options = {});
     void setMeshVerticesWorld(
         ecs::Entity entity,
-        const std::vector<dm::float3>& vertices,
+        const std::vector<math::float3>& vertices,
         const MeshDeformOptions& options = {});
     void requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation = true);
     void requestFullAccelRebuild();

@@ -141,7 +141,7 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             {
                 RESET_ON_CHANGE(ImGui::DragFloat("Soft shadow radius", &m_settings.GaussianSplatShadowSoftRadius, 0.01f, 0.0f, 0.5f, "%.2f"));
                 RESET_ON_CHANGE(ImGui::InputInt("Soft shadow samples", &m_settings.GaussianSplatShadowSoftSampleCount, 1, 4));
-                m_settings.GaussianSplatShadowSoftSampleCount = dm::clamp(m_settings.GaussianSplatShadowSoftSampleCount, 1, 16);
+                m_settings.GaussianSplatShadowSoftSampleCount = math::clamp(m_settings.GaussianSplatShadowSoftSampleCount, 1, 16);
             }
 
             RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_settings.GaussianSplatShadowRayOffset, 0.01f, 0.0f, 1.0f, "%.2f"));

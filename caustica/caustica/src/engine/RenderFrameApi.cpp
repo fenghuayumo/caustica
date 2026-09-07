@@ -10,6 +10,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/RenderSessionApi.h>
+#include <engine/RenderTextureDebugApi.h>
 #include <engine/Time.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
@@ -57,8 +58,8 @@ namespace
         if (keys.size() < 2)
             return true;
 
-        const dm::float4 a = keys.front().value;
-        const dm::float4 b = keys.back().value;
+        const math::float4 a = keys.front().value;
+        const math::float4 b = keys.back().value;
         if (channel.attribute == AnimationAttribute::Rotation)
         {
             const float aLength2 = dot(a, a);
@@ -71,8 +72,8 @@ namespace
             return normalizedDot >= 1.f - 1e-5f;
         }
 
-        const dm::float4 delta = abs(a - b);
-        const dm::float4 scale = max(max(abs(a), abs(b)), dm::float4(1.f));
+        const math::float4 delta = abs(a - b);
+        const math::float4 scale = max(max(abs(a), abs(b)), math::float4(1.f));
         return all(delta <= scale * 1e-5f);
     }
 
@@ -557,3 +558,25 @@ double& sceneTimeRef(App& app)
 }
 
 } // namespace caustica
+
+uint32_t caustica::debugViewTextureCount(const App& app)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->debugViewTextureCount() : 0;
+}
+
+bool caustica::debugViewTextureInfo(
+    const App& app,
+    uint32_t index,
+    std::string* outName,
+    rhi::Texture** outTexture)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->debugViewTextureInfo(index, outName, outTexture) : false;
+}
+
+caustica::rhi::Texture* caustica::findDebugViewTexture(const App& app, std::string_view name)
+{
+    const render::WorldRenderer* wr = worldRenderer(app);
+    return wr ? wr->findDebugViewTexture(name) : nullptr;
+}

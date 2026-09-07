@@ -3,6 +3,7 @@
 #include <render/core/FramebufferFactory.h>
 #include <render/core/RenderDevice.h>
 #include <render/passes/debug/ShaderDebug.h>
+#include <core/log.h>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -97,14 +98,22 @@ void PostProcess::apply(caustica::rhi::CommandList* commandList, ComputePassType
         m_computePSOs[passIndex] = m_device->createComputePipeline(pipelineDesc);
     }
 
+    if (!m_computePSOs[passIndex])
+    {
+        // Missing shader permutation or failed PSO creation: never hand a null
+        // pipeline to the command list, D3D12 dereferences it unconditionally.
+        caustica::error("PostProcess: pipeline unavailable for compute pass %u; skipping pass.", passIndex);
+        return;
+    }
+
     caustica::rhi::ComputeState state;
     state.bindings = { bindingSet };
     state.pipeline = m_computePSOs[passIndex];
 
     commandList->setComputeState(state);
 
-    const dm::uint  threads = NUM_COMPUTE_THREADS_PER_DIM;
-    const dm::uint2 dispatchSize = dm::uint2((width + threads - 1) / threads, (height + threads - 1) / threads);
+    const math::uint  threads = NUM_COMPUTE_THREADS_PER_DIM;
+    const math::uint2 dispatchSize = math::uint2((width + threads - 1) / threads, (height + threads - 1) / threads);
     commandList->setPushConstants(&miniConsts, sizeof(miniConsts));
     commandList->dispatch(dispatchSize.x, dispatchSize.y);
 }

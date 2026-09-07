@@ -36,13 +36,13 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
     if (useStreamlineThisFrame)
     {
         {
-            affine3 viewReprojection = camera.view()->getChildView(ViewType::PLANAR, 0)->getInverseViewMatrix()
+            affine3 viewReprojection = camera.view()->getInverseViewMatrix()
                 * camera.viewPrevious()->getViewMatrix();
             float4x4 reprojectionMatrix = inverse(camera.view()->getProjectionMatrix(false))
                 * affineToHomogeneous(viewReprojection)
                 * camera.viewPrevious()->getProjectionMatrix(false);
             const float outputAspectRatio = params.displayAspectRatio;
-            const dm::float2 intrinsicsViewport = camera.intrinsicsViewport();
+            const math::float2 intrinsicsViewport = camera.intrinsicsViewport();
             const float cameraAspectRatio = camera.useCustomIntrinsics()
                 && intrinsicsViewport.x > 0.f && intrinsicsViewport.y > 0.f
                 ? intrinsicsViewport.x / intrinsicsViewport.y
@@ -80,9 +80,9 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
             if (settings.RealtimeAA == 3 && params.dlssRROptions != nullptr)
             {
                 params.dlssRROptions->worldToCameraView =
-                    dm::affineToHomogeneous(camera.view()->getViewMatrix());
+                    math::affineToHomogeneous(camera.view()->getViewMatrix());
                 params.dlssRROptions->cameraViewToWorld =
-                    dm::affineToHomogeneous(camera.view()->getInverseViewMatrix());
+                    math::affineToHomogeneous(camera.view()->getInverseViewMatrix());
                 params.gpuDevice->getStreamline().setDLSSRROptions(*params.dlssRROptions);
             }
         }
@@ -91,14 +91,14 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
 
         params.gpuDevice->getStreamline().tagResourcesGeneral(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             renderTargets->screenMotionVectors,
             renderTargets->depth,
             renderTargets->preUIColor);
 
         params.gpuDevice->getStreamline().tagResourcesDLSSNIS(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             renderTargets->processedOutputColor,
             renderTargets->outputColor);
 
@@ -131,7 +131,7 @@ void postProcessAAPlatform(CameraController& camera, PostProcessAAParams& params
         static bool useSpecHitT = false;
         params.gpuDevice->getStreamline().tagResourcesDLSSRR(
             commandList,
-            camera.view()->getChildView(ViewType::PLANAR, 0),
+            camera.view().get(),
             (int2)params.renderSize,
             (int2)params.displaySize,
             renderTargets->outputColor,

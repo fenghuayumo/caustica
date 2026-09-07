@@ -285,7 +285,7 @@ namespace caustica::math
 	}
 
 	template<typename T>
-	bool4 isnear(const quaternion<T>& a, const quaternion<T>& b, T eps = dm::epsilon)
+	bool4 isnear(const quaternion<T>& a, const quaternion<T>& b, T eps = math::epsilon)
 	{
 		bool4 result;
 		for (int i = 0; i < 4; ++i)
@@ -294,7 +294,7 @@ namespace caustica::math
 	}
 
 	template<typename T>
-	bool4 isnear(const quaternion<T>& a, T b, T eps = dm::epsilon)
+	bool4 isnear(const quaternion<T>& a, T b, T eps = math::epsilon)
 	{
 		bool4 result;
 		for (int i = 0; i < 4; ++i)
@@ -303,7 +303,7 @@ namespace caustica::math
 	}
 
 	template<typename T>
-	bool4 isnear(T a, const quaternion<T>& b, T eps = dm::epsilon)
+	bool4 isnear(T a, const quaternion<T>& b, T eps = math::epsilon)
 	{
 		bool4 result;
 		for (int i = 0; i < 4; ++i)

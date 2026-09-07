@@ -507,6 +507,16 @@ bool GpuDevice_VK::findQueueFamilies(vk::PhysicalDevice physicalDevice)
         }
     }
 
+    // Dedicated transfer families are optional. Copy work can use a compute
+    // family (still transfer-capable) and, last, the graphics family.
+    if (m_TransferQueueFamily == -1 && m_DeviceParams.enableCopyQueue)
+    {
+        if (m_ComputeQueueFamily != -1)
+            m_TransferQueueFamily = m_ComputeQueueFamily;
+        else if (m_GraphicsQueueFamily != -1)
+            m_TransferQueueFamily = m_GraphicsQueueFamily;
+    }
+
     if (m_GraphicsQueueFamily == -1 || 
         (m_PresentQueueFamily == -1 && !m_DeviceParams.headlessDevice) ||
         (m_ComputeQueueFamily == -1 && m_DeviceParams.enableComputeQueue) || 

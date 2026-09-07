@@ -6,7 +6,7 @@
 namespace caustica
 {
     class ShaderFactory;
-    class IView;
+    class ViewInfo;
 }
 
 class AccumulationPass
@@ -16,7 +16,7 @@ public:
 
     void createPipeline();
     void createBindingSet(caustica::rhi::Texture* inputTexture, caustica::rhi::Texture* outputTexture, caustica::rhi::Texture* renderOutputTexture);
-    void render(caustica::rhi::CommandList* commandList, const caustica::IView& sourceView, const caustica::IView& upscaledView, float accumulationWeight);
+    void render(caustica::rhi::CommandList* commandList, const caustica::ViewInfo& sourceView, const caustica::ViewInfo& upscaledView, float accumulationWeight);
 
 private:
     caustica::rhi::DeviceHandle m_device;

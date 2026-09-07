@@ -10,7 +10,7 @@ class RenderTargets;
 namespace caustica
 {
     class ShaderFactory;
-    class PlanarView;
+    class ViewInfo;
 }
 
 struct NVSDK_NGX_Handle;
@@ -68,7 +68,7 @@ namespace caustica::render
         virtual bool evaluate(
             caustica::rhi::CommandList* commandList,
             const EvaluateParameters& params,
-            const caustica::PlanarView& view) = 0;
+            const caustica::ViewInfo& view) = 0;
 
         virtual ~DLSS() = default;
 

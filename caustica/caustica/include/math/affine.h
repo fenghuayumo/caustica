@@ -289,7 +289,7 @@ namespace caustica::math
 	// !!! this doesn't match the behavior of isnear() for vectors and matrices -
 	// returns a single result rather than a componentwise result
 	template <typename T, int n>
-	bool isnear(affine<T, n> const & a, affine<T, n> const & b, T epsilon = dm::epsilon)
+	bool isnear(affine<T, n> const & a, affine<T, n> const & b, T epsilon = math::epsilon)
 	{
 		return all(isnear(a.m_linear, b.m_linear, epsilon)) &&
 			   all(isnear(a.m_translation, b.m_translation, epsilon));
@@ -455,7 +455,9 @@ namespace caustica::math
 		vector<T, 3> lookNormalized = normalize(look);
 		vector<T, 3> left = normalize(orthogonal(lookNormalized));
 		vector<T, 3> up = cross(lookNormalized, left);
-		return affine<T, 3>::from_cols(-left, up, -lookNormalized, vector<T, 3>::zero());
+		// affine::transformVector uses row-vector multiplication (v * m).  The
+		// look direction therefore lives in row 2, not column 2.
+		return affine<T, 3>(-left, up, -lookNormalized, vector<T, 3>::zero());
 	}
 
 	template<typename T>
@@ -464,7 +466,7 @@ namespace caustica::math
 		vector<T, 3> lookNormalized = normalize(look);
 		vector<T, 3> left = normalize(cross(up, lookNormalized));
 		vector<T, 3> trueUp = cross(lookNormalized, left);
-		return affine<T, 3>::from_cols(-left, trueUp, -lookNormalized, vector<T, 3>::zero());
+		return affine<T, 3>(-left, trueUp, -lookNormalized, vector<T, 3>::zero());
 	}
 
 	template<typename T>

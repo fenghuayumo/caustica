@@ -45,7 +45,7 @@ namespace
 {
     constexpr float kGaussianSplatShadowKernelMinResponse = 0.0113f;
 
-    float shadowLightLuminance(const dm::float3& color)
+    float shadowLightLuminance(const math::float3& color)
     {
         return std::max(0.0f, color.x * 0.2126f + color.y * 0.7152f + color.z * 0.0722f);
     }
@@ -74,17 +74,17 @@ namespace
                 if (environment == nullptr)
                     continue;
 
-                const dm::float3 radiance(
+                const math::float3 radiance(
                     std::max(proxy.color.x * environment->radianceScale.x, 0.0f),
                     std::max(proxy.color.y * environment->radianceScale.y, 0.0f),
                     std::max(proxy.color.z * environment->radianceScale.z, 0.0f));
-                candidate.light.positionAndType = dm::float4(0.0f, 0.0f, 0.0f, float(LightType_Environment));
+                candidate.light.positionAndType = math::float4(0.0f, 0.0f, 0.0f, float(LightType_Environment));
                 // A Gaussian has no receiver normal. Use a stable upper-hemisphere
                 // direction as an inexpensive approximation of environment occlusion.
                 const float rotation = environment->rotation;
-                const dm::float3 direction = normalize(dm::float3(std::sin(rotation), 0.75f, std::cos(rotation)));
-                candidate.light.directionAndRange = dm::float4(direction.x, direction.y, direction.z, 0.0f);
-                candidate.light.colorAndIntensity = dm::float4(radiance.x, radiance.y, radiance.z, 1.0f);
+                const math::float3 direction = normalize(math::float3(std::sin(rotation), 0.75f, std::cos(rotation)));
+                candidate.light.directionAndRange = math::float4(direction.x, direction.y, direction.z, 0.0f);
+                candidate.light.colorAndIntensity = math::float4(radiance.x, radiance.y, radiance.z, 1.0f);
                 candidate.importance = shadowLightLuminance(radiance);
             }
             else
@@ -94,7 +94,7 @@ namespace
                 if (lightConstants.intensity <= 0.0f)
                     continue;
 
-                const dm::float3 color(
+                const math::float3 color(
                     std::max(lightConstants.color.x, 0.0f),
                     std::max(lightConstants.color.y, 0.0f),
                     std::max(lightConstants.color.z, 0.0f));
@@ -102,30 +102,30 @@ namespace
                     ? 1.0f / lightConstants.angularSizeOrInvRange
                     : 0.0f;
 
-                candidate.light.positionAndType = dm::float4(
+                candidate.light.positionAndType = math::float4(
                     lightConstants.position.x,
                     lightConstants.position.y,
                     lightConstants.position.z,
                     float(lightType));
-                candidate.light.colorAndIntensity = dm::float4(
+                candidate.light.colorAndIntensity = math::float4(
                     color.x, color.y, color.z, std::max(lightConstants.intensity, 0.0f));
 
                 if (lightType == LightType_Directional)
                 {
-                    const dm::float3 directionToLight = normalize(-lightConstants.direction);
-                    candidate.light.directionAndRange = dm::float4(
+                    const math::float3 directionToLight = normalize(-lightConstants.direction);
+                    candidate.light.directionAndRange = math::float4(
                         directionToLight.x, directionToLight.y, directionToLight.z, 0.0f);
-                    candidate.light.shape = dm::float4(
+                    candidate.light.shape = math::float4(
                         std::max(lightConstants.angularSizeOrInvRange, 0.0f), 0.0f, 0.0f, 0.0f);
                 }
                 else if (lightType == LightType_Point || lightType == LightType_Spot)
                 {
-                    candidate.light.directionAndRange = dm::float4(
+                    candidate.light.directionAndRange = math::float4(
                         lightConstants.direction.x,
                         lightConstants.direction.y,
                         lightConstants.direction.z,
                         range);
-                    candidate.light.shape = dm::float4(
+                    candidate.light.shape = math::float4(
                         std::max(lightConstants.radius, 0.0f),
                         lightType == LightType_Spot ? std::cos(lightConstants.innerAngle) : -1.0f,
                         lightType == LightType_Spot ? std::cos(std::abs(lightConstants.outerAngle)) : -1.0f,
@@ -159,7 +159,7 @@ void fillGaussianSplatShadowConstants(
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex,
-    const dm::float3& shadowDirectionToLight)
+    const math::float3& shadowDirectionToLight)
 {
     const uint32_t gaussianSplatShadowMode = resolveGaussianSplatShadowMode(settings);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryBinding.splatPass;
@@ -194,7 +194,7 @@ void fillGaussianSplatShadowConstants(
     constants.GaussianSplatShadowDirectionToLight = normalize(shadowDirectionToLight);
     constants.GaussianSplatShadowWorldToObject = primaryBinding.splatPass != nullptr
         ? inverse(primaryBinding.objectToWorld)
-        : dm::float4x4::identity();
+        : math::float4x4::identity();
 }
 
 bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings)
@@ -302,7 +302,7 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     return renderSettings;
 }
 
-dm::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights)
+math::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRenderProxy> lights)
 {
     for (const scene::LightRenderProxy& lightProxy : lights)
     {
@@ -314,7 +314,7 @@ dm::float3 resolveGaussianSplatShadowDirection(std::span<const scene::LightRende
         return -lightConstants.direction;
     }
 
-    return dm::float3(0.0f, 1.0f, 0.0f);
+    return math::float3(0.0f, 1.0f, 0.0f);
 }
 
 } // namespace caustica::render

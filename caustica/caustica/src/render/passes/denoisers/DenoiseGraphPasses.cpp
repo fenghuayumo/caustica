@@ -34,25 +34,20 @@ namespace
     }
 }
 
-rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
     assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
-    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return after;
+        return {};
 
     const PathTraceGraphTargets handles = importPathTraceGraphTargets(*ctx.graph, *ctx.renderTargets);
-    extractPathTraceGraphOutputs(*ctx.graph, handles);
     DenoisePass* const denoise = ctx.denoise;
 
-    rg::PassOptions specHitPassOptions{};
-    specHitPassOptions.after = after;
-
-    const rg::PassHandle specHitPass = ctx.graph->addPass(
+    ctx.graph->addPass(
         kDenoiseSpecHitTPass,
         [handles](rg::PassBuilder& setup) {
             setup.write(handles.depth, rg::TextureAccess::UnorderedAccess);
@@ -62,10 +57,7 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
         [denoise](rg::RenderPassContext& passCtx) {
             denoise->denoiseSpecHitT(passCtx.commandList());
         },
-        specHitPassOptions);
-
-    rg::PassOptions avgLayerPassOptions{};
-    avgLayerPassOptions.after = specHitPass;
+        rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
 
     rg::PassHandle guidesReady = ctx.graph->addPass(
         kAvgLayerRadiancePass,
@@ -75,13 +67,10 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
         [denoise](rg::RenderPassContext& passCtx) {
             denoise->computeAvgLayerRadiance(passCtx.commandList());
         },
-        avgLayerPassOptions);
+        rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
 
     if (needsStablePlanesDebugViz(*ctx.settings))
     {
-        rg::PassOptions debugVizPassOptions{};
-        debugVizPassOptions.after = guidesReady;
-
         guidesReady = ctx.graph->addPass(
             kStablePlanesDebugVizPass,
             [handles](rg::PassBuilder& setup) {
@@ -89,8 +78,7 @@ rg::PassHandle registerDenoiserPreparePass(FrameGraphContext ctx, rg::PassHandle
             },
             [denoise](rg::RenderPassContext& passCtx) {
                 denoise->stablePlanesDebugViz(passCtx.commandList());
-            },
-            debugVizPassOptions);
+            });
     }
 
     return guidesReady;
@@ -157,9 +145,6 @@ namespace
         handles.specularHitT = graph.importTexture(
             targets.specularHitT, rg::TextureAccess::ShaderResource);
 
-        graph.extractTexture(handles.outputColor, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(handles.outDiff, rg::TextureAccess::UnorderedAccess);
-        graph.extractTexture(handles.outSpec, rg::TextureAccess::UnorderedAccess);
         return handles;
     }
 
@@ -198,6 +183,23 @@ namespace
             setup.write(handles.validation, rg::TextureAccess::UnorderedAccess);
     }
 
+    void rebaseNrdPlaneHandles(rg::GraphBuilder& graph, NrdPlaneGraphHandles& handles)
+    {
+        handles.denoiserViewspaceZ = graph.currentTexture(handles.denoiserViewspaceZ);
+        handles.denoiserMotionVectors = graph.currentTexture(handles.denoiserMotionVectors);
+        handles.denoiserNormalRoughness = graph.currentTexture(handles.denoiserNormalRoughness);
+        handles.denoiserDiffRadianceHitDist = graph.currentTexture(handles.denoiserDiffRadianceHitDist);
+        handles.denoiserSpecRadianceHitDist = graph.currentTexture(handles.denoiserSpecRadianceHitDist);
+        handles.denoiserDisocclusionThresholdMix =
+            graph.currentTexture(handles.denoiserDisocclusionThresholdMix);
+        handles.historyClampRelax = graph.currentTexture(handles.historyClampRelax);
+        handles.outputColor = graph.currentTexture(handles.outputColor);
+        handles.outDiff = graph.currentTexture(handles.outDiff);
+        handles.outSpec = graph.currentTexture(handles.outSpec);
+        if (handles.validation.isValid())
+            handles.validation = graph.currentTexture(handles.validation);
+    }
+
     void declareNrdMergeAccess(
         rg::PassBuilder& setup,
         const NrdPlaneGraphHandles& handles,
@@ -216,16 +218,15 @@ namespace
     }
 }
 
-rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady)
+rg::PassHandle registerNrdPass(FrameGraphContext ctx)
 {
     assert(ctx.denoise);
     assert(ctx.renderTargets);
     assert(ctx.settings);
     assert(ctx.graph);
-    assert(guidesReady.isValid());
 
     if (!ctx.hasScene || !ctx.settings->actualUseStandaloneDenoiser())
-        return guidesReady;
+        return {};
 
     ctx.denoise->ensureNrdIntegrations();
     DenoisePass* const denoise = ctx.denoise;
@@ -235,10 +236,8 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
         static_cast<int>(cStablePlaneCount));
 
     // Highest plane first (initializes outputColor from stable radiance), then lower planes
-    // accumulate. Within/across planes, resource edges (guides / outDiff / outputColor) order
-    // Prepare → Run → Merge; only the first Prepare needs an explicit external edge.
-    bool firstPrepare = true;
-    rg::PassHandle nrdReady = guidesReady;
+    // accumulate. Resource edges (specularHitT / outDiff / outputColor) order Prepare → Run → Merge.
+    rg::PassHandle nrdReady{};
 
     for (int pass = maxPassCount - 1; pass >= 0; --pass)
     {
@@ -247,17 +246,11 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
 
         const bool initWithStableRadiance = planeIndex == (maxPassCount - 1);
         const bool readsExistingOutputColor = planeIndex < (maxPassCount - 1);
-        const NrdPlaneGraphHandles handles = importNrdPlaneHandles(
+        NrdPlaneGraphHandles handles = importNrdPlaneHandles(
             *ctx.graph,
             *ctx.renderTargets,
             planeIndex);
 
-        rg::PassOptions prepareOptions{};
-        if (firstPrepare)
-        {
-            prepareOptions.after = guidesReady;
-            firstPrepare = false;
-        }
         ctx.graph->addPass(
             nrdPreparePassName(planeIndex),
             [handles, initWithStableRadiance](rg::PassBuilder& setup) {
@@ -265,8 +258,8 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
             },
             [denoise, planeIndex](rg::RenderPassContext& passCtx) {
                 denoise->prepareNrdInputs(passCtx.commandList(), planeIndex);
-            },
-            prepareOptions);
+            });
+        rebaseNrdPlaneHandles(*ctx.graph, handles);
 
         ctx.graph->addPass(
             nrdRunPassName(planeIndex),
@@ -275,7 +268,9 @@ rg::PassHandle registerNrdPass(FrameGraphContext ctx, rg::PassHandle guidesReady
             },
             [denoise, planeIndex](rg::RenderPassContext& passCtx) {
                 denoise->runNrd(passCtx.commandList(), planeIndex);
-            });
+            },
+            rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
+        rebaseNrdPlaneHandles(*ctx.graph, handles);
 
         nrdReady = ctx.graph->addPass(
             nrdMergePassName(planeIndex),
@@ -360,7 +355,7 @@ namespace
     }
 }
 
-rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
+rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx, FrameSlots& slots)
 {
     assert(ctx.graph);
     assert(ctx.denoise);
@@ -371,12 +366,8 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
 
     RenderTargets& targets = *ctx.renderTargets;
 
-    const rg::TextureHandle outputColor = ctx.graph->importTexture(
-        targets.outputColor,
-        rg::TextureAccess::UnorderedAccess);
-    const rg::TextureHandle processedOutputColor = ctx.graph->importTexture(
-        targets.processedOutputColor,
-        rg::TextureAccess::UnorderedAccess);
+    rg::TextureHandle outputColor = slots.outputColor;
+    rg::TextureHandle processedOutputColor = slots.hdrColor;
     const rg::TextureHandle accumulatedRadiance = ctx.graph->importTexture(
         targets.accumulatedRadiance,
         rg::TextureAccess::UnorderedAccess);
@@ -393,8 +384,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         targets.combinedHistoryClampRelax,
         rg::TextureAccess::ShaderResource);
 
-    ctx.graph->extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
-    ctx.graph->extractTexture(processedOutputColor, rg::TextureAccess::UnorderedAccess);
+    // History leaves the graph; current-frame color is consumed by later in-graph passes.
     ctx.graph->extractTexture(accumulatedRadiance, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(temporalFeedback1, rg::TextureAccess::UnorderedAccess);
     ctx.graph->extractTexture(temporalFeedback2, rg::TextureAccess::UnorderedAccess);
@@ -429,6 +419,8 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                 denoise->runNoDenoiserFinalMerge(passCtx.commandList());
             },
             rg::PassOptions{ .sideEffect = true });
+        outputColor = ctx.graph->currentTexture(outputColor);
+        processedOutputColor = ctx.graph->currentTexture(processedOutputColor);
     }
 
     if (needsRealtimeCopyPass(*ctx.settings))
@@ -452,6 +444,8 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                         passCtx.texture(outputColor),
                         caustica::rhi::TextureSlice());
                 });
+            outputColor = ctx.graph->currentTexture(outputColor);
+            processedOutputColor = ctx.graph->currentTexture(processedOutputColor);
         }
     }
 
@@ -460,7 +454,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         const auto taaParams = makeTemporalAAParameters(ctx);
         const bool feedbackIsValid = computeTemporalFeedbackValid(ctx);
         const bool stochasticSplats = ctx.settings->EnableGaussianSplats && ctx.settings->GaussianSplatSortingMode == 1;
-        const ICompositeView* const compositeView = ctx.compositeView;
+        const ViewInfo* const view = ctx.view;
         int* const gaussianSampleIndex = ctx.gaussianSplatTemporalSampleIndex;
         bool* const gaussianTemporalReset = ctx.gaussianSplatTemporalReset;
 
@@ -477,9 +471,9 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                 setup.write(temporalFeedback1, rg::TextureAccess::UnorderedAccess);
                 setup.write(temporalFeedback2, rg::TextureAccess::UnorderedAccess);
             },
-            [temporalAAPass, taaParams, feedbackIsValid, stochasticSplats, compositeView,
+            [temporalAAPass, taaParams, feedbackIsValid, stochasticSplats, view,
              gaussianSampleIndex, gaussianTemporalReset](rg::RenderPassContext& passCtx) {
-                const ICompositeView& taaView = *compositeView;
+                const ViewInfo& taaView = *view;
                 temporalAAPass->temporalResolve(
                     passCtx.commandList(),
                     taaParams,
@@ -494,14 +488,14 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                     *gaussianTemporalReset = false;
                 }
             });
+        outputColor = ctx.graph->currentTexture(outputColor);
+        processedOutputColor = ctx.graph->currentTexture(processedOutputColor);
     }
 
     if (needsDlssPass(*ctx.settings))
     {
         const bool dlssRayReconstruction = ctx.settings->RealtimeAA == 3;
-        const rg::TextureHandle depth = ctx.graph->importTexture(
-            targets.depth,
-            rg::TextureAccess::ShaderResource);
+        const rg::TextureHandle depth = ctx.graph->currentTexture(slots.depth);
         const rg::TextureHandle preUIColor = ctx.graph->importTexture(
             targets.preUIColor,
             rg::TextureAccess::ShaderResource);
@@ -540,6 +534,8 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                 denoise->runDlssUpscale(passCtx.commandList(), aaReset);
             },
             rg::PassOptions{ .sideEffect = true });
+        outputColor = ctx.graph->currentTexture(outputColor);
+        processedOutputColor = ctx.graph->currentTexture(processedOutputColor);
     }
 
     if (needsAccumulationPass(*ctx.settings, accumulationPass))
@@ -548,7 +544,7 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         const float accumulationWeight = (accumulationSampleIndex < ctx.settings->AccumulationTarget)
             ? (1.f / float(std::max(0, accumulationSampleIndex) + 1))
             : 0.0f;
-        const IView* const view = ctx.view;
+        const ViewInfo* const view = ctx.view;
 
         denoiseReady = ctx.graph->addPass(
             "Accumulation",
@@ -564,9 +560,11 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
                     *view,
                     accumulationWeight);
             });
+        outputColor = ctx.graph->currentTexture(outputColor);
+        processedOutputColor = ctx.graph->currentTexture(processedOutputColor);
     }
 
-    // Reference OIDN: mid-pass close/execute/wait — keep on primary, after AA/accum.
+    // Reference OIDN: mid-pass close/execute/wait — keep on primary.
     if (!ctx.settings->RealtimeMode && ctx.settings->ReferenceOIDNDenoiser && ctx.denoise)
     {
         rg::BufferHandle constants{};
@@ -576,8 +574,6 @@ rg::PassHandle registerDenoiseAAPass(FrameGraphContext ctx)
         rg::PassOptions oidnOptions{};
         oidnOptions.sideEffect = true;
         oidnOptions.serialOnPrimary = true;
-        assert(denoiseReady.isValid());
-        oidnOptions.after = denoiseReady;
         bool* const commandListWasClosed = ctx.commandListWasClosed;
         FrameConstants* const frameConstants = ctx.frameConstants;
         const caustica::rhi::BufferHandle constantBuffer = ctx.constantBuffer;

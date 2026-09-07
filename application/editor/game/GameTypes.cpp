@@ -23,7 +23,7 @@ bool Pose::read( const Json::Value & node )
     {
         double4 value = double4(0.0, 0.0, 0.0, 1.0);
         rotation >> value;
-        Rotation = dm::dquat::fromXYZW(value);
+        Rotation = math::dquat::fromXYZW(value);
     }
     else
     {
@@ -99,10 +99,10 @@ void KeyframeAnimation::fromKeys(const std::vector<demo::Pose> & keys)
 
 affine3 Pose::toTransform() const
 {
-    dm::daffine3 transformD = dm::scaling(this->Scaling);
+    math::daffine3 transformD = math::scaling(this->Scaling);
     transformD *= this->Rotation.toAffine();
-    transformD *= dm::translation(this->Translation);
-    return dm::affine3(transformD);
+    transformD *= math::translation(this->Translation);
+    return math::affine3(transformD);
 }
 
 std::tuple<float3, float3, float3> Pose::getPosDirUp() const
@@ -115,7 +115,7 @@ std::tuple<float3, float3, float3> Pose::getPosDirUp() const
 
 void Pose::setTransform(const affine3 & transform)
 {
-    dm::decomposeAffine(daffine3(transform), &Translation, &Rotation, &Scaling);
+    math::decomposeAffine(daffine3(transform), &Translation, &Rotation, &Scaling);
 }
 
 void Pose::setTransformFromCamera(const float3 & pos, const float3 & dir, const float3 & up)
@@ -214,7 +214,7 @@ static inline double3 quat_log(dquat q, float eps = 1e-8f)
     }
     else
     {
-        double halfangle = acosf(dm::clamp(q.w, -1.0, 1.0));
+        double halfangle = acosf(math::clamp(q.w, -1.0, 1.0));
         return halfangle * (double3(q.x, q.y, q.z) / length);
     }
 }

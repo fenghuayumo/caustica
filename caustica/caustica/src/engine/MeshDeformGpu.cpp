@@ -28,9 +28,9 @@ namespace caustica
 namespace
 {
 
-using dm::affine3;
-using dm::box3;
-using dm::float3;
+using math::affine3;
+using math::box3;
+using math::float3;
 
 struct UniquePositionMap
 {
@@ -206,11 +206,11 @@ ecs::Entity FindUniqueMeshInstanceEntity(
     return result;
 }
 
-dm::affine3 GetEntityTransformFloat(const scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
+math::affine3 GetEntityTransformFloat(const scene::SceneEntityWorld& entityWorld, ecs::Entity entity)
 {
     if (const auto* global = entityWorld.world().get<scene::GlobalTransformComponent>(entity))
         return global->transformFloat;
-    return dm::affine3::identity();
+    return math::affine3::identity();
 }
 
 float3 NormalizeOrFallback(const float3& v, const float3& fallback)
@@ -385,7 +385,7 @@ void RebuildSceneMeshBuffersIfNeeded(const std::shared_ptr<MeshInfo>& mesh, cons
 
 } // namespace
 
-std::vector<dm::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
+std::vector<math::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
 {
     assertLogicThread();
 
@@ -395,7 +395,7 @@ std::vector<dm::float3> getMeshVertices(const std::shared_ptr<MeshInfo>& mesh)
         GetMeshSourcePositionIndices(mesh, renderVertices.size())).uniquePositions;
 }
 
-std::vector<dm::float3> getMeshVerticesWorld(
+std::vector<math::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     const std::shared_ptr<MeshInfo>& mesh,
     uint32_t frameIndex)
@@ -406,7 +406,7 @@ std::vector<dm::float3> getMeshVerticesWorld(
     return getMeshVerticesWorld(scene, entity, frameIndex);
 }
 
-std::vector<dm::float3> getMeshVerticesWorld(
+std::vector<math::float3> getMeshVerticesWorld(
     const std::shared_ptr<Scene>& scene,
     ecs::Entity entity,
     uint32_t frameIndex)
@@ -434,7 +434,7 @@ std::vector<dm::float3> getMeshVerticesWorld(
 
 void setMeshVertices(
     const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformGpuParams& params)
 {
     assertLogicThread();
@@ -494,7 +494,7 @@ void setMeshVertices(
 
 void setMeshVerticesWorld(
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformGpuParams& params)
 {
     assertLogicThread();
@@ -509,14 +509,14 @@ void setMeshVerticesWorld(
         throw std::runtime_error("setMeshVerticesWorld: scene has no entity world");
 
     auto mesh = GetMeshInfoFromEntity(*entityWorld, entity, "setMeshVerticesWorld");
-    const affine3 worldToLocal = affine3(inverse(dm::daffine3(GetEntityTransformFloat(*entityWorld, entity))));
+    const affine3 worldToLocal = affine3(inverse(math::daffine3(GetEntityTransformFloat(*entityWorld, entity))));
 
     std::vector<float3> objectVertices;
     objectVertices.reserve(vertices.size());
     for (const float3& vertex : vertices)
     {
         const float3 objectVertex = worldToLocal.transformPoint(vertex);
-        if (!dm::all(dm::isfinite(objectVertex)))
+        if (!math::all(math::isfinite(objectVertex)))
             throw std::runtime_error("setMeshVerticesWorld: world-to-object transform produced a non-finite vertex");
         objectVertices.push_back(objectVertex);
     }
@@ -526,7 +526,7 @@ void setMeshVerticesWorld(
 
 void setMeshVerticesWorld(
     const std::shared_ptr<MeshInfo>& mesh,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformGpuParams& params)
 {
     assertLogicThread();
@@ -537,7 +537,7 @@ void setMeshVerticesWorld(
 
 void setMeshPositionsDirect(
     const std::shared_ptr<MeshInfo>& mesh,
-    const dm::float3* positions,
+    const math::float3* positions,
     size_t count,
     const MeshDeformGpuParams& params)
 {

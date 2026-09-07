@@ -630,6 +630,12 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
     )
 
     target_link_libraries(caustica_py PRIVATE causticaApp)
+    if (MSVC AND NOT CAUSTICA_DISTRIBUTION_BUILD)
+        # Keep release PDBs for the extension so crash offsets can be
+        # symbolized during development (MODULE linker flags do not inherit
+        # the /DEBUG added for EXE/SHARED targets).
+        target_link_options(caustica_py PRIVATE "$<$<CONFIG:Release,RelWithDebInfo>:/DEBUG>")
+    endif()
     if (UNIX AND NOT APPLE)
         # The extension is a shared module. GNU ld scans each static archive
         # once and, unlike an executable, allows leftover undefined symbols.

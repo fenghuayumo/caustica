@@ -24,18 +24,18 @@ struct MeshDeformOptions
     bool resetAccumulationOnAccelRebuild = true;
 };
 
-[[nodiscard]] std::vector<dm::float3> getMeshVertices(App& app, ecs::Entity entity);
-[[nodiscard]] std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity);
+[[nodiscard]] std::vector<math::float3> getMeshVertices(App& app, ecs::Entity entity);
+[[nodiscard]] std::vector<math::float3> getMeshVerticesWorld(App& app, ecs::Entity entity);
 
 void setMeshVertices(
     App& app,
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options = {});
 void setMeshVerticesWorld(
     App& app,
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options = {});
 
 bool applyGeometrySequence(

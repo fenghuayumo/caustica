@@ -15,12 +15,11 @@
 namespace caustica::render
 {
 
-rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(after.isValid());
     if (!ctx.constantBuffer || !ctx.frameConstants)
-        return after;
+        return {};
 
     const rg::BufferHandle constants =
         ctx.graph->importBuffer(ctx.constantBuffer, rg::BufferAccess::CopyDest);
@@ -41,28 +40,24 @@ rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx, rg::PassH
                 sizeof(FrameConstants));
         },
         rg::PassOptions{
-            .sideEffect = true,
-            .after = after,
+            // No sideEffect: with no declared reader this upload is safely
+            // dead-code eliminated — VolatileConstantBinder rewrites the CB on
+            // every command list, and declaring readers (path-trace schedule
+            // inputs) keeps it ordered on the Copy queue.
+            .queue = caustica::rhi::CommandQueue::Copy,
         });
 }
 
-rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle after)
+rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.graph);
-    assert(after.isValid());
 
     if (!ctx.hasScene)
-        return after;
+        return {};
 
-    // EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData
-    // Downstream passes depend on kLightingReadyPass (UploadSubInstanceData).
-
-    rg::PassHandle previous = after;
+    // EnvMapUpdate → LightSamplingUpdateBegin → UploadSubInstanceData via resource edges.
+    rg::PassHandle previous{};
     {
-        rg::PassOptions passOptions{};
-        passOptions.sideEffect = true;
-        passOptions.after = previous;
-
         rg::TextureHandle envCube{};
         rg::TextureHandle radianceImportance{};
         if (ctx.environment != nullptr)
@@ -76,30 +71,29 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                         ctx.graph->importTexture(map, rg::TextureAccess::UnorderedAccess);
             }
         }
-        PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
-        const uint64_t frameIndex = ctx.frameIndex;
+        if (envCube.isValid() || radianceImportance.isValid())
+        {
+            PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
+            const uint64_t frameIndex = ctx.frameIndex;
 
-        previous = ctx.graph->addPass(
-            kEnvMapUpdatePass,
-            [envCube, radianceImportance](rg::PassBuilder& setup) {
-                if (envCube.isValid())
-                    setup.write(envCube, rg::TextureAccess::UnorderedAccess);
-                if (radianceImportance.isValid())
-                    setup.write(radianceImportance, rg::TextureAccess::UnorderedAccess);
-            },
-            [pathTracingContext, frameIndex](rg::RenderPassContext& passCtx) {
-                if (passCtx.commandList() == nullptr || pathTracingContext == nullptr)
-                    return;
-                updateEnvMapFrame(*pathTracingContext, passCtx.commandList(), frameIndex);
-            },
-            passOptions);
+            previous = ctx.graph->addPass(
+                kEnvMapUpdatePass,
+                [envCube, radianceImportance](rg::PassBuilder& setup) {
+                    if (envCube.isValid())
+                        setup.write(envCube, rg::TextureAccess::UnorderedAccess);
+                    if (radianceImportance.isValid())
+                        setup.write(radianceImportance, rg::TextureAccess::UnorderedAccess);
+                },
+                [pathTracingContext, frameIndex](rg::RenderPassContext& passCtx) {
+                    if (passCtx.commandList() == nullptr || pathTracingContext == nullptr)
+                        return;
+                    updateEnvMapFrame(*pathTracingContext, passCtx.commandList(), frameIndex);
+                },
+                rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
+        }
     }
 
     {
-        rg::PassOptions passOptions{};
-        passOptions.sideEffect = true;
-        passOptions.after = previous;
-
         rg::TextureHandle radianceImportance{};
         rg::BufferHandle lightBuffer{};
         rg::BufferHandle lightProxies{};
@@ -125,35 +119,34 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
         const std::vector<GaussianSplatEmissionProxy>* const gaussianEmissionProxies =
             ctx.gaussianSplatEmissionProxies;
 
-        previous = ctx.graph->addPass(
-            kLightSamplingUpdateBeginPass,
-            [radianceImportance, lightBuffer, lightProxies](rg::PassBuilder& setup) {
-                if (radianceImportance.isValid())
-                    setup.read(radianceImportance, rg::TextureAccess::ShaderResource);
-                if (lightBuffer.isValid())
-                    setup.write(lightBuffer, rg::BufferAccess::UnorderedAccess);
-                if (lightProxies.isValid())
-                    setup.write(lightProxies, rg::BufferAccess::UnorderedAccess);
-            },
-            [pathTracingContext, lightSampling, frameIndex,
-             gaussianEmissionProxies](rg::RenderPassContext& passCtx) {
-                if (passCtx.commandList() == nullptr || pathTracingContext == nullptr
-                    || lightSampling == nullptr)
-                    return;
-                updateLightSamplingBeginFrame(
-                    *pathTracingContext,
-                    passCtx.commandList(),
-                    frameIndex,
-                    gaussianEmissionProxies);
-            },
-            passOptions);
+        if (radianceImportance.isValid() || lightBuffer.isValid() || lightProxies.isValid())
+        {
+            previous = ctx.graph->addPass(
+                kLightSamplingUpdateBeginPass,
+                [radianceImportance, lightBuffer, lightProxies](rg::PassBuilder& setup) {
+                    if (radianceImportance.isValid())
+                        setup.read(radianceImportance, rg::TextureAccess::ShaderResource);
+                    if (lightBuffer.isValid())
+                        setup.write(lightBuffer, rg::BufferAccess::UnorderedAccess);
+                    if (lightProxies.isValid())
+                        setup.write(lightProxies, rg::BufferAccess::UnorderedAccess);
+                },
+                [pathTracingContext, lightSampling, frameIndex,
+                 gaussianEmissionProxies](rg::RenderPassContext& passCtx) {
+                    if (passCtx.commandList() == nullptr || pathTracingContext == nullptr
+                        || lightSampling == nullptr)
+                        return;
+                    updateLightSamplingBeginFrame(
+                        *pathTracingContext,
+                        passCtx.commandList(),
+                        frameIndex,
+                        gaussianEmissionProxies);
+                },
+                rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
+        }
     }
 
     {
-        rg::PassOptions passOptions{};
-        passOptions.sideEffect = true;
-        passOptions.after = previous;
-
         rg::BufferHandle subInstance{};
         rg::BufferHandle constants{};
         if (ctx.subInstanceDataBuffer)
@@ -193,7 +186,7 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx, rg::PassHandle
                         sizeof(FrameConstants));
                 }
             },
-            passOptions);
+            rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Copy });
     }
 
     return previous;

@@ -30,7 +30,14 @@ enum class Aov : uint32_t
     SemanticId   = 1u << 4,
     MotionVector = 1u << 5,
     Segmentation = InstanceId,
+    Diffuse      = 1u << 6,
+    Roughness    = 1u << 7,
+    Specular     = 1u << 8,
+    Metallic     = 1u << 9,
+    Throughput   = 1u << 10,
+    GuideDiffuse = 1u << 11,
     All = Rgb | Depth | Normal | InstanceId | SemanticId | MotionVector
+        | Diffuse | Roughness | Specular | Metallic | Throughput | GuideDiffuse
 };
 
 inline constexpr Aov operator|(Aov a, Aov b)
@@ -80,6 +87,12 @@ struct SensorOutput
     ecs::Entity camera = ecs::NullEntity;
     uint32_t width = 0;
     uint32_t height = 0;
+    uint32_t geometryWidth = 0;
+    uint32_t geometryHeight = 0;
+    uint32_t materialWidth = 0;
+    uint32_t materialHeight = 0;
+    uint32_t guideWidth = 0;
+    uint32_t guideHeight = 0;
     uint32_t aovs = 0;
 
     std::vector<uint8_t> rgb;            // RGBA8, W*H*4
@@ -88,6 +101,12 @@ struct SensorOutput
     std::vector<uint32_t> instanceId;    // W*H, 0 = miss
     std::vector<uint32_t> semanticId;    // W*H, 0 = unlabeled / miss
     std::vector<float> motionVector;     // pixel xy, W*H*2
+    std::vector<float> diffuse;          // first-hit diffuse albedo RGB, W*H*3
+    std::vector<float> roughness;        // first-hit perceptual roughness, W*H
+    std::vector<float> specular;         // first-hit specular F0 RGB, W*H*3
+    std::vector<float> metallic;         // first-hit metalness, W*H
+    std::vector<float> throughput;       // path throughput RGB, W*H*3
+    std::vector<float> guideDiffuse;     // denoiser diffuse-albedo guide RGB, W*H*3
 };
 
 bool addRenderProduct(App& app, RenderProductDesc product);

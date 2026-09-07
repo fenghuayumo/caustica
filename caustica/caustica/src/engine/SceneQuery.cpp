@@ -224,6 +224,25 @@ std::shared_ptr<Material> findMaterial(const App& app, int materialID)
     return wrap;
 }
 
+std::shared_ptr<Material> linkRuntimeMaterialData(
+    const App& app,
+    const std::shared_ptr<Material>& material)
+{
+    const std::shared_ptr<MaterialEx> materialEx =
+        material ? std::dynamic_pointer_cast<MaterialEx>(material) : nullptr;
+    if (!materialEx || materialEx->standardData)
+        return material;
+
+    auto* wr = worldRenderer(app);
+    const auto& cache = wr ? wr->lightingPasses().materials() : nullptr;
+    if (!cache)
+        return material;
+
+    materialEx->standardData = cache->findByResourceId(
+        RenderResourceAccess::materialId(materialEx.get()));
+    return material;
+}
+
 ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex)
 {
     return SceneManager::findEntityByInstanceIndex(activeScene(app), instanceIndex);

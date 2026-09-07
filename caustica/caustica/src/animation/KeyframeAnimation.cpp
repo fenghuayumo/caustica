@@ -53,7 +53,7 @@ float4 caustica::animation::interpolate(const InterpolationMode mode,
     }
 }
 
-std::optional<dm::float4> Sampler::evaluate(float time, bool extrapolateLastValues) const
+std::optional<math::float4> Sampler::evaluate(float time, bool extrapolateLastValues) const
 {
     const size_t count = m_Keyframes.size();
 
@@ -238,11 +238,11 @@ void Sampler::load(Json::Value& node)
     }
 }
 
-std::optional<dm::float4> Sequence::evaluate(const std::string& name, float time, bool extrapolateLastValues)
+std::optional<math::float4> Sequence::evaluate(const std::string& name, float time, bool extrapolateLastValues)
 {
     std::shared_ptr<Sampler> track = getTrack(name);
     if (!track)
-        return std::optional<dm::float4>();
+        return std::optional<math::float4>();
 
     return track->evaluate(time, extrapolateLastValues);
 }

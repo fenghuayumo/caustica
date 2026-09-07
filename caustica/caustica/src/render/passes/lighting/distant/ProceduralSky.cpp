@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cmath>
+#include <chrono>
 
 using namespace caustica::math;
 using namespace caustica;
@@ -70,8 +71,8 @@ void ProceduralSky::reloadShaders(std::shared_ptr<caustica::ShaderFactory> shade
 
 float3 ProceduralSky::computeSunDirection(float elevationDeg, float azimuthDeg) const
 {
-    const float elev = dm::radians(dm::clamp(elevationDeg, -89.9f, 89.9f));
-    const float azim = dm::radians(azimuthDeg);
+    const float elev = math::radians(math::clamp(elevationDeg, -89.9f, 89.9f));
+    const float azim = math::radians(azimuthDeg);
     // Sky-local Z-up: elevation from horizon, azimuth from +X toward +Y.
     return normalize(float3(
         std::cos(elev) * std::cos(azim),
@@ -309,7 +310,7 @@ void ProceduralSky::applyAerialPerspective(
     caustica::rhi::CommandList* commandList,
     caustica::rhi::Texture* color,
     caustica::rhi::Texture* depth,
-    const caustica::IView& view,
+    const caustica::ViewInfo& view,
     uint width,
     uint height,
     const float3& environmentTint,
@@ -320,7 +321,7 @@ void ProceduralSky::applyAerialPerspective(
         return;
 
     AerialPerspectiveConstants constants = {};
-    view.fillPlanarViewConstants(constants.View);
+    fillViewConstants(constants.View, view);
     constants.Atmosphere = m_lastConstants.Atmosphere;
     constants.SunDir = m_lastConstants.SunDir;
     constants.CameraHeightKm = m_lastConstants.CameraHeightKm;
@@ -328,13 +329,13 @@ void ProceduralSky::applyAerialPerspective(
     constants.WorldToKilometers = m_worldToKilometers;
     constants.RadianceMultiplier = environmentTint * std::max(environmentIntensity, 0.0f);
     constants.MaxDistanceKm = m_aerialPerspectiveMaxDistanceKm;
-    const affine3 skyToWorld = dm::rotation(dm::radians(environmentRotationDeg));
+    const affine3 skyToWorld = math::rotation(math::radians(environmentRotationDeg));
     constants.AtmosphereBasisXWorld = skyToWorld.transformVector(float3(1.0f, 0.0f, 0.0f));
     constants.AtmosphereBasisYWorld = skyToWorld.transformVector(float3(0.0f, 0.0f, 1.0f));
     constants.AtmosphereBasisZWorld = skyToWorld.transformVector(float3(0.0f, 1.0f, 0.0f));
     constants.OutputSize = uint2(width, height);
     constants.ReverseDepth = view.isReverseDepth() ? 1u : 0u;
-    constants.SampleCount = (uint)dm::clamp(m_aerialPerspectiveSampleCount, 1, 64);
+    constants.SampleCount = (uint)math::clamp(m_aerialPerspectiveSampleCount, 1, 64);
     commandList->writeBuffer(m_aerialPerspectiveConstantBuffer, &constants, sizeof(constants));
 
     caustica::rhi::BindingSetDesc bindingSetDesc;
@@ -375,7 +376,7 @@ bool ProceduralSky::update(
 
     fillEarthAtmosphere(outConstants.Atmosphere);
 
-    outConstants.CameraHeightKm = dm::clamp(
+    outConstants.CameraHeightKm = math::clamp(
         m_cameraHeightKm,
         0.001f,
         m_atmosphereHeightKm - 0.001f);
@@ -431,9 +432,27 @@ bool ProceduralSky::update(
     }
     else if (m_animateSun)
     {
-        // free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
+        // Free sky day-cycle: elevation from -max..+max, azimuth swings ±90° around noon bearing.
+        // Advances on a wall clock so pure-static scenes (no skeletal/imported
+        // animation entities) still get a moving sun. Frozen when
+        // forceInstantUpdate (offline accumulation / scrubbing) so lighting
+        // stays stable while accumulating samples.
+        const double wallNow = std::chrono::duration<double>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        float animDt = 0.0f;
+        if (!forceInstantUpdate)
+        {
+            if (m_wallTimeValid)
+                animDt = (float)caustica::math::clamp(wallNow - m_lastWallTime, 0.0, 0.3);
+            m_lastWallTime = wallNow;
+            m_wallTimeValid = true;
+        }
+        else
+        {
+            m_wallTimeValid = false;
+        }
         const float daysPerSecond = m_sunAnimSpeed / 60.0f;
-        m_sunAnimPhase = (float)std::fmod(m_sunAnimPhase + deltaTime * daysPerSecond + 1.0, 1.0);
+        m_sunAnimPhase = (float)std::fmod(m_sunAnimPhase + animDt * daysPerSecond + 1.0, 1.0);
         const float dayAngle = m_sunAnimPhase * 2.0f * PI_f;
         m_sunElevationDeg = std::sin(dayAngle) * m_sunAnimMaxElevation;
         m_sunAzimuthDeg = WrapDegrees360(m_noonAzimuthDeg + std::cos(dayAngle) * 90.0f);

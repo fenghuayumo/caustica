@@ -122,7 +122,7 @@ void RayTracingPass::execute(
         if (pushConstants)
             commandList->setPushConstants(pushConstants, pushConstantSize);
 
-        commandList->dispatch(dm::div_ceil(width, ComputeGroupSize), dm::div_ceil(height, ComputeGroupSize), 1);
+        commandList->dispatch(math::div_ceil(width, ComputeGroupSize), math::div_ceil(height, ComputeGroupSize), 1);
     }
     else
     {

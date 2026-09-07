@@ -44,11 +44,15 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/pathTrace/PathTracePass.h>
+#include <render/passes/pathTrace/PathTraceGraphResources.h>
 #include <render/passes/debug/ShaderDebug.h>
 #include <core/log.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cctype>
+#include <iterator>
+#include <string_view>
 #include <string>
 #include <assets/loader/ShaderFactory.h>
 #include <render/gpuSort/GPUSort.h>
@@ -270,6 +274,8 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(87));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(88));
     globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(89));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(90));
+    globalBindingLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(91));
 
     m_bindingLayout = gpuDevice->createBindingLayout(globalBindingLayoutDesc);
 }
@@ -286,6 +292,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
     m_renderBufferPool.setDevice(device);
     m_frameGraph.setRenderTargetPool(&m_renderTargetPool);
     m_frameGraph.setRenderBufferPool(&m_renderBufferPool);
+    createGraphScratchFallbacks();
 
 #if CAUSTICA_WITH_NATIVE_DLSS
     m_nativeDLSS = caustica::render::DLSS::create(device, *m_context->shaderFactory, caustica::getDirectoryWithExecutable().string());
@@ -564,7 +571,7 @@ SimpleViewConstants FromPlanarViewConstants(PlanarViewConstants & view)
     return ret;
 }
 
-void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList )
+bool caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList )
 {
     (void)exposureResetRequired;
     m_context->bindingCache.clear();
@@ -589,7 +596,10 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
     createPostProcessRenderPasses();
 
     if (!createPTPipeline())
-        { assert(false); }
+    {
+        caustica::error("WorldRenderer: failed to create path-tracing export pipeline");
+        return false;
+    }
 
     const uint2 screenResolution = {
         m_renderTargets->outputColor->getDesc().width,
@@ -613,6 +623,8 @@ void caustica::render::WorldRenderer::createRenderPasses( bool& exposureResetReq
         m_renderTargets,
         m_shaderDebug,
         m_bindingLayout);
+
+    return true;
 }
 
 bool caustica::render::WorldRenderer::createPTPipeline()
@@ -900,6 +912,11 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         gaussianSplatBuffer = primaryGaussianSplatPass->getSplatBuffer();
     }
 
+    auto scratchOrFallback = [this](const caustica::rhi::TextureHandle& published,
+        const caustica::rhi::TextureHandle& fallback) -> caustica::rhi::Texture* {
+        return published ? published.Get() : fallback.Get();
+    };
+
     // Fixed resources that do not change between binding sets
     caustica::rhi::BindingSetDesc bindingSetDescBase;
     bindingSetDescBase.bindings = {
@@ -912,7 +929,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(3, gpuHandles.geometryBuffer),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(4, geometryDebugBuffer),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(5, materialDataBuffer),
-        caustica::rhi::BindingSetItem::Texture_SRV(6,  m_renderTargets->ldrColorScratch, caustica::rhi::Format::SRGBA8_UNORM),
+        caustica::rhi::BindingSetItem::Texture_SRV(6,  scratchOrFallback(m_renderTargets->ldrColorScratch, m_ldrColorScratchFallback), caustica::rhi::Format::SRGBA8_UNORM),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
         caustica::rhi::BindingSetItem::Texture_SRV(10, environment->getEnvMapCube()),
@@ -937,7 +954,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_UAV(5, m_renderTargets->screenMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(6, m_renderTargets->depth),
         caustica::rhi::BindingSetItem::Texture_UAV(7, m_renderTargets->specularHitT), 
-        caustica::rhi::BindingSetItem::Texture_UAV(8, m_renderTargets->scratchFloat1), 
+        caustica::rhi::BindingSetItem::Texture_UAV(8, scratchOrFallback(m_renderTargets->scratchFloat1, m_scratchFloat1Fallback)), 
         caustica::rhi::BindingSetItem::Texture_UAV(31, m_renderTargets->denoiserViewspaceZ),
         caustica::rhi::BindingSetItem::Texture_UAV(32, m_renderTargets->denoiserMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(33, m_renderTargets->denoiserNormalRoughness),
@@ -956,7 +973,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_UAV(72, m_renderTargets->rrNormalsAndRoughness),
         caustica::rhi::BindingSetItem::Texture_UAV(73, m_renderTargets->rrSpecMotionVectors),
         caustica::rhi::BindingSetItem::Texture_UAV(74, (m_renderTargets->rrTransparencyLayer!=nullptr)?m_renderTargets->rrTransparencyLayer:m_renderTargets->rrSpecMotionVectors),
-        caustica::rhi::BindingSetItem::Texture_UAV(75, m_renderTargets->denoiserAvgLayerRadianceHalfRes),
+        caustica::rhi::BindingSetItem::Texture_UAV(75, scratchOrFallback(m_renderTargets->denoiserAvgLayerRadianceHalfRes, m_avgLayerFallback)),
 
         ///***
         caustica::rhi::BindingSetItem::Texture_UAV(100, m_renderTargets->baseColor),
@@ -1007,6 +1024,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(87, m_context->renderDevice.builtins().blackTexture()));  // t_PrevDepth placeholder
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(88, m_renderTargets->sensorNormalDepth));
         bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(89, m_renderTargets->sensorIds));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(90, m_renderTargets->sensorMaterial));
+        bindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(91, m_renderTargets->sensorSpecular));
 
         caustica::rhi::BindingSetHandle bindingSet =
             device()->createBindingSet(bindingSetDesc, m_bindingLayout);
@@ -1026,6 +1045,56 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
                     : nullptr);
         }
     }
+}
+
+void caustica::render::WorldRenderer::createGraphScratchFallbacks()
+{
+    caustica::rhi::Device* const device = this->device();
+    if (!device)
+        return;
+
+    caustica::rhi::TextureDesc desc;
+    desc.width = 1;
+    desc.height = 1;
+    desc.dimension = caustica::rhi::TextureDimension::Texture2D;
+    desc.keepInitialState = true;
+    desc.isUAV = true;
+    desc.initialState = caustica::rhi::ResourceStates::UnorderedAccess;
+
+    desc.format = caustica::rhi::Format::R32_FLOAT;
+    desc.debugName = "scratchFloat1Fallback";
+    m_scratchFloat1Fallback = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+    desc.debugName = "avgLayerFallback";
+    m_avgLayerFallback = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::SRGBA8_UNORM;
+    desc.isTypeless = true;
+    desc.debugName = "ldrColorScratchFallback";
+    m_ldrColorScratchFallback = device->createTexture(desc);
+}
+
+void caustica::render::WorldRenderer::publishGraphScratchBindings(rg::GraphBuilder& graph)
+{
+    if (!m_renderTargets)
+        return;
+
+    bool changed = false;
+    const auto assignIfChanged = [&](rg::TextureHandle handle, caustica::rhi::TextureHandle& dest) {
+        const caustica::rhi::TextureHandle owned = graph.ownedTextureHandle(handle);
+        if (!owned || owned == dest)
+            return;
+        dest = owned;
+        changed = true;
+    };
+
+    assignIfChanged(graph.findTexture(kScratchFloat1Name), m_renderTargets->scratchFloat1);
+    assignIfChanged(graph.findTexture(kAvgLayerRadianceName), m_renderTargets->denoiserAvgLayerRadianceHalfRes);
+    assignIfChanged(graph.findTexture(kLdrColorScratchName), m_renderTargets->ldrColorScratch);
+
+    if (changed || !m_sceneBindings.ready())
+        recreateBindingSet(m_context ? m_context->frameScene : nullptr);
 }
 
 void caustica::render::WorldRenderer::denoisedScreenshot(caustica::rhi::Texture* framebufferTexture) const
@@ -1088,13 +1157,13 @@ void caustica::render::WorldRenderer::syncCameraViews()
     m_context->camera.updateViews(makeCameraUpdateParams());
     // Stable primary-hit pick: disable TAA/DLSS jitter for the pick frame.
     if (m_context->activeRuntime().Picking.hasActivePickRequest())
-        m_context->camera.view()->setPixelOffset(dm::float2::zero());
+        m_context->camera.view()->setPixelOffset(math::float2::zero());
 }
 
-dm::float2 caustica::render::WorldRenderer::computeCameraJitter() const
+math::float2 caustica::render::WorldRenderer::computeCameraJitter() const
 {
     if (m_context->activeRuntime().Picking.hasActivePickRequest())
-        return dm::float2::zero();
+        return math::float2::zero();
     return m_context->camera.computeJitter(makeCameraUpdateParams());
 }
 
@@ -1348,8 +1417,8 @@ void caustica::render::WorldRenderer::streamlinePreRender()
                     // this is an example on how to override defaults - overriding default 2/3 to higher res 3/4
                     if (dlssOptions.mode == SI::DLSSMode::eMaxQuality)
                     {
-                        m_recommendedDLSSSettings.optimalRenderSize.x = dm::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.x, m_recommendedDLSSSettings.maxRenderSize.x);
-                        m_recommendedDLSSSettings.optimalRenderSize.y = dm::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.y, m_recommendedDLSSSettings.maxRenderSize.y);
+                        m_recommendedDLSSSettings.optimalRenderSize.x = math::clamp((int)(dlssOptions.outputWidth * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.x, m_recommendedDLSSSettings.maxRenderSize.x);
+                        m_recommendedDLSSSettings.optimalRenderSize.y = math::clamp((int)(dlssOptions.outputHeight * 3 / 4 + 0.5f), m_recommendedDLSSSettings.minRenderSize.y, m_recommendedDLSSSettings.maxRenderSize.y);
                     }
 
                     if (m_recommendedDLSSSettings.optimalRenderSize.x <= 0 || m_recommendedDLSSSettings.optimalRenderSize.y <= 0)
@@ -1465,3 +1534,133 @@ void caustica::render::WorldRenderer::nativeDLSSPreRender()
 }
 #endif
 
+
+
+// ----------------------------------------------------------------------------
+// Debug texture vis (editor `vis <name>` console command / texture viewer).
+// Merges two sources:
+//   1. Canonical RenderTargets textures (frame-persistent members).
+//   2. The last executed frame graph's named textures — any pass that names its
+//      rg::createTexture() targets becomes `vis <name>`-able automatically.
+// The graph snapshot is captured after graph->execute() on the render thread
+// and read from the UI thread; a small mutex keeps the pointer vector stable.
+// Note: transient pooled textures may be aliased by later same-frame passes,
+// so a vis'd scratch texture can legitimately show post-alias content.
+// ----------------------------------------------------------------------------
+namespace caustica::render
+{
+namespace
+{
+struct DebugViewTextureEntry
+{
+    const char* name;
+    caustica::rhi::TextureHandle RenderTargets::* handle;
+};
+
+constexpr DebugViewTextureEntry kDebugViewTextures[] = {
+    { "outputColor", &RenderTargets::outputColor },
+    { "processedOutputColor", &RenderTargets::processedOutputColor },
+    { "accumulatedRadiance", &RenderTargets::accumulatedRadiance },
+    { "ldrColor", &RenderTargets::ldrColor },
+    { "depth", &RenderTargets::depth },
+    { "screenMotionVectors", &RenderTargets::screenMotionVectors },
+    { "baseColor", &RenderTargets::baseColor },
+    { "specNormal", &RenderTargets::specNormal },
+    { "roughnessMetal", &RenderTargets::roughnessMetal },
+    { "materialInfo", &RenderTargets::materialInfo },
+    { "specularHitT", &RenderTargets::specularHitT },
+    { "throughput", &RenderTargets::throughput },
+    { "sensorNormalDepth", &RenderTargets::sensorNormalDepth },
+    { "sensorMaterial", &RenderTargets::sensorMaterial },
+    { "sensorSpecular", &RenderTargets::sensorSpecular },
+    { "sensorIds", &RenderTargets::sensorIds },
+    { "denoiserViewspaceZ", &RenderTargets::denoiserViewspaceZ },
+    { "denoiserMotionVectors", &RenderTargets::denoiserMotionVectors },
+    { "denoiserNormalRoughness", &RenderTargets::denoiserNormalRoughness },
+    { "denoiserDiffRadianceHitDist", &RenderTargets::denoiserDiffRadianceHitDist },
+    { "denoiserSpecRadianceHitDist", &RenderTargets::denoiserSpecRadianceHitDist },
+    { "denoiserOutValidation", &RenderTargets::denoiserOutValidation },
+    { "stableRadiance", &RenderTargets::stableRadiance },
+    { "secondarySurfacePositionNormal", &RenderTargets::secondarySurfacePositionNormal },
+    { "secondarySurfaceRadiance", &RenderTargets::secondarySurfaceRadiance },
+    { "ssrResult", &RenderTargets::ssrResult },
+    { "combinedHistoryClampRelax", &RenderTargets::combinedHistoryClampRelax },
+    { "rrDiffuseAlbedo", &RenderTargets::rrDiffuseAlbedo },
+    { "rrSpecAlbedo", &RenderTargets::rrSpecAlbedo },
+    { "rrNormalsAndRoughness", &RenderTargets::rrNormalsAndRoughness },
+    { "rrSpecMotionVectors", &RenderTargets::rrSpecMotionVectors },
+};
+
+bool DebugNameIEquals(std::string_view a, std::string_view b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i])))
+            return false;
+    return true;
+}
+
+} // namespace
+
+std::vector<WorldRenderer::DebugNamedTexture> WorldRenderer::debugTextureList() const
+{
+    std::vector<DebugNamedTexture> list;
+    if (m_renderTargets != nullptr)
+    {
+        for (const DebugViewTextureEntry& entry : kDebugViewTextures)
+        {
+            const caustica::rhi::TextureHandle& handle = m_renderTargets.get()->*entry.handle;
+            if (handle)
+                list.push_back({ entry.name, handle.Get() });
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+    for (const rg::GraphBuilder::NamedTexture& named : m_debugTextureSnapshot)
+    {
+        if (named.texture == nullptr)
+            continue;
+        bool duplicate = false;
+        for (const DebugNamedTexture& existing : list)
+        {
+            if (DebugNameIEquals(existing.name, named.name))
+            {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate)
+            list.push_back({ named.name, named.texture });
+    }
+    return list;
+}
+
+uint32_t WorldRenderer::debugViewTextureCount() const
+{
+    return static_cast<uint32_t>(debugTextureList().size());
+}
+
+bool WorldRenderer::debugViewTextureInfo(
+    uint32_t index, std::string* outName, caustica::rhi::Texture** outTexture) const
+{
+    const std::vector<DebugNamedTexture> list = debugTextureList();
+    if (index >= list.size())
+        return false;
+    if (outName)
+        *outName = list[index].name;
+    if (outTexture)
+        *outTexture = list[index].texture;
+    return true;
+}
+
+caustica::rhi::Texture* WorldRenderer::findDebugViewTexture(std::string_view name) const
+{
+    for (const DebugNamedTexture& entry : debugTextureList())
+        if (DebugNameIEquals(entry.name, name))
+            return entry.texture;
+    return nullptr;
+}
+
+} // namespace caustica::render

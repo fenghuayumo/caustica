@@ -19,7 +19,7 @@ namespace caustica
     struct SkinnedMeshJoint
     {
         ecs::Entity jointEntity = ecs::NullEntity;
-        dm::float4x4 inverseBindMatrix = dm::float4x4::identity();
+        math::float4x4 inverseBindMatrix = math::float4x4::identity();
     };
 
     // =========================================================================
@@ -43,9 +43,9 @@ namespace caustica
     // Each field is optional so load applies only keys that were actually authored.
     struct EnvironmentLookSettings
     {
-        std::optional<dm::float3> tintColor;
+        std::optional<math::float3> tintColor;
         std::optional<float> intensity;
-        std::optional<dm::float3> rotationXYZ;
+        std::optional<math::float3> rotationXYZ;
         std::optional<bool> visibleToCamera;
         std::optional<bool> enabled;
         std::optional<std::string> overrideSource;
@@ -57,7 +57,7 @@ namespace caustica
         std::optional<float> footprintScale;
         std::optional<float> alphaScale;
         std::optional<float> brightness;
-        std::optional<dm::float3> tintColor;
+        std::optional<math::float3> tintColor;
         std::optional<bool> applyToneMapping;
         std::optional<bool> asEmitter;
         std::optional<float> emissionIntensity;

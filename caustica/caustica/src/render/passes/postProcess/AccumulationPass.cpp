@@ -61,8 +61,8 @@ void AccumulationPass::createBindingSet(caustica::rhi::Texture* inputTexture, ca
 
 void AccumulationPass::render(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView& sourceView,
-    const caustica::IView& upscaledView,
+    const caustica::ViewInfo& sourceView,
+    const caustica::ViewInfo& upscaledView,
     float accumulationWeight)
 {
     commandList->beginMarker("Accumulation");
@@ -87,8 +87,8 @@ void AccumulationPass::render(
     commandList->setPushConstants(&constants, sizeof(constants));
     
     commandList->dispatch(
-        dm::div_ceil(upscaledView.getViewExtent().width(), 8), 
-        dm::div_ceil(upscaledView.getViewExtent().height(), 8), 
+        math::div_ceil(upscaledView.getViewExtent().width(), 8), 
+        math::div_ceil(upscaledView.getViewExtent().height(), 8), 
         1);
 
     commandList->endMarker();

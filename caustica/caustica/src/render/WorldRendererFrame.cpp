@@ -86,7 +86,8 @@ void caustica::render::WorldRenderer::populateFrameView(ExtractedFrameView& view
     view.renderSize = m_renderSize;
     view.displayAspectRatio = m_displayAspectRatio;
 
-    view.postProcessView = *m_context->camera.view();
+    view.main = *m_context->camera.view();
+    view.postProcessView = view.main;
     ViewportDesc windowViewport(float(m_displaySize.x), float(m_displaySize.y));
     view.postProcessView.setViewport(windowViewport);
     view.postProcessView.updateCache();
@@ -141,6 +142,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .environment = m_context->scenePasses.lighting.environment().get(),
         .bindingLayout = m_bindingLayout,
         .bindingSet = m_sceneBindings.bindingSet(),
+        .sceneBindings = &m_sceneBindings,
         .descriptorTable = descriptorTable,
         .constantBuffer = m_constantBuffer,
         .ptBuildStablePlanes = rayTracing.pipelineBuildStablePlanes(),
@@ -170,8 +172,7 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .frameIndex = m_frameIndex,
         .accumulationSampleIndex = m_accumulationSampleIndex,
         .accumulationCompleted = m_accumulationCompleted,
-        .view = m_context->camera.view().get(),
-        .compositeView = m_context->camera.view().get(),
+        .view = &ctx.view.main,
         .hasScene = m_context->hasFrameScene(),
         .aaReset = aaReset,
         .commandListWasClosed = &ctx.commandListWasClosed,
@@ -256,6 +257,19 @@ void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
     if (ctx.frame.aborted)
         return;
 
+    // Debug overlay composites AFTER the graph's final blit, directly onto the
+    // presented framebuffer (editor viewport FB or swapchain). Recording it
+    // earlier gets overwritten by the graph-owned tone-mapping write to ldrColor.
+    if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
+    {
+        caustica::rhi::Framebuffer* presentFb = ctx.frame.framebuffer;
+        m_shaderDebug->endFrameAndOutput(
+            m_frameCommands->primary(),
+            presentFb,
+            m_renderTargets->depth,
+            presentFb->getFramebufferInfo().getViewport());
+    }
+
     framePassFinalize(ctx.frame);
 }
 
@@ -285,18 +299,6 @@ FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameCo
     ctx.commandListWasClosed = false;
     ctx.graphBuilt = true;
 
-    caustica::rhi::Framebuffer* framebuffer = ctx.frame.framebuffer;
-    const auto& fbinfo = framebuffer->getFramebufferInfo();
-
-    if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
-    {
-        m_shaderDebug->endFrameAndOutput(
-            m_frameCommands->primary(),
-            m_renderTargets->ldrFramebuffer->getFramebuffer(ctx.view.postProcessView),
-            m_renderTargets->depth,
-            fbinfo.getViewport());
-    }
-
     return makeFrameGraphContext(ctx);
 }
 
@@ -312,6 +314,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
             telemetryFrame,
             FrameCpuStage::GraphCompile);
         ctx.graph->compile();
+        publishGraphScratchBindings(*ctx.graph);
     }
 
     while (auto timingFrame = ctx.graph->collectCompletedGpuTimings())
@@ -363,6 +366,13 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         ctx.graph->lastCompileCacheHit());
     m_renderTargetPool.endFrame();
     m_renderBufferPool.endFrame();
+
+    // Debug texture vis: publish this frame's named graph textures for the
+    // editor `vis` command / texture viewer (UI thread reads the snapshot).
+    {
+        std::lock_guard<std::mutex> lock(m_debugTextureSnapshotMutex);
+        m_debugTextureSnapshot = ctx.graph->namedTextureSnapshot();
+    }
 
     // ToneMapping / ReferenceOIDN may close+reopen primary mid-graph; they rewrite
     // FrameConstants before later passes. A final rewrite covers any leftover use.
@@ -451,17 +461,18 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
         return;
     }
 
-    const bool environmentLightPresent = std::any_of(
+    const bool distantLightPresent = std::any_of(
         m_context->frameLights().begin(),
         m_context->frameLights().end(),
         [](const scene::LightRenderProxy& light) {
-            return scene::tryGetEnvironmentLightData(light.data) != nullptr;
+            return scene::tryGetEnvironmentLightData(light.data) != nullptr
+                || scene::tryGetDirectionalLightData(light.data) != nullptr;
         });
     caustica::syncEnvMapSceneParams(
         m_context->activeSettings(),
         m_context->scenePasses.lighting.envMapSceneParams(),
         c_envMapRadianceScale,
-        environmentLightPresent);
+        distantLightPresent);
 
     if (m_context->scenePasses.rayTracing.consumeShaderReloadRequest())
     {
@@ -564,12 +575,18 @@ void caustica::render::WorldRenderer::framePassRendererInit(PathTracingFrameCont
             return;
         }
         m_frameCommands->beginPrimary();
-        createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
+        const bool renderPassesCreated = createRenderPasses(ctx.exposureResetRequired, m_frameCommands->primaryHandle());
         m_frameCommands->endFrame();
         caustica::info("WorldRenderer: needNewPasses graphics fence (post createRenderPasses)");
         if (!waitGraphicsQueueFence("post createRenderPasses", /*runGc=*/false))
         {
             caustica::error("WorldRenderer: post-createRenderPasses graphics fence failed");
+            ctx.aborted = true;
+            return;
+        }
+        if (!renderPassesCreated)
+        {
+            caustica::error("WorldRenderer: render pass creation failed; aborting frame");
             ctx.aborted = true;
             return;
         }
@@ -686,7 +703,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
 
     if (m_context->activeSettings().EnableShaderDebug && m_shaderDebug)
     {
-        dm::float4x4 viewProj = m_context->camera.view()->getViewProjectionMatrix();
+        math::float4x4 viewProj = m_context->camera.view()->getViewProjectionMatrix();
         m_shaderDebug->beginFrame(m_frameCommands->primary(), viewProj);
     }
 
@@ -863,7 +880,7 @@ void caustica::render::WorldRenderer::mergeImmediateMaterialPick()
 
     const uint64_t packedPosition =
         m_immediateMaterialPickPosition.load(std::memory_order_relaxed);
-    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+    m_frameRuntimeSnapshot.Picking.Position = math::uint2{
         uint32_t(packedPosition >> 32u),
         uint32_t(packedPosition & 0xffffffffu)};
     m_frameRuntimeSnapshot.Picking.MaterialRequestId = requestId;
@@ -894,7 +911,7 @@ void caustica::render::WorldRenderer::mergeImmediateInstancePick()
 
     const uint64_t packedPosition =
         m_immediateInstancePickPosition.load(std::memory_order_relaxed);
-    m_frameRuntimeSnapshot.Picking.Position = dm::uint2{
+    m_frameRuntimeSnapshot.Picking.Position = math::uint2{
         uint32_t(packedPosition >> 32u),
         uint32_t(packedPosition & 0xffffffffu)};
     m_frameRuntimeSnapshot.Picking.InstanceRequestId = requestId;
@@ -949,9 +966,9 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         lighting.environment()->getImportanceSampling()->getShaderParams();
 
     PlanarViewConstants view;
-    m_context->camera.view()->fillPlanarViewConstants(view);
+    fillViewConstants(view, *m_context->camera.view());
     PlanarViewConstants previousView;
-    m_context->camera.viewPrevious()->fillPlanarViewConstants(previousView);
+    fillViewConstants(previousView, *m_context->camera.viewPrevious());
     constants.view = FromPlanarViewConstants(view);
     constants.previousView = FromPlanarViewConstants(previousView);
 
@@ -966,7 +983,7 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     // this frame's path-trace space only here — after DLSS has settled m_renderSize.
     // Input must not pre-scale with live getRenderSize() (render thread resets it
     // to framebuffer size at the start of every render()).
-    auto displayToRenderPixel = [this](dm::uint2 displayPixel) -> dm::int2 {
+    auto displayToRenderPixel = [this](math::uint2 displayPixel) -> math::int2 {
         if (m_displaySize.x == 0 || m_displaySize.y == 0
             || m_renderSize.x == 0 || m_renderSize.y == 0)
             return { -1, -1 };
@@ -977,14 +994,14 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
         return { x, y };
     };
 
-    const dm::uint2 pickDisplayPixel =
+    const math::uint2 pickDisplayPixel =
         m_context->activeRuntime().Picking.hasActivePickRequest()
         ? m_context->activeRuntime().Picking.Position
         : m_context->activeSettings().DebugPixel;
-    const dm::int2 pickPixel = pickActive
+    const math::int2 pickPixel = pickActive
         ? displayToRenderPixel(pickDisplayPixel)
-        : dm::int2{ -1, -1 };
-    const dm::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
+        : math::int2{ -1, -1 };
+    const math::int2 mousePixel = displayToRenderPixel(m_context->activeSettings().MousePos);
 
     constants.debug.pickX = pickPixel.x;
     constants.debug.pickY = pickPixel.y;
@@ -1126,14 +1143,30 @@ void caustica::render::WorldRenderer::framePassFinalize(PathTracingFrameContext&
 namespace caustica::render
 {
 
-rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
+void seedFrameSlots(FrameSlots& slots, FrameGraphContext ctx)
+{
+    assert(ctx.graph);
+    assert(ctx.renderTargets);
+    const auto identity = [](rg::TextureHandle handle) {
+        handle.version = 0;
+        return handle;
+    };
+    slots.outputColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->outputColor, rg::TextureAccess::UnorderedAccess));
+    slots.hdrColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->processedOutputColor, rg::TextureAccess::UnorderedAccess));
+    slots.ldrColor = identity(ctx.graph->importTexture(
+        ctx.renderTargets->ldrColor, rg::TextureAccess::ShaderResource));
+    slots.depth = identity(ctx.graph->importTexture(
+        ctx.renderTargets->depth, rg::TextureAccess::UnorderedAccess));
+}
+
+rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx, FrameSlots& slots)
 {
     if (!ctx.graph || !ctx.renderTargets)
         return {};
 
-    const rg::TextureHandle depth = ctx.graph->importTexture(
-        ctx.renderTargets->depth,
-        rg::TextureAccess::UnorderedAccess);
+    const rg::TextureHandle depth = slots.depth;
     const rg::TextureHandle combinedHistoryClampRelax = ctx.graph->importTexture(
         ctx.renderTargets->combinedHistoryClampRelax,
         rg::TextureAccess::UnorderedAccess);
@@ -1148,13 +1181,12 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
         [renderTargets](rg::RenderPassContext& passCtx) {
             renderTargets->clear(passCtx.commandList());
         },
-        rg::PassOptions{ .sideEffect = true });
+        {});
 
     if (!ctx.hasScene)
     {
-        const rg::TextureHandle outputColor = ctx.graph->importTexture(
-            ctx.renderTargets->outputColor,
-            rg::TextureAccess::UnorderedAccess);
+        const rg::TextureHandle outputColor = slots.outputColor;
+        ctx.graph->extractTexture(outputColor, rg::TextureAccess::UnorderedAccess);
 
         ctx.graph->addPass(
             "ClearNoSceneOutput",
@@ -1166,8 +1198,7 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
                     passCtx.texture(outputColor),
                     caustica::rhi::AllSubresources,
                     caustica::rhi::Color(1, 1, 0, 0));
-            },
-            rg::PassOptions{ .sideEffect = true, .after = clearFrameTargets });
+            });
     }
 
     return clearFrameTargets;
@@ -1176,32 +1207,31 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx)
 void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
 {
     assert(ctx.settings);
+    assert(ctx.graph);
+    assert(ctx.renderTargets);
 
-    const rg::PassHandle clear = registerClearFrameTargetsPass(ctx);
-    const rg::PassHandle frameConstants = registerUploadFrameConstantsPass(ctx, clear);
-    const rg::PassHandle lightingReady = registerLightingGraphPasses(ctx, frameConstants);
-    const rg::PassHandle rtxdiBeginReady = registerRtxdiBeginFramePass(ctx, lightingReady);
-    const rg::PassHandle pathTracePreReady = registerPathTracePrePass(ctx, rtxdiBeginReady);
-    const rg::PassHandle vbufferReady = registerVBufferExportPass(ctx, pathTracePreReady);
+    FrameSlots slots{};
+    seedFrameSlots(slots, ctx);
 
-    const rg::PassHandle pathTraceInputsReady = ctx.settings->RealtimeMode
-        ? vbufferReady
-        : lightingReady;
-    const rg::PassHandle lightingEndReady =
-        registerPathTraceLightingEndPass(ctx, pathTraceInputsReady);
-    const rg::PassHandle gaussianAccelReady =
-        registerGaussianSplatAccelBuildPass(ctx, lightingEndReady);
-    const rg::PassHandle mainPathTraceReady = registerMainPathTracePass(ctx, gaussianAccelReady);
-    const rg::PassHandle rtxdiExecuteReady = registerRtxdiExecutePass(ctx, mainPathTraceReady);
-    const rg::PassHandle denoiseGuidesReady = registerDenoiserPreparePass(ctx, rtxdiExecuteReady);
-    (void)registerNrdPass(ctx, denoiseGuidesReady);
-    (void)registerGaussianSplatPreAAPass(ctx);
-    (void)registerDenoiseAAPass(ctx);
+    registerClearFrameTargetsPass(ctx, slots);
+    registerUploadFrameConstantsPass(ctx);
+    registerLightingGraphPasses(ctx);
+    registerRtxdiBeginFramePass(ctx);
+    registerGaussianSplatAccelBuildPass(ctx);
+    registerPathTracePrePass(ctx);
+    registerVBufferExportPass(ctx);
+    registerPathTraceLightingEndPass(ctx);
+    registerMainPathTracePass(ctx);
+    registerRtxdiExecutePass(ctx);
+    registerDenoiserPreparePass(ctx);
+    registerNrdPass(ctx);
+    registerGaussianSplatPreAAPass(ctx, slots);
+    registerDenoiseAAPass(ctx, slots);
     if (ctx.settings->GaussianSplatApplyToneMapping)
-        (void)registerGaussianSplatCompositePass(ctx);
-    registerPostProcessGraphPasses(ctx);
-    const rg::PassHandle blitReady = registerCompositeGraphPasses(ctx);
-    (void)registerDebugOverlayGraphPasses(ctx, blitReady);
+        registerGaussianSplatCompositePass(ctx, slots);
+    registerPostProcessGraphPasses(ctx, slots);
+    registerCompositeGraphPasses(ctx, slots);
+    registerDebugOverlayGraphPasses(ctx, slots);
 }
 
 } // namespace caustica::render

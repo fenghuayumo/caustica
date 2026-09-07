@@ -168,13 +168,13 @@ namespace
         pose.position = ToDouble3(position);
         pose.rotation = ToDQuatXYZW(rotation);
         pose.scaling = ToDouble3(scaling);
-        if (!dm::all(dm::isfinite(pose.position))
-            || !dm::all(dm::isfinite(pose.rotation))
-            || !dm::all(dm::isfinite(pose.scaling)))
+        if (!math::all(math::isfinite(pose.position))
+            || !math::all(math::isfinite(pose.rotation))
+            || !math::all(math::isfinite(pose.scaling)))
         {
             throw std::runtime_error("pose values must be finite");
         }
-        const double rotationNorm = dm::length(pose.rotation);
+        const double rotationNorm = math::length(pose.rotation);
         if (!std::isfinite(rotationNorm) || rotationNorm <= 1e-12)
             throw std::runtime_error("pose rotation quaternion must be non-zero");
         pose.rotation /= rotationNorm;
@@ -198,9 +198,9 @@ namespace
             ToFloat3(nb::borrow<nb::object>(pose[0])),
             ToFloat3(nb::borrow<nb::object>(pose[1])),
             ToFloat3(nb::borrow<nb::object>(pose[2])) };
-        if (!dm::all(dm::isfinite(result.position))
-            || !dm::all(dm::isfinite(result.direction))
-            || !dm::all(dm::isfinite(result.up)))
+        if (!math::all(math::isfinite(result.position))
+            || !math::all(math::isfinite(result.direction))
+            || !math::all(math::isfinite(result.up)))
         {
             throw std::runtime_error("camera_pose values must be finite");
         }
@@ -303,7 +303,7 @@ namespace
 
     scene::SceneEntityWorld& RequireEntityWorld(PySceneEntity& entity, const char* property);
 
-    [[nodiscard]] dm::float3* TryMutableLightColor(PySceneEntity& self)
+    [[nodiscard]] math::float3* TryMutableLightColor(PySceneEntity& self)
     {
         scene::SceneEntityWorld* entityWorld = self.entityWorld();
         if (!entityWorld)
@@ -337,7 +337,7 @@ namespace
         return nullptr;
     }
 
-    void SetLightProperty(PySceneEntity& self, const char* property, const dm::float4& value)
+    void SetLightProperty(PySceneEntity& self, const char* property, const math::float4& value)
     {
         scene::SceneEntityWorld& entityWorld = RequireEntityWorld(self, property);
         if (!scene::setLightProperty(entityWorld.world(), self.entity, property, value))
@@ -361,44 +361,71 @@ namespace
     }
 
 
-    std::vector<std::shared_ptr<StandardMaterial>> GetSceneMaterials(const Scene* scene)
+    const App* SceneOwnerApp(const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
+    {
+        return owner && owner->engine && owner->engine->isValid()
+            ? &owner->engine->app()
+            : nullptr;
+    }
+
+    std::vector<std::shared_ptr<StandardMaterial>> GetSceneMaterials(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner)
     {
         std::vector<std::shared_ptr<StandardMaterial>> result;
         if (!scene)
             return result;
 
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            if (auto pt = StandardMaterial::safeCast(mat))
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            if (auto pt = StandardMaterial::safeCast(linked))
                 result.push_back(pt);
         }
         return result;
     }
 
-    std::shared_ptr<StandardMaterial> FindSceneMaterial(const Scene* scene, const std::string& name)
+    std::shared_ptr<StandardMaterial> FindSceneMaterial(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const std::string& name)
     {
         if (!scene)
             return nullptr;
 
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            auto pt = StandardMaterial::safeCast(mat);
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            auto pt = StandardMaterial::safeCast(linked);
             if (pt && (pt->name == name || pt->uniqueName == name))
                 return pt;
         }
         return nullptr;
     }
 
-    std::shared_ptr<StandardMaterial> FindSceneMaterialById(const Scene* scene, int materialId)
+    std::shared_ptr<StandardMaterial> FindSceneMaterialById(
+        const Scene* scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        int materialId)
     {
         if (!scene || materialId < 0)
             return nullptr;
 
         // Scene-only lookup: StandardMaterial::gpuDataIndex only.
         // Prefer EngineApp.find_material / caustica::findMaterial (cache-backed pick id).
+        const App* app = SceneOwnerApp(owner);
         for (const auto& mat : scene->getMaterials())
         {
-            const auto pt = StandardMaterial::safeCast(mat);
+            const std::shared_ptr<Material> linked = app
+                ? linkRuntimeMaterialData(*app, mat)
+                : mat;
+            const auto pt = StandardMaterial::safeCast(linked);
             if (pt && int(pt->gpuDataIndex) == materialId)
                 return pt;
         }
@@ -810,12 +837,10 @@ caustica::EngineApp* embedEngine()
 namespace
 {
 
-bool SensorShape(const caustica::SensorOutput& output, uint32_t channels, size_t count, uint32_t& width, uint32_t& height)
+bool SensorShapeForSize(size_t count, uint32_t channels, uint32_t& width, uint32_t& height)
 {
     if (count == 0 || channels == 0)
         return false;
-    width = output.width;
-    height = output.height;
     const size_t pixels = count / channels;
     if (channels != 0 && count % channels != 0)
         return false;
@@ -828,6 +853,18 @@ bool SensorShape(const caustica::SensorOutput& output, uint32_t channels, size_t
         return height != 0;
     }
     return false;
+}
+
+bool SensorShape(
+    const caustica::SensorOutput& output,
+    uint32_t channels,
+    size_t count,
+    uint32_t& width,
+    uint32_t& height)
+{
+    width = output.width;
+    height = output.height;
+    return SensorShapeForSize(count, channels, width, height);
 }
 
 } // namespace
@@ -848,7 +885,9 @@ nb::object sensorDepthNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.depth.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.depth.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.depth);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
@@ -860,7 +899,9 @@ nb::object sensorNormalNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 3, output.normal.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.normal.size(), 3, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.normal);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
@@ -872,7 +913,9 @@ nb::object sensorInstanceIdNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.instanceId.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.instanceId.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<uint32_t>(output.instanceId);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
@@ -884,7 +927,9 @@ nb::object sensorSemanticIdNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 1, output.semanticId.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.semanticId.size(), 1, width, height))
         return nb::none();
     auto* data = new std::vector<uint32_t>(output.semanticId);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<uint32_t>*>(p); });
@@ -896,12 +941,98 @@ nb::object sensorMotionVectorNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
     uint32_t height = 0;
-    if (!SensorShape(output, 2, output.motionVector.size(), width, height))
+    width = output.geometryWidth ? output.geometryWidth : output.width;
+    height = output.geometryHeight ? output.geometryHeight : output.height;
+    if (!SensorShapeForSize(output.motionVector.size(), 2, width, height))
         return nb::none();
     auto* data = new std::vector<float>(output.motionVector);
     nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
     return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 2>, nb::c_contig, nb::device::cpu>(
         data->data(), { height, width, 2 }, owner));
+}
+
+nb::object sensorDiffuseNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.diffuse.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.diffuse);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorRoughnessNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.roughness.size(), 1, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.roughness);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorSpecularNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.specular.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.specular);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorMetallicNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.metallic.size(), 1, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.metallic);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width }, owner));
+}
+
+nb::object sensorThroughputNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.materialWidth ? output.materialWidth : output.width;
+    height = output.materialHeight ? output.materialHeight : output.height;
+    if (!SensorShapeForSize(output.throughput.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.throughput);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
+nb::object sensorGuideDiffuseNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    width = output.guideWidth ? output.guideWidth : output.width;
+    height = output.guideHeight ? output.guideHeight : output.height;
+    if (!SensorShapeForSize(output.guideDiffuse.size(), 3, width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.guideDiffuse);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
 }
 
 void RegisterCoreBindings(nb::module_& m)
@@ -1100,17 +1231,39 @@ void RegisterCoreBindings(nb::module_& m)
         .value("instance_id", Aov::InstanceId)
         .value("semantic_id", Aov::SemanticId)
         .value("motion_vector", Aov::MotionVector)
+        .value("diffuse", Aov::Diffuse)
+        .value("roughness", Aov::Roughness)
+        .value("specular", Aov::Specular)
+        .value("metallic", Aov::Metallic)
+        .value("throughput", Aov::Throughput)
+        .value("guide_diffuse", Aov::GuideDiffuse)
         .value("segmentation", Aov::Segmentation)
         .value("all", Aov::All)
         .def("__or__", [](Aov a, Aov b) { return uint32_t(a) | uint32_t(b); })
         .def("__or__", [](Aov a, uint32_t b) { return uint32_t(a) | b; })
         .def("__ror__", [](Aov a, uint32_t b) { return uint32_t(a) | b; });
 
+    nb::enum_<DebugViewType>(m, "DebugViewType",
+        "Path-tracer / denoiser debug visualization. Overlays the selected buffer on the back buffer.",
+        nb::is_arithmetic())
+        .value("Disabled", DebugViewType::Disabled)
+        .value("DenoiserGuide_Albedo", DebugViewType::DenoiserGuide_Albedo)
+        .value("FirstHit_Diffuse", DebugViewType::FirstHit_Diffuse)
+        .value("FirstHit_Specular", DebugViewType::FirstHit_Specular)
+        .value("FirstHit_Roughness", DebugViewType::FirstHit_Roughness)
+        .export_values();
+
     nb::class_<SensorOutput>(m, "SensorOutput",
         "One captured camera + AOV set. Empty arrays mean the AOV was not requested.")
         .def_ro("name", &SensorOutput::name)
         .def_ro("width", &SensorOutput::width)
         .def_ro("height", &SensorOutput::height)
+        .def_ro("geometry_width", &SensorOutput::geometryWidth)
+        .def_ro("geometry_height", &SensorOutput::geometryHeight)
+        .def_ro("material_width", &SensorOutput::materialWidth)
+        .def_ro("material_height", &SensorOutput::materialHeight)
+        .def_ro("guide_width", &SensorOutput::guideWidth)
+        .def_ro("guide_height", &SensorOutput::guideHeight)
         .def_ro("aovs", &SensorOutput::aovs)
         .def_prop_ro("rgb", [](const SensorOutput& self) { return sensorRgbNumpy(self); },
             "NumPy (H, W, 4) uint8 RGBA, or None.")
@@ -1126,6 +1279,18 @@ void RegisterCoreBindings(nb::module_& m)
             "Alias of instance_id.")
         .def_prop_ro("motion_vector", [](const SensorOutput& self) { return sensorMotionVectorNumpy(self); },
             "NumPy (H, W, 2) float32 screen-space motion in pixels.")
+        .def_prop_ro("diffuse", [](const SensorOutput& self) { return sensorDiffuseNumpy(self); },
+            "NumPy (H, W, 3) float32 first-hit linear diffuse albedo.")
+        .def_prop_ro("roughness", [](const SensorOutput& self) { return sensorRoughnessNumpy(self); },
+            "NumPy (H, W) float32 first-hit perceptual roughness.")
+        .def_prop_ro("specular", [](const SensorOutput& self) { return sensorSpecularNumpy(self); },
+            "NumPy (H, W, 3) float32 first-hit specular F0.")
+        .def_prop_ro("metallic", [](const SensorOutput& self) { return sensorMetallicNumpy(self); },
+            "NumPy (H, W) float32 first-hit metalness.")
+        .def_prop_ro("throughput", [](const SensorOutput& self) { return sensorThroughputNumpy(self); },
+            "NumPy (H, W, 3) float32 primary path throughput.")
+        .def_prop_ro("guide_diffuse", [](const SensorOutput& self) { return sensorGuideDiffuseNumpy(self); },
+            "NumPy (H, W, 3) float32 denoiser diffuse-albedo guide.")
         .def("__repr__", [](const SensorOutput& self) {
             return std::string("<caustica.SensorOutput '") + self.name + "' "
                 + std::to_string(self.width) + "x" + std::to_string(self.height) + ">";
@@ -1457,13 +1622,13 @@ void RegisterCoreBindings(nb::module_& m)
             }, "LightType_* constant, or 0 when this entity is not a light.")
         .def_prop_rw("color",
             [](PySceneEntity& self) {
-                if (const dm::float3* color = TryMutableLightColor(self))
+                if (const math::float3* color = TryMutableLightColor(self))
                     return Float3ToTuple(*color);
-                return Float3ToTuple(dm::float3(1.f));
+                return Float3ToTuple(math::float3(1.f));
             },
             [](PySceneEntity& self, nb::object v) {
-                const dm::float3 color = ToFloat3(v);
-                SetLightProperty(self, "color", dm::float4(color.x, color.y, color.z, 0.f));
+                const math::float3 color = ToFloat3(v);
+                SetLightProperty(self, "color", math::float4(color.x, color.y, color.z, 0.f));
             },
             "Light color when this entity has a light component.")
         .def_prop_rw("intensity",
@@ -1472,7 +1637,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return intensity ? *intensity : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "intensity", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "intensity", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             },
             "Point/spot intensity, or emitted radiance multiplier for a rectangular light.")
         .def_prop_rw("width",
@@ -1482,7 +1647,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->width : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                SetLightProperty(self, "width", dm::float4(value, 0.f, 0.f, 0.f));
+                SetLightProperty(self, "width", math::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight width in local X.")
         .def_prop_rw("height",
             [](PySceneEntity& self) {
@@ -1491,7 +1656,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return rect ? rect->height : 0.f;
             },
             [](PySceneEntity& self, float value) {
-                SetLightProperty(self, "height", dm::float4(value, 0.f, 0.f, 0.f));
+                SetLightProperty(self, "height", math::float4(value, 0.f, 0.f, 0.f));
             }, "RectLight height in local Y.")
         .def_prop_rw("irradiance",
             [](PySceneEntity& self) {
@@ -1501,7 +1666,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->irradiance : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "irradiance", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "irradiance", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("angular_size",
             [](PySceneEntity& self) {
@@ -1511,7 +1676,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return directional ? directional->angularSize : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "angularSize", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "angularSize", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("radius",
             [](PySceneEntity& self) {
@@ -1525,7 +1690,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "radius", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "radius", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("range",
             [](PySceneEntity& self) {
@@ -1539,7 +1704,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "range", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "range", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("inner_angle",
             [](PySceneEntity& self) {
@@ -1548,7 +1713,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->innerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "innerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "innerAngle", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("outer_angle",
             [](PySceneEntity& self) {
@@ -1557,7 +1722,7 @@ void RegisterCoreBindings(nb::module_& m)
                 return spot ? spot->outerAngle : 0.f;
             },
             [](PySceneEntity& self, nb::object v) {
-                SetLightProperty(self, "outerAngle", dm::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
+                SetLightProperty(self, "outerAngle", math::float4(nb::cast<float>(v), 0.f, 0.f, 0.f));
             })
         .def_prop_rw("environment_path",
             [](PySceneEntity& self) {
@@ -1609,7 +1774,7 @@ void RegisterCoreBindings(nb::module_& m)
                     scene::CameraWorldLookTo look;
                     if (!scene::tryGetCameraWorldLookTo(entityWorld, self.entity, look))
                         throw std::runtime_error("direction setter failed: camera pose is unavailable");
-                    const dm::float3 dir = ToFloat3(v);
+                    const math::float3 dir = ToFloat3(v);
                     if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, look.position, dir, look.up))
                         throw std::runtime_error("direction setter failed");
                     return;
@@ -1818,9 +1983,9 @@ void RegisterCoreBindings(nb::module_& m)
         .def("look_to",
             [](PySceneEntity& self, nb::object position, nb::object direction, nb::object up) {
                 RequireCamera(self);
-                const dm::float3 pos = ToFloat3(position);
-                const dm::float3 dir = ToFloat3(direction);
-                const dm::float3 upVec = ToFloat3(up);
+                const math::float3 pos = ToFloat3(position);
+                const math::float3 dir = ToFloat3(direction);
+                const math::float3 upVec = ToFloat3(up);
                 if (!setSceneCameraLookTo(RequireEntityApp(self), self.entity, pos, dir, upVec))
                     throw std::runtime_error("look_to failed");
             },
@@ -1930,15 +2095,15 @@ void RegisterCoreBindings(nb::module_& m)
         "Loaded caustica scene. Materials, lights, and SceneEntity lookup live here.\n"
         "Prefer Sample.find_entity / get_mesh_entities over digging engine MeshInfo.")
         .def("get_materials", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get());
+                return GetSceneMaterials(self.scene.get(), self.owner);
             }, "Return every StandardMaterial in this scene.")
 
         .def("find_material", [](PyScene& self, const std::string& name) {
-                return FindSceneMaterial(self.scene.get(), name);
+                return FindSceneMaterial(self.scene.get(), self.owner, name);
             }, nb::arg("name"), "Look up a material by Name or uniqueName.")
 
         .def("find_material_by_id", [](PyScene& self, int materialId) {
-                return FindSceneMaterialById(self.scene.get(), materialId);
+                return FindSceneMaterialById(self.scene.get(), self.owner, materialId);
             }, nb::arg("material_id"),
             "Look up by gpuDataIndex only. Prefer EngineApp.find_material (cache-backed).")
 
@@ -1967,7 +2132,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
         .def_prop_ro("material_count", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get()).size();
+                return GetSceneMaterials(self.scene.get(), self.owner).size();
             }, "Number of StandardMaterial instances in this scene.")
         .def_prop_ro("mesh_count", [](PyScene& self) {
                 return self.scene ? self.scene->getMeshes().size() : 0;
@@ -1996,7 +2161,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Diagonal extent (max - min) of `Scene.bounds`, or ``None`` for an empty scene.")
 
         .def("__repr__", [](PyScene& self) {
-                const auto materialCount = GetSceneMaterials(self.scene.get()).size();
+                const auto materialCount = GetSceneMaterials(self.scene.get(), self.owner).size();
                 const auto lightCount = self.scene ? self.scene->getLightEntities().size() : 0;
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
@@ -2082,6 +2247,8 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("accumulation_target",           &PathTracerSettings::AccumulationTarget)
         .def_rw("reset_accumulation",            &PathTracerSettings::ResetAccumulation)
         .def_rw("reset_realtime_caches",         &PathTracerSettings::ResetRealtimeCaches)
+        .def_rw("freeze_realtime_noise_seed",    &PathTracerSettings::DbgFreezeRealtimeNoiseSeed,
+            "Freeze realtime camera jitter and noise sequences for diagnostics.")
         .def_rw("accumulation_aa",               &PathTracerSettings::AccumulationAA)
         .def_rw("accumulation_prewarm_realtime_caches", &PathTracerSettings::AccumulationPreWarmRealtimeCaches)
 
@@ -2233,6 +2400,14 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("dlss_rr_micro_jitter",          &PathTracerSettings::DLSSRRMicroJitter)
         .def_rw("dlss_rr_brightness_clamp_k",    &PathTracerSettings::DLSSRRBrightnessClampK)
         .def_rw("disable_restirs_with_dlss_rr",  &PathTracerSettings::DisableReSTIRsWithDLSSRR)
+
+        .def_prop_rw("debug_view",
+            [](PathTracerSettings& s) { return int(s.DebugView); },
+            [](PathTracerSettings& s, int v) {
+                s.DebugView = DebugViewType(std::clamp(v, 0, int(DebugViewType::MaxCount)));
+                s.ResetAccumulation = true;
+            },
+            "DebugViewType integer. FirstHit_Diffuse and DenoiserGuide_Albedo dump albedo overlays.")
 
         // Reflex (low latency)
         .def_rw("reflex_mode",                   &PathTracerSettings::ReflexMode,

@@ -1,6 +1,7 @@
 #include <render/passes/denoisers/DenoisePass.h>
 
 #include <render/FrameGraphContext.h>
+#include <render/PathTraceSceneBindings.h>
 #include <render/PathTracingContext.h>
 #include <render/core/CameraController.h>
 #include <render/core/PostProcessAA.h>
@@ -144,6 +145,7 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
     m_device = ctx.device ? ctx.device : m_device;
     m_renderTargets = ctx.renderTargets;
     m_postProcess = ctx.postProcess;
+    m_sceneBindings = ctx.sceneBindings;
     m_bindingSet = ctx.bindingSet;
     m_bindingLayout = ctx.bindingLayout;
     m_constantBuffer = ctx.constantBuffer;
@@ -169,8 +171,15 @@ void DenoisePass::bindFrame(const FrameGraphContext& ctx)
 #endif
 }
 
+void DenoisePass::refreshLiveBindingSet()
+{
+    if (m_sceneBindings && m_sceneBindings->ready())
+        m_bindingSet = m_sceneBindings->bindingSet();
+}
+
 void DenoisePass::denoiseSpecHitT(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_denoisingGuidesPass);
     assert(m_bindingSet);
@@ -180,6 +189,7 @@ void DenoisePass::denoiseSpecHitT(caustica::rhi::CommandList* commandList)
 
 void DenoisePass::computeAvgLayerRadiance(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_denoisingGuidesPass);
     assert(m_context);
@@ -206,6 +216,7 @@ void DenoisePass::prepareGuides(caustica::rhi::CommandList* commandList)
 
 void DenoisePass::stablePlanesDebugViz(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_postProcess);
     assert(m_renderTargets);
@@ -234,17 +245,34 @@ void DenoisePass::ensureNrdIntegrations()
     if (!m_context->activeSettings().actualUseStandaloneDenoiser())
         return;
 
+    const nrd::Denoiser denoiserMethod = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
+        ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
+        : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
+
     for (int i = 0; i < std::size(m_nrd); i++)
     {
+        // Rebuild whenever the requested method changed, even if the one-shot
+        // NRDModeChanged flag was dropped by an extract-ring fallback frame.
+        // Without this check the old-method NRD instance would be fed the
+        // other method's settings struct (mismatched pipelines/dispatches).
+        if (m_nrd[i] != nullptr && m_nrd[i]->getDenoiser() != denoiserMethod)
+        {
+            m_nrd[i] = nullptr;
+            m_context->activeSettings().ResetRealtimeCaches = true;
+        }
+
         if (m_nrd[i] != nullptr)
             continue;
 
-        nrd::Denoiser denoiserMethod = m_context->activeSettings().NRDMethod == NrdConfig::DenoiserMethod::REBLUR
-            ? nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR
-            : nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
-
         m_nrd[i] = std::make_unique<NrdIntegration>(m_device, denoiserMethod);
-        m_nrd[i]->initialize(m_renderSize.x, m_renderSize.y, *m_context->shaderFactory);
+        if (!m_nrd[i]->initialize(m_renderSize.x, m_renderSize.y, *m_context->shaderFactory))
+        {
+            caustica::error(
+                "DenoisePass: NRD integration init failed (size %ux%u); denoiser disabled this frame",
+                m_renderSize.x,
+                m_renderSize.y);
+            m_nrd[i] = nullptr;
+        }
     }
 }
 
@@ -264,6 +292,7 @@ FrameMiniConstants makeNrdPlaneMiniConstants(const PathTracerSettings& settings,
 
 void DenoisePass::prepareNrdInputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -351,6 +380,7 @@ void DenoisePass::runNrd(caustica::rhi::CommandList* commandList, int planeIndex
 
 void DenoisePass::mergeNrdOutputs(caustica::rhi::CommandList* commandList, int planeIndex)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -397,6 +427,15 @@ void DenoisePass::denoiseStablePlane(
     assert(planeIndex >= 0 && planeIndex < static_cast<int>(std::size(passNames)));
 
     commandList->beginMarker(passNames[planeIndex]);
+
+    // A partially initialized (or recreated) integration must never reach the
+    // command list; NRD dereferences its instance unconditionally.
+    if (m_nrd[planeIndex] == nullptr || !m_nrd[planeIndex]->isAvailable())
+    {
+        commandList->endMarker();
+        return;
+    }
+
     prepareNrdInputs(commandList, planeIndex);
     runNrd(commandList, planeIndex);
     mergeNrdOutputs(commandList, planeIndex);
@@ -405,6 +444,7 @@ void DenoisePass::denoiseStablePlane(
 
 void DenoisePass::denoise(caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* framebuffer)
 {
+    refreshLiveBindingSet();
     assert(m_context);
 
     if (!m_context->activeSettings().actualUseStandaloneDenoiser())
@@ -421,6 +461,7 @@ void DenoisePass::denoise(caustica::rhi::CommandList* commandList, caustica::rhi
 
 void DenoisePass::runNoDenoiserFinalMerge(caustica::rhi::CommandList* commandList)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_renderTargets);
@@ -538,6 +579,7 @@ bool DenoisePass::evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bo
 
 void DenoisePass::runDlssUpscale(caustica::rhi::CommandList* commandList, bool reset)
 {
+    refreshLiveBindingSet();
     assert(commandList);
     assert(m_context);
     assert(m_camera);

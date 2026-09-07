@@ -9,10 +9,10 @@ namespace caustica
 {
     struct StlMeshData
     {
-        std::vector<dm::float3> positions;
-        std::vector<dm::float3> normals;
+        std::vector<math::float3> positions;
+        std::vector<math::float3> normals;
         std::vector<uint32_t> indices;
-        dm::box3 bounds = dm::box3::empty();
+        math::box3 bounds = math::box3::empty();
 
         [[nodiscard]] bool empty() const { return positions.empty() || indices.empty(); }
     };

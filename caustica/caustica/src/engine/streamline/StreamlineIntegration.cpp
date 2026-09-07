@@ -95,22 +95,22 @@ StreamlineIntegration::RenderFrameTokenScope::~RenderFrameTokenScope()
 }
 
 // Format conversion functions
-static sl::float2 make_sl_float2(const dm::float2& srcF) 
+static sl::float2 make_sl_float2(const math::float2& srcF) 
 { 
     return sl::float2{ srcF.x, srcF.y }; 
 }
 
-static sl::float3 make_sl_float3(const dm::float3& srcF)
+static sl::float3 make_sl_float3(const math::float3& srcF)
 { 
     return sl::float3{ srcF.x, srcF.y, srcF.z }; 
 }
 
-static sl::float4 make_sl_float4(const dm::float4& srcF)
+static sl::float4 make_sl_float4(const math::float4& srcF)
 { 
     return sl::float4{ srcF.x, srcF.y, srcF.z, srcF.w }; 
 }
 
-static sl::float4x4 make_sl_float4x4(const dm::float4x4& srcF4x4)
+static sl::float4x4 make_sl_float4x4(const math::float4x4& srcF4x4)
 {
     sl::float4x4 outF4x4;
     outF4x4.setRow(0, make_sl_float4(srcF4x4.row0));
@@ -1283,7 +1283,7 @@ static void GetSLResource(
     caustica::rhi::CommandList* commandList,
     sl::Resource& slResource,
     caustica::rhi::Texture* inputTex,
-    const caustica::IView* view)
+    const caustica::ViewInfo* view)
 {
     if (commandList == nullptr)
     {
@@ -1344,7 +1344,7 @@ static void GetSLResource(
 
 void StreamlineIntegration::tagResourcesGeneral(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* motionVectors,
     caustica::rhi::Texture* depth,
     caustica::rhi::Texture* finalColorHudless)
@@ -1374,7 +1374,7 @@ void StreamlineIntegration::tagResourcesGeneral(
 
 void StreamlineIntegration::tagResourcesDLSSNIS(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* Output,
     caustica::rhi::Texture* Input)
 {
@@ -1422,7 +1422,7 @@ void StreamlineIntegration::tagResourcesDLSSFG(
 
 void StreamlineIntegration::tagResourcesDeepDVC(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
+    const caustica::ViewInfo* view,
     caustica::rhi::Texture* Output)
 {
     if (!m_slInitialized)
@@ -1453,9 +1453,9 @@ void StreamlineIntegration::unTagResourcesDeepDVC()
 
 void StreamlineIntegration::tagResourcesDLSSRR(
     caustica::rhi::CommandList* commandList,
-    const caustica::IView* view,
-    dm::int2 renderSize,
-    dm::int2 displaySize,
+    const caustica::ViewInfo* view,
+    math::int2 renderSize,
+    math::int2 displaySize,
     caustica::rhi::Texture* inputColor,
     caustica::rhi::Texture* diffuseAlbedo,
     caustica::rhi::Texture* specAlbedo,

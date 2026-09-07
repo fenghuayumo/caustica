@@ -24,19 +24,19 @@ namespace demo
 
     struct Pose
     {
-        dm::double3 Translation = { 0, 0, 0 };
-        dm::dquat   Rotation    = { 0, 0, 0, 1 };
-        dm::double3 Scaling     = { 1, 1, 1 };
+        math::double3 Translation = { 0, 0, 0 };
+        math::dquat   Rotation    = { 0, 0, 0, 1 };
+        math::double3 Scaling     = { 1, 1, 1 };
         double      KeyTime     = 0.0;
 
         bool read(const Json::Value& node);
         Json::Value write();
 
-        dm::affine3 toTransform() const;
-        std::tuple<dm::float3, dm::float3, dm::float3> getPosDirUp() const;
+        math::affine3 toTransform() const;
+        std::tuple<math::float3, math::float3, math::float3> getPosDirUp() const;
 
-        void setTransform(const dm::affine3& transform);
-        void setTransformFromCamera(const dm::float3& pos, const dm::float3& dir, const dm::float3& up);
+        void setTransform(const math::affine3& transform);
+        void setTransformFromCamera(const math::float3& pos, const math::float3& dir, const math::float3& up);
     };
 
     struct KeyframeAnimation
@@ -59,7 +59,7 @@ namespace demo
     {
         caustica::ecs::Entity Entity = caustica::ecs::NullEntity;
 
-        dm::float3 Color               = dm::float3(1, 1, 1);
+        math::float3 Color               = math::float3(1, 1, 1);
         float      Intensity           = 1.0f;
         bool       enabled             = true;
         bool       ToggleOnUIClick     = false;
@@ -75,7 +75,7 @@ namespace demo
 
     struct ScreenGUISel
     {
-        dm::float2 ScreenPos     = { 0, 0 };
+        math::float2 ScreenPos     = { 0, 0 };
         float      ScreenRadius  = 0.0f;
         float      RangeToCamera = FLT_MAX;
         bool       Selected      = false;

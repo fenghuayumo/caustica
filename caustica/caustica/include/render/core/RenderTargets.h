@@ -15,14 +15,14 @@ namespace caustica
 
 class RenderTargets
 {
-    const dm::uint m_sampleCount = 1; // no MSAA supported in this sample
+    const math::uint m_sampleCount = 1; // no MSAA supported in this sample
     bool m_useReverseProjection = false;
     int m_backbufferCount = -1;
     caustica::rhi::Device* m_device;
 public:
     caustica::rhi::TextureHandle accumulatedRadiance;   // used only in non-realtime mode
     caustica::rhi::TextureHandle ldrColor;              // final, post-tonemapped color
-    caustica::rhi::TextureHandle ldrColorScratch;       // used for ping-ponging post-process stuff vs LdrColor
+    caustica::rhi::TextureHandle ldrColorScratch;       // graph-owned same-frame scratch; published after compile
     caustica::rhi::TextureHandle outputColor;           // raw path tracing output goes here (in both realtime and non-realtime modes); this can be input to TAA/DLSS
     caustica::rhi::TextureHandle processedOutputColor;  // for when post-processing OutputColor (i.e. TAA) (previously ResolvedColor); this is the output of TAA/DLSS in full res, but before tonemapping and without ImGUI
     caustica::rhi::TextureHandle temporalFeedback1;     // used by TAA
@@ -41,6 +41,8 @@ public:
     caustica::rhi::TextureHandle screenMotionVectors;   // screen space motion vectors, exported by path tracer, used by RTXDI, TAA and others
     caustica::rhi::TextureHandle sensorNormalDepth;     // xyz camera-space normal, w = linear |view Z| meters
     caustica::rhi::TextureHandle sensorIds;             // RG32UINT: R = instance_id, G = semantic_id
+    caustica::rhi::TextureHandle sensorMaterial;        // xyz diffuse albedo, w = roughness
+    caustica::rhi::TextureHandle sensorSpecular;        // xyz specular F0, w = metalness
 
     caustica::rhi::TextureHandle denoiserViewspaceZ;
     caustica::rhi::TextureHandle denoiserMotionVectors;
@@ -52,7 +54,7 @@ public:
 
     caustica::rhi::BufferHandle  surfaceDataBuffer;
 
-    caustica::rhi::TextureHandle denoiserAvgLayerRadianceHalfRes;
+    caustica::rhi::TextureHandle denoiserAvgLayerRadianceHalfRes; // graph-owned same-frame scratch
 
     caustica::rhi::TextureHandle denoiserDiffRadianceHitDist;       // input to denoiser
     caustica::rhi::TextureHandle denoiserSpecRadianceHitDist;       // input to denoiser
@@ -74,7 +76,7 @@ public:
     caustica::rhi::TextureHandle materialInfo;
 
     caustica::rhi::TextureHandle specularHitT;                      // input for denoisers to be able to resolve spec motion vectors
-    caustica::rhi::TextureHandle scratchFloat1;                     // can be used to ping-pong stuff - 32bit float 1
+    caustica::rhi::TextureHandle scratchFloat1;                     // graph-owned same-frame ping-pong scratch
 
     // === Reflection System render Targets ===
     caustica::rhi::TextureHandle localCubemap;                      // 256x256x6, RGBA16F, ray-traced local environment cubemap
@@ -86,16 +88,16 @@ public:
 
     caustica::rhi::HeapHandle heap;
 
-    dm::uint2 renderSize;// size of render targets pre-DLSS
-    dm::uint2 displaySize; // size of render targets post-DLSS
+    math::uint2 renderSize;// size of render targets pre-DLSS
+    math::uint2 displaySize; // size of render targets post-DLSS
 
     // Framebuffers are used by the bloom and tone mapping passes
     std::shared_ptr<caustica::FramebufferFactory> outputFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> processedOutputFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> ldrFramebuffer;
 
-    void init(caustica::rhi::Device* device, dm::uint2 renderSize, dm::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
-    [[nodiscard]] bool isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount = 1) const;
+    void init(caustica::rhi::Device* device, math::uint2 renderSize, math::uint2 displaySize, bool enableMotionVectors, bool useReverseProjection, int backbufferCount);// override;
+    [[nodiscard]] bool isUpdateRequired(math::uint2 renderSize, math::uint2 displaySize, math::uint sampleCount = 1) const;
     void clear(caustica::rhi::CommandList* commandList);
 
     static uint32_t getNumMipLevels(uint32_t width, uint32_t height);

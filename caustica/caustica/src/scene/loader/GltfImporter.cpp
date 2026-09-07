@@ -1020,7 +1020,7 @@ bool GltfImporter::load(
 
         matinfo->emissiveTexture = load_texture(material.emissive_texture.texture, true);
         matinfo->emissiveColor = material.emissive_factor;
-        matinfo->emissiveIntensity = dm::maxComponent(matinfo->emissiveColor);
+        matinfo->emissiveIntensity = math::maxComponent(matinfo->emissiveColor);
         if (matinfo->emissiveIntensity > 0.f)
             matinfo->emissiveColor /= matinfo->emissiveIntensity;
         else
@@ -1036,7 +1036,7 @@ bool GltfImporter::load(
         // Only scaling transformation for normal map texture coordinate is supported in importer.
         // All other transformations(offset, rotation) and all transformations for other textures is ignored.
         // This is for saving memory of material buffer, and the usage for other textures of this extension is very limited.
-        matinfo->normalTextureTransformScale = material.normal_texture.has_transform ? dm::float2(material.normal_texture.transform.scale[0], material.normal_texture.transform.scale[1]) : dm::float2(1.0f);
+        matinfo->normalTextureTransformScale = material.normal_texture.has_transform ? math::float2(material.normal_texture.transform.scale[0], material.normal_texture.transform.scale[1]) : math::float2(1.0f);
         // Log warnings for all unsupported texture coordinate transformations
         if (material.pbr_metallic_roughness.base_color_texture.has_transform ||
             material.pbr_metallic_roughness.metallic_roughness_texture.has_transform ||
@@ -1163,7 +1163,7 @@ bool GltfImporter::load(
         meshMap[&mesh] = minfo;
 
         size_t morphTargetDataCount = 0;
-        std::vector<std::vector<dm::float3>> morphTargetData;
+        std::vector<std::vector<math::float3>> morphTargetData;
 
         for (size_t prim_idx = 0; prim_idx < mesh.primitives_count; prim_idx++)
         {
@@ -1321,7 +1321,7 @@ bool GltfImporter::load(
                 }
             }
 
-            dm::box3 bounds = dm::box3::empty();
+            math::box3 bounds = math::box3::empty();
 
             if (positions)
             {
@@ -1536,7 +1536,7 @@ bool GltfImporter::load(
 
                     for (size_t v_idx = 0; v_idx < joint_indices->count; v_idx++)
                     {
-                        *jointDst = dm::vector<uint16_t, 4>(jointSrc[0], jointSrc[1], jointSrc[2], jointSrc[3]);
+                        *jointDst = math::vector<uint16_t, 4>(jointSrc[0], jointSrc[1], jointSrc[2], jointSrc[3]);
 
                         jointSrc += jointStride;
                         ++jointDst;
@@ -1551,7 +1551,7 @@ bool GltfImporter::load(
                     for (size_t v_idx = 0; v_idx < joint_indices->count; v_idx++)
                     {
                         const uint16_t* jointSrcUshort = (const uint16_t*)jointSrc;
-                        *jointDst = dm::vector<uint16_t, 4>(jointSrcUshort[0], jointSrcUshort[1], jointSrcUshort[2], jointSrcUshort[3]);
+                        *jointDst = math::vector<uint16_t, 4>(jointSrcUshort[0], jointSrcUshort[1], jointSrcUshort[2], jointSrcUshort[3]);
 
                         jointSrc += jointStride;
                         ++jointDst;
@@ -1574,7 +1574,7 @@ bool GltfImporter::load(
 
                     for (size_t v_idx = 0; v_idx < joint_indices->count; v_idx++)
                     {
-                        *weightDst = dm::float4(
+                        *weightDst = math::float4(
                             float(weightSrc[0]) / 255.f,
                             float(weightSrc[1]) / 255.f,
                             float(weightSrc[2]) / 255.f,
@@ -1591,7 +1591,7 @@ bool GltfImporter::load(
                     for (size_t v_idx = 0; v_idx < joint_indices->count; v_idx++)
                     {
                         const uint16_t* weightSrcUshort = (const uint16_t*)weightSrc;
-                        *weightDst = dm::float4(
+                        *weightDst = math::float4(
                             float(weightSrcUshort[0]) / 65535.f,
                             float(weightSrcUshort[1]) / 65535.f,
                             float(weightSrcUshort[2]) / 65535.f,
@@ -1746,7 +1746,7 @@ bool GltfImporter::load(
 
         const std::shared_ptr<BufferGroup> source = mesh->buffers;
         auto dots = std::make_shared<BufferGroup>();
-        dm::box3 meshBounds = dm::box3::empty();
+        math::box3 meshBounds = math::box3::empty();
         uint32_t outputOffset = 0;
 
         for (const std::shared_ptr<MeshGeometry>& geometry : mesh->geometries)
@@ -1760,7 +1760,7 @@ bool GltfImporter::load(
             {
                 geometry->material->enableHair = true;
                 geometry->material->hair.model = Material::HairParams::Model::FarField;
-                geometry->material->hair.baseColor = dm::float3(0.227f, 0.130f, 0.035f);
+                geometry->material->hair.baseColor = math::float3(0.227f, 0.130f, 0.035f);
                 geometry->material->hair.melanin = 0.805f;
                 geometry->material->hair.melaninRedness = 0.05f;
                 geometry->material->hair.longitudinalRoughness = 0.25f;
@@ -1792,8 +1792,8 @@ bool GltfImporter::load(
                     * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex0]);
                 segment.vertices[1].radius = kDefaultHairRadiusScale
                     * (source->radiusData.empty() ? 0.001f : source->radiusData[vertex1]);
-                segment.vertices[0].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex0];
-                segment.vertices[1].texcoord = source->texcoord1Data.empty() ? dm::float2(0.f) : source->texcoord1Data[vertex1];
+                segment.vertices[0].texcoord = source->texcoord1Data.empty() ? math::float2(0.f) : source->texcoord1Data[vertex0];
+                segment.vertices[1].texcoord = source->texcoord1Data.empty() ? math::float2(0.f) : source->texcoord1Data[vertex1];
                 segments.push_back(segment);
             }
 
@@ -1804,7 +1804,7 @@ bool GltfImporter::load(
             geometry->numIndices = geometryVertexCount;
             geometry->numVertices = geometryVertexCount;
             geometry->type = MeshGeometryPrimitiveType::Triangles;
-            geometry->objectSpaceBounds = dm::box3::empty();
+            geometry->objectSpaceBounds = math::box3::empty();
             for (uint32_t vertex = outputOffset; vertex < outputOffset + geometryVertexCount; ++vertex)
                 geometry->objectSpaceBounds |= dots->positionData[vertex];
             meshBounds |= geometry->objectSpaceBounds;
@@ -1881,8 +1881,8 @@ bool GltfImporter::load(
             spot.color = src->color;
             spot.intensity = src->intensity;
             spot.range = src->range;
-            spot.innerAngle = dm::degrees(src->spot_inner_cone_angle);
-            spot.outerAngle = dm::degrees(src->spot_outer_cone_angle);
+            spot.innerAngle = math::degrees(src->spot_inner_cone_angle);
+            spot.outerAngle = math::degrees(src->spot_outer_cone_angle);
             lightMap[src] = std::move(spot);
             break;
         }
@@ -1939,17 +1939,17 @@ bool GltfImporter::load(
             double3 scaling;
             dquat rotation;
 
-            decomposeAffine(dm::daffine3(aff), &translation, &rotation, &scaling);
+            decomposeAffine(math::daffine3(aff), &translation, &rotation, &scaling);
             world.setLocalTransform(dst, &translation, &rotation, &scaling);
         }
         else
         {
             if (src->has_scale)
-                world.setScaling(dst, dm::double3(dm::float3(src->scale)));
+                world.setScaling(dst, math::double3(math::float3(src->scale)));
             if (src->has_rotation)
-                world.setRotation(dst, dm::dquat(dm::quat::fromXYZW(src->rotation)));
+                world.setRotation(dst, math::dquat(math::quat::fromXYZW(src->rotation)));
             if (src->has_translation)
-                world.setTranslation(dst, dm::double3(dm::float3(src->translation)));
+                world.setTranslation(dst, math::double3(math::float3(src->translation)));
         }
 
         if (src->skin)

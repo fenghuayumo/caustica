@@ -267,7 +267,7 @@ namespace
         case ObjTextureChannel::Blue: return b;
         case ObjTextureChannel::Alpha: return a;
         case ObjTextureChannel::Luminance:
-            return static_cast<uint8_t>(dm::clamp(0.2126f * float(r) + 0.7152f * float(g) + 0.0722f * float(b), 0.0f, 255.0f));
+            return static_cast<uint8_t>(math::clamp(0.2126f * float(r) + 0.7152f * float(g) + 0.0722f * float(b), 0.0f, 255.0f));
         case ObjTextureChannel::Red:
         default:
             return r;
@@ -441,26 +441,26 @@ namespace
         return true;
     }
 
-    dm::float3 NormalizeOrFallback(dm::float3 value, dm::float3 fallback)
+    math::float3 NormalizeOrFallback(math::float3 value, math::float3 fallback)
     {
-        const float len = dm::length(value);
+        const float len = math::length(value);
         return len > 1e-20f ? value / len : fallback;
     }
 
-    dm::float3 BuildFallbackTangent(dm::float3 normal)
+    math::float3 BuildFallbackTangent(math::float3 normal)
     {
-        const dm::float3 axis = std::abs(normal.z) < 0.999f
-            ? dm::float3(0.0f, 0.0f, 1.0f)
-            : dm::float3(0.0f, 1.0f, 0.0f);
-        return NormalizeOrFallback(dm::cross(axis, normal), dm::float3(1.0f, 0.0f, 0.0f));
+        const math::float3 axis = std::abs(normal.z) < 0.999f
+            ? math::float3(0.0f, 0.0f, 1.0f)
+            : math::float3(0.0f, 1.0f, 0.0f);
+        return NormalizeOrFallback(math::cross(axis, normal), math::float3(1.0f, 0.0f, 0.0f));
     }
 
     struct ObjMaterialInfo
     {
         std::string name = "default";
-        dm::float3 baseColor = dm::float3(0.8f);
-        dm::float3 specularColor = dm::float3(0.0f);
-        dm::float3 emissiveColor = dm::float3(0.0f);
+        math::float3 baseColor = math::float3(0.8f);
+        math::float3 specularColor = math::float3(0.0f);
+        math::float3 emissiveColor = math::float3(0.0f);
         float roughness = 0.5f;
         float metalness = 0.0f;
         float opacity = 1.0f;
@@ -520,7 +520,7 @@ namespace
             }
             else if (current && (keyword == "kd" || keyword == "ke" || keyword == "ks") && tokens.size() >= 4)
             {
-                dm::float3 color(
+                math::float3 color(
                     std::strtof(tokens[1].c_str(), nullptr),
                     std::strtof(tokens[2].c_str(), nullptr),
                     std::strtof(tokens[3].c_str(), nullptr));
@@ -543,18 +543,18 @@ namespace
             else if (current && keyword == "ns" && tokens.size() >= 2)
             {
                 const float ns = std::max(0.0f, std::strtof(tokens[1].c_str(), nullptr));
-                current->roughness = dm::clamp(std::sqrt(2.0f / (ns + 2.0f)), 0.02f, 1.0f);
+                current->roughness = math::clamp(std::sqrt(2.0f / (ns + 2.0f)), 0.02f, 1.0f);
                 current->hasRoughness = true;
             }
             else if (current && keyword == "pr" && tokens.size() >= 2)
             {
-                current->roughness = dm::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.02f, 1.0f);
+                current->roughness = math::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.02f, 1.0f);
                 current->hasRoughness = true;
                 current->useSpecularGlossModel = false;
             }
             else if (current && keyword == "pm" && tokens.size() >= 2)
             {
-                current->metalness = dm::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.0f, 1.0f);
+                current->metalness = math::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.0f, 1.0f);
                 current->hasMetalness = true;
                 current->useSpecularGlossModel = false;
             }
@@ -564,16 +564,16 @@ namespace
             }
             else if (current && (keyword == "d" || keyword == "tr") && tokens.size() >= 2)
             {
-                const float value = dm::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.0f, 1.0f);
+                const float value = math::clamp(std::strtof(tokens[1].c_str(), nullptr), 0.0f, 1.0f);
                 current->opacity = keyword == "tr" ? 1.0f - value : value;
             }
             else if (current && keyword == "tf" && tokens.size() >= 4)
             {
-                const dm::float3 color(
+                const math::float3 color(
                     std::strtof(tokens[1].c_str(), nullptr),
                     std::strtof(tokens[2].c_str(), nullptr),
                     std::strtof(tokens[3].c_str(), nullptr));
-                current->transmissionFactor = dm::clamp(dm::maxComponent(color), 0.0f, 1.0f);
+                current->transmissionFactor = math::clamp(math::maxComponent(color), 0.0f, 1.0f);
                 current->hasTransmission = true;
             }
             else if (current && (
@@ -618,7 +618,7 @@ namespace
                     current->emissiveTexture = texture;
                     if (!current->hasEmissiveColor)
                     {
-                        current->emissiveColor = dm::float3(1.0f);
+                        current->emissiveColor = math::float3(1.0f);
                         current->hasEmissiveColor = true;
                     }
                 }
@@ -809,9 +809,9 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         return false;
     }
 
-    std::vector<dm::float3> positions;
-    std::vector<dm::float2> texcoords;
-    std::vector<dm::float3> normals;
+    std::vector<math::float3> positions;
+    std::vector<math::float2> texcoords;
+    std::vector<math::float3> normals;
     std::unordered_map<std::string, ObjMaterialInfo> materials;
     materials["default"] = ObjMaterialInfo{};
 
@@ -819,7 +819,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
     {
         std::string materialName = "default";
         std::vector<uint32_t> indices;
-        dm::box3 bounds = dm::box3::empty();
+        math::box3 bounds = math::box3::empty();
     };
 
     std::vector<ObjGroup> groups;
@@ -843,7 +843,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
     mesh->name = filePath.stem().string();
     mesh->type = MeshType::Triangles;
     mesh->buffers = std::make_shared<BufferGroup>();
-    mesh->objectSpaceBounds = dm::box3::empty();
+    mesh->objectSpaceBounds = math::box3::empty();
 
     std::unordered_map<ObjFaceVertex, uint32_t, ObjFaceVertexHash> vertexMap;
     std::vector<int> vertexNormalRefs;
@@ -857,9 +857,9 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         const uint32_t index = static_cast<uint32_t>(mesh->buffers->positionData.size());
         vertexMap[key] = index;
 
-        const dm::float3 position = positions[key.position];
+        const math::float3 position = positions[key.position];
         mesh->buffers->positionData.push_back(position);
-        mesh->buffers->texcoord1Data.push_back(key.texcoord >= 0 ? texcoords[key.texcoord] : dm::float2(0.0f));
+        mesh->buffers->texcoord1Data.push_back(key.texcoord >= 0 ? texcoords[key.texcoord] : math::float2(0.0f));
         mesh->DeformationSourcePositionIndices.push_back(static_cast<uint32_t>(key.position));
         vertexNormalRefs.push_back(key.normal);
         mesh->objectSpaceBounds |= position;
@@ -885,23 +885,23 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
 
         if (keyword == "v" && tokens.size() >= 4)
         {
-            positions.push_back(dm::float3(
+            positions.push_back(math::float3(
                 std::strtof(tokens[1].c_str(), nullptr),
                 std::strtof(tokens[2].c_str(), nullptr),
                 std::strtof(tokens[3].c_str(), nullptr)));
         }
         else if (keyword == "vt" && tokens.size() >= 3)
         {
-            texcoords.push_back(dm::float2(
+            texcoords.push_back(math::float2(
                 std::strtof(tokens[1].c_str(), nullptr),
                 1.0f - std::strtof(tokens[2].c_str(), nullptr)));
         }
         else if (keyword == "vn" && tokens.size() >= 4)
         {
-            normals.push_back(NormalizeOrFallback(dm::float3(
+            normals.push_back(NormalizeOrFallback(math::float3(
                 std::strtof(tokens[1].c_str(), nullptr),
                 std::strtof(tokens[2].c_str(), nullptr),
-                std::strtof(tokens[3].c_str(), nullptr)), dm::float3(0.0f, 1.0f, 0.0f)));
+                std::strtof(tokens[3].c_str(), nullptr)), math::float3(0.0f, 1.0f, 0.0f)));
         }
         else if (keyword == "mtllib" && tokens.size() >= 2)
         {
@@ -959,7 +959,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         return false;
     }
 
-    std::vector<dm::float3> accumulatedNormals(mesh->buffers->positionData.size(), dm::float3(0.0f));
+    std::vector<math::float3> accumulatedNormals(mesh->buffers->positionData.size(), math::float3(0.0f));
     for (const ObjGroup& group : groups)
     {
         for (size_t i = 0; i + 2 < group.indices.size(); i += 3)
@@ -967,31 +967,31 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
             const uint32_t i0 = group.indices[i + 0];
             const uint32_t i1 = group.indices[i + 1];
             const uint32_t i2 = group.indices[i + 2];
-            const dm::float3& p0 = mesh->buffers->positionData[i0];
-            const dm::float3& p1 = mesh->buffers->positionData[i1];
-            const dm::float3& p2 = mesh->buffers->positionData[i2];
-            const dm::float3 faceNormal = NormalizeOrFallback(dm::cross(p1 - p0, p2 - p0), dm::float3(0.0f, 1.0f, 0.0f));
+            const math::float3& p0 = mesh->buffers->positionData[i0];
+            const math::float3& p1 = mesh->buffers->positionData[i1];
+            const math::float3& p2 = mesh->buffers->positionData[i2];
+            const math::float3 faceNormal = NormalizeOrFallback(math::cross(p1 - p0, p2 - p0), math::float3(0.0f, 1.0f, 0.0f));
             accumulatedNormals[i0] += faceNormal;
             accumulatedNormals[i1] += faceNormal;
             accumulatedNormals[i2] += faceNormal;
         }
     }
 
-    std::vector<dm::float3> resolvedNormals;
+    std::vector<math::float3> resolvedNormals;
     resolvedNormals.reserve(mesh->buffers->positionData.size());
     mesh->buffers->normalData.reserve(mesh->buffers->positionData.size());
     for (size_t i = 0; i < mesh->buffers->positionData.size(); ++i)
     {
         const int normalIndex = vertexNormalRefs[i];
-        const dm::float3 normal = normalIndex >= 0
+        const math::float3 normal = normalIndex >= 0
             ? normals[normalIndex]
-            : NormalizeOrFallback(accumulatedNormals[i], dm::float3(0.0f, 1.0f, 0.0f));
+            : NormalizeOrFallback(accumulatedNormals[i], math::float3(0.0f, 1.0f, 0.0f));
         resolvedNormals.push_back(normal);
-        mesh->buffers->normalData.push_back(dm::vectorToSnorm8(normal));
+        mesh->buffers->normalData.push_back(math::vectorToSnorm8(normal));
     }
 
-    std::vector<dm::float3> accumulatedTangents(mesh->buffers->positionData.size(), dm::float3(0.0f));
-    std::vector<dm::float3> accumulatedBitangents(mesh->buffers->positionData.size(), dm::float3(0.0f));
+    std::vector<math::float3> accumulatedTangents(mesh->buffers->positionData.size(), math::float3(0.0f));
+    std::vector<math::float3> accumulatedBitangents(mesh->buffers->positionData.size(), math::float3(0.0f));
     for (const ObjGroup& group : groups)
     {
         for (size_t i = 0; i + 2 < group.indices.size(); i += 3)
@@ -999,24 +999,24 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
             const uint32_t i0 = group.indices[i + 0];
             const uint32_t i1 = group.indices[i + 1];
             const uint32_t i2 = group.indices[i + 2];
-            const dm::float3& p0 = mesh->buffers->positionData[i0];
-            const dm::float3& p1 = mesh->buffers->positionData[i1];
-            const dm::float3& p2 = mesh->buffers->positionData[i2];
-            const dm::float2& uv0 = mesh->buffers->texcoord1Data[i0];
-            const dm::float2& uv1 = mesh->buffers->texcoord1Data[i1];
-            const dm::float2& uv2 = mesh->buffers->texcoord1Data[i2];
+            const math::float3& p0 = mesh->buffers->positionData[i0];
+            const math::float3& p1 = mesh->buffers->positionData[i1];
+            const math::float3& p2 = mesh->buffers->positionData[i2];
+            const math::float2& uv0 = mesh->buffers->texcoord1Data[i0];
+            const math::float2& uv1 = mesh->buffers->texcoord1Data[i1];
+            const math::float2& uv2 = mesh->buffers->texcoord1Data[i2];
 
-            const dm::float3 edge1 = p1 - p0;
-            const dm::float3 edge2 = p2 - p0;
-            const dm::float2 deltaUv1 = uv1 - uv0;
-            const dm::float2 deltaUv2 = uv2 - uv0;
+            const math::float3 edge1 = p1 - p0;
+            const math::float3 edge2 = p2 - p0;
+            const math::float2 deltaUv1 = uv1 - uv0;
+            const math::float2 deltaUv2 = uv2 - uv0;
             const float determinant = deltaUv1.x * deltaUv2.y - deltaUv2.x * deltaUv1.y;
             if (std::abs(determinant) <= 1e-20f)
                 continue;
 
             const float invDeterminant = 1.0f / determinant;
-            const dm::float3 tangent = (edge1 * deltaUv2.y - edge2 * deltaUv1.y) * invDeterminant;
-            const dm::float3 bitangent = (edge2 * deltaUv1.x - edge1 * deltaUv2.x) * invDeterminant;
+            const math::float3 tangent = (edge1 * deltaUv2.y - edge2 * deltaUv1.y) * invDeterminant;
+            const math::float3 bitangent = (edge2 * deltaUv1.x - edge1 * deltaUv2.x) * invDeterminant;
 
             accumulatedTangents[i0] += tangent;
             accumulatedTangents[i1] += tangent;
@@ -1030,11 +1030,11 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
     mesh->buffers->tangentData.reserve(mesh->buffers->positionData.size());
     for (size_t i = 0; i < mesh->buffers->positionData.size(); ++i)
     {
-        const dm::float3 normal = resolvedNormals[i];
-        dm::float3 tangent = accumulatedTangents[i] - normal * dm::dot(normal, accumulatedTangents[i]);
+        const math::float3 normal = resolvedNormals[i];
+        math::float3 tangent = accumulatedTangents[i] - normal * math::dot(normal, accumulatedTangents[i]);
         tangent = NormalizeOrFallback(tangent, BuildFallbackTangent(normal));
-        const float handedness = dm::dot(dm::cross(normal, tangent), accumulatedBitangents[i]) < 0.0f ? -1.0f : 1.0f;
-        mesh->buffers->tangentData.push_back(dm::vectorToSnorm8(dm::float4(tangent, handedness)));
+        const float handedness = math::dot(math::cross(normal, tangent), accumulatedBitangents[i]) < 0.0f ? -1.0f : 1.0f;
+        mesh->buffers->tangentData.push_back(math::vectorToSnorm8(math::float4(tangent, handedness)));
     }
 
     auto loadObjTexture = [&](const std::filesystem::path& texturePath, bool sRGB) -> Handle<ImageAsset>
@@ -1074,10 +1074,10 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         const bool hasSpecGlossTexture = !objMaterial.specularTexture.empty() || !objMaterial.glossinessTexture.empty();
 
         material->baseOrDiffuseColor = !objMaterial.baseTexture.empty() && !objMaterial.hasBaseColor
-            ? dm::float3(1.0f)
+            ? math::float3(1.0f)
             : objMaterial.baseColor;
         material->specularColor = hasSpecGlossTexture && objMaterial.useSpecularGlossModel && !objMaterial.hasSpecularColor
-            ? dm::float3(1.0f)
+            ? math::float3(1.0f)
             : objMaterial.specularColor;
         material->emissiveColor = objMaterial.emissiveColor;
         if (objMaterial.useSpecularGlossModel)

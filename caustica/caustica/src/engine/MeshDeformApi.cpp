@@ -63,12 +63,12 @@ MeshDeformGpuParams makeInternalMeshDeformParams(App& app, const MeshDeformOptio
 
 } // namespace
 
-std::vector<dm::float3> getMeshVertices(App& app, ecs::Entity entity)
+std::vector<math::float3> getMeshVertices(App& app, ecs::Entity entity)
 {
     return caustica::getMeshVertices(meshFromEntity(app, entity));
 }
 
-std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
+std::vector<math::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
 {
     GpuDevice* device = gpuDevice(app);
     const uint32_t frameIndex = device ? device->getFrameIndex() : 0u;
@@ -78,7 +78,7 @@ std::vector<dm::float3> getMeshVerticesWorld(App& app, ecs::Entity entity)
 void setMeshVertices(
     App& app,
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options)
 {
     caustica::setMeshVertices(meshFromEntity(app, entity), vertices, makeInternalMeshDeformParams(app, options));
@@ -87,7 +87,7 @@ void setMeshVertices(
 void setMeshVerticesWorld(
     App& app,
     ecs::Entity entity,
-    const std::vector<dm::float3>& vertices,
+    const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options)
 {
     caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshDeformParams(app, options));

@@ -18,8 +18,8 @@ struct PathTracingFrameContext
 {
     caustica::rhi::Framebuffer*      framebuffer = nullptr;
 
-    dm::uint2 displaySize{};
-    dm::uint2 renderSize{};
+    math::uint2 displaySize{};
+    math::uint2 renderSize{};
     float     displayAspectRatio = 1.f;
     float     lodBias = 0.f;
 

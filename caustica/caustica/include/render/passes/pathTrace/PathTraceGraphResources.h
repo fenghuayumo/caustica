@@ -39,6 +39,8 @@ struct PathTraceGraphTargets
     rg::TextureHandle secondarySurfaceRadiance;
     rg::TextureHandle sensorNormalDepth;
     rg::TextureHandle sensorIds;
+    rg::TextureHandle sensorMaterial;
+    rg::TextureHandle sensorSpecular;
 };
 
 struct PathTraceLightingEndTargets
@@ -64,7 +66,25 @@ PathTraceLightingEndTargets importPathTraceLightingEndTargets(
     LightSamplingCache* lightSampling,
     caustica::rhi::Buffer* subInstanceDataBuffer);
 
-void extractPathTraceGraphOutputs(rg::GraphBuilder& graph, const PathTraceGraphTargets& handles);
+struct PathTraceScheduleInputs
+{
+    rg::TextureHandle envCube;
+    rg::BufferHandle lightBuffer;
+    rg::BufferHandle subInstance;
+    rg::BufferHandle constants;
+    rg::TextureHandle feedbackTotalWeight;
+    rg::TextureHandle feedbackCandidates;
+    rg::AccelStructHandle sceneAS;
+    rg::AccelStructHandle gaussianAS;
+};
+
+inline constexpr const char* kScratchFloat1Name = "scratchFloat1";
+inline constexpr const char* kAvgLayerRadianceName = "denoiserAvgLayerRadianceHalfRes";
+inline constexpr const char* kLdrColorScratchName = "ldrColorScratch";
+
+PathTraceScheduleInputs importPathTraceScheduleInputs(const FrameGraphContext& ctx);
+
+void declarePathTraceScheduleReads(rg::PassBuilder& setup, const PathTraceScheduleInputs& inputs);
 
 void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTargets& handles);
 void declarePathTraceLightingEndAccess(rg::PassBuilder& setup, const PathTraceLightingEndTargets& handles);

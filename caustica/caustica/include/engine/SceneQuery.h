@@ -59,6 +59,10 @@ struct SceneLoadStatus
 
 // Resolve by path-tracer pick id (StandardMaterial::gpuDataIndex). Not Material::materialID.
 [[nodiscard]] std::shared_ptr<Material> findMaterial(const App& app, int materialID);
+// Populate a live imported MaterialEx from the path-tracer material cache.
+[[nodiscard]] std::shared_ptr<Material> linkRuntimeMaterialData(
+    const App& app,
+    const std::shared_ptr<Material>& material);
 [[nodiscard]] ecs::Entity findEntityByInstanceIndex(const App& app, int instanceIndex);
 
 // Hierarchy path lookup on the live scene ECS (same rules as SceneEntityWorld::findEntity).

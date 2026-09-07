@@ -27,7 +27,7 @@ namespace caustica
 	class ShaderFactory;
 	namespace render { class RenderDevice; }
 	struct ShaderMacro;
-	class PlanarView;
+	class ViewInfo;
 }
 
 #include <render/passes/rtxdi/RtxdiUserSettings.h>
@@ -191,14 +191,14 @@ private:
 		caustica::rhi::CommandListHandle& commandList, 
 		ComputePass& pass, 
 		const char* passName, 
-		dm::int3 dispatchSize, 
+		math::int3 dispatchSize, 
 		caustica::rhi::BindingSetHandle extraBindingSet = nullptr);
 
 	void executeRayTracingPass(
 		caustica::rhi::CommandListHandle& commandList,
 		RayTracingPass& pass,
 		const char* passName,
-		dm::int2 dispatchSize, 
+		math::int2 dispatchSize, 
 		caustica::rhi::BindingSet* extraBindingSet = nullptr
 	);
 

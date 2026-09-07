@@ -228,13 +228,13 @@ namespace caustica
 			DEFINE_TYPED_ACCESSORS(Bool, bool);
 
 			DEFINE_TYPED_ACCESSORS(Int, int);
-			DEFINE_TYPED_ACCESSORS(Int2, dm::int2);
-			DEFINE_TYPED_ACCESSORS(Int3, dm::int3);
+			DEFINE_TYPED_ACCESSORS(Int2, math::int2);
+			DEFINE_TYPED_ACCESSORS(Int3, math::int3);
 			
 			DEFINE_TYPED_ACCESSORS(Float, float);
-			DEFINE_TYPED_ACCESSORS(Float2, dm::float2);
-			DEFINE_TYPED_ACCESSORS(Float3, dm::float3);
-			DEFINE_TYPED_ACCESSORS(Float4, dm::float4);
+			DEFINE_TYPED_ACCESSORS(Float2, math::float2);
+			DEFINE_TYPED_ACCESSORS(Float3, math::float3);
+			DEFINE_TYPED_ACCESSORS(Float4, math::float4);
 
 			DEFINE_TYPED_REF_ACCESSORS(String, std::string);
 
@@ -345,11 +345,11 @@ namespace caustica
 		template <> Variable* registerBoundVariable<bool>(BoundVariableDesc<bool> const& desc);
 		template <> Variable* registerBoundVariable<int>(BoundVariableDesc<int> const& desc);
 		template <> Variable* registerBoundVariable<float>(BoundVariableDesc<float> const& desc);
-		template <> Variable* registerBoundVariable<dm::int2>(BoundVariableDesc<dm::int2> const& desc);
-		template <> Variable* registerBoundVariable<dm::int3>(BoundVariableDesc<dm::int3> const& desc);
-		template <> Variable* registerBoundVariable<dm::float2>(BoundVariableDesc<dm::float2> const& desc);
-		template <> Variable* registerBoundVariable<dm::float3>(BoundVariableDesc<dm::float3> const& desc);
-		template <> Variable* registerBoundVariable<dm::float4>(BoundVariableDesc<dm::float4> const& desc);
+		template <> Variable* registerBoundVariable<math::int2>(BoundVariableDesc<math::int2> const& desc);
+		template <> Variable* registerBoundVariable<math::int3>(BoundVariableDesc<math::int3> const& desc);
+		template <> Variable* registerBoundVariable<math::float2>(BoundVariableDesc<math::float2> const& desc);
+		template <> Variable* registerBoundVariable<math::float3>(BoundVariableDesc<math::float3> const& desc);
+		template <> Variable* registerBoundVariable<math::float4>(BoundVariableDesc<math::float4> const& desc);
 		template <> Variable* registerBoundVariable<std::string>(BoundVariableDesc<std::string> const& desc);
 
 		// STARTUP_ONLY variables remain writable until this is called by the host
@@ -385,13 +385,13 @@ namespace caustica
 	typedef console::AutoVariable<bool> cvarBool;
 	typedef console::AutoVariable<int> cvarInt;
 	typedef console::AutoVariable<float> cvarFloat;
-	typedef console::AutoVariable<dm::int2> cvarInt2;
-	typedef console::AutoVariable<dm::int3> cvarInt3;
-	typedef console::AutoVariable<dm::uint2> cvarUint2;
-	typedef console::AutoVariable<dm::uint3> cvarUint3;
-	typedef console::AutoVariable<dm::float2> cvarFloat2;
-	typedef console::AutoVariable<dm::float3> cvarFloat3;
-	typedef console::AutoVariable<dm::float4> cvarFloat4;
+	typedef console::AutoVariable<math::int2> cvarInt2;
+	typedef console::AutoVariable<math::int3> cvarInt3;
+	typedef console::AutoVariable<math::uint2> cvarUint2;
+	typedef console::AutoVariable<math::uint3> cvarUint3;
+	typedef console::AutoVariable<math::float2> cvarFloat2;
+	typedef console::AutoVariable<math::float3> cvarFloat3;
+	typedef console::AutoVariable<math::float4> cvarFloat4;
 	typedef console::AutoVariable<std::string> cvarString;
 
 } // end namespace caustica

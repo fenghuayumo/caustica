@@ -26,7 +26,7 @@ caustica::rhi::Framebuffer* FramebufferFactory::getFramebuffer(const caustica::r
     return item;
 }
 
-caustica::rhi::Framebuffer* FramebufferFactory::getFramebuffer(const IView& view)
+caustica::rhi::Framebuffer* FramebufferFactory::getFramebuffer(const ViewInfo& view)
 {
     return getFramebuffer(caustica::toRhi(view.getSubresources()));
 }

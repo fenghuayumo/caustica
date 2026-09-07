@@ -177,11 +177,11 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
         if (m_settings.ToneMappingParams.autoExposure)
         {
             toneMappingChanged |= SettingsInputFloat("Minimum EV", &m_settings.ToneMappingParams.exposureValueMin);
-            m_settings.ToneMappingParams.exposureValueMin = dm::min(
+            m_settings.ToneMappingParams.exposureValueMin = math::min(
                 m_settings.ToneMappingParams.exposureValueMax,
                 m_settings.ToneMappingParams.exposureValueMin);
             toneMappingChanged |= SettingsInputFloat("Maximum EV", &m_settings.ToneMappingParams.exposureValueMax);
-            m_settings.ToneMappingParams.exposureValueMax = dm::max(
+            m_settings.ToneMappingParams.exposureValueMax = math::max(
                 m_settings.ToneMappingParams.exposureValueMin,
                 m_settings.ToneMappingParams.exposureValueMax);
         }
@@ -204,40 +204,40 @@ void EditorUI::BuildPostProcessPanel(const PanelLayout& layout)
 
         toneMappingChanged |= SettingsInputFloat("Compensation", &m_settings.ToneMappingParams.exposureCompensation);
         m_settings.ToneMappingParams.exposureCompensation =
-            dm::clamp(m_settings.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
+            math::clamp(m_settings.ToneMappingParams.exposureCompensation, -12.0f, 12.0f);
 
         toneMappingChanged |= SettingsInputFloat("Exposure Value", &m_settings.ToneMappingParams.exposureValue);
-        m_settings.ToneMappingParams.exposureValue = dm::clamp(
+        m_settings.ToneMappingParams.exposureValue = math::clamp(
             m_settings.ToneMappingParams.exposureValue,
-            dm::log2f(0.1f * 0.1f * 0.1f),
-            dm::log2f(100000.f * 100.f * 100.f));
+            math::log2f(0.1f * 0.1f * 0.1f),
+            math::log2f(100000.f * 100.f * 100.f));
 
         toneMappingChanged |= SettingsInputFloat("Film Speed", &m_settings.ToneMappingParams.filmSpeed);
         m_settings.ToneMappingParams.filmSpeed =
-            dm::clamp(m_settings.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
+            math::clamp(m_settings.ToneMappingParams.filmSpeed, 1.0f, 6400.0f);
 
         toneMappingChanged |= SettingsInputFloat("F-Number", &m_settings.ToneMappingParams.fNumber);
         m_settings.ToneMappingParams.fNumber =
-            dm::clamp(m_settings.ToneMappingParams.fNumber, 0.1f, 100.0f);
+            math::clamp(m_settings.ToneMappingParams.fNumber, 0.1f, 100.0f);
 
         toneMappingChanged |= SettingsInputFloat("Shutter", &m_settings.ToneMappingParams.shutter);
         m_settings.ToneMappingParams.shutter =
-            dm::clamp(m_settings.ToneMappingParams.shutter, 0.1f, 10000.0f);
+            math::clamp(m_settings.ToneMappingParams.shutter, 0.1f, 10000.0f);
 
         SettingsCategoryHeader("White Balance");
         toneMappingChanged |= SettingsCheckbox("Enabled##WhiteBalance", &m_settings.ToneMappingParams.whiteBalance);
 
         toneMappingChanged |= SettingsInputFloat("White Point", &m_settings.ToneMappingParams.whitePoint);
         m_settings.ToneMappingParams.whitePoint =
-            dm::clamp(m_settings.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
+            math::clamp(m_settings.ToneMappingParams.whitePoint, 1905.0f, 25000.0f);
 
         toneMappingChanged |= SettingsInputFloat("Max Luminance", &m_settings.ToneMappingParams.whiteMaxLuminance);
         m_settings.ToneMappingParams.whiteMaxLuminance =
-            dm::clamp(m_settings.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
+            math::clamp(m_settings.ToneMappingParams.whiteMaxLuminance, 0.1f, FLT_MAX);
 
         toneMappingChanged |= SettingsInputFloat("White Scale", &m_settings.ToneMappingParams.whiteScale);
         m_settings.ToneMappingParams.whiteScale =
-            dm::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
+            math::clamp(m_settings.ToneMappingParams.whiteScale, 0.f, 100.f);
 
         toneMappingChanged |= SettingsCheckbox("Clamp", &m_settings.ToneMappingParams.clamped);
 
@@ -446,17 +446,17 @@ void EditorUI::BuildDebuggingPanel(const PanelLayout& layout)
                 "ReGIRIndirectOutput\0"
                 "\0\0"))
                 m_settings.ResetAccumulation = true;
-            m_settings.DebugView = dm::clamp(m_settings.DebugView, (DebugViewType)0, DebugViewType::MaxCount);
+            m_settings.DebugView = math::clamp(m_settings.DebugView, (DebugViewType)0, DebugViewType::MaxCount);
 
             if (m_settings.DebugView >= DebugViewType::StablePlane_VirtualRayLength && m_settings.DebugView <= DebugViewType::StablePlane_DenoiserValidation)
             {
-                m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
+                m_settings.DebugViewStablePlaneIndex = math::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
                 RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent); );
                 float3 spcolor = (m_settings.DebugViewStablePlaneIndex >= 0) ? (StablePlaneDebugVizColor(m_settings.DebugViewStablePlaneIndex)) : (float3(1, 1, 0)); spcolor = spcolor * 0.7f + float3(0.2f, 0.2f, 0.2f);
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(spcolor.x, spcolor.y, spcolor.z, 1.0f));
                 ImGui::InputInt("Stable Plane index", &m_settings.DebugViewStablePlaneIndex);
                 ImGui::PopStyleColor(1);
-                m_settings.DebugViewStablePlaneIndex = dm::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
+                m_settings.DebugViewStablePlaneIndex = math::clamp(m_settings.DebugViewStablePlaneIndex, -1, (int)m_settings.StablePlanesActiveCount - 1);
             }
 
             const DebugFeedbackStruct& feedback = caustica::feedbackData(*m_sceneEditor.app());

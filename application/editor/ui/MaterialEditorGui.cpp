@@ -140,7 +140,7 @@ bool DrawStandardMaterialEditor(StandardMaterial& material, MaterialGpuCache& ca
         update |= ImGui::InputFloat("subsurface_radius", &material.subsurfaceRadius);
         if (material.subsurfaceRadius < 0.0f) { material.subsurfaceRadius = 0.0f; update = true; }
         update |= ImGui::InputFloat3("subsurface_radius_scale", material.subsurfaceRadiusScale.data());
-        material.subsurfaceRadiusScale = dm::max(material.subsurfaceRadiusScale, dm::float3(0.0f));
+        material.subsurfaceRadiusScale = math::max(material.subsurfaceRadiusScale, math::float3(0.0f));
         update |= ImGui::SliderFloat("subsurface_scatter_anisotropy", &material.subsurfaceAnisotropy, -1.f, 1.f);
     }
 
@@ -210,7 +210,7 @@ bool DrawStandardMaterialEditor(StandardMaterial& material, MaterialGpuCache& ca
         if (material.volumeAttenuationDistance < 0.0f) { material.volumeAttenuationDistance = 0.0f; update = true; }
         update |= ImGui::ColorEdit3("volume_attenuation_color", material.volumeAttenuationColor.data(), ImGuiColorEditFlags_Float);
         update |= ImGui::InputInt("nested_priority", &material.nestedPriority);
-        if (material.nestedPriority < 0 || material.nestedPriority > 14) { material.nestedPriority = dm::clamp(material.nestedPriority, 0, 14); update = true; }
+        if (material.nestedPriority < 0 || material.nestedPriority > 14) { material.nestedPriority = math::clamp(material.nestedPriority, 0, 14); update = true; }
     }
 
     update |= ImGui::Checkbox("geometry_enable_alpha_test", &material.enableAlphaTesting);
@@ -273,9 +273,9 @@ bool DrawStandardMaterialEditor(StandardMaterial& material, MaterialGpuCache& ca
         
         {
             UI_SCOPED_DISABLE(material.psdExclude);
-            int dominantDeltaLobeP1 = dm::clamp(material.psdDominantDeltaLobe, -1, 2) + 1;
+            int dominantDeltaLobeP1 = math::clamp(material.psdDominantDeltaLobe, -1, 2) + 1;
             update |= ImGui::Combo("Dominant bounce", &dominantDeltaLobeP1, "None (surface)\0Transparency\0Reflection\0Coat\0\0");
-            material.psdDominantDeltaLobe = dm::clamp(dominantDeltaLobeP1 - 1, -1, 2);
+            material.psdDominantDeltaLobe = math::clamp(dominantDeltaLobeP1 - 1, -1, 2);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Determines which surface will:\n * provide motion vectors for denoising\n * get ReSTIR DI lighting\n * get 'boost samples' for NEE lighting");
         }
         ImGui::Unindent();

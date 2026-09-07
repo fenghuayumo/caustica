@@ -31,6 +31,7 @@ namespace caustica::render
 {
 
 class PathTracingContext;
+class PathTraceSceneBindings;
 class TemporalAntiAliasingPass;
 struct FrameGraphContext;
 
@@ -80,8 +81,11 @@ private:
     bool evaluateNativeDLSS(caustica::rhi::CommandList* commandList, bool reset);
 #endif
 
+    void refreshLiveBindingSet();
+
     PathTracingContext* m_context = nullptr;
     caustica::rhi::Device* m_device = nullptr;
+    PathTraceSceneBindings* m_sceneBindings = nullptr;
 
     // Per-frame snapshot filled by bindFrame from FrameGraphContext.
     RenderTargets* m_renderTargets = nullptr;
@@ -90,10 +94,10 @@ private:
     caustica::rhi::BindingLayoutHandle m_bindingLayout;
     caustica::rhi::BufferHandle m_constantBuffer;
     caustica::rhi::CommandList* m_commandList = nullptr;
-    dm::uint2 m_renderSize{};
-    dm::uint2 m_displaySize{};
+    math::uint2 m_renderSize{};
+    math::uint2 m_displaySize{};
     float m_displayAspectRatio = 1.f;
-    dm::float2 m_cameraJitter{};
+    math::float2 m_cameraJitter{};
     uint32_t m_sampleIndex = 0;
     uint64_t m_frameIndex = 0;
     int m_accumulationSampleIndex = 0;

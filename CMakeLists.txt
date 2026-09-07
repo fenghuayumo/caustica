@@ -89,6 +89,65 @@ option(CAUSTICA_WITH_VULKAN "Enable the Vulkan version of the framework runtime 
 option(CAUSTICA_WITH_RHI "Enable Caustica RHI and related projects" ON)
 option(CAUSTICA_WITH_AFTERMATH "Enable Aftermath crash dump generation with engine runtime code" OFF)
 
+# PhysX is deliberately opt-in. SDK headers, libraries, and runtime DLLs are
+# considered only when a host explicitly enables this switch.
+option(CAUSTICA_WITH_PHYSX "Enable the optional NVIDIA PhysX physics backend" OFF)
+set(CAUSTICA_PHYSX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/PhysX/physx" CACHE PATH
+    "PhysX source root (the External/PhysX submodule's physx directory)")
+if (CAUSTICA_WITH_PHYSX)
+    if (NOT EXISTS "${CAUSTICA_PHYSX_SOURCE_DIR}/include/PxPhysicsAPI.h")
+        message(FATAL_ERROR
+            "CAUSTICA_WITH_PHYSX requires the External/PhysX submodule. Run: "
+            "git submodule update --init --recursive External/PhysX")
+    endif()
+
+    # Build the pinned source submodule directly. Keep its optional GPU,
+    # snippets, and vendor-runtime copying disabled: Caustica's first backend
+    # is CPU rigid bodies only, and PhysX must remain absent from default builds.
+    set(PHYSX_ROOT_DIR "${CAUSTICA_PHYSX_SOURCE_DIR}")
+    if (WIN32)
+        set(TARGET_BUILD_PLATFORM windows)
+        set(PX_OUTPUT_ARCH x86)
+    elseif (UNIX)
+        set(TARGET_BUILD_PLATFORM linux)
+        set(PX_OUTPUT_ARCH x86)
+    else()
+        message(FATAL_ERROR "CAUSTICA_WITH_PHYSX is not configured for this platform")
+    endif()
+    set(PX_GENERATE_STATIC_LIBRARIES ON CACHE BOOL "" FORCE)
+    set(PX_GENERATE_GPU_PROJECTS OFF CACHE BOOL "" FORCE)
+    set(PX_GENERATE_GPU_PROJECTS_ONLY OFF CACHE BOOL "" FORCE)
+    set(PX_BUILDSNIPPETS OFF CACHE BOOL "" FORCE)
+    set(PX_COPY_EXTERNAL_DLL OFF CACHE BOOL "" FORCE)
+    set(PX_OUTPUT_LIB_DIR "${CMAKE_BINARY_DIR}/physx" CACHE PATH "" FORCE)
+    set(PX_OUTPUT_BIN_DIR "${CMAKE_BINARY_DIR}/physx" CACHE PATH "" FORCE)
+    set(PUBLIC_RELEASE 0)
+    list(APPEND CMAKE_MODULE_PATH "${CAUSTICA_PHYSX_SOURCE_DIR}/source/compiler/cmake/modules")
+    # PhysX 5.5.1 emits C5054/C5055 with current MSVC. Caustica keeps /WX;
+    # only this vendored SDK is exempt so an SDK compiler warning cannot block
+    # an otherwise valid optional backend build.
+    set(_caustica_warnings_as_errors "${CMAKE_COMPILE_WARNING_AS_ERROR}")
+    set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
+    add_subdirectory(
+        "${CAUSTICA_PHYSX_SOURCE_DIR}/source/compiler/cmake"
+        "${CMAKE_BINARY_DIR}/physx-sdk")
+    set(CMAKE_COMPILE_WARNING_AS_ERROR "${_caustica_warnings_as_errors}")
+    set(_caustica_physx_targets
+        PhysX PhysXCommon PhysXFoundation PhysXExtensions PhysXTask
+        LowLevel LowLevelAABB LowLevelDynamics SceneQuery SimulationController)
+    if (MSVC)
+        # PhysX 5.5.1 predates VS 17.10's mixed-enum C5054/C5055 warnings.
+        # Preserve PhysX's own /WX policy while treating only those newer
+        # compiler diagnostics as unavailable for this SDK revision.
+        foreach(_caustica_physx_target IN LISTS _caustica_physx_targets)
+            if (TARGET ${_caustica_physx_target})
+                target_compile_options(${_caustica_physx_target} PRIVATE /Wv:18)
+            endif()
+        endforeach()
+    endif()
+    message(STATUS "PhysX backend enabled from submodule: ${CAUSTICA_PHYSX_SOURCE_DIR}")
+endif()
+
 # we want shader PDBs always embedded
 option(CAUSTICA_EMBED_SHADER_PDBS "" ON)
 if (CAUSTICA_DISTRIBUTION_BUILD)

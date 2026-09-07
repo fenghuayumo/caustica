@@ -20,7 +20,7 @@ struct HdrPostProcessParams
     PathTracerSettings&              settings;
     caustica::rhi::CommandList*             commandList = nullptr;
     RenderTargets*                   renderTargets = nullptr;
-    dm::uint2                        displaySize{};
+    math::uint2                        displaySize{};
 
     render::BloomPass*               bloomPass = nullptr;
 };

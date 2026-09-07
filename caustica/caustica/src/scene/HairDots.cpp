@@ -10,14 +10,14 @@ namespace
 constexpr uint32_t kVerticesPerSegment = 12;
 constexpr float kMinRadius = 1e-6f;
 
-void buildFrame(const dm::float3& forward, dm::float3& side, dm::float3& up)
+void buildFrame(const math::float3& forward, math::float3& side, math::float3& up)
 {
     // Pick the least aligned cardinal axis to keep the cross product stable.
-    const dm::float3 helper = std::abs(forward.x) < 0.8f
-        ? dm::float3(1.f, 0.f, 0.f)
-        : dm::float3(0.f, 1.f, 0.f);
-    side = dm::normalize(dm::cross(forward, helper));
-    up = dm::cross(forward, side);
+    const math::float3 helper = std::abs(forward.x) < 0.8f
+        ? math::float3(1.f, 0.f, 0.f)
+        : math::float3(0.f, 1.f, 0.f);
+    side = math::normalize(math::cross(forward, helper));
+    up = math::cross(forward, side);
 }
 }
 
@@ -42,15 +42,15 @@ void appendStaticDots(
     for (size_t segmentIndex = 0; segmentIndex < segments.size(); ++segmentIndex)
     {
         const StrandSegment& segment = segments[segmentIndex];
-        const dm::float3 delta = segment.vertices[1].position - segment.vertices[0].position;
-        const float lengthSquared = dm::dot(delta, delta);
-        const dm::float3 forward = lengthSquared > 1e-20f
+        const math::float3 delta = segment.vertices[1].position - segment.vertices[0].position;
+        const float lengthSquared = math::dot(delta, delta);
+        const math::float3 forward = lengthSquared > 1e-20f
             ? delta / std::sqrt(lengthSquared)
-            : dm::float3(0.f, 1.f, 0.f);
-        dm::float3 side;
-        dm::float3 up;
+            : math::float3(0.f, 1.f, 0.f);
+        math::float3 side;
+        math::float3 up;
         buildFrame(forward, side, up);
-        const dm::float3 ribbonDirections[2] = { side, up };
+        const math::float3 ribbonDirections[2] = { side, up };
         const float radii[2] = {
             std::max(segment.vertices[0].radius, kMinRadius) * volumeCompensation,
             std::max(segment.vertices[1].radius, kMinRadius) * volumeCompensation
@@ -60,8 +60,8 @@ void appendStaticDots(
         {
             const uint32_t base = firstOutputVertex
                 + uint32_t(segmentIndex) * kVerticesPerSegment + face * 6;
-            const dm::float3 ribbon = ribbonDirections[face];
-            const dm::float3 positions[6] = {
+            const math::float3 ribbon = ribbonDirections[face];
+            const math::float3 positions[6] = {
                 segment.vertices[0].position + ribbon * radii[0],
                 segment.vertices[1].position - ribbon * radii[1],
                 segment.vertices[1].position + ribbon * radii[1],
@@ -77,8 +77,8 @@ void appendStaticDots(
                 const uint32_t dst = base + vertex;
                 output.indexData[dst] = dst - firstOutputVertex;
                 output.positionData[dst] = positions[vertex];
-                output.normalData[dst] = dm::vectorToSnorm8(positiveSide[vertex] ? ribbon : -ribbon);
-                output.tangentData[dst] = dm::vectorToSnorm8(dm::float4(forward, 1.f));
+                output.normalData[dst] = math::vectorToSnorm8(positiveSide[vertex] ? ribbon : -ribbon);
+                output.tangentData[dst] = math::vectorToSnorm8(math::float4(forward, 1.f));
                 output.texcoord1Data[dst] = segment.vertices[endpoint[vertex]].texcoord;
                 output.radiusData[dst] = radii[endpoint[vertex]];
             }

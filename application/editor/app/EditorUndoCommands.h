@@ -22,9 +22,9 @@ class SceneEditor;
 
 struct LocalTransformSnapshot
 {
-    dm::double3 translation = 0.0;
-    dm::dquat rotation = dm::dquat::identity();
-    dm::double3 scaling = 1.0;
+    math::double3 translation = 0.0;
+    math::dquat rotation = math::dquat::identity();
+    math::double3 scaling = 1.0;
 };
 
 [[nodiscard]] LocalTransformSnapshot captureLocalTransform(const caustica::scene::LocalTransformComponent& local);

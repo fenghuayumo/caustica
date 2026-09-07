@@ -7,7 +7,7 @@
 
 #include <math/math.h>
 
-using namespace dm;
+using namespace caustica::math;
 #include <shaders/render/rtxdi/ShaderParameters.h>
 
 uint32_t getNextPowerOf2(uint32_t a)

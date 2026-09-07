@@ -80,7 +80,7 @@ private:
     RenderTargets* m_renderTargets = nullptr;
     caustica::AccelStructManager* m_accelStructs = nullptr;
     SceneGaussianSplatPasses* m_scenePasses = nullptr;
-    dm::uint2 m_displaySize{};
+    math::uint2 m_displaySize{};
     uint64_t m_frameIndex = 0;
     uint32_t m_sampleIndex = 0;
     int* m_temporalSampleIndex = nullptr;

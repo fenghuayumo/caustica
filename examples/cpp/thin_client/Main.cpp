@@ -95,7 +95,7 @@ int main(int, char**)
     }
 
     // Settings / camera via EngineApp (PathTracerSettings + CameraApi).
-    engine->setCameraVerticalFOV(dm::radians(55.f));
+    engine->setCameraVerticalFOV(math::radians(55.f));
     (void)engine->settings();
 
     engine->emplaceResource<ThinClientState>();
@@ -127,9 +127,9 @@ int main(int, char**)
                 {
                     scene.setLocalTransform(
                         state->spawnedMesh,
-                        dm::double3{ 2.0, 1.0, 0.0 },
+                        math::double3{ 2.0, 1.0, 0.0 },
                         std::nullopt,
-                        dm::double3{ 0.5, 0.5, 0.5 });
+                        math::double3{ 0.5, 0.5, 0.5 });
                     scene.setVisible(state->spawnedMesh, true);
                     scene.emplace<ThinClientSpun>(state->spawnedMesh);
                     caustica::info("thin_client: spawned GlassSphere entity");
@@ -143,9 +143,9 @@ int main(int, char**)
                 state->spawnedLight = scene.spawnNamed(
                     "ThinClient.PointLight",
                     caustica::scene::LocalTransformComponent::fromTRS(
-                        dm::double3{ 2.0, 2.5, 0.0 },
-                        dm::dquat::identity(),
-                        dm::double3{ 1.0, 1.0, 1.0 }),
+                        math::double3{ 2.0, 2.5, 0.0 },
+                        math::dquat::identity(),
+                        math::double3{ 1.0, 1.0, 1.0 }),
                     caustica::scene::PointLightComponent{ .intensity = 8.f });
                 if (caustica::ecs::isValid(state->spawnedLight))
                     caustica::info("thin_client: spawned point light bundle");
@@ -196,8 +196,8 @@ int main(int, char**)
                 const double half = 0.5 * angle;
                 transforms.setRotation(
                     entity,
-                    dm::dquat::fromWXYZ(
-                        std::cos(half), dm::double3{ 0.0, std::sin(half), 0.0 }));
+                    math::dquat::fromWXYZ(
+                        std::cos(half), math::double3{ 0.0, std::sin(half), 0.0 }));
             });
         },
         caustica::AppSystemOrdering{}

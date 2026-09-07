@@ -93,8 +93,8 @@ struct MeshGpuUploadCommand
 {
     scene::MeshRenderResourceId meshId;
     uint32_t vertexOffset = 0;
-    std::vector<dm::float3> positions;
-    std::vector<dm::float3> previousPositions;
+    std::vector<math::float3> positions;
+    std::vector<math::float3> previousPositions;
     std::vector<uint32_t> normals;
     bool recreateVertexBuffer = false;
 };

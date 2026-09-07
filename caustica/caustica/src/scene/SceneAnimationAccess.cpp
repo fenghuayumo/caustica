@@ -92,12 +92,12 @@ bool applyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     switch (channel.attribute)
     {
     case AnimationAttribute::Scaling:
-        world.setScaling(channel.targetEntity, dm::double3(value.xyz()));
+        world.setScaling(channel.targetEntity, math::double3(value.xyz()));
         MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         break;
 
     case AnimationAttribute::Rotation: {
-        dm::dquat quat = dm::dquat::fromXYZW(dm::double4(value));
+        math::dquat quat = math::dquat::fromXYZW(math::double4(value));
         const double len = length(quat);
         if (len == 0.0)
         {
@@ -113,7 +113,7 @@ bool applyAnimationChannel(const AnimationChannelData& channel, float time, Scen
     }
 
     case AnimationAttribute::Translation:
-        world.setTranslation(channel.targetEntity, dm::double3(value.xyz()));
+        world.setTranslation(channel.targetEntity, math::double3(value.xyz()));
         MarkSkinnedMeshDirtyForTransformChannel(world, channel);
         break;
 

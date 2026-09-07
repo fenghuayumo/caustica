@@ -18,13 +18,12 @@ using namespace caustica::math;
 #include <algorithm>
 #include <cstdint>
 
-using namespace dm;
 using namespace caustica::math;
 
 void RenderTargets::init(
         caustica::rhi::Device* device,
-        dm::uint2 renderSize, 
-        dm::uint2 displaySize,
+        math::uint2 renderSize, 
+        math::uint2 displaySize,
         bool enableMotionVectors,
         bool useReverseProjection,
         int backbufferCount
@@ -74,6 +73,12 @@ void RenderTargets::init(
     desc.format = caustica::rhi::Format::RG32_UINT;
     desc.debugName = "sensorIds";
     sensorIds = device->createTexture(desc);
+
+    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
+    desc.debugName = "sensorMaterial";
+    sensorMaterial = device->createTexture(desc);
+    desc.debugName = "sensorSpecular";
+    sensorSpecular = device->createTexture(desc);
 
     desc.format = caustica::rhi::Format::RGBA16_FLOAT;
     desc.debugName = "denoiserMotionVectors";
@@ -135,9 +140,6 @@ void RenderTargets::init(
     desc.format = caustica::rhi::Format::R32_FLOAT;   // currently shaders expect FP32 but could be tweaked to FP16
     desc.debugName = "specularHitT";
     specularHitT = device->createTexture(desc);
-
-    desc.debugName = "scratchFloat1";
-    scratchFloat1 = device->createTexture(desc);
     
     desc.isUAV = false;
     desc.isRenderTarget = true;
@@ -194,13 +196,6 @@ void RenderTargets::init(
     desc.debugName = "rrTransparencyLayer";
     // rrTransparencyLayer = device->createTexture(desc); // not currently used
 
-    // Half-res denoiser guide must use the real render size before GBuffer placeholders
-    // temporarily force 1x1 dimensions below.
-    const dm::uint2 halfRenderSize = {
-        (renderSize.x + 1) / 2,
-        (renderSize.y + 1) / 2
-    };
-
     // GBuffer targets are kept as placeholders for the main path-tracing renderer.
     desc.width = 1;
     desc.height = 1;
@@ -217,12 +212,6 @@ void RenderTargets::init(
     desc.debugName = "GBufferMaterialInfo";
     desc.format = caustica::rhi::Format::R32_UINT;
     materialInfo = device->createTexture(desc);
-
-    desc.width = halfRenderSize.x;
-    desc.height = halfRenderSize.y;
-    desc.format = caustica::rhi::Format::RGBA16_FLOAT;
-    desc.debugName = "DenoiserAvgRadianceHalfRes";
-    denoiserAvgLayerRadianceHalfRes = device->createTexture(desc);
 
     // !!! NOTE !!! setting desc.width/desc.height to display size (was render size!)
     desc.width = displaySize.x;
@@ -242,8 +231,6 @@ void RenderTargets::init(
     desc.isTypeless = true;
     desc.debugName = "ldrColor";
     ldrColor = device->createTexture(desc);
-    desc.debugName = "ldrColorScratch";
-    ldrColorScratch = device->createTexture(desc);
     desc.isTypeless = false;
 
     desc.isUAV = false;
@@ -366,7 +353,7 @@ void RenderTargets::init(
     }
 }
 
-[[nodiscard]] bool RenderTargets::isUpdateRequired(dm::uint2 renderSize, dm::uint2 displaySize, dm::uint sampleCount) const
+[[nodiscard]] bool RenderTargets::isUpdateRequired(math::uint2 renderSize, math::uint2 displaySize, math::uint sampleCount) const
 {
     if (any(renderSize != this->renderSize) || any(displaySize != this->displaySize) || m_sampleCount != sampleCount) return true;
     return false;

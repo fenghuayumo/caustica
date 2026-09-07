@@ -25,6 +25,12 @@ namespace caustica_py
     nanobind::object sensorInstanceIdNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorSemanticIdNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorMotionVectorNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorDiffuseNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorRoughnessNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorSpecularNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorMetallicNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorThroughputNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorGuideDiffuseNumpy(const caustica::SensorOutput& output);
 
     void RegisterCoreBindings(nanobind::module_& m);
     void BindEngineApp(nanobind::class_<PyEngineApp>& cls);

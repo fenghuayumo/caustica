@@ -116,7 +116,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                     {
                         UI_SCOPED_DISABLE( (m_settings.actualUseReSTIRDI() || m_settings.actualUseReSTIRGI() || m_settings.actualUseReSTIRPT()) );
                         SettingsInputInt("Samples / Pixel", &m_settings.RealtimeSamplesPerPixel);
-                        m_settings.RealtimeSamplesPerPixel = dm::clamp(m_settings.RealtimeSamplesPerPixel, 1, 64);
+                        m_settings.RealtimeSamplesPerPixel = math::clamp(m_settings.RealtimeSamplesPerPixel, 1, 64);
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) 
                             ImGui::SetTooltip("How many full paths to trace per pixel from the primary surface\n(camera ray is not re-cast so there is no added AA)\n(currently incompatible with ReSTIR DI, ReSTIR GI & ReSTIR PT)");
                     }
@@ -129,7 +129,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                 {
                     RESET_ON_CHANGE(SettingsInputInt(
                         "Target Samples", &m_settings.AccumulationTarget));
-                    m_settings.AccumulationTarget = dm::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
+                    m_settings.AccumulationTarget = math::clamp(m_settings.AccumulationTarget, 1, 4 * 1024 * 1024); // this max is beyond float32 precision threshold; expect some banding creeping in when using more than 500k samples
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Number of path samples per pixel to collect");
                     ImGui::TextDisabled(
                         "Accumulated %d / %d  ·  %.3f ms",
@@ -151,11 +151,11 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                 }
 
                 RESET_ON_CHANGE(SettingsInputInt("Max Bounces", &m_settings.BounceCount));
-                m_settings.BounceCount = dm::clamp(m_settings.BounceCount, 0, MAX_BOUNCE_COUNT);
+                m_settings.BounceCount = math::clamp(m_settings.BounceCount, 0, MAX_BOUNCE_COUNT);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Max number of all bounces (including NEE and diffuse bounces)");
                 RESET_ON_CHANGE(SettingsInputInt(
                     "Diffuse Bounces", &m_settings.DiffuseBounceCount));
-                m_settings.DiffuseBounceCount = dm::clamp(m_settings.DiffuseBounceCount, 0, MAX_BOUNCE_COUNT);
+                m_settings.DiffuseBounceCount = math::clamp(m_settings.DiffuseBounceCount, 0, MAX_BOUNCE_COUNT);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Max number of diffuse bounces (diffuse lobe and specular with roughness > 0.25 or similar depending on settings)");
 
                 if (m_settings.RealtimeMode)
@@ -172,7 +172,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                             0.01f,
                             0.1f,
                             "%.5f"));
-                        m_settings.RealtimeFireflyFilterThreshold = dm::clamp(m_settings.RealtimeFireflyFilterThreshold, 0.00001f, 1000.0f);
+                        m_settings.RealtimeFireflyFilterThreshold = math::clamp(m_settings.RealtimeFireflyFilterThreshold, 0.00001f, 1000.0f);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Better light importance sampling allows for setting higher firefly filter threshold and conversely.");
                         //ImGui::SameLine();
                         //RESET_ON_CHANGE( ImGui::Checkbox("RX", &m_settings.RealtimeFireflyFilterRelaxOnNonNoisy) ); 
@@ -193,7 +193,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                             0.1f,
                             0.2f,
                             "%.5f"));
-                        m_settings.ReferenceFireflyFilterThreshold = dm::clamp(m_settings.ReferenceFireflyFilterThreshold, 0.01f, 1000.0f);
+                        m_settings.ReferenceFireflyFilterThreshold = math::clamp(m_settings.ReferenceFireflyFilterThreshold, 0.01f, 1000.0f);
                     }
                 }
 
@@ -202,7 +202,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
 
                 RESET_ON_CHANGE(SettingsInputInt(
                     "Environment MIP", &m_settings.EnvironmentMapDiffuseSampleMIPLevel));
-                m_settings.EnvironmentMapDiffuseSampleMIPLevel = dm::clamp(m_settings.EnvironmentMapDiffuseSampleMIPLevel, 0, 16);
+                m_settings.EnvironmentMapDiffuseSampleMIPLevel = math::clamp(m_settings.EnvironmentMapDiffuseSampleMIPLevel, 0, 16);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Use the specific MIP level to sample environment map texture during light sampling and for main path terminating\ninto sky after a diffuse scatter. Only 0 produces unbiased results.");
 
                 RESET_ON_CHANGE(SettingsCheckbox(
@@ -225,7 +225,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
 
                     const int itemCount = IM_ARRAYSIZE(items);
 
-                    m_settings.RealtimeAA = dm::clamp(m_settings.RealtimeAA, 0, dlssAvailable ? itemCount : 1);
+                    m_settings.RealtimeAA = math::clamp(m_settings.RealtimeAA, 0, dlssAvailable ? itemCount : 1);
 
                     if (SettingsBeginCombo("AA / SR / Denoise", items[m_settings.RealtimeAA]))
                     {
@@ -416,7 +416,7 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                             "Sampling",
                             (int*)&m_settings.NEEType,
                             "Uniform\0Power+\0NEE-AT\0\0"));
-                        m_settings.NEEType = dm::clamp(m_settings.NEEType, 0, 2);
+                        m_settings.NEEType = math::clamp(m_settings.NEEType, 0, 2);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Light importance sampling technique to use for NEE.\nNote: Additional NEE-AT settings are exposed in 'Lighting -> NEE-AT' UI section.");
     
                         RESET_ON_CHANGE(SettingsInputInt(
@@ -434,18 +434,18 @@ void EditorUI::BuildPathTracerPanel(const PanelLayout& layout)
                                                                               "Out of those %d will be Local and %d will be Global NEE-AT samples", localCandidateSamples, globalCandidateSamples);
                             }
                         }
-                        m_settings.NEECandidateSamples = dm::clamp(m_settings.NEECandidateSamples, 1, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
+                        m_settings.NEECandidateSamples = math::clamp(m_settings.NEECandidateSamples, 1, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
 
                         RESET_ON_CHANGE(SettingsInputInt(
                             "Full Samples", &m_settings.NEEFullSamples, 1));
-                        m_settings.NEEFullSamples = dm::clamp(m_settings.NEEFullSamples, 0, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
+                        m_settings.NEEFullSamples = math::clamp(m_settings.NEEFullSamples, 0, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("This is the number of light samples to shadow test and integrate\nNote: Maximum total number of samples is 63");
 
                         RESET_ON_CHANGE(SettingsCombo(
                             "MIS Type",
                             (int*)&m_settings.NEEMISType,
                             "Full\0ApproxInRealtime\0Approximate\0\0"));
-                        m_settings.NEEMISType = dm::clamp(m_settings.NEEMISType, 0, 2);
+                        m_settings.NEEMISType = math::clamp(m_settings.NEEMISType, 0, 2);
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Path (BSDF) vs light sampler Multiple Importance Sampling approach.\n'Approximate' is faster and easier to implement but more noisy, with \nthe impact of noise especially detrimental in reference accumulation.");
                     }
                 }

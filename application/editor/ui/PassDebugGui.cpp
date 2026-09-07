@@ -130,16 +130,16 @@ bool DrawLightSamplingDebug(LightSamplingCache& cache, float indent)
             RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
             RAII_SCOPE(ImGui::PushID("Delta");, ImGui::PopID(););
             ImGui::InputFloat("multiplier", &cache.importanceBoostIntensityDeltaMul());
-            cache.importanceBoostIntensityDeltaMul() = dm::clamp(cache.importanceBoostIntensityDeltaMul(), 0.0f, 1000.0f);
+            cache.importanceBoostIntensityDeltaMul() = math::clamp(cache.importanceBoostIntensityDeltaMul(), 0.0f, 1000.0f);
         }
         ImGui::Checkbox("...by light frustum proximity", &cache.importanceBoostFrustum());
         {
             RAII_SCOPE(ImGui::Indent(indent);, ImGui::Unindent(indent););
             RAII_SCOPE(ImGui::PushID("FrustProx");, ImGui::PopID(););
             ImGui::InputFloat("multiplier", &cache.importanceBoostFrustumMul());
-            cache.importanceBoostFrustumMul() = dm::clamp(cache.importanceBoostFrustumMul(), 0.0f, 1000.0f);
+            cache.importanceBoostFrustumMul() = math::clamp(cache.importanceBoostFrustumMul(), 0.0f, 1000.0f);
             ImGui::InputFloat("fade distance", &cache.importanceBoostFrustumFadeDistance());
-            cache.importanceBoostFrustumFadeDistance() = dm::clamp(cache.importanceBoostFrustumFadeDistance(), 0.0f, 1000.0f);
+            cache.importanceBoostFrustumFadeDistance() = math::clamp(cache.importanceBoostFrustumFadeDistance(), 0.0f, 1000.0f);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("How fast the boost fades outside of the frustum\nThe bigger the value, the slower it fades");
         }
@@ -251,7 +251,7 @@ bool DrawProceduralSkyDebug(ProceduralSky& sky, float indent)
                 ImGui::SetTooltip("0 = +X, 90 = +Y in sky-local (Z-up) space.");
             mark(ImGui::InputFloat("Elevation##in", &sky.sunElevationDeg(), 1.0f, 5.0f, "%.2f"));
             mark(ImGui::InputFloat("Azimuth##in", &sky.sunAzimuthDeg(), 1.0f, 15.0f, "%.2f"));
-            sky.sunElevationDeg() = dm::clamp(sky.sunElevationDeg(), -89.0f, 89.0f);
+            sky.sunElevationDeg() = math::clamp(sky.sunElevationDeg(), -89.0f, 89.0f);
             sky.sunAzimuthDeg() = WrapDegrees360(sky.sunAzimuthDeg());
         }
 

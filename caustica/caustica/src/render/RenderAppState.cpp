@@ -21,7 +21,7 @@ const PerformancePreset kDefaultPerformancePreset{
     1,  // RealtimeSamplesPerPixel
     18, // BounceCount
     2,  // DiffuseBounceCount
-    -1.0f, // TexLODBias
+    -2.0f, // TexLODBias
     1,  // NestedDielectricsQuality
     2,  // EnvironmentMapDiffuseSampleMIPLevel
     3,  // StablePlanesActiveCount

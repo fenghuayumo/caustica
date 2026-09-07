@@ -12,9 +12,9 @@ namespace caustica::scene
 // This is not camera view space — aim cameras with setCameraWorldLookTo / look_to.
 struct EntityPose
 {
-    dm::double3 position = dm::double3(0.0);
-    dm::dquat rotation = dm::dquat::identity();
-    dm::double3 scaling = dm::double3(1.0);
+    math::double3 position = math::double3(0.0);
+    math::dquat rotation = math::dquat::identity();
+    math::double3 scaling = math::double3(1.0);
 };
 
 [[nodiscard]] bool getEntityLocalPose(

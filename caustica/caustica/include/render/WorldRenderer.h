@@ -27,6 +27,7 @@
 #include <render/ecs/RenderFrameContext.h>
 #include <render/graph/RenderTargetPool.h>
 #include <render/graph/RenderBufferPool.h>
+#include <render/graph/GraphBuilder.h>
 #include <render/PathTracingFrameContext.h>
 
 #include <chrono>
@@ -35,6 +36,10 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <vector>
 #include <string>
 #include <vector>
 
@@ -54,8 +59,6 @@ struct PathTracerConstants;
 namespace caustica
 {
 class GpuDevice;
-class ICompositeView;
-class IView;
 class Scene;
 struct GpuSharedCaches;
 namespace scene
@@ -119,6 +122,8 @@ public:
     void prepareGaussianSplatPasses();
     void buildGaussianSplatEmissionProxies();
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
+    void createGraphScratchFallbacks();
+    void publishGraphScratchBindings(rg::GraphBuilder& graph);
     // Render-thread only. Caller must waitForIdle() first.
     void releaseStreamlineTemporalResources();
     void onSceneUnloading();
@@ -137,6 +142,21 @@ public:
     RenderTargets* getRenderTargets() { return m_renderTargets.get(); }
     const RenderTargets* getRenderTargets() const { return m_renderTargets.get(); }
 
+    // Debug texture vis (editor `vis <name>` console command / texture viewer).
+    // Merges canonical RenderTargets textures with the last frame graph's
+    // named textures (rg::TextureDesc::name), so new graph passes that name
+    // their createTexture() targets are `vis`-able automatically.
+    [[nodiscard]] uint32_t debugViewTextureCount() const;
+    [[nodiscard]] bool debugViewTextureInfo(
+        uint32_t index, std::string* outName, caustica::rhi::Texture** outTexture) const;
+    [[nodiscard]] caustica::rhi::Texture* findDebugViewTexture(std::string_view name) const;
+    struct DebugNamedTexture
+    {
+        std::string name;
+        caustica::rhi::Texture* texture = nullptr;
+    };
+    [[nodiscard]] std::vector<DebugNamedTexture> debugTextureList() const;
+
     [[nodiscard]] bool hasSceneBindingSet() const { return m_sceneBindings.ready(); }
 
     // Explicit load/cook precache of every cooked feature-preset RT PSO bundle.
@@ -145,8 +165,8 @@ public:
 
     ToneMappingPass* getToneMappingPass() { return m_toneMappingPass.get(); }
 
-    dm::uint2 getRenderSize() const { return m_renderSize; }
-    dm::uint2 getDisplaySize() const { return m_displaySize; }
+    math::uint2 getRenderSize() const { return m_renderSize; }
+    math::uint2 getDisplaySize() const { return m_displaySize; }
 
     uint64_t getFrameIndex() const { return m_frameIndex; }
     int getAccumulationSampleIndex() const { return m_accumulationSampleIndex; }
@@ -180,7 +200,7 @@ private:
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
     void syncCameraViews();
-    [[nodiscard]] dm::float2 computeCameraJitter() const;
+    [[nodiscard]] math::float2 computeCameraJitter() const;
 
     void populateRenderFrameContext(caustica::rhi::Framebuffer* framebuffer, RenderFrameContext& ctx);
     void populateFrameView(ExtractedFrameView& view);
@@ -203,7 +223,7 @@ private:
     // Falls back to waitForIdle only if EventQuery create fails. runGc retires destroyed resources.
     [[nodiscard]] bool waitGraphicsQueueFence(const char* reason, bool runGc = false);
 
-    void createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
+    [[nodiscard]] bool createRenderPasses(bool& exposureResetRequired, caustica::rhi::CommandListHandle initializeCommandList);
     void createPostProcessRenderPasses();
     void preUpdatePathTracing(bool resetAccum, caustica::rhi::CommandListHandle commandList);
     void postUpdatePathTracing();
@@ -219,12 +239,18 @@ private:
     rg::RenderTargetPool         m_renderTargetPool;
     rg::RenderBufferPool         m_renderBufferPool;
     RenderFrameContext           m_renderFrameCtx{};
+    // Last executed frame's named graph textures, for editor texture vis.
+    mutable std::mutex                               m_debugTextureSnapshotMutex;
+    std::vector<rg::GraphBuilder::NamedTexture>      m_debugTextureSnapshot;
 
     std::unique_ptr<RtxdiPass>                  m_rtxdiPass;
     std::unique_ptr<PathTracePass>              m_pathTracePass;
     std::unique_ptr<DenoisePass>                m_denoisePass;
     std::unique_ptr<GaussianSplatFramePass>     m_gaussianFramePass;
     std::unique_ptr<RenderTargets>              m_renderTargets;
+    caustica::rhi::TextureHandle                m_scratchFloat1Fallback;
+    caustica::rhi::TextureHandle                m_avgLayerFallback;
+    caustica::rhi::TextureHandle                m_ldrColorScratchFallback;
     caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
     caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
 
@@ -249,8 +275,8 @@ private:
     std::unique_ptr<DLSS>                       m_nativeDLSS;
 #endif
 
-    dm::uint2                                   m_renderSize{};
-    dm::uint2                                   m_displaySize{};
+    math::uint2                                   m_renderSize{};
+    math::uint2                                   m_displaySize{};
     float                                       m_displayAspectRatio = 1.0f;
 
     int                                         m_accumulationSampleIndex = 0;

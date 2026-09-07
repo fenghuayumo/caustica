@@ -464,21 +464,21 @@ void AccelStructManager::buildTlas(caustica::rhi::CommandList*            comman
         }
         const uint32_t compactedGeometryInstanceIndex = subInstanceCount;
 
-        const dm::affine3& transform = proxy.transformFloat;
+        const math::affine3& transform = proxy.transformFloat;
         const bool finiteTransform =
-            dm::all(dm::isfinite(transform.m_linear[0]))
-            && dm::all(dm::isfinite(transform.m_linear[1]))
-            && dm::all(dm::isfinite(transform.m_linear[2]))
-            && dm::all(dm::isfinite(transform.m_translation));
+            math::all(math::isfinite(transform.m_linear[0]))
+            && math::all(math::isfinite(transform.m_linear[1]))
+            && math::all(math::isfinite(transform.m_linear[2]))
+            && math::all(math::isfinite(transform.m_translation));
         const bool validTransform =
-            finiteTransform && std::abs(dm::determinant(transform.m_linear)) > 1e-12f;
+            finiteTransform && std::abs(math::determinant(transform.m_linear)) > 1e-12f;
 
         caustica::rhi::rt::InstanceDesc instanceDesc;
         instanceDesc.instanceID = compactedGeometryInstanceIndex;
         instanceDesc.instanceContributionToHitGroupIndex = compactedGeometryInstanceIndex;
         instanceDesc.flags = caustica::rhi::rt::InstanceFlags::None;
-        dm::affineToColumnMajor(
-            validTransform ? transform : dm::affine3::identity(),
+        math::affineToColumnMajor(
+            validTransform ? transform : math::affine3::identity(),
             instanceDesc.transform);
 
         const scene::MeshRenderResourceSnapshot* mesh = renderData.findMesh(proxy.meshId);

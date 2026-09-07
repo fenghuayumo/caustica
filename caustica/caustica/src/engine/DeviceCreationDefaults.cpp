@@ -116,6 +116,8 @@ namespace
 
 std::unique_ptr<Window> createGpuWindow(const GpuDeviceCreateDesc& desc)
 {
+    // Windowed Streamline (DLSS / DLSS-RR) requires this HWND. The factory
+    // initializes GLFW before glfwCreateWindow.
     GlfwWindow::makeDefault();
 
     WindowDesc windowDesc;

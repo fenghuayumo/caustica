@@ -17,6 +17,7 @@ namespace
         size_t resourceIndex = 0;
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
         uint64_t exactDescHash = 0;
         uint64_t compatibilityHash = 0;
     };
@@ -27,6 +28,7 @@ namespace
         TextureDesc desc{};
         uint64_t exactDescHash = 0;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
     };
 
     struct PhysicalBufferSlot
@@ -35,6 +37,7 @@ namespace
         uint64_t compatibilityHash = 0;
         uint64_t byteSize = 0;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
     };
 
     struct HeapMemorySlot
@@ -44,6 +47,7 @@ namespace
         uint64_t alignment = 1;
         size_t resourceIndex = SIZE_MAX;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
     };
 
     struct TextureHeapRequest
@@ -51,6 +55,7 @@ namespace
         size_t resourceIndex = 0;
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
         caustica::rhi::MemoryRequirements memReq{};
         caustica::rhi::TextureHandle virtualTexture;
         uint64_t heapOffset = 0;
@@ -61,6 +66,7 @@ namespace
         size_t resourceIndex = 0;
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
+        uint8_t queueMask = 0;
         caustica::rhi::MemoryRequirements memReq{};
         caustica::rhi::BufferHandle virtualBuffer;
         uint64_t heapOffset = 0;
@@ -70,7 +76,8 @@ namespace
         const std::vector<PhysicalTextureSlot>& physicalTextures,
         uint64_t exactDescHash,
         const TextureDesc& desc,
-        int32_t firstPassOrder)
+        int32_t firstPassOrder,
+        uint8_t queueMask)
     {
         int exactMatch = -1;
         int supersetMatch = -1;
@@ -80,6 +87,8 @@ namespace
         {
             const PhysicalTextureSlot& slot = physicalTextures[static_cast<size_t>(slotIndex)];
             if (slot.lastPassOrder >= firstPassOrder)
+                continue;
+            if (!canAliasTransientQueues(queueMask, slot.queueMask))
                 continue;
 
             if (slot.exactDescHash == exactDescHash)
@@ -106,7 +115,8 @@ namespace
         const std::vector<PhysicalBufferSlot>& physicalBuffers,
         uint64_t compatibilityHash,
         uint64_t byteSize,
-        int32_t firstPassOrder)
+        int32_t firstPassOrder,
+        uint8_t queueMask)
     {
         int bestSlot = -1;
         uint64_t bestSize = UINT64_MAX;
@@ -114,6 +124,8 @@ namespace
         for (int slotIndex = 0; slotIndex < static_cast<int>(physicalBuffers.size()); ++slotIndex)
         {
             const PhysicalBufferSlot& slot = physicalBuffers[static_cast<size_t>(slotIndex)];
+            if (!canAliasTransientQueues(queueMask, slot.queueMask))
+                continue;
             if (slot.compatibilityHash != compatibilityHash)
                 continue;
             if (slot.byteSize < byteSize)
@@ -134,7 +146,8 @@ namespace
     int findHeapMemorySlot(
         const std::vector<HeapMemorySlot>& memorySlots,
         const caustica::rhi::MemoryRequirements& memReq,
-        int32_t firstPassOrder)
+        int32_t firstPassOrder,
+        uint8_t queueMask)
     {
         int bestSlot = -1;
         uint64_t bestSize = UINT64_MAX;
@@ -142,6 +155,8 @@ namespace
         for (int slotIndex = 0; slotIndex < static_cast<int>(memorySlots.size()); ++slotIndex)
         {
             const HeapMemorySlot& slot = memorySlots[static_cast<size_t>(slotIndex)];
+            if (!canAliasTransientQueues(queueMask, slot.queueMask))
+                continue;
             if (slot.size < memReq.size)
                 continue;
             if (slot.lastPassOrder >= firstPassOrder)
@@ -260,6 +275,7 @@ void TransientResourceAllocator::allocate(
             i,
             textureLifetimes[i].firstPassOrder,
             textureLifetimes[i].lastPassOrder,
+            textureLifetimes[i].queueMask,
             hashTextureDesc(desc),
             hashTextureCompatibilityDesc(desc),
         });
@@ -283,7 +299,8 @@ void TransientResourceAllocator::allocate(
             physicalTextures,
             request.exactDescHash,
             resource.desc,
-            request.firstPassOrder);
+            request.firstPassOrder,
+            request.queueMask);
 
         if (physicalIndex >= 0)
         {
@@ -305,6 +322,7 @@ void TransientResourceAllocator::allocate(
                 slot.exactDescHash = hashTextureDesc(resource.desc);
                 slot.handle = pooled;
                 slot.lastPassOrder = request.lastPassOrder;
+                slot.queueMask = request.queueMask;
                 physicalTextures.push_back(slot);
 
                 resource.owned = slot.handle;
@@ -324,6 +342,7 @@ void TransientResourceAllocator::allocate(
                 ? graph.m_renderTargetPool->acquireTexture(resource.desc)
                 : graph.createNativeTexture(resource.desc);
             slot.lastPassOrder = request.lastPassOrder;
+            slot.queueMask = request.queueMask;
             physicalTextures.push_back(slot);
 
             resource.owned = slot.handle;
@@ -341,6 +360,7 @@ void TransientResourceAllocator::allocate(
             request.resourceIndex,
             request.firstPassOrder,
             request.lastPassOrder,
+            request.queueMask,
             memReq,
             virtualTexture,
         });
@@ -353,7 +373,11 @@ void TransientResourceAllocator::allocate(
 
         for (TextureHeapRequest& request : heapRequests)
         {
-            const int slotIndex = findHeapMemorySlot(memorySlots, request.memReq, request.firstPassOrder);
+            const int slotIndex = findHeapMemorySlot(
+                memorySlots,
+                request.memReq,
+                request.firstPassOrder,
+                request.queueMask);
             if (slotIndex >= 0)
             {
                 HeapMemorySlot& slot = memorySlots[static_cast<size_t>(slotIndex)];
@@ -374,7 +398,7 @@ void TransientResourceAllocator::allocate(
             const uint64_t alignment = std::max<uint64_t>(request.memReq.alignment, 1);
             const uint64_t alignedOffset = alignUp(heapSize, alignment);
             heapSize = alignedOffset + request.memReq.size;
-            memorySlots.push_back({ alignedOffset, request.memReq.size, alignment, request.resourceIndex, request.lastPassOrder });
+            memorySlots.push_back({ alignedOffset, request.memReq.size, alignment, request.resourceIndex, request.lastPassOrder, request.queueMask });
             request.heapOffset = alignedOffset;
         }
 
@@ -415,6 +439,7 @@ void TransientResourceAllocator::allocate(
             i,
             bufferLifetimes[i].firstPassOrder,
             bufferLifetimes[i].lastPassOrder,
+            bufferLifetimes[i].queueMask,
             hashBufferDesc(desc),
             hashBufferCompatibilityDesc(desc),
         });
@@ -437,7 +462,8 @@ void TransientResourceAllocator::allocate(
             physicalBuffers,
             request.compatibilityHash,
             resource.desc.byteSize,
-            request.firstPassOrder);
+            request.firstPassOrder,
+            request.queueMask);
 
         if (physicalIndex >= 0)
         {
@@ -459,6 +485,7 @@ void TransientResourceAllocator::allocate(
                 slot.handle = pooled;
                 slot.byteSize = std::max(resource.desc.byteSize, pooled->getDesc().byteSize);
                 slot.lastPassOrder = request.lastPassOrder;
+                slot.queueMask = request.queueMask;
                 physicalBuffers.push_back(slot);
 
                 resource.owned = slot.handle;
@@ -480,6 +507,7 @@ void TransientResourceAllocator::allocate(
             if (slot.handle)
                 slot.byteSize = std::max(slot.byteSize, slot.handle->getDesc().byteSize);
             slot.lastPassOrder = request.lastPassOrder;
+            slot.queueMask = request.queueMask;
             physicalBuffers.push_back(slot);
 
             resource.owned = slot.handle;
@@ -498,6 +526,7 @@ void TransientResourceAllocator::allocate(
             request.resourceIndex,
             request.firstPassOrder,
             request.lastPassOrder,
+            request.queueMask,
             memReq,
             virtualBuffer,
         });
@@ -510,7 +539,11 @@ void TransientResourceAllocator::allocate(
 
         for (BufferHeapRequest& request : bufferHeapRequests)
         {
-            const int slotIndex = findHeapMemorySlot(memorySlots, request.memReq, request.firstPassOrder);
+            const int slotIndex = findHeapMemorySlot(
+                memorySlots,
+                request.memReq,
+                request.firstPassOrder,
+                request.queueMask);
             if (slotIndex >= 0)
             {
                 HeapMemorySlot& slot = memorySlots[static_cast<size_t>(slotIndex)];
@@ -531,7 +564,7 @@ void TransientResourceAllocator::allocate(
             const uint64_t alignment = std::max<uint64_t>(request.memReq.alignment, 1);
             const uint64_t alignedOffset = alignUp(heapSize, alignment);
             heapSize = alignedOffset + request.memReq.size;
-            memorySlots.push_back({ alignedOffset, request.memReq.size, alignment, request.resourceIndex, request.lastPassOrder });
+            memorySlots.push_back({ alignedOffset, request.memReq.size, alignment, request.resourceIndex, request.lastPassOrder, request.queueMask });
             request.heapOffset = alignedOffset;
         }
 

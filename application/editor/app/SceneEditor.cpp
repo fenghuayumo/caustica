@@ -2,6 +2,7 @@
 
 #include "SceneContentEditor.h"
 #include "common/LocalConfig.h"
+#include "common/RecentScenes.h"
 #include "common/CaptureScriptManager.h"
 #include "common/TransformGizmo.h"
 #include "ui/RenderSettingsConsole.h"
@@ -154,7 +155,7 @@ animation::Keyframe MakeVisibilityKeyframe(float time, bool visible)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(visible ? 1.f : 0.f, 0.f, 0.f, 0.f);
+    keyframe.value = math::float4(visible ? 1.f : 0.f, 0.f, 0.f, 0.f);
     return keyframe;
 }
 
@@ -197,11 +198,11 @@ void EnsureUniqueSampler(scene::AnimationChannelData& channel)
         channel.sampler = std::make_shared<animation::Sampler>(*channel.sampler);
 }
 
-animation::Keyframe MakeKeyframe(float time, const dm::double3& value)
+animation::Keyframe MakeKeyframe(float time, const math::double3& value)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(
+    keyframe.value = math::float4(
         static_cast<float>(value.x),
         static_cast<float>(value.y),
         static_cast<float>(value.z),
@@ -209,11 +210,11 @@ animation::Keyframe MakeKeyframe(float time, const dm::double3& value)
     return keyframe;
 }
 
-animation::Keyframe MakeKeyframe(float time, const dm::dquat& value)
+animation::Keyframe MakeKeyframe(float time, const math::dquat& value)
 {
     animation::Keyframe keyframe;
     keyframe.time = time;
-    keyframe.value = dm::float4(
+    keyframe.value = math::float4(
         static_cast<float>(value.x),
         static_cast<float>(value.y),
         static_cast<float>(value.z),
@@ -704,6 +705,8 @@ void SceneEditor::syncLoadedSceneSystems()
     if (scenePath.empty() || caustica::isInlineScenePath(scenePath))
         return;
 
+    addRecentScene(scenePath);
+
     Json::Value document;
     if (caustica::json::loadFromFile(scenePath, document))
     {
@@ -756,7 +759,7 @@ const char* AnimationAttributeName(const scene::AnimationChannelData& channel)
 
 void WriteAnimationValue(
     Json::Value& destination,
-    const dm::float4& value,
+    const math::float4& value,
     AnimationAttribute attribute)
 {
     if (attribute == AnimationAttribute::Visibility)
@@ -1061,6 +1064,7 @@ bool SceneEditor::saveSceneAsFromDialog()
 
     const std::string sceneName = path.filename().generic_string();
     caustica::retargetCurrentScene(*m_app, sceneName, path);
+    addRecentScene(path);
 
     m_editorState.loadedSceneName = sceneName;
     caustica::info("Saved scene as '%s'", path.generic_string().c_str());

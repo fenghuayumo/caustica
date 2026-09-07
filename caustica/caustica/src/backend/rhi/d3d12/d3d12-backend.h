@@ -452,6 +452,7 @@ namespace caustica::rhi::d3d12
 
         RefCountPtr<ID3D12Fence> fence;
         uint64_t fenceCounter = 0;
+        CommandQueue queue = CommandQueue::Graphics;
 
         bool started = false;
         bool resolved = false;

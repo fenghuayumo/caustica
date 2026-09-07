@@ -264,7 +264,7 @@ static PolymorphicLightInfoFull ConvertRectLightTriangle(
     const auto& rect = *rectData;
     const double halfWidth = std::max(0.f, rect.width) * 0.5;
     const double halfHeight = std::max(0.f, rect.height) * 0.5;
-    const dm::double3 localCorners[4] = {
+    const math::double3 localCorners[4] = {
         { -halfWidth, -halfHeight, 0.0 },
         { -halfWidth,  halfHeight, 0.0 },
         {  halfWidth,  halfHeight, 0.0 },
@@ -312,12 +312,12 @@ static bool ConvertLightProxy(
             packLightColor(flux, polymorphic);
             polymorphic.Base.Center = lightPos;
             polymorphic.Base.Direction1 = NDirToOctUnorm32(lightDir);
-            polymorphic.Base.Direction2 = fp32ToFp16(dm::radians(abs(spot.outerAngle)));
-            polymorphic.Base.Direction2 |= fp32ToFp16(dm::radians(spot.innerAngle)) << 16;
+            polymorphic.Base.Direction2 = fp32ToFp16(math::radians(abs(spot.outerAngle)));
+            polymorphic.Base.Direction2 |= fp32ToFp16(math::radians(spot.innerAngle)) << 16;
         }
         else
         {
-            float projectedArea = dm::PI_f * square(spot.radius);
+            float projectedArea = math::PI_f * square(spot.radius);
             float3 radiance = proxy.color * spot.intensity / projectedArea;
             float softness = saturate(1.f - spot.innerAngle / abs(spot.outerAngle));
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift | ((spot.outerAngle < 0) ? kPolymorphicLightShapingUseMinFalloff : 0);
@@ -326,7 +326,7 @@ static bool ConvertLightProxy(
             polymorphic.Base.Center = lightPos;
             polymorphic.Base.Scalars = fp32ToFp16(spot.radius);
             polymorphic.Extended.PrimaryAxis = NDirToOctUnorm32(lightDir);
-            polymorphic.Extended.CosConeAngleAndSoftness = fp32ToFp16(cosf(dm::radians(abs(spot.outerAngle))));
+            polymorphic.Extended.CosConeAngleAndSoftness = fp32ToFp16(cosf(math::radians(abs(spot.outerAngle))));
             polymorphic.Extended.CosConeAngleAndSoftness |= fp32ToFp16(softness) << 16;
         }
         return true;
@@ -341,11 +341,11 @@ static bool ConvertLightProxy(
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kPoint << kPolymorphicLightTypeShift;
             packLightColor(flux, polymorphic);
             polymorphic.Base.Center = lightPos;
-            polymorphic.Base.Direction2 = fp32ToFp16(dm::PI_f) | fp32ToFp16(0.0f) << 16;
+            polymorphic.Base.Direction2 = fp32ToFp16(math::PI_f) | fp32ToFp16(0.0f) << 16;
         }
         else
         {
-            float projectedArea = dm::PI_f * square(point.radius);
+            float projectedArea = math::PI_f * square(point.radius);
             float3 radiance = proxy.color * point.intensity / projectedArea;
             polymorphic.Base.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
             packLightColor(radiance, polymorphic);
@@ -404,7 +404,7 @@ static float TransformRadiusScale(const float4x4& transform)
     const float3 row0 = float3(transform.row0.x, transform.row0.y, transform.row0.z);
     const float3 row1 = float3(transform.row1.x, transform.row1.y, transform.row1.z);
     const float3 row2 = float3(transform.row2.x, transform.row2.y, transform.row2.z);
-    return std::max(1e-4f, std::max(dm::length(row0), std::max(dm::length(row1), dm::length(row2))));
+    return std::max(1e-4f, std::max(math::length(row0), std::max(math::length(row1), math::length(row2))));
 }
 
 static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
@@ -637,7 +637,7 @@ RTXDI_LightBufferParameters PrepareLightsPass::process(caustica::rhi::CommandLis
     
     //Skip the prepare lights dispatch if there are no lights. Note the Environment map is handled in another pass
     if (lightBufferOffset > 0)
-        commandList->dispatch(dm::div_ceil(lightBufferOffset, 256));
+        commandList->dispatch(math::div_ceil(lightBufferOffset, 256));
 
     commandList->endMarker();
 

@@ -6,6 +6,7 @@
 #include <rhi/rhi.h>
 
 #include <array>
+#include <climits>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -48,20 +49,49 @@ enum class BufferAccess : uint8_t
     AccelStructBuildInput,
 };
 
+enum class AccelStructAccess : uint8_t
+{
+    ShaderResource,
+    Build,
+};
+
 class GraphBuilder;
+
+// Graph-owned transients are created with createTexture/createBuffer and may
+// alias. External resources are importTexture/importBuffer (history, present,
+// vendor buffers) and stay owned by the caller.
+enum class ResourceOwnership : uint8_t
+{
+    External,
+    Graph,
+};
+
+struct CompiledWave
+{
+    caustica::rhi::CommandQueue queue = caustica::rhi::CommandQueue::Graphics;
+    std::vector<uint32_t> passes;
+    // Producer wave indices on another queue that must complete first.
+    std::vector<uint32_t> waitWaves;
+};
 
 struct PassOptions
 {
     bool enabled = true;
+    // Graph-external side effect with no declarable handle (e.g. AS not imported).
+    // Do not use this to keep a no-op pass alive — skip addPass instead.
     bool sideEffect = false;
-    // Force this pass onto the primary list (and alone in its wave). Use for
+    // Force this pass onto the graphics primary (and alone in its wave). Use for
     // mid-pass close/execute sync-points (e.g. ToneMapping first-frame AE).
     bool serialOnPrimary = false;
     // Relative CPU recording cost. The compiler groups independent passes into
     // a bounded number of worker command lists instead of one list per pass.
     uint16_t recordingCost = 1;
-    // Explicit ordering for side effects not represented by resource accesses.
+    // Order only when a side effect cannot be expressed as a resource access.
     PassHandle after;
+    // Queue for this pass. Waves are split per queue; cross-queue resource
+    // edges become queueWaitForCommandList. Falls back to Graphics when the
+    // device has no compute/copy queue (DX11).
+    caustica::rhi::CommandQueue queue = caustica::rhi::CommandQueue::Graphics;
 };
 
 struct ExecuteParams
@@ -85,18 +115,28 @@ class PassBuilder
 public:
     using TextureAccessList = std::vector<std::pair<TextureHandle, TextureAccess>>;
     using BufferAccessList = std::vector<std::pair<BufferHandle, BufferAccess>>;
+    using AccelStructAccessList = std::vector<std::pair<AccelStructHandle, AccelStructAccess>>;
 
     PassBuilder(
         GraphBuilder& graph,
         TextureAccessList& textureReads,
         TextureAccessList& textureWrites,
         BufferAccessList& bufferReads,
-        BufferAccessList& bufferWrites);
+        BufferAccessList& bufferWrites,
+        AccelStructAccessList& accelStructReads,
+        AccelStructAccessList& accelStructWrites);
 
     void read(TextureHandle texture, TextureAccess access = TextureAccess::ShaderResource);
-    void write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
+    // Produces latest+1. A captured handle is rebased so sequential writes work;
+    // the returned handle is the version later reads must use.
+    TextureHandle write(TextureHandle texture, TextureAccess access = TextureAccess::RenderTarget);
+    // Same-pass RMW. The incoming handle must be current; a version-0 identity
+    // handle (FrameSlots / fresh import) resolves to the latest version first.
+    TextureHandle readWrite(TextureHandle texture, TextureAccess access = TextureAccess::UnorderedAccess);
     void read(BufferHandle buffer, BufferAccess access = BufferAccess::ShaderResource);
     void write(BufferHandle buffer, BufferAccess access = BufferAccess::UnorderedAccess);
+    void read(AccelStructHandle accel, AccelStructAccess access = AccelStructAccess::ShaderResource);
+    void write(AccelStructHandle accel, AccelStructAccess access = AccelStructAccess::Build);
 
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
@@ -107,6 +147,8 @@ private:
     TextureAccessList* m_textureWrites = nullptr;
     BufferAccessList* m_bufferReads = nullptr;
     BufferAccessList* m_bufferWrites = nullptr;
+    AccelStructAccessList* m_accelStructReads = nullptr;
+    AccelStructAccessList* m_accelStructWrites = nullptr;
 };
 
 class RenderPassContext
@@ -117,6 +159,7 @@ public:
     [[nodiscard]] caustica::rhi::CommandList* commandList() const { return m_commandList; }
     [[nodiscard]] caustica::rhi::Texture* texture(TextureHandle handle) const;
     [[nodiscard]] caustica::rhi::Buffer* buffer(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::rt::AccelStruct* accelStruct(AccelStructHandle handle) const;
 
 private:
     caustica::rhi::CommandList* m_commandList = nullptr;
@@ -139,10 +182,33 @@ public:
     TextureHandle importTexture(caustica::rhi::Texture* texture, TextureAccess initialAccess = TextureAccess::ShaderResource);
     BufferHandle importBuffer(caustica::rhi::Buffer* buffer, caustica::rhi::ResourceStates initialState);
     BufferHandle importBuffer(caustica::rhi::Buffer* buffer, BufferAccess initialAccess = BufferAccess::ShaderResource);
+    AccelStructHandle importAccelStruct(
+        caustica::rhi::rt::AccelStruct* accel,
+        caustica::rhi::ResourceStates initialState);
+    AccelStructHandle importAccelStruct(
+        caustica::rhi::rt::AccelStruct* accel,
+        AccelStructAccess initialAccess = AccelStructAccess::ShaderResource);
 
+    // Graph-owned transient. Allocation is deferred until compile() with a device.
+    // A second createTexture with the same non-empty name returns the first handle.
     [[nodiscard]] TextureHandle createTexture(const TextureDesc& desc);
     [[nodiscard]] BufferHandle createBuffer(const BufferDesc& desc);
+    [[nodiscard]] TextureHandle findTexture(std::string_view name) const;
+    // Debug texture vis: name + resolved device pointer for every named graph
+    // texture of the last compiled/ executed frame. Empty names are skipped;
+    // transient pooled entries may alias later passes in the same frame.
+    struct NamedTexture
+    {
+        std::string name;
+        caustica::rhi::Texture* texture = nullptr;
+    };
+    [[nodiscard]] std::vector<NamedTexture> namedTextureSnapshot() const;
+    // Rebase a handle to the resource's latest write version (after another pass wrote it).
+    [[nodiscard]] TextureHandle currentTexture(TextureHandle handle) const;
+    [[nodiscard]] caustica::rhi::TextureHandle ownedTextureHandle(TextureHandle handle) const;
 
+    // Keep the resource alive after execute() (present, next-frame history,
+    // CPU readback). Do not extract a target just to pin its producer chain.
     void extractTexture(TextureHandle handle, caustica::rhi::ResourceStates finalState);
     void extractTexture(TextureHandle handle, TextureAccess finalAccess);
     void extractBuffer(BufferHandle handle, caustica::rhi::ResourceStates finalState);
@@ -171,17 +237,40 @@ public:
 
     [[nodiscard]] caustica::rhi::Texture* resolveTexture(TextureHandle handle) const;
     [[nodiscard]] caustica::rhi::Buffer* resolveBuffer(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::rt::AccelStruct* resolveAccelStruct(AccelStructHandle handle) const;
     [[nodiscard]] caustica::rhi::ResourceStates textureState(TextureHandle handle) const;
     [[nodiscard]] caustica::rhi::ResourceStates bufferState(BufferHandle handle) const;
+    [[nodiscard]] caustica::rhi::ResourceStates accelStructState(AccelStructHandle handle) const;
+    [[nodiscard]] bool isHandleCurrent(TextureHandle handle) const;
+    [[nodiscard]] bool isHandleCurrent(BufferHandle handle) const;
+    [[nodiscard]] bool isHandleCurrent(AccelStructHandle handle) const;
+    [[nodiscard]] bool isHandleCurrent(PassHandle handle) const;
     [[nodiscard]] bool isCompiled() const { return m_compiled; }
 
     [[nodiscard]] size_t passCount() const { return m_passes.size(); }
     [[nodiscard]] const std::vector<std::string>& passNames() const { return m_passNames; }
     [[nodiscard]] const std::vector<uint32_t>& compiledPassOrder() const;
     [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaves() const;
+    [[nodiscard]] const std::vector<caustica::rhi::CommandQueue>& compiledWaveQueues() const;
+    [[nodiscard]] const std::vector<std::vector<uint32_t>>& compiledWaveWaits() const;
     [[nodiscard]] const TransientResourceStats& transientResourceStats() const { return m_transientStats; }
     [[nodiscard]] bool lastCompileCacheHit() const { return m_lastCompileCacheHit; }
+    [[nodiscard]] bool lastCompileHadCycle() const { return m_lastCompileHadCycle; }
+    [[nodiscard]] bool lastCompileHadInvalidQueueAccess() const { return m_lastCompileHadInvalidQueueAccess; }
+
+    // Declared access vs queue. Compile records a flag; it does not rewrite the pass.
+    [[nodiscard]] static bool textureAccessLegalOnQueue(
+        TextureAccess access,
+        caustica::rhi::CommandQueue queue);
+    [[nodiscard]] static bool bufferAccessLegalOnQueue(
+        BufferAccess access,
+        caustica::rhi::CommandQueue queue);
+    [[nodiscard]] static bool accelStructAccessLegalOnQueue(
+        AccelStructAccess access,
+        caustica::rhi::CommandQueue queue);
     [[nodiscard]] uint32_t lastParallelBatchCount() const { return m_lastParallelBatchCount; }
+    [[nodiscard]] ResourceOwnership textureOwnership(TextureHandle handle) const;
+    [[nodiscard]] ResourceOwnership bufferOwnership(BufferHandle handle) const;
     [[nodiscard]] size_t activePassCount() const;
     [[nodiscard]] PassHandle findPass(std::string_view name) const;
     [[nodiscard]] bool isPassRegistered(std::string_view name) const;
@@ -206,6 +295,7 @@ private:
         ResourceLifetime lifetime = ResourceLifetime::Imported;
         TextureDesc desc;
         caustica::rhi::TextureHandle owned;
+        uint32_t latestVersion = 0;
     };
 
     struct GraphBuffer
@@ -216,6 +306,13 @@ private:
         ResourceLifetime lifetime = ResourceLifetime::Imported;
         BufferDesc desc;
         caustica::rhi::BufferHandle owned;
+    };
+
+    struct GraphAccelStruct
+    {
+        caustica::rhi::rt::AccelStruct* accel = nullptr;
+        caustica::rhi::ResourceStates currentState = caustica::rhi::ResourceStates::AccelStructRead;
+        ResourceLifetime lifetime = ResourceLifetime::Imported;
     };
 
     struct Pass
@@ -229,6 +326,8 @@ private:
         std::vector<std::pair<TextureHandle, TextureAccess>> textureWrites;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferReads;
         std::vector<std::pair<BufferHandle, BufferAccess>> bufferWrites;
+        std::vector<std::pair<AccelStructHandle, AccelStructAccess>> accelStructReads;
+        std::vector<std::pair<AccelStructHandle, AccelStructAccess>> accelStructWrites;
         caustica::rhi::TimerQuery* gpuTimer = nullptr;
     };
 
@@ -255,6 +354,14 @@ private:
 
     static caustica::rhi::ResourceStates accessToState(TextureAccess access);
     static caustica::rhi::ResourceStates accessToState(BufferAccess access);
+    static caustica::rhi::ResourceStates accessToState(AccelStructAccess access);
+
+    [[nodiscard]] TextureHandle makeTextureHandle(uint32_t index) const;
+    void validateTextureRead(TextureHandle& handle) const;
+    TextureHandle advanceTextureWrite(TextureHandle handle);
+    [[nodiscard]] BufferHandle makeBufferHandle(uint32_t index) const;
+    [[nodiscard]] AccelStructHandle makeAccelStructHandle(uint32_t index) const;
+    [[nodiscard]] PassHandle makePassHandle(uint32_t index) const;
 
     [[nodiscard]] caustica::rhi::TextureHandle createNativeTexture(const TextureDesc& desc, bool isVirtual = false) const;
     [[nodiscard]] caustica::rhi::BufferHandle createNativeBuffer(const BufferDesc& desc, bool isVirtual = false) const;
@@ -262,6 +369,11 @@ private:
     {
         int32_t firstPassOrder = INT32_MAX;
         int32_t lastPassOrder = -1;
+        // Bit per CommandQueue of every wave touching the resource. Aliasing
+        // two transients is only safe when all their waves share one queue:
+        // aliasing barriers sync within the acquiring queue only, and aliased
+        // resources never carry graph edges that would insert a queue wait.
+        uint8_t queueMask = 0;
     };
 
     void computeTransientLifetimes(
@@ -284,6 +396,11 @@ private:
     void syncPassEndStates(const Pass& pass);
     static bool passUsesTextureAsWrite(const Pass& pass, TextureHandle handle);
     static bool passUsesBufferAsWrite(const Pass& pass, BufferHandle handle);
+    static bool passUsesAccelStructAsWrite(const Pass& pass, AccelStructHandle handle);
+    void transitionAccelStruct(
+        caustica::rhi::CommandList* commandList,
+        AccelStructHandle handle,
+        AccelStructAccess access);
     void transitionExtractedResources(caustica::rhi::CommandList* commandList);
     void recordPass(
         caustica::rhi::CommandList* commandList,
@@ -299,13 +416,30 @@ private:
         const std::vector<bool>& needed,
         const std::vector<std::vector<uint32_t>>& incoming,
         const std::vector<std::vector<uint32_t>>& outgoing);
+    void evictOldestCompiledPlanIfNeeded();
     [[nodiscard]] uint64_t compiledPlanKey() const;
+    [[nodiscard]] caustica::rhi::CommandQueue passQueue(uint32_t passIndex) const;
+    [[nodiscard]] caustica::rhi::CommandQueue resolveQueue(caustica::rhi::CommandQueue queue) const;
+    void applyWaveWaits(
+        caustica::rhi::FrameCommandContext& frameCtx,
+        caustica::rhi::CommandQueue consumer,
+        const std::vector<uint32_t>& waitWaves);
+    void applyFrameBoundaryWaits(caustica::rhi::FrameCommandContext& frameCtx);
+    void recordCompileQueueAccessErrors();
+    [[nodiscard]] bool passAccessLegalOnQueue(const Pass& pass, caustica::rhi::CommandQueue queue) const;
+    uint64_t executeWaveAsync(
+        caustica::rhi::FrameCommandContext& frameCtx,
+        caustica::rhi::CommandQueue queue,
+        const std::vector<uint32_t>& wave,
+        caustica::rhi::CommandQueue& executedQueue);
 
     struct CompiledPlan
     {
         std::vector<bool> activePasses;
         std::vector<uint32_t> passOrder;
         std::vector<std::vector<uint32_t>> waves;
+        std::vector<caustica::rhi::CommandQueue> waveQueues;
+        std::vector<std::vector<uint32_t>> waveWaits;
         std::vector<bool> referencedTextures;
         std::vector<bool> referencedBuffers;
         std::vector<TransientLifetime> textureLifetimes;
@@ -350,15 +484,21 @@ private:
     bool m_compiled = false;
     std::vector<GraphTexture> m_textures;
     std::vector<GraphBuffer> m_buffers;
+    std::vector<GraphAccelStruct> m_accelStructs;
     std::vector<Pass> m_passes;
     // Keeps Pass-owned strings and access-list capacities alive across reset().
     // Graph topology is rebuilt each frame, but its allocator footprint is not.
     std::vector<Pass> m_recycledPasses;
     std::vector<uint32_t> m_compiledPassOrder;
     std::vector<std::vector<uint32_t>> m_compiledWaves;
+    std::vector<caustica::rhi::CommandQueue> m_compiledWaveQueues;
+    std::vector<std::vector<uint32_t>> m_compiledWaveWaits;
     std::vector<std::string> m_passNames;
     std::unordered_map<caustica::rhi::Texture*, uint32_t> m_importIndexByTexture;
     std::unordered_map<caustica::rhi::Buffer*, uint32_t> m_importIndexByBuffer;
+    std::unordered_map<caustica::rhi::rt::AccelStruct*, uint32_t> m_importIndexByAccelStruct;
+    std::unordered_map<std::string, uint32_t> m_createIndexByName;
+    uint32_t m_handleGeneration = 0;
     std::vector<caustica::rhi::HeapHandle> m_transientHeaps;
     std::vector<caustica::rhi::HeapHandle> m_transientHeapPool;
     std::vector<TextureAliasingBarrier> m_textureAliasingBarriers;
@@ -367,6 +507,8 @@ private:
     TransientResourceStats m_transientStats;
     VolatileConstantBinder m_volatileConstants;
     std::unordered_map<uint64_t, CompiledPlan> m_compiledPlanCache;
+    std::vector<uint64_t> m_compiledPlanCacheOrder;
+    static constexpr size_t kCompiledPlanCacheLimit = 16;
     // Cache-hit plans are immutable until the next compile/reset. Borrow their
     // topology instead of deep-copying pass order and waves every stable frame.
     const CompiledPlan* m_activeCachedPlan = nullptr;
@@ -379,7 +521,26 @@ private:
     std::array<GpuTimingSlot, kGpuTimingSlotCount> m_gpuTimingSlots{};
     int32_t m_activeGpuTimingSlot = -1;
     bool m_lastCompileCacheHit = false;
+    bool m_lastCompileHadCycle = false;
+    bool m_lastCompileHadInvalidQueueAccess = false;
     uint32_t m_lastParallelBatchCount = 0;
+    std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_lastQueueInstance{};
+    std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> m_queueSubmitted{};
+    // Actual execution queue per compiled wave (execute-time reality, which can
+    // differ from the declared wave queue when an async list fails to open).
+    std::vector<uint8_t> m_executedWaveQueues;
+    // True when the open primary cannot contain recorded work (freshly opened
+    // by flushPrimary). Prevents empty submissions from consuming cross-queue
+    // timeline waits that must ride the next real graphics submission.
+    bool m_primaryClean = false;
+    // Highest async instance the graphics queue actually waited on this frame.
+    // The final join can be skipped only while this covers m_lastQueueInstance.
+    std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_graphicsWaitedInstance{};
+    // Survive reset() so the next execute can order imported history against
+    // last frame's async / graphics producers (Vulkan same-queue FIFO is not
+    // enough when the consumer is on another queue).
+    std::array<uint64_t, size_t(caustica::rhi::CommandQueue::Count)> m_prevFrameQueueInstance{};
+    std::array<uint8_t, size_t(caustica::rhi::CommandQueue::Count)> m_prevFrameQueueSubmitted{};
 };
 
 } // namespace caustica::rg

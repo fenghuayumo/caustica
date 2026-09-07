@@ -339,7 +339,7 @@ box3 Scene::getSceneBounds() const
         return box3::empty();
 
     const box3& globalBounds = bounds->globalBounds;
-    const bool finite = dm::all(dm::isfinite(globalBounds.m_mins)) && dm::all(dm::isfinite(globalBounds.m_maxs));
+    const bool finite = math::all(math::isfinite(globalBounds.m_mins)) && math::all(math::isfinite(globalBounds.m_maxs));
     return finite ? globalBounds : box3::empty();
 }
 
@@ -707,7 +707,7 @@ void Scene::syncRectLightVisualFromComponent(scene::SceneEntityWorld& world, ecs
 
     const float width = std::max(1e-4f, rect->width);
     const float height = std::max(1e-4f, rect->height);
-    world.setScaling(entity, dm::double3(double(width), double(height), 1.0));
+    world.setScaling(entity, math::double3(double(width), double(height), 1.0));
 
     auto* meshComp = world.world().tryGet<scene::MeshInstanceComponent>(entity);
     if (!meshComp || !meshComp->mesh)
@@ -823,6 +823,19 @@ void Scene::adoptLiveEcs(ecs::World& liveWorld)
     if (!m_EntityWorld)
         return;
     m_EntityWorld->adoptInto(liveWorld, m_SceneTypeFactory.get());
+}
+
+void Scene::detachLiveEcs()
+{
+    // Must run while the borrowed ecs::World is still alive (App::shutdown).
+    // resetScene() detaches the graph from the live registry; replacing the
+    // entity world afterwards guarantees the destructor never touches the
+    // borrowed world again even if this Scene outlives the App.
+    if (!m_EntityWorld)
+        return;
+    if (!m_EntityWorld->ownsRegistry())
+        m_EntityWorld->resetScene();
+    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
 }
 
 bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
@@ -1233,10 +1246,10 @@ void Scene::attachLeafFromJson(
     }
 }
 
-static dm::float4 ReadUpToFloat4(const Json::Value& node)
+static math::float4 ReadUpToFloat4(const Json::Value& node)
 {
     if (node.isNumeric())
-        return dm::float4(node.asFloat());
+        return math::float4(node.asFloat());
 
     if (node.isArray())
     {

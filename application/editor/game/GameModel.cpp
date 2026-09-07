@@ -185,7 +185,7 @@ void ModelInstance::updateLightFromControllers(double gameTime)
             continue;
 
         float3 scale;
-        dm::decomposeAffine<float>(global->transformFloat, nullptr, nullptr, &scale);
+        math::decomposeAffine<float>(global->transformFloat, nullptr, nullptr, &scale);
         float reallyAverageScale = (scale.x + scale.y + scale.z) / 3.0f;
 
         auto* spot = scene::tryGetSpotLight(ecsWorld, controller->Entity);
@@ -207,7 +207,7 @@ void ModelInstance::updateLightFromControllers(double gameTime)
         {
             double periodLength = controller->AutoOffTime + controller->AutoOnTime;
             double scaledTime = (gameTime + controller->AutoOnOffTimeOffset) / periodLength;
-            double remainder = dm::saturate<double>(scaledTime - floor(scaledTime));
+            double remainder = math::saturate<double>(scaledTime - floor(scaledTime));
             enabled &= remainder < (controller->AutoOffTime / periodLength);
         }
 
@@ -234,13 +234,13 @@ void ModelInstance::updateLightFromControllers(double gameTime)
     }
 }
 
-void ModelInstance::setTransform(const dm::double3& translation, const dm::dquat& rotation, const dm::double3& scaling)
+void ModelInstance::setTransform(const math::double3& translation, const math::dquat& rotation, const math::double3& scaling)
 {
     if (auto* world = m_modelType->liveEntityWorld())
         world->setLocalTransform(m_entity, &translation, &rotation, &scaling);
 }
 
-void ModelInstance::setTransform(const dm::float3& translation, const dm::quat& rotation, const dm::float3& scaling)
+void ModelInstance::setTransform(const math::float3& translation, const math::quat& rotation, const math::float3& scaling)
 {
-    setTransform(dm::double3(translation), dm::dquat(rotation), dm::double3(scaling));
+    setTransform(math::double3(translation), math::dquat(rotation), math::double3(scaling));
 }

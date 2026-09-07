@@ -18,26 +18,26 @@ bool IsFinitePositive(float value)
     return std::isfinite(value) && value > 0.f;
 }
 
-dm::float3 SafeNormalize(const dm::float3& v, const dm::float3& fallback)
+math::float3 SafeNormalize(const math::float3& v, const math::float3& fallback)
 {
-    const float len = dm::length(v);
+    const float len = math::length(v);
     return len > kDirEpsilon ? v / len : fallback;
 }
 
-dm::affine3 MakeCameraViewToWorld(const dm::float3& position, const dm::float3& direction, const dm::float3& up)
+math::affine3 MakeCameraViewToWorld(const math::float3& position, const math::float3& direction, const math::float3& up)
 {
-    const dm::float3 d = SafeNormalize(direction, dm::float3(0.f, 0.f, -1.f));
-    dm::float3 r = dm::cross(d, up);
-    if (dm::length(r) <= kDirEpsilon)
+    const math::float3 d = SafeNormalize(direction, math::float3(0.f, 0.f, -1.f));
+    math::float3 r = math::cross(d, up);
+    if (math::length(r) <= kDirEpsilon)
     {
-        const dm::float3 fallback = std::abs(d.y) < 0.99f
-            ? dm::float3(0.f, 1.f, 0.f)
-            : dm::float3(1.f, 0.f, 0.f);
-        r = dm::cross(d, fallback);
+        const math::float3 fallback = std::abs(d.y) < 0.99f
+            ? math::float3(0.f, 1.f, 0.f)
+            : math::float3(1.f, 0.f, 0.f);
+        r = math::cross(d, fallback);
     }
-    r = SafeNormalize(r, dm::float3(1.f, 0.f, 0.f));
-    const dm::float3 u = SafeNormalize(dm::cross(r, d), dm::float3(0.f, 1.f, 0.f));
-    return dm::affine3(r, u, d, position);
+    r = SafeNormalize(r, math::float3(1.f, 0.f, 0.f));
+    const math::float3 u = SafeNormalize(math::cross(r, d), math::float3(0.f, 1.f, 0.f));
+    return math::affine3(r, u, d, position);
 }
 
 void MarkCameraComponentChanged(SceneEntityWorld& world, ecs::Entity entity)
@@ -66,14 +66,14 @@ SceneContentFlags getCameraContentFlags()
     return SceneContentFlags::Cameras;
 }
 
-dm::affine3 getCameraViewToWorldMatrix(const dm::daffine3& globalTransform)
+math::affine3 getCameraViewToWorldMatrix(const math::daffine3& globalTransform)
 {
-    return dm::scaling(dm::float3(1.f, 1.f, -1.f)) * dm::affine3(globalTransform);
+    return math::scaling(math::float3(1.f, 1.f, -1.f)) * math::affine3(globalTransform);
 }
 
-dm::affine3 getCameraWorldToViewMatrix(const dm::daffine3& globalTransform)
+math::affine3 getCameraWorldToViewMatrix(const math::daffine3& globalTransform)
 {
-    return dm::affine3(inverse(globalTransform)) * dm::scaling(dm::float3(1.f, 1.f, -1.f));
+    return math::affine3(inverse(globalTransform)) * math::scaling(math::float3(1.f, 1.f, -1.f));
 }
 
 bool isPerspectiveCamera(const CameraComponent& component)
@@ -106,7 +106,7 @@ OrthographicCameraData* tryGetOrthographicCameraData(CameraComponent& component)
     return std::get_if<OrthographicCameraData>(&component.data);
 }
 
-bool setCameraProperty(CameraComponent& component, const std::string& propName, const dm::float4& value)
+bool setCameraProperty(CameraComponent& component, const std::string& propName, const math::float4& value)
 {
     if (auto* perspective = tryGetPerspectiveCameraData(component))
     {
@@ -158,37 +158,37 @@ bool tryGetCameraWorldLookTo(const SceneEntityWorld& world, ecs::Entity entity, 
     if (!global)
         return false;
 
-    const dm::affine3 viewToWorld = getCameraViewToWorldMatrix(global->transform);
+    const math::affine3 viewToWorld = getCameraViewToWorldMatrix(global->transform);
     out.position = viewToWorld.m_translation;
-    out.direction = SafeNormalize(viewToWorld.m_linear.row2, dm::float3(0.f, 0.f, -1.f));
-    out.up = SafeNormalize(viewToWorld.m_linear.row1, dm::float3(0.f, 1.f, 0.f));
+    out.direction = SafeNormalize(viewToWorld.m_linear.row2, math::float3(0.f, 0.f, -1.f));
+    out.up = SafeNormalize(viewToWorld.m_linear.row1, math::float3(0.f, 1.f, 0.f));
     return true;
 }
 
 bool setCameraWorldLookTo(
     SceneEntityWorld& world,
     ecs::Entity entity,
-    const dm::float3& position,
-    const dm::float3& direction,
-    const dm::float3& up)
+    const math::float3& position,
+    const math::float3& direction,
+    const math::float3& up)
 {
     if (!tryGetCamera(world.world(), entity))
         return false;
-    if (!dm::all(dm::isfinite(position))
-        || !dm::all(dm::isfinite(direction))
-        || !dm::all(dm::isfinite(up))
-        || dm::length(direction) <= kDirEpsilon)
+    if (!math::all(math::isfinite(position))
+        || !math::all(math::isfinite(direction))
+        || !math::all(math::isfinite(up))
+        || math::length(direction) <= kDirEpsilon)
         return false;
 
-    const dm::affine3 viewToWorld = MakeCameraViewToWorld(position, direction, up);
-    const dm::affine3 zflip = dm::scaling(dm::float3(1.f, 1.f, -1.f));
-    const dm::daffine3 desiredWorld(zflip * viewToWorld);
+    const math::affine3 viewToWorld = MakeCameraViewToWorld(position, direction, up);
+    const math::affine3 zflip = math::scaling(math::float3(1.f, 1.f, -1.f));
+    const math::daffine3 desiredWorld(zflip * viewToWorld);
 
     ecs::Entity parentEntity = ecs::NullEntity;
     if (const auto* parent = world.world().get<ParentComponent>(entity))
         parentEntity = parent->parent;
 
-    dm::daffine3 parentToWorld = dm::daffine3::identity();
+    math::daffine3 parentToWorld = math::daffine3::identity();
     if (ecs::isValid(parentEntity))
     {
         if (const auto* globalTransform = world.world().get<GlobalTransformComponent>(parentEntity))
@@ -196,10 +196,10 @@ bool setCameraWorldLookTo(
     }
 
     // Scene hierarchy composition is row-vector based: world = local * parent.
-    const dm::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
-    dm::double3 translation;
-    dm::dquat rotation;
-    dm::double3 scaling;
+    const math::daffine3 localToParent = desiredWorld * inverse(parentToWorld);
+    math::double3 translation;
+    math::dquat rotation;
+    math::double3 scaling;
     decomposeAffine<double>(localToParent, &translation, &rotation, &scaling);
     world.setLocalTransform(entity, &translation, &rotation, &scaling);
     world.refreshHierarchy();
@@ -208,7 +208,7 @@ bool setCameraWorldLookTo(
 
 bool setCameraVerticalFov(SceneEntityWorld& world, ecs::Entity entity, float radians)
 {
-    if (!std::isfinite(radians) || radians <= 0.f || radians >= dm::PI_f)
+    if (!std::isfinite(radians) || radians <= 0.f || radians >= math::PI_f)
         return false;
     PerspectiveCameraData* perspective = MutablePerspective(world, entity);
     if (!perspective)

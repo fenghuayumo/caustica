@@ -22,23 +22,23 @@ scene::SceneEntityWorld* logicEntityWorld(App& app)
 bool setEntityLocalTransform(
     App& app,
     ecs::Entity entity,
-    const std::optional<dm::double3>& translation,
-    const std::optional<dm::dquat>& rotation,
-    const std::optional<dm::double3>& scaling)
+    const std::optional<math::double3>& translation,
+    const std::optional<math::dquat>& rotation,
+    const std::optional<math::double3>& scaling)
 {
     scene::SceneEntityWorld* ew = logicEntityWorld(app);
     if (!ew || !ecs::isValid(entity) || !ew->world().isAlive(entity))
         return false;
 
-    const dm::double3* t = translation ? &*translation : nullptr;
-    const dm::dquat* r = rotation ? &*rotation : nullptr;
-    const dm::double3* s = scaling ? &*scaling : nullptr;
+    const math::double3* t = translation ? &*translation : nullptr;
+    const math::dquat* r = rotation ? &*rotation : nullptr;
+    const math::double3* s = scaling ? &*scaling : nullptr;
     ew->setLocalTransform(entity, t, r, s);
     ew->refreshHierarchy();
     return true;
 }
 
-bool setEntityTranslation(App& app, ecs::Entity entity, const dm::double3& translation)
+bool setEntityTranslation(App& app, ecs::Entity entity, const math::double3& translation)
 {
     return setEntityLocalTransform(app, entity, translation, std::nullopt, std::nullopt);
 }

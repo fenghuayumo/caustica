@@ -12,7 +12,7 @@ namespace caustica
 {
     class ShaderFactory;
     class FramebufferFactory;
-    class ICompositeView;
+    class ViewInfo;
 }
 
 namespace caustica::render
@@ -43,7 +43,7 @@ namespace caustica::render
         void renderInternal(
             caustica::rhi::CommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-            const caustica::ICompositeView& compositeView,
+            const caustica::ViewInfo& compositeView,
             caustica::rhi::Texture* sourceDestTexture,
             caustica::rhi::Texture* textureDownscale1,
             caustica::rhi::Texture* textureDownscale2,
@@ -52,18 +52,43 @@ namespace caustica::render
             float sigmaInPixels,
             float blendFactor);
 
+        void executeDownscale1(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ViewInfo& compositeView,
+            caustica::FramebufferFactory* framebufferFactory,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest);
+        void executeDownscale2(
+            caustica::rhi::CommandList* commandList,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest);
+        void executeBlur(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ViewInfo& compositeView,
+            caustica::rhi::Texture* source,
+            caustica::rhi::Texture* dest,
+            caustica::rhi::Buffer* constants,
+            bool horizontal,
+            float sigmaInPixels);
+        void executeComposite(
+            caustica::rhi::CommandList* commandList,
+            const caustica::ViewInfo& compositeView,
+            caustica::FramebufferFactory* framebufferFactory,
+            caustica::rhi::Texture* source,
+            float blendFactor);
+
     public:
         BloomPass(
             caustica::rhi::Device* device,
             const std::shared_ptr<caustica::ShaderFactory>& shaderFactory,
             caustica::render::RenderDevice& renderDevice,
             std::shared_ptr<caustica::FramebufferFactory> framebufferFactory,
-            const caustica::ICompositeView& compositeView);
+            const caustica::ViewInfo& compositeView);
 
         void render(
             caustica::rhi::CommandList* commandList,
             const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-            const caustica::ICompositeView& compositeView,
+            const caustica::ViewInfo& compositeView,
             caustica::rhi::Texture* sourceDestTexture,
             float sigmaInPixels,
             float blendFactor);
@@ -71,8 +96,8 @@ namespace caustica::render
         void registerGraphPass(
             caustica::rg::GraphBuilder& graph,
             caustica::rg::TextureHandle processedOutputColor,
-            const std::shared_ptr<caustica::FramebufferFactory>& framebufferFactory,
-            caustica::PlanarView compositeView,
+            caustica::FramebufferFactory* framebufferFactory,
+            const caustica::ViewInfo& compositeView,
             float sigmaInPixels,
             float blendFactor,
             bool enabled);

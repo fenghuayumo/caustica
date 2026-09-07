@@ -11,7 +11,7 @@ namespace caustica
 {
     class ShaderFactory;
     class FramebufferFactory;
-    class ICompositeView;
+    class ViewInfo;
 }
 
 namespace caustica::render
@@ -38,9 +38,9 @@ namespace caustica::render
 
         uint32_t m_FrameIndex;
         uint32_t m_StencilMask;
-        dm::float2 m_ResolvedColorSize;
+        math::float2 m_ResolvedColorSize;
 
-        dm::float2 m_R2Jitter;
+        math::float2 m_R2Jitter;
         TemporalAntiAliasingJitter m_Jitter;
 
         bool m_HasHistoryClampRelaxTexture;
@@ -64,24 +64,24 @@ namespace caustica::render
             caustica::rhi::Device* device,
             std::shared_ptr<caustica::ShaderFactory> shaderFactory,
             caustica::render::RenderDevice& renderDevice,
-            const caustica::ICompositeView& compositeView,
+            const caustica::ViewInfo& compositeView,
             const CreateParameters& params);
 
         void renderMotionVectors(
             caustica::rhi::CommandList* commandList,
-            const caustica::ICompositeView& compositeView,
-            const caustica::ICompositeView& compositeViewPrevious,
-            dm::float3 preViewTranslationDifference = dm::float3::zero());
+            const caustica::ViewInfo& compositeView,
+            const caustica::ViewInfo& compositeViewPrevious,
+            math::float3 preViewTranslationDifference = math::float3::zero());
 
         void temporalResolve(
             caustica::rhi::CommandList* commandList,
             const TemporalAntiAliasingParameters& params,
             bool feedbackIsValid,
-            const caustica::ICompositeView& compositeViewInput,
-            const caustica::ICompositeView& compositeViewOutput);
+            const caustica::ViewInfo& compositeViewInput,
+            const caustica::ViewInfo& compositeViewOutput);
 
         void advanceFrame();
         void setJitter(TemporalAntiAliasingJitter jitter);
-        dm::float2 getCurrentPixelOffset();
+        math::float2 getCurrentPixelOffset();
     };
 }

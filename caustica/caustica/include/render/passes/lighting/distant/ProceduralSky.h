@@ -12,7 +12,7 @@ using namespace caustica::math;
 
 namespace caustica
 {
-    class IView;
+    class ViewInfo;
     class ShaderFactory;
 }
 
@@ -70,7 +70,7 @@ public:
         caustica::rhi::CommandList* commandList,
         caustica::rhi::Texture* color,
         caustica::rhi::Texture* depth,
-        const caustica::IView& view,
+        const caustica::ViewInfo& view,
         uint width,
         uint height,
         const float3& environmentTint,
@@ -83,6 +83,8 @@ private:
     void dispatchLutPasses(caustica::rhi::CommandList* commandList, const ProceduralSkyConstants& consts, bool rebuildAtmosphereLuts, bool rebuildSkyView);
 
     double m_lastSceneTime = 0.0;
+    double m_lastWallTime = 0.0;
+    bool m_wallTimeValid = false;
 
     caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<caustica::ShaderFactory> m_shaderFactory;

@@ -267,15 +267,15 @@ bool SceneGaussianSplatLogic::attachToScene(
     ecs::Entity entity = entityWorld->createEntity(entityName, parent);
 
     constexpr double deg2rad = 3.14159265358979323846 / 180.0;
-    entityWorld->setTranslation(entity, dm::double3(
+    entityWorld->setTranslation(entity, math::double3(
         double(settings.GaussianSplatTranslation.x),
         double(settings.GaussianSplatTranslation.y),
         double(settings.GaussianSplatTranslation.z)));
-    entityWorld->setRotation(entity, dm::rotationQuat(dm::double3(
+    entityWorld->setRotation(entity, math::rotationQuat(math::double3(
         double(settings.GaussianSplatRotationEulerDeg.x) * deg2rad,
         double(settings.GaussianSplatRotationEulerDeg.y) * deg2rad,
         double(settings.GaussianSplatRotationEulerDeg.z) * deg2rad)));
-    entityWorld->setScaling(entity, dm::double3(
+    entityWorld->setScaling(entity, math::double3(
         double(settings.GaussianSplatObjectScale.x),
         double(settings.GaussianSplatObjectScale.y),
         double(settings.GaussianSplatObjectScale.z)));

@@ -267,21 +267,21 @@ namespace caustica::string_utils {
 	template <> std::optional<float> parse(std::string_view s);
 	template <> std::optional<double> parse(std::string_view s);
 
-	template <> std::optional<dm::bool2> parse(std::string_view s);
-	template <> std::optional<dm::bool3> parse(std::string_view s);
-	template <> std::optional<dm::bool4> parse(std::string_view s);
+	template <> std::optional<math::bool2> parse(std::string_view s);
+	template <> std::optional<math::bool3> parse(std::string_view s);
+	template <> std::optional<math::bool4> parse(std::string_view s);
 
-	template <> std::optional<dm::int2> parse(std::string_view s);
-	template <> std::optional<dm::int3> parse(std::string_view s);
-	template <> std::optional<dm::int4> parse(std::string_view s);
+	template <> std::optional<math::int2> parse(std::string_view s);
+	template <> std::optional<math::int3> parse(std::string_view s);
+	template <> std::optional<math::int4> parse(std::string_view s);
 
-	template <> std::optional<dm::uint2> parse(std::string_view s);
-	template <> std::optional<dm::uint3> parse(std::string_view s);
-	template <> std::optional<dm::uint4> parse(std::string_view s);
+	template <> std::optional<math::uint2> parse(std::string_view s);
+	template <> std::optional<math::uint3> parse(std::string_view s);
+	template <> std::optional<math::uint4> parse(std::string_view s);
 
-	template <> std::optional<dm::float2> parse(std::string_view s);
-	template <> std::optional<dm::float3> parse(std::string_view s);
-	template <> std::optional<dm::float4> parse(std::string_view s);
+	template <> std::optional<math::float2> parse(std::string_view s);
+	template <> std::optional<math::float3> parse(std::string_view s);
+	template <> std::optional<math::float4> parse(std::string_view s);
 
 	template <> std::optional<std::string_view> parse<std::string_view>(std::string_view s);
 	template <> std::optional<std::string> parse<std::string>(std::string_view s);

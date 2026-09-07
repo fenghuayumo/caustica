@@ -15,8 +15,7 @@ class ShaderDebug;
 
 namespace caustica
 {
-class IView;
-class PlanarView;
+class ViewInfo;
 class ShaderFactory;
 }
 
@@ -31,7 +30,7 @@ struct GaussianSplatPrepareContext
     std::shared_ptr<::GPUSort> gpuSort;
 };
 
-[[nodiscard]] dm::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
+[[nodiscard]] math::float4x4 gaussianSplatObjectToWorld(const scene::GaussianSplatRenderProxy& proxy);
 [[nodiscard]] bool isGaussianSplatProxyActive(
     const scene::GaussianSplatRenderProxy& proxy,
     const SceneGaussianSplatPasses& scenePasses);
@@ -57,7 +56,7 @@ void buildGaussianSplatEmissionProxies(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
-    const caustica::IView& splatView,
+    const caustica::ViewInfo& splatView,
     caustica::rhi::rt::AccelStruct* meshTopLevelAS,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings);
@@ -71,7 +70,7 @@ void sortGaussianSplatScene(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
     SceneGaussianSplatPasses& scenePasses,
-    const caustica::IView& splatView);
+    const caustica::ViewInfo& splatView);
 
 void buildGaussianSplatSceneAccelStructs(
     caustica::rhi::CommandList* commandList,

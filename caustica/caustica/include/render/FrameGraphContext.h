@@ -31,8 +31,7 @@ namespace caustica
 class AccelStructManager;
 class BindingCache;
 class CameraController;
-class ICompositeView;
-class IView;
+class ViewInfo;
 }
 
 namespace caustica::rg
@@ -46,6 +45,7 @@ namespace caustica::render
 class BloomPass;
 class DenoisePass;
 class DLSS;
+class PathTraceSceneBindings;
 class FullscreenBlitPass;
 class GaussianSplatFramePass;
 class PathTracePass;
@@ -53,10 +53,11 @@ class PathTracingContext;
 class SceneGaussianSplatPasses;
 class TemporalAntiAliasingPass;
 
-// Registration-only parameter bag (UE RDG AllocParameters style).
-// Fill once per frame in WorldRenderer::makeFrameGraphContext. Execute lambdas
-// must capture only the pointers, handles and immutable values they consume;
-// never capture this entire context or references to registration locals.
+// Registration-only parameter bag (device, settings, pass objects).
+// Public image identity lives on FrameSlots, not here. Fill once per frame in
+// WorldRenderer::makeFrameGraphContext. Execute lambdas must capture only the
+// pointers, handles and immutable values they consume; never capture this
+// entire context or references to registration locals.
 struct FrameGraphContext
 {
     rg::GraphBuilder* graph = nullptr;
@@ -81,6 +82,7 @@ struct FrameGraphContext
 
     caustica::rhi::BindingLayoutHandle bindingLayout;
     caustica::rhi::BindingSetHandle bindingSet;
+    PathTraceSceneBindings* sceneBindings = nullptr;
     caustica::rhi::DescriptorTable* descriptorTable = nullptr;
     caustica::rhi::BufferHandle constantBuffer;
 
@@ -108,16 +110,15 @@ struct FrameGraphContext
     SceneGaussianSplatPasses* gaussianScenePasses = nullptr;
     caustica::CameraController* camera = nullptr;
 
-    dm::uint2 renderSize{};
-    dm::uint2 displaySize{};
+    math::uint2 renderSize{};
+    math::uint2 displaySize{};
     float displayAspectRatio = 1.f;
-    dm::float2 cameraJitter{};
+    math::float2 cameraJitter{};
     uint32_t sampleIndex = 0;
     uint64_t frameIndex = 0;
     int accumulationSampleIndex = 0;
     bool accumulationCompleted = false;
-    const caustica::IView* view = nullptr;
-    const caustica::ICompositeView* compositeView = nullptr;
+    const caustica::ViewInfo* view = nullptr;
 
     bool hasScene = true;
     bool aaReset = false;

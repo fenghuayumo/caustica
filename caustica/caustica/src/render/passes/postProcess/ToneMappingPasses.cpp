@@ -26,13 +26,13 @@ ToneMappingPass::ToneMappingPass(
     std::shared_ptr<caustica::ShaderFactory> shaderFactory,
     caustica::render::RenderDevice& renderDevice,
     std::shared_ptr<caustica::FramebufferFactory> colorFramebufferFactory,
-    const caustica::ICompositeView& compositeView,
+    const caustica::ViewInfo& compositeView,
 	caustica::rhi::TextureHandle sourceTexture)
     : m_device(device)
     , m_renderDevice(renderDevice)
     , m_FramebufferFactory(colorFramebufferFactory)
 {
-    const IView* sampleView = compositeView.getChildView(ViewType::PLANAR, 0);
+    const ViewInfo* sampleView = &compositeView;
     caustica::rhi::Framebuffer* colorSampleFramebuffer = m_FramebufferFactory->getFramebuffer(*sampleView);
     {
         m_LuminanceShader = shaderFactory->createShader("caustica/shaders/render/toneMapper/luminance_ps.hlsl", "main", nullptr, caustica::rhi::ShaderType::Pixel);
@@ -69,11 +69,11 @@ ToneMappingPass::ToneMappingPass(
     m_cameraLut3DTexture = m_renderDevice.builtins().blackTexture3D();
 
 
-    m_PerView.resize(compositeView.getNumChildViews(ViewType::PLANAR));
+    m_PerView.resize(1u);
     {
-        for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
+        for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
         {
-            const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
+            const ViewInfo* view = &compositeView;
             caustica::rhi::Framebuffer* sampleFrameBuffer = m_FramebufferFactory->getFramebuffer(*view);
             PerViewData& perViewData = m_PerView[viewIndex];
 
@@ -201,7 +201,7 @@ void ToneMappingPass::preRender(const ToneMappingParameters& params)
 
 bool ToneMappingPass::render(
     caustica::rhi::CommandList* commandList, 
-    const caustica::ICompositeView& compositeView,
+    const caustica::ViewInfo& compositeView,
     caustica::rhi::Texture* sourceTexture,
     caustica::rhi::Buffer* constantsBuffer,
     bool enabled)
@@ -213,7 +213,18 @@ bool ToneMappingPass::render(
     // Formerly set when AE closed the primary list mid-pass (removed in ADR 0002 S1).
     constexpr bool commandListWasClosed = false;
 
-    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
+    if (!m_ToneMapPso)
+    {
+        static bool psoFailureReported = false;
+        if (!psoFailureReported)
+        {
+            psoFailureReported = true;
+            caustica::error("ToneMappingPass: tone-map PSO unavailable (shader/PSO creation failed); skipping tone mapping.");
+        }
+        return false;
+    }
+
+    for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
     {
         PerViewData& viewData = m_PerView[viewIndex];
 
@@ -226,10 +237,10 @@ bool ToneMappingPass::render(
         }
     }
 
-    if(m_AutoExposure) 
+    if(m_AutoExposure && m_LuminancePso)
     {
 		commandList->beginMarker("Luminance");
-		for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
+		for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
 		{
             PerViewData & viewData = m_PerView[viewIndex];
 
@@ -243,8 +254,6 @@ bool ToneMappingPass::render(
 				};
 				bindingSet = m_device->createBindingSet(bindingSetDesc, m_LuminanceBindingLayout);
 			}
-
-			const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
 
 			caustica::rhi::GraphicsState state;
 			state.pipeline = m_LuminancePso;
@@ -261,9 +270,10 @@ bool ToneMappingPass::render(
 			args.vertexCount = 4;
 			commandList->draw(args);    
 
-            generateMips(commandList, compositeView.getNumChildViews(ViewType::PLANAR));
+            generateMips(commandList, 1u);
 
 #if TONEMAPPING_AUTOEXPOSURE_CPU
+            if (m_CaptureLumPso)
             {
                 caustica::rhi::BindingSetDesc bindingSetDesc; bindingSetDesc.bindings = {
                         caustica::rhi::BindingSetItem::Texture_SRV(0, viewData.luminanceTexture),
@@ -307,7 +317,7 @@ bool ToneMappingPass::render(
     }
 
     commandList->beginMarker("ToneMapping");
-    for (uint viewIndex = 0; viewIndex < compositeView.getNumChildViews(ViewType::PLANAR); viewIndex++)
+    for (uint viewIndex = 0; viewIndex < 1u; viewIndex++)
     {
 		caustica::rhi::BindingSetHandle& bindingSet = m_PerView[viewIndex].colorBindingSet;
 		if (!bindingSet)
@@ -324,7 +334,7 @@ bool ToneMappingPass::render(
 			};
 			bindingSet = m_device->createBindingSet(bindingSetDesc, m_ToneMapBindingLayout);
 		}
-        const IView* view = compositeView.getChildView(ViewType::PLANAR, viewIndex);
+        const ViewInfo* view = &compositeView;
 
         caustica::rhi::GraphicsState state;
         state.pipeline = m_ToneMapPso;
@@ -387,14 +397,13 @@ void ToneMappingPass::registerGraphPass(
     caustica::rg::GraphBuilder& graph,
     caustica::rg::TextureHandle sourceColor,
     caustica::rg::TextureHandle outputLdrColor,
-    caustica::PlanarView compositeView,
+    caustica::ViewInfo compositeView,
     bool enabled,
     bool* outCommandListWasClosed)
 {
     const caustica::rg::BufferHandle constantsBuffer = graph.importBuffer(
         m_ToneMappingCB,
         caustica::rg::BufferAccess::ConstantBuffer);
-    graph.extractBuffer(constantsBuffer, caustica::rg::BufferAccess::ConstantBuffer);
 
     graph.addPass(
         "ToneMapping",
@@ -554,7 +563,7 @@ void ToneMappingPass::updateWhiteBalanceTransform()
 	//Calculate color transform for the current white point. 
 	m_WhiteBalanceTransform = m_WhiteBalance ?
 		calculateWhiteBalanceTransformRGB_Rec709(m_WhitePoint) :
-		dm::float3x3::identity();
+		math::float3x3::identity();
 
 	//Calculate source illuminant, i.e. the color that transform to a pure white (1, 1, 1) output at the current color settings.
 	m_SourceWhite = inverse(m_WhiteBalanceTransform) * float3(1, 1, 1);

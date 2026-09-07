@@ -2,6 +2,7 @@
 
 #include <core/console/ConsoleObjects.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -9,6 +10,11 @@
 namespace caustica::console
 {
 class Interpreter;
+}
+
+namespace caustica
+{
+class App;
 }
 
 namespace caustica::editor
@@ -22,6 +28,10 @@ class RenderSettingsConsoleBinding
 {
 public:
     explicit RenderSettingsConsoleBinding(EditorUIData& ui);
+    // App provider enables commands that reach the renderer (e.g. `vis`).
+    RenderSettingsConsoleBinding(
+        EditorUIData& ui,
+        std::function<App*()> appProvider);
     ~RenderSettingsConsoleBinding();
 
     RenderSettingsConsoleBinding(const RenderSettingsConsoleBinding&) = delete;
@@ -40,6 +50,7 @@ public:
 
 private:
     EditorUIData* m_ui = nullptr;
+    std::function<App*()> m_appProvider;
     std::shared_ptr<caustica::console::Interpreter> m_interpreter;
 };
 

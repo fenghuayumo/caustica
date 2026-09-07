@@ -32,7 +32,7 @@ public:
     void                    sceneLoaded( const std::filesystem::path& sceneFilePath, const std::filesystem::path & mediaPath );
     void                    sceneUnloading( );
     bool                    debugGUI(float indent);
-    void                    StandaloneGUI(const std::shared_ptr<caustica::PlanarView> & view, const float2 & displaySize);
+    void                    StandaloneGUI(const std::shared_ptr<caustica::ViewInfo> & view, const float2 & displaySize);
 
     bool                    IsInitialized() const           { return !m_props.empty(); }
     bool                    CameraActive() const            { return m_gameCameraAttached.lock() != nullptr; }

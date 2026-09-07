@@ -38,6 +38,6 @@ bool equalsIgnoreCase(const std::string& a, const std::string& b);
 // --- Float3 parsing from comma-separated string ---
 // Parses up to 3 floats separated by commas. Consumes the parsed portion from 's'.
 // Returns true if 3 valid floats were parsed.
-bool parseFloat3Consume(std::string& s, dm::float3& out);
+bool parseFloat3Consume(std::string& s, math::float3& out);
 
 } // namespace caustica
