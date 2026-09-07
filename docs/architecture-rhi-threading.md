@@ -7,6 +7,9 @@ Do **not** add another Logic→Render enqueue helper — extend `EnqueueRenderCo
 `EnqueueRenderCommandAndWait` only. Do **not** add another “are we loading?” flag —
 extend `LoadSession`. Do **not** make resource create free-threaded. Code comments may
 still say `ADR 0001` / `ADR 0002`; those labels mean the rules in this file.
+Scene CPU import may run on `Affinity::IO` against a scratch EnTT registry while
+Logic uses `App::world()`; that path requires `ENTT_USE_ATOMIC` (sequential
+`type_index` is otherwise a data race).
 
 ## Thread roles
 

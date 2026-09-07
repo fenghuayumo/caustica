@@ -8,7 +8,6 @@
 #include <engine/SceneViewState.h>
 #include <engine/LoadSession.h>
 #include <core/path_utils.h>
-#include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <cstdarg>
 #include <chrono>
@@ -16,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <render/core/PathTracerSettings.h>
 #include <scene/SceneManager.h>
 
@@ -45,6 +45,8 @@ void sceneSwitchTrace(const char* fmt, ...)
     OutputDebugStringA(line);
     OutputDebugStringA("\n");
 #endif
+    static std::mutex logMutex;
+    std::lock_guard<std::mutex> lock(logMutex);
     std::ofstream f("scene_switch.log", std::ios::app);
     if (f)
         f << line << '\n';
@@ -141,9 +143,11 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
 
     vs->loadSession.reset();
     vs->loadSession.deferredImportPending = true;
+    // Hold GPU/Extract until FirstPresent. Importing on Affinity::IO must not
+    // overlap a live path-trace frame, and Startup must not launch the IO
+    // worker before the render thread exists.
+    vs->sceneGpuSuspended.store(true, std::memory_order_release);
 
-    // If a live scene exists, finish GPU teardown before starting the CPU import worker
-    // (async Teardown → tickLoadSession begins the deferred import).
     if (manager->getScene())
     {
         sceneSwitchTrace("applySceneSwitch: Teardown then deferred import '%s'", sceneName.c_str());
@@ -152,26 +156,11 @@ void applySceneSwitch(App& app, const std::string& sceneName, bool forceReload)
         return;
     }
 
-    vs->loadSession.phase = LoadSessionPhase::Importing;
-    vs->loadSession.deferredImportPending = false;
-    vs->sceneGpuSuspended.store(false, std::memory_order_release);
-
-    sceneSwitchTrace("applySceneSwitch: begin async load '%s'", sceneName.c_str());
-    manager->beginLoadingScene(
-        std::make_shared<caustica::NativeFileSystem>(),
-        manager->getCurrentScenePath());
-    sceneSwitchTrace("applySceneSwitch: beginLoadingScene returned (async worker running=%d)",
-        manager->isSceneLoading() ? 1 : 0);
-
-    if (!manager->isSceneLoading() && manager->getScene() == nullptr)
-    {
-        caustica::error("Unable to load scene '%s'", sceneName.c_str());
-        manager->clearScene();
-        clearActiveScene(app);
-        vs->progressLoading.stop();
-        vs->loadSession.reset();
-        vs->sceneGpuSuspended.store(false, std::memory_order_release);
-    }
+    // Cold start: nothing to unload. tickLoadSession starts the CPU import on
+    // the first Update after App::run (render thread already pumping).
+    vs->loadSession.phase = LoadSessionPhase::Teardown;
+    vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
+    sceneSwitchTrace("applySceneSwitch: deferred import '%s' (no live scene)", sceneName.c_str());
 }
 
 } // namespace caustica::detail

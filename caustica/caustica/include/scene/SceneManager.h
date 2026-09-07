@@ -3,6 +3,7 @@
 #include <scene/SceneLoader.h>
 
 #include <ecs/Entity.h>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -99,7 +100,7 @@ private:
 
     std::vector<std::string>                  m_sceneFilesAvailable;
     std::shared_ptr<caustica::Scene>          m_scene;
-    std::shared_ptr<caustica::Scene>          m_pendingScene;
+    std::atomic<std::shared_ptr<caustica::Scene>> m_pendingScene;
     std::string                               m_currentSceneName;
     std::filesystem::path                     m_currentScenePath;
     std::string                               m_inlineSceneJson;

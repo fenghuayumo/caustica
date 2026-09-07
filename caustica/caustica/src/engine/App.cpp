@@ -848,6 +848,12 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
         runSchedule(AppSchedule::PostUpdate, scheduleContext);
     }
 
+    // Update may start or finish a LoadSession (onSceneLoaded sets
+    // sceneGpuSuspended). Re-evaluate before Extract so this frame cannot
+    // path-trace a scene whose GPU bind is still in flight.
+    if (scheduleContext.runRender && skipRenderPhase())
+        scheduleContext.runRender = false;
+
     if (scheduleContext.runRender)
     {
         // Snapshot slots use the logic frame index. A no-render gap can advance that

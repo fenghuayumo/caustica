@@ -52,7 +52,8 @@ on the old graph and leaves App resources (`Time`, plugins, settings) in place.
 does not attach those components — use it for deferred component edits, not for scene actors.
 
 Importers must not write `App::world()` from the load thread. `Scene::load` always populates a
-scratch registry; only the logic-thread commit adopts it.
+scratch registry; only the logic-thread commit adopts it. The IO worker and Logic may first-touch
+different EnTT component types at the same time, so the engine compiles with `ENTT_USE_ATOMIC`.
 
 ## What is extracted today
 

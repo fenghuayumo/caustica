@@ -12,9 +12,9 @@
 #include <engine/ScenePlugins.h>
 #include <engine/CameraApi.h>
 #include <engine/RenderSessionApi.h>
-#include <engine/EnqueueRenderCommand.h>
 #include <engine/internal/SceneApiInternal.h>
 #include <engine/RenderThread.h>
+#include <core/ThreadContext.h>
 #include <engine/ActiveScene.h>
 #include <engine/SceneSession.h>
 #include <core/task/TaskRuntime.h>
@@ -208,11 +208,11 @@ void initializeScene(App& app, const std::string& preferredScene)
 
     caustica::info("initializeScene: loading '%s'", sceneArg.c_str());
     setCurrentScene(app, sceneArg);
-    // Do not block Startup on CPU import + GPU bind. The render thread and frame
-    // loop are not running yet; sync-waiting here freezes the window and piles
-    // upload work onto the wrong thread. SceneAnimate::updateLoading finishes
-    // the load after App::run starts (same path as Open Scene).
-    caustica::info("initializeScene: async load started for '%s'", sceneArg.c_str());
+    // Do not start the IO import worker during Startup. The render thread is not
+    // running yet; overlapping EnTT/component first-use with remaining startup
+    // systems caused occasional segfaults. tickLoadSession starts the deferred
+    // import on the first Update after App::run (same path as Open Scene).
+    caustica::info("initializeScene: deferred async load for '%s'", sceneArg.c_str());
 }
 
 void setCurrentScene(App& app, const std::string& sceneName, bool forceReload)
@@ -271,32 +271,61 @@ void onSceneUnloading(App& app)
     }
 
     detail::sceneSwitchTrace("onSceneUnloading: enqueue GPU teardown");
-    EnqueueRenderCommand(app, [&app, vs]() {
-        GpuDevice* device = gpuDevice(app);
-        caustica::rhi::Device* rhi = device ? device->getDevice() : nullptr;
-        // THREADING: sync-point, RT-only — never waitForIdle from the logic thread.
-        if (rhi && !rhi->waitForIdle())
+    struct TeardownGpuJob
+    {
+        App* app = nullptr;
+        SceneViewState* vs = nullptr;
+        static void run(void* user)
         {
-            if (device)
-                device->setShuttingDown(true);
+            std::unique_ptr<TeardownGpuJob> job(static_cast<TeardownGpuJob*>(user));
+            if (!job->app || !job->vs)
+                return;
+
+            App& app = *job->app;
+            SceneViewState* vs = job->vs;
+            GpuDevice* device = gpuDevice(app);
+            caustica::rhi::Device* rhi = device ? device->getDevice() : nullptr;
+            // THREADING: sync-point, RT-only — never waitForIdle from the logic thread.
+            if (rhi && !rhi->waitForIdle())
+            {
+                if (device)
+                    device->setShuttingDown(true);
+                vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
+                return;
+            }
+
+            if (render::WorldRenderer* wr = worldRenderer(app))
+                wr->releaseStreamlineTemporalResources();
+
+            if (GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>())
+                gr->onSceneUnloading();
+
+            if (rhi)
+            {
+                // THREADING: sync-point, shutdown — ADR 0002 allowed (LoadSession teardown).
+                rhi->waitForIdle();
+                rhi->runGarbageCollection();
+            }
             vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
-            return;
         }
+    };
 
-        if (render::WorldRenderer* wr = worldRenderer(app))
-            wr->releaseStreamlineTemporalResources();
-
-        if (GpuRenderSubsystem* gr = app.tryResource<GpuRenderSubsystem>())
-            gr->onSceneUnloading();
-
-        if (rhi)
-        {
-            // THREADING: sync-point, shutdown — ADR 0002 allowed (LoadSession teardown).
-            rhi->waitForIdle();
-            rhi->runGarbageCollection();
-        }
-        vs->loadSession.teardownGpuDone.store(true, std::memory_order_release);
-    });
+    auto job = std::make_unique<TeardownGpuJob>();
+    job->app = &app;
+    job->vs = vs;
+    (void)task::launch(
+        "LoadSession.Teardown",
+        task::Priority::High,
+        task::Affinity::Render,
+        &TeardownGpuJob::run,
+        job.release(),
+        task::loadSessionPipe());
+    // Startup / --syncRender: nothing is pumping Affinity::Render yet.
+    if (!app.useDedicatedRenderThread() || !app.renderThread().isRunning())
+    {
+        const ThreadDomainScope renderDomain(ThreadDomain::Render);
+        task::pumpRender();
+    }
 
     // Drop logic-side active scene immediately; GPU teardown runs under suspension.
     clearActiveScene(app);
@@ -637,7 +666,9 @@ void tickLoadSession(App& app)
         if (!session.teardownGpuDone.load(std::memory_order_acquire))
             return;
 
-        vs->sceneGpuSuspended.store(false, std::memory_order_release);
+        // Stay suspended through Importing and GpuStreaming. FirstPresent
+        // unsuspends after StructureGpu commits. Dropping the flag here let
+        // Extract/render observe a half-bound scene on the join frame.
         session.phase = LoadSessionPhase::Importing;
         session.teardownGpuDone.store(false, std::memory_order_relaxed);
         syncLoadProgress(*vs);
