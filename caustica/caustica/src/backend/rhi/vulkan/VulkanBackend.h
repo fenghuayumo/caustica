@@ -1,0 +1,1343 @@
+#pragma once
+
+#include <rhi/vulkan.h>
+#include <rhi/utils.h>
+#include <rhi/common/aftermath.h>
+#include <rhi/common/deferred-deletion.h>
+#include "../common/state-tracking.h"
+#include "../common/versioning.h"
+#include <mutex>
+#include <list>
+
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vulkan/vulkan.hpp>
+
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+#include "../internal/accel_struct/VkAccelStructManager.h"
+#endif
+
+#if (VK_HEADER_VERSION < 318)
+#error "Vulkan SDK version 1.4.318 or later is required to compile Caustica RHI"
+#endif
+
+#define CHECK_VK_RETURN(res) if ((res) != vk::Result::eSuccess) { return res; }
+#define CHECK_VK_FAIL(res) if ((res) != vk::Result::eSuccess) { return nullptr; }
+#if _DEBUG
+#define ASSERT_VK_OK(res) assert((res) == vk::Result::eSuccess)
+#else // _DEBUG
+#define ASSERT_VK_OK(res) do {(void)(res);} while(0)
+#endif // _DEBUG
+
+namespace caustica::rhi::vulkan
+{
+    class Texture;
+    class StagingTexture;
+    class InputLayout;
+    class Buffer;
+    class Shader;
+    class Sampler;
+    class Framebuffer;
+    class GraphicsPipeline;
+    class ComputePipeline;
+    class BindingSet;
+    class EventQuery;
+    class TimerQuery;
+    class Marker;
+    class Device;
+
+    struct ResourceStateMapping
+    {
+        ResourceStates rhiState;
+        vk::PipelineStageFlags2 stageFlags;
+        vk::AccessFlags2 accessMask;
+        vk::ImageLayout imageLayout;
+    };
+
+    vk::SamplerAddressMode convertSamplerAddressMode(SamplerAddressMode mode);
+    vk::PipelineStageFlagBits2 convertShaderTypeToPipelineStageFlagBits(ShaderType shaderType);
+    vk::ShaderStageFlagBits convertShaderTypeToShaderStageFlagBits(ShaderType shaderType);
+    ResourceStateMapping convertResourceState(ResourceStates state, bool isImage);
+    vk::PrimitiveTopology convertPrimitiveTopology(PrimitiveType topology);
+    vk::PolygonMode convertFillMode(RasterFillMode mode);
+    vk::CullModeFlagBits convertCullMode(RasterCullMode mode);
+    vk::CompareOp convertCompareOp(ComparisonFunc op);
+    vk::StencilOp convertStencilOp(StencilOp op);
+    vk::StencilOpState convertStencilState(const DepthStencilState& depthStencilState, const DepthStencilState::StencilOpDesc& desc);
+    vk::BlendFactor convertBlendValue(BlendFactor value);
+    vk::BlendOp convertBlendOp(BlendOp op);
+    vk::ColorComponentFlags convertColorMask(ColorMask mask);
+    vk::PipelineColorBlendAttachmentState convertBlendState(const BlendState::RenderTarget& state);
+    vk::BuildAccelerationStructureFlagsKHR convertAccelStructBuildFlags(rt::AccelStructBuildFlags buildFlags);
+    vk::GeometryInstanceFlagsKHR convertInstanceFlags(rt::InstanceFlags instanceFlags);
+    vk::Extent2D convertFragmentShadingRate(VariableShadingRate shadingRate);
+    vk::FragmentShadingRateCombinerOpKHR convertShadingRateCombiner(ShadingRateCombiner combiner);
+    vk::DescriptorType convertResourceType(ResourceType type);
+    vk::ComponentTypeKHR convertCoopVecDataType(coopvec::DataType type);
+    coopvec::DataType convertCoopVecDataType(vk::ComponentTypeKHR type);
+    vk::CooperativeVectorMatrixLayoutNV convertCoopVecMatrixLayout(coopvec::MatrixLayout layout);
+
+    void countSpecializationConstants(
+        Shader* shader,
+        size_t& numShaders,
+        size_t& numShadersWithSpecializations,
+        size_t& numSpecializationConstants);
+
+    vk::PipelineShaderStageCreateInfo makeShaderStageCreateInfo(
+        Shader* shader,
+        std::vector<vk::SpecializationInfo>& specInfos,
+        std::vector<vk::SpecializationMapEntry>& specMapEntries,
+        std::vector<uint32_t>& specData);
+
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+    struct AccelStructResources
+    {
+        std::vector<uint64_t> asBuildsCompleted;
+        std::mutex asListMutex;
+    };
+#endif
+
+    // underlying vulkan context
+    struct VulkanContext
+    {
+        VulkanContext(vk::Instance instance,
+                      vk::PhysicalDevice physicalDevice,
+                      vk::Device device,
+                      vk::AllocationCallbacks *allocationCallbacks = nullptr)
+            : instance(instance)
+            , physicalDevice(physicalDevice)
+            , device(device)
+            , allocationCallbacks(allocationCallbacks)
+            , pipelineCache(nullptr)
+        { }
+
+        vk::Instance instance;
+        vk::PhysicalDevice physicalDevice;
+        vk::Device device;
+        vk::AllocationCallbacks *allocationCallbacks;
+        vk::PipelineCache pipelineCache;
+
+        struct {
+            bool EXT_debug_report = false;
+            bool EXT_debug_marker = false;
+            bool KHR_acceleration_structure = false;
+            bool buffer_device_address = false; // either KHR_ or Vulkan 1.2 versions
+            bool KHR_ray_query = false;
+            bool KHR_ray_tracing_pipeline = false;
+            bool EXT_mesh_shader = false;
+            bool KHR_fragment_shading_rate = false;
+            bool EXT_conservative_rasterization = false;
+            bool EXT_opacity_micromap = false;
+            bool NV_ray_tracing_invocation_reorder = false;
+            bool NV_cluster_acceleration_structure = false;
+            bool EXT_mutable_descriptor_type = false;
+            bool EXT_debug_utils = false;
+            bool NV_cooperative_vector = false;
+            bool NV_ray_tracing_linear_swept_spheres = false;
+#if CAUSTICA_RHI_WITH_AFTERMATH
+            bool NV_device_diagnostic_checkpoints = false;
+            bool NV_device_diagnostics_config= false;
+#endif
+        } extensions;
+
+        vk::PhysicalDeviceProperties physicalDeviceProperties;
+        vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties;
+        vk::PhysicalDeviceAccelerationStructurePropertiesKHR accelStructProperties;
+        vk::PhysicalDeviceConservativeRasterizationPropertiesEXT conservativeRasterizationProperties;
+        vk::PhysicalDeviceFragmentShadingRatePropertiesKHR shadingRateProperties;
+        vk::PhysicalDeviceOpacityMicromapPropertiesEXT opacityMicromapProperties;
+        vk::PhysicalDeviceRayTracingInvocationReorderPropertiesNV nvRayTracingInvocationReorderProperties;
+        vk::PhysicalDeviceClusterAccelerationStructurePropertiesNV nvClusterAccelerationStructureProperties;
+        vk::PhysicalDeviceFragmentShadingRateFeaturesKHR shadingRateFeatures;
+        vk::PhysicalDeviceCooperativeVectorFeaturesNV coopVecFeatures;
+        vk::PhysicalDeviceCooperativeVectorPropertiesNV coopVecProperties;
+        vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV linearSweptSpheresFeatures;
+        vk::PhysicalDeviceSubgroupProperties subgroupProperties;
+        MessageCallback* messageCallback = nullptr;
+        bool logBufferLifetime = false;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::unique_ptr<caustica::rhi::internal::VkAccelStructManager> accelStructManager;
+        std::unique_ptr<AccelStructResources> accelStructResources;
+#endif
+        vk::DescriptorSetLayout emptyDescriptorSetLayout;
+
+        // Owned by Device; used to defer VkBuffer/VkImage destroy past last-use timeline.
+        DeferredDeletionQueue* deferredDeletion = nullptr;
+        Device* parentDevice = nullptr;
+
+        void nameVKObject(const void* handle, const vk::ObjectType objtype,
+            const vk::DebugReportObjectTypeEXT objtypeEXT, const char* name) const;
+        void error(const std::string& message) const;
+        void warning(const std::string& message) const;
+        void info(const std::string& message) const;
+    };
+
+    // command buffer with resource tracking
+    class TrackedCommandBuffer
+    {
+    public:
+
+        // the command buffer itself
+        vk::CommandBuffer cmdBuf = vk::CommandBuffer();
+        vk::CommandPool cmdPool = vk::CommandPool();
+
+        std::vector<RefCountPtr<Resource>> referencedResources; // to keep them alive
+        std::vector<RefCountPtr<Buffer>> referencedStagingBuffers; // to allow synchronous mapBuffer
+
+        uint64_t recordingID = 0;
+        uint64_t submissionID = 0;
+
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::vector<uint64_t> accelStructBuildIds;
+        std::vector<uint64_t> accelStructCompactionIds;
+#endif
+
+        explicit TrackedCommandBuffer(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~TrackedCommandBuffer();
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    typedef std::shared_ptr<TrackedCommandBuffer> TrackedCommandBufferPtr;
+
+    // represents a hardware queue
+    class Queue
+    {
+    public:
+        vk::Semaphore trackingSemaphore;
+
+        Queue(const VulkanContext& context, CommandQueue queueID, vk::Queue queue, uint32_t queueFamilyIndex);
+        ~Queue();
+
+        // creates a command buffer and its synchronization resources
+        TrackedCommandBufferPtr createCommandBuffer();
+
+        TrackedCommandBufferPtr getOrCreateCommandBuffer();
+
+        void addWaitSemaphore(vk::Semaphore semaphore, uint64_t value);
+        void addSignalSemaphore(vk::Semaphore semaphore, uint64_t value);
+
+        // submits a command buffer to this queue, returns submissionID
+        uint64_t submit(rhi::CommandList* const* ppCmd, size_t numCmd);
+
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings);
+
+        // retire any command buffers that have finished execution from the pending execution list
+        void retireCommandBuffers();
+
+        TrackedCommandBufferPtr getCommandBufferInFlight(uint64_t submissionID);
+
+        uint64_t updateLastFinishedID();
+        uint64_t getLastSubmittedID() const { return m_lastSubmittedID; }
+        uint64_t getLastFinishedID() const { return m_lastFinishedID; }
+        CommandQueue getQueueID() const { return m_queueID; }
+        vk::Queue getVkQueue() const { return m_queue; }
+
+        bool pollCommandList(uint64_t commandListID);
+        bool waitCommandList(uint64_t commandListID, uint64_t timeout);
+
+    private:
+        const VulkanContext& m_context;
+
+        vk::Queue m_queue;
+        CommandQueue m_queueID;
+        uint32_t m_queueFamilyIndex = uint32_t(-1);
+
+        std::mutex m_mutex;
+        std::vector<vk::Semaphore> m_waitSemaphores;
+        std::vector<uint64_t> m_waitSemaphoreValues;
+        std::vector<vk::Semaphore> m_signalSemaphores;
+        std::vector<uint64_t> m_signalSemaphoreValues;
+
+        uint64_t m_lastRecordingID = 0;
+        uint64_t m_lastSubmittedID = 0;
+        uint64_t m_lastFinishedID = 0;
+
+        // tracks the list of command buffers in flight on this queue
+        std::list<TrackedCommandBufferPtr> m_commandBuffersInFlight;
+        std::list<TrackedCommandBufferPtr> m_commandBuffersPool;
+    };
+
+    class MemoryResource
+    {
+    public:
+        bool managed = true;
+        vk::DeviceMemory memory;
+    };
+
+    class VulkanAllocator
+    {
+    public:
+        explicit VulkanAllocator(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        vk::Result allocateBufferMemory(Buffer* buffer, bool enableBufferAddress = false) const;
+        void freeBufferMemory(Buffer* buffer) const;
+
+        vk::Result allocateTextureMemory(Texture* texture) const;
+        void freeTextureMemory(Texture* texture) const;
+
+        vk::Result allocateMemory(MemoryResource* res,
+            vk::MemoryRequirements memRequirements,
+            vk::MemoryPropertyFlags memPropertyFlags,
+            bool enableDeviceAddress = false,
+            bool enableExportMemory = false,
+            VkImage dedicatedImage = nullptr,
+            VkBuffer dedicatedBuffer = nullptr) const;
+        void freeMemory(MemoryResource* res) const;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class Heap : public MemoryResource, public RefCounter<rhi::Heap>
+    {
+    public:
+        explicit Heap(VulkanAllocator& allocator)
+            : m_allocator(allocator)
+        { }
+
+        ~Heap() override;
+
+        HeapDesc desc;
+
+        const HeapDesc& getDesc() override { return desc; }
+
+    private:
+        VulkanAllocator& m_allocator;
+    };
+
+    struct TextureSubresourceView
+    {
+        Texture& texture;
+        TextureSubresourceSet subresource;
+
+        vk::ImageView view = nullptr;
+        vk::ImageSubresourceRange subresourceRange;
+
+        TextureSubresourceView(Texture& texture)
+            : texture(texture)
+        { }
+
+        TextureSubresourceView(const TextureSubresourceView&) = delete;
+
+        bool operator==(const TextureSubresourceView& other) const
+        {
+            return &texture == &other.texture &&
+                    subresource == other.subresource &&
+                    view == other.view &&
+                    subresourceRange == other.subresourceRange;
+        }
+    };
+
+    class Texture : public MemoryResource, public RefCounter<rhi::Texture>, public TextureStateExtension
+    {
+    public:
+
+        enum class TextureSubresourceViewType // see getSubresourceView()
+        {
+            AllAspects,
+            DepthOnly,
+            StencilOnly
+        };
+
+        typedef std::tuple<TextureSubresourceSet, TextureSubresourceViewType, TextureDimension, Format, vk::ImageUsageFlags> SubresourceViewKey;
+
+        struct Hash
+        {
+            std::size_t operator()(SubresourceViewKey const& s) const noexcept
+            {
+                const auto& [subresources, viewType, dimension, format, usage] = s;
+
+                size_t hash = 0;
+
+                hash_combine(hash, subresources.baseMipLevel);
+                hash_combine(hash, subresources.numMipLevels);
+                hash_combine(hash, subresources.baseArraySlice);
+                hash_combine(hash, subresources.numArraySlices);
+                hash_combine(hash, viewType);
+                hash_combine(hash, dimension);
+                hash_combine(hash, format);
+                hash_combine(hash, uint32_t(usage));
+
+                return hash;
+            }
+        };
+
+
+        TextureDesc desc;
+
+        vk::ImageCreateInfo imageInfo;
+        vk::ExternalMemoryImageCreateInfo externalMemoryImageInfo;
+        vk::Image image;
+        static constexpr uint32_t tileByteSize = 65536;
+
+        HeapHandle heap;
+
+        void* sharedHandle = nullptr;
+
+        // contains subresource views for this texture
+        // note that we only create the views that the app uses, and that multiple views may map to the same subresources
+        std::unordered_map<SubresourceViewKey, TextureSubresourceView, Texture::Hash> subresourceViews;
+
+        Texture(const VulkanContext& context, VulkanAllocator& allocator)
+            : TextureStateExtension(desc)
+            , m_context(context)
+            , m_allocator(allocator)
+        { }
+
+        // returns a subresource view for an arbitrary range of mip levels and array layers.
+        // 'viewtype' only matters when asking for a depth-stencil view; in situations where only depth or stencil can be bound
+        // (such as an SRV with ImageLayout::eShaderReadOnlyOptimal), but not both, then this specifies which of the two aspect bits is to be set.
+        TextureSubresourceView& getSubresourceView(const TextureSubresourceSet& subresources, TextureDimension dimension,
+            Format format, vk::ImageUsageFlags usage, TextureSubresourceViewType viewtype = TextureSubresourceViewType::AllAspects);
+
+        uint32_t getNumSubresources() const;
+        uint32_t getSubresourceIndex(uint32_t mipLevel, uint32_t arrayLayer) const;
+
+        ~Texture() override;
+        const TextureDesc& getDesc() const override { return desc; }
+        Object getNativeObject(ObjectType objectType) override;
+        Object getNativeView(ObjectType objectType, Format format, TextureSubresourceSet subresources, TextureDimension dimension, bool isReadOnlyDSV = false) override;
+
+    private:
+        const VulkanContext& m_context;
+        VulkanAllocator& m_allocator;
+        std::mutex m_mutex;
+    };
+
+    /* ----------------------------------------------------------------------------
+
+    The volatile buffer implementation needs some explanation, might as well be here.
+
+    The implementation is designed around a few constraints and assumptions:
+
+    1.  Need to efficiently represent them with core Vulkan API with minimal overhead.
+        This rules out a few options:
+
+        - Can't use regular descriptors and update the references to each volatile CB
+          in every descriptor set. That would require versioning of the descriptor
+          sets and tracking of every use of volatile CBs.
+        - Can't use push descriptors (vkCmdPushDescriptorSetKHR) because they are not
+          in core Vulkan and are not supported by e.g. AMD drivers at this time. This
+          rules out the DX12 style approach where an upload manager is assigned to a
+          command list and creates buffers as needed - because then one volatile CB
+          might be using different buffer objects for different versions.
+        - Any other options that I missed?...
+
+        The only option left is dynamic descriptors. You create a UBO descriptor that
+        points to a buffer and then bind it with different offsets within that buffer.
+        So all the versions of a volatile CB must live in the same buffer because the
+        descriptor may be baked into multiple descriptor sets.
+
+    2.  A volatile buffer may be written into from different command lists, potentially
+        those which are recorded concurrently or out of order, and then executed on
+        different queues.
+
+        This requirement makes it impossible to put different versions of a CB into a
+        single buffer in a round-robin fashion and track their completion with chunks.
+        Tracking must be more fine-grained.
+
+    3.  The version tracking implementation should be efficient, which means we shouldn't
+        do things like allocating tracking objects for each version or pooling them
+        for reuse, and keep iterating over many buffers or versions to a minimum.
+
+    The system designed with these characteristics in mind is following.
+
+    Every volatile buffer has a fixed maximum number of versions specified at creation,
+    see BufferDesc::maxVersions. For a typical once-per-frame render pass, something
+    like 3-4 versions should be sufficient. Iterative passes may need more, or should
+    avoid using volatile CBs in that fashion and switch to push constants or maybe
+    structured buffers.
+
+    For each version of a buffer, a tracking object is stored in the Buffer::versionTracking
+    array. The object is just a 64-bit word, which contains a bitfield:
+
+        - c_VersionSubmittedFlag means that the version is used in a submitted
+            command list;
+
+        - (queue & c_VersionQueueMask << c_VersionQueueShift) is the queue index,
+            see caustica::rhi::CommandQueue for values;
+
+        - (id & c_VersionIDMask) is the instance ID of the command list, either
+            pending or submitted. If pending, it matches the recordingID field of
+            TrackedCommandBuffer, otherwise the submissionID.
+
+    When a buffer version is allocated, it is transitioned into the pending state.
+    When the command list containing such pending versions is submitted, all the
+    pending versions are transitioned to the submitted state. In the submitted
+    state, they may be reused later if that submitted instance of the command list
+    has finished executing, which is determined based on the queue's semaphore.
+    Pending versions cannot be reused. Also, pending versions might be transitioned
+    to the available state (tracking word == 0) if their command list is abandoned,
+    but that is currently not implemented.
+
+    See also:
+        - CommandList::writeVolatileBuffer
+        - CommandList::flushVolatileBufferWrites
+        - CommandList::submitVolatileBuffers
+
+    -----------------------------------------------------------------------------*/
+
+    struct VolatileBufferState
+    {
+        int latestVersion = 0;
+        int minVersion = 0;
+        int maxVersion = 0;
+        bool initialized = false;
+    };
+
+    // A copyable version of std::atomic to be used in an std::vector
+    class BufferVersionItem : public std::atomic<uint64_t>  // NOLINT(cppcoreguidelines-special-member-functions)
+    {
+    public:
+        BufferVersionItem()
+            : std::atomic<uint64_t>()
+        { }
+
+        BufferVersionItem(const BufferVersionItem& other)
+        {
+            store(other);
+        }
+
+        BufferVersionItem& operator=(const uint64_t a)
+        {
+            store(a);
+            return *this;
+        }
+    };
+
+    class Buffer : public MemoryResource, public RefCounter<rhi::Buffer>, public BufferStateExtension
+    {
+    public:
+        BufferDesc desc;
+
+        vk::Buffer buffer;
+        vk::DeviceAddress deviceAddress = 0;
+
+        HeapHandle heap;
+
+        std::unordered_map<uint64_t, vk::BufferView> viewCache;
+
+        std::vector<BufferVersionItem> versionTracking;
+        void* mappedMemory = nullptr;
+        void* sharedHandle = nullptr;
+        uint32_t versionSearchStart = 0;
+
+        // For staging buffers only
+        CommandQueue lastUseQueue = CommandQueue::Graphics;
+        uint64_t lastUseCommandListID = 0;
+
+        Buffer(const VulkanContext& context, VulkanAllocator& allocator)
+            : BufferStateExtension(desc)
+            , m_context(context)
+            , m_allocator(allocator)
+        { }
+
+        ~Buffer() override;
+        const BufferDesc& getDesc() const override { return desc; }
+        GpuVirtualAddress getGpuVirtualAddress() const override { return deviceAddress; }
+        Object getNativeObject(ObjectType type) override;
+
+    private:
+        const VulkanContext& m_context;
+        VulkanAllocator& m_allocator;
+    };
+
+    struct PlacedSubresourceFootprint
+    {
+        // offset, size in bytes
+        size_t offset;
+        size_t totalBytes;
+        uint32_t rowSizeInBytes;
+        uint32_t numRows;
+        Format format;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t rowPitch;
+    };
+
+    class StagingTexture : public RefCounter<rhi::StagingTexture>
+    {
+    public:
+        TextureDesc desc;
+        // backing store for staging texture is a buffer
+        RefCountPtr<Buffer> buffer;
+        // Per-mip, per-slice regions: index = mipLevel * arraySize + arraySlice
+        std::vector<PlacedSubresourceFootprint> placedFootprints;
+
+        size_t computeCopyableFootprints();
+        const PlacedSubresourceFootprint* getCopyableFootprint(MipLevel mipLevel, ArraySlice arraySlice);
+
+        const TextureDesc& getDesc() const override { return desc; }
+    };
+
+    class Sampler : public RefCounter<rhi::Sampler>
+    {
+    public:
+        SamplerDesc desc;
+
+        vk::SamplerCreateInfo samplerInfo;
+        vk::Sampler sampler;
+
+        explicit Sampler(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~Sampler() override;
+        const SamplerDesc& getDesc() const override { return desc; }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class Shader : public RefCounter<rhi::Shader>
+    {
+    public:
+        ShaderDesc desc;
+
+        vk::ShaderModule shaderModule;
+        vk::ShaderStageFlagBits stageFlagBits{};
+
+        // Shader specializations are just references to the original shader module
+        // plus the specialization constant array.
+        ResourceHandle baseShader; // Could be a Shader or ShaderLibrary
+        std::vector<ShaderSpecialization> specializationConstants;
+
+        explicit Shader(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~Shader() override;
+        const ShaderDesc& getDesc() const override { return desc; }
+        void getBytecode(const void** ppBytecode, size_t* pSize) const override;
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class ShaderLibrary : public RefCounter<rhi::ShaderLibrary>
+    {
+    public:
+        vk::ShaderModule shaderModule;
+
+        explicit ShaderLibrary(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~ShaderLibrary() override;
+        void getBytecode(const void** ppBytecode, size_t* pSize) const override;
+        ShaderHandle getShader(const char* entryName, ShaderType shaderType) override;
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class InputLayout : public RefCounter<rhi::InputLayout>
+    {
+    public:
+        std::vector<VertexAttributeDesc> inputDesc;
+
+        std::vector<vk::VertexInputBindingDescription> bindingDesc;
+        std::vector<vk::VertexInputAttributeDescription> attributeDesc;
+
+        uint32_t getNumAttributes() const override;
+        const VertexAttributeDesc* getAttributeDesc(uint32_t index) const override;
+    };
+
+    class EventQuery : public RefCounter<rhi::EventQuery>
+    {
+    public:
+        CommandQueue queue = CommandQueue::Graphics;
+        uint64_t commandListID = 0;
+    };
+
+    class TimerQuery : public RefCounter<rhi::TimerQuery>
+    {
+    public:
+        int beginQueryIndex = -1;
+        int endQueryIndex = -1;
+
+        bool started = false;
+        bool resolved = false;
+        float time = 0.f;
+
+        explicit TimerQuery(utils::BitSetAllocator& allocator)
+            : m_queryAllocator(allocator)
+        { }
+
+        ~TimerQuery() override;
+
+    private:
+        utils::BitSetAllocator& m_queryAllocator;
+    };
+
+    class Framebuffer : public RefCounter<rhi::Framebuffer>
+    {
+    public:
+        FramebufferDesc desc;
+        FramebufferInfoEx framebufferInfo;
+
+        static_vector<vk::RenderingAttachmentInfo, c_MaxRenderTargets> colorAttachments;
+        vk::RenderingAttachmentInfo depthAttachment{};
+        vk::RenderingAttachmentInfo stencilAttachment{};
+        vk::RenderingFragmentShadingRateAttachmentInfoKHR shadingRateAttachment{};
+
+        std::vector<ResourceHandle> resources;
+
+        bool managed = true;
+
+        const FramebufferDesc& getDesc() const override { return desc; }
+        const FramebufferInfoEx& getFramebufferInfo() const override { return framebufferInfo; }
+    };
+
+    class BindingLayout : public RefCounter<rhi::BindingLayout>
+    {
+    public:
+        BindingLayoutDesc desc;
+        BindlessLayoutDesc bindlessDesc;
+        bool isBindless;
+
+        std::vector<vk::DescriptorSetLayoutBinding> vulkanLayoutBindings;
+
+        vk::DescriptorSetLayout descriptorSetLayout;
+
+        // descriptor pool size information per binding set
+        std::vector<vk::DescriptorPoolSize> descriptorPoolSizeInfo;
+
+        BindingLayout(const VulkanContext& context, const BindingLayoutDesc& desc);
+        BindingLayout(const VulkanContext& context, const BindlessLayoutDesc& desc);
+        ~BindingLayout() override;
+        const BindingLayoutDesc* getDesc() const override { return isBindless ? nullptr : &desc; }
+        const BindlessLayoutDesc* getBindlessDesc() const override { return isBindless ? &bindlessDesc : nullptr; }
+        Object getNativeObject(ObjectType objectType) override;
+
+        // generate the descriptor set layout
+        vk::Result bake();
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    // contains a vk::DescriptorSet
+    class BindingSet : public RefCounter<rhi::BindingSet>
+    {
+    public:
+        BindingSetDesc desc;
+        BindingLayoutHandle layout;
+
+        // TODO: move pool to the context instead
+        vk::DescriptorPool descriptorPool;
+        vk::DescriptorSet descriptorSet;
+
+        std::vector<ResourceHandle> resources;
+        static_vector<Buffer*, c_MaxVolatileConstantBuffersPerLayout> volatileConstantBuffers;
+
+        std::vector<uint16_t> bindingsThatNeedTransitions;
+        bool hasUavBindings = false;
+
+        explicit BindingSet(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~BindingSet() override;
+        const BindingSetDesc* getDesc() const override { return &desc; }
+        BindingLayout* getLayout() const override { return static_cast<BindingLayout*>(layout.Get()); }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class DescriptorTable : public RefCounter<rhi::DescriptorTable>
+    {
+    public:
+        BindingLayoutHandle layout;
+        uint32_t capacity = 0;
+
+        vk::DescriptorPool descriptorPool;
+        vk::DescriptorSet descriptorSet;
+
+        explicit DescriptorTable(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~DescriptorTable() override;
+        const BindingSetDesc* getDesc() const override { return nullptr; }
+        BindingLayout* getLayout() const override { return static_cast<BindingLayout*>(layout.Get()); }
+        uint32_t getCapacity() const override { return capacity; }
+
+        // Vulkan doesn't have a concept of the first descriptor in the heap
+        uint32_t getFirstDescriptorIndexInHeap() const override { return 0; }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    template <typename T>
+    using BindingVector = static_vector<T, c_MaxBindingLayouts>;
+
+    // common code when creating shader pipelines to build binding set layouts
+    vk::Result createPipelineLayout(
+        vk::PipelineLayout& outPipelineLayout,
+        BindingVector<RefCountPtr<BindingLayout>>& outBindingLayouts,
+        vk::ShaderStageFlags& outPushConstantVisibility,
+        BindingVector<uint32_t>& outStateBindingIdxToPipelineBindingIdx,
+        VulkanContext const& context,
+        BindingLayoutVector const& inBindingLayouts);
+
+    class GraphicsPipeline : public RefCounter<rhi::GraphicsPipeline>
+    {
+    public:
+        GraphicsPipelineDesc desc;
+        FramebufferInfo framebufferInfo;
+        ShaderType shaderMask = ShaderType::None;
+        BindingVector<RefCountPtr<BindingLayout>> pipelineBindingLayouts;
+        BindingVector<uint32_t> descriptorSetIdxToBindingIdx;
+        vk::PipelineLayout pipelineLayout;
+        vk::Pipeline pipeline;
+        vk::ShaderStageFlags pushConstantVisibility;
+        bool usesBlendConstants = false;
+
+        explicit GraphicsPipeline(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~GraphicsPipeline() override;
+        const GraphicsPipelineDesc& getDesc() const override { return desc; }
+        const FramebufferInfo& getFramebufferInfo() const override { return framebufferInfo; }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class ComputePipeline : public RefCounter<rhi::ComputePipeline>
+    {
+    public:
+        ComputePipelineDesc desc;
+
+        BindingVector<RefCountPtr<BindingLayout>> pipelineBindingLayouts;
+        BindingVector<uint32_t> descriptorSetIdxToBindingIdx;
+        vk::PipelineLayout pipelineLayout;
+        vk::Pipeline pipeline;
+        vk::ShaderStageFlags pushConstantVisibility;
+
+        explicit ComputePipeline(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~ComputePipeline() override;
+        const ComputePipelineDesc& getDesc() const override { return desc; }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class MeshletPipeline : public RefCounter<rhi::MeshletPipeline>
+    {
+    public:
+        MeshletPipelineDesc desc;
+        FramebufferInfo framebufferInfo;
+        ShaderType shaderMask = ShaderType::None;
+        BindingVector<RefCountPtr<BindingLayout>> pipelineBindingLayouts;
+        BindingVector<uint32_t> descriptorSetIdxToBindingIdx;
+        vk::PipelineLayout pipelineLayout;
+        vk::Pipeline pipeline;
+        vk::ShaderStageFlags pushConstantVisibility;
+        bool usesBlendConstants = false;
+
+        explicit MeshletPipeline(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~MeshletPipeline() override;
+        const MeshletPipelineDesc& getDesc() const override { return desc; }
+        const FramebufferInfo& getFramebufferInfo() const override { return framebufferInfo; }
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class RayTracingPipeline : public RefCounter<rt::Pipeline>
+    {
+    public:
+        rt::PipelineDesc desc;
+        BindingVector<RefCountPtr<BindingLayout>> pipelineBindingLayouts;
+        BindingVector<uint32_t> descriptorSetIdxToBindingIdx;
+        vk::PipelineLayout pipelineLayout;
+        vk::Pipeline pipeline;
+        vk::ShaderStageFlags pushConstantVisibility;
+
+        std::unordered_map<std::string, uint32_t> shaderGroups; // name -> index
+        std::vector<uint8_t> shaderGroupHandles;
+
+        explicit RayTracingPipeline(const VulkanContext& context, Device* device)
+            : m_context(context)
+            , m_device(device)
+        { }
+
+        ~RayTracingPipeline() override;
+        const rt::PipelineDesc& getDesc() const override { return desc; }
+        rt::ShaderTableHandle createShaderTable(rt::ShaderTableDesc const& stDesc) override;
+        Object getNativeObject(ObjectType objectType) override;
+
+        int findShaderGroup(const std::string& name); // returns -1 if not found
+        uint32_t getShaderTableEntrySize() const { return m_context.rayTracingPipelineProperties.shaderGroupBaseAlignment; }
+
+    private:
+        const VulkanContext& m_context;
+        Device* m_device;
+    };
+
+    struct ShaderTableState
+    {
+        uint32_t version = 0;
+        vk::StridedDeviceAddressRegionKHR rayGen;
+        vk::StridedDeviceAddressRegionKHR miss;
+        vk::StridedDeviceAddressRegionKHR hitGroups;
+        vk::StridedDeviceAddressRegionKHR callable;
+    };
+
+    class ShaderTable : public RefCounter<rt::ShaderTable>
+    {
+    public:
+        RefCountPtr<RayTracingPipeline> pipeline;
+
+        int rayGenerationShader = -1;
+        std::vector<uint32_t> missShaders;
+        std::vector<uint32_t> callableShaders;
+        std::vector<uint32_t> hitGroups;
+
+        uint32_t version = 0;
+
+        BufferHandle cache;
+        ShaderTableState cacheState;
+
+        ShaderTable(const VulkanContext& context, RayTracingPipeline* _pipeline, rt::ShaderTableDesc const& desc)
+            : pipeline(_pipeline)
+            , m_context(context)
+            , m_desc(desc)
+        { }
+
+        size_t getUploadSize() const { return pipeline->getShaderTableEntrySize() * size_t(getNumEntries()); }
+        void bake(uint8_t* cpuVA, vk::DeviceAddress gpuVA, ShaderTableState& state);
+
+        rt::ShaderTableDesc const& getDesc() const override { return m_desc; }
+        uint32_t getNumEntries() const override;
+        rt::Pipeline* getPipeline() const override { return pipeline; }
+        void setRayGenerationShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addMissShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addHitGroup(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addCallableShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        void clearMissShaders() override;
+        void clearHitShaders() override;
+        void clearCallableShaders() override;
+
+    private:
+        const VulkanContext& m_context;
+        rt::ShaderTableDesc const m_desc;
+
+        bool verifyShaderGroupExists(const char* exportName, int shaderGroupIndex) const;
+    };
+
+    struct BufferChunk
+    {
+        BufferHandle buffer;
+        uint64_t version = 0;
+        uint64_t bufferSize = 0;
+        uint64_t writePointer = 0;
+        void* mappedMemory = nullptr;
+
+        static constexpr uint64_t c_sizeAlignment = 4096; // GPU page size
+    };
+
+    class UploadManager
+    {
+    public:
+        UploadManager(Device* pParent, uint64_t defaultChunkSize, uint64_t memoryLimit, bool isScratchBuffer)
+            : m_device(pParent)
+            , m_defaultChunkSize(defaultChunkSize)
+            , m_memoryLimit(memoryLimit)
+            , m_isScratchBuffer(isScratchBuffer)
+        { }
+
+        std::shared_ptr<BufferChunk> CreateChunk(uint64_t size);
+
+        bool suballocateBuffer(uint64_t size, Buffer** pBuffer, uint64_t* pOffset, void** pCpuVA, uint64_t currentVersion, uint32_t alignment = 256);
+        void submitChunks(uint64_t currentVersion, uint64_t submittedVersion);
+
+    private:
+        Device* m_device;
+        uint64_t m_defaultChunkSize = 0;
+        uint64_t m_memoryLimit = 0;
+        uint64_t m_allocatedMemory = 0;
+        bool m_isScratchBuffer = false;
+
+        std::list<std::shared_ptr<BufferChunk>> m_chunkPool;
+        std::shared_ptr<BufferChunk> m_currentChunk;
+    };
+
+    class AccelStruct : public RefCounter<rt::AccelStruct>
+    {
+    public:
+        BufferHandle dataBuffer;
+        std::vector<vk::AccelerationStructureInstanceKHR> instances;
+        vk::AccelerationStructureKHR accelStruct;
+        vk::DeviceAddress accelStructDeviceAddress = 0;
+        rt::AccelStructDesc desc;
+        bool allowUpdate = false;
+        bool compacted = false;
+        size_t managedId = ~0ull;
+
+
+        explicit AccelStruct(const VulkanContext& context)
+            : m_context(context)
+        { }
+
+        ~AccelStruct() override;
+
+        Object getNativeObject(ObjectType objectType) override;
+        const rt::AccelStructDesc& getDesc() const override { return desc; }
+        bool isCompacted() const override { return compacted; }
+        uint64_t getDeviceAddress() const override;
+
+    private:
+        const VulkanContext& m_context;
+    };
+
+    class OpacityMicromap : public RefCounter<rt::OpacityMicromap>
+    {
+    public:
+        BufferHandle dataBuffer;
+        vk::UniqueMicromapEXT opacityMicromap;
+        rt::OpacityMicromapDesc desc;
+        bool allowUpdate = false;
+        bool compacted = false;
+
+        explicit OpacityMicromap()
+        { }
+
+        ~OpacityMicromap() override;
+
+        Object getNativeObject(ObjectType objectType) override;
+        const rt::OpacityMicromapDesc& getDesc() const override { return desc; }
+        bool isCompacted() const override { return compacted; }
+        uint64_t getDeviceAddress() const override;
+    };
+
+    class Device : public RefCounter<rhi::Device>
+    {
+    public:
+        // Internal backend methods
+
+        Device(const DeviceDesc& desc);
+        ~Device() override;
+
+        Queue* getQueue(CommandQueue queue) const { return m_queues[int(queue)].get(); }
+        vk::QueryPool getTimerQueryPool() const { return m_timerQueryPool; }
+
+        // Resource implementation
+
+        Object getNativeObject(ObjectType objectType) override;
+
+
+        // Device implementation
+
+        HeapHandle createHeap(const HeapDesc& d) override;
+
+        TextureHandle createTexture(const TextureDesc& d) override;
+        MemoryRequirements getTextureMemoryRequirements(rhi::Texture* texture) override;
+        bool bindTextureMemory(rhi::Texture* texture, rhi::Heap* heap, uint64_t offset) override;
+
+        TextureHandle createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc) override;
+
+        StagingTextureHandle createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess) override;
+        void *mapStagingTexture(rhi::StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
+        void unmapStagingTexture(rhi::StagingTexture* tex) override;
+
+        void getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
+
+        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture) override;
+
+        BufferHandle createBuffer(const BufferDesc& d) override;
+        void *mapBuffer(rhi::Buffer* b, CpuAccessMode mapFlags) override;
+        void unmapBuffer(rhi::Buffer* b) override;
+        MemoryRequirements getBufferMemoryRequirements(rhi::Buffer* buffer) override;
+        bool bindBufferMemory(rhi::Buffer* buffer, rhi::Heap* heap, uint64_t offset) override;
+
+        BufferHandle createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc) override;
+
+        ShaderHandle createShader(const ShaderDesc& d, const void* binary, size_t binarySize) override;
+        ShaderHandle createShaderSpecialization(rhi::Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
+        ShaderLibraryHandle createShaderLibrary(const void* binary, size_t binarySize) override;
+
+        SamplerHandle createSampler(const SamplerDesc& d) override;
+
+        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* vertexShader) override;
+
+        // event queries
+        EventQueryHandle createEventQuery() override;
+        void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
+        bool pollEventQuery(rhi::EventQuery* query) override;
+        bool waitEventQuery(rhi::EventQuery* query) override;
+        void resetEventQuery(rhi::EventQuery* query) override;
+
+        // timer queries
+        TimerQueryHandle createTimerQuery() override;
+        bool pollTimerQuery(rhi::TimerQuery* query) override;
+        float getTimerQueryTime(rhi::TimerQuery* query) override;
+        void resetTimerQuery(rhi::TimerQuery* query) override;
+
+        GraphicsAPI getGraphicsAPI() override;
+
+        FramebufferHandle createFramebuffer(const FramebufferDesc& desc) override;
+
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
+
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb) override;
+
+        ComputePipelineHandle createComputePipeline(const ComputePipelineDesc& desc) override;
+
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
+
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb) override;
+
+        rt::PipelineHandle createRayTracingPipeline(const rt::PipelineDesc& desc) override;
+
+        BindingLayoutHandle createBindingLayout(const BindingLayoutDesc& desc) override;
+        BindingLayoutHandle createBindlessLayout(const BindlessLayoutDesc& desc) override;
+
+        BindingSetHandle createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* layout) override;
+        DescriptorTableHandle createDescriptorTable(rhi::BindingLayout* layout) override;
+
+        void resizeDescriptorTable(rhi::DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
+        bool writeDescriptorTable(rhi::DescriptorTable* descriptorTable, const BindingSetItem& item) override;
+
+        rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
+        rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
+        MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
+        rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
+        bool bindAccelStructMemory(rt::AccelStruct* as, rhi::Heap* heap, uint64_t offset) override;
+
+        CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
+        uint64_t executeCommandLists(rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
+        bool waitForIdle() override;
+        void runGarbageCollection() override;
+        bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
+        FormatSupport queryFormatSupport(Format format) override;
+        coopvec::DeviceFeatures queryCoopVecFeatures() override;
+        size_t getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns) override;
+        Object getNativeQueue(ObjectType objectType, CommandQueue queue) override;
+        MessageCallback* getMessageCallback() override { return m_context.messageCallback; }
+        bool isAftermathEnabled() override { return m_aftermathEnabled; }
+        AftermathCrashDumpHelper& getAftermathCrashDumpHelper() override { return m_aftermathCrashDumpHelper; }
+
+        // vulkan::Device implementation
+        VkSemaphore getQueueSemaphore(CommandQueue queue);
+        void queueWaitForSemaphore(CommandQueue waitQueue, VkSemaphore semaphore, uint64_t value);
+        void queueSignalSemaphore(CommandQueue executionQueue, VkSemaphore semaphore, uint64_t value);
+        uint64_t queueGetCompletedInstance(CommandQueue queue);
+
+        // Used by DeferredDeletionQueue (staging buffer last-use timeline).
+        [[nodiscard]] bool isQueueSubmissionComplete(CommandQueue queue, uint64_t submissionID) const;
+
+    private:
+        // Warning m_aftermathCrashDump helper must be first due to reverse destruction order
+        // Queues will destroy CommandLists which will unregister from m_aftermathCrashDumpHelper in their destructors
+        bool m_aftermathEnabled = false;
+        AftermathCrashDumpHelper m_aftermathCrashDumpHelper;
+
+        VulkanContext m_context;
+        VulkanAllocator m_allocator;
+
+        vk::QueryPool m_timerQueryPool = nullptr;
+        utils::BitSetAllocator m_timerQueryAllocator;
+
+        // Serializes execute + permanentState writeback and GC flush ordering.
+        std::mutex m_mutex;
+        DeferredDeletionQueue m_deferredDeletion;
+
+        // array of submission queues
+        std::array<std::unique_ptr<Queue>, uint32_t(CommandQueue::Count)> m_queues;
+
+        void *mapBuffer(Buffer* b, CpuAccessMode flags, uint64_t offset, size_t size) const;
+    };
+
+    class CommandList : public RefCounter<rhi::CommandList>
+    {
+    public:
+        // Internal backend methods
+
+        CommandList(Device* device, const VulkanContext& context, const CommandListParameters& parameters);
+        ~CommandList() override;
+
+        void executed(Queue& queue, uint64_t submissionID);
+
+        // Resource implementation
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        // CommandList implementation
+
+        [[nodiscard]] bool open() override;
+        void close() override;
+        void clearState() override;
+
+        void clearTextureFloat(rhi::Texture* texture, TextureSubresourceSet subresources, const Color& clearColor) override;
+        void clearDepthStencilTexture(rhi::Texture* texture, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
+        void clearTextureUInt(rhi::Texture* texture, TextureSubresourceSet subresources, uint32_t clearColor) override;
+        void clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture) override;
+        void decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, Format format) override;
+        void setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits) override;
+
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::StagingTexture* dest, const TextureSlice& dstSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& dstSlice, rhi::StagingTexture* src, const TextureSlice& srcSlice) override;
+        void writeTexture(rhi::Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
+        void resolveTexture(rhi::Texture* dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* src, const TextureSubresourceSet& srcSubresources) override;
+
+        void writeBuffer(rhi::Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
+        void clearBufferUInt(rhi::Buffer* b, uint32_t clearValue) override;
+        void copyBuffer(rhi::Buffer* dest, uint64_t destOffsetBytes, rhi::Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
+
+        void setPushConstants(const void* data, size_t byteSize) override;
+
+        void setGraphicsState(const GraphicsState& state) override;
+        void draw(const DrawArguments& args) override;
+        void drawIndexed(const DrawArguments& args) override;
+        void drawIndirect(uint32_t offsetBytes, uint32_t drawCount) override;
+        void drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount) override;
+        void drawIndexedIndirectCount(uint32_t paramOffsetBytes, uint32_t countOffsetBytes, uint32_t maxDrawCount) override;
+
+        void setComputeState(const ComputeState& state) override;
+        void dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) override;
+        void dispatchIndirect(uint32_t offsetBytes)  override;
+
+        void setMeshletState(const MeshletState& state) override;
+        void dispatchMesh(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) override;
+
+        void setRayTracingState(const rt::State& state) override;
+        void dispatchRays(const rt::DispatchRaysArguments& args) override;
+
+        void buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
+        void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
+        void compactBottomLevelAccelStructs() override;
+        void buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
+        void buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+            rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
+        void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
+
+        void convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs) override;
+
+        void beginTimerQuery(rhi::TimerQuery* query) override;
+        void endTimerQuery(rhi::TimerQuery* query) override;
+
+        void beginMarker(const char* name) override;
+        void endMarker() override;
+
+        void setEnableAutomaticBarriers(bool enable) override;
+        void setResourceStatesForBindingSet(rhi::BindingSet* bindingSet) override;
+
+        void setEnableUavBarriersForTexture(rhi::Texture* texture, bool enableBarriers) override;
+        void setEnableUavBarriersForBuffer(rhi::Buffer* buffer, bool enableBarriers) override;
+
+        void beginTrackingTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void beginTrackingBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+
+        void setTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void setBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+        void textureAliasingBarrier(rhi::Texture* before, rhi::Texture* after) override;
+        void bufferAliasingBarrier(rhi::Buffer* before, rhi::Buffer* after) override;
+        void setAccelStructState(rt::AccelStruct* _as, ResourceStates stateBits) override;
+
+        void setPermanentTextureState(rhi::Texture* texture, ResourceStates stateBits) override;
+        void setPermanentBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+
+        void commitBarriers() override;
+
+        ResourceStates getTextureSubresourceState(rhi::Texture* texture, ArraySlice arraySlice, MipLevel mipLevel) override;
+        ResourceStates getBufferState(rhi::Buffer* buffer) override;
+
+        Device* getDevice() override { return m_device; }
+        const CommandListParameters& getDesc() override { return m_commandListParameters; }
+
+        TrackedCommandBufferPtr getCurrentCmdBuf() const { return m_currentCmdBuf; }
+
+    private:
+        Device* m_device;
+        const VulkanContext& m_context;
+
+        CommandListParameters m_commandListParameters;
+
+        CommandListResourceStateTracker m_stateTracker;
+        bool m_enableAutomaticBarriers = true;
+
+        // current internal command buffer
+        TrackedCommandBufferPtr m_currentCmdBuf = nullptr;
+
+#if CAUSTICA_RHI_WITH_AFTERMATH
+        AftermathMarkerTracker m_aftermathTracker;
+#endif
+
+        vk::PipelineLayout m_currentPipelineLayout;
+        vk::ShaderStageFlags m_currentPushConstantsVisibility;
+        GraphicsState m_currentGraphicsState{};
+        ComputeState m_currentComputeState{};
+        MeshletState m_currentMeshletState{};
+        rt::State m_currentRayTracingState;
+        bool m_anyVolatileBufferWrites = false;
+        bool m_bindingStatesDirty = false;
+
+        std::unordered_map<rt::ShaderTable*, std::unique_ptr<ShaderTableState>> m_uncachedShaderTableStates;
+        ShaderTableState& getShaderTableState(rt::ShaderTable* shaderTable);
+
+        std::unordered_map<Buffer*, VolatileBufferState> m_volatileBufferStates;
+
+        std::unique_ptr<UploadManager> m_uploadManager;
+        std::unique_ptr<UploadManager> m_scratchManager;
+
+        void clearTexture(rhi::Texture* texture, TextureSubresourceSet subresources, const vk::ClearColorValue& clearValue);
+
+        void bindBindingSets(vk::PipelineBindPoint bindPoint, vk::PipelineLayout pipelineLayout, const BindingSetVector& bindings, BindingVector<uint32_t> const& descriptorSetIdxToBindingIdx);
+
+        void beginRenderPass(caustica::rhi::Framebuffer* framebuffer);
+        void endRenderPass();
+
+        void insertGraphicsResourceBarriers(const GraphicsState& state);
+        void insertComputeResourceBarriers(const ComputeState& state);
+        void insertMeshletResourceBarriers(const MeshletState& state);
+        void insertRayTracingResourceBarriers(const rt::State& state);
+        void insertResourceBarriersForBindingSets(const BindingSetVector& newBindings, const BindingSetVector& oldBindings);
+
+        void writeVolatileBuffer(Buffer* buffer, const void* data, size_t dataSize);
+        void flushVolatileBufferWrites();
+        void submitVolatileBuffers(uint64_t recordingID, uint64_t submittedID);
+
+        void updateGraphicsVolatileBuffers();
+        void updateComputeVolatileBuffers();
+        void updateMeshletVolatileBuffers();
+        void updateRayTracingVolatileBuffers();
+
+        void requireTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
+        void requireBufferState(rhi::Buffer* buffer, ResourceStates state);
+        bool anyBarriers() const;
+
+        void buildTopLevelAccelStructInternal(AccelStruct* as, VkDeviceAddress instanceData, size_t numInstances, rt::AccelStructBuildFlags buildFlags, uint64_t currentVersion);
+
+        void commitBarriersInternal();
+    };
+
+} // namespace caustica::rhi::vulkan

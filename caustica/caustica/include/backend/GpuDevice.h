@@ -10,7 +10,7 @@
 // backend/internal/DeviceParams.h and are not a second public create API.
 
 #if CAUSTICA_WITH_DX12
-#include <d3d12.h>
+#include <rhi/d3d12.h>
 #endif
 
 #if CAUSTICA_WITH_AFTERMATH

@@ -127,22 +127,22 @@ set(src_d3d12
     common/dxgi-format.h
     common/dxgi-format.cpp
     common/versioning.h
-    d3d12/d3d12-buffer.cpp
-    d3d12/d3d12-commandlist.cpp
-    d3d12/d3d12-compute.cpp
-    d3d12/d3d12-constants.cpp
-    d3d12/d3d12-backend.h
-    d3d12/d3d12-descriptor-heap.cpp
-    d3d12/d3d12-device.cpp
-    d3d12/d3d12-graphics.cpp
-    d3d12/d3d12-meshlets.cpp
-    d3d12/d3d12-queries.cpp
-    d3d12/d3d12-raytracing.cpp
-    d3d12/d3d12-resource-bindings.cpp
-    d3d12/d3d12-shader.cpp
-    d3d12/d3d12-state-tracking.cpp
-    d3d12/d3d12-texture.cpp
-    d3d12/d3d12-upload.cpp)
+    d3d12/D3D12Buffer.cpp
+    d3d12/D3D12CommandList.cpp
+    d3d12/D3D12Compute.cpp
+    d3d12/D3D12Constants.cpp
+    d3d12/D3D12Backend.h
+    d3d12/D3D12DescriptorHeap.cpp
+    d3d12/D3D12Device.cpp
+    d3d12/D3D12Graphics.cpp
+    d3d12/D3D12Meshlets.cpp
+    d3d12/D3D12Queries.cpp
+    d3d12/D3D12RayTracing.cpp
+    d3d12/D3D12ResourceBindings.cpp
+    d3d12/D3D12Shader.cpp
+    d3d12/D3D12StateTracking.cpp
+    d3d12/D3D12Texture.cpp
+    d3d12/D3D12Upload.cpp)
 
 # ------------------------------------------------------------------
 # Vulkan backend
@@ -151,24 +151,24 @@ set(include_vk
     ${RHI_INCLUDE_DIR}/vulkan.h)
 set(src_vk
     common/versioning.h
-    vulkan/vulkan-allocator.cpp
-    vulkan/vulkan-buffer.cpp
-    vulkan/vulkan-commandlist.cpp
-    vulkan/vulkan-compute.cpp
-    vulkan/vulkan-constants.cpp
-    vulkan/vulkan-device.cpp
-    vulkan/vulkan-graphics.cpp
-    vulkan/vulkan-meshlets.cpp
-    vulkan/vulkan-queries.cpp
-    vulkan/vulkan-queue.cpp
-    vulkan/vulkan-raytracing.cpp
-    vulkan/vulkan-resource-bindings.cpp
-    vulkan/vulkan-shader.cpp
-    vulkan/vulkan-staging-texture.cpp
-    vulkan/vulkan-state-tracking.cpp
-    vulkan/vulkan-texture.cpp
-    vulkan/vulkan-upload.cpp
-    vulkan/vulkan-backend.h)
+    vulkan/VulkanAllocator.cpp
+    vulkan/VulkanBuffer.cpp
+    vulkan/VulkanCommandList.cpp
+    vulkan/VulkanCompute.cpp
+    vulkan/VulkanConstants.cpp
+    vulkan/VulkanDevice.cpp
+    vulkan/VulkanGraphics.cpp
+    vulkan/VulkanMeshlets.cpp
+    vulkan/VulkanQueries.cpp
+    vulkan/VulkanQueue.cpp
+    vulkan/VulkanRayTracing.cpp
+    vulkan/VulkanResourceBindings.cpp
+    vulkan/VulkanShader.cpp
+    vulkan/VulkanStagingTexture.cpp
+    vulkan/VulkanStateTracking.cpp
+    vulkan/VulkanTexture.cpp
+    vulkan/VulkanUpload.cpp
+    vulkan/VulkanBackend.h)
 
 # ==================================================================
 # caustica_rhi target: core interface + common implementation
