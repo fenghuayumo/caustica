@@ -77,7 +77,9 @@ struct LoadSession
     // Teardown: RT sets true when Streamline/AS release + GC finished.
     std::atomic<bool> teardownGpuDone{false};
 
-    // After Teardown, tickLoadSession calls beginLoadingScene (avoids racing GPU unload).
+    // After Teardown (including cold-start with teardownGpuDone already true),
+    // tickLoadSession calls beginLoadingScene (avoids racing GPU unload and
+    // avoids launching the IO worker during Startup).
     bool deferredImportPending = false;
 
     // OMM / opacity builds and similar work outside the Open Scene phase machine.
