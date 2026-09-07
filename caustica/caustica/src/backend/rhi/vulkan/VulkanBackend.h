@@ -4,8 +4,8 @@
 #include <rhi/utils.h>
 #include <rhi/common/aftermath.h>
 #include <rhi/common/deferred-deletion.h>
-#include "../common/state-tracking.h"
-#include "../common/versioning.h"
+#include "../common/StateTracking.h"
+#include "../common/Versioning.h"
 #include <mutex>
 #include <list>
 

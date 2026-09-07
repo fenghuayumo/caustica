@@ -28,9 +28,6 @@ using namespace caustica::math;
 static_assert(sizeof(InstanceData) == 128, "InstanceData must stay 8 x 16 bytes for HLSL LoadInstanceData");
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/skinning_cs.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/skinning_cs.dxil.h"
 #endif
@@ -231,7 +228,7 @@ caustica::rhi::BufferHandle CreateGeometryBuffer(SceneGpuResources& gpu)
 
 caustica::rhi::BufferHandle CreateInstanceBuffer(SceneGpuResources& gpu)
 {
-    const bool needStructuredBuffer = gpu.device->getGraphicsAPI() != caustica::rhi::GraphicsAPI::D3D11;
+    const bool needStructuredBuffer = true;
 
     caustica::rhi::BufferDesc bufferDesc;
     bufferDesc.byteSize = sizeof(InstanceData) * gpu.instanceData.size();

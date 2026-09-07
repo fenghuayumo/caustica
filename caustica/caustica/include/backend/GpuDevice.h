@@ -264,7 +264,6 @@ protected:
     virtual void prepareShutdown() {}
 
 private:
-    static GpuDevice* createD3D11();
     static GpuDevice* createD3D12();
     static GpuDevice* createVK();
 

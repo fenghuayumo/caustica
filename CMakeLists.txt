@@ -71,9 +71,6 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64")
     endif()
 endif()
 
-# we can't run with DX11
-option(CAUSTICA_WITH_DX11 "Enable the DX11 version of the framework runtime code" OFF)
-
 if (WIN32)
     set(CAUSTICA_DEFAULT_WITH_DX12 ON)
 else()
@@ -447,7 +444,6 @@ option(CAUSTICA_WITH_LZ4 "Include LZ4" OFF)
 
 if (CAUSTICA_WITH_RHI)
     # Caustica RHI backend variables: forwarded from the project-wide CAUSTICA settings.
-    set(CAUSTICA_RHI_WITH_DX11 "${CAUSTICA_WITH_DX11}" CACHE BOOL "" FORCE)
     set(CAUSTICA_RHI_WITH_DX12 "${CAUSTICA_WITH_DX12}" CACHE BOOL "" FORCE)
     set(CAUSTICA_RHI_WITH_VULKAN "${CAUSTICA_WITH_VULKAN}" CACHE BOOL "" FORCE)
     set(CAUSTICA_RHI_WITH_AFTERMATH "${CAUSTICA_WITH_AFTERMATH}" CACHE BOOL "" FORCE)

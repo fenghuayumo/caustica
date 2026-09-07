@@ -8,10 +8,6 @@
 #include <core/log.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/imgui_vertex.dxbc.h"
-#include "compiled_shaders/imgui_pixel.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/imgui_vertex.dxil.h"
 #include "compiled_shaders/imgui_pixel.dxil.h"

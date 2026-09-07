@@ -149,7 +149,6 @@ namespace caustica::rhi::utils
     {
         switch (api)
         {
-        case GraphicsAPI::D3D11:  return "D3D11";
         case GraphicsAPI::D3D12:  return "D3D12";
         case GraphicsAPI::VULKAN: return "Vulkan";
         default:                         return "<UNKNOWN>";
@@ -362,50 +361,50 @@ namespace caustica::rhi::utils
     }
 
     BitSetAllocator::BitSetAllocator(const size_t capacity, bool multithreaded)
-        : m_MultiThreaded(multithreaded)
+        : m_multiThreaded(multithreaded)
     {
-        m_Allocated.resize(capacity);
+        m_allocated.resize(capacity);
     }
 
     int BitSetAllocator::allocate()
     {
-        if (m_MultiThreaded)
-            m_Mutex.lock();
+        if (m_multiThreaded)
+            m_mutex.lock();
 
         int result = -1;
 
-        int capacity = static_cast<int>(m_Allocated.size());
+        int capacity = static_cast<int>(m_allocated.size());
         for (int i = 0; i < capacity; i++)
         {
-            int ii = (m_NextAvailable + i) % capacity;
+            int ii = (m_nextAvailable + i) % capacity;
 
-            if (!m_Allocated[ii])
+            if (!m_allocated[ii])
             {
                 result = ii;
-                m_NextAvailable = (ii + 1) % capacity;
-                m_Allocated[ii] = true;
+                m_nextAvailable = (ii + 1) % capacity;
+                m_allocated[ii] = true;
                 break;
             }
         }
 
-        if (m_MultiThreaded)
-            m_Mutex.unlock();
+        if (m_multiThreaded)
+            m_mutex.unlock();
 
         return result;
     }
 
     void BitSetAllocator::release(const int index)
     {
-        if (index >= 0 && index < static_cast<int>(m_Allocated.size()))
+        if (index >= 0 && index < static_cast<int>(m_allocated.size()))
         {
-            if (m_MultiThreaded)
-                m_Mutex.lock();
+            if (m_multiThreaded)
+                m_mutex.lock();
 
-            m_Allocated[index] = false;
-            m_NextAvailable = std::min(m_NextAvailable, index);
+            m_allocated[index] = false;
+            m_nextAvailable = std::min(m_nextAvailable, index);
 
-            if (m_MultiThreaded)
-                m_Mutex.unlock();
+            if (m_multiThreaded)
+                m_mutex.unlock();
         }
     }
 

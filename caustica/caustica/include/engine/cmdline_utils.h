@@ -6,7 +6,7 @@
 namespace caustica
 {
 
-// Parse -d3d11/-dx11, -d3d12/-dx12, -vk/-vulkan flags from argv.
+// Parse -d3d12/-dx12, -vk/-vulkan flags from argv.
 // Returns the detected API, or a build-time default.
 inline caustica::rhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const char* const* argv)
 {
@@ -14,10 +14,7 @@ inline caustica::rhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const 
     {
         const char* arg = argv[n];
 
-        if (!strcmp(arg, "-d3d11") || !strcmp(arg, "-dx11") ||
-            !strcmp(arg, "--d3d11") || !strcmp(arg, "--dx11"))
-            return caustica::rhi::GraphicsAPI::D3D11;
-        else if (!strcmp(arg, "-d3d12") || !strcmp(arg, "-dx12") ||
+        if (!strcmp(arg, "-d3d12") || !strcmp(arg, "-dx12") ||
                  !strcmp(arg, "--d3d12") || !strcmp(arg, "--dx12"))
             return caustica::rhi::GraphicsAPI::D3D12;
         else if (!strcmp(arg, "-vk") || !strcmp(arg, "-vulkan") ||
@@ -29,8 +26,6 @@ inline caustica::rhi::GraphicsAPI getGraphicsAPIFromCommandLine(int argc, const 
     return caustica::rhi::GraphicsAPI::D3D12;
 #elif CAUSTICA_WITH_VULKAN
     return caustica::rhi::GraphicsAPI::VULKAN;
-#elif CAUSTICA_WITH_DX11
-    return caustica::rhi::GraphicsAPI::D3D11;
 #else
     #error "No Graphics API defined"
 #endif

@@ -99,9 +99,6 @@ caustica::rhi::GraphicsAPI ResolveGraphicsApi(const EngineAppDesc& desc)
 #elif CAUSTICA_WITH_DX12
     (void)desc;
     return caustica::rhi::GraphicsAPI::D3D12;
-#elif CAUSTICA_WITH_DX11
-    (void)desc;
-    return caustica::rhi::GraphicsAPI::D3D11;
 #else
 #error "No graphics API enabled"
 #endif

@@ -1,4 +1,4 @@
-#include "dxgi-format.h"
+#include "DxgiFormat.h"
 
 namespace caustica::rhi
 {

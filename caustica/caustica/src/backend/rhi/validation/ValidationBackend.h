@@ -106,21 +106,21 @@ namespace caustica::rhi::validation
         size_t maxInstances = 0;
         size_t buildInstances = 0;
 
-        AccelStructWrapper(AccelStruct* as) : m_AccelStruct(as) { }
-        AccelStruct* getUnderlyingObject() const { return m_AccelStruct; }
+        AccelStructWrapper(AccelStruct* as) : m_accelStruct(as) { }
+        AccelStruct* getUnderlyingObject() const { return m_accelStruct; }
 
         // Resource
 
-        Object getNativeObject(ObjectType objectType) override { return m_AccelStruct->getNativeObject(objectType); }
+        Object getNativeObject(ObjectType objectType) override { return m_accelStruct->getNativeObject(objectType); }
 
         // AccelStruct
 
-        const rt::AccelStructDesc& getDesc() const override { return m_AccelStruct->getDesc(); }
-        bool isCompacted() const override { return m_AccelStruct->isCompacted(); }
-        uint64_t getDeviceAddress() const override { return m_AccelStruct->getDeviceAddress(); };
+        const rt::AccelStructDesc& getDesc() const override { return m_accelStruct->getDesc(); }
+        bool isCompacted() const override { return m_accelStruct->isCompacted(); }
+        uint64_t getDeviceAddress() const override { return m_accelStruct->getDeviceAddress(); };
         
     private:
-        rt::AccelStructHandle m_AccelStruct;
+        rt::AccelStructHandle m_accelStruct;
     };
     
     class CommandListWrapper : public RefCounter<CommandList>
@@ -131,24 +131,24 @@ namespace caustica::rhi::validation
         CommandListWrapper(DeviceWrapper* device, CommandList* commandList, bool isImmediate, CommandQueue queueType);
 
     protected:
-        CommandListHandle m_CommandList;
-        RefCountPtr<DeviceWrapper> m_Device;
-        MessageCallback* m_MessageCallback;
-        bool m_IsImmediate;
+        CommandListHandle m_commandList;
+        RefCountPtr<DeviceWrapper> m_device;
+        MessageCallback* m_messageCallback;
+        bool m_isImmediate;
         CommandQueue m_type;
 
-        CommandListState m_State = CommandListState::INITIAL;
-        bool m_GraphicsStateSet = false;
-        bool m_ComputeStateSet = false;
-        bool m_MeshletStateSet = false;
-        bool m_RayTracingStateSet = false;
-        GraphicsState m_CurrentGraphicsState;
-        ComputeState m_CurrentComputeState;
-        MeshletState m_CurrentMeshletState;
-        rt::State m_CurrentRayTracingState;
+        CommandListState m_state = CommandListState::INITIAL;
+        bool m_graphicsStateSet = false;
+        bool m_computeStateSet = false;
+        bool m_meshletStateSet = false;
+        bool m_rayTracingStateSet = false;
+        GraphicsState m_currentGraphicsState;
+        ComputeState m_currentComputeState;
+        MeshletState m_currentMeshletState;
+        rt::State m_currentRayTracingState;
 
-        size_t m_PipelinePushConstantSize = 0;
-        bool m_PushConstantsSet = false;
+        size_t m_pipelinePushConstantSize = 0;
+        bool m_pushConstantsSet = false;
 
         void error(const std::string& messageText) const;
         void warning(const std::string& messageText) const;
@@ -156,7 +156,7 @@ namespace caustica::rhi::validation
         bool requireOpenState() const;
         bool requireExecuteState();
         bool requireType(CommandQueue queueType, const char* operation) const;
-        CommandList* getUnderlyingCommandList() const { return m_CommandList; }
+        CommandList* getUnderlyingCommandList() const { return m_commandList; }
 
         void evaluatePushConstantSize(const caustica::rhi::BindingLayoutVector& bindingLayouts);
         bool validatePushConstants(const char* pipelineType, const char* stateFunctionName) const;
@@ -264,9 +264,9 @@ namespace caustica::rhi::validation
         DeviceWrapper(Device* device);
         
     protected:
-        DeviceHandle m_Device;
-        MessageCallback* m_MessageCallback;
-        std::atomic<unsigned int> m_NumOpenImmediateCommandLists = 0;
+        DeviceHandle m_device;
+        MessageCallback* m_messageCallback;
+        std::atomic<unsigned int> m_numOpenImmediateCommandLists = 0;
 
         void error(const std::string& messageText) const;
         void warning(const std::string& messageText) const;

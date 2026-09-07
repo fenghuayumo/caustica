@@ -21,7 +21,7 @@
 #   core/       — Foundation utilities (logging, threading, VFS, JSON, etc.)
 #   events/     — Event system (key, mouse, application events)
 #   platform/   — OS abstraction (window, GLFW, OS)
-#   backend/    — GPU device wrappers (DX11, DX12, Vulkan)
+#   backend/    — GPU device wrappers (DX12, Vulkan)
 #   scene/      — Scene graph, camera, game model types
 #   animation/  — Keyframe animation
 #   assets/     — Asset system (loaders, cache, registry)
@@ -91,7 +91,6 @@ set(CAUSTICA_COMMON_COMPILE_DEFS
     # EnTT's sequential type_index is a process-wide counter; without this it races
     # when two threads first-touch different component types (occasional segfault).
     ENTT_USE_ATOMIC
-    CAUSTICA_WITH_DX11=$<BOOL:${CAUSTICA_WITH_DX11}>
     CAUSTICA_WITH_DX12=$<BOOL:${CAUSTICA_WITH_DX12}>
     CAUSTICA_WITH_VULKAN=$<BOOL:${CAUSTICA_WITH_VULKAN}>
     CAUSTICA_WITH_STATIC_SHADERS=$<BOOL:${CAUSTICA_WITH_STATIC_SHADERS}>
@@ -269,7 +268,7 @@ if (NOT WIN32)
 endif()
 
 # ── causBackend ───────────────────────────────────────────────────────────
-# GPU device wrappers (DX11/DX12/Vulkan) + RHI integration.
+# GPU device wrappers (DX12/Vulkan) + RHI integration.
 # Does NOT include the RHI implementation itself (separate CMake build).
 
 # Core backend files
@@ -281,14 +280,6 @@ list(FILTER caus_backend_sources_base EXCLUDE REGEX ".*/backend/rhi/")
 
 set(caus_backend_headers ${caus_backend_headers_base})
 set(caus_backend_sources ${caus_backend_sources_base})
-
-# Conditional: DX11
-if (CAUSTICA_WITH_DX11)
-    file(GLOB dx11_h include/backend/dx11/*.h)
-    file(GLOB dx11_cpp src/backend/dx11/*.cpp)
-    list(APPEND caus_backend_headers ${dx11_h})
-    list(APPEND caus_backend_sources ${dx11_cpp})
-endif()
 
 # Conditional: DX12
 if (CAUSTICA_WITH_DX12)
@@ -327,12 +318,6 @@ if (BUILD_TESTING)
     add_test(NAME causDeviceFactoryTests COMMAND causDeviceFactoryTests)
 endif()
 # Backend-specific link deps
-if (CAUSTICA_WITH_DX11)
-    if (NOT CAUSTICA_RHI_BUILD_SHARED)
-        target_link_libraries(causBackend PUBLIC caustica_rhi_d3d11)
-    endif()
-    target_link_libraries(causBackend PUBLIC d3d11 dxgi dxguid)
-endif()
 if (CAUSTICA_WITH_DX12)
     if (NOT CAUSTICA_RHI_BUILD_SHARED)
         target_link_libraries(causBackend PUBLIC caustica_rhi_d3d12)

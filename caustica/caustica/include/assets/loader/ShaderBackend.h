@@ -8,7 +8,6 @@ namespace caustica::shader
 
 enum class Backend : uint8_t
 {
-    D3D11,
     D3D12,
     Vulkan,
 };

@@ -66,7 +66,7 @@ namespace caustica::rhi
     {
     public:
         explicit CommandListResourceStateTracker(MessageCallback* messageCallback)
-            : m_MessageCallback(messageCallback)
+            : m_messageCallback(messageCallback)
         { }
 
         // CommandList-like interface
@@ -92,23 +92,23 @@ namespace caustica::rhi
         void keepTextureInitialStates();
         void commandListSubmitted();
 
-        [[nodiscard]] const std::vector<TextureBarrier>& getTextureBarriers() const { return m_TextureBarriers; }
-        [[nodiscard]] const std::vector<BufferBarrier>& getBufferBarriers() const { return m_BufferBarriers; }
-        void clearBarriers() { m_TextureBarriers.clear(); m_BufferBarriers.clear(); }
+        [[nodiscard]] const std::vector<TextureBarrier>& getTextureBarriers() const { return m_textureBarriers; }
+        [[nodiscard]] const std::vector<BufferBarrier>& getBufferBarriers() const { return m_bufferBarriers; }
+        void clearBarriers() { m_textureBarriers.clear(); m_bufferBarriers.clear(); }
 
     private:
-        MessageCallback* m_MessageCallback;
+        MessageCallback* m_messageCallback;
 
-        std::unordered_map<TextureStateExtension*, std::unique_ptr<TextureState>> m_TextureStates;
-        std::unordered_map<BufferStateExtension*, std::unique_ptr<BufferState>> m_BufferStates;
+        std::unordered_map<TextureStateExtension*, std::unique_ptr<TextureState>> m_textureStates;
+        std::unordered_map<BufferStateExtension*, std::unique_ptr<BufferState>> m_bufferStates;
 
         // Deferred transitions of textures and buffers to permanent states.
         // They are executed only when the command list is executed, not when the app calls setPermanentTextureState or setPermanentBufferState.
-        std::vector<std::pair<TextureStateExtension*, ResourceStates>> m_PermanentTextureStates;
-        std::vector<std::pair<BufferStateExtension*, ResourceStates>> m_PermanentBufferStates;
+        std::vector<std::pair<TextureStateExtension*, ResourceStates>> m_permanentTextureStates;
+        std::vector<std::pair<BufferStateExtension*, ResourceStates>> m_permanentBufferStates;
 
-        std::vector<TextureBarrier> m_TextureBarriers;
-        std::vector<BufferBarrier> m_BufferBarriers;
+        std::vector<TextureBarrier> m_textureBarriers;
+        std::vector<BufferBarrier> m_bufferBarriers;
 
         TextureState* getTextureStateTracking(TextureStateExtension* texture, bool allowCreate);
         BufferState* getBufferStateTracking(BufferStateExtension* buffer, bool allowCreate);

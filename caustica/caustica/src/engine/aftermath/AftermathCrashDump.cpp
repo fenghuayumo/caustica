@@ -119,8 +119,8 @@ uint64_t caustica::AftermathCrashDump::getShaderHashForBinary(std::pair<const vo
         return hash.hash;
     }
 #endif
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-    if (api == caustica::rhi::GraphicsAPI::D3D11 || api == caustica::rhi::GraphicsAPI::D3D12)
+#if CAUSTICA_WITH_DX12
+    if (api == caustica::rhi::GraphicsAPI::D3D12)
     {
         D3D12_SHADER_BYTECODE dxil = {};
         dxil.pShaderBytecode = shaderBinary.first;
@@ -143,7 +143,7 @@ void caustica::AftermathCrashDump::initializeAftermathCrashDump(AftermathCrashDu
     }
 
     uint32_t watchedApis = GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_None;
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
     watchedApis |= GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX;
 #endif
 #if CAUSTICA_WITH_VULKAN

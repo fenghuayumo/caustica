@@ -66,9 +66,9 @@
 #include <rhi/common/resourcebindingmap.h>
 #include <rhi/common/deferred-deletion.h>
 #include <rhi/utils.h>
-#include "../common/state-tracking.h"
-#include "../common/dxgi-format.h"
-#include "../common/versioning.h"
+#include "../common/StateTracking.h"
+#include "../common/DxgiFormat.h"
+#include "../common/Versioning.h"
 
 #ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
 #include "../internal/accel_struct/D3D12AccelStructManager.h"

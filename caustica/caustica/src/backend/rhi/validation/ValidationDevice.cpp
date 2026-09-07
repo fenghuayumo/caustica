@@ -1,4 +1,4 @@
-#include "validation-backend.h"
+#include "ValidationBackend.h"
 
 #include <rhi/utils.h>
 #include <rhi/common/misc.h>
@@ -42,25 +42,25 @@ namespace caustica::rhi::validation
     }
 
     DeviceWrapper::DeviceWrapper(Device* device)
-        : m_Device(device)
-        , m_MessageCallback(device->getMessageCallback())
+        : m_device(device)
+        , m_messageCallback(device->getMessageCallback())
     {
 
     }
 
     void DeviceWrapper::error(const std::string& messageText) const
     {
-        m_MessageCallback->message(MessageSeverity::Error, messageText.c_str());
+        m_messageCallback->message(MessageSeverity::Error, messageText.c_str());
     }
 
     void DeviceWrapper::warning(const std::string& messageText) const
     {
-        m_MessageCallback->message(MessageSeverity::Warning, messageText.c_str());
+        m_messageCallback->message(MessageSeverity::Warning, messageText.c_str());
     }
 
     Object DeviceWrapper::getNativeObject(ObjectType objectType)
     {
-        return m_Device->getNativeObject(objectType);
+        return m_device->getNativeObject(objectType);
     }
 
     HeapHandle DeviceWrapper::createHeap(const HeapDesc& d)
@@ -75,7 +75,7 @@ namespace caustica::rhi::validation
         if (patchedDesc.debugName.empty())
             patchedDesc.debugName = utils::GenerateHeapDebugName(patchedDesc);
 
-        return m_Device->createHeap(patchedDesc);
+        return m_device->createHeap(patchedDesc);
     }
 
     TextureHandle DeviceWrapper::createTexture(const TextureDesc& d)
@@ -221,7 +221,7 @@ namespace caustica::rhi::validation
         default:;
         }
 
-        if (d.isVirtual && !m_Device->queryFeatureSupport(Feature::VirtualResources))
+        if (d.isVirtual && !m_device->queryFeatureSupport(Feature::VirtualResources))
         {
             std::stringstream ss;
             ss << dimensionStr << " " << debugName << ": The device does not support virtual resources";
@@ -244,41 +244,41 @@ namespace caustica::rhi::validation
         if (patchedDesc.debugName.empty())
             patchedDesc.debugName = utils::GenerateTextureDebugName(patchedDesc);
 
-        return m_Device->createTexture(patchedDesc);
+        return m_device->createTexture(patchedDesc);
     }
 
     void DeviceWrapper::getTextureTiling(Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings)
     {
-        m_Device->getTextureTiling(texture, numTiles, desc, tileShape, subresourceTilingsNum, subresourceTilings);
+        m_device->getTextureTiling(texture, numTiles, desc, tileShape, subresourceTilingsNum, subresourceTilings);
     }
 
     void DeviceWrapper::updateTextureTileMappings(Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue)
     {
-        m_Device->updateTextureTileMappings(texture, tileMappings, numTileMappings, executionQueue);
+        m_device->updateTextureTileMappings(texture, tileMappings, numTileMappings, executionQueue);
     }
 
     SamplerFeedbackTextureHandle DeviceWrapper::createSamplerFeedbackTexture(Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc)
     {
-        const GraphicsAPI graphicsApi = m_Device->getGraphicsAPI();
+        const GraphicsAPI graphicsApi = m_device->getGraphicsAPI();
         if (graphicsApi != GraphicsAPI::D3D12)
         {
             std::stringstream ss;
-            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_Device->getGraphicsAPI()) << ") "
+            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_device->getGraphicsAPI()) << ") "
                 "doesn't support createSamplerFeedbackTexture";
             error(ss.str());
             return nullptr;
         }
 
-        return m_Device->createSamplerFeedbackTexture(pairedTexture, desc);
+        return m_device->createSamplerFeedbackTexture(pairedTexture, desc);
     }
 
     SamplerFeedbackTextureHandle DeviceWrapper::createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, Texture* pairedTexture)
     {
-        const GraphicsAPI graphicsApi = m_Device->getGraphicsAPI();
+        const GraphicsAPI graphicsApi = m_device->getGraphicsAPI();
         if (graphicsApi != GraphicsAPI::D3D12)
         {
             std::stringstream ss;
-            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_Device->getGraphicsAPI()) << ") "
+            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_device->getGraphicsAPI()) << ") "
                 "doesn't support createSamplerFeedbackForNativeTexture";
             error(ss.str());
             return nullptr;
@@ -295,7 +295,7 @@ namespace caustica::rhi::validation
             return MemoryRequirements();
         }
 
-        const MemoryRequirements memReq = m_Device->getTextureMemoryRequirements(texture);
+        const MemoryRequirements memReq = m_device->getTextureMemoryRequirements(texture);
 
         if (memReq.size == 0)
         {
@@ -336,7 +336,7 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        MemoryRequirements memReq = m_Device->getTextureMemoryRequirements(texture);
+        MemoryRequirements memReq = m_device->getTextureMemoryRequirements(texture);
 
         if (offset + memReq.size > heapDesc.capacity)
         {
@@ -362,12 +362,12 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        return m_Device->bindTextureMemory(texture, heap, offset);
+        return m_device->bindTextureMemory(texture, heap, offset);
     }
     
     TextureHandle DeviceWrapper::createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc)
     {
-        return m_Device->createHandleForNativeTexture(objectType, texture, desc);
+        return m_device->createHandleForNativeTexture(objectType, texture, desc);
     }
 
     StagingTextureHandle DeviceWrapper::createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess)
@@ -376,17 +376,17 @@ namespace caustica::rhi::validation
         if (patchedDesc.debugName.empty())
             patchedDesc.debugName = utils::GenerateTextureDebugName(patchedDesc);
 
-        return m_Device->createStagingTexture(patchedDesc, cpuAccess);
+        return m_device->createStagingTexture(patchedDesc, cpuAccess);
     }
 
     void * DeviceWrapper::mapStagingTexture(StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch)
     {
-        return m_Device->mapStagingTexture(tex, slice, cpuAccess, outRowPitch);
+        return m_device->mapStagingTexture(tex, slice, cpuAccess, outRowPitch);
     }
 
     void DeviceWrapper::unmapStagingTexture(StagingTexture* tex)
     {
-        m_Device->unmapStagingTexture(tex);
+        m_device->unmapStagingTexture(tex);
     }
 
     BufferHandle DeviceWrapper::createBuffer(const BufferDesc& d)
@@ -436,7 +436,7 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        if (d.isVirtual && !m_Device->queryFeatureSupport(Feature::VirtualResources))
+        if (d.isVirtual && !m_device->queryFeatureSupport(Feature::VirtualResources))
         {
             error("The device does not support virtual resources");
             return nullptr;
@@ -450,17 +450,17 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        return m_Device->createBuffer(patchedDesc);
+        return m_device->createBuffer(patchedDesc);
     }
 
     void * DeviceWrapper::mapBuffer(Buffer* b, CpuAccessMode mapFlags)
     {
-        return m_Device->mapBuffer(b, mapFlags);
+        return m_device->mapBuffer(b, mapFlags);
     }
 
     void DeviceWrapper::unmapBuffer(Buffer* b)
     {
-        m_Device->unmapBuffer(b);
+        m_device->unmapBuffer(b);
     }
 
     MemoryRequirements DeviceWrapper::getBufferMemoryRequirements(Buffer* buffer)
@@ -471,7 +471,7 @@ namespace caustica::rhi::validation
             return MemoryRequirements();
         }
 
-        const MemoryRequirements memReq = m_Device->getBufferMemoryRequirements(buffer);
+        const MemoryRequirements memReq = m_device->getBufferMemoryRequirements(buffer);
 
         if (memReq.size == 0)
         {
@@ -512,7 +512,7 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        MemoryRequirements memReq = m_Device->getBufferMemoryRequirements(buffer);
+        MemoryRequirements memReq = m_device->getBufferMemoryRequirements(buffer);
 
         if (offset + memReq.size > heapDesc.capacity)
         {
@@ -538,25 +538,25 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        return m_Device->bindBufferMemory(buffer, heap, offset);
+        return m_device->bindBufferMemory(buffer, heap, offset);
     }
 
     BufferHandle DeviceWrapper::createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc)
     {
-        return m_Device->createHandleForNativeBuffer(objectType, buffer, desc);
+        return m_device->createHandleForNativeBuffer(objectType, buffer, desc);
     }
 
     ShaderHandle DeviceWrapper::createShader(const ShaderDesc& d, const void* binary, const size_t binarySize)
     {
-        return m_Device->createShader(d, binary, binarySize);
+        return m_device->createShader(d, binary, binarySize);
     }
     
     ShaderHandle DeviceWrapper::createShaderSpecialization(Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants)
     {
-        if (!m_Device->queryFeatureSupport(Feature::ShaderSpecializations))
+        if (!m_device->queryFeatureSupport(Feature::ShaderSpecializations))
         {
             std::stringstream ss;
-            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_Device->getGraphicsAPI()) << ") "
+            ss << "The current graphics API (" << utils::GraphicsAPIToString(m_device->getGraphicsAPI()) << ") "
                 "doesn't support shader specializations";
             error(ss.str());
             return nullptr;
@@ -574,72 +574,72 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        return m_Device->createShaderSpecialization(baseShader, constants, numConstants);
+        return m_device->createShaderSpecialization(baseShader, constants, numConstants);
     }
 
     caustica::rhi::ShaderLibraryHandle DeviceWrapper::createShaderLibrary(const void* binary, const size_t binarySize)
     {
-        return m_Device->createShaderLibrary(binary, binarySize);
+        return m_device->createShaderLibrary(binary, binarySize);
     }
     
     SamplerHandle DeviceWrapper::createSampler(const SamplerDesc& d)
     {
-        return m_Device->createSampler(d);
+        return m_device->createSampler(d);
     }
 
     InputLayoutHandle DeviceWrapper::createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, Shader* vertexShader)
     {
-        return m_Device->createInputLayout(d, attributeCount, vertexShader);
+        return m_device->createInputLayout(d, attributeCount, vertexShader);
     }
 
     EventQueryHandle DeviceWrapper::createEventQuery()
     {
-        return m_Device->createEventQuery();
+        return m_device->createEventQuery();
     }
 
     void DeviceWrapper::setEventQuery(EventQuery* query, CommandQueue queue)
     {
-        m_Device->setEventQuery(query, queue);
+        m_device->setEventQuery(query, queue);
     }
 
     bool DeviceWrapper::pollEventQuery(EventQuery* query)
     {
-        return m_Device->pollEventQuery(query);
+        return m_device->pollEventQuery(query);
     }
 
     bool DeviceWrapper::waitEventQuery(EventQuery* query)
     {
-        return m_Device->waitEventQuery(query);
+        return m_device->waitEventQuery(query);
     }
 
     void DeviceWrapper::resetEventQuery(EventQuery* query)
     {
-        m_Device->resetEventQuery(query);
+        m_device->resetEventQuery(query);
     }
 
     TimerQueryHandle DeviceWrapper::createTimerQuery()
     {
-        return m_Device->createTimerQuery();
+        return m_device->createTimerQuery();
     }
 
     bool DeviceWrapper::pollTimerQuery(TimerQuery* query)
     {
-        return m_Device->pollTimerQuery(query);
+        return m_device->pollTimerQuery(query);
     }
 
     float DeviceWrapper::getTimerQueryTime(TimerQuery* query)
     {
-        return m_Device->getTimerQueryTime(query);
+        return m_device->getTimerQueryTime(query);
     }
 
     void DeviceWrapper::resetTimerQuery(TimerQuery* query)
     {
-        return m_Device->resetTimerQuery(query);
+        return m_device->resetTimerQuery(query);
     }
 
     GraphicsAPI DeviceWrapper::getGraphicsAPI()
     {
-        return m_Device->getGraphicsAPI();
+        return m_device->getGraphicsAPI();
     }
 
     FramebufferHandle DeviceWrapper::createFramebuffer(const FramebufferDesc& desc)
@@ -792,7 +792,7 @@ namespace caustica::rhi::validation
             }
         }
 
-        return m_Device->createFramebuffer(desc);
+        return m_device->createFramebuffer(desc);
     }
 
     static void UpdateBindingSummaryWithLocation(MessageCallback* messageCallback, ResourceType type,
@@ -951,7 +951,7 @@ namespace caustica::rhi::validation
         std::stringstream ssDuplicateBindings;
         std::stringstream ssOverlappingBindings;
 
-        bool const ignoreRegisterSpaces = (m_Device->getGraphicsAPI() == GraphicsAPI::D3D11);
+        bool const ignoreRegisterSpaces = false;
 
         for (Shader* shader : shaders)
         {
@@ -981,7 +981,7 @@ namespace caustica::rhi::validation
                                 continue;
 
                         BindingLocationSet duplicates;
-                        FillBindingLayoutSummary(m_MessageCallback, *layoutDesc, ignoreRegisterSpaces,
+                        FillBindingLayoutSummary(m_messageCallback, *layoutDesc, ignoreRegisterSpaces,
                             bindingsPerLayout[layoutIndex], duplicates);
 
                         // Layouts with duplicates should not have passed validation in createBindingLayout
@@ -1012,10 +1012,10 @@ namespace caustica::rhi::validation
 
                     anyDuplicateBindings = true;
                 }
-                else if (m_Device->getGraphicsAPI() == GraphicsAPI::D3D11)
+                else
                 {
-                    // Check for overlapping layouts on DX11, because the backend implements each binding set as a single
-                    // call to a function like PSSetShaderResources. If binding sets overlap, a set with higher index
+                    // Check for overlapping layouts because the backend implements each binding set as a single
+                    // call to a resource binding function. If binding sets overlap, a set with higher index
                     // will overwrite bindings from the lower-indexed sets, even if they are on different slots.
                     // Do this only when there are no duplicates, as with duplicates the layouts will always overlap.
 
@@ -1199,7 +1199,7 @@ namespace caustica::rhi::validation
             }
         }
 
-        if (renderState.rasterState.conservativeRasterEnable && !m_Device->queryFeatureSupport(Feature::ConservativeRasterization))
+        if (renderState.rasterState.conservativeRasterEnable && !m_device->queryFeatureSupport(Feature::ConservativeRasterization))
         {
             warning("Conservative rasterization is not supported on this device");
             return false;
@@ -1230,7 +1230,7 @@ namespace caustica::rhi::validation
         if (!validateRenderState(pipelineDesc.renderState, fbinfo))
             return nullptr;
 
-        return m_Device->createGraphicsPipeline(pipelineDesc, fbinfo);
+        return m_device->createGraphicsPipeline(pipelineDesc, fbinfo);
     }
 
     GraphicsPipelineHandle DeviceWrapper::createGraphicsPipeline(const GraphicsPipelineDesc& pipelineDesc, Framebuffer* fb)
@@ -1260,7 +1260,7 @@ namespace caustica::rhi::validation
         if (!validateShaderType(ShaderType::Compute, pipelineDesc.CS->getDesc(), "createComputePipeline"))
             return nullptr;
 
-        return m_Device->createComputePipeline(pipelineDesc);
+        return m_device->createComputePipeline(pipelineDesc);
     }
 
     MeshletPipelineHandle DeviceWrapper::createMeshletPipeline(const MeshletPipelineDesc& pipelineDesc, FramebufferInfo const& fbinfo)
@@ -1285,7 +1285,7 @@ namespace caustica::rhi::validation
         if (!validateRenderState(pipelineDesc.renderState, fbinfo))
             return nullptr;
 
-        return m_Device->createMeshletPipeline(pipelineDesc, fbinfo);
+        return m_device->createMeshletPipeline(pipelineDesc, fbinfo);
     }
 
     MeshletPipelineHandle DeviceWrapper::createMeshletPipeline(const MeshletPipelineDesc& pipelineDesc, Framebuffer* fb)
@@ -1301,19 +1301,19 @@ namespace caustica::rhi::validation
 
     caustica::rhi::rt::PipelineHandle DeviceWrapper::createRayTracingPipeline(const rt::PipelineDesc& desc)
     {
-        return m_Device->createRayTracingPipeline(desc);
+        return m_device->createRayTracingPipeline(desc);
     }
 
     BindingLayoutHandle DeviceWrapper::createBindingLayout(const BindingLayoutDesc& desc)
     {
         std::stringstream errorStream;
         bool anyErrors = false;
-        bool const ignoreRegisterSpaces = (m_Device->getGraphicsAPI() == GraphicsAPI::D3D11);
+        bool const ignoreRegisterSpaces = false;
 
         BindingSummary bindings;
         BindingLocationSet duplicates;
 
-        FillBindingLayoutSummary(m_MessageCallback, desc, ignoreRegisterSpaces, bindings, duplicates);
+        FillBindingLayoutSummary(m_messageCallback, desc, ignoreRegisterSpaces, bindings, duplicates);
 
         if (desc.visibility == ShaderType::None)
         {
@@ -1394,7 +1394,7 @@ namespace caustica::rhi::validation
             anyErrors = true;
         }
 
-        const GraphicsAPI graphicsApi = m_Device->getGraphicsAPI();
+        const GraphicsAPI graphicsApi = m_device->getGraphicsAPI();
         
         if (desc.registerSpace != 0 && graphicsApi == GraphicsAPI::VULKAN && !desc.registerSpaceIsDescriptorSet)
         {
@@ -1409,7 +1409,7 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        return m_Device->createBindingLayout(desc);
+        return m_device->createBindingLayout(desc);
     }
 
     BindingLayoutHandle DeviceWrapper::createBindlessLayout(const BindlessLayoutDesc& desc)
@@ -1484,7 +1484,7 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        return m_Device->createBindlessLayout(desc);
+        return m_device->createBindlessLayout(desc);
     }
 
     static bool textureDimensionsCompatible(TextureDimension resourceDimension, TextureDimension viewDimension)
@@ -1636,10 +1636,10 @@ namespace caustica::rhi::validation
         {
             Buffer* buffer = checked_cast<Buffer*>(binding.resourceHandle);
 
-            if (buffer == nullptr && binding.type != ResourceType::TypedBuffer_SRV && binding.type != ResourceType::TypedBuffer_UAV && m_Device->getGraphicsAPI() != GraphicsAPI::VULKAN)
+            if (buffer == nullptr && binding.type != ResourceType::TypedBuffer_SRV && binding.type != ResourceType::TypedBuffer_UAV && m_device->getGraphicsAPI() != GraphicsAPI::VULKAN)
             {
                 errorStream << "Null resource bindings are not allowed for buffers, unless it's a "
-                    "TypedBuffer_SRV or TypedBuffer_UAV type binding on DX11 or DX12." << std::endl;
+                    "TypedBuffer_SRV or TypedBuffer_UAV type binding on DX12." << std::endl;
                 return false;
             }
 
@@ -1810,18 +1810,18 @@ namespace caustica::rhi::validation
 
         std::stringstream errorStream;
         bool anyErrors = false;
-        bool const ignoreRegisterSpaces = (m_Device->getGraphicsAPI() == GraphicsAPI::D3D11);
+        bool const ignoreRegisterSpaces = false;
 
         BindingSummary layoutBindings;
         BindingLocationSet layoutDuplicates;
 
-        FillBindingLayoutSummary(m_MessageCallback, *layoutDesc, ignoreRegisterSpaces,
+        FillBindingLayoutSummary(m_messageCallback, *layoutDesc, ignoreRegisterSpaces,
             layoutBindings, layoutDuplicates);
 
         BindingSummary setBindings;
         BindingLocationSet setDuplicates;
 
-        FillBindingSetSummary(m_MessageCallback, desc, ignoreRegisterSpaces, layoutDesc->registerSpace,
+        FillBindingSetSummary(m_messageCallback, desc, ignoreRegisterSpaces, layoutDesc->registerSpace,
             setBindings, setDuplicates);
 
         BindingLocationSet declaredNotBound;
@@ -1867,7 +1867,7 @@ namespace caustica::rhi::validation
             binding.resourceHandle = unwrapResource(binding.resourceHandle);
         }
 
-        return m_Device->createBindingSet(patchedDesc, layout);
+        return m_device->createBindingSet(patchedDesc, layout);
     }
 
     DescriptorTableHandle DeviceWrapper::createDescriptorTable(BindingLayout* layout)
@@ -1878,12 +1878,12 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        return m_Device->createDescriptorTable(layout);
+        return m_device->createDescriptorTable(layout);
     }
 
     void DeviceWrapper::resizeDescriptorTable(DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents)
     {
-        m_Device->resizeDescriptorTable(descriptorTable, newSize, keepContents);
+        m_device->resizeDescriptorTable(descriptorTable, newSize, keepContents);
     }
 
     bool DeviceWrapper::writeDescriptorTable(DescriptorTable* descriptorTable, const BindingSetItem& item)
@@ -1899,7 +1899,7 @@ namespace caustica::rhi::validation
         BindingSetItem patchedItem = item;
         patchedItem.resourceHandle = unwrapResource(patchedItem.resourceHandle);
 
-        return m_Device->writeDescriptorTable(descriptorTable, patchedItem);
+        return m_device->writeDescriptorTable(descriptorTable, patchedItem);
     }
 
     rt::OpacityMicromapHandle DeviceWrapper::createOpacityMicromap(const rt::OpacityMicromapDesc& desc)
@@ -1916,7 +1916,7 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        rt::OpacityMicromapHandle omm = m_Device->createOpacityMicromap(desc);
+        rt::OpacityMicromapHandle omm = m_device->createOpacityMicromap(desc);
         if (!omm)
         {
             error("createOpacityMicromap returned nullptr");
@@ -1927,7 +1927,7 @@ namespace caustica::rhi::validation
 
     rt::AccelStructHandle DeviceWrapper::createAccelStruct(const rt::AccelStructDesc& desc)
     {
-        rt::AccelStructHandle as = m_Device->createAccelStruct(desc);
+        rt::AccelStructHandle as = m_device->createAccelStruct(desc);
 
         if (!as)
             return nullptr;
@@ -1964,7 +1964,7 @@ namespace caustica::rhi::validation
     rt::AccelStructBuildMemoryRequirements DeviceWrapper::getAccelStructBuildMemoryRequirements(
         const rt::AccelStructDesc& desc)
     {
-        return m_Device->getAccelStructBuildMemoryRequirements(desc);
+        return m_device->getAccelStructBuildMemoryRequirements(desc);
     }
 
     MemoryRequirements DeviceWrapper::getAccelStructMemoryRequirements(rt::AccelStruct* as)
@@ -1979,7 +1979,7 @@ namespace caustica::rhi::validation
         if (wrapper)
             as = wrapper->getUnderlyingObject();
 
-        const MemoryRequirements memReq = m_Device->getAccelStructMemoryRequirements(as);
+        const MemoryRequirements memReq = m_device->getAccelStructMemoryRequirements(as);
         
         return memReq;
     }
@@ -2108,7 +2108,7 @@ namespace caustica::rhi::validation
             return rt::cluster::OperationSizeInfo{};
         }
 
-        return m_Device->getClusterOperationSizeInfo(params);
+        return m_device->getClusterOperationSizeInfo(params);
     }
 
     bool DeviceWrapper::bindAccelStructMemory(rt::AccelStruct* as, Heap* heap, uint64_t offset)
@@ -2142,7 +2142,7 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        MemoryRequirements memReq = m_Device->getAccelStructMemoryRequirements(as);
+        MemoryRequirements memReq = m_device->getAccelStructMemoryRequirements(as);
 
         if (offset + memReq.size > heapDesc.capacity)
         {
@@ -2168,7 +2168,7 @@ namespace caustica::rhi::validation
             return false;
         }
 
-        return m_Device->bindAccelStructMemory(as, heap, offset);
+        return m_device->bindAccelStructMemory(as, heap, offset);
     }
 
     CommandListHandle DeviceWrapper::createCommandList(const CommandListParameters& params)
@@ -2180,7 +2180,7 @@ namespace caustica::rhi::validation
             break;
 
         case CommandQueue::Compute:
-            if (!m_Device->queryFeatureSupport(Feature::ComputeQueue))
+            if (!m_device->queryFeatureSupport(Feature::ComputeQueue))
             {
                 error("Compute queue is not supported or initialized in this device");
                 return nullptr;
@@ -2188,7 +2188,7 @@ namespace caustica::rhi::validation
             break;
 
         case CommandQueue::Copy:
-            if (!m_Device->queryFeatureSupport(Feature::CopyQueue))
+            if (!m_device->queryFeatureSupport(Feature::CopyQueue))
             {
                 error("Copy queue is not supported or initialized in this device");
                 return nullptr;
@@ -2201,15 +2201,12 @@ namespace caustica::rhi::validation
             return nullptr;
         }
 
-        CommandListHandle commandList = m_Device->createCommandList(params);
+        CommandListHandle commandList = m_device->createCommandList(params);
 
         if (commandList == nullptr)
             return nullptr;
 
-        // D3D11 is always immediate regardless of the deferred default on CommandListParameters.
-        const bool immediate = (m_Device->getGraphicsAPI() == GraphicsAPI::D3D11)
-            ? true
-            : params.enableImmediateExecution;
+        const bool immediate = params.enableImmediateExecution;
         CommandListWrapper* wrapper = new CommandListWrapper(this, commandList, immediate, params.queueType);
         return CommandListHandle::Create(wrapper);
     }
@@ -2260,47 +2257,47 @@ namespace caustica::rhi::validation
                 unwrappedCommandLists[i] = pCommandLists[i];
         }
 
-        return m_Device->executeCommandLists(unwrappedCommandLists.data(), unwrappedCommandLists.size(), executionQueue);
+        return m_device->executeCommandLists(unwrappedCommandLists.data(), unwrappedCommandLists.size(), executionQueue);
     }
 
     void DeviceWrapper::queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance)
     {
-        m_Device->queueWaitForCommandList(waitQueue, executionQueue, instance);
+        m_device->queueWaitForCommandList(waitQueue, executionQueue, instance);
     }
 
     bool DeviceWrapper::waitForIdle()
     {
-        return m_Device->waitForIdle();
+        return m_device->waitForIdle();
     }
 
     bool DeviceWrapper::isDeviceHealthy() const
     {
-        return m_Device->isDeviceHealthy();
+        return m_device->isDeviceHealthy();
     }
 
     void DeviceWrapper::runGarbageCollection()
     {
-        m_Device->runGarbageCollection();
+        m_device->runGarbageCollection();
     }
 
     bool DeviceWrapper::queryFeatureSupport(Feature feature, void* pInfo, size_t infoSize)
     {
-        return m_Device->queryFeatureSupport(feature, pInfo, infoSize);
+        return m_device->queryFeatureSupport(feature, pInfo, infoSize);
     }
 
     FormatSupport DeviceWrapper::queryFormatSupport(Format format)
     {
-        return m_Device->queryFormatSupport(format);
+        return m_device->queryFormatSupport(format);
     }
 
     coopvec::DeviceFeatures DeviceWrapper::queryCoopVecFeatures()
     {
-        return m_Device->queryCoopVecFeatures();
+        return m_device->queryCoopVecFeatures();
     }
 
     size_t DeviceWrapper::getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns)
     {
-        if (!m_Device->queryFeatureSupport(Feature::CooperativeVectorInferencing))
+        if (!m_device->queryFeatureSupport(Feature::CooperativeVectorInferencing))
         {
             error("getCoopVecMatrixSize: Cooperative Vectors are not supported by the device");
             return 0;
@@ -2312,27 +2309,27 @@ namespace caustica::rhi::validation
             return 0;
         }
         
-        return m_Device->getCoopVecMatrixSize(type, layout, rows, columns);
+        return m_device->getCoopVecMatrixSize(type, layout, rows, columns);
     }
 
     Object DeviceWrapper::getNativeQueue(ObjectType objectType, CommandQueue queue)
     {
-        return m_Device->getNativeQueue(objectType, queue);
+        return m_device->getNativeQueue(objectType, queue);
     }
 
     MessageCallback* DeviceWrapper::getMessageCallback()
     {
-        return m_MessageCallback;
+        return m_messageCallback;
     }
 
     bool DeviceWrapper::isAftermathEnabled()
     {
-        return m_Device->isAftermathEnabled();
+        return m_device->isAftermathEnabled();
     }
 
     AftermathCrashDumpHelper& DeviceWrapper::getAftermathCrashDumpHelper()
     {
-        return m_Device->getAftermathCrashDumpHelper();
+        return m_device->getAftermathCrashDumpHelper();
     }
 
     void Range::add(uint32_t item)

@@ -1,4 +1,4 @@
-#include "state-tracking.h"
+#include "StateTracking.h"
 
 #include <rhi/utils.h>
 
@@ -90,7 +90,7 @@ namespace caustica::rhi
             std::stringstream ss;
             ss << "Attempted to perform a permanent state transition on a subset of subresources of texture "
                 << utils::DebugNameToString(desc.debugName);
-            m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+            m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
             permanent = false;
         }
 
@@ -98,7 +98,7 @@ namespace caustica::rhi
 
         if (permanent)
         {
-            m_PermanentTextureStates.push_back(std::make_pair(texture, stateBits));
+            m_permanentTextureStates.push_back(std::make_pair(texture, stateBits));
             getTextureStateTracking(texture, true)->permanentTransition = true;
         }
     }
@@ -107,7 +107,7 @@ namespace caustica::rhi
     {
         requireBufferState(buffer, stateBits);
 
-        m_PermanentBufferStates.push_back(std::make_pair(buffer, stateBits));
+        m_permanentBufferStates.push_back(std::make_pair(buffer, stateBits));
     }
 
     ResourceStates CommandListResourceStateTracker::getTextureSubresourceState(TextureStateExtension* texture, ArraySlice arraySlice, MipLevel mipLevel)
@@ -142,7 +142,7 @@ namespace caustica::rhi
     {
         if (texture->permanentState != 0)
         {
-            verifyPermanentResourceState(texture->permanentState, state, true, texture->descRef.debugName, m_MessageCallback);
+            verifyPermanentResourceState(texture->permanentState, state, true, texture->descRef.debugName, m_messageCallback);
             return;
         }
 
@@ -156,7 +156,7 @@ namespace caustica::rhi
             ss << "Unknown prior state of texture " << utils::DebugNameToString(texture->descRef.debugName) << ". "
                 "Call CommandList::beginTrackingTextureState(...) before using the texture or use the "
                 "keepInitialState and initialState members of TextureDesc.";
-            m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+            m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
         }
         
         if (subresources.isEntireTexture(texture->descRef) && tracking->subresourceStates.empty())
@@ -174,7 +174,7 @@ namespace caustica::rhi
                 barrier.entireTexture = true;
                 barrier.stateBefore = tracking->state;
                 barrier.stateAfter = state;
-                m_TextureBarriers.push_back(barrier);
+                m_textureBarriers.push_back(barrier);
             }
 
             tracking->state = state;
@@ -214,7 +214,7 @@ namespace caustica::rhi
                             << " subresource (MipLevel = " << mipLevel << ", ArraySlice = " << arraySlice << "). "
                             "Call CommandList::beginTrackingTextureState(...) before using the texture or use the "
                             "keepInitialState and initialState members of TextureDesc.";
-                        m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+                        m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
                     }
                     
                     bool transitionNecessary = priorState != state;
@@ -230,7 +230,7 @@ namespace caustica::rhi
                         barrier.arraySlice = arraySlice;
                         barrier.stateBefore = priorState;
                         barrier.stateAfter = state;
-                        m_TextureBarriers.push_back(barrier);
+                        m_textureBarriers.push_back(barrier);
                     }
 
                     tracking->subresourceStates[subresourceIndex] = state;
@@ -252,7 +252,7 @@ namespace caustica::rhi
 
         if (buffer->permanentState != 0)
         {
-            verifyPermanentResourceState(buffer->permanentState, state, false, buffer->descRef.debugName, m_MessageCallback);
+            verifyPermanentResourceState(buffer->permanentState, state, false, buffer->descRef.debugName, m_messageCallback);
 
             return;
         }
@@ -271,7 +271,7 @@ namespace caustica::rhi
             ss << "Unknown prior state of buffer " << utils::DebugNameToString(buffer->descRef.debugName) << ". "
                 "Call CommandList::beginTrackingBufferState(...) before using the buffer or use the "
                 "keepInitialState and initialState members of BufferDesc.";
-            m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+            m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
         }
 
         bool transitionNecessary = tracking->state != state;
@@ -283,7 +283,7 @@ namespace caustica::rhi
             // See if this buffer is already used for a different purpose in this batch.
             // If it is, combine the state bits.
             // Example: same buffer used as index and vertex buffer, or as SRV and indirect arguments.
-            for (BufferBarrier& barrier : m_BufferBarriers)
+            for (BufferBarrier& barrier : m_bufferBarriers)
             {
                 if (barrier.buffer == buffer)
                 {
@@ -300,7 +300,7 @@ namespace caustica::rhi
             barrier.buffer = buffer;
             barrier.stateBefore = tracking->state;
             barrier.stateAfter = state;
-            m_BufferBarriers.push_back(barrier);
+            m_bufferBarriers.push_back(barrier);
         }
 
         if (uavNecessary && !transitionNecessary)
@@ -313,7 +313,7 @@ namespace caustica::rhi
 
     void CommandListResourceStateTracker::keepBufferInitialStates()
     {
-        for (auto& [buffer, tracking] : m_BufferStates)
+        for (auto& [buffer, tracking] : m_bufferStates)
         {
             if (buffer->descRef.keepInitialState && 
                 !buffer->permanentState &&
@@ -327,7 +327,7 @@ namespace caustica::rhi
 
     void CommandListResourceStateTracker::keepTextureInitialStates()
     {
-        for (auto& [texture, tracking] : m_TextureStates)
+        for (auto& [texture, tracking] : m_textureStates)
         {
             if (texture->descRef.keepInitialState && 
                 !texture->permanentState && 
@@ -342,51 +342,51 @@ namespace caustica::rhi
     {
         // Called from Device::executeCommandLists under the backend submit lock so
         // permanentState writeback is serialized across command lists.
-        for (auto [texture, state] : m_PermanentTextureStates)
+        for (auto [texture, state] : m_permanentTextureStates)
         {
             if (texture->permanentState != 0 && texture->permanentState != state)
             {
                 std::stringstream ss;
                 ss << "Attempted to switch permanent state of texture " << utils::DebugNameToString(texture->descRef.debugName)
                     << " from 0x" << std::hex << uint32_t(texture->permanentState) << " to 0x" << std::hex << uint32_t(state);
-                m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+                m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
                 continue;
             }
 
             texture->permanentState = state;
         }
-        m_PermanentTextureStates.clear();
+        m_permanentTextureStates.clear();
 
-        for (auto [buffer, state] : m_PermanentBufferStates)
+        for (auto [buffer, state] : m_permanentBufferStates)
         {
             if (buffer->permanentState != 0 && buffer->permanentState != state)
             {
                 std::stringstream ss;
                 ss << "Attempted to switch permanent state of buffer " << utils::DebugNameToString(buffer->descRef.debugName)
                     << " from 0x" << std::hex << uint32_t(buffer->permanentState) << " to 0x" << std::hex << uint32_t(state);
-                m_MessageCallback->message(MessageSeverity::Error, ss.str().c_str());
+                m_messageCallback->message(MessageSeverity::Error, ss.str().c_str());
                 continue;
             }
 
             buffer->permanentState = state;
         }
-        m_PermanentBufferStates.clear();
+        m_permanentBufferStates.clear();
 
-        for (const auto& [texture, stateTracking] : m_TextureStates)
+        for (const auto& [texture, stateTracking] : m_textureStates)
         {
             if (texture->descRef.keepInitialState && !texture->stateInitialized)
                 texture->stateInitialized = true;
         }
 
-        m_TextureStates.clear();
-        m_BufferStates.clear();
+        m_textureStates.clear();
+        m_bufferStates.clear();
     }
 
     TextureState* CommandListResourceStateTracker::getTextureStateTracking(TextureStateExtension* texture, bool allowCreate)
     {
-        auto it = m_TextureStates.find(texture);
+        auto it = m_textureStates.find(texture);
 
-        if (it != m_TextureStates.end())
+        if (it != m_textureStates.end())
         {
             return it->second.get();
         }
@@ -397,7 +397,7 @@ namespace caustica::rhi
         std::unique_ptr<TextureState> trackingRef = std::make_unique<TextureState>();
 
         TextureState* tracking = trackingRef.get();
-        m_TextureStates.insert(std::make_pair(texture, std::move(trackingRef)));
+        m_textureStates.insert(std::make_pair(texture, std::move(trackingRef)));
         
         if (texture->descRef.keepInitialState)
         {
@@ -409,9 +409,9 @@ namespace caustica::rhi
 
     BufferState* CommandListResourceStateTracker::getBufferStateTracking(BufferStateExtension* buffer, bool allowCreate)
     {
-        auto it = m_BufferStates.find(buffer);
+        auto it = m_bufferStates.find(buffer);
 
-        if (it != m_BufferStates.end())
+        if (it != m_bufferStates.end())
         {
             return it->second.get();
         }
@@ -422,7 +422,7 @@ namespace caustica::rhi
         std::unique_ptr<BufferState> trackingRef = std::make_unique<BufferState>();
 
         BufferState* tracking = trackingRef.get();
-        m_BufferStates.insert(std::make_pair(buffer, std::move(trackingRef)));
+        m_bufferStates.insert(std::make_pair(buffer, std::move(trackingRef)));
                                                    
         if (buffer->descRef.keepInitialState)
         {

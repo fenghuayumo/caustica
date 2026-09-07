@@ -106,10 +106,6 @@ namespace caustica::render
         void waitBeforeReleaseFeature();
         caustica::rhi::EventQueryHandle m_featureSyncQuery;
         
-    #if CAUSTICA_WITH_DX11
-        static std::unique_ptr<DLSS> createDX11(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
-            std::string const& directoryWithExecutable, uint32_t applicationID);
-    #endif
     #if CAUSTICA_WITH_DX12
         static std::unique_ptr<DLSS> createDX12(caustica::rhi::Device* device, caustica::ShaderFactory& shaderFactory,
             std::string const& directoryWithExecutable, uint32_t applicationID);

@@ -6,10 +6,6 @@
 #include <scene/View.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/passes/motion_vectors_ps.dxbc.h"
-#include "compiled_shaders/passes/taa_cs.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/motion_vectors_ps.dxil.h"
 #include "compiled_shaders/passes/taa_cs.dxil.h"

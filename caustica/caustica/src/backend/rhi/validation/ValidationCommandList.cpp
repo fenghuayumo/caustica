@@ -1,4 +1,4 @@
-#include "validation-backend.h"
+#include "ValidationBackend.h"
 
 #include <rhi/common/misc.h>
 #include <rhi/utils.h>
@@ -10,22 +10,22 @@ namespace caustica::rhi::validation
 {
 
     CommandListWrapper::CommandListWrapper(DeviceWrapper* device, CommandList* commandList, bool isImmediate, CommandQueue queueType)
-        : m_CommandList(commandList)
-        , m_Device(device)
-        , m_MessageCallback(device->getMessageCallback())
-        , m_IsImmediate(isImmediate)
+        : m_commandList(commandList)
+        , m_device(device)
+        , m_messageCallback(device->getMessageCallback())
+        , m_isImmediate(isImmediate)
         , m_type(queueType)
     {
     }
     
     void CommandListWrapper::error(const std::string& messageText) const
     {
-        m_MessageCallback->message(MessageSeverity::Error, messageText.c_str());
+        m_messageCallback->message(MessageSeverity::Error, messageText.c_str());
     }
 
     void CommandListWrapper::warning(const std::string& messageText) const
     {
-        m_MessageCallback->message(MessageSeverity::Warning, messageText.c_str());
+        m_messageCallback->message(MessageSeverity::Warning, messageText.c_str());
     }
 
     static const char* CommandListStateToString(CommandListState state)
@@ -61,12 +61,12 @@ namespace caustica::rhi::validation
 
     bool CommandListWrapper::requireOpenState() const
     {
-        if (m_State == CommandListState::OPEN)
+        if (m_state == CommandListState::OPEN)
             return true;
 
         std::stringstream ss;
         ss << "A command list must be opened before any rendering commands can be executed. "
-            "Actual state: " << CommandListStateToString(m_State);
+            "Actual state: " << CommandListStateToString(m_state);
         error(ss.str());
 
         return false;
@@ -74,7 +74,7 @@ namespace caustica::rhi::validation
 
     bool CommandListWrapper::requireExecuteState()
     {
-        switch (m_State)
+        switch (m_state)
         {
         case CommandListState::INITIAL:
             error("Cannot execute a command list before it is opened and then closed");
@@ -87,7 +87,7 @@ namespace caustica::rhi::validation
             break;
         }
 
-        m_State = CommandListState::INITIAL;
+        m_state = CommandListState::INITIAL;
         return true;
     }
 
@@ -108,18 +108,18 @@ namespace caustica::rhi::validation
 
     Object CommandListWrapper::getNativeObject(ObjectType objectType)
     {
-        return m_CommandList->getNativeObject(objectType);
+        return m_commandList->getNativeObject(objectType);
     }
 
     bool CommandListWrapper::open()
     {
-        switch (m_State)
+        switch (m_state)
         {
         case CommandListState::OPEN:
             error("Cannot open a command list that is already open");
             return false;
         case CommandListState::CLOSED:
-            if (m_IsImmediate)
+            if (m_isImmediate)
             {
                 error("An immediate command list cannot be abandoned and must be executed before it is re-opened");
                 return false;
@@ -134,34 +134,34 @@ namespace caustica::rhi::validation
             break;
         }
 
-        if (m_IsImmediate)
+        if (m_isImmediate)
         {
-            if (++m_Device->m_NumOpenImmediateCommandLists > 1)
+            if (++m_device->m_numOpenImmediateCommandLists > 1)
             {
                 error("Two or more immediate command lists cannot be open at the same time");
-                --m_Device->m_NumOpenImmediateCommandLists;
+                --m_device->m_numOpenImmediateCommandLists;
                 return false;
             }
         }
 
-        if (!m_CommandList->open())
+        if (!m_commandList->open())
         {
-            if (m_IsImmediate)
-                --m_Device->m_NumOpenImmediateCommandLists;
+            if (m_isImmediate)
+                --m_device->m_numOpenImmediateCommandLists;
             error("The backend failed to open the command list");
             return false;
         }
 
-        m_State = CommandListState::OPEN;
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = false;
+        m_state = CommandListState::OPEN;
+        m_graphicsStateSet = false;
+        m_computeStateSet = false;
+        m_meshletStateSet = false;
         return true;
     }
 
     void CommandListWrapper::close()
     {
-        switch (m_State)
+        switch (m_state)
         {
         case CommandListState::INITIAL:
             error("Cannot close a command list before it is opened");
@@ -174,17 +174,17 @@ namespace caustica::rhi::validation
             break;
         }
 
-        if (m_IsImmediate)
+        if (m_isImmediate)
         {
-            --m_Device->m_NumOpenImmediateCommandLists;
+            --m_device->m_numOpenImmediateCommandLists;
         }
 
-        m_CommandList->close();
+        m_commandList->close();
 
-        m_State = CommandListState::CLOSED;
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = false;
+        m_state = CommandListState::CLOSED;
+        m_graphicsStateSet = false;
+        m_computeStateSet = false;
+        m_meshletStateSet = false;
     }
 
     void CommandListWrapper::clearTextureFloat(Texture* t, TextureSubresourceSet subresources, const Color& clearColor)
@@ -225,7 +225,7 @@ namespace caustica::rhi::validation
             return;
         }
         
-        m_CommandList->clearTextureFloat(t, subresources, clearColor);
+        m_commandList->clearTextureFloat(t, subresources, clearColor);
     }
 
     void CommandListWrapper::clearDepthStencilTexture(Texture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil)
@@ -255,7 +255,7 @@ namespace caustica::rhi::validation
             return;
         }
 
-        m_CommandList->clearDepthStencilTexture(t, subresources, clearDepth, depth, clearStencil, stencil);
+        m_commandList->clearDepthStencilTexture(t, subresources, clearDepth, depth, clearStencil, stencil);
     }
 
     void CommandListWrapper::clearTextureUInt(Texture* t, TextureSubresourceSet subresources, uint32_t clearColor)
@@ -296,7 +296,7 @@ namespace caustica::rhi::validation
             return;
         }
 
-        m_CommandList->clearTextureUInt(t, subresources, clearColor);
+        m_commandList->clearTextureUInt(t, subresources, clearColor);
     }
 
     void CommandListWrapper::copyTexture(Texture* dest, const TextureSlice& destSlice, Texture* src, const TextureSlice& srcSlice)
@@ -304,7 +304,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
         
-        m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
+        m_commandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
     void CommandListWrapper::copyTexture(StagingTexture* dest, const TextureSlice& destSlice, Texture* src, const TextureSlice& srcSlice)
@@ -312,7 +312,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
+        m_commandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
     void CommandListWrapper::copyTexture(Texture* dest, const TextureSlice& destSlice, StagingTexture* src, const TextureSlice& srcSlice)
@@ -320,7 +320,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->copyTexture(dest, destSlice, src, srcSlice);
+        m_commandList->copyTexture(dest, destSlice, src, srcSlice);
     }
 
     void CommandListWrapper::writeTexture(Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch)
@@ -333,7 +333,7 @@ namespace caustica::rhi::validation
             error("writeTexture: rowPitch is 0 but dest has multiple rows");
         }
 
-        m_CommandList->writeTexture(dest, arraySlice, mipLevel, data, rowPitch, depthPitch);
+        m_commandList->writeTexture(dest, arraySlice, mipLevel, data, rowPitch, depthPitch);
     }
 
     void CommandListWrapper::resolveTexture(Texture* dest, const TextureSubresourceSet& dstSubresources, Texture* src, const TextureSubresourceSet& srcSubresources)
@@ -404,7 +404,7 @@ namespace caustica::rhi::validation
         if (anyErrors)
             return;
 
-        m_CommandList->resolveTexture(dest, dstSubresources, src, srcSubresources);
+        m_commandList->resolveTexture(dest, dstSubresources, src, srcSubresources);
     }
 
     void CommandListWrapper::writeBuffer(Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes)
@@ -430,7 +430,7 @@ namespace caustica::rhi::validation
             return;
         }
 
-        m_CommandList->writeBuffer(b, data, dataSize, destOffsetBytes);
+        m_commandList->writeBuffer(b, data, dataSize, destOffsetBytes);
     }
 
     void CommandListWrapper::clearBufferUInt(Buffer* b, uint32_t clearValue)
@@ -441,7 +441,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "clearBufferUInt"))
             return;
 
-        m_CommandList->clearBufferUInt(b, clearValue);
+        m_commandList->clearBufferUInt(b, clearValue);
     }
 
     void CommandListWrapper::copyBuffer(Buffer* dest, uint64_t destOffsetBytes, Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes)
@@ -449,22 +449,22 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->copyBuffer(dest, destOffsetBytes, src, srcOffsetBytes, dataSizeBytes);
+        m_commandList->copyBuffer(dest, destOffsetBytes, src, srcOffsetBytes, dataSizeBytes);
     }
 
     void CommandListWrapper::clearSamplerFeedbackTexture(SamplerFeedbackTexture* texture)
     {
-        m_CommandList->clearSamplerFeedbackTexture(texture);
+        m_commandList->clearSamplerFeedbackTexture(texture);
     }
 
     void CommandListWrapper::decodeSamplerFeedbackTexture(Buffer* buffer, SamplerFeedbackTexture* texture, caustica::rhi::Format format)
     {
-        m_CommandList->decodeSamplerFeedbackTexture(buffer, texture, format);
+        m_commandList->decodeSamplerFeedbackTexture(buffer, texture, format);
     }
 
     void CommandListWrapper::setSamplerFeedbackTextureState(SamplerFeedbackTexture* texture, ResourceStates stateBits)
     {
-        m_CommandList->setSamplerFeedbackTextureState(texture, stateBits);
+        m_commandList->setSamplerFeedbackTextureState(texture, stateBits);
     }
 
     bool CommandListWrapper::validateBindingSetsAgainstLayouts(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& layouts, const static_vector<BindingSet*, c_MaxBindingLayouts>& sets) const
@@ -521,7 +521,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        if (!m_GraphicsStateSet && !m_ComputeStateSet && !m_MeshletStateSet && !m_RayTracingStateSet)
+        if (!m_graphicsStateSet && !m_computeStateSet && !m_meshletStateSet && !m_rayTracingStateSet)
         {
             error("setPushConstants is only valid when a graphics, compute, meshlet, or ray tracing state is set");
             return;
@@ -535,22 +535,22 @@ namespace caustica::rhi::validation
             return;
         }
 
-        if (byteSize != m_PipelinePushConstantSize)
+        if (byteSize != m_pipelinePushConstantSize)
         {
             std::stringstream ss;
 
-            if (m_PipelinePushConstantSize == 0)
+            if (m_pipelinePushConstantSize == 0)
                 ss << "The current pipeline does not expect any push constants, so the setPushConstants call is invalid.";
             else
-                ss << "Push constant size (" << byteSize << " bytes) doesn't match the size expected by the pipeline (" << m_PipelinePushConstantSize << " bytes)";
+                ss << "Push constant size (" << byteSize << " bytes) doesn't match the size expected by the pipeline (" << m_pipelinePushConstantSize << " bytes)";
 
             error(ss.str());
             return;
         }
 
-        m_PushConstantsSet = true;
+        m_pushConstantsSet = true;
 
-        m_CommandList->setPushConstants(data, byteSize);
+        m_commandList->setPushConstants(data, byteSize);
     }
 
     void CommandListWrapper::setGraphicsState(const GraphicsState& state)
@@ -635,14 +635,14 @@ namespace caustica::rhi::validation
 
         evaluatePushConstantSize(state.pipeline->getDesc().bindingLayouts);
 
-        m_CommandList->setGraphicsState(state);
+        m_commandList->setGraphicsState(state);
 
-        m_GraphicsStateSet = true;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = false;
-        m_RayTracingStateSet = false;
-        m_PushConstantsSet = false;
-        m_CurrentGraphicsState = state;
+        m_graphicsStateSet = true;
+        m_computeStateSet = false;
+        m_meshletStateSet = false;
+        m_rayTracingStateSet = false;
+        m_pushConstantsSet = false;
+        m_currentGraphicsState = state;
     }
 
     void CommandListWrapper::draw(const DrawArguments& args)
@@ -653,7 +653,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "draw"))
             return;
 
-        if (!m_GraphicsStateSet)
+        if (!m_graphicsStateSet)
         {
             error("Graphics state is not set before a draw call.\n"
                 "Note that setting compute state invalidates the graphics state.");
@@ -663,7 +663,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("graphics", "setGraphicsState"))
             return;
 
-        m_CommandList->draw(args);
+        m_commandList->draw(args);
     }
 
     void CommandListWrapper::drawIndexed(const DrawArguments& args)
@@ -674,14 +674,14 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "drawIndexed"))
             return;
 
-        if (!m_GraphicsStateSet)
+        if (!m_graphicsStateSet)
         {
             error("Graphics state is not set before a drawIndexed call.\n"
                 "Note that setting compute state invalidates the graphics state.");
             return;
         }
 
-        if (m_CurrentGraphicsState.indexBuffer.buffer == nullptr)
+        if (m_currentGraphicsState.indexBuffer.buffer == nullptr)
         {
             error("Index buffer is not set before a drawIndexed call");
             return;
@@ -690,7 +690,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("graphics", "setGraphicsState"))
             return;
 
-        m_CommandList->drawIndexed(args);
+        m_commandList->drawIndexed(args);
     }
 
     void CommandListWrapper::drawIndirect(uint32_t offsetBytes, uint32_t drawCount)
@@ -701,14 +701,14 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "drawIndirect"))
             return;
 
-        if (!m_GraphicsStateSet)
+        if (!m_graphicsStateSet)
         {
             error("Graphics state is not set before a drawIndirect call.\n"
                 "Note that setting compute state invalidates the graphics state.");
             return;
         }
 
-        if (!m_CurrentGraphicsState.indirectParams)
+        if (!m_currentGraphicsState.indirectParams)
         {
             error("Indirect params buffer is not set before a drawIndirect call.");
             return;
@@ -717,7 +717,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("graphics", "setGraphicsState"))
             return;
 
-        m_CommandList->drawIndirect(offsetBytes, drawCount);
+        m_commandList->drawIndirect(offsetBytes, drawCount);
     }
 
     void CommandListWrapper::drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount)
@@ -728,14 +728,14 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "drawIndexedIndirect"))
             return;
 
-        if (!m_GraphicsStateSet)
+        if (!m_graphicsStateSet)
         {
             error("Graphics state is not set before a drawIndexedIndirect call.\n"
                 "Note that setting compute state invalidates the graphics state.");
             return;
         }
 
-        if (!m_CurrentGraphicsState.indirectParams)
+        if (!m_currentGraphicsState.indirectParams)
         {
             error("Indirect params buffer is not set before a drawIndexedIndirect call.");
             return;
@@ -744,7 +744,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("graphics", "setGraphicsState"))
             return;
 
-        m_CommandList->drawIndexedIndirect(offsetBytes, drawCount);
+        m_commandList->drawIndexedIndirect(offsetBytes, drawCount);
     }
 
     void CommandListWrapper::drawIndexedIndirectCount(uint32_t paramOffsetBytes, uint32_t countOffsetBytes, uint32_t maxDrawCount)
@@ -755,20 +755,20 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "drawIndexedIndirectCount"))
             return;
 
-        if (!m_GraphicsStateSet)
+        if (!m_graphicsStateSet)
         {
             error("Graphics state is not set before a drawIndexedIndirectCount call.\n"
                 "Note that setting compute state invalidates the graphics state.");
             return;
         }
 
-        if (!m_CurrentGraphicsState.indirectParams)
+        if (!m_currentGraphicsState.indirectParams)
         {
             error("Indirect params buffer is not set before a drawIndexedIndirectCount call.");
             return;
         }
 
-        if (!m_CurrentGraphicsState.indirectCountBuffer)
+        if (!m_currentGraphicsState.indirectCountBuffer)
         {
             error("Indirect count buffer is not set before a drawIndexedIndirectCount call.");
             return;
@@ -777,7 +777,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("graphics", "setGraphicsState"))
             return;
 
-        m_CommandList->drawIndexedIndirectCount(paramOffsetBytes, countOffsetBytes, maxDrawCount);
+        m_commandList->drawIndexedIndirectCount(paramOffsetBytes, countOffsetBytes, maxDrawCount);
     }
 
     void CommandListWrapper::setComputeState(const ComputeState& state)
@@ -821,14 +821,14 @@ namespace caustica::rhi::validation
 
         evaluatePushConstantSize(state.pipeline->getDesc().bindingLayouts);
 
-        m_CommandList->setComputeState(state);
+        m_commandList->setComputeState(state);
 
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = true;
-        m_MeshletStateSet = false;
-        m_RayTracingStateSet = false;
-        m_PushConstantsSet = false;
-        m_CurrentComputeState = state;
+        m_graphicsStateSet = false;
+        m_computeStateSet = true;
+        m_meshletStateSet = false;
+        m_rayTracingStateSet = false;
+        m_pushConstantsSet = false;
+        m_currentComputeState = state;
     }
 
     void CommandListWrapper::dispatch(uint32_t groupsX, uint32_t groupsY /*= 1*/, uint32_t groupsZ /*= 1*/)
@@ -839,7 +839,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "dispatch"))
             return;
 
-        if (!m_ComputeStateSet)
+        if (!m_computeStateSet)
         {
             error("Compute state is not set before a dispatch call.\n"
                 "Note that setting graphics state invalidates the compute state.");
@@ -849,7 +849,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("compute", "setComputeState"))
             return;
 
-        m_CommandList->dispatch(groupsX, groupsY, groupsZ);
+        m_commandList->dispatch(groupsX, groupsY, groupsZ);
     }
 
     void CommandListWrapper::dispatchIndirect(uint32_t offsetBytes)
@@ -860,14 +860,14 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "dispatchIndirect"))
             return;
 
-        if (!m_ComputeStateSet)
+        if (!m_computeStateSet)
         {
             error("Compute state is not set before a dispatchIndirect call.\n"
                 "Note that setting graphics state invalidates the compute state.");
             return;
         }
 
-        if (!m_CurrentComputeState.indirectParams)
+        if (!m_currentComputeState.indirectParams)
         {
             error("Indirect params buffer is not set before a dispatchIndirect call.");
             return;
@@ -876,7 +876,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("compute", "setComputeState"))
             return;
 
-        m_CommandList->dispatchIndirect(offsetBytes);
+        m_commandList->dispatchIndirect(offsetBytes);
     }
 
     void CommandListWrapper::setMeshletState(const MeshletState& state)
@@ -905,14 +905,14 @@ namespace caustica::rhi::validation
 
         evaluatePushConstantSize(state.pipeline->getDesc().bindingLayouts);
 
-        m_CommandList->setMeshletState(state);
+        m_commandList->setMeshletState(state);
 
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = true;
-        m_RayTracingStateSet = false;
-        m_PushConstantsSet = false;
-        m_CurrentMeshletState = state;
+        m_graphicsStateSet = false;
+        m_computeStateSet = false;
+        m_meshletStateSet = true;
+        m_rayTracingStateSet = false;
+        m_pushConstantsSet = false;
+        m_currentMeshletState = state;
     }
 
     void CommandListWrapper::dispatchMesh(uint32_t groupsX, uint32_t groupsY /*= 1*/, uint32_t groupsZ /*= 1*/)
@@ -923,7 +923,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Graphics, "dispatchMesh"))
             return;
 
-        if (!m_MeshletStateSet)
+        if (!m_meshletStateSet)
         {
             error("Meshlet state is not set before a dispatchMesh call.\n"
                 "Note that setting graphics or compute state invalidates the meshlet state.");
@@ -933,7 +933,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("meshlet", "setMeshletState"))
             return;
 
-        m_CommandList->dispatchMesh(groupsX, groupsY, groupsZ);
+        m_commandList->dispatchMesh(groupsX, groupsY, groupsZ);
     }
 
     void CommandListWrapper::beginTimerQuery(TimerQuery* query)
@@ -941,7 +941,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->beginTimerQuery(query);
+        m_commandList->beginTimerQuery(query);
     }
 
     void CommandListWrapper::endTimerQuery(TimerQuery* query)
@@ -949,7 +949,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->endTimerQuery(query);
+        m_commandList->endTimerQuery(query);
     }
 
     void CommandListWrapper::beginMarker(const char *name)
@@ -957,7 +957,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->beginMarker(name);
+        m_commandList->beginMarker(name);
     }
 
     void CommandListWrapper::endMarker()
@@ -965,7 +965,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->endMarker();
+        m_commandList->endMarker();
     }
 
     void CommandListWrapper::setEnableAutomaticBarriers(bool enable)
@@ -973,7 +973,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
         
-        m_CommandList->setEnableAutomaticBarriers(enable);
+        m_commandList->setEnableAutomaticBarriers(enable);
     }
 
     void CommandListWrapper::setResourceStatesForBindingSet(BindingSet* bindingSet)
@@ -981,7 +981,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setResourceStatesForBindingSet(bindingSet);
+        m_commandList->setResourceStatesForBindingSet(bindingSet);
     }
 
     void CommandListWrapper::setEnableUavBarriersForTexture(Texture* texture, bool enableBarriers)
@@ -992,7 +992,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "setEnableUavBarriersForTexture"))
             return;
 
-        m_CommandList->setEnableUavBarriersForTexture(texture, enableBarriers);
+        m_commandList->setEnableUavBarriersForTexture(texture, enableBarriers);
     }
 
     void CommandListWrapper::setEnableUavBarriersForBuffer(Buffer* buffer, bool enableBarriers)
@@ -1003,7 +1003,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "setEnableUavBarriersForBuffer"))
             return;
 
-        m_CommandList->setEnableUavBarriersForBuffer(buffer, enableBarriers);
+        m_commandList->setEnableUavBarriersForBuffer(buffer, enableBarriers);
     }
 
     void CommandListWrapper::beginTrackingTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
@@ -1011,7 +1011,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->beginTrackingTextureState(texture, subresources, stateBits);
+        m_commandList->beginTrackingTextureState(texture, subresources, stateBits);
     }
 
     void CommandListWrapper::beginTrackingBufferState(Buffer* buffer, ResourceStates stateBits)
@@ -1019,7 +1019,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->beginTrackingBufferState(buffer, stateBits);
+        m_commandList->beginTrackingBufferState(buffer, stateBits);
     }
 
     void CommandListWrapper::setTextureState(Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits)
@@ -1027,7 +1027,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setTextureState(texture, subresources, stateBits);
+        m_commandList->setTextureState(texture, subresources, stateBits);
     }
 
     void CommandListWrapper::setBufferState(Buffer* buffer, ResourceStates stateBits)
@@ -1035,7 +1035,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setBufferState(buffer, stateBits);
+        m_commandList->setBufferState(buffer, stateBits);
     }
 
     void CommandListWrapper::textureAliasingBarrier(Texture* before, Texture* after)
@@ -1043,7 +1043,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->textureAliasingBarrier(
+        m_commandList->textureAliasingBarrier(
             before ? checked_cast<Texture*>(unwrapResource(before)) : nullptr,
             after ? checked_cast<Texture*>(unwrapResource(after)) : nullptr);
     }
@@ -1053,7 +1053,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->bufferAliasingBarrier(
+        m_commandList->bufferAliasingBarrier(
             before ? checked_cast<Buffer*>(unwrapResource(before)) : nullptr,
             after ? checked_cast<Buffer*>(unwrapResource(after)) : nullptr);
     }
@@ -1063,7 +1063,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setAccelStructState(checked_cast<rt::AccelStruct*>(unwrapResource(as)), stateBits);
+        m_commandList->setAccelStructState(checked_cast<rt::AccelStruct*>(unwrapResource(as)), stateBits);
     }
 
     void CommandListWrapper::setPermanentTextureState(Texture* texture, ResourceStates stateBits)
@@ -1071,7 +1071,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setPermanentTextureState(texture, stateBits);
+        m_commandList->setPermanentTextureState(texture, stateBits);
     }
 
     void CommandListWrapper::setPermanentBufferState(Buffer* buffer, ResourceStates stateBits)
@@ -1079,7 +1079,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->setPermanentBufferState(buffer, stateBits);
+        m_commandList->setPermanentBufferState(buffer, stateBits);
     }
 
     void CommandListWrapper::commitBarriers()
@@ -1087,7 +1087,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_CommandList->commitBarriers();
+        m_commandList->commitBarriers();
     }
 
     ResourceStates CommandListWrapper::getTextureSubresourceState(Texture* texture, ArraySlice arraySlice, MipLevel mipLevel)
@@ -1095,7 +1095,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return ResourceStates::Common;
 
-        return m_CommandList->getTextureSubresourceState(texture, arraySlice, mipLevel);
+        return m_commandList->getTextureSubresourceState(texture, arraySlice, mipLevel);
     }
 
     ResourceStates CommandListWrapper::getBufferState(Buffer* buffer)
@@ -1103,7 +1103,7 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return ResourceStates::Common;
 
-        return m_CommandList->getBufferState(buffer);
+        return m_commandList->getBufferState(buffer);
     }
 
     void CommandListWrapper::clearState()
@@ -1111,23 +1111,23 @@ namespace caustica::rhi::validation
         if (!requireOpenState())
             return;
 
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = false;
-        m_RayTracingStateSet = false;
-        m_PushConstantsSet = false;
+        m_graphicsStateSet = false;
+        m_computeStateSet = false;
+        m_meshletStateSet = false;
+        m_rayTracingStateSet = false;
+        m_pushConstantsSet = false;
 
-        m_CommandList->clearState();
+        m_commandList->clearState();
     }
 
     Device* CommandListWrapper::getDevice()
     {
-        return m_Device;
+        return m_device;
     }
 
     const CommandListParameters& CommandListWrapper::getDesc()
     {
-        return m_CommandList->getDesc();
+        return m_commandList->getDesc();
     }
 
     void CommandListWrapper::setRayTracingState(const rt::State& state)
@@ -1140,14 +1140,14 @@ namespace caustica::rhi::validation
 
         evaluatePushConstantSize(state.shaderTable->getPipeline()->getDesc().globalBindingLayouts);
 
-        m_CommandList->setRayTracingState(state);
+        m_commandList->setRayTracingState(state);
 
-        m_GraphicsStateSet = false;
-        m_ComputeStateSet = false;
-        m_MeshletStateSet = true;
-        m_RayTracingStateSet = true;
-        m_PushConstantsSet = false;
-        m_CurrentRayTracingState = state;
+        m_graphicsStateSet = false;
+        m_computeStateSet = false;
+        m_meshletStateSet = true;
+        m_rayTracingStateSet = true;
+        m_pushConstantsSet = false;
+        m_currentRayTracingState = state;
     }
 
     void CommandListWrapper::dispatchRays(const rt::DispatchRaysArguments& args)
@@ -1158,7 +1158,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "dispatchRays"))
             return;
 
-        if (!m_RayTracingStateSet)
+        if (!m_rayTracingStateSet)
         {
             error("Ray tracing state is not set before a dispatchRays call.\n"
                 "Note that setting graphics or compute state invalidates the ray tracing state.");
@@ -1168,7 +1168,7 @@ namespace caustica::rhi::validation
         if (!validatePushConstants("ray tracing", "setRayTracingState"))
             return;
 
-        m_CommandList->dispatchRays(args);
+        m_commandList->dispatchRays(args);
     }
 
     void CommandListWrapper::compactBottomLevelAccelStructs()
@@ -1179,7 +1179,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "compactBottomLevelAccelStructs"))
             return;
 
-        m_CommandList->compactBottomLevelAccelStructs();
+        m_commandList->compactBottomLevelAccelStructs();
     }
 
     void CommandListWrapper::buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) 
@@ -1190,7 +1190,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "buildOpacityMicromap"))
             return;
 
-        m_CommandList->buildOpacityMicromap(omm, desc);
+        m_commandList->buildOpacityMicromap(omm, desc);
     }
 
     void CommandListWrapper::buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags)
@@ -1227,7 +1227,7 @@ namespace caustica::rhi::validation
                         switch (triangles.indexFormat)  // NOLINT(clang-diagnostic-switch-enum)
                         {
                         case Format::R8_UINT:
-                            if (m_Device->getGraphicsAPI() != GraphicsAPI::VULKAN)
+                            if (m_device->getGraphicsAPI() != GraphicsAPI::VULKAN)
                             {
                                 std::stringstream ss;
                                 ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
@@ -1441,7 +1441,7 @@ namespace caustica::rhi::validation
                         ss << "BLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build geometry " << i
                             << " is of type AABB but has useTransform = true, "
                             "which is unsupported, and the transform will be ignored";
-                        m_MessageCallback->message(MessageSeverity::Warning, ss.str().c_str());
+                        m_messageCallback->message(MessageSeverity::Warning, ss.str().c_str());
                     }
                 }
                 else if (geom.geometryType == rt::GeometryType::Spheres)
@@ -1574,7 +1574,7 @@ namespace caustica::rhi::validation
             wrapper->buildGeometries.assign(pGeometries, pGeometries + numGeometries);
         }
 
-        m_CommandList->buildBottomLevelAccelStruct(underlyingAS, pGeometries, numGeometries, buildFlags);
+        m_commandList->buildBottomLevelAccelStruct(underlyingAS, pGeometries, numGeometries, buildFlags);
     }
 
     bool CommandListWrapper::validateBuildTopLevelAccelStruct(AccelStructWrapper* wrapper, size_t numInstances, rt::AccelStructBuildFlags buildFlags) const
@@ -1715,14 +1715,14 @@ namespace caustica::rhi::validation
                     ss << "TLAS " << utils::DebugNameToString(as->getDesc().debugName) << " build instance " << i
                         << " has instanceMask = 0, which means the instance "
                         "will never be included in any ray intersections";
-                    m_MessageCallback->message(MessageSeverity::Warning, ss.str().c_str());
+                    m_messageCallback->message(MessageSeverity::Warning, ss.str().c_str());
                 }
             }
             
             wrapper->wasBuilt = true;
             wrapper->buildInstances = numInstances;
         }
-        m_CommandList->buildTopLevelAccelStruct(underlyingAS, patchedInstances.data(), uint32_t(patchedInstances.size()), buildFlags);
+        m_commandList->buildTopLevelAccelStruct(underlyingAS, patchedInstances.data(), uint32_t(patchedInstances.size()), buildFlags);
     }
 
     void CommandListWrapper::buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances, rt::AccelStructBuildFlags buildFlags)
@@ -1777,7 +1777,7 @@ namespace caustica::rhi::validation
             return;
         }
 
-        m_CommandList->buildTopLevelAccelStructFromBuffer(underlyingAS, instanceBuffer, instanceBufferOffset, numInstances, buildFlags);
+        m_commandList->buildTopLevelAccelStructFromBuffer(underlyingAS, instanceBuffer, instanceBufferOffset, numInstances, buildFlags);
     }
 
     void CommandListWrapper::executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc)
@@ -1788,7 +1788,7 @@ namespace caustica::rhi::validation
         if (!requireType(CommandQueue::Compute, "executeMultiIndirectClusterOperation"))
             return;
 
-        if (!m_Device->validateClusterOperationParams(desc.params))
+        if (!m_device->validateClusterOperationParams(desc.params))
             return;
 
         if (desc.inIndirectArgCountBuffer == nullptr && desc.params.maxArgCount == 0)
@@ -1839,12 +1839,12 @@ namespace caustica::rhi::validation
             }
         }
 
-        m_CommandList->executeMultiIndirectClusterOperation(desc);
+        m_commandList->executeMultiIndirectClusterOperation(desc);
     }
 
     void CommandListWrapper::convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs)
     {
-        if (!m_Device->queryFeatureSupport(Feature::CooperativeVectorInferencing))
+        if (!m_device->queryFeatureSupport(Feature::CooperativeVectorInferencing))
         {
             error("convertCoopVecMatrices: Cooperative Vectors are not supported by the device");
             return;
@@ -1870,7 +1870,7 @@ namespace caustica::rhi::validation
                 return;
             }
 
-            if (!desc.dst.buffer->getDesc().canHaveUAVs && m_Device->getGraphicsAPI() == GraphicsAPI::D3D12)
+            if (!desc.dst.buffer->getDesc().canHaveUAVs && m_device->getGraphicsAPI() == GraphicsAPI::D3D12)
             {
                 std::stringstream ss;
                 ss << "convertCoopVecMatrices: dst.buffer " << utils::DebugNameToString(desc.dst.buffer->getDesc().debugName)
@@ -1889,12 +1889,12 @@ namespace caustica::rhi::validation
             }
         }
 
-        m_CommandList->convertCoopVecMatrices(convertDescs, numDescs);
+        m_commandList->convertCoopVecMatrices(convertDescs, numDescs);
     }
 
     void CommandListWrapper::evaluatePushConstantSize(const caustica::rhi::BindingLayoutVector& bindingLayouts)
     {
-        m_PipelinePushConstantSize = 0;
+        m_pipelinePushConstantSize = 0;
 
         // Find the first PushConstants entry.
         // Assumes that the binding layout vector has been validated for duplicated push constants entries.
@@ -1910,7 +1910,7 @@ namespace caustica::rhi::validation
             {
                 if (item.type == ResourceType::PushConstants)
                 {
-                    m_PipelinePushConstantSize = item.size;
+                    m_pipelinePushConstantSize = item.size;
                     return;
                 }
             }
@@ -1919,10 +1919,10 @@ namespace caustica::rhi::validation
 
     bool CommandListWrapper::validatePushConstants(const char* pipelineType, const char* stateFunctionName) const
     {
-        if (m_PipelinePushConstantSize != 0 && !m_PushConstantsSet)
+        if (m_pipelinePushConstantSize != 0 && !m_pushConstantsSet)
         {
             std::stringstream ss;
-            ss << "The " << pipelineType << " pipeline expects push constants (" << m_PipelinePushConstantSize << " bytes) that were not set." << std::endl;
+            ss << "The " << pipelineType << " pipeline expects push constants (" << m_pipelinePushConstantSize << " bytes) that were not set." << std::endl;
             ss << "Push constants must be set after each call to " << stateFunctionName << ".";
 
             error(ss.str());
