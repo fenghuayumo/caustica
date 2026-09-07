@@ -69,7 +69,7 @@ void ToolbarSeparator(ImDrawList* dl, float height)
 
 } // namespace
 
-void caustica::editor::GetTransformGizmoToolbarSize(float& width, float& height)
+void GetTransformGizmoToolbarSize(float& width, float& height)
 {
     // Select | Move | Rotate | Scale | Space | Snap | Grid | Lights | Material
     constexpr int toolCount = 9;
@@ -79,7 +79,7 @@ void caustica::editor::GetTransformGizmoToolbarSize(float& width, float& height)
     height = kBtn + kPad * 2.f;
 }
 
-void caustica::editor::BuildTransformGizmoToolbar(EditorUIState& editorUI)
+void BuildTransformGizmoToolbar(EditorUIState& editorUI)
 {
     const auto operation = static_cast<ImGuizmo::OPERATION>(editorUI.GizmoOperation);
     const auto mode = static_cast<ImGuizmo::MODE>(editorUI.GizmoMode);
