@@ -38,7 +38,7 @@ bool ToneMappingParameters::loadCameraLut(const std::string& path, std::string* 
 {
     try
     {
-        std::ifstream stream(std::filesystem::u8path(path));
+        std::ifstream stream(std::filesystem::path(reinterpret_cast<const char8_t*>(path.c_str())));
         if (!stream)
             throw std::runtime_error("Cannot open camera LUT: " + path);
 

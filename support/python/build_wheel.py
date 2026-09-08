@@ -173,12 +173,17 @@ def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) 
     return pack_path
 
 
+def _is_elf(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) == b"\x7fELF"
+    except OSError:
+        return False
+
+
 def _set_linux_origin_rpath(path: Path) -> None:
-    """Make a shared object look next to itself so a site-packages wheel works."""
-    if os.name == "nt":
-        return
-    name = path.name
-    if not (name.endswith(".so") or ".so." in name):
+    """Make ELF binaries look next to themselves so a relocated package works."""
+    if os.name == "nt" or not _is_elf(path):
         return
     patchelf = shutil.which("patchelf")
     if not patchelf:

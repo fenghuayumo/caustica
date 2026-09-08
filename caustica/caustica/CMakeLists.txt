@@ -87,6 +87,10 @@ set(CAUSTICA_COMMON_INCLUDE_PRIVATE
 )
 
 set(CAUSTICA_COMMON_COMPILE_DEFS
+    # Scratch-registry scene import runs on Affinity::IO while Logic uses App::world().
+    # EnTT's sequential type_index is a process-wide counter; without this it races
+    # when two threads first-touch different component types (occasional segfault).
+    ENTT_USE_ATOMIC
     CAUSTICA_WITH_DX11=$<BOOL:${CAUSTICA_WITH_DX11}>
     CAUSTICA_WITH_DX12=$<BOOL:${CAUSTICA_WITH_DX12}>
     CAUSTICA_WITH_VULKAN=$<BOOL:${CAUSTICA_WITH_VULKAN}>

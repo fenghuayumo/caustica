@@ -43,8 +43,10 @@ SceneManager::SceneManager(caustica::GpuDevice&                     device,
                                 const std::filesystem::path& path)
     {
         // Import into pending only — never publish m_scene from the worker thread.
-        m_pendingScene = loadSceneToPending(std::move(fs), path);
-        return m_pendingScene != nullptr;
+        auto pending = loadSceneToPending(std::move(fs), path);
+        const bool ok = pending != nullptr;
+        m_pendingScene.store(std::move(pending), std::memory_order_release);
+        return ok;
     });
 }
 
@@ -198,7 +200,7 @@ void SceneManager::clearScene()
     // a second time, racing a duplicate GPU teardown with the new import/frame.
     m_loader.reset();
     m_scene.reset();
-    m_pendingScene.reset();
+    m_pendingScene.store({}, std::memory_order_release);
 }
 
 void SceneManager::retargetCurrentScene(
@@ -261,8 +263,7 @@ std::shared_ptr<caustica::Scene> SceneManager::loadSceneToPending(
 
 void SceneManager::promotePendingScene()
 {
-    m_scene = std::move(m_pendingScene);
-    m_pendingScene.reset();
+    m_scene = m_pendingScene.exchange({}, std::memory_order_acq_rel);
 }
 
 void SceneManager::setAsyncLoadingEnabled(bool enabled)
@@ -282,7 +283,7 @@ void SceneManager::setLoadingCallbacks(std::function<void()> onLoaded,
         if (onUnloading)
             onUnloading();
         m_scene.reset();
-        m_pendingScene.reset();
+        m_pendingScene.store({}, std::memory_order_release);
     };
 }
 
@@ -309,7 +310,7 @@ void SceneManager::updateLoading()
 
     if (wasLoading && !m_loader.isLoading() && !m_loader.isLoaded())
     {
-        m_pendingScene.reset();
+        m_pendingScene.store({}, std::memory_order_release);
         m_scene.reset();
         if (m_onLoadFailed)
             m_onLoadFailed();

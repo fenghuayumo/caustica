@@ -17,6 +17,10 @@ namespace caustica
 // Owns the load TaskHandle and loading state. The actual load work is
 // injected via setLoadFunc(). Call update() once per frame to join a
 // finished task and fire the onLoaded callback.
+//
+// Import runs on Affinity::IO against a scratch EnTT registry. Logic keeps
+// using App::world() concurrently — ENTT_USE_ATOMIC is required so type_index
+// first-touch from those two threads cannot race.
 // =============================================================================
 class SceneLoader
 {

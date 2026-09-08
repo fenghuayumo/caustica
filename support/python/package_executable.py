@@ -3,7 +3,9 @@ from __future__ import annotations
 """Assemble a portable Caustica executable package from bin/."""
 
 import argparse
+import os
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -12,6 +14,9 @@ from build_wheel import (
     DIST_DIR,
     PROJECT_VERSION,
     RUNTIME_DIR_NAMES,
+    _copy_file,
+    _copy_tree,
+    _runtime_libs_to_copy,
     directory_size,
     shader_types_for_api,
     write_shader_pack,
@@ -19,20 +24,19 @@ from build_wheel import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNTIME_DLL_SUFFIXES = {".dll", ".so", ".dylib"}
+SYSTEM_LIB_PREFIXES = ("/lib/", "/lib64/", "/usr/lib/", "/usr/lib64/")
 
 
-def _copy_file(src: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
+def executable_name() -> str:
+    return "caustica.exe" if os.name == "nt" else "caustica"
 
 
-def _copy_tree(src: Path, dest: Path) -> None:
-    if not src.is_dir():
-        return
-    if dest.exists():
-        shutil.rmtree(dest)
-    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(".git"))
+def package_tag() -> str:
+    if os.name == "nt":
+        return "windows-x64"
+    machine = os.uname().machine.lower()
+    arch = "x64" if machine in {"x86_64", "amd64"} else machine
+    return f"linux-{arch}"
 
 
 def _copy_assets(stage_dir: Path, assets: str) -> None:
@@ -44,15 +48,43 @@ def _copy_assets(stage_dir: Path, assets: str) -> None:
     if assets == "full":
         if not (full_assets / "pack.json").is_file():
             raise FileNotFoundError(f"Full asset pack not found: {full_assets / 'pack.json'}")
-        _copy_tree(full_assets, stage_dir / "Assets")
+        _copy_tree(full_assets, stage_dir / "Assets", ignore_names=(".git",))
         return
 
     if builtin.is_dir():
-        _copy_tree(builtin, stage_dir / "Assets")
+        _copy_tree(builtin, stage_dir / "Assets", ignore_names=(".git",))
     elif (full_assets / "pack.json").is_file():
-        _copy_tree(full_assets, stage_dir / "Assets")
+        _copy_tree(full_assets, stage_dir / "Assets", ignore_names=(".git",))
     else:
         raise FileNotFoundError("Neither assets-builtin nor Assets/pack.json is available")
+
+
+def _copy_missing_needed_libs(source_binary: Path, stage_dir: Path) -> None:
+    """Copy non-system NEEDED libs (e.g. conda libpython) next to the executable."""
+    if os.name == "nt" or not source_binary.is_file():
+        return
+    try:
+        output = subprocess.check_output(["ldd", str(source_binary)], text=True, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.CalledProcessError):
+        return
+
+    for line in output.splitlines():
+        if "=>" not in line:
+            continue
+        _, _, rest = line.strip().partition("=>")
+        path_text = rest.strip().split(" ")[0]
+        if path_text in {"", "not"}:
+            continue
+        src = Path(path_text)
+        if not src.is_file():
+            continue
+        resolved = str(src.resolve())
+        if any(resolved.startswith(prefix) for prefix in SYSTEM_LIB_PREFIXES):
+            continue
+        dest = stage_dir / src.name
+        if dest.exists():
+            continue
+        _copy_file(src, dest)
 
 
 def assemble_package(
@@ -66,7 +98,7 @@ def assemble_package(
     if not BIN_DIR.is_dir():
         raise FileNotFoundError(f"{BIN_DIR} does not exist. Build caustica first.")
 
-    executable = BIN_DIR / "caustica.exe"
+    executable = BIN_DIR / executable_name()
     if not executable.is_file():
         raise FileNotFoundError(f"Executable not found: {executable}")
 
@@ -76,18 +108,17 @@ def assemble_package(
 
     _copy_file(executable, stage_dir / executable.name)
 
-    # CMake deploys the native runtime beside the executable. Include every
-    # shared library and Streamline JSON manifest, while leaving tests/PDBs and
-    # build tools out of the portable package.
-    for path in BIN_DIR.iterdir():
-        if not path.is_file():
-            continue
-        suffix = path.suffix.lower()
-        if suffix in RUNTIME_DLL_SUFFIXES or (path.name.lower().startswith("sl.") and suffix == ".json"):
-            _copy_file(path, stage_dir / path.name)
+    # CMake deploys the native runtime beside the executable. Reuse the wheel
+    # filter so versioned Linux SONAMEs (DLSS/OIDN) are included and unused
+    # HIP/SYCL stacks are left out.
+    for path in _runtime_libs_to_copy():
+        _copy_file(path, stage_dir / path.name)
+    _copy_missing_needed_libs(executable, stage_dir)
 
     for directory_name in RUNTIME_DIR_NAMES:
-        _copy_tree(BIN_DIR / directory_name, stage_dir / directory_name)
+        src = BIN_DIR / directory_name
+        if src.is_dir():
+            _copy_tree(src, stage_dir / directory_name)
 
     # Copy the checked-in examples directly instead of relying on the generated
     # bin/PythonExamples directory, which may contain stale scripts from older
@@ -129,8 +160,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-dir", type=Path, default=DIST_DIR)
     parser.add_argument("--assets", choices=["minimal", "full", "none"], default="minimal")
-    parser.add_argument("--dynamic-shaders", choices=["bin", "full", "none"], default="bin")
-    parser.add_argument("--shader-api", choices=["d3d12", "vulkan", "both"], default="d3d12")
+    parser.add_argument("--dynamic-shaders", choices=["bin", "full", "none"], default="none")
+    parser.add_argument(
+        "--shader-api",
+        choices=["d3d12", "vulkan", "both"],
+        default="d3d12" if os.name == "nt" else "vulkan",
+    )
     parser.add_argument("--shader-pack", dest="shader_pack", action="store_true", default=True)
     parser.add_argument("--no-shader-pack", dest="shader_pack", action="store_false")
     parser.add_argument("--no-zip", action="store_true", help="Keep only the unpacked directory")
@@ -140,7 +175,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.resolve()
-    package_name = f"caustica-{PROJECT_VERSION}-windows-x64"
+    package_name = f"caustica-{PROJECT_VERSION}-{package_tag()}"
     stage_dir = output_dir / package_name
     zip_path = output_dir / f"{package_name}.zip"
 
