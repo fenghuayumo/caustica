@@ -137,4 +137,4 @@ private:
     size_type current_size = 0;
 };
 
-} // namespace caustica::rhi 
+} // namespace caustica::rhi

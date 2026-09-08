@@ -94,13 +94,13 @@ namespace caustica::rhi::utils
 
         int allocate();
         void release(int index);
-        [[nodiscard]] size_t getCapacity() const { return m_Allocated.size(); }
+        [[nodiscard]] size_t getCapacity() const { return m_allocated.size(); }
 
     private:
-        int m_NextAvailable = 0;
-        std::vector<bool> m_Allocated;
-        bool m_MultiThreaded;
-        std::mutex m_Mutex;
+        int m_nextAvailable = 0;
+        std::vector<bool> m_allocated;
+        bool m_multiThreaded;
+        std::mutex m_mutex;
     };
 
     // Automatic begin/end marker for command list

@@ -1,0 +1,1315 @@
+#pragma once
+
+#include <rhi/d3d12.h>
+
+#ifndef CAUSTICA_RHI_D3D12_WITH_NVAPI
+#define CAUSTICA_RHI_D3D12_WITH_NVAPI 0
+#endif
+
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI
+#include <dxgi.h>
+#include <nvapi.h>
+#endif
+
+#include <rhi/common/aftermath.h>
+#if CAUSTICA_RHI_WITH_AFTERMATH
+#include <GFSDK_Aftermath.h>
+#endif
+
+// If using the Agility SDK version of OMM, ignore the NVAPI version
+#if CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP
+    #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (0)
+#else
+    // There's no version check available in the nvapi header,
+    // instead to check if the NvAPI linked is OMM compatible version (>520) we look for one of the defines it adds...
+    #if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_OPACITY_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
+        #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (1)
+    #else
+        #define CAUSTICA_RHI_WITH_NVAPI_OPACITY_MICROMAP (0)
+    #endif
+#endif
+
+// ... same for DMM compatible versions (>=535) we look for one of the defines it adds
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_DISPLACEMENT_MICROMAP_ARRAY_PREBUILD_INFO_PARAMS_VER)
+#define CAUSTICA_RHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (1)
+#else
+#define CAUSTICA_RHI_WITH_NVAPI_DISPLACEMENT_MICROMAP (0)
+#endif
+
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && defined(NVAPI_GET_RAYTRACING_MULTI_INDIRECT_CLUSTER_OPERATION_REQUIREMENTS_INFO_PARAMS_VER)
+#define CAUSTICA_RHI_WITH_NVAPI_CLUSTERS (1)
+#else
+#define CAUSTICA_RHI_WITH_NVAPI_CLUSTERS (0)
+#endif
+
+// Line-Swept Spheres were added in NVAPI SDK 572.18
+#if CAUSTICA_RHI_D3D12_WITH_NVAPI && !CAUSTICA_RHI_D3D12_WITH_DXR12_OPACITY_MICROMAP && (NVAPI_SDK_VERSION >= 57218)
+#define CAUSTICA_RHI_WITH_NVAPI_LSS (1)
+#else
+#define CAUSTICA_RHI_WITH_NVAPI_LSS (0)
+#endif
+
+#if D3D12_PREVIEW_SDK_VERSION == 717
+#define CAUSTICA_RHI_D3D12_WITH_COOPVEC (1)
+#else
+#define CAUSTICA_RHI_D3D12_WITH_COOPVEC (0)
+#endif
+
+#include <bitset>
+#include <memory>
+#include <queue>
+#include <list>
+#include <mutex>
+#include <unordered_map>
+#include <utility>
+
+#include <rhi/common/resourcebindingmap.h>
+#include <rhi/common/deferred-deletion.h>
+#include <rhi/utils.h>
+#include "../common/StateTracking.h"
+#include "../common/DxgiFormat.h"
+#include "../common/Versioning.h"
+
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+#include "../internal/accel_struct/D3D12AccelStructManager.h"
+#endif
+
+namespace caustica::rhi::d3d12
+{
+    class RootSignature;
+    class Buffer;
+    class CommandList;
+    class Device;
+    struct Context;
+
+    typedef uint32_t RootParameterIndex;
+    typedef uint32_t OptionalResourceState; // D3D12_RESOURCE_STATES + unknown value
+
+    constexpr RootParameterIndex c_InvalidRootParameterIndex = ~0u; // Used to skip mutable descriptor set
+    constexpr DescriptorIndex c_InvalidDescriptorIndex = ~0u;
+    constexpr OptionalResourceState c_ResourceStateUnknown = ~0u;
+
+    D3D12_SHADER_VISIBILITY convertShaderStage(ShaderType s);
+    D3D12_BLEND convertBlendValue(BlendFactor value);
+    D3D12_BLEND_OP convertBlendOp(BlendOp value);
+    D3D12_STENCIL_OP convertStencilOp(StencilOp value);
+    D3D12_COMPARISON_FUNC convertComparisonFunc(ComparisonFunc value);
+    D3D_PRIMITIVE_TOPOLOGY convertPrimitiveType(PrimitiveType pt, uint32_t controlPoints);
+    D3D12_TEXTURE_ADDRESS_MODE convertSamplerAddressMode(SamplerAddressMode mode);
+    UINT convertSamplerReductionType(SamplerReductionType reductionType);
+    D3D12_SHADING_RATE convertPixelShadingRate(VariableShadingRate shadingRate);
+    D3D12_SHADING_RATE_COMBINER convertShadingRateCombiner(ShadingRateCombiner combiner);
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
+    D3D12_LINEAR_ALGEBRA_DATATYPE convertCoopVecDataType(coopvec::DataType type);
+    coopvec::DataType convertCoopVecDataType(D3D12_LINEAR_ALGEBRA_DATATYPE type);
+    D3D12_LINEAR_ALGEBRA_MATRIX_LAYOUT convertCoopVecMatrixLayout(coopvec::MatrixLayout layout);
+#endif
+
+    bool WaitForFence(ID3D12Fence* fence, uint64_t value, HANDLE event);
+    uint32_t calcSubresource(uint32_t MipSlice, uint32_t ArraySlice, uint32_t PlaneSlice, uint32_t MipLevels, uint32_t ArraySize);
+    void TranslateBlendState(const BlendState& inState, D3D12_BLEND_DESC& outState);
+    void TranslateDepthStencilState(const DepthStencilState& inState, D3D12_DEPTH_STENCIL_DESC& outState);
+    void TranslateRasterizerState(const RasterState& inState, D3D12_RASTERIZER_DESC& outState);
+
+    struct Context
+    {
+        RefCountPtr<ID3D12Device> device;
+        RefCountPtr<ID3D12Device2> device2;
+        RefCountPtr<ID3D12Device5> device5;
+        RefCountPtr<ID3D12Device8> device8;
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
+        RefCountPtr<ID3D12DevicePreview> devicePreview;
+#endif
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::unique_ptr<caustica::rhi::internal::DxAccelStructManager> accelStructManager;
+#endif
+
+        RefCountPtr<ID3D12CommandSignature> drawIndirectSignature;
+        RefCountPtr<ID3D12CommandSignature> drawIndexedIndirectSignature;
+        RefCountPtr<ID3D12CommandSignature> dispatchIndirectSignature;
+        RefCountPtr<ID3D12QueryHeap> timerQueryHeap;
+        RefCountPtr<Buffer> timerQueryResolveBuffer;
+
+        bool logBufferLifetime = false;
+        MessageCallback* messageCallback = nullptr;
+        // Owned by Device; used to defer ID3D12Resource release past lastUseFence.
+        DeferredDeletionQueue* deferredDeletion = nullptr;
+        void error(const std::string& message) const;
+        void info(const std::string& message) const;
+    };
+
+    class StaticDescriptorHeap : public DescriptorHeap
+    {
+    private:
+        const Context& m_context;
+        RefCountPtr<ID3D12DescriptorHeap> m_heap;
+        RefCountPtr<ID3D12DescriptorHeap> m_shaderVisibleHeap;
+        D3D12_DESCRIPTOR_HEAP_TYPE m_heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        D3D12_CPU_DESCRIPTOR_HANDLE m_startCpuHandle = { 0 };
+        D3D12_CPU_DESCRIPTOR_HANDLE m_startCpuHandleShaderVisible = { 0 };
+        D3D12_GPU_DESCRIPTOR_HANDLE m_startGpuHandleShaderVisible = { 0 };
+        uint32_t m_stride = 0;
+        uint32_t m_numDescriptors = 0;
+        std::vector<bool> m_allocatedDescriptors;
+        DescriptorIndex m_searchStart = 0;
+        uint32_t m_numAllocatedDescriptors = 0;
+        std::mutex m_mutex;
+
+        HRESULT Grow(uint32_t minRequiredSize);
+    public:
+        explicit StaticDescriptorHeap(const Context& context);
+
+        HRESULT allocateResources(D3D12_DESCRIPTOR_HEAP_TYPE heapType, uint32_t numDescriptors, bool shaderVisible);
+        void copyToShaderVisibleHeap(DescriptorIndex index, uint32_t count = 1);
+
+        DescriptorIndex allocateDescriptors(uint32_t count) override;
+        DescriptorIndex allocateDescriptor() override;
+        void releaseDescriptors(DescriptorIndex baseIndex, uint32_t count) override;
+        void releaseDescriptor(DescriptorIndex index) override;
+        D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(DescriptorIndex index) override;
+        D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandleShaderVisible(DescriptorIndex index) override;
+        D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(DescriptorIndex index) override;
+        [[nodiscard]] ID3D12DescriptorHeap* getHeap() const override;
+        [[nodiscard]] ID3D12DescriptorHeap* getShaderVisibleHeap() const override;
+    };
+
+    class DeviceResources
+    {
+    public:
+        StaticDescriptorHeap renderTargetViewHeap;
+        StaticDescriptorHeap depthStencilViewHeap;
+        StaticDescriptorHeap shaderResourceViewHeap;
+        StaticDescriptorHeap samplerHeap;
+        utils::BitSetAllocator timerQueries;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::mutex asListMutex;
+        std::vector<uint64_t> asBuildsCompleted;
+#endif
+
+        // The cache does not own the RS objects, so store weak references
+        std::unordered_map<size_t, RootSignature*> rootsigCache;
+
+        explicit DeviceResources(const Context& context, const DeviceDesc& desc);
+
+        uint8_t getFormatPlaneCount(DXGI_FORMAT format);
+
+    private:
+        const Context& m_context;
+        std::unordered_map<DXGI_FORMAT, uint8_t> m_dxgiFormatPlaneCounts;
+    };
+
+
+    class Shader : public RefCounter<rhi::Shader>
+    {
+    public:
+        ShaderDesc desc;
+        std::vector<char> bytecode;
+    #if CAUSTICA_RHI_D3D12_WITH_NVAPI
+        std::vector<NVAPI_D3D12_PSO_EXTENSION_DESC*> extensions;
+        std::vector<NV_CUSTOM_SEMANTIC> customSemantics;
+        std::vector<uint32_t> coordinateSwizzling;
+    #endif
+
+        const ShaderDesc& getDesc() const override { return desc; }
+        void getBytecode(const void** ppBytecode, size_t* pSize) const override;
+    };
+
+    class ShaderLibrary;
+
+    class ShaderLibraryEntry : public RefCounter<rhi::Shader>
+    {
+    public:
+        ShaderDesc desc;
+        RefCountPtr<ShaderLibrary> library;
+
+        ShaderLibraryEntry(ShaderLibrary* pLibrary, const char* entryName, ShaderType shaderType)
+            : library(pLibrary)
+        {
+            desc.shaderType = shaderType;
+            desc.entryName = entryName;
+        }
+
+        const ShaderDesc& getDesc() const override { return desc; }
+        void getBytecode(const void** ppBytecode, size_t* pSize) const override;
+    };
+
+    class ShaderLibrary : public RefCounter<rhi::ShaderLibrary>
+    {
+    public:
+        std::vector<char> bytecode;
+
+        void getBytecode(const void** ppBytecode, size_t* pSize) const override;
+        ShaderHandle getShader(const char* entryName, ShaderType shaderType) override;
+    };
+
+    class Heap : public RefCounter<rhi::Heap>
+    {
+    public:
+        HeapDesc desc;
+        RefCountPtr<ID3D12Heap> heap;
+
+        const HeapDesc& getDesc() override { return desc; }
+    };
+
+    class Texture : public RefCounter<rhi::Texture>, public TextureStateExtension
+    {
+    public:
+        const TextureDesc desc;
+        const D3D12_RESOURCE_DESC resourceDesc;
+        RefCountPtr<ID3D12Resource> resource;
+        uint8_t planeCount = 1;
+        HANDLE sharedHandle = nullptr;
+        HeapHandle heap;
+
+
+        Texture(const Context& context, DeviceResources& resources, TextureDesc desc, const D3D12_RESOURCE_DESC& resourceDesc)
+            : TextureStateExtension(this->desc)
+            , desc(std::move(desc))
+            , resourceDesc(resourceDesc)
+            , m_context(context)
+            , m_resources(resources)
+        {
+            TextureStateExtension::stateInitialized = true;
+        }
+
+        ~Texture() override;
+
+        const TextureDesc& getDesc() const override { return desc; }
+
+        Object getNativeObject(ObjectType objectType) override;
+        Object getNativeView(ObjectType objectType, Format format, TextureSubresourceSet subresources, TextureDimension dimension, bool isReadOnlyDSV = false) override;
+
+        void postCreate();
+        void createSRV(size_t descriptor, Format format, TextureDimension dimension, TextureSubresourceSet subresources) const;
+        void createUAV(size_t descriptor, Format format, TextureDimension dimension, TextureSubresourceSet subresources) const;
+        void createRTV(size_t descriptor, Format format, TextureSubresourceSet subresources) const;
+        void createDSV(size_t descriptor, TextureSubresourceSet subresources, bool isReadOnly = false) const;
+        DescriptorIndex getClearMipLevelUAV(uint32_t mipLevel);
+
+    private:
+        const Context& m_context;
+        DeviceResources& m_resources;
+
+        TextureBindingKey_HashMap<DescriptorIndex> m_renderTargetViews;
+        TextureBindingKey_HashMap<DescriptorIndex> m_depthStencilViews;
+        TextureBindingKey_HashMap<DescriptorIndex> m_customSRVs;
+        TextureBindingKey_HashMap<DescriptorIndex> m_customUAVs;
+        std::vector<DescriptorIndex> m_clearMipLevelUAVs;
+    };
+
+    class Buffer : public RefCounter<rhi::Buffer>, public BufferStateExtension
+    {
+    public:
+        const BufferDesc desc;
+        RefCountPtr<ID3D12Resource> resource;
+        D3D12_GPU_VIRTUAL_ADDRESS gpuVA{};
+        D3D12_RESOURCE_DESC resourceDesc{};
+
+        HeapHandle heap;
+
+        RefCountPtr<ID3D12Fence> lastUseFence;
+        uint64_t lastUseFenceValue = 0;
+        HANDLE sharedHandle = nullptr;
+
+        Buffer(const Context& context, DeviceResources& resources, BufferDesc desc)
+            : BufferStateExtension(this->desc)
+            , desc(std::move(desc))
+            , m_context(context)
+            , m_resources(resources)
+        { }
+
+        ~Buffer() override;
+
+        const BufferDesc& getDesc() const override { return desc; }
+        GpuVirtualAddress getGpuVirtualAddress() const override { return gpuVA; }
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        void postCreate();
+        DescriptorIndex getClearUAV();
+        void createCBV(size_t descriptor, BufferRange range) const;
+        void createSRV(size_t descriptor, Format format, BufferRange range, ResourceType type) const;
+        void createUAV(size_t descriptor, Format format, BufferRange range, ResourceType type) const;
+        static void createNullSRV(size_t descriptor, Format format, const Context& context);
+        static void createNullUAV(size_t descriptor, Format format, const Context& context);
+
+    private:
+        const Context& m_context;
+        DeviceResources& m_resources;
+        DescriptorIndex m_clearUAV = c_InvalidDescriptorIndex;
+    };
+
+    class StagingTexture : public RefCounter<rhi::StagingTexture>
+    {
+    public:
+        TextureDesc desc;
+        D3D12_RESOURCE_DESC resourceDesc{};
+        RefCountPtr<Buffer> buffer;
+        CpuAccessMode cpuAccess = CpuAccessMode::None;
+        std::vector<UINT64> subresourceOffsets;
+
+        RefCountPtr<ID3D12Fence> lastUseFence;
+        uint64_t lastUseFenceValue = 0;
+
+        struct SliceRegion
+        {
+            // offset and size in bytes of this region inside the buffer
+            off_t offset = 0;
+            size_t size = 0;
+
+            D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+        };
+
+        SliceRegion mappedRegion;
+        CpuAccessMode mappedAccess = CpuAccessMode::None;
+
+        // returns a SliceRegion struct corresponding to the subresource that slice points at
+        // note that this always returns the entire subresource
+        SliceRegion getSliceRegion(ID3D12Device *device, const TextureSlice& slice);
+
+        // returns the total size in bytes required for this staging texture
+        size_t getSizeInBytes(ID3D12Device *device);
+
+        void computeSubresourceOffsets(ID3D12Device *device);
+
+        const TextureDesc& getDesc() const override { return desc; }
+        Object getNativeObject(ObjectType objectType) override;
+    };
+
+    class SamplerFeedbackTexture : public RefCounter<rhi::SamplerFeedbackTexture>, public TextureStateExtension
+    {
+    public:
+        const SamplerFeedbackTextureDesc desc;
+        const TextureDesc textureDesc; // used with state tracking
+        RefCountPtr<ID3D12Resource> resource;
+        TextureHandle pairedTexture;
+        DescriptorIndex clearDescriptorIndex = c_InvalidDescriptorIndex;
+
+        SamplerFeedbackTexture(const Context& context, SamplerFeedbackTextureDesc desc, TextureDesc textureDesc, rhi::Texture* pairedTexture)
+            : TextureStateExtension(SamplerFeedbackTexture::textureDesc)
+            , desc(std::move(desc))
+            , textureDesc(std::move(textureDesc))
+            , pairedTexture(pairedTexture)
+            , m_context(context)
+        {
+            TextureStateExtension::stateInitialized = true;
+            TextureStateExtension::isSamplerFeedback = true;
+        }
+
+        const SamplerFeedbackTextureDesc& getDesc() const override { return desc; }
+        TextureHandle getPairedTexture() override { return pairedTexture; }
+
+        void createUAV(size_t descriptor) const;
+
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        const Context& m_context;
+    };
+
+    class Sampler : public RefCounter<rhi::Sampler>
+    {
+    public:
+        Sampler(const Context& context, const SamplerDesc& desc);
+
+        void createDescriptor(size_t descriptor) const;
+
+        const SamplerDesc& getDesc() const override { return m_desc; }
+
+    private:
+        const Context& m_context;
+        const SamplerDesc m_desc;
+        D3D12_SAMPLER_DESC m_d3d12desc;
+    };
+
+    class InputLayout : public RefCounter<rhi::InputLayout>
+    {
+    public:
+        std::vector<VertexAttributeDesc> attributes;
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
+
+        // maps a binding slot to an element stride
+        std::unordered_map<uint32_t, uint32_t> elementStrides;
+
+        uint32_t getNumAttributes() const override;
+        const VertexAttributeDesc* getAttributeDesc(uint32_t index) const override;
+    };
+
+    class EventQuery : public RefCounter<rhi::EventQuery>
+    {
+    public:
+        RefCountPtr<ID3D12Fence> fence;
+        uint64_t fenceCounter = 0;
+        bool started = false;
+        bool resolved = false;
+    };
+
+    class TimerQuery : public RefCounter<rhi::TimerQuery>
+    {
+    public:
+        uint32_t beginQueryIndex = 0;
+        uint32_t endQueryIndex = 0;
+
+        RefCountPtr<ID3D12Fence> fence;
+        uint64_t fenceCounter = 0;
+        CommandQueue queue = CommandQueue::Graphics;
+
+        bool started = false;
+        bool resolved = false;
+        float time = 0.f;
+
+        TimerQuery(DeviceResources& resources)
+            : m_resources(resources)
+        { }
+
+        ~TimerQuery() override;
+
+    private:
+        DeviceResources& m_resources;
+    };
+
+    class BindingLayout : public RefCounter<rhi::BindingLayout>
+    {
+    public:
+        BindingLayoutDesc desc;
+        uint32_t pushConstantByteSize = 0;
+        RootParameterIndex rootParameterPushConstants = ~0u;
+        RootParameterIndex rootParameterSRVetc = ~0u;
+        RootParameterIndex rootParameterSamplers = ~0u;
+        int descriptorTableSizeSRVetc = 0;
+        int descriptorTableSizeSamplers = 0;
+        std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorRangesSRVetc;
+        std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorRangesSamplers;
+        std::vector<BindingLayoutItem> bindingLayoutsSRVetc;
+        static_vector<std::pair<RootParameterIndex, D3D12_ROOT_DESCRIPTOR1>, c_MaxVolatileConstantBuffersPerLayout> rootParametersVolatileCB;
+        static_vector<D3D12_ROOT_PARAMETER1, 32> rootParameters;
+
+        BindingLayout(const BindingLayoutDesc& desc);
+
+        const BindingLayoutDesc* getDesc() const override { return &desc; }
+        const BindlessLayoutDesc* getBindlessDesc() const override { return nullptr; }
+    };
+
+    class BindlessLayout : public RefCounter<rhi::BindingLayout>
+    {
+    public:
+        BindlessLayoutDesc desc;
+        static_vector<D3D12_DESCRIPTOR_RANGE1, 32> descriptorRanges;
+        D3D12_ROOT_PARAMETER1 rootParameter{};
+
+        BindlessLayout(const BindlessLayoutDesc& desc);
+
+        const BindingLayoutDesc* getDesc() const override { return nullptr; }
+        const BindlessLayoutDesc* getBindlessDesc() const override { return &desc; }
+    };
+
+    class RootSignature : public RefCounter<rhi::Resource>
+    {
+    public:
+        size_t hash = 0;
+        static_vector<std::pair<BindingLayoutHandle, RootParameterIndex>, c_MaxBindingLayouts> pipelineLayouts;
+        RefCountPtr<ID3D12RootSignature> handle;
+        uint32_t pushConstantByteSize = 0;
+        RootParameterIndex rootParameterPushConstants = ~0u;
+
+        RootSignature(DeviceResources& resources)
+            : m_resources(resources)
+        { }
+
+        ~RootSignature() override;
+        Object getNativeObject(ObjectType objectType) override;
+
+    private:
+        DeviceResources& m_resources;
+    };
+
+    class Framebuffer : public RefCounter<rhi::Framebuffer>
+    {
+    public:
+        FramebufferDesc desc;
+        FramebufferInfoEx framebufferInfo;
+
+        static_vector<TextureHandle, c_MaxRenderTargets + 1> textures;
+        static_vector<DescriptorIndex, c_MaxRenderTargets> RTVs;
+        DescriptorIndex DSV = c_InvalidDescriptorIndex;
+        uint32_t rtWidth = 0;
+        uint32_t rtHeight = 0;
+
+        Framebuffer(DeviceResources& resources)
+            : m_resources(resources)
+        { }
+
+        ~Framebuffer() override;
+
+        const FramebufferDesc& getDesc() const override { return desc; }
+        const FramebufferInfoEx& getFramebufferInfo() const override { return framebufferInfo; }
+
+    private:
+        DeviceResources& m_resources;
+    };
+
+    struct DX12_ViewportState
+    {
+        UINT numViewports = 0;
+        D3D12_VIEWPORT viewports[16] = {};
+        UINT numScissorRects = 0;
+        D3D12_RECT scissorRects[16] = {};
+    };
+
+    class GraphicsPipeline : public RefCounter<rhi::GraphicsPipeline>
+    {
+    public:
+        GraphicsPipelineDesc desc;
+        FramebufferInfo framebufferInfo;
+
+        RefCountPtr<RootSignature> rootSignature;
+        RefCountPtr<ID3D12PipelineState> pipelineState;
+
+        bool requiresBlendFactor = false;
+
+        const GraphicsPipelineDesc& getDesc() const override { return desc; }
+        const FramebufferInfo& getFramebufferInfo() const override { return framebufferInfo; }
+        Object getNativeObject(ObjectType objectType) override;
+    };
+
+    class ComputePipeline : public RefCounter<rhi::ComputePipeline>
+    {
+    public:
+        ComputePipelineDesc desc;
+
+        RefCountPtr<RootSignature> rootSignature;
+        RefCountPtr<ID3D12PipelineState> pipelineState;
+
+        const ComputePipelineDesc& getDesc() const override { return desc; }
+        Object getNativeObject(ObjectType objectType) override;
+    };
+
+    class MeshletPipeline : public RefCounter<rhi::MeshletPipeline>
+    {
+    public:
+        MeshletPipelineDesc desc;
+        FramebufferInfo framebufferInfo;
+
+        RefCountPtr<RootSignature> rootSignature;
+        RefCountPtr<ID3D12PipelineState> pipelineState;
+
+        DX12_ViewportState viewportState;
+
+        bool requiresBlendFactor = false;
+
+        const MeshletPipelineDesc& getDesc() const override { return desc; }
+        const FramebufferInfo& getFramebufferInfo() const override { return framebufferInfo; }
+        Object getNativeObject(ObjectType objectType) override;
+    };
+
+    class BindingSet : public RefCounter<rhi::BindingSet>
+    {
+    public:
+        RefCountPtr<BindingLayout> layout;
+        BindingSetDesc desc;
+
+        // ShaderType -> DescriptorIndex
+        DescriptorIndex descriptorTableSRVetc = 0;
+        DescriptorIndex descriptorTableSamplers = 0;
+        RootParameterIndex rootParameterIndexSRVetc = 0;
+        RootParameterIndex rootParameterIndexSamplers = 0;
+        bool descriptorTableValidSRVetc = false;
+        bool descriptorTableValidSamplers = false;
+        bool hasUavBindings = false;
+
+        static_vector<std::pair<RootParameterIndex, Buffer*>, c_MaxVolatileConstantBuffersPerLayout> rootParametersVolatileCB;
+
+        std::vector<RefCountPtr<Resource>> resources;
+
+        std::vector<uint16_t> bindingsThatNeedTransitions;
+
+        BindingSet(const Context& context, DeviceResources& resources)
+            : m_context(context)
+            , m_resources(resources)
+        { }
+
+        ~BindingSet() override;
+
+        void createDescriptors();
+
+        const BindingSetDesc* getDesc() const override { return &desc; }
+        BindingLayout* getLayout() const override { return layout; }
+
+    private:
+        const Context& m_context;
+        DeviceResources& m_resources;
+    };
+
+    class DescriptorTable : public RefCounter<rhi::DescriptorTable>
+    {
+    public:
+        uint32_t capacity = 0;
+        DescriptorIndex firstDescriptor = 0;
+
+        DescriptorTable(DeviceResources& resources)
+            : m_resources(resources)
+        { }
+
+        ~DescriptorTable() override;
+
+        const BindingSetDesc* getDesc() const override { return nullptr; }
+        BindingLayout* getLayout() const override { return nullptr; }
+        uint32_t getCapacity() const override { return capacity; }
+        uint32_t getFirstDescriptorIndexInHeap() const override { return firstDescriptor; }
+
+    private:
+        DeviceResources& m_resources;
+    };
+
+    DX12_ViewportState convertViewportState(const RasterState& rasterState, const FramebufferInfoEx& framebufferInfo, const ViewportState& vpState);
+
+    class TextureState
+    {
+    public:
+        std::vector<OptionalResourceState> subresourceStates;
+        bool enableUavBarriers = true;
+        bool firstUavBarrierPlaced = false;
+        bool permanentTransition = false;
+
+        TextureState(uint32_t numSubresources)
+        {
+            subresourceStates.resize(numSubresources, c_ResourceStateUnknown);
+        }
+    };
+
+    class BufferState
+    {
+    public:
+        OptionalResourceState state = c_ResourceStateUnknown;
+        bool enableUavBarriers = true;
+        bool firstUavBarrierPlaced = false;
+        D3D12_GPU_VIRTUAL_ADDRESS volatileData = 0;
+        bool permanentTransition = false;
+    };
+
+    D3D12_RESOURCE_STATES convertResourceStates(ResourceStates stateBits);
+
+    class BufferChunk
+    {
+    public:
+        static const uint64_t c_sizeAlignment = 4096; // GPU page size
+
+        RefCountPtr<ID3D12Resource> buffer;
+        uint64_t version = 0;
+        uint64_t bufferSize = 0;
+        uint64_t writePointer = 0;
+        void* cpuVA = nullptr;
+        D3D12_GPU_VIRTUAL_ADDRESS gpuVA = 0;
+        uint32_t identifier = 0;
+
+        ~BufferChunk();
+    };
+
+    class UploadManager
+    {
+    public:
+        UploadManager(const Context& context, class Queue* pQueue, size_t defaultChunkSize, uint64_t memoryLimit, bool isScratchBuffer);
+
+        bool suballocateBuffer(uint64_t size, ID3D12GraphicsCommandList* pCommandList, ID3D12Resource** pBuffer, size_t* pOffset, void** pCpuVA,
+            D3D12_GPU_VIRTUAL_ADDRESS* pGpuVA, uint64_t currentVersion, uint32_t alignment = 256);
+
+        void submitChunks(
+            uint64_t currentVersion,
+            uint64_t submittedVersion,
+            std::vector<std::shared_ptr<BufferChunk>>* referencedChunks = nullptr);
+
+    private:
+        const Context& m_context;
+        Queue* m_queue;
+        size_t m_defaultChunkSize = 0;
+        uint64_t m_memoryLimit = 0;
+        uint64_t m_allocatedMemory = 0;
+        bool m_isScratchBuffer = false;
+
+        std::list<std::shared_ptr<BufferChunk>> m_chunkPool;
+        std::shared_ptr<BufferChunk> m_currentChunk;
+
+        [[nodiscard]] std::shared_ptr<BufferChunk> createChunk(size_t size);
+        // Fence-wait + reuse when over budget or CreateCommittedResource fails.
+        bool acquireReusableChunk(size_t sizeToAllocate, ID3D12GraphicsCommandList* pCommandList);
+    };
+
+    class OpacityMicromap : public RefCounter<rt::OpacityMicromap>
+    {
+    public:
+        RefCountPtr<d3d12::Buffer> dataBuffer;
+        rt::OpacityMicromapDesc desc;
+        bool allowUpdate = false;
+        bool compacted = false;
+
+        OpacityMicromap()
+        { }
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        const rt::OpacityMicromapDesc& getDesc() const override { return desc; }
+        bool isCompacted() const override { return compacted; }
+        uint64_t getDeviceAddress() const override;
+    };
+
+    class AccelStruct : public RefCounter<rt::AccelStruct>
+    {
+    public:
+        RefCountPtr<d3d12::Buffer> dataBuffer;
+        std::vector<rt::AccelStructHandle> bottomLevelASes;
+        std::vector<D3D12_RAYTRACING_INSTANCE_DESC> dxrInstances;
+        rt::AccelStructDesc desc;
+        bool allowUpdate = false;
+        bool compacted = false;
+        size_t managedId = ~0ull;
+
+        AccelStruct(const Context& context)
+            : m_context(context)
+        { }
+
+        ~AccelStruct() override;
+
+        void createSRV(size_t descriptor) const;
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        const rt::AccelStructDesc& getDesc() const override { return desc; }
+        bool isCompacted() const override { return compacted; }
+        uint64_t getDeviceAddress() const override;
+
+    private:
+        const Context& m_context;
+    };
+
+    class RayTracingPipeline : public RefCounter<rt::Pipeline>
+    {
+    public:
+        rt::PipelineDesc desc;
+
+        std::unordered_map<rhi::BindingLayout*, RootSignatureHandle> localRootSignatures;
+        RefCountPtr<RootSignature> globalRootSignature;
+        RefCountPtr<ID3D12StateObject> pipelineState;
+        RefCountPtr<ID3D12StateObjectProperties> pipelineInfo;
+
+        struct ExportTableEntry
+        {
+            rhi::BindingLayout* bindingLayout;
+            const void* pShaderIdentifier;
+        };
+
+        std::unordered_map<std::string, ExportTableEntry> exports;
+        uint32_t maxLocalRootParameters = 0;
+
+        RayTracingPipeline(const Context& context, Device* device)
+            : m_context(context)
+            , m_device(device)
+        { }
+
+        const ExportTableEntry* getExport(const char* name);
+        uint32_t getShaderTableEntrySize() const;
+        bool hasLocalResources() const { return maxLocalRootParameters != 0; }
+
+        const rt::PipelineDesc& getDesc() const override { return desc; }
+        rt::ShaderTableHandle createShaderTable(rt::ShaderTableDesc const& stDesc) override;
+
+    private:
+        const Context& m_context;
+        Device* m_device;
+    };
+
+
+    class ShaderTableState
+    {
+    public:
+        uint32_t committedVersion = 0;
+        ID3D12DescriptorHeap* descriptorHeapSRV = nullptr;
+        ID3D12DescriptorHeap* descriptorHeapSamplers = nullptr;
+        D3D12_DISPATCH_RAYS_DESC dispatchRaysTemplate = {};
+    };
+
+    class ShaderTable : public RefCounter<rt::ShaderTable>
+    {
+    public:
+        struct Entry
+        {
+            const void* pShaderIdentifier;
+            BindingSetHandle localBindings;
+        };
+
+        RefCountPtr<RayTracingPipeline> pipeline;
+
+        Entry rayGenerationShader = {};
+        std::vector<Entry> missShaders;
+        std::vector<Entry> callableShaders;
+        std::vector<Entry> hitGroups;
+
+        uint32_t version = 0;
+
+        BufferHandle cache;
+        ShaderTableState cacheState;
+
+        ShaderTable(const Context& context, RayTracingPipeline* _pipeline, rt::ShaderTableDesc const& desc)
+            : pipeline(_pipeline)
+            , m_context(context)
+            , m_desc(desc)
+        { }
+
+        size_t getUploadSize() const { return pipeline->getShaderTableEntrySize() * size_t(getNumEntries()); }
+        bool isStateValid(ShaderTableState const& state, DeviceResources const& resources) const;
+        void bake(uint8_t* cpuVA, D3D12_GPU_VIRTUAL_ADDRESS gpuVA, DeviceResources& resources,
+            ShaderTableState& state);
+
+        rt::ShaderTableDesc const& getDesc() const override { return m_desc; }
+        uint32_t getNumEntries() const override;
+        rt::Pipeline* getPipeline() const override { return pipeline; }
+        void setRayGenerationShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addMissShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addHitGroup(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        int addCallableShader(const char* exportName, rhi::BindingSet* bindings = nullptr) override;
+        void clearMissShaders() override;
+        void clearHitShaders() override;
+        void clearCallableShaders() override;
+
+    private:
+        const Context& m_context;
+        rt::ShaderTableDesc const m_desc;
+
+        bool verifyExport(const RayTracingPipeline::ExportTableEntry* pExport, BindingSet* bindings) const;
+    };
+
+
+    class Queue
+    {
+    public:
+        RefCountPtr<ID3D12CommandQueue> queue;
+        RefCountPtr<ID3D12Fence> fence;
+        uint64_t lastSubmittedInstance = 0;
+        uint64_t lastCompletedInstance = 0;
+        std::atomic<uint64_t> recordingInstance = 1;
+        std::deque<std::shared_ptr<class CommandListInstance>> commandListsInFlight;
+
+        explicit Queue(const Context& context, ID3D12CommandQueue* queue);
+        uint64_t updateLastCompletedInstance();
+
+    private:
+        const Context& m_context;
+    };
+
+    class InternalCommandList
+    {
+    public:
+        RefCountPtr<ID3D12CommandAllocator> allocator;
+        RefCountPtr<ID3D12GraphicsCommandList> commandList;
+        RefCountPtr<ID3D12GraphicsCommandList4> commandList4;
+        RefCountPtr<ID3D12GraphicsCommandList6> commandList6;
+#if CAUSTICA_RHI_D3D12_WITH_COOPVEC
+        RefCountPtr<ID3D12GraphicsCommandListPreview> commandListPreview;
+#endif
+        uint64_t lastSubmittedInstance = 0;
+#if CAUSTICA_RHI_WITH_AFTERMATH
+        GFSDK_Aftermath_ContextHandle aftermathContext;
+#endif
+    };
+
+    class CommandListInstance
+    {
+    public:
+        uint64_t submittedInstance = 0;
+        CommandQueue commandQueue = CommandQueue::Graphics;
+        RefCountPtr<ID3D12Fence> fence;
+        RefCountPtr<ID3D12CommandAllocator> commandAllocator;
+        RefCountPtr<ID3D12CommandList> commandList;
+        std::vector<RefCountPtr<Resource>> referencedResources;
+        std::vector<RefCountPtr<IUnknown>> referencedNativeResources;
+        std::vector<RefCountPtr<StagingTexture>> referencedStagingTextures;
+        std::vector<RefCountPtr<Buffer>> referencedStagingBuffers;
+        std::vector<RefCountPtr<TimerQuery>> referencedTimerQueries;
+        std::vector<std::shared_ptr<BufferChunk>> referencedUploadChunks;
+        std::vector<std::shared_ptr<BufferChunk>> referencedScratchChunks;
+#ifdef CAUSTICA_RHI_WITH_ACCEL_STRUCT_MANAGER
+        std::vector<uint64_t> accelStructBuildIds;
+        std::vector<uint64_t> accelStructCompactionIds;
+#endif
+    };
+
+    class CommandList final : public RefCounter<rhi::CommandList>
+    {
+    public:
+
+        // Internal interface functions
+
+        CommandList(Device* device, const Context& context, DeviceResources& resources, const CommandListParameters& params);
+        ~CommandList() override;
+        std::shared_ptr<CommandListInstance> executed(Queue* pQueue);
+        void requireTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates state);
+        void requireSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates state);
+        void requireBufferState(rhi::Buffer* buffer, ResourceStates state);
+        ID3D12CommandList* getD3D12CommandList() const
+        {
+            return m_readyForExecute && m_activeCommandList
+                ? m_activeCommandList->commandList.Get()
+                : nullptr;
+        }
+
+        // Resource implementation
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        // CommandList implementation
+
+        [[nodiscard]] bool open() override;
+        void close() override;
+        void clearState() override;
+
+        void clearTextureFloat(rhi::Texture* t, TextureSubresourceSet subresources, const Color& clearColor) override;
+        void clearDepthStencilTexture(rhi::Texture* t, TextureSubresourceSet subresources, bool clearDepth, float depth, bool clearStencil, uint8_t stencil) override;
+        void clearTextureUInt(rhi::Texture* t, TextureSubresourceSet subresources, uint32_t clearColor) override;
+        void clearSamplerFeedbackTexture(rhi::SamplerFeedbackTexture* texture) override;
+        void decodeSamplerFeedbackTexture(rhi::Buffer* buffer, rhi::SamplerFeedbackTexture* texture, Format format) override;
+        void setSamplerFeedbackTextureState(rhi::SamplerFeedbackTexture* texture, ResourceStates stateBits) override;
+
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::StagingTexture* dest, const TextureSlice& destSlice, rhi::Texture* src, const TextureSlice& srcSlice) override;
+        void copyTexture(rhi::Texture* dest, const TextureSlice& destSlice, rhi::StagingTexture* src, const TextureSlice& srcSlice) override;
+        void writeTexture(rhi::Texture* dest, uint32_t arraySlice, uint32_t mipLevel, const void* data, size_t rowPitch, size_t depthPitch) override;
+        void resolveTexture(rhi::Texture* dest, const TextureSubresourceSet& dstSubresources, rhi::Texture* src, const TextureSubresourceSet& srcSubresources) override;
+
+        void writeBuffer(rhi::Buffer* b, const void* data, size_t dataSize, uint64_t destOffsetBytes = 0) override;
+        void clearBufferUInt(rhi::Buffer* b, uint32_t clearValue) override;
+        void copyBuffer(rhi::Buffer* dest, uint64_t destOffsetBytes, rhi::Buffer* src, uint64_t srcOffsetBytes, uint64_t dataSizeBytes) override;
+
+        void setPushConstants(const void* data, size_t byteSize) override;
+
+        void setGraphicsState(const GraphicsState& state) override;
+        void draw(const DrawArguments& args) override;
+        void drawIndexed(const DrawArguments& args) override;
+        void drawIndirect(uint32_t offsetBytes, uint32_t drawCount) override;
+        void drawIndexedIndirect(uint32_t offsetBytes, uint32_t drawCount) override;
+        void drawIndexedIndirectCount(uint32_t paramOffsetBytes, uint32_t countOffsetBytes, uint32_t maxDrawCount) override;
+
+        void setComputeState(const ComputeState& state) override;
+        void dispatch(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) override;
+        void dispatchIndirect(uint32_t offsetBytes) override;
+
+        void setMeshletState(const MeshletState& state) override;
+        void dispatchMesh(uint32_t groupsX, uint32_t groupsY = 1, uint32_t groupsZ = 1) override;
+
+        void setRayTracingState(const rt::State& state) override;
+        void dispatchRays(const rt::DispatchRaysArguments& args) override;
+
+        void buildOpacityMicromap(rt::OpacityMicromap* omm, const rt::OpacityMicromapDesc& desc) override;
+        void buildBottomLevelAccelStruct(rt::AccelStruct* as, const rt::GeometryDesc* pGeometries, size_t numGeometries, rt::AccelStructBuildFlags buildFlags) override;
+        void compactBottomLevelAccelStructs() override;
+        void buildTopLevelAccelStruct(rt::AccelStruct* as, const rt::InstanceDesc* pInstances, size_t numInstances, rt::AccelStructBuildFlags buildFlags) override;
+        void buildTopLevelAccelStructFromBuffer(rt::AccelStruct* as, caustica::rhi::Buffer* instanceBuffer, uint64_t instanceBufferOffset, size_t numInstances,
+            rt::AccelStructBuildFlags buildFlags = rt::AccelStructBuildFlags::None) override;
+        void executeMultiIndirectClusterOperation(const rt::cluster::OperationDesc& desc) override;
+
+        void convertCoopVecMatrices(coopvec::ConvertMatrixLayoutDesc const* convertDescs, size_t numDescs) override;
+
+        void beginTimerQuery(rhi::TimerQuery* query) override;
+        void endTimerQuery(rhi::TimerQuery* query) override;
+
+        void beginMarker(const char *name) override;
+        void endMarker() override;
+
+        void setEnableAutomaticBarriers(bool enable) override;
+        void setResourceStatesForBindingSet(rhi::BindingSet* bindingSet) override;
+
+        void setEnableUavBarriersForTexture(rhi::Texture* texture, bool enableBarriers) override;
+        void setEnableUavBarriersForBuffer(rhi::Buffer* buffer, bool enableBarriers) override;
+
+        void beginTrackingTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void beginTrackingBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+
+        void setTextureState(rhi::Texture* texture, TextureSubresourceSet subresources, ResourceStates stateBits) override;
+        void setBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+        void textureAliasingBarrier(rhi::Texture* before, rhi::Texture* after) override;
+        void bufferAliasingBarrier(rhi::Buffer* before, rhi::Buffer* after) override;
+        void setAccelStructState(rt::AccelStruct* as, ResourceStates stateBits) override;
+
+        void setPermanentTextureState(rhi::Texture* texture, ResourceStates stateBits) override;
+        void setPermanentBufferState(rhi::Buffer* buffer, ResourceStates stateBits) override;
+
+        void commitBarriers() override;
+
+        ResourceStates getTextureSubresourceState(rhi::Texture* texture, ArraySlice arraySlice, MipLevel mipLevel) override;
+        ResourceStates getBufferState(rhi::Buffer* buffer) override;
+
+        caustica::rhi::Device* getDevice() override;
+        const CommandListParameters& getDesc() override { return m_desc; }
+
+        // D3D12 specific methods
+
+        bool allocateUploadBuffer(size_t size, void** pCpuAddress, D3D12_GPU_VIRTUAL_ADDRESS* pGpuAddress);
+        bool allocateDxrScratchBuffer(size_t size, void** pCpuAddress, D3D12_GPU_VIRTUAL_ADDRESS* pGpuAddress);
+        bool commitDescriptorHeaps();
+        D3D12_GPU_VIRTUAL_ADDRESS getBufferGpuVA(rhi::Buffer* buffer);
+
+        void updateGraphicsVolatileBuffers();
+        void updateComputeVolatileBuffers();
+
+        void setComputeBindings(
+            const BindingSetVector& bindings,
+            uint32_t bindingUpdateMask,
+            Buffer* indirectParams,
+            bool updateIndirectParams,
+            const RootSignature* rootSignature);
+
+        void setGraphicsBindings(
+            const BindingSetVector& bindings,
+            uint32_t bindingUpdateMask,
+            Buffer* indirectParams,
+            bool updateIndirectParams,
+            Buffer* indirectCountBuffer,
+            bool updateIndirectCountBuffer,
+            const RootSignature* rootSignature);
+
+    private:
+        const Context& m_context;
+        DeviceResources& m_resources;
+
+        struct VolatileConstantBufferBinding
+        {
+            uint32_t bindingPoint; // RootParameterIndex
+            Buffer* buffer;
+            D3D12_GPU_VIRTUAL_ADDRESS address;
+        };
+
+        Device* m_device;
+        Queue* m_queue;
+        UploadManager m_uploadManager;
+        UploadManager m_dxrScratchManager;
+        CommandListResourceStateTracker m_stateTracker;
+        bool m_enableAutomaticBarriers = true;
+
+        CommandListParameters m_desc;
+
+        std::shared_ptr<InternalCommandList> m_activeCommandList;
+        std::list<std::shared_ptr<InternalCommandList>> m_commandListPool;
+        std::shared_ptr<CommandListInstance> m_instance;
+        bool m_readyForExecute = false;
+        bool m_recordingFailed = false;
+        uint64_t m_recordingVersion = 0;
+#if CAUSTICA_RHI_WITH_AFTERMATH
+        AftermathMarkerTracker m_aftermathTracker;
+#endif
+
+        // Cache for user-provided state
+
+        GraphicsState m_currentGraphicsState;
+        ComputeState m_currentComputeState;
+        MeshletState m_currentMeshletState;
+        rt::State m_currentRayTracingState;
+        bool m_currentGraphicsStateValid = false;
+        bool m_currentComputeStateValid = false;
+        bool m_currentMeshletStateValid = false;
+        bool m_currentRayTracingStateValid = false;
+        bool m_bindingStatesDirty = false;
+
+        // Cache for internal state
+
+        ID3D12DescriptorHeap* m_currentHeapSRVetc = nullptr;
+        ID3D12DescriptorHeap* m_currentHeapSamplers = nullptr;
+        ID3D12Resource* m_currentUploadBuffer = nullptr;
+        SinglePassStereoState m_currentSinglePassStereoState;
+
+        std::unordered_map<Buffer*, D3D12_GPU_VIRTUAL_ADDRESS> m_volatileConstantBufferAddresses;
+        bool m_anyVolatileBufferWrites = false;
+
+        std::vector<D3D12_RESOURCE_BARRIER> m_d3DBarriers; // Used locally in commitBarriers, member to avoid re-allocations
+
+        // Bound volatile buffer state. Saves currently bound volatile buffers and their current GPU VAs.
+        // Necessary to patch the bound VAs when a buffer is updated between setGraphicsState and draw, or between draws.
+
+        static_vector<VolatileConstantBufferBinding, c_MaxVolatileConstantBuffers> m_currentGraphicsVolatileCBs;
+        static_vector<VolatileConstantBufferBinding, c_MaxVolatileConstantBuffers> m_currentComputeVolatileCBs;
+
+        std::unordered_map<rt::ShaderTable*, std::unique_ptr<ShaderTableState>> m_uncachedShaderTableStates;
+        ShaderTableState& getShaderTableState(rt::ShaderTable* shaderTable);
+
+        void clearStateCache();
+
+        void bindGraphicsPipeline(GraphicsPipeline* pso, bool updateRootSignature) const;
+        void bindMeshletPipeline(MeshletPipeline* pso, bool updateRootSignature) const;
+        void bindFramebuffer(Framebuffer* fb);
+        void unbindShadingRateState();
+
+        std::shared_ptr<InternalCommandList> createInternalCommandList() const;
+
+        void buildTopLevelAccelStructInternal(AccelStruct* as, D3D12_GPU_VIRTUAL_ADDRESS instanceData, size_t numInstances, rt::AccelStructBuildFlags buildFlags);
+    };
+
+    class Device final : public RefCounter<rhi::Device>
+    {
+    public:
+        explicit Device(const DeviceDesc& desc);
+        ~Device() override;
+
+        // Resource implementation
+
+        Object getNativeObject(ObjectType objectType) override;
+
+        // Device implementation
+
+        HeapHandle createHeap(const HeapDesc& d) override;
+
+        TextureHandle createTexture(const TextureDesc& d) override;
+        MemoryRequirements getTextureMemoryRequirements(rhi::Texture* texture) override;
+        bool bindTextureMemory(rhi::Texture* texture, rhi::Heap* heap, uint64_t offset) override;
+
+        TextureHandle createHandleForNativeTexture(ObjectType objectType, Object texture, const TextureDesc& desc) override;
+
+        StagingTextureHandle createStagingTexture(const TextureDesc& d, CpuAccessMode cpuAccess) override;
+        void *mapStagingTexture(rhi::StagingTexture* tex, const TextureSlice& slice, CpuAccessMode cpuAccess, size_t *outRowPitch) override;
+        void unmapStagingTexture(rhi::StagingTexture* tex) override;
+
+        void getTextureTiling(rhi::Texture* texture, uint32_t* numTiles, PackedMipDesc* desc, TileShape* tileShape, uint32_t* subresourceTilingsNum, SubresourceTiling* subresourceTilings) override;
+        void updateTextureTileMappings(rhi::Texture* texture, const TextureTilesMapping* tileMappings, uint32_t numTileMappings, CommandQueue executionQueue = CommandQueue::Graphics) override;
+
+        SamplerFeedbackTextureHandle createSamplerFeedbackTexture(rhi::Texture* pairedTexture, const SamplerFeedbackTextureDesc& desc) override;
+        SamplerFeedbackTextureHandle createSamplerFeedbackForNativeTexture(ObjectType objectType, Object texture, rhi::Texture* pairedTexture) override;
+
+        BufferHandle createBuffer(const BufferDesc& d) override;
+        void *mapBuffer(rhi::Buffer* b, CpuAccessMode mapFlags) override;
+        void unmapBuffer(rhi::Buffer* b) override;
+        MemoryRequirements getBufferMemoryRequirements(rhi::Buffer* buffer) override;
+        bool bindBufferMemory(rhi::Buffer* buffer, rhi::Heap* heap, uint64_t offset) override;
+
+        BufferHandle createHandleForNativeBuffer(ObjectType objectType, Object buffer, const BufferDesc& desc) override;
+
+        ShaderHandle createShader(const ShaderDesc& d, const void* binary, size_t binarySize) override;
+        ShaderHandle createShaderSpecialization(rhi::Shader* baseShader, const ShaderSpecialization* constants, uint32_t numConstants) override;
+        ShaderLibraryHandle createShaderLibrary(const void* binary, size_t binarySize) override;
+
+        SamplerHandle createSampler(const SamplerDesc& d) override;
+
+        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* vertexShader) override;
+
+        EventQueryHandle createEventQuery() override;
+        void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;
+        bool pollEventQuery(rhi::EventQuery* query) override;
+        bool waitEventQuery(rhi::EventQuery* query) override;
+        void resetEventQuery(rhi::EventQuery* query) override;
+
+        TimerQueryHandle createTimerQuery() override;
+        bool pollTimerQuery(rhi::TimerQuery* query) override;
+        float getTimerQueryTime(rhi::TimerQuery* query) override;
+        void resetTimerQuery(rhi::TimerQuery* query) override;
+
+        GraphicsAPI getGraphicsAPI() override;
+
+        FramebufferHandle createFramebuffer(const FramebufferDesc& desc) override;
+
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
+
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc, rhi::Framebuffer* fb) override;
+
+        ComputePipelineHandle createComputePipeline(const ComputePipelineDesc& desc) override;
+
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, FramebufferInfo const& fbinfo) override;
+
+        MeshletPipelineHandle createMeshletPipeline(const MeshletPipelineDesc& desc, rhi::Framebuffer* fb) override;
+
+        rt::PipelineHandle createRayTracingPipeline(const rt::PipelineDesc& desc) override;
+
+        BindingLayoutHandle createBindingLayout(const BindingLayoutDesc& desc) override;
+        BindingLayoutHandle createBindlessLayout(const BindlessLayoutDesc& desc) override;
+
+        BindingSetHandle createBindingSet(const BindingSetDesc& desc, rhi::BindingLayout* layout) override;
+        DescriptorTableHandle createDescriptorTable(rhi::BindingLayout* layout) override;
+
+        void resizeDescriptorTable(rhi::DescriptorTable* descriptorTable, uint32_t newSize, bool keepContents = true) override;
+        bool writeDescriptorTable(rhi::DescriptorTable* descriptorTable, const BindingSetItem& item) override;
+
+        rt::OpacityMicromapHandle createOpacityMicromap(const rt::OpacityMicromapDesc& desc) override;
+        rt::AccelStructHandle createAccelStruct(const rt::AccelStructDesc& desc) override;
+        rt::AccelStructBuildMemoryRequirements getAccelStructBuildMemoryRequirements(
+            const rt::AccelStructDesc& desc) override;
+        MemoryRequirements getAccelStructMemoryRequirements(rt::AccelStruct* as) override;
+        rt::cluster::OperationSizeInfo getClusterOperationSizeInfo(const rt::cluster::OperationParams& params) override;
+
+        bool bindAccelStructMemory(rt::AccelStruct* as, rhi::Heap* heap, uint64_t offset) override;
+
+        caustica::rhi::CommandListHandle createCommandList(const CommandListParameters& params = CommandListParameters()) override;
+        uint64_t executeCommandLists(caustica::rhi::CommandList* const* pCommandLists, size_t numCommandLists, CommandQueue executionQueue = CommandQueue::Graphics) override;
+        void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
+        bool waitForIdle() override;
+        [[nodiscard]] bool isDeviceHealthy() const override;
+        void runGarbageCollection() override;
+        bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
+        FormatSupport queryFormatSupport(Format format) override;
+        coopvec::DeviceFeatures queryCoopVecFeatures() override;
+        size_t getCoopVecMatrixSize(coopvec::DataType type, coopvec::MatrixLayout layout, int rows, int columns) override;
+        Object getNativeQueue(ObjectType objectType, CommandQueue queue) override;
+        MessageCallback* getMessageCallback() override { return m_context.messageCallback; }
+        bool isAftermathEnabled() override { return m_aftermathEnabled; }
+        AftermathCrashDumpHelper& getAftermathCrashDumpHelper() override { return m_aftermathCrashDumpHelper; }
+
+        // d3d12::Device implementation
+
+        RootSignatureHandle buildRootSignature(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& pipelineLayouts, bool allowInputLayout, bool isLocal, const D3D12_ROOT_PARAMETER1* pCustomParameters = nullptr, uint32_t numCustomParameters = 0);
+        GraphicsPipelineHandle createHandleForNativeGraphicsPipeline(RootSignature* rootSignature, ID3D12PipelineState* pipelineState, const GraphicsPipelineDesc& desc, const FramebufferInfo& framebufferInfo);
+        MeshletPipelineHandle createHandleForNativeMeshletPipeline(RootSignature* rootSignature, ID3D12PipelineState* pipelineState, const MeshletPipelineDesc& desc, const FramebufferInfo& framebufferInfo);
+        DescriptorHeap* getDescriptorHeap(DescriptorHeapType heapType);
+
+        // Internal interface
+        Queue* getQueue(CommandQueue type) { return m_queues[int(type)].get(); }
+
+        Context& getContext() { return m_context; }
+
+        bool setHlslExtensionsUAV(uint32_t slot);
+
+        bool GetAccelStructPreBuildInfo(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO& outPreBuildInfo, const rt::AccelStructDesc& desc) const;
+
+        bool GetNvapiIsInitialized() const { return m_nvapiIsInitialized; }
+        bool GetOpacityMicromapSupported() const { return m_opacityMicromapSupported; }
+        bool GetLinearSweptSpheresSupported( ) const { return m_linearSweptSpheresSupported; }
+
+    private:
+        Context m_context;
+        DeviceResources m_resources;
+
+        std::array<std::unique_ptr<Queue>, (int)CommandQueue::Count> m_queues;
+        HANDLE m_fenceEvent;
+
+        // Serializes execute / queueWait / waitForIdle / GC (and permanentState writeback).
+        std::mutex m_mutex;
+
+        DeferredDeletionQueue m_deferredDeletion;
+
+        bool m_nvapiIsInitialized = false;
+        bool m_singlePassStereoSupported = false;
+        bool m_hlslExtensionsSupported = false;
+        bool m_fastGeometryShaderSupported = false;
+        bool m_rayTracingSupported = false;
+        bool m_traceRayInlineSupported = false;
+        bool m_meshletsSupported = false;
+        bool m_variableRateShadingSupported = false;
+        bool m_opacityMicromapSupported = false;
+        bool m_rayTracingClustersSupported = false;
+        bool m_linearSweptSpheresSupported = false;
+        bool m_spheresSupported = false;
+        bool m_shaderExecutionReorderingSupported = false;
+        bool m_samplerFeedbackSupported = false;
+        bool m_aftermathEnabled = false;
+        bool m_heapDirectlyIndexedEnabled = false;
+        bool m_coopVecInferencingSupported = false;
+        bool m_coopVecTrainingSupported = false;
+        AftermathCrashDumpHelper m_aftermathCrashDumpHelper;
+
+
+        D3D12_FEATURE_DATA_D3D12_OPTIONS  m_options = {};
+        D3D12_FEATURE_DATA_D3D12_OPTIONS1 m_options1 = {};
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 m_options5 = {};
+        D3D12_FEATURE_DATA_D3D12_OPTIONS6 m_options6 = {};
+        D3D12_FEATURE_DATA_D3D12_OPTIONS7 m_options7 = {};
+
+        RefCountPtr<RootSignature> getRootSignature(const static_vector<BindingLayoutHandle, c_MaxBindingLayouts>& pipelineLayouts, bool allowInputLayout);
+        RefCountPtr<ID3D12PipelineState> createPipelineState(const GraphicsPipelineDesc& desc, RootSignature* pRS, const FramebufferInfo& fbinfo) const;
+        RefCountPtr<ID3D12PipelineState> createPipelineState(const ComputePipelineDesc& desc, RootSignature* pRS) const;
+        RefCountPtr<ID3D12PipelineState> createPipelineState(const MeshletPipelineDesc& desc, RootSignature* pRS, const FramebufferInfo& fbinfo) const;
+
+    };
+
+} // namespace caustica::rhi::d3d12

@@ -26,10 +26,6 @@
 #include <dxgi.h>
 #include <dxgi1_5.h>
 
-#if CAUSTICA_WITH_DX11
-#include <d3d11.h>
-#include <rhi/d3d11.h>
-#endif
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #include <rhi/d3d12.h>
@@ -301,9 +297,6 @@ bool StreamlineIntegration::initializePreDevice(caustica::rhi::GraphicsAPI api, 
 
     switch (api)
     {
-    case (caustica::rhi::GraphicsAPI::D3D11):
-        pref.renderAPI = sl::RenderAPI::eD3D11;
-        break;
     case (caustica::rhi::GraphicsAPI::D3D12):
         pref.renderAPI = sl::RenderAPI::eD3D12;
         break;
@@ -338,7 +331,7 @@ bool StreamlineIntegration::initializePreDevice(caustica::rhi::GraphicsAPI api, 
     return true;
 }
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
 bool StreamlineIntegration::setD3DDevice(IUnknown* nativeDevice)
 {
     bool result = successCheck(slSetD3DDevice(nativeDevice), "slSetD3DDevice");
@@ -350,25 +343,17 @@ bool StreamlineIntegration::setD3DDevice(IUnknown* nativeDevice)
 }
 #endif
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
-bool StreamlineIntegration::initializeDeviceDX(caustica::rhi::Device *device, AdapterInfo::LUID *pAdapterIdDx11)
+#if CAUSTICA_WITH_DX12
+bool StreamlineIntegration::initializeDeviceDX(caustica::rhi::Device *device)
 {
     m_device = device;
-
-#if CAUSTICA_WITH_DX11
-    if (m_api == caustica::rhi::GraphicsAPI::D3D11 && pAdapterIdDx11)
-    {
-        assert(pAdapterIdDx11->size() == sizeof(m_d3d11Luid));
-        memcpy(&m_d3d11Luid, pAdapterIdDx11->data(), pAdapterIdDx11->size());
-    }
-#endif
 
     updateFeatureAvailable();
     return true;
 }
 #endif
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
 bool StreamlineIntegration::upgradeInterface(IUnknown*& interfacePointer)
 {
     IUnknown* nativeInterface = interfacePointer;
@@ -446,13 +431,6 @@ void StreamlineIntegration::updateFeatureAvailable()
 {
     sl::AdapterInfo adapterInfo;
 
-#if CAUSTICA_WITH_DX11
-    if (m_api == caustica::rhi::GraphicsAPI::D3D11)
-    {
-        adapterInfo.deviceLUID = (uint8_t*)&m_d3d11Luid;
-        adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
-    }
-#endif
 #if CAUSTICA_WITH_DX12
     if (m_api == caustica::rhi::GraphicsAPI::D3D12)
     {
@@ -1109,20 +1087,6 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
 
     if (isBuffer)
     {
-#if CAUSTICA_WITH_DX11
-        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D11)
-        {
-            D3D11_BUFFER_DESC* desc = (D3D11_BUFFER_DESC*)resDesc->desc;
-            ID3D11Device* pd3d11Device = (ID3D11Device*)device;
-            ID3D11Buffer* pbuffer;
-            bool success = SUCCEEDED(pd3d11Device->CreateBuffer(desc, nullptr, &pbuffer));
-            if (!success) caustica::error("Failed to create buffer in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = pbuffer;
-
-        }
-#endif
-
 #if CAUSTICA_WITH_DX12
         if (Get().m_api == caustica::rhi::GraphicsAPI::D3D12)
         {
@@ -1140,20 +1104,6 @@ sl::Resource StreamlineIntegration::allocateResourceCallback(const sl::ResourceA
     }
     else
     {
-#if CAUSTICA_WITH_DX11
-        if (Get().m_api == caustica::rhi::GraphicsAPI::D3D11)
-        {
-            D3D11_TEXTURE2D_DESC* desc = (D3D11_TEXTURE2D_DESC*)resDesc->desc;
-            ID3D11Device* pd3d11Device = (ID3D11Device*)device;
-            ID3D11Texture2D* ptexture;
-            bool success = SUCCEEDED(pd3d11Device->CreateTexture2D(desc, nullptr, &ptexture));
-            if (!success) caustica::error("Failed to create texture in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = ptexture;
-
-        }
-#endif
-
 #if CAUSTICA_WITH_DX12
         if (Get().m_api == caustica::rhi::GraphicsAPI::D3D12)
         {
@@ -1230,11 +1180,6 @@ D3D12_RESOURCE_STATES D3D12convertResourceStates(caustica::rhi::ResourceStates s
 
 caustica::rhi::Object StreamlineIntegration::getNativeCommandList(caustica::rhi::CommandList* commandList)
 {
-#if CAUSTICA_WITH_DX11
-    if (m_api == caustica::rhi::GraphicsAPI::D3D11)
-        return m_device->getNativeObject(caustica::rhi::ObjectTypes::D3D11_DeviceContext);
-#endif
-
     if (commandList == nullptr)
     {
         caustica::error("Invalid command list!");
@@ -1299,12 +1244,6 @@ static void GetSLResource(
 
     switch (commandList->getDevice()->getGraphicsAPI())
     {
-#if CAUSTICA_WITH_DX11
-    case caustica::rhi::GraphicsAPI::D3D11:
-        slResource = sl::Resource{ sl::ResourceType::eTex2d, inputTex->getNativeObject(caustica::rhi::ObjectTypes::D3D11_Resource), 0 };
-        break;
-#endif
-
 #if CAUSTICA_WITH_DX12
     case caustica::rhi::GraphicsAPI::D3D12:
     {

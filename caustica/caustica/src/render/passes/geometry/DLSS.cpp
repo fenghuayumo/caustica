@@ -5,9 +5,6 @@
 #include <assets/loader/ShaderFactory.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/passes/dlss_exposure_cs.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/dlss_exposure_cs.dxil.h"
 #endif
@@ -112,12 +109,6 @@ void DLSS::computeExposure(caustica::rhi::CommandList* commandList, caustica::rh
 {
     switch(device->getGraphicsAPI())
     {
-    case caustica::rhi::GraphicsAPI::D3D11:
-        #if CAUSTICA_WITH_DX11
-        return DLSS::createDX11(device, shaderFactory, directoryWithExecutable, applicationID);
-        #else
-        return nullptr;
-        #endif
     case caustica::rhi::GraphicsAPI::D3D12:
         #if CAUSTICA_WITH_DX12
         return DLSS::createDX12(device, shaderFactory, directoryWithExecutable, applicationID);

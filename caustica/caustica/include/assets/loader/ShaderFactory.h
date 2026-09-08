@@ -30,11 +30,7 @@ struct StaticShader
     size_t size = 0;
 };
 
-#if CAUSTICA_WITH_DX11 && CAUSTICA_WITH_STATIC_SHADERS
-#define CAUSTICA_MAKE_DXBC_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}
-#else
 #define CAUSTICA_MAKE_DXBC_SHADER(symbol) caustica::StaticShader()
-#endif
 
 #if CAUSTICA_WITH_DX12 && CAUSTICA_WITH_STATIC_SHADERS
 #define CAUSTICA_MAKE_DXIL_SHADER(symbol) caustica::StaticShader{symbol,sizeof(symbol)}

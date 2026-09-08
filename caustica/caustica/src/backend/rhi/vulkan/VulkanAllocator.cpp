@@ -1,0 +1,148 @@
+#include "VulkanBackend.h"
+
+namespace caustica::rhi::vulkan
+{
+
+    static vk::MemoryPropertyFlags pickBufferMemoryProperties(const BufferDesc& d)
+    {
+        vk::MemoryPropertyFlags flags{};
+
+        switch(d.cpuAccess)
+        {
+        case CpuAccessMode::None:
+            flags = vk::MemoryPropertyFlagBits::eDeviceLocal;
+            break;
+        case CpuAccessMode::Read:
+            flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCached;
+            break;
+        case CpuAccessMode::Write:
+            flags = vk::MemoryPropertyFlagBits::eHostVisible;
+            break;
+        }
+
+        return flags;
+    }
+
+    vk::Result VulkanAllocator::allocateBufferMemory(Buffer *buffer, bool enableDeviceAddress) const
+    {
+        // figure out memory requirements
+        vk::MemoryRequirements memRequirements;
+        m_context.device.getBufferMemoryRequirements(buffer->buffer, &memRequirements);
+
+        // allocate memory
+        const bool enableMemoryExport = (buffer->desc.sharedResourceFlags & SharedResourceFlags::Shared) != 0;
+        const vk::Result res = allocateMemory(buffer, memRequirements, pickBufferMemoryProperties(buffer->desc), enableDeviceAddress, enableMemoryExport, nullptr, buffer->buffer);
+        CHECK_VK_RETURN(res)
+
+        m_context.device.bindBufferMemory(buffer->buffer, buffer->memory, 0);
+
+        return vk::Result::eSuccess;
+    }
+
+    void VulkanAllocator::freeBufferMemory(Buffer *buffer) const
+    {
+        freeMemory(buffer);
+    }
+
+    vk::Result VulkanAllocator::allocateTextureMemory(Texture *texture) const
+    {
+        // grab the image memory requirements
+        vk::MemoryRequirements memRequirements;
+        m_context.device.getImageMemoryRequirements(texture->image, &memRequirements);
+
+        // allocate memory
+        const vk::MemoryPropertyFlags memProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+        const bool enableDeviceAddress = false;
+        const bool enableMemoryExport = (texture->desc.sharedResourceFlags & SharedResourceFlags::Shared) != 0;
+        const vk::Result res = allocateMemory(texture, memRequirements, memProperties, enableDeviceAddress, enableMemoryExport, texture->image, nullptr);
+        CHECK_VK_RETURN(res)
+
+        m_context.device.bindImageMemory(texture->image, texture->memory, 0);
+
+        return vk::Result::eSuccess;
+    }
+
+    void VulkanAllocator::freeTextureMemory(Texture *texture) const
+    {
+        freeMemory(texture);
+    }
+
+    vk::Result VulkanAllocator::allocateMemory(MemoryResource *res,
+                                               vk::MemoryRequirements memRequirements,
+                                               vk::MemoryPropertyFlags memPropertyFlags,
+                                                bool enableDeviceAddress,
+                                                bool enableExportMemory,
+                                                VkImage dedicatedImage,
+                                                VkBuffer dedicatedBuffer) const
+    {
+        res->managed = true;
+
+        // find a memory space that satisfies the requirements
+        vk::PhysicalDeviceMemoryProperties memProperties;
+        m_context.physicalDevice.getMemoryProperties(&memProperties);
+
+        uint32_t memTypeIndex;
+        for(memTypeIndex = 0; memTypeIndex < memProperties.memoryTypeCount; memTypeIndex++)
+        {
+            if ((memRequirements.memoryTypeBits & (1 << memTypeIndex)) &&
+                ((memProperties.memoryTypes[memTypeIndex].propertyFlags & memPropertyFlags) == memPropertyFlags))
+            {
+                break;
+            }
+        }
+
+        if (memTypeIndex == memProperties.memoryTypeCount)
+        {
+            // xxxnsubtil: this is incorrect; need better error reporting
+            return vk::Result::eErrorOutOfDeviceMemory;
+        }
+
+        // allocate memory
+        auto allocFlags = vk::MemoryAllocateFlagsInfo();
+        if (enableDeviceAddress)
+            allocFlags.flags |= vk::MemoryAllocateFlagBits::eDeviceAddress;
+        const void* pNext = &allocFlags;
+
+        auto dedicatedAllocation = vk::MemoryDedicatedAllocateInfo()
+            .setImage(dedicatedImage)
+            .setBuffer(dedicatedBuffer)
+            .setPNext(pNext);
+
+        if (dedicatedImage || dedicatedBuffer)
+        {
+            // Append the VkMemoryDedicatedAllocateInfo structure to the chain
+            pNext = &dedicatedAllocation;
+        }
+
+#ifdef _WIN32
+        const auto handleType = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueWin32;
+#else
+        const auto handleType = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd;
+#endif
+        auto exportInfo = vk::ExportMemoryAllocateInfo()
+            .setHandleTypes(handleType)
+            .setPNext(pNext);
+
+        if(enableExportMemory)
+        {
+            // Append the VkExportMemoryAllocateInfo structure to the chain
+            pNext = &exportInfo;
+        }
+
+        auto allocInfo = vk::MemoryAllocateInfo()
+                            .setAllocationSize(memRequirements.size)
+                            .setMemoryTypeIndex(memTypeIndex)
+                            .setPNext(pNext);
+
+        return m_context.device.allocateMemory(&allocInfo, m_context.allocationCallbacks, &res->memory);
+    }
+
+    void VulkanAllocator::freeMemory(MemoryResource *res) const
+    {
+        assert(res->managed);
+
+        m_context.device.freeMemory(res->memory, m_context.allocationCallbacks);
+        res->memory = vk::DeviceMemory(nullptr);
+    }
+
+} // namespace caustica::rhi::vulkan

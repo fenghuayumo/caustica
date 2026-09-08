@@ -32,14 +32,14 @@ namespace caustica::rhi
     private:
         // using a filesystem path to track the event stack since that automatically inserts "/" separators
         // and is easy to push/pop entries
-        std::filesystem::path m_EventStack;
+        std::filesystem::path m_eventStack;
         
         // Some apps have unique marker text on every frame (for example, by appending the frame number to the marker)
         // In these cases, we want to cap the max number of strings stored to prevent memory usage from growing
         const static size_t MaxEventStrings = 128;
-        std::array<size_t, MaxEventStrings> m_EventHashes;
-        size_t m_OldestHashIndex;
-        std::unordered_map<size_t, std::string> m_EventStrings;
+        std::array<size_t, MaxEventStrings> m_eventHashes;
+        size_t m_oldestHashIndex;
+        std::unordered_map<size_t, std::string> m_eventStrings;
     };
 
     // AftermathCrashDumpHelper tracks all caustica::rhi::Device-level constructs that we need when generating a crash dump
@@ -61,10 +61,10 @@ namespace caustica::rhi
         ResolvedMarker ResolveMarker(size_t markerHash);
         BinaryBlob findShaderBinary(uint64_t shaderHash, ShaderHashGeneratorFunction hashGenerator);
     private:
-        std::set<AftermathMarkerTracker*> m_MarkerTrackers;
+        std::set<AftermathMarkerTracker*> m_markerTrackers;
         // Command lists that are deleted on the CPU-side could still be executing (and crashing) GPU side,
         // so we keep around a small number of recently destroyed marker trackers just in case
-        std::deque<AftermathMarkerTracker> m_DestroyedMarkerTrackers;
-        std::unordered_map<void*, ShaderBinaryLookupCallback> m_ShaderBinaryLookupCallbacks;
+        std::deque<AftermathMarkerTracker> m_destroyedMarkerTrackers;
+        std::unordered_map<void*, ShaderBinaryLookupCallback> m_shaderBinaryLookupCallbacks;
     };
 } // namespace caustica::rhi

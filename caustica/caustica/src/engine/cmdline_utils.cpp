@@ -41,11 +41,6 @@ namespace
             api = caustica::rhi::GraphicsAPI::D3D12;
             return true;
         }
-        if (backend == "dx11" || backend == "d3d11" || backend == "directx11")
-        {
-            api = caustica::rhi::GraphicsAPI::D3D11;
-            return true;
-        }
         return false;
     }
 } // namespace

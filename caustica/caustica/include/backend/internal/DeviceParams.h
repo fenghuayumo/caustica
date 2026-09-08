@@ -3,16 +3,12 @@
 // Backend-only create knobs. Hosts use GpuDeviceCreateDesc.
 // Instance → adapter → logical device → optional surface.
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
 #include <DXGI.h>
 #endif
 
-#if CAUSTICA_WITH_DX11
-#include <d3d11.h>
-#endif
-
 #if CAUSTICA_WITH_DX12
-#include <d3d12.h>
+#include <rhi/d3d12.h>
 #endif
 
 #if CAUSTICA_WITH_VULKAN
@@ -88,7 +84,7 @@ struct DeviceCreationParameters : public InstanceParameters
     bool resizeWindowWithDisplayScale = false;
     caustica::rhi::MessageCallback* messageCallback = nullptr;
 
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
     DXGI_USAGE swapChainUsage = DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
 #endif

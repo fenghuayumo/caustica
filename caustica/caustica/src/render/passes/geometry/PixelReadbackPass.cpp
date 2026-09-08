@@ -3,9 +3,6 @@
 #include <render/core/RenderPassConstants.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/passes/pixel_readback_cs.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/pixel_readback_cs.dxil.h"
 #endif

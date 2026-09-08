@@ -62,4 +62,4 @@ namespace caustica::rhi
         return static_cast<T>(u);
 #endif
     }
-} // namespace caustica::rhi 
+} // namespace caustica::rhi

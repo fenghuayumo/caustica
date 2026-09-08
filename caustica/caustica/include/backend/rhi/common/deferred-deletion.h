@@ -26,25 +26,25 @@ namespace caustica::rhi
                 return;
             }
 
-            std::lock_guard lock(m_Mutex);
-            m_Items.push_back(Item{ fenceContext, fenceValue, isComplete, std::move(destroy) });
+            std::lock_guard lock(m_mutex);
+            m_items.push_back(Item{ fenceContext, fenceValue, isComplete, std::move(destroy) });
         }
 
         void flush()
         {
             std::vector<Item> ready;
             {
-                std::lock_guard lock(m_Mutex);
+                std::lock_guard lock(m_mutex);
                 std::vector<Item> remaining;
-                remaining.reserve(m_Items.size());
-                for (auto& item : m_Items)
+                remaining.reserve(m_items.size());
+                for (auto& item : m_items)
                 {
                     if (item.isComplete && item.isComplete(item.fenceContext, item.fenceValue))
                         ready.push_back(std::move(item));
                     else
                         remaining.push_back(std::move(item));
                 }
-                m_Items.swap(remaining);
+                m_items.swap(remaining);
             }
 
             for (auto& item : ready)
@@ -58,8 +58,8 @@ namespace caustica::rhi
         {
             std::vector<Item> items;
             {
-                std::lock_guard lock(m_Mutex);
-                items.swap(m_Items);
+                std::lock_guard lock(m_mutex);
+                items.swap(m_items);
             }
             for (auto& item : items)
             {
@@ -77,7 +77,7 @@ namespace caustica::rhi
             std::function<void()> destroy;
         };
 
-        std::mutex m_Mutex;
-        std::vector<Item> m_Items;
+        std::mutex m_mutex;
+        std::vector<Item> m_items;
     };
 }

@@ -2,7 +2,7 @@
 
 #include <backend/GpuDevice.h>
 
-#if defined(_WIN32) && (CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12)
+#if defined(_WIN32) && CAUSTICA_WITH_DX12
 
 #include <dxgi1_4.h>
 #include <wrl/client.h>

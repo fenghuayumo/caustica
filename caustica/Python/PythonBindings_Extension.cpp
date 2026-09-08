@@ -108,7 +108,6 @@ NB_MODULE(caustica, m)
         .def_prop_ro("backend", [](const caustica::rhi::AdapterDesc& self) {
             switch (self.api)
             {
-            case caustica::rhi::GraphicsAPI::D3D11: return std::string("d3d11");
             case caustica::rhi::GraphicsAPI::D3D12: return std::string("d3d12");
             case caustica::rhi::GraphicsAPI::VULKAN: return std::string("vulkan");
             }

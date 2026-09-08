@@ -1,0 +1,209 @@
+#include "D3D12Backend.h"
+
+#include <rhi/common/misc.h>
+
+namespace caustica::rhi::d3d12
+{
+    TimerQuery::~TimerQuery()
+    {
+        m_resources.timerQueries.release(static_cast<int>(beginQueryIndex) / 2);
+    }
+
+    EventQueryHandle Device::createEventQuery(void)
+    {
+        EventQuery *ret = new EventQuery();
+        return EventQueryHandle::Create(ret);
+    }
+
+    void Device::setEventQuery(rhi::EventQuery* _query, CommandQueue queue)
+    {
+        EventQuery* query = checked_cast<EventQuery*>(_query);
+        Queue* pQueue = getQueue(queue);
+
+        query->started = true;
+        query->fence = pQueue->fence;
+        query->fenceCounter = pQueue->lastSubmittedInstance;
+        query->resolved = false;
+    }
+
+    bool Device::pollEventQuery(rhi::EventQuery* _query)
+    {
+        EventQuery* query = checked_cast<EventQuery*>(_query);
+
+        if (!query->started)
+            return false;
+
+        if (query->resolved)
+            return true;
+
+        assert(query->fence);
+
+        if (query->fence->GetCompletedValue() >= query->fenceCounter)
+        {
+            query->resolved = true;
+            query->fence = nullptr;
+        }
+
+        return query->resolved;
+    }
+
+    bool Device::waitEventQuery(rhi::EventQuery* _query)
+    {
+        EventQuery* query = checked_cast<EventQuery*>(_query);
+
+        if (!query->started || query->resolved)
+            return true;
+
+        assert(query->fence);
+
+        return WaitForFence(query->fence, query->fenceCounter, m_fenceEvent);
+    }
+
+    void Device::resetEventQuery(rhi::EventQuery* _query)
+    {
+        EventQuery* query = checked_cast<EventQuery*>(_query);
+
+        query->started = false;
+        query->resolved = false;
+        query->fence = nullptr;
+    }
+
+    TimerQueryHandle Device::createTimerQuery(void)
+    {
+        if (!m_context.timerQueryHeap)
+        {
+            std::lock_guard lockGuard(m_mutex);
+
+            if (!m_context.timerQueryHeap)
+            {
+                D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
+                queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+                queryHeapDesc.Count = uint32_t(m_resources.timerQueries.getCapacity()) * 2; // Use 2 D3D12 queries per 1 TimerQuery
+                m_context.device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&m_context.timerQueryHeap));
+
+                BufferDesc qbDesc;
+                qbDesc.byteSize = queryHeapDesc.Count * 8;
+                qbDesc.cpuAccess = CpuAccessMode::Read;
+
+                BufferHandle timerQueryBuffer = createBuffer(qbDesc);
+                m_context.timerQueryResolveBuffer = checked_cast<Buffer*>(timerQueryBuffer.Get());
+            }
+        }
+
+        int queryIndex = m_resources.timerQueries.allocate();
+
+        if (queryIndex < 0)
+            return nullptr;
+
+        TimerQuery* query = new TimerQuery(m_resources);
+        query->beginQueryIndex = uint32_t(queryIndex) * 2;
+        query->endQueryIndex = query->beginQueryIndex + 1;
+        query->resolved = false;
+        query->time = 0.f;
+
+        return TimerQueryHandle::Create(query);
+    }
+
+    bool Device::pollTimerQuery(rhi::TimerQuery* _query)
+    {
+        TimerQuery* query = checked_cast<TimerQuery*>(_query);
+
+        if (!query->started)
+            return false;
+
+        if (!query->fence)
+            return true;
+
+        if (query->fence->GetCompletedValue() >= query->fenceCounter)
+        {
+            query->fence = nullptr;
+            return true;
+        }
+
+        return false;
+    }
+
+    float Device::getTimerQueryTime(rhi::TimerQuery* _query)
+    {
+        TimerQuery* query = checked_cast<TimerQuery*>(_query);
+
+        if (!query->resolved)
+        {
+            if (query->fence)
+            {
+                WaitForFence(query->fence, query->fenceCounter, m_fenceEvent);
+                query->fence = nullptr;
+            }
+
+            uint64_t frequency = 0;
+            Queue* timestampQueue = getQueue(query->queue);
+            if (!timestampQueue)
+                timestampQueue = getQueue(CommandQueue::Graphics);
+            if (!timestampQueue || !timestampQueue->queue)
+            {
+                m_context.error("getTimerQueryTime: timestamp queue is missing");
+                return 0.f;
+            }
+            timestampQueue->queue->GetTimestampFrequency(&frequency);
+
+            D3D12_RANGE bufferReadRange = {
+                query->beginQueryIndex * sizeof(uint64_t),
+                (query->beginQueryIndex + 2) * sizeof(uint64_t) };
+            uint64_t *data;
+            const HRESULT res = m_context.timerQueryResolveBuffer->resource->Map(0, &bufferReadRange, (void**)&data);
+
+            if (FAILED(res))
+            {
+                m_context.error("getTimerQueryTime: Map() failed");
+                return 0.f;
+            }
+
+            query->resolved = true;
+            query->time = float(double(data[query->endQueryIndex] - data[query->beginQueryIndex]) / double(frequency));
+
+            m_context.timerQueryResolveBuffer->resource->Unmap(0, nullptr);
+        }
+
+        return query->time;
+    }
+
+    void Device::resetTimerQuery(rhi::TimerQuery* _query)
+    {
+        TimerQuery* query = checked_cast<TimerQuery*>(_query);
+
+        query->started = false;
+        query->resolved = false;
+        query->time = 0.f;
+        query->fence = nullptr;
+    }
+
+    void CommandList::beginTimerQuery(rhi::TimerQuery* _query)
+    {
+        TimerQuery* query = checked_cast<TimerQuery*>(_query);
+
+        m_instance->referencedTimerQueries.push_back(query);
+
+        m_activeCommandList->commandList->EndQuery(m_context.timerQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, query->beginQueryIndex);
+
+        // two timestamps within the same command list are always reliably comparable, so we avoid kicking off here
+        // (note: we don't call SetStablePowerState anymore)
+    }
+
+    void CommandList::endTimerQuery(rhi::TimerQuery* _query)
+    {
+        TimerQuery* query = checked_cast<TimerQuery*>(_query);
+
+        m_instance->referencedTimerQueries.push_back(query);
+
+        m_activeCommandList->commandList->EndQuery(m_context.timerQueryHeap, D3D12_QUERY_TYPE_TIMESTAMP, query->endQueryIndex);
+
+        m_activeCommandList->commandList->ResolveQueryData(m_context.timerQueryHeap,
+            D3D12_QUERY_TYPE_TIMESTAMP,
+            query->beginQueryIndex,
+            2,
+            m_context.timerQueryResolveBuffer->resource,
+            query->beginQueryIndex * 8);
+    }
+
+
+} // namespace caustica::rhi::d3d12

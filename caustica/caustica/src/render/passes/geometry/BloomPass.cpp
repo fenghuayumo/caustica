@@ -12,9 +12,6 @@
 #include <memory>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/passes/bloom_ps.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/passes/bloom_ps.dxil.h"
 #endif

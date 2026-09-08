@@ -112,9 +112,6 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShad
     StaticShader shader;
     switch(m_Device->getGraphicsAPI())
     {
-        case caustica::rhi::GraphicsAPI::D3D11:
-            shader = dxbc;
-            break;
         case caustica::rhi::GraphicsAPI::D3D12:
             shader = dxil;
             break;

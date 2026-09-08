@@ -4,12 +4,6 @@
 #include <render/core/BindingCache.h>
 
 #if CAUSTICA_WITH_STATIC_SHADERS
-#if CAUSTICA_WITH_DX11
-#include "compiled_shaders/fullscreen_vs.dxbc.h"
-#include "compiled_shaders/rect_vs.dxbc.h"
-#include "compiled_shaders/blit_ps.dxbc.h"
-#include "compiled_shaders/sharpen_ps.dxbc.h"
-#endif
 #if CAUSTICA_WITH_DX12
 #include "compiled_shaders/fullscreen_vs.dxil.h"
 #include "compiled_shaders/rect_vs.dxil.h"

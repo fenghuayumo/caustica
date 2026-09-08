@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_WIN32) && (CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12)
+#if defined(_WIN32) && CAUSTICA_WITH_DX12
 
 struct IDXGIAdapter;
 

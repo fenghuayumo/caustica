@@ -60,15 +60,15 @@ set(include_common
     ${RHI_INCLUDE_DIR}/common/aftermath.h)
 
 set(src_common
-    common/format-info.cpp
-    common/device_factory.cpp
-    common/caustica-format.cpp
-    common/misc.cpp
-    common/state-tracking.cpp
-    common/state-tracking.h
-    common/utils.cpp
-    common/command_list_pool.cpp
-    common/aftermath.cpp)
+    common/FormatInfo.cpp
+    common/DeviceFactory.cpp
+    common/CausticaFormat.cpp
+    common/Misc.cpp
+    common/StateTracking.cpp
+    common/StateTracking.h
+    common/Utils.cpp
+    common/CommandListPool.cpp
+    common/Aftermath.cpp)
 
 set(accel_struct_manager_dir ${CMAKE_CURRENT_SOURCE_DIR}/internal/accel_struct)
 set(accel_struct_manager_common
@@ -94,29 +94,9 @@ set(accel_struct_manager_vulkan
 set(include_validation
     ${RHI_INCLUDE_DIR}/validation.h)
 set(src_validation
-    validation/validation-commandlist.cpp
-    validation/validation-device.cpp
-    validation/validation-backend.h)
-
-# ------------------------------------------------------------------
-# D3D11 backend
-# ------------------------------------------------------------------
-set(include_d3d11
-    ${RHI_INCLUDE_DIR}/d3d11.h)
-set(src_d3d11
-    common/dxgi-format.h
-    common/dxgi-format.cpp
-    d3d11/d3d11-buffer.cpp
-    d3d11/d3d11-commandlist.cpp
-    d3d11/d3d11-compute.cpp
-    d3d11/d3d11-constants.cpp
-    d3d11/d3d11-backend.h
-    d3d11/d3d11-device.cpp
-    d3d11/d3d11-graphics.cpp
-    d3d11/d3d11-queries.cpp
-    d3d11/d3d11-resource-bindings.cpp
-    d3d11/d3d11-shader.cpp
-    d3d11/d3d11-texture.cpp)
+    validation/ValidationCommandList.cpp
+    validation/ValidationDevice.cpp
+    validation/ValidationBackend.h)
 
 # ------------------------------------------------------------------
 # D3D12 backend
@@ -124,25 +104,25 @@ set(src_d3d11
 set(include_d3d12
     ${RHI_INCLUDE_DIR}/d3d12.h)
 set(src_d3d12
-    common/dxgi-format.h
-    common/dxgi-format.cpp
-    common/versioning.h
-    d3d12/d3d12-buffer.cpp
-    d3d12/d3d12-commandlist.cpp
-    d3d12/d3d12-compute.cpp
-    d3d12/d3d12-constants.cpp
-    d3d12/d3d12-backend.h
-    d3d12/d3d12-descriptor-heap.cpp
-    d3d12/d3d12-device.cpp
-    d3d12/d3d12-graphics.cpp
-    d3d12/d3d12-meshlets.cpp
-    d3d12/d3d12-queries.cpp
-    d3d12/d3d12-raytracing.cpp
-    d3d12/d3d12-resource-bindings.cpp
-    d3d12/d3d12-shader.cpp
-    d3d12/d3d12-state-tracking.cpp
-    d3d12/d3d12-texture.cpp
-    d3d12/d3d12-upload.cpp)
+    common/DxgiFormat.h
+    common/DxgiFormat.cpp
+    common/Versioning.h
+    d3d12/D3D12Buffer.cpp
+    d3d12/D3D12CommandList.cpp
+    d3d12/D3D12Compute.cpp
+    d3d12/D3D12Constants.cpp
+    d3d12/D3D12Backend.h
+    d3d12/D3D12DescriptorHeap.cpp
+    d3d12/D3D12Device.cpp
+    d3d12/D3D12Graphics.cpp
+    d3d12/D3D12Meshlets.cpp
+    d3d12/D3D12Queries.cpp
+    d3d12/D3D12RayTracing.cpp
+    d3d12/D3D12ResourceBindings.cpp
+    d3d12/D3D12Shader.cpp
+    d3d12/D3D12StateTracking.cpp
+    d3d12/D3D12Texture.cpp
+    d3d12/D3D12Upload.cpp)
 
 # ------------------------------------------------------------------
 # Vulkan backend
@@ -150,25 +130,25 @@ set(src_d3d12
 set(include_vk
     ${RHI_INCLUDE_DIR}/vulkan.h)
 set(src_vk
-    common/versioning.h
-    vulkan/vulkan-allocator.cpp
-    vulkan/vulkan-buffer.cpp
-    vulkan/vulkan-commandlist.cpp
-    vulkan/vulkan-compute.cpp
-    vulkan/vulkan-constants.cpp
-    vulkan/vulkan-device.cpp
-    vulkan/vulkan-graphics.cpp
-    vulkan/vulkan-meshlets.cpp
-    vulkan/vulkan-queries.cpp
-    vulkan/vulkan-queue.cpp
-    vulkan/vulkan-raytracing.cpp
-    vulkan/vulkan-resource-bindings.cpp
-    vulkan/vulkan-shader.cpp
-    vulkan/vulkan-staging-texture.cpp
-    vulkan/vulkan-state-tracking.cpp
-    vulkan/vulkan-texture.cpp
-    vulkan/vulkan-upload.cpp
-    vulkan/vulkan-backend.h)
+    common/Versioning.h
+    vulkan/VulkanAllocator.cpp
+    vulkan/VulkanBuffer.cpp
+    vulkan/VulkanCommandList.cpp
+    vulkan/VulkanCompute.cpp
+    vulkan/VulkanConstants.cpp
+    vulkan/VulkanDevice.cpp
+    vulkan/VulkanGraphics.cpp
+    vulkan/VulkanMeshlets.cpp
+    vulkan/VulkanQueries.cpp
+    vulkan/VulkanQueue.cpp
+    vulkan/VulkanRayTracing.cpp
+    vulkan/VulkanResourceBindings.cpp
+    vulkan/VulkanShader.cpp
+    vulkan/VulkanStagingTexture.cpp
+    vulkan/VulkanStateTracking.cpp
+    vulkan/VulkanTexture.cpp
+    vulkan/VulkanUpload.cpp
+    vulkan/VulkanBackend.h)
 
 # ==================================================================
 # caustica_rhi target: core interface + common implementation
@@ -204,37 +184,6 @@ set_target_properties(caustica_rhi PROPERTIES FOLDER "caustica/backend")
 
 
 target_compile_definitions(caustica_rhi PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
-
-# ==================================================================
-# D3D11 backend
-# ==================================================================
-if (CAUSTICA_RHI_WITH_DX11)
-    if (CAUSTICA_RHI_BUILD_SHARED)
-        set(caustica_rhi_d3d11_target caustica_rhi)
-        target_sources(${caustica_rhi_d3d11_target} PRIVATE
-            ${include_d3d11}
-            ${src_d3d11})
-    else()
-        set(caustica_rhi_d3d11_target caustica_rhi_d3d11)
-        add_library(${caustica_rhi_d3d11_target} STATIC
-            ${include_d3d11}
-            ${src_d3d11})
-        set_target_properties(${caustica_rhi_d3d11_target} PROPERTIES FOLDER "caustica/backend")
-        target_include_directories(${caustica_rhi_d3d11_target} PRIVATE ${CMAKE_SOURCE_DIR}/caustica/caustica/include/backend)
-    endif()
-
-    target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC d3d11 dxguid)
-
-    if (CAUSTICA_RHI_WITH_NVAPI)
-        target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC nvapi)
-    endif()
-    target_compile_definitions(${caustica_rhi_d3d11_target} PRIVATE CAUSTICA_RHI_D3D11_WITH_NVAPI=$<BOOL:${CAUSTICA_RHI_WITH_NVAPI}>)
-
-    if (CAUSTICA_RHI_WITH_AFTERMATH)
-        target_link_libraries(${caustica_rhi_d3d11_target} PUBLIC aftermath)
-    endif()
-    target_compile_definitions(${caustica_rhi_d3d11_target} PRIVATE CAUSTICA_RHI_WITH_AFTERMATH=$<BOOL:${CAUSTICA_RHI_WITH_AFTERMATH}>)
-endif()
 
 # ==================================================================
 # D3D12 backend

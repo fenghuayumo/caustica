@@ -112,10 +112,6 @@ private:
     caustica::rhi::Device* m_device = nullptr;
     caustica::rhi::EventQueryHandle m_graphicsSyncQuery;
 
-#ifdef CAUSTICA_WITH_DX11
-    LUID m_d3d11Luid = {};
-#endif
-
     bool m_dlssAvailable = false;
     bool m_nisAvailable = false;
     bool m_deepdvcAvailable = false;
@@ -165,9 +161,9 @@ public:
     };
 
     bool initializePreDevice(caustica::rhi::GraphicsAPI api, int appId, const bool checkSig = true, const bool enableLog = false);
-#if CAUSTICA_WITH_DX11 || CAUSTICA_WITH_DX12
+#if CAUSTICA_WITH_DX12
     bool setD3DDevice(IUnknown* nativeDevice);
-    bool initializeDeviceDX(caustica::rhi::Device *device, AdapterInfo::LUID* pAdapterIdDx11 = nullptr);
+    bool initializeDeviceDX(caustica::rhi::Device *device);
     // In-place slUpgradeInterface of a raw pointer
     template<typename T>
     static inline bool upgradeInterface(T*& interfacePointer)

@@ -130,7 +130,6 @@ namespace caustica::rhi
 
     enum class GraphicsAPI : uint8_t
     {
-        D3D11,
         D3D12,
         VULKAN
     };

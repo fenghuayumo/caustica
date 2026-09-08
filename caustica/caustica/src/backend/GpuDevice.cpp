@@ -12,10 +12,6 @@
 
 #include <algorithm>
 
-#if CAUSTICA_WITH_DX11
-#include <d3d11.h>
-#endif
-
 #if CAUSTICA_WITH_DX12
 #include <d3d12.h>
 #endif
@@ -489,10 +485,6 @@ caustica::GpuDevice* caustica::GpuDevice::createBackend(caustica::rhi::GraphicsA
 {
     switch (api)
     {
-#if CAUSTICA_WITH_DX11
-    case caustica::rhi::GraphicsAPI::D3D11:
-        return createD3D11();
-#endif
 #if CAUSTICA_WITH_DX12
     case caustica::rhi::GraphicsAPI::D3D12:
         return createD3D12();
