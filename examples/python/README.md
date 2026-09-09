@@ -98,7 +98,8 @@ stable `uuid:hex` / `luid:hex` selectors; list devices with
 
 Realtime scripts share a `--denoiser` flag accepting `auto`, `off`, `taa`,
 `nrd`, `dlss`, and `dlss-rr`. `auto` selects NRD + TAA, and any DLSS path falls
-back automatically when the device does not support it.
+back automatically when the device does not support it. The NRD path uses
+RELAX by default; switch with `engine.settings.nrd_method = int(caustica.NrdMethod.REBLUR)`.
 
 ## Gaussian splats
 

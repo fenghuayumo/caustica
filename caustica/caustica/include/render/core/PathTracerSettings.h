@@ -383,7 +383,7 @@ struct PathTracerSettings
 
     // Denoiser
     bool                                NRDModeChanged = false;
-    NrdConfig::DenoiserMethod           NRDMethod = NrdConfig::DenoiserMethod::REBLUR;
+    NrdConfig::DenoiserMethod           NRDMethod = NrdConfig::DenoiserMethod::RELAX;
     float                               NRDDisocclusionThreshold = 0.03f;
     bool                                NRDUseAlternateDisocclusionThresholdMix = true;
     float                               NRDDisocclusionThresholdAlternate = 0.2f;

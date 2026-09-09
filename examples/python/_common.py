@@ -259,7 +259,8 @@ def apply_realtime_mode(engine, caustica, requested: str = "auto") -> str:
         engine.set_realtime_mode(
             standalone_denoiser=True, realtime_aa=int(caustica.RealtimeAA.TAA)
         )
-        return "realtime NRD + TAA"
+        settings.nrd_method = int(caustica.NrdMethod.RELAX)
+        return "realtime NRD (RELAX) + TAA"
     if denoiser == "taa":
         engine.set_realtime_mode(
             standalone_denoiser=False, realtime_aa=int(caustica.RealtimeAA.TAA)

@@ -913,7 +913,11 @@ engine.set_reference_mode(
 )
 ```
 
-`spp=0` keeps the current accumulation target. `realtime_aa`: `0=Off`, `1=TAA`, `2=DLSS`, `3=DLSS_RR`.
+`spp=0` keeps the current accumulation target. `realtime_aa`: `0=Off`, `1=TAA`, `2=DLSS`, `3=DLSS_RR`. When NRD is on (`standalone_denoiser=True` and `realtime_aa` is not DLSS-RR), `settings.nrd_method` selects REBLUR or RELAX (default RELAX):
+
+```python
+engine.settings.nrd_method = int(caustica.NrdMethod.RELAX)
+```
 
 ### Builtin / inline scenes
 
@@ -1738,6 +1742,7 @@ Availability depends on build options and hardware.
 | Python | Type | Notes |
 | --- | --- | --- |
 | `standalone_denoiser` | `bool` | NRD in realtime; no effect with DLSS-RR. |
+| `nrd_method` | `int` / `NrdMethod` | `0=REBLUR`, `1=RELAX`. Default RELAX. Used when standalone NRD is on. |
 | `denoiser_radiance_clamp_k` | `float` | |
 | `oidn_enabled` | `bool` | Run OIDN after accumulation completes. |
 | `oidn_use_gpu` | `bool` | CUDA/HIP/SYCL if available. |
@@ -1769,6 +1774,7 @@ Arithmetic: `int(enum_value)` works and enum values can be assigned to int-backe
 | `ExposureMode` | `AperturePriority`, `ShutterPriority` |
 | `CameraLutPreset` | `Disabled`, `Neutral`, `SoftContrast`, `WarmFilm`, `CoolFilm` |
 | `RealtimeAA` | `Off=0`, `TAA=1`, `DLSS=2`, `DLSS_RR=3` |
+| `NrdMethod` | `REBLUR=0`, `RELAX=1` |
 | `DLSSMode` | `Off`, `MaxPerformance`, `Balanced`, `MaxQuality`, `UltraPerformance`, `UltraQuality`, `DLAA` |
 | `DLSSFGMode` | `Off`, `On`, `Auto` |
 | `DLSSRRPreset` | `Default`, `PresetA` … `PresetH` |

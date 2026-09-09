@@ -71,6 +71,7 @@ using caustica::render::RenderAppState;
 namespace py_enums
 {
     enum class RealtimeAA     : int { Off = 0, TAA = 1, DLSS = 2, DLSS_RR = 3 };
+    enum class NrdMethod      : int { REBLUR = 0, RELAX = 1 };
     enum class DLSSMode       : int { Off = 0, MaxPerformance = 1, Balanced = 2, MaxQuality = 3, UltraPerformance = 4, UltraQuality = 5, DLAA = 6 };
     enum class DLSSFGMode     : int { Off = 0, On = 1, Auto = 2 };
     enum class DLSSRRPreset   : int { Default = 0, PresetA = 1, PresetB = 2, PresetC = 3, PresetD = 4, PresetE = 5, PresetF = 6, PresetG = 7, PresetH = 8 };
@@ -1088,6 +1089,13 @@ void RegisterCoreBindings(nb::module_& m)
         .value("TAA",     RealtimeAA::TAA,     "Temporal anti-aliasing (no DLSS).")
         .value("DLSS",    RealtimeAA::DLSS,    "DLSS Super Resolution.")
         .value("DLSS_RR", RealtimeAA::DLSS_RR, "DLSS Ray Reconstruction (DLSS + denoising).")
+        .export_values();
+
+    nb::enum_<NrdMethod>(m, "NrdMethod",
+        "Standalone NRD method used when Settings.standalone_denoiser is on (RealtimeAA != DLSS-RR).",
+        nb::is_arithmetic())
+        .value("REBLUR", NrdMethod::REBLUR, "NRD REBLUR (hit-distance reconstruction).")
+        .value("RELAX",  NrdMethod::RELAX,  "NRD RELAX (A-trous; default when DLSS-RR is not used).")
         .export_values();
 
     // --- DLSS quality enums (mirrors SI::DLSSMode) -------------------------
@@ -2423,6 +2431,19 @@ void RegisterCoreBindings(nb::module_& m)
         // --- Standalone NRD denoiser (realtime, RealtimeAA != DLSS-RR) ---
         .def_rw("standalone_denoiser",           &PathTracerSettings::StandaloneDenoiser,
                 "Enable NRD denoiser in realtime mode (no effect with DLSS-RR).")
+        .def_prop_rw("nrd_method",
+            [](PathTracerSettings& s) { return int(s.NRDMethod); },
+            [](PathTracerSettings& s, int v) {
+                const auto method = NrdConfig::DenoiserMethod(
+                    std::clamp(v, 0, int(NrdConfig::DenoiserMethod::MaxCount) - 1));
+                if (s.NRDMethod != method)
+                {
+                    s.NRDMethod = method;
+                    s.NRDModeChanged = true;
+                }
+            },
+            "NRD method (caustica.NrdMethod): 0=REBLUR, 1=RELAX.\n"
+            "Used when standalone_denoiser is on. Default is RELAX.")
         .def_rw("denoiser_radiance_clamp_k",     &PathTracerSettings::DenoiserRadianceClampK)
 
         // --- OIDN reference-mode denoiser --------------------------------

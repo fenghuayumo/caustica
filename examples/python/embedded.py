@@ -37,7 +37,8 @@ def configure_realtime(app) -> str:
         standalone_denoiser=True,
         realtime_aa=int(caustica.RealtimeAA.TAA),
     )
-    return "NRD + TAA"
+    settings.nrd_method = int(caustica.NrdMethod.RELAX)
+    return "NRD (RELAX) + TAA"
 
 
 def customize_scene(app) -> None:
