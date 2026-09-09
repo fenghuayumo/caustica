@@ -243,6 +243,10 @@ void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, 
         if (!label->semanticLabel.empty())
             node["class"] = label->semanticLabel;
     }
+    if (const auto* body = world.world().tryGet<caustica::physics::RigidBodyComponent>(entity))
+        writeRigidBodyComponent(EnsureComponent(entityNode, "RigidBody"), *body);
+    if (const auto* collider = world.world().tryGet<caustica::physics::ColliderComponent>(entity))
+        writeColliderComponent(EnsureComponent(entityNode, "Collider"), *collider);
 }
 
 bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
@@ -254,7 +258,9 @@ bool HasInspectorComponents(SceneEntityWorld& world, ecs::Entity entity)
         || tryGetEnvironmentLight(world.world(), entity)
         || tryGetCamera(world.world(), entity)
         || world.world().tryGet<GaussianSplatComponent>(entity)
-        || world.world().tryGet<SemanticLabelComponent>(entity);
+        || world.world().tryGet<SemanticLabelComponent>(entity)
+        || world.world().tryGet<caustica::physics::RigidBodyComponent>(entity)
+        || world.world().tryGet<caustica::physics::ColliderComponent>(entity);
 }
 
 std::string EntityPathString(SceneEntityWorld& world, ecs::Entity entity)

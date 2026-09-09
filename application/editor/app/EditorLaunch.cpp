@@ -10,6 +10,7 @@
 #include <backend/GpuSurface.h>
 #include <core/console/ConsoleObjects.h>
 #include <core/log.h>
+#include <physics/PhysicsPlugin.h>
 #include <platform/window.h>
 #include <render/passes/debug/Korgi.h>
 
@@ -178,8 +179,21 @@ std::unique_ptr<caustica::EngineApp> createEditorEngine(
         app->addPlugin<EditorPlugin>(editor, static_cast<const EditorUISubsystemConfig*>(nullptr));
     }
 
+    // Opt-in PhysX: no-op when CAUSTICA_WITH_PHYSX is off (backend is null).
+    // Interactive editor starts paused so loading physics-drop does not
+    // immediately drop bodies. Capture / non-interactive runs simulate.
+    app->addPlugin<caustica::physics::PhysicsPlugin>(
+        caustica::physics::createPhysXBackend(),
+        /*simulationEnabled=*/automatedRun);
+
     if (!engine->finishStartup())
         return nullptr;
+
+    if (!automatedRun)
+    {
+        if (auto* physics = app->tryResource<caustica::physics::PhysicsRuntime>())
+            physics->simulationEnabled = false;
+    }
 
     // Re-apply assignments after scene/subsystem startup so late registrations
     // and scene-provided render settings still receive command-line priority.

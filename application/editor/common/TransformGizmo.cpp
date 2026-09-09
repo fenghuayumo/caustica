@@ -17,6 +17,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneLightAccess.h>
 #include <scene/View.h>
+#include <physics/Physics.h>
 
 #include <algorithm>
 #include <cmath>
@@ -261,6 +262,77 @@ void DashedWorldCircle(
         prev = screen;
         prevOk = ok;
     }
+}
+
+void SolidScreenLine(ImDrawList* drawList, ImVec2 a, ImVec2 b, ImU32 col, float thickness, const EditorViewportState& vp)
+{
+    if (!ClipSegmentToRect(a, b, ImVec2(vp.PosX, vp.PosY), ImVec2(vp.PosX + vp.SizeX, vp.PosY + vp.SizeY)))
+        return;
+    const float dx = b.x - a.x;
+    const float dy = b.y - a.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 1.f || len > 4000.f)
+        return;
+    drawList->AddLine(a, b, col, thickness);
+}
+
+void SolidWorldLine(
+    ImDrawList* drawList,
+    const float viewProj[16],
+    const EditorViewportState& vp,
+    const math::float3& a,
+    const math::float3& b,
+    ImU32 col,
+    float thickness)
+{
+    ImVec2 sa, sb;
+    if (ProjectWorldWithGizmo(a, viewProj, vp, sa) && ProjectWorldWithGizmo(b, viewProj, vp, sb))
+        SolidScreenLine(drawList, sa, sb, col, thickness, vp);
+}
+
+void SolidWorldArc(
+    ImDrawList* drawList,
+    const float viewProj[16],
+    const EditorViewportState& vp,
+    const math::float3& center,
+    const math::float3& axisX,
+    const math::float3& axisY,
+    float radius,
+    float startRad,
+    float endRad,
+    ImU32 col,
+    float thickness,
+    int segments = 16)
+{
+    ImVec2 prev{};
+    bool prevOk = false;
+    for (int i = 0; i <= segments; ++i)
+    {
+        const float t = float(i) / float(segments);
+        const float a = startRad + (endRad - startRad) * t;
+        const math::float3 world = center + axisX * (std::cos(a) * radius) + axisY * (std::sin(a) * radius);
+        ImVec2 screen;
+        const bool ok = ProjectWorldWithGizmo(world, viewProj, vp, screen);
+        if (ok && prevOk)
+            SolidScreenLine(drawList, prev, screen, col, thickness, vp);
+        prev = screen;
+        prevOk = ok;
+    }
+}
+
+void SolidWorldCircle(
+    ImDrawList* drawList,
+    const float viewProj[16],
+    const EditorViewportState& vp,
+    const math::float3& center,
+    const math::float3& axisX,
+    const math::float3& axisY,
+    float radius,
+    ImU32 col,
+    float thickness,
+    int segments = 32)
+{
+    SolidWorldArc(drawList, viewProj, vp, center, axisX, axisY, radius, 0.f, math::PI_f * 2.f, col, thickness, segments);
 }
 
 void DrawViewportLightIcon(ImDrawList* drawList, ImVec2 center, EditorGlyphIcon kind, ImU32 col, float size)
@@ -703,6 +775,181 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
 
     for (const PendingIcon& icon : icons)
         DrawViewportLightIcon(drawList, icon.screen, icon.kind, icon.col, icon.size);
+
+    drawList->PopClipRect();
+}
+
+void caustica::editor::DrawColliderHelpers(const TransformGizmoContext& ctx)
+{
+    if (!ctx.editorUI.ShowUI || !ctx.editorUI.ShowColliderHelpers)
+        return;
+
+    App* app = ctx.sceneEditor.app();
+    auto* ew = app ? caustica::entityWorld(*app) : nullptr;
+    const auto& view = app ? caustica::currentView(*app) : nullptr;
+    if (!ew || !view)
+        return;
+
+    const auto& vp = ctx.editorUI.Viewport;
+    if (!vp.RectValid || vp.SizeX <= 1.f || vp.SizeY <= 1.f)
+        return;
+
+    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+    if (!viewportWindow || !viewportWindow->Active || viewportWindow->Hidden)
+        return;
+
+    ImDrawList* drawList = viewportWindow->DrawList;
+    const ImVec2 clipMin(vp.PosX, vp.PosY);
+    const ImVec2 clipMax(vp.PosX + vp.SizeX, vp.PosY + vp.SizeY);
+    drawList->PushClipRect(clipMin, clipMax, true);
+
+    float viewMatrix[16];
+    float projectionMatrix[16];
+    float viewProj[16];
+    Affine3ToImGuizmoMatrix(view->getViewMatrix(), viewMatrix);
+    BuildGizmoProjectionMatrix(ctx, *view, projectionMatrix);
+    MultiplyImGuizmoMatrix(viewMatrix, projectionMatrix, viewProj);
+
+    auto line = [&](const math::float3& a, const math::float3& b, ImU32 col, float thickness)
+    {
+        SolidWorldLine(drawList, viewProj, vp, a, b, col, thickness);
+    };
+    auto circle = [&](const math::float3& center, const math::float3& axisX, const math::float3& axisY,
+        float radius, ImU32 col, float thickness, int segments = 32)
+    {
+        SolidWorldCircle(drawList, viewProj, vp, center, axisX, axisY, radius, col, thickness, segments);
+    };
+    auto arc = [&](const math::float3& center, const math::float3& axisX, const math::float3& axisY,
+        float radius, float startRad, float endRad, ImU32 col, float thickness)
+    {
+        SolidWorldArc(drawList, viewProj, vp, center, axisX, axisY, radius, startRad, endRad, col, thickness);
+    };
+
+    auto drawBox = [&](const math::float3& origin, const math::float3& axisX, const math::float3& axisY,
+        const math::float3& axisZ, const math::float3& half, ImU32 col, float thickness)
+    {
+        const math::float3 c[8] = {
+            origin + axisX * (-half.x) + axisY * (-half.y) + axisZ * (-half.z),
+            origin + axisX * (half.x) + axisY * (-half.y) + axisZ * (-half.z),
+            origin + axisX * (half.x) + axisY * (half.y) + axisZ * (-half.z),
+            origin + axisX * (-half.x) + axisY * (half.y) + axisZ * (-half.z),
+            origin + axisX * (-half.x) + axisY * (-half.y) + axisZ * (half.z),
+            origin + axisX * (half.x) + axisY * (-half.y) + axisZ * (half.z),
+            origin + axisX * (half.x) + axisY * (half.y) + axisZ * (half.z),
+            origin + axisX * (-half.x) + axisY * (half.y) + axisZ * (half.z),
+        };
+        static constexpr int kEdges[12][2] = {
+            { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 },
+            { 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 },
+            { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 },
+        };
+        for (const auto& edge : kEdges)
+            line(c[edge[0]], c[edge[1]], col, thickness);
+    };
+
+    auto drawSphere = [&](const math::float3& origin, const math::float3& axisX, const math::float3& axisY,
+        const math::float3& axisZ, float radius, ImU32 col, float thickness)
+    {
+        circle(origin, axisX, axisY, radius, col, thickness);
+        circle(origin, axisX, axisZ, radius, col, thickness);
+        circle(origin, axisY, axisZ, radius, col, thickness);
+    };
+
+    auto drawCapsule = [&](const math::float3& origin, const math::float3& axisX, const math::float3& axisY,
+        const math::float3& axisZ, float radius, float cylinderHeight, ImU32 col, float thickness)
+    {
+        // PhysX capsules are X-aligned: cylinder along axisX, hemispheres on ±X.
+        const float halfCyl = std::max(cylinderHeight * 0.5f, 0.f);
+        const math::float3 p0 = origin - axisX * halfCyl;
+        const math::float3 p1 = origin + axisX * halfCyl;
+        circle(p0, axisY, axisZ, radius, col, thickness);
+        circle(p1, axisY, axisZ, radius, col, thickness);
+        constexpr int kRails = 4;
+        for (int i = 0; i < kRails; ++i)
+        {
+            const float a = (math::PI_f * 2.f * float(i)) / float(kRails);
+            const math::float3 radial = axisY * std::cos(a) + axisZ * std::sin(a);
+            line(p0 + radial * radius, p1 + radial * radius, col, thickness);
+        }
+        arc(p1, axisY, axisX, radius, -math::PI_f * 0.5f, math::PI_f * 0.5f, col, thickness);
+        arc(p1, axisZ, axisX, radius, -math::PI_f * 0.5f, math::PI_f * 0.5f, col, thickness);
+        arc(p0, axisY, -axisX, radius, -math::PI_f * 0.5f, math::PI_f * 0.5f, col, thickness);
+        arc(p0, axisZ, -axisX, radius, -math::PI_f * 0.5f, math::PI_f * 0.5f, col, thickness);
+    };
+
+    ew->world().each<physics::ColliderComponent, scene::GlobalTransformComponent>(
+        [&](ecs::Entity entity, physics::ColliderComponent& collider, scene::GlobalTransformComponent& global)
+        {
+            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            if (!ctx.editorUI.ShowAllColliderHelpers && !selected)
+                return;
+
+            const auto* body = ew->world().tryGet<physics::RigidBodyComponent>(entity);
+            const bool enabled = !body || body->enabled;
+            ImU32 col = IM_COL32(80, 220, 180, 230);
+            if (collider.isTrigger)
+                col = IM_COL32(255, 210, 70, 230);
+            else if (body)
+            {
+                switch (body->type)
+                {
+                case physics::RigidBodyType::Static:
+                    col = IM_COL32(120, 170, 255, 220);
+                    break;
+                case physics::RigidBodyType::Kinematic:
+                    col = IM_COL32(220, 180, 80, 220);
+                    break;
+                default:
+                    col = IM_COL32(80, 220, 180, 230);
+                    break;
+                }
+            }
+            if (selected)
+                col = IM_COL32(255, 230, 120, 255);
+            else if (!enabled)
+            {
+                const ImU32 a = (col >> 24) / 2;
+                col = (col & 0x00ffffffu) | (a << 24);
+            }
+            const float thickness = selected ? 2.4f : 1.5f;
+
+            math::double3 translation;
+            math::dquat rotation;
+            math::double3 scaling;
+            math::decomposeAffine(global.transform, &translation, &rotation, &scaling);
+            const auto rot = rotation.toAffine();
+            auto axis = [&](double x, double y, double z) {
+                return math::float3(rot.transformVector(math::double3(x, y, z)));
+            };
+            const math::float3 axisX = axis(1.0, 0.0, 0.0);
+            const math::float3 axisY = axis(0.0, 1.0, 0.0);
+            const math::float3 axisZ = axis(0.0, 0.0, 1.0);
+            const math::float3 origin = math::float3(translation)
+                + math::float3(rot.transformVector(math::double3(collider.offset)));
+
+            switch (collider.shape)
+            {
+            case physics::ColliderShape::Sphere:
+                drawSphere(origin, axisX, axisY, axisZ, std::max(collider.dimensions.x, 0.001f), col, thickness);
+                break;
+            case physics::ColliderShape::Capsule:
+                drawCapsule(
+                    origin, axisX, axisY, axisZ,
+                    std::max(collider.dimensions.x, 0.001f),
+                    std::max(collider.dimensions.y, 0.f),
+                    col, thickness);
+                break;
+            default:
+                drawBox(
+                    origin, axisX, axisY, axisZ,
+                    math::float3(
+                        std::max(collider.dimensions.x * 0.5f, 0.001f),
+                        std::max(collider.dimensions.y * 0.5f, 0.001f),
+                        std::max(collider.dimensions.z * 0.5f, 0.001f)),
+                    col, thickness);
+                break;
+            }
+        });
 
     drawList->PopClipRect();
 }

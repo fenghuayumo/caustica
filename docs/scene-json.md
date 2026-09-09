@@ -185,8 +185,30 @@ Debug 配置的可执行文件名为 `causticaD.exe`。如果传入的是相对�
 | `OrthographicCamera` | 正交相机。 |
 | `GaussianSplat` | 3DGS PLY。 |
 | `SemanticLabel` | 稳定 `instance_id` / `semantic_id`，供传感器 AOV 与物理实体对齐。 |
+| `RigidBody` | 刚体。`motion` 为 `dynamic` / `static` / `kinematic`。`enabled` 为 `false` 时不参与模拟。需要同时有 `Collider`，并且 host 安装了 `physics::PhysicsPlugin`（`CAUSTICA_WITH_PHYSX=ON`）。 |
+| `Collider` | 碰撞体。`shape` 为 `box` / `sphere` / `capsule`。尺寸是 actor 空间的全尺寸（不受 `Transform.scale` 影响）：box 为 `[x,y,z]`，sphere 半径在 `x` 或 `radius`，capsule 为半径/`height`。`offset` 是碰撞体中心相对 `Transform` 的平移。 |
 | `MaterialOverride` | 显式材质资产。 |
 | `GameSettings` | 编辑器 `game/` 层原始 JSON。 |
+
+### `RigidBody` / `Collider`
+
+需要 `CAUSTICA_WITH_PHYSX=ON`，并且 host（编辑器会自动加）安装 `physics::PhysicsPlugin`。示例场景：`physics-drop.scene.json`。
+
+编辑器加载场景后默认**暂停**模拟（Inspector 顶部的 `Simulate Physics`），避免刚打开就掉落。勾选后再开始下落。选中物体后，Inspector 的 **Physics** 分组可改 `Enabled` / `Motion` / `Mass` / `Gravity`，以及碰撞体 `Shape` / `Dimensions` / `Offset` / 摩擦 / 弹性。`Show Colliders` 会在视口里画出碰撞体线框（Box / Sphere / Capsule，含 `offset`）；`Show All Colliders` 画出场景里每一个碰撞体。
+
+```json
+{
+  "id": "FallingCube",
+  "components": {
+    "Transform": { "translation": [0.0, 3.0, 0.0] },
+    "PrefabInstance": { "source": "builtin:cube" },
+    "RigidBody": { "motion": "dynamic", "mass": 1.0, "gravity": true },
+    "Collider": { "shape": "box", "dimensions": [1.0, 1.0, 1.0], "offset": [0.0, 0.5, 0.0], "restitution": 0.05 }
+  }
+}
+```
+
+碰撞体默认绕 `Transform` 原点。内置 `builtin:cube` / `builtin:sphere` 的网格原点在底部，碰撞体要用 `"offset": [0, 0.5, 0]` 对齐网格中心。地面薄片用一个顶面贴在 y=0 的厚 box（例如 `dimensions: [18, 2, 18]`, `offset: [0, -1, 0]`）。
 
 ## 灯光参数
 

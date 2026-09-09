@@ -435,6 +435,7 @@ void EditorUI::BuildMainMenuBar()
         ImGui::Separator();
         ImGui::MenuItem("Infinite Grid", nullptr, &m_editorUI.ShowInfiniteGrid);
         ImGui::MenuItem("Light Gizmos", "G", &m_editorUI.ShowLightHelpers);
+        ImGui::MenuItem("Collider Gizmos", nullptr, &m_editorUI.ShowColliderHelpers);
         ImGui::MenuItem("Show All UI", "F2", &m_editorUI.ShowUI);
         if (ImGui::MenuItem("Reset Layout"))
         {

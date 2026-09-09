@@ -1,6 +1,7 @@
 #pragma once
 
 #include <scene/SceneEcs.h>
+#include <physics/Physics.h>
 
 #include <optional>
 #include <string>
@@ -29,5 +30,13 @@ using AnyLightComponent = std::variant<
     const std::string& type, const Json::Value& src);
 [[nodiscard]] std::optional<CameraComponent> makeCameraComponentFromJson(
     const std::string& type, const Json::Value& src);
+
+[[nodiscard]] bool isJsonPhysicsLeafType(const std::string& type);
+[[nodiscard]] std::optional<physics::RigidBodyComponent> makeRigidBodyComponentFromJson(
+    const Json::Value& src);
+[[nodiscard]] std::optional<physics::ColliderComponent> makeColliderComponentFromJson(
+    const Json::Value& src);
+void writeRigidBodyComponent(Json::Value& dst, const physics::RigidBodyComponent& body);
+void writeColliderComponent(Json::Value& dst, const physics::ColliderComponent& collider);
 
 } // namespace caustica::scene

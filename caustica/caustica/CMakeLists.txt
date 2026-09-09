@@ -469,6 +469,7 @@ caus_configure_static(causPhysics)
 target_link_libraries(causPhysics PUBLIC causScene causEcs)
 target_compile_definitions(causPhysics PUBLIC CAUSTICA_WITH_PHYSX=$<BOOL:${CAUSTICA_WITH_PHYSX}>)
 if (CAUSTICA_WITH_PHYSX)
+    target_compile_definitions(causPhysics PUBLIC PX_PHYSX_STATIC_LIB)
     target_link_libraries(causPhysics PRIVATE
         PhysX
         PhysXCommon
@@ -508,6 +509,13 @@ if (BUILD_TESTING)
         target_compile_options(causSchedulePlanTests PRIVATE /utf-8)
     endif()
     add_test(NAME causSchedulePlanTests COMMAND causSchedulePlanTests)
+
+    add_executable(causPhysicsTests tests/PhysicsTests.cpp)
+    target_link_libraries(causPhysicsTests PRIVATE causPhysics causEngine)
+    if (MSVC)
+        target_compile_options(causPhysicsTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causPhysicsTests COMMAND causPhysicsTests)
 endif()
 
 file(GLOB_RECURSE caus_render_headers include/render/*.h)

@@ -1,0 +1,158 @@
+{
+  "format": "caustica.scene",
+  "version": 2,
+  "name": "physics-drop",
+  "settings": {
+    "realtimeMode": true,
+    "enableAnimations": false
+  },
+  "entities": [
+    {
+      "id": "Ground",
+      "name": "Ground",
+      "components": {
+        "Transform": {
+          "translation": [0.0, 0.0, 0.0],
+          "scale": [3.0, 1.0, 3.0]
+        },
+        "PrefabInstance": { "source": "builtin:plane" },
+        "RigidBody": {
+          "motion": "static",
+          "mass": 0.0,
+          "gravity": false
+        },
+        "Collider": {
+          "shape": "box",
+          "dimensions": [18.0, 2.0, 18.0],
+          "offset": [0.0, -1.0, 0.0],
+          "staticFriction": 0.7,
+          "dynamicFriction": 0.7,
+          "restitution": 0.0
+        },
+        "SemanticLabel": { "class": "ground" }
+      }
+    },
+    {
+      "id": "FallingCube",
+      "name": "FallingCube",
+      "components": {
+        "Transform": { "translation": [-0.6, 3.0, 0.15] },
+        "PrefabInstance": { "source": "builtin:cube" },
+        "RigidBody": {
+          "motion": "dynamic",
+          "mass": 1.0,
+          "gravity": true
+        },
+        "Collider": {
+          "shape": "box",
+          "dimensions": [1.0, 1.0, 1.0],
+          "offset": [0.0, 0.5, 0.0],
+          "staticFriction": 0.5,
+          "dynamicFriction": 0.5,
+          "restitution": 0.05
+        },
+        "SemanticLabel": { "class": "dynamic-box" }
+      }
+    },
+    {
+      "id": "FallingCubeB",
+      "name": "FallingCubeB",
+      "components": {
+        "Transform": { "translation": [0.55, 4.6, -0.2] },
+        "PrefabInstance": { "source": "builtin:cube" },
+        "RigidBody": {
+          "motion": "dynamic",
+          "mass": 1.2,
+          "gravity": true
+        },
+        "Collider": {
+          "shape": "box",
+          "dimensions": [1.0, 1.0, 1.0],
+          "offset": [0.0, 0.5, 0.0],
+          "staticFriction": 0.45,
+          "dynamicFriction": 0.45,
+          "restitution": 0.08
+        },
+        "SemanticLabel": { "class": "dynamic-box" }
+      }
+    },
+    {
+      "id": "BouncingSphere",
+      "name": "BouncingSphere",
+      "components": {
+        "Transform": { "translation": [0.05, 6.2, 0.4] },
+        "PrefabInstance": { "source": "builtin:sphere" },
+        "RigidBody": {
+          "motion": "dynamic",
+          "mass": 0.8,
+          "gravity": true
+        },
+        "Collider": {
+          "shape": "sphere",
+          "radius": 0.5,
+          "offset": [0.0, 0.5, 0.0],
+          "staticFriction": 0.3,
+          "dynamicFriction": 0.3,
+          "restitution": 0.15
+        },
+        "SemanticLabel": { "class": "dynamic-sphere" }
+      }
+    },
+    { "id": "Lights", "name": "Lights" },
+    {
+      "id": "Sun",
+      "name": "Sun",
+      "parent": "Lights",
+      "components": {
+        "Transform": {
+          "rotation": [-0.23053891, -0.15879166, -0.68904659, 0.66846975]
+        },
+        "DirectionalLight": {
+          "angularSize": 1.5,
+          "color": [1.0, 0.96, 0.9],
+          "irradiance": 4.0
+        }
+      }
+    },
+    {
+      "id": "Fill",
+      "name": "Fill",
+      "parent": "Lights",
+      "components": {
+        "Transform": { "translation": [0.0, 3.5, 4.0] },
+        "PointLight": {
+          "color": [1.0, 0.95, 0.85],
+          "intensity": 25.0,
+          "radius": 0.05,
+          "range": 12.0
+        }
+      }
+    },
+    {
+      "id": "Sky",
+      "name": "Sky",
+      "parent": "Lights",
+      "components": {
+        "EnvironmentLight": {
+          "radianceScale": [1.0, 1.0, 1.0],
+          "source": "procedural:sky"
+        }
+      }
+    },
+    { "id": "Cameras", "name": "Cameras" },
+    {
+      "id": "Default",
+      "name": "Default",
+      "parent": "Cameras",
+      "components": {
+        "Transform": { "translation": [0.0, 2.4, 8.0] },
+        "PerspectiveCameraEx": {
+          "verticalFov": 0.7,
+          "zNear": 0.001,
+          "enableAutoExposure": false,
+          "exposureCompensation": 1.0
+        }
+      }
+    }
+  ]
+}

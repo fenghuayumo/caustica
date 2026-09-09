@@ -1196,6 +1196,26 @@ void Scene::attachLeafFromJson(
         return;
     }
 
+    if (scene::isJsonPhysicsLeafType(type))
+    {
+        if (type == "RigidBody")
+        {
+            if (auto component = scene::makeRigidBodyComponentFromJson(src))
+                world.world().emplace<physics::RigidBodyComponent>(entity, *component);
+            else
+                caustica::warning("Failed to build RigidBody leaf.");
+            return;
+        }
+        if (type == "Collider")
+        {
+            if (auto component = scene::makeColliderComponentFromJson(src))
+                world.world().emplace<physics::ColliderComponent>(entity, *component);
+            else
+                caustica::warning("Failed to build Collider leaf.");
+            return;
+        }
+    }
+
     if (type == "SemanticLabel")
     {
         uint32_t instanceId = 0;

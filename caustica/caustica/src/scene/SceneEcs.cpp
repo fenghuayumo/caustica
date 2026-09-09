@@ -2,6 +2,7 @@
 #include <scene/SceneAnimationAccess.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneLightAccess.h>
+#include <physics/Physics.h>
 
 #include <ecs/ChangeDetection.h>
 
@@ -231,6 +232,12 @@ void CopyEntityComponents(
         dstWorld.emplace<MaterialOverrideComponent>(dstEntity, *materialOverride);
     if (const auto* semantic = srcWorld.get<SemanticLabelComponent>(srcEntity))
         dstWorld.emplace<SemanticLabelComponent>(dstEntity, *semantic);
+    if (const auto* authoring = srcWorld.get<SceneAuthoringIdComponent>(srcEntity))
+        dstWorld.emplace<SceneAuthoringIdComponent>(dstEntity, *authoring);
+    if (const auto* body = srcWorld.get<caustica::physics::RigidBodyComponent>(srcEntity))
+        dstWorld.emplace<caustica::physics::RigidBodyComponent>(dstEntity, *body);
+    if (const auto* collider = srcWorld.get<caustica::physics::ColliderComponent>(srcEntity))
+        dstWorld.emplace<caustica::physics::ColliderComponent>(dstEntity, *collider);
     if (const auto* directional = srcWorld.get<DirectionalLightComponent>(srcEntity))
         dstWorld.emplace<DirectionalLightComponent>(dstEntity, *directional);
     if (const auto* spot = srcWorld.get<SpotLightComponent>(srcEntity))

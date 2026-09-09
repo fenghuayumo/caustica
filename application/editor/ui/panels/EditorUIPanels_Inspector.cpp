@@ -20,6 +20,7 @@
 #include <scene/SceneEcs.h>
 #include <scene/SceneCameraAccess.h>
 #include <scene/SceneLightAccess.h>
+#include <physics/Physics.h>
 #include <imgui_internal.h>
 #include <assets/loader/ShaderFactory.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
@@ -28,6 +29,7 @@
 #include <render/passes/debug/Korgi.h>
 #include <common/CaptureScriptManager.h>
 
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -65,9 +67,46 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     };
     static InspectorTransformUndoState s_transformUndo;
 
+    auto drawPhysicsSimulateToggle = [&]() {
+        auto* physics = m_sceneEditor.app()
+            ? m_sceneEditor.app()->tryResource<caustica::physics::PhysicsRuntime>()
+            : nullptr;
+        if (physics && physics->backend)
+        {
+            if (InspectorCheckbox("Simulate Physics", &physics->simulationEnabled))
+                m_settings.ResetAccumulation = true;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "When off, rigid bodies keep their current poses so you can inspect\n"
+                    "and edit the scene. Enable when you are ready to drop / simulate.");
+            if (!physics->simulationEnabled)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, warnColor);
+                ImGui::TextUnformatted("Simulation paused.");
+                ImGui::PopStyleColor();
+            }
+            else
+                ImGui::TextDisabled("Backend: %s", physics->backend->name());
+        }
+        InspectorCheckbox("Show Colliders", &m_editorUI.ShowColliderHelpers);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Draw wireframe collider shapes in the viewport.\n"
+                "Box / sphere / capsule match PhysX size and offset.");
+        ImGui::BeginDisabled(!m_editorUI.ShowColliderHelpers);
+        InspectorCheckbox("Show All Colliders", &m_editorUI.ShowAllColliderHelpers);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("When off, only the selected entity's collider is drawn.");
+        ImGui::EndDisabled();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    };
+
     if (!ew || m_editorUI.SelectedEntity == ecs::NullEntity)
     {
         s_transformUndo = {};
+        drawPhysicsSimulateToggle();
         ImGui::TextDisabled("No selection");
         ImGui::End();
         return;
@@ -98,6 +137,8 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     caustica::GaussianSplat* gaussianSplat = splatComp ? &splatComp->splat : nullptr;
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.f, 6.f));
+
+    drawPhysicsSimulateToggle();
 
     ImGui::TextUnformatted(entityName.c_str());
     ImGui::PushStyleColor(ImGuiCol_Text, GetEditorColors().TextMuted);
@@ -258,6 +299,216 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         }
         beginTransformEdit(sclEdit);
         endTransformEdit(sclEdit);
+    }
+
+    {
+        auto* body = ew->world().tryGet<caustica::physics::RigidBodyComponent>(entity);
+        auto* collider = ew->world().tryGet<caustica::physics::ColliderComponent>(entity);
+        ImGui::Spacing();
+        if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Spacing();
+            if (!body && !collider)
+            {
+                ImGui::TextDisabled("No rigid body on this entity.");
+                if (ImGui::Button("Add Rigid Body", ImVec2(-1.f, 0.f)))
+                {
+                    caustica::physics::RigidBodyComponent newBody{};
+                    caustica::physics::ColliderComponent newCollider{};
+                    newCollider.restitution = 0.05f;
+                    newCollider.offset = math::float3(0.f, 0.5f, 0.f);
+
+                    std::string source;
+                    if (const auto* prefab =
+                            ew->world().tryGet<caustica::scene::PrefabInstanceComponent>(entity))
+                        source = prefab->source;
+                    else if (meshComp && meshComp->mesh)
+                        source = meshComp->mesh->name;
+                    for (char& c : source)
+                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+                    if (source.find("sphere") != std::string::npos)
+                    {
+                        newCollider.shape = caustica::physics::ColliderShape::Sphere;
+                        newCollider.dimensions = math::float3(0.5f);
+                    }
+                    else if (source.find("plane") != std::string::npos)
+                    {
+                        newBody.type = caustica::physics::RigidBodyType::Static;
+                        newBody.mass = 0.f;
+                        newBody.gravity = false;
+                        newCollider.dimensions = math::float3(2.f, 0.2f, 2.f);
+                        newCollider.offset = math::float3(0.f, -0.1f, 0.f);
+                    }
+
+                    ew->world().emplace<caustica::physics::RigidBodyComponent>(entity, newBody);
+                    ew->world().emplace<caustica::physics::ColliderComponent>(entity, newCollider);
+                    m_settings.ResetAccumulation = true;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Adds RigidBody + Collider. Builtin cube/sphere sit on y=0, so the\n"
+                        "default collider offset is (0, 0.5, 0) to match the mesh center.");
+            }
+            else
+            {
+                if (body)
+                {
+                    if (InspectorCheckbox("Enabled", &body->enabled))
+                        m_settings.ResetAccumulation = true;
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("When off, this body is excluded from the simulation.");
+
+                    auto motionLabel = [](caustica::physics::RigidBodyType type) {
+                        switch (type)
+                        {
+                        case caustica::physics::RigidBodyType::Static:
+                            return "Static";
+                        case caustica::physics::RigidBodyType::Kinematic:
+                            return "Kinematic";
+                        default:
+                            return "Dynamic";
+                        }
+                    };
+                    if (InspectorBeginCombo("Motion", motionLabel(body->type)))
+                    {
+                        auto pickMotion = [&](const char* label, caustica::physics::RigidBodyType type) {
+                            const bool selected = body->type == type;
+                            if (ImGui::Selectable(label, selected))
+                            {
+                                body->type = type;
+                                m_settings.ResetAccumulation = true;
+                            }
+                            if (selected)
+                                ImGui::SetItemDefaultFocus();
+                        };
+                        pickMotion("Dynamic", caustica::physics::RigidBodyType::Dynamic);
+                        pickMotion("Static", caustica::physics::RigidBodyType::Static);
+                        pickMotion("Kinematic", caustica::physics::RigidBodyType::Kinematic);
+                        ImGui::EndCombo();
+                        ImGui::PopID();
+                    }
+
+                    const bool isDynamic = body->type == caustica::physics::RigidBodyType::Dynamic;
+                    ImGui::BeginDisabled(!isDynamic);
+                    if (InspectorDragFloat("Mass", &body->mass, 0.05f, 0.001f, 1e6f, "%.3f"))
+                        m_settings.ResetAccumulation = true;
+                    if (InspectorCheckbox("Gravity", &body->gravity))
+                        m_settings.ResetAccumulation = true;
+                    ImGui::EndDisabled();
+                }
+                else if (ImGui::Button("Add Rigid Body", ImVec2(-1.f, 0.f)))
+                {
+                    ew->world().emplace<caustica::physics::RigidBodyComponent>(
+                        entity, caustica::physics::RigidBodyComponent{});
+                    m_settings.ResetAccumulation = true;
+                }
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+                ImGui::TextColored(categoryColor, "Collider");
+                InspectorCheckbox("Show Collider", &m_editorUI.ShowColliderHelpers);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Viewport wireframe for this collider (and others if Show All is on).");
+
+                if (collider)
+                {
+                    auto shapeLabel = [](caustica::physics::ColliderShape shape) {
+                        switch (shape)
+                        {
+                        case caustica::physics::ColliderShape::Sphere:
+                            return "Sphere";
+                        case caustica::physics::ColliderShape::Capsule:
+                            return "Capsule";
+                        default:
+                            return "Box";
+                        }
+                    };
+                    if (InspectorBeginCombo("Shape", shapeLabel(collider->shape)))
+                    {
+                        auto pickShape = [&](const char* label, caustica::physics::ColliderShape shape) {
+                            const bool selected = collider->shape == shape;
+                            if (ImGui::Selectable(label, selected))
+                            {
+                                collider->shape = shape;
+                                m_settings.ResetAccumulation = true;
+                            }
+                            if (selected)
+                                ImGui::SetItemDefaultFocus();
+                        };
+                        pickShape("Box", caustica::physics::ColliderShape::Box);
+                        pickShape("Sphere", caustica::physics::ColliderShape::Sphere);
+                        pickShape("Capsule", caustica::physics::ColliderShape::Capsule);
+                        ImGui::EndCombo();
+                        ImGui::PopID();
+                    }
+
+                    if (collider->shape == caustica::physics::ColliderShape::Sphere)
+                    {
+                        if (InspectorDragFloat("Radius", &collider->dimensions.x, 0.01f, 0.001f, 1e6f, "%.3f"))
+                        {
+                            collider->dimensions.y = collider->dimensions.x;
+                            collider->dimensions.z = collider->dimensions.x;
+                            m_settings.ResetAccumulation = true;
+                        }
+                    }
+                    else if (collider->shape == caustica::physics::ColliderShape::Capsule)
+                    {
+                        if (InspectorDragFloat("Radius", &collider->dimensions.x, 0.01f, 0.001f, 1e6f, "%.3f"))
+                            m_settings.ResetAccumulation = true;
+                        if (InspectorDragFloat("Height", &collider->dimensions.y, 0.01f, 0.001f, 1e6f, "%.3f"))
+                            m_settings.ResetAccumulation = true;
+                    }
+                    else
+                    {
+                        float dimensions[3] = {
+                            collider->dimensions.x, collider->dimensions.y, collider->dimensions.z
+                        };
+                        if (InspectorDragFloat3("Dimensions", dimensions, 0.01f, 0.001f, 1e6f, "%.3f"))
+                        {
+                            collider->dimensions = math::float3(dimensions[0], dimensions[1], dimensions[2]);
+                            m_settings.ResetAccumulation = true;
+                        }
+                    }
+
+                    float offset[3] = { collider->offset.x, collider->offset.y, collider->offset.z };
+                    if (InspectorDragFloat3("Offset", offset, 0.01f, 0.f, 0.f, "%.3f"))
+                    {
+                        collider->offset = math::float3(offset[0], offset[1], offset[2]);
+                        m_settings.ResetAccumulation = true;
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Collider center relative to Transform. Builtin cube/sphere origin\n"
+                            "is at the bottom, so (0, 0.5, 0) aligns a 1m collider with the mesh.");
+
+                    if (InspectorDragFloat("Static Friction", &collider->staticFriction, 0.01f, 0.f, 2.f, "%.2f"))
+                        m_settings.ResetAccumulation = true;
+                    if (InspectorDragFloat("Dynamic Friction", &collider->dynamicFriction, 0.01f, 0.f, 2.f, "%.2f"))
+                        m_settings.ResetAccumulation = true;
+                    if (InspectorDragFloat("Restitution", &collider->restitution, 0.01f, 0.f, 1.f, "%.2f"))
+                        m_settings.ResetAccumulation = true;
+                    if (InspectorCheckbox("Trigger", &collider->isTrigger))
+                        m_settings.ResetAccumulation = true;
+                }
+                else if (ImGui::Button("Add Collider", ImVec2(-1.f, 0.f)))
+                {
+                    caustica::physics::ColliderComponent newCollider{};
+                    newCollider.offset = math::float3(0.f, 0.5f, 0.f);
+                    ew->world().emplace<caustica::physics::ColliderComponent>(entity, newCollider);
+                    m_settings.ResetAccumulation = true;
+                }
+
+                ImGui::Spacing();
+                if (ImGui::Button("Remove Rigid Body", ImVec2(-1.f, 0.f)))
+                {
+                    ew->world().remove<caustica::physics::RigidBodyComponent>(entity);
+                    ew->world().remove<caustica::physics::ColliderComponent>(entity);
+                    m_settings.ResetAccumulation = true;
+                }
+            }
+        }
     }
 
     if (gaussianSplat)

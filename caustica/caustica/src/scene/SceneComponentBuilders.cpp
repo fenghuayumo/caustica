@@ -1,6 +1,9 @@
 #include <scene/SceneComponentBuilders.h>
 #include <scene/SceneSerializer.h>
 #include <core/json.h>
+#include <core/StringUtils.h>
+
+#include <algorithm>
 
 namespace caustica::scene
 {
@@ -148,6 +151,106 @@ std::optional<CameraComponent> makeCameraComponentFromJson(const std::string& ty
     }
 
     return std::nullopt;
+}
+
+bool isJsonPhysicsLeafType(const std::string& type)
+{
+    return type == "RigidBody" || type == "Collider";
+}
+
+std::optional<physics::RigidBodyComponent> makeRigidBodyComponentFromJson(const Json::Value& src)
+{
+    physics::RigidBodyComponent body;
+    std::string motion = "dynamic";
+    if (src["motion"].isString())
+        src["motion"] >> motion;
+    else if (src["bodyType"].isString())
+        src["bodyType"] >> motion;
+    if (caustica::string_utils::caseInsensitiveEquals(motion, std::string("static")))
+        body.type = physics::RigidBodyType::Static;
+    else if (caustica::string_utils::caseInsensitiveEquals(motion, std::string("kinematic")))
+        body.type = physics::RigidBodyType::Kinematic;
+    else
+        body.type = physics::RigidBodyType::Dynamic;
+    src["mass"] >> body.mass;
+    src["gravity"] >> body.gravity;
+    src["enabled"] >> body.enabled;
+    src["linearVelocity"] >> body.linearVelocity;
+    src["angularVelocity"] >> body.angularVelocity;
+    return body;
+}
+
+std::optional<physics::ColliderComponent> makeColliderComponentFromJson(const Json::Value& src)
+{
+    physics::ColliderComponent collider;
+    std::string shape = "box";
+    if (src["shape"].isString())
+        src["shape"] >> shape;
+    if (caustica::string_utils::caseInsensitiveEquals(shape, std::string("sphere")))
+        collider.shape = physics::ColliderShape::Sphere;
+    else if (caustica::string_utils::caseInsensitiveEquals(shape, std::string("capsule")))
+        collider.shape = physics::ColliderShape::Capsule;
+    else
+        collider.shape = physics::ColliderShape::Box;
+    if (src["dimensions"].isArray() || src["dimensions"].isNumeric())
+        src["dimensions"] >> collider.dimensions;
+    else if (src["size"].isArray() || src["size"].isNumeric())
+        src["size"] >> collider.dimensions;
+    else if (collider.shape == physics::ColliderShape::Sphere && src["radius"].isNumeric())
+    {
+        float radius = collider.dimensions.x;
+        src["radius"] >> radius;
+        collider.dimensions = math::float3(radius);
+    }
+    src["offset"] >> collider.offset;
+    src["staticFriction"] >> collider.staticFriction;
+    src["dynamicFriction"] >> collider.dynamicFriction;
+    src["restitution"] >> collider.restitution;
+    src["isTrigger"] >> collider.isTrigger;
+    return collider;
+}
+
+void writeRigidBodyComponent(Json::Value& dst, const physics::RigidBodyComponent& body)
+{
+    switch (body.type)
+    {
+    case physics::RigidBodyType::Static:
+        dst["motion"] = "static";
+        break;
+    case physics::RigidBodyType::Kinematic:
+        dst["motion"] = "kinematic";
+        break;
+    default:
+        dst["motion"] = "dynamic";
+        break;
+    }
+    dst["mass"] << body.mass;
+    dst["gravity"] << body.gravity;
+    dst["enabled"] << body.enabled;
+    dst["linearVelocity"] << body.linearVelocity;
+    dst["angularVelocity"] << body.angularVelocity;
+}
+
+void writeColliderComponent(Json::Value& dst, const physics::ColliderComponent& collider)
+{
+    switch (collider.shape)
+    {
+    case physics::ColliderShape::Sphere:
+        dst["shape"] = "sphere";
+        break;
+    case physics::ColliderShape::Capsule:
+        dst["shape"] = "capsule";
+        break;
+    default:
+        dst["shape"] = "box";
+        break;
+    }
+    dst["dimensions"] << collider.dimensions;
+    dst["offset"] << collider.offset;
+    dst["staticFriction"] << collider.staticFriction;
+    dst["dynamicFriction"] << collider.dynamicFriction;
+    dst["restitution"] << collider.restitution;
+    dst["isTrigger"] << collider.isTrigger;
 }
 
 } // namespace caustica::scene

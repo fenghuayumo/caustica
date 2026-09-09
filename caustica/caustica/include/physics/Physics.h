@@ -40,6 +40,7 @@ struct RigidBodyComponent
     RigidBodyType type = RigidBodyType::Dynamic;
     float mass = 1.0f;
     bool gravity = true;
+    bool enabled = true;
     math::float3 linearVelocity = 0.f;
     math::float3 angularVelocity = 0.f;
 };
@@ -49,6 +50,9 @@ struct ColliderComponent
     ColliderShape shape = ColliderShape::Box;
     // Full box dimensions, sphere radius in x, capsule radius/height in x/y.
     math::float3 dimensions = math::float3(1.f);
+    // Shape center relative to the entity transform. Builtin cube/sphere sit
+    // on y=0 with their origin at the bottom, so use (0, 0.5, 0).
+    math::float3 offset = 0.f;
     float staticFriction = 0.5f;
     float dynamicFriction = 0.5f;
     float restitution = 0.f;
@@ -91,6 +95,9 @@ struct PhysicsRuntime
     float fixedDeltaSeconds = 1.0f / 60.0f;
     float accumulatorSeconds = 0.f;
     uint32_t maxSubsteps = 4;
+    // Editor starts this false so loading a physics scene does not immediately
+    // drop bodies before the user can inspect them.
+    bool simulationEnabled = true;
     // Kept separately so presentation may interpolate between fixed ticks
     // without changing the simulation state.
     std::unordered_map<ecs::Entity, PhysicsPose> previousPoses;

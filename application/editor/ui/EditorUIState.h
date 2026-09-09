@@ -103,6 +103,10 @@ struct EditorSelectionState
     bool ShowInfiniteGrid = true;
     // Viewport light icons / dashed helpers; toggle with G.
     bool ShowLightHelpers = true;
+    // Viewport collider wireframes (box / sphere / capsule). Selected is
+    // highlighted; ShowAllColliderHelpers draws every body.
+    bool ShowColliderHelpers = true;
+    bool ShowAllColliderHelpers = false;
     // Viewport corner orientation gizmo (ImOGuizmo); default visible.
     bool ShowViewOrientationGizmo = true;
     bool GizmoEnabled = true;

@@ -2,6 +2,7 @@
 #include <scene/SceneLightAccess.h>
 #include <scene/SceneRenderSnapshot.h>
 #include <scene/SceneSemanticIds.h>
+#include <physics/Physics.h>
 
 #include <cstdio>
 
@@ -151,6 +152,32 @@ int main()
         const caustica::ecs::Entity extra = scratch.createEntity("Extra", scratch.root());
         passed &= expect(live.isAlive(extra) && &scratch.world() == &live,
             "borrowed SceneEntityWorld did not spawn into the live registry");
+    }
+
+    {
+        caustica::ecs::World live;
+        caustica::scene::SceneEntityWorld scratch;
+        const caustica::ecs::Entity root = scratch.createEntity("Root");
+        const caustica::ecs::Entity box = scratch.createEntity("Box", root);
+        scratch.world().emplace<caustica::physics::RigidBodyComponent>(
+            box, caustica::physics::RigidBodyComponent{
+                .type = caustica::physics::RigidBodyType::Dynamic,
+                .mass = 2.5f,
+            });
+        scratch.world().emplace<caustica::physics::ColliderComponent>(
+            box, caustica::physics::ColliderComponent{
+                .shape = caustica::physics::ColliderShape::Box,
+                .dimensions = caustica::math::float3(1.f, 2.f, 3.f),
+            });
+
+        scratch.adoptInto(live);
+        const caustica::ecs::Entity imported = scratch.findEntity("Box", scratch.root());
+        const auto* body = live.tryGet<caustica::physics::RigidBodyComponent>(imported);
+        const auto* collider = live.tryGet<caustica::physics::ColliderComponent>(imported);
+        passed &= expect(body && body->mass == 2.5f,
+            "adoptInto dropped RigidBodyComponent");
+        passed &= expect(collider && collider->dimensions.y == 2.f,
+            "adoptInto dropped ColliderComponent");
     }
 
     {

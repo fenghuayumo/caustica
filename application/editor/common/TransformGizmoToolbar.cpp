@@ -71,9 +71,9 @@ void ToolbarSeparator(ImDrawList* dl, float height)
 
 void GetTransformGizmoToolbarSize(float& width, float& height)
 {
-    // Select | Move | Rotate | Scale | Space | Snap | Grid | Lights | Material
-    constexpr int toolCount = 9;
-    constexpr int gapCount = 6;
+    // Select | Move | Rotate | Scale | Space | Snap | Grid | Lights | Colliders | Material
+    constexpr int toolCount = 10;
+    constexpr int gapCount = 7;
     constexpr int sepCount = 2;
     width = kPad * 2.f + kBtn * float(toolCount) + kGap * float(gapCount) + 5.f * float(sepCount);
     height = kBtn + kPad * 2.f;
@@ -174,6 +174,15 @@ void BuildTransformGizmoToolbar(EditorUIState& editorUI)
             editorUI.ShowLightHelpers,
             editorUI.ShowLightHelpers ? "Hide light gizmos (G)" : "Show light gizmos (G)"))
         editorUI.ShowLightHelpers = !editorUI.ShowLightHelpers;
+
+    ImGui::SameLine(0.f, kGap);
+
+    if (ToolButton(
+            "##GizmoColliders",
+            ICON_MS_VIEW_IN_AR,
+            editorUI.ShowColliderHelpers,
+            editorUI.ShowColliderHelpers ? "Hide collider gizmos" : "Show collider gizmos"))
+        editorUI.ShowColliderHelpers = !editorUI.ShowColliderHelpers;
 
     ImGui::SameLine(0.f, kGap);
 

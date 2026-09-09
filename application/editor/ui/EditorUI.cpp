@@ -305,6 +305,7 @@ void EditorUI::buildUI(void)
     const TransformGizmoContext gizmoCtx{ m_sceneEditor, m_editorUI, m_settings };
     DrawInfiniteGrid(gizmoCtx);
     DrawLightHelpers(gizmoCtx);
+    DrawColliderHelpers(gizmoCtx);
     DrawTransformGizmo(gizmoCtx);
     DrawViewOrientationGizmo(gizmoCtx);
     BuildStatusBar();

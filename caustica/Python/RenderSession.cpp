@@ -4,6 +4,7 @@
 
 #include <engine/EngineApp.h>
 #include <core/log.h>
+#include <physics/PhysicsPlugin.h>
 #include <platform/window.h>
 
 #include <algorithm>
@@ -72,6 +73,8 @@ RenderSession::RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, 
         m_device->unbind();
         return;
     }
+
+    m_engine->addPlugin<caustica::physics::PhysicsPlugin>();
 
     auto& cmdLine = m_engine->commandLine();
     cmdLine.nonInteractive = cfg.nonInteractive;

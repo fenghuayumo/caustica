@@ -12,7 +12,22 @@ namespace
 using namespace physx;
 
 PxVec3 px(const math::double3& value) { return PxVec3(float(value.x), float(value.y), float(value.z)); }
+PxVec3 px(const math::float3& value) { return PxVec3(value.x, value.y, value.z); }
 PxQuat px(const math::dquat& value) { return PxQuat(float(value.x), float(value.y), float(value.z), float(value.w)); }
+
+PxFilterFlags SimulationFilter(
+    PxFilterObjectAttributes attributes0, PxFilterData,
+    PxFilterObjectAttributes attributes1, PxFilterData,
+    PxPairFlags& pairFlags, const void*, PxU32)
+{
+    if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
+    {
+        pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+        return PxFilterFlag::eDEFAULT;
+    }
+    pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eDETECT_CCD_CONTACT;
+    return PxFilterFlag::eDEFAULT;
+}
 
 class PhysXBackend final : public PhysicsBackend
 {
@@ -29,7 +44,8 @@ public:
         desc.gravity = PxVec3(0.f, -9.81f, 0.f);
         m_dispatcher = PxDefaultCpuDispatcherCreate(2);
         desc.cpuDispatcher = m_dispatcher;
-        desc.filterShader = PxDefaultSimulationFilterShader;
+        desc.filterShader = SimulationFilter;
+        desc.flags |= PxSceneFlag::eENABLE_CCD;
         m_scene = m_physics->createScene(desc);
     }
 
@@ -54,6 +70,8 @@ public:
         {
             auto* dynamic = m_physics->createRigidDynamic(transform);
             dynamic->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, body.type == RigidBodyType::Kinematic);
+            if (body.type == RigidBodyType::Dynamic)
+                dynamic->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, true);
             dynamic->setActorFlag(PxActorFlag::eDISABLE_GRAVITY, !body.gravity);
             dynamic->setLinearVelocity(PxVec3(body.linearVelocity.x, body.linearVelocity.y, body.linearVelocity.z));
             dynamic->setAngularVelocity(PxVec3(body.angularVelocity.x, body.angularVelocity.y, body.angularVelocity.z));
@@ -72,6 +90,7 @@ public:
         }
         material->release();
         if (!shape) { actor->release(); return false; }
+        shape->setLocalPose(PxTransform(px(collider.offset)));
         shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, !collider.isTrigger);
         shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, collider.isTrigger);
         actor->attachShape(*shape);

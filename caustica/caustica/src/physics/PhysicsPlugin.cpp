@@ -1,5 +1,6 @@
 #include <physics/PhysicsPlugin.h>
 
+#include <core/log.h>
 #include <engine/App.h>
 #include <engine/AppSchedules.h>
 #include <engine/SystemSets.h>
@@ -25,13 +26,13 @@ struct PhysicsSyncTransforms
 
 bool same(const RigidBodyComponent& a, const RigidBodyComponent& b)
 {
-    return a.type == b.type && a.mass == b.mass && a.gravity == b.gravity
+    return a.type == b.type && a.mass == b.mass && a.gravity == b.gravity && a.enabled == b.enabled
         && all(a.linearVelocity == b.linearVelocity) && all(a.angularVelocity == b.angularVelocity);
 }
 
 bool same(const ColliderComponent& a, const ColliderComponent& b)
 {
-    return a.shape == b.shape && all(a.dimensions == b.dimensions)
+    return a.shape == b.shape && all(a.dimensions == b.dimensions) && all(a.offset == b.offset)
         && a.staticFriction == b.staticFriction && a.dynamicFriction == b.dynamicFriction
         && a.restitution == b.restitution && a.isTrigger == b.isTrigger;
 }
@@ -126,7 +127,8 @@ void createMissingBodies(ecs::World& world, PhysicsRuntime& runtime)
     for (auto it = runtime.previousPoses.begin(); it != runtime.previousPoses.end();)
     {
         const ecs::Entity entity = it->first;
-        if (!world.tryGet<RigidBodyComponent>(entity) || !world.tryGet<ColliderComponent>(entity)
+        const auto* body = world.tryGet<RigidBodyComponent>(entity);
+        if (!body || !body->enabled || !world.tryGet<ColliderComponent>(entity)
             || !world.tryGet<scene::LocalTransformComponent>(entity))
         {
             runtime.backend->destroyBody(entity);
@@ -141,6 +143,8 @@ void createMissingBodies(ecs::World& world, PhysicsRuntime& runtime)
     world.each<RigidBodyComponent, ColliderComponent, scene::LocalTransformComponent, scene::GlobalTransformComponent>(
         [&runtime](ecs::Entity entity, RigidBodyComponent& body, ColliderComponent& collider,
             scene::LocalTransformComponent& local, scene::GlobalTransformComponent& global) {
+            if (!body.enabled)
+                return;
             const PhysicsBodyDescriptor descriptor{ body, collider };
             if (const auto existing = runtime.bodyDescriptors.find(entity);
                 existing != runtime.bodyDescriptors.end() && same(existing->second, descriptor))
@@ -165,7 +169,9 @@ void createMissingBodies(ecs::World& world, PhysicsRuntime& runtime)
 void synchronizePoses(ecs::World& world, PhysicsRuntime& runtime)
 {
     world.each<RigidBodyComponent, scene::LocalTransformComponent>(
-        [&runtime, &world](ecs::Entity entity, RigidBodyComponent&, scene::LocalTransformComponent& transform) {
+        [&runtime, &world](ecs::Entity entity, RigidBodyComponent& body, scene::LocalTransformComponent& transform) {
+            if (!body.enabled)
+                return;
             const auto current = runtime.currentPoses.find(entity);
             if (current == runtime.currentPoses.end())
                 return;
@@ -177,6 +183,18 @@ void synchronizePoses(ecs::World& world, PhysicsRuntime& runtime)
         });
 }
 
+void destroyAllBodies(PhysicsRuntime& runtime)
+{
+    if (!runtime.backend)
+        return;
+    for (auto& [entity, _] : runtime.previousPoses)
+        runtime.backend->destroyBody(entity);
+    runtime.previousPoses.clear();
+    runtime.currentPoses.clear();
+    runtime.bodyDescriptors.clear();
+    runtime.accumulatorSeconds = 0.f;
+}
+
 } // namespace
 
 void PhysicsPlugin::build(App& app)
@@ -186,6 +204,10 @@ void PhysicsPlugin::build(App& app)
 
     PhysicsRuntime runtime;
     runtime.backend = std::move(m_backend);
+    runtime.simulationEnabled = m_simulationEnabled;
+    caustica::info("PhysicsPlugin: backend=%s fixedDt=%.4fs simulate=%s",
+        runtime.backend->name(), runtime.fixedDeltaSeconds,
+        runtime.simulationEnabled ? "on" : "paused");
     app.insertResource(std::move(runtime));
 }
 
@@ -202,6 +224,11 @@ void PhysicsPlugin::configureSchedules(App& app)
             PhysicsRuntime& runtime = ctx.resMut<PhysicsRuntime>();
             if (!runtime.backend || ctx.deltaTimeSeconds <= 0.f)
                 return;
+            if (!runtime.simulationEnabled)
+            {
+                destroyAllBodies(runtime);
+                return;
+            }
 
             createMissingBodies(ctx.world, runtime);
             runtime.accumulatorSeconds += ctx.deltaTimeSeconds;
@@ -229,7 +256,7 @@ void PhysicsPlugin::configureSchedules(App& app)
         AppSchedule::PostUpdate,
         [](SystemContext& ctx) {
             PhysicsRuntime& runtime = ctx.resMut<PhysicsRuntime>();
-            if (runtime.backend)
+            if (runtime.backend && runtime.simulationEnabled)
                 synchronizePoses(ctx.world, runtime);
         },
         AppSystemOrdering{}.runBefore<system_set::TransformPropagate>());

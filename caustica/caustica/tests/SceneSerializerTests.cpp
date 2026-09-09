@@ -533,5 +533,50 @@ int main()
         passed &= expect(label["class"].asString() == "cube", "SemanticLabel.class was not saved");
     }
 
+    {
+        const Json::Value bodyNode = parse(R"({
+            "motion": "static",
+            "mass": 4.5,
+            "gravity": false,
+            "linearVelocity": [0.1, 0.2, 0.3]
+        })");
+        auto body = caustica::scene::makeRigidBodyComponentFromJson(bodyNode);
+        passed &= expect(body && body->type == caustica::physics::RigidBodyType::Static,
+            "RigidBody.motion=static was not parsed");
+        passed &= expect(body && std::abs(body->mass - 4.5f) < 1e-5f, "RigidBody.mass was not parsed");
+        passed &= expect(body && !body->gravity, "RigidBody.gravity was not parsed");
+        passed &= expect(body && std::abs(body->linearVelocity.y - 0.2f) < 1e-5f,
+            "RigidBody.linearVelocity was not parsed");
+
+        const Json::Value colliderNode = parse(R"({
+            "shape": "sphere",
+            "radius": 0.75,
+            "restitution": 0.4
+        })");
+        auto collider = caustica::scene::makeColliderComponentFromJson(colliderNode);
+        passed &= expect(collider && collider->shape == caustica::physics::ColliderShape::Sphere,
+            "Collider.shape=sphere was not parsed");
+        passed &= expect(collider && std::abs(collider->dimensions.x - 0.75f) < 1e-5f,
+            "Collider.radius was not parsed");
+        passed &= expect(collider && std::abs(collider->restitution - 0.4f) < 1e-5f,
+            "Collider.restitution was not parsed");
+
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity box = world.createEntity("Box", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            box, caustica::scene::SceneAuthoringIdComponent{ "Box" });
+        world.world().emplace<caustica::physics::RigidBodyComponent>(box, *body);
+        world.world().emplace<caustica::physics::ColliderComponent>(box, *collider);
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::upsertAuthoredEntityNode(document, world, box);
+        const Json::Value& components = document["entities"][0]["components"];
+        passed &= expect(components["RigidBody"]["motion"].asString() == "static",
+            "upsert did not write RigidBody.motion");
+        passed &= expect(components["Collider"]["shape"].asString() == "sphere",
+            "upsert did not write Collider.shape");
+    }
+
     return passed ? 0 : 1;
 }
