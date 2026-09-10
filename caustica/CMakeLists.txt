@@ -797,5 +797,19 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
             RESOURCE_LOCK caustica_gpu
             TIMEOUT 300
         )
+
+        add_test(
+            NAME causSensorRobotFkRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/sensor_robot_fk_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/sensor-robot-fk"
+        )
+        set_tests_properties(causSensorRobotFkRenderTests PROPERTIES
+            LABELS "gpu;render;sensor"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
     endif()
 endif()

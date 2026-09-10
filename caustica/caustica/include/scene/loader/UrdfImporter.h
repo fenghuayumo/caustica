@@ -10,9 +10,9 @@ namespace caustica
     class TextureLoader;
     class SceneTypeFactory;
 
-    // Imports a URDF robot as a static scene hierarchy (links + joints at rest pose).
-    // Visual meshes: STL (ASCII/binary). Primitive visuals (box/cylinder/sphere) are generated.
-    // Collision geometry and joint animation are ignored.
+    // Imports a URDF robot as a visual link tree. Movable joints are stored on the
+    // robot root (RobotComponent) for engine visual FK. Collision / drive / effort
+    // are ignored. Visual meshes: STL (ASCII/binary) and box/cylinder/sphere primitives.
     class UrdfImporter
     {
     protected:

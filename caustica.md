@@ -51,10 +51,10 @@ Schedule internals: [docs/embedding-cpp.md](docs/embedding-cpp.md) · header all
 
 - Render: [headless](#headless-reference-render) · [framebuffer](#accumulate-then-read-framebuffer-cpu--numpy) · [window](#windowed-interactive-loop) · [modes](#realtime-vs-reference-helpers)
 - Camera: [pose and FOV](#camera-pose-and-fov) · [reference](#camera)
-- Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets)
+- Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets) · [URDF visual FK](#urdf-visual-fk)
 - Look: [materials](#edit-materials) · [textures](#read-and-replace-material-textures) · [lights](#edit-lights) · [unlit](#unlit-receivers-with-shadows)
 - 3DGS: [load](#load-3d-gaussian-splats) · [batch](#3dgs-reference--realtime-batch) · [COLMAP](#colmap-camera-3dgs-alignment)
-- Mesh: [deform](#deform-mesh-vertices)
+- Mesh: [deform](#deform-mesh-vertices) · [triangles](#rewrite-mesh-triangles)
 - GPU: [reuse device](#reuse-a-gpu-across-scene-loads)
 
 **[Reference](#reference)**
@@ -320,10 +320,10 @@ Copy a recipe and jump to [Reference](#reference) for signatures.
 
 - Render: [headless](#headless-reference-render) · [framebuffer](#accumulate-then-read-framebuffer-cpu--numpy) · [window](#windowed-interactive-loop) · [modes](#realtime-vs-reference-helpers)
 - Camera: [pose and FOV](#camera-pose-and-fov) · [reference](#camera)
-- Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets)
+- Scene: [builtin](#builtin--inline-scenes) · [OBJ](#load-obj-meshes-with-materials) · [spawn](#spawn--despawn-assets) · [URDF visual FK](#urdf-visual-fk)
 - Look: [materials](#edit-materials) · [textures](#read-and-replace-material-textures) · [lights](#edit-lights) · [unlit](#unlit-receivers-with-shadows)
 - 3DGS: [load](#load-3d-gaussian-splats) · [batch](#3dgs-reference--realtime-batch) · [COLMAP](#colmap-camera-3dgs-alignment)
-- Mesh: [deform](#deform-mesh-vertices)
+- Mesh: [deform](#deform-mesh-vertices) · [triangles](#rewrite-mesh-triangles)
 - GPU: [reuse device](#reuse-a-gpu-across-scene-loads)
 
 ### Headless reference render
@@ -829,6 +829,43 @@ auto clone = engine->spawn(prefab);
 engine->despawn(entity);
 ```
 
+### URDF visual FK
+
+URDF import builds a visual link tree. **Scheme A**: the engine stores movable joints on the robot root and applies FK. Contact, effort, and joint drive stay on the host. `joint_names` is `revolute` / `continuous` / `prismatic` in URDF order. `q` is radians or metres. Host-side FK can still use `set_world_poses` (scheme B).
+
+```python
+import math
+import numpy as np
+import caustica
+
+with caustica.EngineApp.create(scene="builtin:plane_cube", headless=True, realtime=True) as engine:
+    engine.wait_until_ready()
+    robot = engine.spawn_from_file("xarm.urdf")
+    q = np.zeros(len(robot.joint_names), dtype=np.float32)
+    q[0] = math.radians(30.0)
+    robot.set_joint_positions(q)
+    t, rot = robot.get_link_pose("link_eef")
+    wrist = robot.attach_camera(
+        "wrist",
+        link="link_eef",
+        local_t=(0.0, 0.0, 0.08),
+        local_q=(0.0, 0.0, 0.0, 1.0),
+    )
+```
+
+```cpp
+auto robot = engine->spawnFromFile("xarm.urdf");
+auto names = engine->jointNames(robot);
+std::vector<float> q(names.size(), 0.f);
+q[0] = 0.5f;
+engine->setJointPositions(robot, q.data(), q.size());
+caustica::math::double3 t;
+caustica::math::dquat r;
+engine->getLinkPose(robot, "link_eef", t, r);
+auto wrist = engine->attachCamera(
+    robot, "wrist", "link_eef", {0.0, 0.0, 0.08}, caustica::math::dquat::identity());
+```
+
 ### Deform mesh vertices
 
 Mesh deformation is **entity-first**. Importers may split one authored position into several render vertices for UV/normal seams; the API returns that position once and write-back propagates to all splits. After `set_mesh_vertices` / `deform_mesh`, GPU buffers refresh and ray-tracing AS can rebuild.
@@ -885,6 +922,23 @@ engine->setMeshVertices(entity, verts, { .recomputeNormals = true });
 ```
 
 Keep `rebuild_acceleration_structure=True` for ray-tracing-correct geometry. Set it `False` only when batching several edits, then call `request_full_accel_rebuild()` once. Shared mesh buffers still apply: deforming through one mesh entity updates other instances of the same engine mesh record.
+
+### Rewrite mesh triangles
+
+Cloth / tearing updates connectivity. `triangles` is `(F, 3)` indexing the unique vertices from `get_mesh_vertices`. Face-count changes rebuild AS.
+
+```python
+import numpy as np
+
+verts = engine.get_mesh_vertices(cloth)
+faces = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.uint32)
+engine.set_mesh_triangles(cloth, faces)
+```
+
+```cpp
+const uint32_t faces[] = { 0, 1, 2, 0, 2, 3 };
+engine->setMeshTriangles(cloth, faces, 2);
+```
 
 ### Unlit receivers with shadows
 
@@ -1049,6 +1103,10 @@ wrist.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
 | `spawnCamera(desc)` | `spawn_camera(name="", parent=None, local_translation=(0,0,0), local_rotation=(0,0,0,1), local_scaling=(1,1,1), vertical_fov=0.7, z_near=0.001, intrinsics=None)` | entity | Perspective camera. `parent=None` attaches under the scene root. Rotation is xyzw. With a parent, aim with `local_pose`, not `look_to`. |
 | `setParent(entity, parent)` | `SceneEntity.set_parent(entity_or_path)` | `bool` / `None` | `NullEntity` / `None` attaches under the scene root. |
 | `setWorldPoses(names, translationsNx3, rotationsXyzwNx4, scalesNx3)` | `set_world_poses(names, translations, rotations_xyzw, scales=None)` | `size_t` / `None` | Batch world TRS. `translations` `(N,3)`, `rotations_xyzw` `(N,4)`, optional `scales` `(N,3)`. One hierarchy refresh. |
+| `jointNames(robot)` | `robot.joint_names` | `list[str]` | Movable URDF joints (`revolute` / `continuous` / `prismatic`) in document order. Empty if the entity is not a robot root. |
+| `setJointPositions(robot, q, count)` | `robot.set_joint_positions(q)` | `bool` / `None` | Visual FK. `q` length matches `joint_names`. Revolute/continuous are **radians**, prismatic is **metres**. One hierarchy refresh. No contact/effort. |
+| `getLinkPose(robot, link, t, q)` | `robot.get_link_pose(link_name)` | `(t, q)` | World translation + xyzw of a named link under the robot. |
+| `attachCamera(robot, name, link, localT, localQ)` | `robot.attach_camera(name, link, local_t=(0,0,0), local_q=(0,0,0,1))` | entity | Perspective camera parented to that link. `local_q` is xyzw. |
 | `loadGaussianSplatFile(path, convertRdfToRub=true)` | `load_gaussian_splat_file(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` node. |
 | `gaussianSplatCount()` | `.gaussian_splat_count` | `int` | |
 | `gaussianSplatObjectCount()` | `.gaussian_splat_object_count` | `int` | |
@@ -1064,6 +1122,7 @@ Empty light `name` auto-generates a unique name (`DirectionalLight`, `PointLight
 | `findMaterial(materialID)` | `find_material(material_id)` | material / `None` | Cache-backed pick id. Name lookup: `engine.scene.find_material("Floor")`. |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[(x,y,z)]` | Unique object-space positions; UV/normal splits collapsed. |
 | `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | Length must match `get_mesh_vertices`. `vertices` may be a list of triples or NumPy `(V, 3)` float32/float64. |
+| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(entity, triangles, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | `triangles` is `(F, 3)` uint32 (or int32/int64) indexing `get_mesh_vertices`. Topology change rebuilds AS. |
 | `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | World space. |
 | — | `deform_mesh` / `deform_mesh_world` | `int` | Python sugar: callback per unique vertex. |
 | `requestMeshAccelRebuild(entity)` | `request_mesh_accel_rebuild(entity)` | `void` | One mesh BLAS. |
@@ -1154,6 +1213,10 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | `world_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Entity world TRS, **no** camera Z-flip. |
 | `set_local_pose(position, rotation, scaling=(1,1,1))` | `None` | One hierarchy refresh. |
 | `set_world_pose(position, rotation, scaling=(1,1,1))` | `None` | Entity TRS through the parent. Do not use this to aim a camera. |
+| `joint_names` | `list[str]` | Movable URDF joints on a robot root. Empty otherwise. |
+| `set_joint_positions(q)` | `None` | Visual FK; `q` aligned with `joint_names`. |
+| `get_link_pose(link_name)` | `((x,y,z), (x,y,z,w))` | World translation + xyzw of a named link. |
+| `attach_camera(name, link, local_t, local_q)` | `SceneEntity` | Camera parented to that link. |
 | `bounds` | AABB tuple or `None` | World subgraph. |
 | `color` | `(r,g,b)` | Light. Writable. |
 | `position` | `(x,y,z)` | World position (updates local translation). Lights and cameras. |
@@ -1538,7 +1601,7 @@ See [Cookbook](#edit-lights). Environment tweaks also live on `settings.environm
 
 ## Spawn / despawn
 
-Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`. Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously.
+Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`. Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously. URDF robots expose visual FK on the spawned root (`joint_names` / `set_joint_positions`); see [URDF visual FK](#urdf-visual-fk).
 
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
@@ -1556,12 +1619,15 @@ See [Cookbook](#spawn--despawn-assets) and [Load OBJ meshes with materials](#loa
 | --- | --- | --- | --- |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space positions. |
 | `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | List of triples or NumPy `(V, 3)`. `space` is `"object"` or `"world"`. |
+| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(entity, triangles, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | `(F, 3)` indices into `get_mesh_vertices`. Rebuilds AS. |
 | — | `deform_mesh(entity, callback, ...)` | `int` | `callback(index, (x,y,z))` → new triple or `None`. |
 | `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | Uses that entity's transform. |
 | — | `deform_mesh_world(...)` | `int` | World-space callback. |
 | `requestMeshAccelRebuild(entity)` | `request_mesh_accel_rebuild(entity)` | `void` | |
 
 `set_mesh_vertices` updates object-space mesh bounds, optionally recomputes normals, refreshes GPU vertex data, resets accumulation, and requests AS rebuild by default. Keep `rebuild_acceleration_structure=True` for ray-tracing-correct geometry. Only set it `False` when batching several edits, then call `request_full_accel_rebuild()` once.
+
+`set_mesh_triangles` rewrites connectivity. Indices refer to the unique vertex array from `get_mesh_vertices` (not the render-vertex split). Face-count changes clone the CPU buffer group, republish the mesh snapshot, and rebuild AS.
 
 `_world` variants refresh transform state first, so recent `entity.translation = ...` is reflected. Shared mesh buffers: deforming through one mesh entity updates other instances of the same engine mesh record.
 

@@ -26,6 +26,7 @@ Caelis Sim sensor/API backlog (warmup, per-camera resolution, snapshot, URDF FK)
 | `engine/SystemSets.h` / `engine/SystemLabel.h` | `Simulation` membership + labels |
 | `engine/SceneSpawn.h` | `load` / `spawn` / `spawnFromFile` / `despawn` / spawn lights |
 | `engine/SceneTransform.h` | App-based transform / visibility |
+| `engine/SceneRobot.h` | URDF visual FK (`jointNames`, `setJointPositions`, `getLinkPose`, `attachCamera`) |
 | `scene/ScenePoseAccess.h` | Entity TRS (`EntityPose`, get/set local/world). Not camera view space. |
 | `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, `gameSettings` / `importedModels` / `sceneTypeFactory` |
 | `engine/ActiveScene.h` | Name/path/generation metadata only (no `Scene*` digs) |

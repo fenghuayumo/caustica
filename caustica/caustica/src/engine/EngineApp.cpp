@@ -8,6 +8,7 @@
 #include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneQuery.h>
+#include <engine/SceneRobot.h>
 #include <engine/SceneStartup.h>
 #include <assets/loader/TextureLoader.h>
 #include <scene/SceneTypes.h>
@@ -775,6 +776,37 @@ size_t EngineApp::setWorldPoses(
         *m_app, names, translationsNx3, rotationsXyzwNx4, scalesNx3, firstMissingName);
 }
 
+std::vector<std::string> EngineApp::jointNames(ecs::Entity robot) const
+{
+    return m_app ? caustica::jointNames(*m_app, robot) : std::vector<std::string>{};
+}
+
+bool EngineApp::setJointPositions(ecs::Entity robot, const float* positions, size_t count)
+{
+    return m_app && caustica::setJointPositions(*m_app, robot, positions, count);
+}
+
+bool EngineApp::getLinkPose(
+    ecs::Entity robot,
+    std::string_view linkName,
+    math::double3& translation,
+    math::dquat& rotation) const
+{
+    return m_app && caustica::getLinkPose(*m_app, robot, linkName, translation, rotation);
+}
+
+ecs::Entity EngineApp::attachCamera(
+    ecs::Entity robot,
+    const std::string& name,
+    const std::string& link,
+    const math::double3& localTranslation,
+    const math::dquat& localRotation)
+{
+    return m_app
+        ? caustica::attachCamera(*m_app, robot, name, link, localTranslation, localRotation)
+        : ecs::NullEntity;
+}
+
 bool EngineApp::loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     return m_app && caustica::loadGaussianSplatFile(*m_app, fileName, convertRdfToRub);
@@ -832,6 +864,16 @@ void EngineApp::setMeshVerticesWorld(
 {
     if (m_app)
         caustica::setMeshVerticesWorld(*m_app, entity, vertices, options);
+}
+
+void EngineApp::setMeshTriangles(
+    ecs::Entity entity,
+    const uint32_t* trianglesFx3,
+    size_t faceCount,
+    const MeshDeformOptions& options)
+{
+    if (m_app)
+        caustica::setMeshTriangles(*m_app, entity, trianglesFx3, faceCount, options);
 }
 
 void EngineApp::requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation)

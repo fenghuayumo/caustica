@@ -21,6 +21,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneTransform.h>
+#include <engine/SceneRobot.h>
 #include <engine/SceneTransforms.h>
 #include <scene/ScenePoseAccess.h>
 #include <engine/Time.h>

@@ -12,6 +12,7 @@
 #include <nanobind/ndarray.h>
 
 #include <engine/EngineApp.h>
+#include <engine/SceneRobot.h>
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
@@ -49,6 +50,7 @@
 
 #include <stdexcept>
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <optional>
@@ -787,6 +789,149 @@ namespace
             return out;
         }
         return ToFloat3Vector(vertices);
+    }
+
+    std::vector<float> CopyFloats1D(const nb::object& obj, size_t count, const char* label)
+    {
+        auto fail = [&](const std::string& why) {
+            throw std::runtime_error(std::string(label) + ": " + why);
+        };
+
+        if (nb::hasattr(obj, "shape"))
+        {
+            nb::object shape = obj.attr("shape");
+            const size_t ndim = size_t(nb::len(shape));
+            if (ndim == 2)
+                return CopyNxK(obj, count, 1, label);
+            if (ndim != 1)
+                fail("expected a 1-D array of length " + std::to_string(count));
+            if (nb::cast<size_t>(shape[0]) != count)
+                fail("expected length " + std::to_string(count));
+
+            auto copyTyped = [&](auto dummy) {
+                using T = decltype(dummy);
+                auto arr = nb::cast<nb::ndarray<nb::numpy, T, nb::c_contig, nb::device::cpu>>(obj);
+                const T* src = arr.data();
+                std::vector<float> out(count);
+                for (size_t i = 0; i < count; ++i)
+                    out[i] = static_cast<float>(src[i]);
+                return out;
+            };
+            try
+            {
+                return copyTyped(float{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            try
+            {
+                return copyTyped(double{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            fail("expected float32 or float64 NumPy array");
+        }
+
+        nb::sequence seq = nb::cast<nb::sequence>(obj);
+        if (size_t(nb::len(seq)) != count)
+            fail("expected length " + std::to_string(count));
+        std::vector<float> out(count);
+        for (size_t i = 0; i < count; ++i)
+            out[i] = nb::cast<float>(seq[i]);
+        return out;
+    }
+
+    std::vector<uint32_t> TrianglesFromPython(const nb::object& triangles)
+    {
+        auto fail = [](const std::string& why) {
+            throw std::runtime_error(std::string("triangles: ") + why);
+        };
+
+        size_t faceCount = 0;
+        if (nb::hasattr(triangles, "shape"))
+        {
+            nb::object shape = triangles.attr("shape");
+            if (nb::len(shape) != 2 || nb::cast<size_t>(shape[1]) != 3)
+                fail("expected array of shape (F, 3)");
+            faceCount = nb::cast<size_t>(shape[0]);
+
+            auto copyTyped = [&](auto dummy) {
+                using T = decltype(dummy);
+                auto arr = nb::cast<nb::ndarray<nb::numpy, T, nb::c_contig, nb::device::cpu>>(triangles);
+                const T* src = arr.data();
+                std::vector<uint32_t> out(faceCount * 3);
+                for (size_t i = 0; i < out.size(); ++i)
+                {
+                    if (src[i] < T(0))
+                        fail("indices must be >= 0");
+                    out[i] = static_cast<uint32_t>(src[i]);
+                }
+                return out;
+            };
+            try
+            {
+                return copyTyped(uint32_t{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            try
+            {
+                return copyTyped(int32_t{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            try
+            {
+                return copyTyped(int64_t{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            fail("expected uint32, int32, or int64 NumPy array");
+        }
+
+        nb::sequence seq = nb::cast<nb::sequence>(triangles);
+        faceCount = size_t(nb::len(seq));
+        std::vector<uint32_t> out;
+        out.reserve(faceCount * 3);
+        for (size_t i = 0; i < faceCount; ++i)
+        {
+            nb::sequence row = nb::cast<nb::sequence>(nb::borrow<nb::object>(seq[i]));
+            if (size_t(nb::len(row)) != 3)
+                fail("each triangle must have 3 indices");
+            for (size_t j = 0; j < 3; ++j)
+            {
+                const int64_t value = nb::cast<int64_t>(row[j]);
+                if (value < 0)
+                    fail("indices must be >= 0");
+                out.push_back(static_cast<uint32_t>(value));
+            }
+        }
+        return out;
     }
 
     nb::list Float3VectorToList(const std::vector<float3>& vertices)
@@ -2103,6 +2248,56 @@ void RegisterCoreBindings(nb::module_& m)
             },
             nb::arg("position"), nb::arg("rotation"), nb::arg("scaling") = nb::make_tuple(1.0, 1.0, 1.0),
             "Write world entity TRS through the parent. Not camera view space — aim cameras with look_to.")
+        .def_prop_ro("joint_names",
+            [](PySceneEntity& self) {
+                App& app = RequireEntityApp(self);
+                return jointNames(app, self.entity);
+            },
+            "Movable URDF joint names in document order. Empty if this entity is not a robot root.")
+        .def("set_joint_positions",
+            [](PySceneEntity& self, nb::object positions) {
+                App& app = RequireEntityApp(self);
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !entityWorld->world().tryGet<scene::RobotComponent>(self.entity))
+                    throw std::runtime_error("set_joint_positions: entity is not a URDF robot root");
+                const std::vector<std::string> names = jointNames(app, self.entity);
+                const std::vector<float> values = CopyFloats1D(positions, names.size(), "q");
+                if (!setJointPositions(app, self.entity, values.data(), values.size()))
+                    throw std::runtime_error("set_joint_positions failed");
+            },
+            nb::arg("q"),
+            "Write visual FK. q is radians (revolute/continuous) or metres (prismatic), aligned with joint_names.")
+        .def("get_link_pose",
+            [](PySceneEntity& self, const std::string& linkName) {
+                App& app = RequireEntityApp(self);
+                math::double3 translation;
+                math::dquat rotation;
+                if (!getLinkPose(app, self.entity, linkName, translation, rotation))
+                    throw std::runtime_error("get_link_pose: link not found: " + linkName);
+                return nb::make_tuple(Double3ToTuple(translation), DQuatToXYZWTuple(rotation));
+            },
+            nb::arg("link_name"),
+            "World translation + xyzw rotation of a named link under this robot.")
+        .def("attach_camera",
+            [](PySceneEntity& self,
+                const std::string& name,
+                const std::string& link,
+                nb::object localT,
+                nb::object localQ) {
+                App& app = RequireEntityApp(self);
+                const scene::EntityPose pose = EntityPoseFromPython(
+                    localT, localQ, nb::make_tuple(1.0, 1.0, 1.0));
+                const ecs::Entity camera = attachCamera(
+                    app, self.entity, name, link, pose.position, pose.rotation);
+                if (!ecs::isValid(camera))
+                    throw std::runtime_error("attach_camera failed for link '" + link + "'");
+                return PyEntityFromEntity(self.scene, self.owner, camera);
+            },
+            nb::arg("name"),
+            nb::arg("link"),
+            nb::arg("local_t") = nb::make_tuple(0.0, 0.0, 0.0),
+            nb::arg("local_q") = nb::make_tuple(0.0, 0.0, 0.0, 1.0),
+            "Spawn a perspective camera parented to a named link. local_q is xyzw.")
         .def_prop_rw("vertical_fov",
             [](PySceneEntity& self) {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
@@ -3108,6 +3303,26 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::arg("rebuild_acceleration_structure") = true,
              nb::arg("space") = "object",
              "Write unique object-space (or world) positions. vertices may be a list of triples or a NumPy (V, 3) array.")
+        .def("set_mesh_triangles",
+             [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object triangles,
+                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                 RequireEntityForApp(self, entity);
+                 MeshDeformOptions options;
+                 options.recomputeNormals = recomputeNormals;
+                 options.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                 const std::vector<uint32_t> indices = TrianglesFromPython(triangles);
+                 const size_t faceCount = indices.size() / 3;
+                 self.engine().setMeshTriangles(
+                     EntityFromPy(entity),
+                     faceCount ? indices.data() : nullptr,
+                     faceCount,
+                     options);
+             },
+             nb::arg("entity"),
+             nb::arg("triangles"),
+             nb::arg("recompute_normals") = true,
+             nb::arg("rebuild_acceleration_structure") = true,
+             "Rewrite triangle indices. triangles is (F, 3) uint32 indexing get_mesh_vertices. Rebuilds AS.")
         .def("deform_mesh",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {

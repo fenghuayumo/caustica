@@ -200,8 +200,21 @@ namespace
         std::string name;
         std::string parent;
         std::string child;
+        std::string type = "fixed";
         UrdfPose origin;
+        math::double3 axis = math::double3(1.0, 0.0, 0.0);
     };
+
+    scene::RobotJointType RobotJointTypeFromUrdf(const std::string& type)
+    {
+        if (type == "revolute")
+            return scene::RobotJointType::Revolute;
+        if (type == "continuous")
+            return scene::RobotJointType::Continuous;
+        if (type == "prismatic")
+            return scene::RobotJointType::Prismatic;
+        return scene::RobotJointType::Fixed;
+    }
 
     size_t FindTagClose(const std::string& xml, size_t openBracket, const std::string& tagName)
     {
@@ -443,6 +456,8 @@ namespace
             const std::string openTag = ElementOpenTag(robotXml, begin, end);
             if (auto name = getAttribute(openTag, "name"))
                 joint.name = *name;
+            if (auto type = getAttribute(openTag, "type"))
+                joint.type = ToLower(Trim(*type));
 
             const std::string inner = ElementInner(robotXml, begin, end);
             joint.origin = ParseOrigin(inner);
@@ -458,6 +473,12 @@ namespace
                 const std::string tag = ElementOpenTag(inner, cBegin, cEnd);
                 if (auto link = getAttribute(tag, "link"))
                     joint.child = *link;
+            }
+            for (const auto& [aBegin, aEnd] : FindElements(inner, "axis"))
+            {
+                const std::string tag = ElementOpenTag(inner, aBegin, aEnd);
+                if (auto xyz = getAttribute(tag, "xyz"))
+                    joint.axis = ParseXyz(*xyz, math::double3(1.0, 0.0, 0.0));
             }
 
             if (!joint.parent.empty() && !joint.child.empty())
@@ -857,6 +878,8 @@ bool UrdfImporter::load(
     }
 
     std::unordered_set<std::string> childLinks;
+    scene::RobotComponent robotComponent;
+    robotComponent.joints.reserve(joints.size());
     for (const UrdfJoint& joint : joints)
     {
         auto parentIt = linkEntities.find(joint.parent);
@@ -875,10 +898,31 @@ bool UrdfImporter::load(
         }
         ApplyPose(world, childIt->second, joint.origin);
         childLinks.insert(joint.child);
+
+        scene::RobotJointDesc desc;
+        desc.name = joint.name;
+        desc.parentLink = joint.parent;
+        desc.childLink = joint.child;
+        desc.type = RobotJointTypeFromUrdf(joint.type);
+        if (joint.type != "fixed" && joint.type != "revolute" && joint.type != "continuous"
+            && joint.type != "prismatic")
+        {
+            caustica::warning("URDF joint '%s' type '%s' is not visually actuated; treated as fixed.",
+                joint.name.c_str(), joint.type.c_str());
+        }
+        const double axisLength = math::length(joint.axis);
+        desc.axis = axisLength > 1e-12
+            ? joint.axis / axisLength
+            : math::double3(1.0, 0.0, 0.0);
+        desc.originTranslation = joint.origin.xyz;
+        desc.originRotation = math::rotationQuat(joint.origin.rpy);
+        desc.childEntity = childIt->second;
+        robotComponent.joints.push_back(std::move(desc));
     }
 
     // Links that are never joint children stay under the robot root (typically base_link).
     (void)childLinks;
+    world.world().emplace<scene::RobotComponent>(rootEntity, std::move(robotComponent));
 
     std::unordered_map<std::string, StlMeshData> stlCache;
     size_t visualCount = 0;
@@ -912,6 +956,7 @@ bool UrdfImporter::load(
     }
 
     world.rebuildPathsFromRoot();
+    world.refreshHierarchy();
 
     if (visualCount == 0)
     {

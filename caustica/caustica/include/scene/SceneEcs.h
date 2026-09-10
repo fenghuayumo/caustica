@@ -66,6 +66,40 @@ struct PrefabInstanceComponent
     std::unordered_map<std::string, std::string> materials;
 };
 
+// Visual URDF joint. Contact, effort, and drive stay on the host.
+enum class RobotJointType : uint8_t
+{
+    Fixed = 0,
+    Revolute,
+    Continuous,
+    Prismatic,
+};
+
+[[nodiscard]] inline bool isMovableRobotJoint(RobotJointType type)
+{
+    return type == RobotJointType::Revolute
+        || type == RobotJointType::Continuous
+        || type == RobotJointType::Prismatic;
+}
+
+struct RobotJointDesc
+{
+    std::string name;
+    std::string parentLink;
+    std::string childLink;
+    RobotJointType type = RobotJointType::Fixed;
+    math::double3 axis = math::double3(1.0, 0.0, 0.0);
+    math::double3 originTranslation = math::double3(0.0);
+    math::dquat originRotation = math::dquat::identity();
+    ecs::Entity childEntity = ecs::NullEntity;
+};
+
+// Stored on the URDF robot root. `set_joint_positions` writes child local TRS.
+struct RobotComponent
+{
+    std::vector<RobotJointDesc> joints;
+};
+
 // Explicit material asset on a mesh entity (or per imported slot).
 struct MaterialOverrideComponent
 {
@@ -476,6 +510,8 @@ public:
 
     void applyAnimations(float time);
     void markTransformDirty();
+    // Mesh topology / buffer layout changed. Next extract republishes static mesh snapshots.
+    void markStructureDirty();
     // createEntity/setParent dirties structure via Parent/Children. Analytic
     // lights are render proxies, not GPU geometry — drop that bit when no mesh
     // / camera / animation / splat actually changed this frame.

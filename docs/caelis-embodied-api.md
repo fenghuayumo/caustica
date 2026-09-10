@@ -241,7 +241,7 @@ engine.apply_visual_snapshot(
 
 URDF 导入已建 link 树（`UrdfImporter.cpp`），**没有**关节驱动。二选一，文档必须写死：
 
-**方案 A（引擎 FK，更像 Isaac，推荐）**
+**方案 A（引擎 FK，更像 Isaac，推荐，已实现）**
 
 ```python
 robot = engine.spawn_from_file("xarm.urdf")

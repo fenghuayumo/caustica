@@ -10,9 +10,12 @@
 #include <engine/SceneQuery.h>
 #include <backend/GpuDevice.h>
 #include <render/WorldRenderer.h>
+#include <render/SceneRayTracingResources.h>
 #include <render/core/PathTracerSettings.h>
 #include <scene/Scene.h>
 #include <scene/SceneEcs.h>
+
+#include <stdexcept>
 
 namespace caustica
 {
@@ -91,6 +94,35 @@ void setMeshVerticesWorld(
     const MeshDeformOptions& options)
 {
     caustica::setMeshVerticesWorld(entity, vertices, makeInternalMeshDeformParams(app, options));
+}
+
+void setMeshTriangles(
+    App& app,
+    ecs::Entity entity,
+    const uint32_t* trianglesFx3,
+    size_t faceCount,
+    const MeshDeformOptions& options)
+{
+    auto mesh = meshFromEntity(app, entity);
+    if (!mesh)
+        throw std::runtime_error("setMeshTriangles: entity is not a mesh instance");
+
+    caustica::setMeshTriangles(
+        mesh, trianglesFx3, faceCount, makeInternalMeshDeformParams(app, options));
+
+    const std::shared_ptr<Scene> scene = activeScene(app);
+    scene::SceneEntityWorld* ew = scene ? scene->getEntityWorld() : nullptr;
+    if (ew && ecs::isValid(entity) && ew->world().isAlive(entity))
+    {
+        ew->markStructureDirty();
+        ew->world().notifyComponentChanged<scene::MeshInstanceComponent>(entity);
+    }
+
+    if (options.rebuildAccelerationStructure)
+    {
+        if (render::WorldRenderer* wr = worldRenderer(app))
+            wr->rayTracingResources().requestAccelerationStructureRebuild();
+    }
 }
 
 bool applyGeometrySequence(

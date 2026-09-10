@@ -20,6 +20,7 @@ using caustica::scene::internal::RenderResourceAccess;
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 namespace caustica
@@ -533,6 +534,111 @@ void setMeshVerticesWorld(
 
     auto entity = FindUniqueMeshInstanceEntity(params.scene, mesh, "setMeshVerticesWorld");
     setMeshVerticesWorld(entity, vertices, params);
+}
+
+void setMeshTriangles(
+    const std::shared_ptr<MeshInfo>& mesh,
+    const uint32_t* trianglesFx3,
+    size_t faceCount,
+    const MeshDeformGpuParams& params)
+{
+    assertLogicThread();
+
+    if (!mesh)
+        throw std::runtime_error("setMeshTriangles: mesh is null");
+    if (!mesh->buffers)
+        throw std::runtime_error("setMeshTriangles: mesh has no buffer group");
+    if (faceCount > 0 && !trianglesFx3)
+        throw std::runtime_error("setMeshTriangles: triangles pointer is null");
+    if (mesh->type != MeshType::Triangles)
+        throw std::runtime_error("setMeshTriangles: mesh is not triangle geometry");
+    if (mesh->geometries.size() != 1 || !mesh->geometries.front())
+        throw std::runtime_error("setMeshTriangles: mesh must have a single triangle geometry");
+    if (mesh->vertexOffset != 0 || mesh->indexOffset != 0)
+        throw std::runtime_error("setMeshTriangles: shared buffer-range meshes are not supported");
+
+    auto& geometry = *mesh->geometries.front();
+    if (geometry.type != MeshGeometryPrimitiveType::Triangles)
+        throw std::runtime_error("setMeshTriangles: geometry is not triangles");
+    if (geometry.vertexOffsetInMesh != 0 || geometry.indexOffsetInMesh != 0)
+        throw std::runtime_error("setMeshTriangles: shared buffer-range meshes are not supported");
+
+    std::vector<float3> renderVertices = GetMeshRenderVertices(mesh, "setMeshTriangles");
+    UniquePositionMap uniqueMap = BuildUniquePositionMap(
+        renderVertices,
+        GetMeshSourcePositionIndices(mesh, renderVertices.size()));
+    const uint32_t uniqueCount = static_cast<uint32_t>(uniqueMap.uniquePositions.size());
+
+    for (size_t i = 0; i < faceCount * 3; ++i)
+    {
+        if (trianglesFx3[i] >= uniqueCount)
+        {
+            throw std::runtime_error(
+                "setMeshTriangles: triangle index exceeds get_mesh_vertices(...) length");
+        }
+    }
+
+    mesh->buffers = std::make_shared<BufferGroup>(*mesh->buffers);
+    auto& buffers = *mesh->buffers;
+
+    auto compactAttribute = [&](auto& attribute) {
+        using Value = typename std::decay_t<decltype(attribute)>::value_type;
+        if (attribute.size() < renderVertices.size())
+        {
+            attribute.clear();
+            return;
+        }
+        std::vector<Value> compacted(uniqueCount);
+        std::vector<uint8_t> filled(uniqueCount, 0);
+        for (size_t i = 0; i < renderVertices.size(); ++i)
+        {
+            const uint32_t unique = uniqueMap.renderToUnique[i];
+            if (filled[unique])
+                continue;
+            compacted[unique] = attribute[i];
+            filled[unique] = 1;
+        }
+        attribute = std::move(compacted);
+    };
+
+    buffers.positionData = uniqueMap.uniquePositions;
+    compactAttribute(buffers.texcoord1Data);
+    compactAttribute(buffers.texcoord2Data);
+    compactAttribute(buffers.normalData);
+    compactAttribute(buffers.tangentData);
+    compactAttribute(buffers.jointData);
+    compactAttribute(buffers.weightData);
+    compactAttribute(buffers.radiusData);
+    compactAttribute(buffers.morphTargetData);
+
+    buffers.indexData.resize(faceCount * 3);
+    if (faceCount > 0)
+        std::memcpy(buffers.indexData.data(), trianglesFx3, faceCount * 3 * sizeof(uint32_t));
+
+    mesh->totalVertices = uniqueCount;
+    mesh->totalIndices = static_cast<uint32_t>(faceCount * 3);
+    mesh->vertexOffset = 0;
+    mesh->indexOffset = 0;
+    mesh->DeformationSourcePositionIndices.clear();
+    geometry.numVertices = uniqueCount;
+    geometry.numIndices = mesh->totalIndices;
+    geometry.vertexOffsetInMesh = 0;
+    geometry.indexOffsetInMesh = 0;
+
+    if (buffers.normalData.size() < uniqueCount)
+        buffers.normalData.resize(uniqueCount, 0);
+    if (buffers.tangentData.size() < uniqueCount)
+        buffers.tangentData.resize(uniqueCount, 0);
+
+    UpdateMeshBoundsFromPositions(mesh);
+    if (params.recomputeNormals)
+        RecomputeMeshNormalsFromPositions(mesh);
+
+    RebuildSceneMeshBuffersIfNeeded(mesh, params);
+    if (params.rebuildAccelerationStructure && params.requestMeshAccelRebuild)
+        params.requestMeshAccelRebuild(mesh);
+    else if (params.resetAccumulation)
+        *params.resetAccumulation = true;
 }
 
 void setMeshPositionsDirect(

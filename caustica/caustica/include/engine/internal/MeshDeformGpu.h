@@ -63,6 +63,15 @@ void setMeshVerticesWorld(
     const std::vector<math::float3>& vertices,
     const MeshDeformGpuParams& params);
 
+// Rewrite triangle indices. `triangles` is F*3 unique-vertex indices matching
+// getMeshVertices. Topology change clones the CPU buffer group and requires an
+// AS rebuild (caller should mark structure dirty).
+void setMeshTriangles(
+    const std::shared_ptr<MeshInfo>& mesh,
+    const uint32_t* trianglesFx3,
+    size_t faceCount,
+    const MeshDeformGpuParams& params);
+
 // Direct 1:1 update of mesh->buffers->positionData[vertexOffset .. +count).
 // Used by geometry-sequence playback (fixed topology point caches).
 void setMeshPositionsDirect(

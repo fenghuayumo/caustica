@@ -11,6 +11,7 @@
 #include <engine/SceneQuery.h>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneTransform.h>
+#include <engine/SceneRobot.h>
 #include <engine/SystemSets.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SceneLifecycle.h>
@@ -234,6 +235,19 @@ public:
         const float* rotationsXyzwNx4,
         const float* scalesNx3,
         std::string* firstMissingName = nullptr);
+    [[nodiscard]] std::vector<std::string> jointNames(ecs::Entity robot) const;
+    bool setJointPositions(ecs::Entity robot, const float* positions, size_t count);
+    bool getLinkPose(
+        ecs::Entity robot,
+        std::string_view linkName,
+        math::double3& translation,
+        math::dquat& rotation) const;
+    ecs::Entity attachCamera(
+        ecs::Entity robot,
+        const std::string& name,
+        const std::string& link,
+        const math::double3& localTranslation,
+        const math::dquat& localRotation);
 
     bool loadGaussianSplatFile(
         const std::filesystem::path& fileName, bool convertRdfToRub = true);
@@ -254,6 +268,11 @@ public:
     void setMeshVerticesWorld(
         ecs::Entity entity,
         const std::vector<math::float3>& vertices,
+        const MeshDeformOptions& options = {});
+    void setMeshTriangles(
+        ecs::Entity entity,
+        const uint32_t* trianglesFx3,
+        size_t faceCount,
         const MeshDeformOptions& options = {});
     void requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation = true);
     void requestFullAccelRebuild();

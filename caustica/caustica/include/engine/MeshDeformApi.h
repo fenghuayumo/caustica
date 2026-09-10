@@ -37,6 +37,12 @@ void setMeshVerticesWorld(
     ecs::Entity entity,
     const std::vector<math::float3>& vertices,
     const MeshDeformOptions& options = {});
+void setMeshTriangles(
+    App& app,
+    ecs::Entity entity,
+    const uint32_t* trianglesFx3,
+    size_t faceCount,
+    const MeshDeformOptions& options = {});
 
 bool applyGeometrySequence(
     App& app,

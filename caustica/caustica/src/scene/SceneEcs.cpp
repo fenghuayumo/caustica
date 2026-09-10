@@ -228,6 +228,8 @@ void CopyEntityComponents(
         dstWorld.emplace<SkinnedMeshReferenceComponent>(dstEntity, *skinRef);
     if (const auto* prefab = srcWorld.get<PrefabInstanceComponent>(srcEntity))
         dstWorld.emplace<PrefabInstanceComponent>(dstEntity, *prefab);
+    if (const auto* robot = srcWorld.get<RobotComponent>(srcEntity))
+        dstWorld.emplace<RobotComponent>(dstEntity, *robot);
     if (const auto* materialOverride = srcWorld.get<MaterialOverrideComponent>(srcEntity))
         dstWorld.emplace<MaterialOverrideComponent>(dstEntity, *materialOverride);
     if (const auto* semantic = srcWorld.get<SemanticLabelComponent>(srcEntity))
@@ -780,6 +782,15 @@ void SceneEntityWorld::applyDeferredCommands()
 void SceneEntityWorld::markTransformDirty()
 {
     m_transformDirty = true;
+}
+
+void SceneEntityWorld::markStructureDirty()
+{
+    ensureChangeDetection();
+    m_structureDirty = true;
+    m_transformDirty = true;
+    if (auto* changeDetection = m_world->getResource<ecs::ChangeDetection>())
+        changeDetection->noteStructureChange();
 }
 
 void SceneEntityWorld::discardStructureDirtyIfGeometryUnchanged()
@@ -1476,6 +1487,22 @@ ecs::Entity SceneEntityWorld::importSubtree(
         if (it != entityMap.end())
             mesh.proxiedAnalyticLight = it->second;
     });
+
+    for (const auto& [srcEntity, dstEntity] : entityMap)
+    {
+        (void)srcEntity;
+        auto* robot = m_world->tryGet<RobotComponent>(dstEntity);
+        if (!robot)
+            continue;
+        for (RobotJointDesc& joint : robot->joints)
+        {
+            if (!ecs::isValid(joint.childEntity))
+                continue;
+            auto it = entityMap.find(joint.childEntity);
+            if (it != entityMap.end())
+                joint.childEntity = it->second;
+        }
+    }
 
     // Only remap animation channels on animations created by this import. Remapping
     // every AnimationComponent causes entity-id collisions when later models load.
