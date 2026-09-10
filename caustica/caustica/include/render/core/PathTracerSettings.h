@@ -242,6 +242,8 @@ struct PathTracerSettings
     bool                                StandaloneDenoiser /*Defaults in CommandLine >*/;
     bool                                ResetAccumulation = false;
     bool                                ResetRealtimeCaches = false;
+    // One-shot: snap procedural-sky / env LUT bake instead of lerping over frames.
+    bool                                ForceEnvMapInstantUpdate = false;
     int                                 BounceCount = 20;
     int                                 DiffuseBounceCount = 2;             // should be 2 on default quality, 3 on ultra high and 1 on ultra fast
     int                                 AccumulationTarget /*Defaults in CommandLine >*/;

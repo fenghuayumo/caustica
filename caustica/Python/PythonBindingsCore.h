@@ -20,6 +20,7 @@ namespace caustica { class EngineApp; }
 namespace caustica_py
 {
     nanobind::object sensorRgbNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorLinearRgbNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorDepthNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorNormalNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorInstanceIdNumpy(const caustica::SensorOutput& output);

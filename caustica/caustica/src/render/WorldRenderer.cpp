@@ -719,6 +719,7 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
             // ReSTIR/NRD/TAA history when a ring slot is missing after a scene switch.
             m_frameSettingsSnapshot.ResetAccumulation = false;
             m_frameSettingsSnapshot.ResetRealtimeCaches = false;
+            m_frameSettingsSnapshot.ForceEnvMapInstantUpdate = false;
             m_frameSettingsSnapshot.NRDModeChanged = false;
             m_frameRuntimeSnapshot.Invalidation = {};
             m_frameGaussianSplatTemporalReset = false;
@@ -1237,6 +1238,7 @@ void caustica::render::WorldRenderer::postUpdatePathTracing( )
 
     m_context->activeSettings().ResetAccumulation = false;
     m_context->activeSettings().ResetRealtimeCaches = false;
+    m_context->activeSettings().ForceEnvMapInstantUpdate = false;
     m_frameIndex++;
 }
 

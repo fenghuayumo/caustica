@@ -58,7 +58,8 @@ class EnvCase:
     tint_color: tuple[float, float, float] = (1.0, 1.0, 1.0)
     rotation_xyz: tuple[float, float, float] = (0.0, 0.0, 0.0)
     visible_to_camera: bool = True
-    # The procedural sky bakes over several frames before it is stable.
+    # Procedural sky used to lerp over ~24 step_n frames; engine.warmup()
+    # snaps the env LUT and fills temporal history without advancing physics.
     warmup_frames: int = 0
 
 
@@ -229,8 +230,8 @@ def apply_case(engine, case: EnvCase, scene_hdri: str) -> None:
     engine.settings.reset_accumulation = True
 
     if case.warmup_frames:
-        print(f"[caustica]   baking environment for {case.warmup_frames} frame(s) ...")
-        engine.step_n(case.warmup_frames)
+        print(f"[caustica]   baking environment ({case.warmup_frames} warmup frame(s)) ...")
+        engine.warmup(case.warmup_frames)
 
 
 def parse_args() -> argparse.Namespace:

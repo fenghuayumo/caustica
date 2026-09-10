@@ -52,8 +52,11 @@ public:
     RenderSession& operator=(const RenderSession&) = delete;
 
     bool LoadScene(const std::string& sceneName, bool waitUntilReady = true,
-                   double timeoutSeconds = 600.0, int warmupFrames = 4);
-    bool WaitUntilReady(double timeoutSeconds = 600.0, int warmupFrames = 4);
+                   double timeoutSeconds = 600.0,
+                   int warmupFrames = caustica::EngineApp::kDefaultWarmupFrames);
+    bool WaitUntilReady(
+        double timeoutSeconds = 600.0,
+        int warmupFrames = caustica::EngineApp::kDefaultWarmupFrames);
     [[nodiscard]] bool IsSceneReady() const;
     bool Step(float dt = -1.0f);
     bool StepN(int frames);

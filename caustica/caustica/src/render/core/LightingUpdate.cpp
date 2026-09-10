@@ -97,6 +97,7 @@ void updateEnvMapLighting(UpdateLightingParams& params)
             dirLights,
             dirLightCount,
             !params.settings.RealtimeMode
+                || params.settings.ForceEnvMapInstantUpdate
                 || !(params.settings.EnableAnimations || params.settings.EnableKeyframes)))
     {
         params.settings.ResetAccumulation = true;

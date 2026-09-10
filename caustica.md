@@ -399,7 +399,7 @@ Layout:
 
 - Tightly packed **RGBA8**, row-major, **top-left** origin.
 - Source is the engine LDR final color (same as `save_screenshot`).
-- HDR readback is not implemented.
+- Linear HDR is `SensorOutput.linear_rgb` / `Aov.linear_rgb` (float32 `H×W×3`, untonemapped). Miss pixels are 0.
 
 C++ uses `engine->readLdrFramebuffer()` (`std::optional<LdrFramebuffer>` with `width`, `height`, `channels`, `pixels`).
 
@@ -499,8 +499,8 @@ for name in ("wrist", "third_person", "overview"):
     if cam is None:
         continue
     cam.activate()
-    engine.reset_accumulation()
-    engine.wait_until_ready()
+    engine.reset_temporal_history()
+    engine.warmup()
     engine.save_screenshot(f"{name}.png")
 
 engine.use_camera(None)  # back to the free / controller camera
@@ -981,7 +981,9 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 | `isSceneLoaded()` | `.is_scene_loaded` | `bool` | |
 | `isSceneLoading()` | `.is_scene_loading` | `bool` | |
 | `isSceneReady()` | `.is_scene_ready` | `bool` | Scene committed and usable. |
-| `waitUntilReady(timeoutSeconds=600, warmupFrames=4)` | `wait_until_ready(timeout_seconds=600.0, warmup_frames=4)` | `bool` | |
+| `waitUntilReady(timeoutSeconds=600, warmupFrames=32)` | `wait_until_ready(timeout_seconds=600.0, warmup_frames=32)` | `bool` | Default 32 frames. Bakes the environment LUT and fills TAA/NRD; does not integrate physics. `warmup_frames` may be `int` or `float`. |
+| `warmup(frames=32)` | `warmup(frames=32)` | `bool` / `None` | Renders N frames at `dt=0` (does not integrate Time or PhysX). Instant env LUT bake on the first frame. Python raises on failure. |
+| `resetTemporalHistory()` | `reset_temporal_history()` | `void` | Clears NRD / TAA / ReSTIR / per-camera motion. Use after a host teleport, not every simulation frame. |
 | `currentSceneName()` | `.scene_name` | `str` | |
 | `availableScenes()` | `.available_scenes` | `list[str]` | Discovered scene files. |
 | `entityWorld()` | `.scene` | Python: `Scene \| None` | Query view. `None` before a scene exists. |
@@ -1071,7 +1073,7 @@ Empty light `name` auto-generates a unique name (`DirectionalLight`, `PointLight
 
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
-| `setRealtimeMode(standaloneDenoiser=true, realtimeAA=2)` | `set_realtime_mode(...)` | `void` | |
+| `setRealtimeMode(standaloneDenoiser=true, realtimeAA=2)` | `set_realtime_mode(...)` | `void` | Python `EngineApp.create(realtime=True, headless=True)` selects NRD+TAA so `get_pixels()` is filled. Headless DLSS/DLSS-RR does not write a CPU-readable LDR buffer. |
 | `setReferenceMode(spp=0, oidn=false, oidnQuality=1, oidnPasses=1, oidnPrefilter=1)` | `set_reference_mode(...)` | `void` | `spp=0` keeps current target. |
 | `prepareAnimationFrame(sceneTime, importedAnimations, keyframes)` | `prepare_animation_frame(time_seconds, imported_animations=True, keyframes=True)` | `bool` | |
 | `accumulationCompleted()` | `.accumulation_completed` | `bool` | |
@@ -1084,7 +1086,7 @@ Empty light `name` auto-generates a unique name (`DirectionalLight`, `PointLight
 | `readLdrFramebuffer()` | `read_ldr_framebuffer()` | `LdrFramebuffer` / `Framebuffer` | Extension Python helper. Embed: use `save_screenshot`. |
 | `saveScreenshot(path)` | `save_screenshot(output_path)` | `bool` | LDR PNG/JPG/BMP/TGA. |
 
-Python also has `reset_accumulation()` and `reset_realtime_caches()` (set the corresponding settings flags), plus `request_shader_reload()` (flags `renderAppState().runtime.Invalidation.ShaderReloadRequested`). After classification edits that change shaders or AS metadata, call `request_shader_reload()` and `request_full_accel_rebuild()`.
+Python also has `reset_accumulation()` and `reset_realtime_caches()` (set the corresponding settings flags), `warmup()` / `reset_temporal_history()` for sidecar hosts that must not step physics, plus `request_shader_reload()` (flags `renderAppState().runtime.Invalidation.ShaderReloadRequested`). After classification edits that change shaders or AS metadata, call `request_shader_reload()` and `request_full_accel_rebuild()`. After a pose teleport, call `reset_temporal_history()` then `warmup(16)` rather than `reset_accumulation()` alone — accumulation reset does not clear TAA/NRD.
 
 ## Scene
 
@@ -1351,7 +1353,8 @@ RGB, linear depth, camera-space normals, stable instance/semantic IDs, and motio
 
 | AOV | Format | Convention |
 | --- | --- | --- |
-| RGB | RGBA8 | Same LDR as `save_screenshot` |
+| RGB | RGBA8 | Same LDR as `save_screenshot` / `get_pixels()` |
+| Linear RGB | float32 `H×W×3` | Untonemapped linear radiance; **0 = miss**. Request with `Aov.linear_rgb` (`Aov.hdr` alias). Not included in `Aov.all`. |
 | Depth | float32 `H×W` | Linear **\|view Z\|** in meters; **0 = miss** |
 | Normal | float32 `H×W×3` | **Camera / view space**; background 0 |
 | Instance ID | uint32 `H×W` | **0 = miss**; never auto-assigned 0 |

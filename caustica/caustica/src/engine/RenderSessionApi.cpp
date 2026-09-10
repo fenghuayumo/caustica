@@ -6,6 +6,7 @@
 #include <engine/internal/ActiveSceneAccess.h>
 #include <engine/SceneQuery.h>
 #include <engine/SceneViewState.h>
+#include <engine/SensorApi.h>
 #include <cassert>
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
@@ -204,6 +205,42 @@ void setGaussianSplatTemporalReset(App& app, bool enabled)
 {
     if (auto* wr = worldRenderer(app))
         wr->setGaussianSplatTemporalReset(enabled);
+}
+
+void resetTemporalHistory(App& app)
+{
+    if (PathTracerSettings* cfg = settings(app))
+    {
+        cfg->ResetAccumulation = true;
+        cfg->ResetRealtimeCaches = true;
+    }
+    if (auto* registry = app.tryResource<RenderProductRegistry>())
+    {
+        registry->previousCameras.clear();
+        registry->pendingPreviousCamera.reset();
+    }
+    setGaussianSplatTemporalReset(app, true);
+}
+
+bool warmup(App& app, int frames)
+{
+    if (frames < 0)
+        return false;
+    if (frames == 0)
+        return true;
+
+    if (PathTracerSettings* cfg = settings(app))
+        cfg->ForceEnvMapInstantUpdate = true;
+
+    // dt = 0 keeps Time.elapsedSeconds and PhysX from integrating (PhysicsPlugin
+    // bails when deltaTimeSeconds <= 0) while still running camera resolve,
+    // hierarchy, AS updates, env LUT bake, and TAA/NRD history.
+    for (int i = 0; i < frames; ++i)
+    {
+        if (!app.stepFrame(0.0))
+            return false;
+    }
+    return true;
 }
 
 bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target)

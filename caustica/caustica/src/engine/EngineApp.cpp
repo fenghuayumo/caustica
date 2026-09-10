@@ -513,18 +513,20 @@ bool EngineApp::waitUntilReady(double timeoutSeconds, int warmupFrames)
     const auto timeout = std::chrono::duration<double>(std::max(0.0, timeoutSeconds));
     while (timeoutSeconds <= 0.0 || std::chrono::steady_clock::now() - start < timeout)
     {
+        // dt = 0 keeps Time.elapsedSeconds from integrating while the load
+        // session still needs Update to commit the scene.
         if (!stepFrame(0.f))
             return false;
         if (isSceneReady())
         {
-            const bool headless = m_window == nullptr;
-            for (int i = 0; i < warmupFrames; ++i)
-            {
-                if (!stepFrame(headless ? (1.f / 60.f) : -1.f))
-                    return false;
-            }
-            m_renderAppState.settings.ResetAccumulation = true;
-            return true;
+            // Scene load can restore CLI RealtimeAA (DLSS-RR). Headless Streamline
+            // does not fill the CPU LDR buffer, so sidecar get_pixels() would be black.
+            if (m_window == nullptr && m_renderAppState.settings.RealtimeMode
+                && m_renderAppState.settings.RealtimeAA >= 2)
+                setRealtimeMode(/*standaloneDenoiser=*/true, /*realtimeAA=*/1);
+            resetTemporalHistory();
+            // At least one dt=0 render so get_pixels() is not an empty load frame.
+            return warmup(std::max(1, warmupFrames));
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -535,6 +537,21 @@ bool EngineApp::waitUntilReady(double timeoutSeconds, int warmupFrames)
         loadSessionPhaseName(m_viewState.loadSession.phase),
         m_viewState.sceneGpuSuspended.load(std::memory_order_acquire) ? 1 : 0);
     return false;
+}
+
+bool EngineApp::warmup(int frames)
+{
+    if (!m_valid || !m_app)
+        return false;
+    if (!finishStartup())
+        return false;
+    return caustica::warmup(*m_app, frames);
+}
+
+void EngineApp::resetTemporalHistory()
+{
+    if (m_app)
+        caustica::resetTemporalHistory(*m_app);
 }
 
 std::string EngineApp::currentSceneName() const

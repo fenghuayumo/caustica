@@ -249,6 +249,129 @@ bool FillRgb(
     return true;
 }
 
+bool FillLinearRgb(
+    App& app,
+    caustica::rhi::Device* device,
+    SensorOutput& output)
+{
+    render::WorldRenderer* renderer = worldRenderer(app);
+    RenderTargets* targets = renderer ? renderer->getRenderTargets() : nullptr;
+    if (!targets)
+        return false;
+
+    caustica::rhi::Texture* texture = targets->processedOutputColor.Get();
+    if (!texture)
+        texture = targets->outputColor.Get();
+    if (!texture)
+        return false;
+
+    std::vector<uint8_t> bytes;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t bpp = 0;
+    if (!CopyTexturePacked(
+            device,
+            nullptr,
+            texture,
+            caustica::rhi::ResourceStates::ShaderResource,
+            false,
+            bytes,
+            width,
+            height,
+            bpp))
+        return false;
+
+    const size_t pixels = size_t(width) * size_t(height);
+    output.linearRgb.assign(pixels * 3u, 0.f);
+
+    if (bpp == 8)
+    {
+        const auto* src = reinterpret_cast<const math::float16_t4*>(bytes.data());
+        for (size_t i = 0; i < pixels; ++i)
+        {
+            const math::float4 value = math::float16ToFloat32x4(src[i]);
+            output.linearRgb[i * 3u + 0] = std::isfinite(value.x) ? std::max(value.x, 0.f) : 0.f;
+            output.linearRgb[i * 3u + 1] = std::isfinite(value.y) ? std::max(value.y, 0.f) : 0.f;
+            output.linearRgb[i * 3u + 2] = std::isfinite(value.z) ? std::max(value.z, 0.f) : 0.f;
+        }
+    }
+    else if (bpp == 4)
+    {
+        const uint32_t* packed = reinterpret_cast<const uint32_t*>(bytes.data());
+        for (size_t i = 0; i < pixels; ++i)
+        {
+            output.linearRgb[i * 3u + 0] = ReadR11G11B10FloatChannel(packed[i], 0);
+            output.linearRgb[i * 3u + 1] = ReadR11G11B10FloatChannel(packed[i], 1);
+            output.linearRgb[i * 3u + 2] = ReadR11G11B10FloatChannel(packed[i], 2);
+        }
+    }
+    else if (bpp == 16)
+    {
+        const float* src = reinterpret_cast<const float*>(bytes.data());
+        for (size_t i = 0; i < pixels; ++i)
+        {
+            output.linearRgb[i * 3u + 0] = std::isfinite(src[i * 4u + 0]) ? std::max(src[i * 4u + 0], 0.f) : 0.f;
+            output.linearRgb[i * 3u + 1] = std::isfinite(src[i * 4u + 1]) ? std::max(src[i * 4u + 1], 0.f) : 0.f;
+            output.linearRgb[i * 3u + 2] = std::isfinite(src[i * 4u + 2]) ? std::max(src[i * 4u + 2], 0.f) : 0.f;
+        }
+    }
+    else
+    {
+        output.linearRgb.clear();
+        return false;
+    }
+
+    const std::vector<float>* depth = output.depth.empty() ? nullptr : &output.depth;
+    std::vector<float> depthScratch;
+    if (!depth)
+    {
+        std::vector<uint8_t> depthBytes;
+        uint32_t depthWidth = 0;
+        uint32_t depthHeight = 0;
+        uint32_t depthBpp = 0;
+        if (CopyTexturePacked(
+                device,
+                nullptr,
+                targets->sensorNormalDepth,
+                caustica::rhi::ResourceStates::UnorderedAccess,
+                false,
+                depthBytes,
+                depthWidth,
+                depthHeight,
+                depthBpp)
+            && depthBpp == 16 && depthWidth == width && depthHeight == height)
+        {
+            const size_t depthPixels = size_t(depthWidth) * size_t(depthHeight);
+            depthScratch.resize(depthPixels, 0.f);
+            const float* src = reinterpret_cast<const float*>(depthBytes.data());
+            for (size_t i = 0; i < depthPixels; ++i)
+                depthScratch[i] = src[i * 4u + 3];
+            depth = &depthScratch;
+        }
+    }
+
+    if (depth && depth->size() == pixels)
+    {
+        for (size_t i = 0; i < pixels; ++i)
+        {
+            if ((*depth)[i] <= 0.f)
+            {
+                output.linearRgb[i * 3u + 0] = 0.f;
+                output.linearRgb[i * 3u + 1] = 0.f;
+                output.linearRgb[i * 3u + 2] = 0.f;
+            }
+        }
+    }
+
+    if (output.width == 0 || output.height == 0)
+    {
+        output.width = width;
+        output.height = height;
+    }
+    output.aovs |= uint32_t(Aov::LinearRgb);
+    return true;
+}
+
 bool FillGeometryAovs(
     App& app,
     caustica::rhi::Device* device,
@@ -629,6 +752,8 @@ SensorOutput ReadCurrentView(App& app, const RenderProductDesc& product)
     if (hasAov(product.aovs, Aov::Rgb))
         FillRgb(app, device, renderDevice, output);
     FillGeometryAovs(app, device, product.aovs, output);
+    if (hasAov(product.aovs, Aov::LinearRgb))
+        FillLinearRgb(app, device, output);
     FillMaterialAovs(app, device, product.aovs, output);
     return output;
 }
@@ -665,6 +790,8 @@ uint32_t parseAovMask(const std::vector<std::string>& names)
             mask |= uint32_t(Aov::Throughput);
         else if (name == "guide_diffuse" || name == "denoiser_diffuse" || name == "denoiser_albedo")
             mask |= uint32_t(Aov::GuideDiffuse);
+        else if (name == "linear_rgb" || name == "linear" || name == "hdr")
+            mask |= uint32_t(Aov::LinearRgb);
         else if (name == "all")
             mask |= uint32_t(Aov::All);
     }
@@ -687,6 +814,7 @@ std::string aovName(Aov aov)
     case Aov::Metallic: return "metallic";
     case Aov::Throughput: return "throughput";
     case Aov::GuideDiffuse: return "guide_diffuse";
+    case Aov::LinearRgb: return "linear_rgb";
     case Aov::None: return "none";
     default: return "all";
     }

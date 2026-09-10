@@ -36,6 +36,8 @@ enum class Aov : uint32_t
     Metallic     = 1u << 9,
     Throughput   = 1u << 10,
     GuideDiffuse = 1u << 11,
+    LinearRgb    = 1u << 12,
+    Hdr          = LinearRgb,
     All = Rgb | Depth | Normal | InstanceId | SemanticId | MotionVector
         | Diffuse | Roughness | Specular | Metallic | Throughput | GuideDiffuse
 };
@@ -96,6 +98,7 @@ struct SensorOutput
     uint32_t aovs = 0;
 
     std::vector<uint8_t> rgb;            // RGBA8, W*H*4
+    std::vector<float> linearRgb;        // linear radiance RGB, W*H*3, 0 = miss
     std::vector<float> depth;            // linear |view Z| meters, W*H, 0 = miss
     std::vector<float> normal;           // camera-space XYZ, W*H*3
     std::vector<uint32_t> instanceId;    // W*H, 0 = miss

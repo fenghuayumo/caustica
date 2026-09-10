@@ -882,6 +882,18 @@ nb::object sensorRgbNumpy(const caustica::SensorOutput& output)
         data->data(), { height, width, 4 }, owner));
 }
 
+nb::object sensorLinearRgbNumpy(const caustica::SensorOutput& output)
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    if (!SensorShape(output, 3, output.linearRgb.size(), width, height))
+        return nb::none();
+    auto* data = new std::vector<float>(output.linearRgb);
+    nb::capsule owner(data, [](void* p) noexcept { delete static_cast<std::vector<float>*>(p); });
+    return nb::cast(nb::ndarray<nb::numpy, float, nb::shape<-1, -1, 3>, nb::c_contig, nb::device::cpu>(
+        data->data(), { height, width, 3 }, owner));
+}
+
 nb::object sensorDepthNumpy(const caustica::SensorOutput& output)
 {
     uint32_t width = 0;
@@ -1245,6 +1257,8 @@ void RegisterCoreBindings(nb::module_& m)
         .value("metallic", Aov::Metallic)
         .value("throughput", Aov::Throughput)
         .value("guide_diffuse", Aov::GuideDiffuse)
+        .value("linear_rgb", Aov::LinearRgb)
+        .value("hdr", Aov::Hdr)
         .value("segmentation", Aov::Segmentation)
         .value("all", Aov::All)
         .def("__or__", [](Aov a, Aov b) { return uint32_t(a) | uint32_t(b); })
@@ -1274,7 +1288,11 @@ void RegisterCoreBindings(nb::module_& m)
         .def_ro("guide_height", &SensorOutput::guideHeight)
         .def_ro("aovs", &SensorOutput::aovs)
         .def_prop_ro("rgb", [](const SensorOutput& self) { return sensorRgbNumpy(self); },
-            "NumPy (H, W, 4) uint8 RGBA, or None.")
+            "NumPy (H, W, 4) uint8 RGBA, or None. Same LDR as get_pixels().")
+        .def_prop_ro("linear_rgb", [](const SensorOutput& self) { return sensorLinearRgbNumpy(self); },
+            "NumPy (H, W, 3) float32 linear radiance, or None if not requested. 0 = miss.")
+        .def_prop_ro("hdr", [](const SensorOutput& self) { return sensorLinearRgbNumpy(self); },
+            "Alias of linear_rgb.")
         .def_prop_ro("depth", [](const SensorOutput& self) { return sensorDepthNumpy(self); },
             "NumPy (H, W) float32 linear |view Z| meters. 0 = miss.")
         .def_prop_ro("normal", [](const SensorOutput& self) { return sensorNormalNumpy(self); },
@@ -2471,6 +2489,13 @@ void RegisterCoreBindings(nb::module_& m)
 
 void BindEngineApp(nb::class_<PyEngineApp>& cls)
 {
+    auto coerceWarmupFrames = [](const nb::object& value, int fallback) {
+        if (value.is_none())
+            return fallback;
+        if (nb::isinstance<nb::int_>(value))
+            return nb::cast<int>(value);
+        return static_cast<int>(nb::cast<double>(value));
+    };
 
     cls
         .def_prop_ro("valid", &PyEngineApp::isValid)
@@ -2486,10 +2511,25 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::arg("max_frames") = 0,
              "Python sugar: step until accumulation_completed.")
         .def("wait_until_ready",
-             [](PyEngineApp& self, double timeoutSeconds, int warmupFrames) {
-                 return self.engine().waitUntilReady(timeoutSeconds, warmupFrames);
+             [coerceWarmupFrames](PyEngineApp& self, double timeoutSeconds, nb::object warmupFrames) {
+                 return self.engine().waitUntilReady(
+                     timeoutSeconds,
+                     coerceWarmupFrames(warmupFrames, EngineApp::kDefaultWarmupFrames));
              },
-             nb::arg("timeout_seconds") = 600.0, nb::arg("warmup_frames") = 4)
+             nb::arg("timeout_seconds") = 600.0,
+             nb::arg("warmup_frames") = EngineApp::kDefaultWarmupFrames)
+        .def("warmup",
+             [coerceWarmupFrames](PyEngineApp& self, nb::object frames) {
+                 if (!self.engine().warmup(
+                         coerceWarmupFrames(frames, EngineApp::kDefaultWarmupFrames)))
+                     throw std::runtime_error("warmup failed");
+             },
+             nb::arg("frames") = EngineApp::kDefaultWarmupFrames,
+             "Render N frames at dt=0 (no Time/PhysX integrate). Bakes the env LUT "
+             "and fills TAA/NRD history.")
+        .def("reset_temporal_history",
+             [](PyEngineApp& self) { self.engine().resetTemporalHistory(); },
+             "Clear NRD / TAA / ReSTIR / per-camera motion history after a teleport.")
 
         .def_prop_ro("is_scene_loaded", [](PyEngineApp& self) { return self.engine().isSceneLoaded(); })
         .def_prop_ro("is_scene_loading", [](PyEngineApp& self) { return self.engine().isSceneLoading(); })

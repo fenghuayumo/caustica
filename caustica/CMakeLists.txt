@@ -727,5 +727,33 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
             RESOURCE_LOCK caustica_gpu
             TIMEOUT 300
         )
+
+        add_test(
+            NAME causSensorWarmupRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/sensor_warmup_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/sensor-warmup"
+        )
+        set_tests_properties(causSensorWarmupRenderTests PROPERTIES
+            LABELS "gpu;render;sensor"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
+
+        add_test(
+            NAME causSensorAovConsistencyRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/sensor_aov_consistency_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/sensor-aov"
+        )
+        set_tests_properties(causSensorAovConsistencyRenderTests PROPERTIES
+            LABELS "gpu;render;sensor"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
     endif()
 endif()

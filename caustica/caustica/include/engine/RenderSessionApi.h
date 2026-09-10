@@ -79,6 +79,8 @@ uint32_t precacheRtFeaturePresets(App& app, bool showProgress = true);
 void requestFullAccelRebuild(App& app);
 [[nodiscard]] uint32_t renderFrameIndex(const App& app);
 void setGaussianSplatTemporalReset(App& app, bool enabled = true);
+void resetTemporalHistory(App& app);
+bool warmup(App& app, int frames);
 bool takeDenoisedScreenshot(App& app, caustica::rhi::Texture* target);
 
 [[nodiscard]] std::shared_ptr<LightSamplingCache> lightSamplingCache(const App& app);

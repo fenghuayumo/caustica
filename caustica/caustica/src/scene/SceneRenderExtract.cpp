@@ -756,6 +756,7 @@ void extractFrameRenderState(const FrameExtractInputs& inputs, SceneRenderData& 
         out.renderSettings.settings = *inputs.settings;
         inputs.settings->ResetAccumulation = false;
         inputs.settings->ResetRealtimeCaches = false;
+        inputs.settings->ForceEnvMapInstantUpdate = false;
         inputs.settings->NRDModeChanged = false;
     }
 

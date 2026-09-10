@@ -162,7 +162,18 @@ public:
     [[nodiscard]] bool isSceneLoaded() const;
     [[nodiscard]] bool isSceneLoading() const;
     [[nodiscard]] bool isSceneReady() const;
-    bool waitUntilReady(double timeoutSeconds = 600.0, int warmupFrames = 4);
+    static constexpr int kDefaultWarmupFrames = 32;
+
+    bool waitUntilReady(
+        double timeoutSeconds = 600.0,
+        int warmupFrames = kDefaultWarmupFrames);
+    // Render N frames at dt=0 (no Time/PhysX integrate). Bakes the environment
+    // LUT on the first frame and fills TAA/NRD history. Call after the scene is
+    // committed and cameras are registered.
+    bool warmup(int frames = kDefaultWarmupFrames);
+    // Clear NRD / TAA / ReSTIR / per-camera motion history. Use after a host
+    // teleport; do not call every frame of a continuous simulation.
+    void resetTemporalHistory();
     [[nodiscard]] std::string currentSceneName() const;
     [[nodiscard]] const std::vector<std::string>& availableScenes() const;
     [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;

@@ -62,6 +62,15 @@ RenderSession::RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, 
     desc.cli.OverrideToReferenceMode = !cfg.realtimeMode;
     desc.cli.OverrideToRealtimeMode = cfg.realtimeMode;
     desc.cli.ReferenceSamplesPerPixel = cfg.accumulationTarget;
+    if (cfg.realtimeMode)
+    {
+        // Headless DLSS / DLSS-RR does not write a CPU-readable LDR buffer.
+        // Sidecar hosts need get_pixels() after wait_until_ready(); NRD+TAA is
+        // the path that fills TAA/NRD history. Set on the CLI snapshot before
+        // create so scene-load deferred RealtimeAA restore keeps TAA.
+        desc.cli.StandaloneDenoiser = 1;
+        desc.cli.RealtimeAA = 1;
+    }
 #if CAUSTICA_WITH_DX12 && defined(CAUSTICA_D3D_AGILITY_SDK_VERSION)
     desc.d3d12DeviceFactory = m_device->d3d12Factory();
 #endif
@@ -81,7 +90,14 @@ RenderSession::RenderSession(std::shared_ptr<caustica_py::PythonDevice> device, 
     cmdLine.OverrideToReferenceMode = !cfg.realtimeMode;
     cmdLine.OverrideToRealtimeMode = cfg.realtimeMode;
     cmdLine.ReferenceSamplesPerPixel = cfg.accumulationTarget;
+    if (cfg.realtimeMode)
+    {
+        cmdLine.StandaloneDenoiser = 1;
+        cmdLine.RealtimeAA = 1;
+    }
     m_engine->settings().AccumulationTarget = cfg.accumulationTarget;
+    if (cfg.realtimeMode)
+        m_engine->setRealtimeMode(/*standaloneDenoiser=*/true, /*realtimeAA=*/1);
 
     m_initialized = true;
 
