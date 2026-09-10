@@ -1011,7 +1011,7 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 | `setActiveCamera(entity)` | `use_camera(entity)` | `bool` / `None` | `NullEntity` / `None` returns to the free camera. C++ returns `false` on failure; Python raises on failure. |
 | `setActiveCameraByPath(path)` | `use_camera_path(path)` | `bool` / `None` | Select a registered scene camera by hierarchy path. |
 | `saveCurrentCamera()` / `loadCurrentCamera()` | `save_current_camera()` / `load_current_camera()` | `void` | Persistence path used by the host. |
-| `addRenderProduct(desc)` | `add_render_product(name, camera=None, aovs=Aov.all)` | `bool` / `None` | Register a named camera + AOV set. `camera=None` is the active camera. |
+| `addRenderProduct(desc)` | `add_render_product(name, camera=None, aovs=Aov.all, width=0, height=0)` | `bool` / `None` | Register a named camera + AOV set. `camera=None` is the active camera. `width`/`height` 0 uses the session resolution; non-zero captures that product at its own size. |
 | `removeRenderProduct(name)` / `clearRenderProducts()` | `remove_render_product` / `clear_render_products` | `bool` / `void` | |
 | `readSensorOutput(aovs=Aov::All)` | `read_sensor_output(aovs=Aov.all)` | `SensorOutput` | AOVs for the camera that was just rendered. |
 | `captureSensorOutputs()` | `capture_sensor_outputs()` | `vector` / `list[SensorOutput]` | Every registered RenderProduct at the current physical time. Extra cameras re-render without stepping simulation or advancing the device frame clock. |
@@ -1378,16 +1378,18 @@ Motion uses the current camera view minus that camera's previous captured view, 
 ```python
 wrist = engine.find_entity("wrist")
 third = engine.find_entity("third_person")
-engine.add_render_product("wrist", wrist, caustica.Aov.all)
-engine.add_render_product("third", third, caustica.Aov.rgb | caustica.Aov.depth)
+engine.add_render_product("wrist", wrist, caustica.Aov.all, width=640, height=480)
+engine.add_render_product("third", third, caustica.Aov.rgb | caustica.Aov.depth, width=1280, height=720)
 engine.step_frame()
 for product in engine.capture_sensor_outputs():
-    depth = product.depth   # NumPy (H, W) float32
+    depth = product.depth   # NumPy (H, W) float32; RGB is product.width x product.height
     inst = product.instance_id
 ```
 
 ```cpp
-engine->addRenderProduct({ .name = "wrist", .camera = wrist, .aovs = uint32_t(caustica::Aov::All) });
+engine->addRenderProduct({
+    .name = "wrist", .camera = wrist, .aovs = uint32_t(caustica::Aov::All),
+    .width = 640, .height = 480 });
 engine->stepFrame();
 for (const caustica::SensorOutput& product : engine->captureSensorOutputs())
     (void)product.depth;

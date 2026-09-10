@@ -63,11 +63,14 @@ inline constexpr bool hasAov(uint32_t mask, Aov aov)
 [[nodiscard]] std::string aovName(Aov aov);
 
 // One named camera + AOV set. camera == NullEntity uses the current active camera.
+// width/height 0 = EngineApp session / swapchain size.
 struct RenderProductDesc
 {
     std::string name;
     ecs::Entity camera = ecs::NullEntity;
     uint32_t aovs = uint32_t(Aov::All);
+    uint32_t width = 0;
+    uint32_t height = 0;
 };
 
 struct RenderProductRegistry

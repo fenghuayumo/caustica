@@ -3,10 +3,12 @@
 #include <engine/App.h>
 #include <engine/AppResources.h>
 #include <engine/GpuSharedCaches.h>
+#include <engine/RenderFramebufferOverride.h>
 #include <engine/RenderSessionApi.h>
 #include <engine/ResolvedActiveCamera.h>
 #include <engine/SceneQuery.h>
 #include <engine/internal/WorldRendererAccess.h>
+#include <backend/GpuDevice.h>
 #include <render/WorldRenderer.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/core/RenderDevice.h>
@@ -17,6 +19,7 @@
 #include <scene/SceneSemanticIds.h>
 #include <core/log.h>
 #include <math/float.h>
+#include <math/math.h>
 #include <rhi/rhi.h>
 
 #include <algorithm>
@@ -70,6 +73,127 @@ RenderProductRegistry& Registry(App& app)
     if (auto* existing = app.tryResource<RenderProductRegistry>())
         return *existing;
     return app.emplaceResource<RenderProductRegistry>();
+}
+
+struct SensorCaptureTarget
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+    caustica::rhi::TextureHandle color;
+    caustica::rhi::TextureHandle depth;
+    caustica::rhi::FramebufferHandle framebuffer;
+};
+
+struct SensorCaptureCache
+{
+    std::vector<SensorCaptureTarget> targets;
+};
+
+SensorCaptureCache& CaptureCache(App& app)
+{
+    if (auto* existing = app.tryResource<SensorCaptureCache>())
+        return *existing;
+    return app.emplaceResource<SensorCaptureCache>();
+}
+
+struct ProductSize
+{
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
+ProductSize SessionDisplaySize(App& app)
+{
+    GpuDevice* gpu = app.getGpuDevice();
+    if (gpu)
+    {
+        if (caustica::rhi::Framebuffer* fb = gpu->getCurrentFramebuffer(true))
+        {
+            const auto info = fb->getFramebufferInfo();
+            if (info.width > 0 && info.height > 0)
+                return { info.width, info.height };
+        }
+    }
+    const auto size = renderSize(app);
+    return { size.x, size.y };
+}
+
+ProductSize ResolveProductSize(App& app, const RenderProductDesc& product)
+{
+    const ProductSize session = SessionDisplaySize(app);
+    return {
+        product.width > 0 ? product.width : session.width,
+        product.height > 0 ? product.height : session.height
+    };
+}
+
+caustica::rhi::Framebuffer* EnsureProductFramebuffer(App& app, ProductSize size)
+{
+    const ProductSize session = SessionDisplaySize(app);
+    if (size.width == 0 || size.height == 0)
+        return nullptr;
+    if (size.width == session.width && size.height == session.height)
+        return nullptr;
+
+    GpuDevice* gpu = app.getGpuDevice();
+    caustica::rhi::Device* device = gpu ? gpu->getDevice() : nullptr;
+    if (!device)
+        return nullptr;
+
+    SensorCaptureCache& cache = CaptureCache(app);
+    for (SensorCaptureTarget& target : cache.targets)
+    {
+        if (target.width == size.width && target.height == size.height && target.framebuffer)
+            return target.framebuffer.Get();
+    }
+
+    SensorCaptureTarget target;
+    target.width = size.width;
+    target.height = size.height;
+
+    caustica::rhi::TextureDesc colorDesc = caustica::rhi::TextureDesc()
+        .setDebugName("SensorProduct.Color")
+        .setWidth(size.width)
+        .setHeight(size.height)
+        .setFormat(caustica::rhi::Format::SRGBA8_UNORM)
+        .setIsRenderTarget(true)
+        .setIsUAV(true)
+        .setIsTypeless(true)
+        .setInitialState(caustica::rhi::ResourceStates::RenderTarget)
+        .setKeepInitialState(true);
+    target.color = device->createTexture(colorDesc);
+    if (!target.color)
+        return nullptr;
+
+    caustica::rhi::TextureDesc depthDesc = caustica::rhi::TextureDesc()
+        .setDebugName("SensorProduct.Depth")
+        .setWidth(size.width)
+        .setHeight(size.height)
+        .setFormat(caustica::rhi::Format::D32)
+        .setIsTypeless(true)
+        .setIsRenderTarget(true)
+        .enableAutomaticStateTracking(caustica::rhi::ResourceStates::DepthWrite);
+    target.depth = device->createTexture(depthDesc);
+    if (!target.depth)
+        return nullptr;
+
+    target.framebuffer = device->createFramebuffer(
+        caustica::rhi::FramebufferDesc()
+            .addColorAttachment(target.color)
+            .setDepthAttachment(target.depth));
+    if (!target.framebuffer)
+        return nullptr;
+
+    cache.targets.push_back(std::move(target));
+    return cache.targets.back().framebuffer.Get();
+}
+
+void BindProductFramebuffer(App& app, caustica::rhi::Framebuffer* framebuffer)
+{
+    RenderFramebufferOverride* overrideFb = app.tryResource<RenderFramebufferOverride>();
+    if (!overrideFb)
+        overrideFb = &app.emplaceResource<RenderFramebufferOverride>();
+    overrideFb->framebuffer = framebuffer;
 }
 
 uint32_t CameraHistoryKey(const scene::ActiveCameraRenderProxy& camera)
@@ -940,9 +1064,37 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
         resolved ? resolved->camera : scene::ActiveCameraRenderProxy{};
     const ecs::Entity originalCamera = savedCamera.sourceEntity;
     ecs::Entity gpuCamera = originalCamera;
+    const ProductSize sessionSize = SessionDisplaySize(app);
+    ProductSize gpuSize = sessionSize;
     bool renderedExtra = false;
 
     app.waitForRenderThreadIdle();
+
+    auto restoreSessionView = [&]() {
+        BindProductFramebuffer(app, nullptr);
+        if (!renderedExtra)
+            return;
+        if (resolved)
+            resolved->camera = savedCamera;
+        const bool cameraChanged = gpuCamera != originalCamera;
+        const bool sizeChanged =
+            gpuSize.width != sessionSize.width || gpuSize.height != sessionSize.height;
+        if (cameraChanged || sizeChanged)
+        {
+            RequestSensorReset(app);
+            if (resolved)
+                PrepareSensorCameraHistory(app, savedCamera);
+            if (!app.extractAndRenderFrozenFrame())
+            {
+                warning("SensorApi: failed to restore the original camera/size after extra-view capture.");
+                if (auto* registry = app.tryResource<RenderProductRegistry>())
+                    registry->pendingPreviousCamera.reset();
+            }
+            else if (resolved)
+                CommitSensorCameraHistory(app, savedCamera);
+        }
+        RequestSensorReset(app);
+    };
 
     std::vector<SensorOutput> outputs;
     outputs.reserve(products.size());
@@ -950,15 +1102,37 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
     {
         const ecs::Entity wanted =
             ecs::isValid(product.camera) ? product.camera : originalCamera;
-        if (wanted != gpuCamera)
+        const ProductSize size = ResolveProductSize(app, product);
+        if (size.width == 0 || size.height == 0)
         {
-            if (!ApplyProductCamera(app, wanted))
+            warning("SensorApi: RenderProduct '%s' has invalid resolution.", product.name.c_str());
+            continue;
+        }
+
+        const bool cameraChanged = wanted != gpuCamera;
+        const bool sizeChanged =
+            size.width != gpuSize.width || size.height != gpuSize.height;
+        if (cameraChanged || sizeChanged)
+        {
+            if (cameraChanged && !ApplyProductCamera(app, wanted))
             {
                 warning(
                     "SensorApi: RenderProduct '%s' is not a perspective scene camera; skipped.",
                     product.name.c_str());
                 continue;
             }
+            caustica::rhi::Framebuffer* productFb = EnsureProductFramebuffer(app, size);
+            if ((size.width != sessionSize.width || size.height != sessionSize.height)
+                && productFb == nullptr)
+            {
+                warning(
+                    "SensorApi: RenderProduct '%s' failed to allocate a %ux%u framebuffer.",
+                    product.name.c_str(),
+                    size.width,
+                    size.height);
+                continue;
+            }
+            BindProductFramebuffer(app, productFb);
             RequestSensorReset(app);
             if (resolved)
                 PrepareSensorCameraHistory(app, resolved->camera);
@@ -969,9 +1143,11 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
                     registry->pendingPreviousCamera.reset();
                 if (resolved)
                     resolved->camera = savedCamera;
+                BindProductFramebuffer(app, nullptr);
                 continue;
             }
             gpuCamera = wanted;
+            gpuSize = size;
             renderedExtra = true;
         }
 
@@ -982,25 +1158,7 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
             CommitSensorCameraHistory(app, resolved->camera);
     }
 
-    if (renderedExtra && resolved)
-    {
-        resolved->camera = savedCamera;
-        if (gpuCamera != originalCamera)
-        {
-            RequestSensorReset(app);
-            PrepareSensorCameraHistory(app, savedCamera);
-            if (!app.extractAndRenderFrozenFrame())
-            {
-                warning("SensorApi: failed to restore the original camera after extra-view capture.");
-                if (auto* registry = app.tryResource<RenderProductRegistry>())
-                    registry->pendingPreviousCamera.reset();
-            }
-            else
-                CommitSensorCameraHistory(app, savedCamera);
-        }
-        RequestSensorReset(app);
-    }
-
+    restoreSessionView();
     return outputs;
 }
 

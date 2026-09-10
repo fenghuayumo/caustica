@@ -2667,18 +2667,30 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
         .def("load_current_camera", [](PyEngineApp& self) { self.engine().loadCurrentCamera(); })
 
         .def("add_render_product",
-             [](PyEngineApp& self, const std::string& name, const std::shared_ptr<PySceneEntity>& camera, uint32_t aovs) {
+             [](PyEngineApp& self,
+                const std::string& name,
+                const std::shared_ptr<PySceneEntity>& camera,
+                uint32_t aovs,
+                int width,
+                int height) {
+                 if (width < 0 || height < 0)
+                     throw std::runtime_error("add_render_product: width/height must be >= 0");
                  RenderProductDesc desc;
                  desc.name = name;
                  desc.camera = camera ? EntityFromPy(camera) : ecs::NullEntity;
                  desc.aovs = aovs == 0u ? uint32_t(Aov::All) : aovs;
+                 desc.width = uint32_t(width);
+                 desc.height = uint32_t(height);
                  if (!self.engine().addRenderProduct(std::move(desc)))
                      throw std::runtime_error("add_render_product failed");
              },
              nb::arg("name"),
              nb::arg("camera").none() = std::shared_ptr<PySceneEntity>{},
              nb::arg("aovs") = uint32_t(Aov::All),
-             "Register a named camera + AOV set. camera=None uses the active camera.")
+             nb::arg("width") = 0,
+             nb::arg("height") = 0,
+             "Register a named camera + AOV set. camera=None uses the active camera. "
+             "width/height 0 uses the EngineApp session resolution.")
         .def("remove_render_product",
              [](PyEngineApp& self, const std::string& name) {
                  if (!self.engine().removeRenderProduct(name))
