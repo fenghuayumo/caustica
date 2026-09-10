@@ -1048,6 +1048,7 @@ wrist.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
 | `spawnEnvironmentLight(...)` | `spawn_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | entity | |
 | `spawnCamera(desc)` | `spawn_camera(name="", parent=None, local_translation=(0,0,0), local_rotation=(0,0,0,1), local_scaling=(1,1,1), vertical_fov=0.7, z_near=0.001, intrinsics=None)` | entity | Perspective camera. `parent=None` attaches under the scene root. Rotation is xyzw. With a parent, aim with `local_pose`, not `look_to`. |
 | `setParent(entity, parent)` | `SceneEntity.set_parent(entity_or_path)` | `bool` / `None` | `NullEntity` / `None` attaches under the scene root. |
+| `setWorldPoses(names, translationsNx3, rotationsXyzwNx4, scalesNx3)` | `set_world_poses(names, translations, rotations_xyzw, scales=None)` | `size_t` / `None` | Batch world TRS. `translations` `(N,3)`, `rotations_xyzw` `(N,4)`, optional `scales` `(N,3)`. One hierarchy refresh. |
 | `loadGaussianSplatFile(path, convertRdfToRub=true)` | `load_gaussian_splat_file(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` node. |
 | `gaussianSplatCount()` | `.gaussian_splat_count` | `int` | |
 | `gaussianSplatObjectCount()` | `.gaussian_splat_object_count` | `int` | |
@@ -1062,7 +1063,7 @@ Empty light `name` auto-generates a unique name (`DirectionalLight`, `PointLight
 | `findEntity(path, context=NullEntity)` | `find_entity(path)` | entity / `None` | Name or path. |
 | `findMaterial(materialID)` | `find_material(material_id)` | material / `None` | Cache-backed pick id. Name lookup: `engine.scene.find_material("Floor")`. |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[(x,y,z)]` | Unique object-space positions; UV/normal splits collapsed. |
-| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | Length must match `get_mesh_vertices`. |
+| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | Length must match `get_mesh_vertices`. `vertices` may be a list of triples or NumPy `(V, 3)` float32/float64. |
 | `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | World space. |
 | — | `deform_mesh` / `deform_mesh_world` | `int` | Python sugar: callback per unique vertex. |
 | `requestMeshAccelRebuild(entity)` | `request_mesh_accel_rebuild(entity)` | `void` | One mesh BLAS. |
@@ -1554,7 +1555,7 @@ See [Cookbook](#spawn--despawn-assets) and [Load OBJ meshes with materials](#loa
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space positions. |
-| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | Length must match getter. |
+| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | List of triples or NumPy `(V, 3)`. `space` is `"object"` or `"world"`. |
 | — | `deform_mesh(entity, callback, ...)` | `int` | `callback(index, (x,y,z))` → new triple or `None`. |
 | `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | Uses that entity's transform. |
 | — | `deform_mesh_world(...)` | `int` | World-space callback. |
@@ -1823,6 +1824,8 @@ Python-only EngineApp sugar, plus `GpuDevice` and `Frame`. Module functions are 
 | `render(dt=-1.0)` | `step_frame` then `Frame` (RGB + AOVs). Extension. |
 | `render_reference(spp=64, oidn=True)` | Accumulate then `Frame`. Extension. |
 | `capture_sensor_outputs()` | `list[SensorOutput]` for registered RenderProducts. |
+| `set_world_poses(...)` | Batch world TRS from NumPy / nested sequences. |
+| `apply_visual_snapshot(rigids, meshes=None)` | `rigids` maps name → `(translation, rotation_xyzw)`. |
 | `render_reference_frame` / `render_realtime_frame` | Shared with embed; return a frame count, not a `Frame`. |
 | `deform_mesh` / `deform_mesh_world` | Callback `(index, (x,y,z)) -> triple or None`. |
 | `with EngineApp.create(...)` | Calls `shutdown()` on exit. |

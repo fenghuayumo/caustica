@@ -228,6 +228,12 @@ public:
         scene::EnvironmentLightComponent component, const std::string& name = {});
     ecs::Entity spawnCamera(SpawnCameraDesc desc);
     bool setParent(ecs::Entity entity, ecs::Entity parent);
+    size_t setWorldPoses(
+        const std::vector<std::string>& names,
+        const float* translationsNx3,
+        const float* rotationsXyzwNx4,
+        const float* scalesNx3,
+        std::string* firstMissingName = nullptr);
 
     bool loadGaussianSplatFile(
         const std::filesystem::path& fileName, bool convertRdfToRub = true);

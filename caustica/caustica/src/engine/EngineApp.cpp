@@ -762,6 +762,19 @@ bool EngineApp::setParent(ecs::Entity entity, ecs::Entity parent)
     return m_app && caustica::setParent(*m_app, entity, parent);
 }
 
+size_t EngineApp::setWorldPoses(
+    const std::vector<std::string>& names,
+    const float* translationsNx3,
+    const float* rotationsXyzwNx4,
+    const float* scalesNx3,
+    std::string* firstMissingName)
+{
+    if (!m_app)
+        return 0;
+    return caustica::setWorldPoses(
+        *m_app, names, translationsNx3, rotationsXyzwNx4, scalesNx3, firstMissingName);
+}
+
 bool EngineApp::loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     return m_app && caustica::loadGaussianSplatFile(*m_app, fileName, convertRdfToRub);

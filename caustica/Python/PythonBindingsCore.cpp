@@ -712,6 +712,83 @@ namespace
         return result;
     }
 
+    std::vector<float> CopyNxK(const nb::object& obj, size_t rows, size_t cols, const char* label)
+    {
+        auto fail = [&](const std::string& why) {
+            throw std::runtime_error(std::string(label) + ": " + why);
+        };
+
+        if (nb::hasattr(obj, "shape"))
+        {
+            auto copyTyped = [&](auto dummy) {
+                using T = decltype(dummy);
+                auto arr = nb::cast<nb::ndarray<nb::numpy, T, nb::c_contig, nb::device::cpu>>(obj);
+                if (arr.ndim() != 2 || arr.shape(0) != rows || arr.shape(1) != cols)
+                    fail("expected C-contiguous array of shape (" + std::to_string(rows) + ", "
+                        + std::to_string(cols) + ")");
+                const T* src = arr.data();
+                std::vector<float> out(rows * cols);
+                for (size_t i = 0; i < out.size(); ++i)
+                    out[i] = static_cast<float>(src[i]);
+                return out;
+            };
+            try
+            {
+                return copyTyped(float{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            try
+            {
+                return copyTyped(double{});
+            }
+            catch (const std::runtime_error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+            }
+            fail("expected float32 or float64 NumPy array");
+        }
+
+        nb::sequence seq = nb::cast<nb::sequence>(obj);
+        if (size_t(nb::len(seq)) != rows)
+            fail("row count mismatch");
+        std::vector<float> out(rows * cols);
+        for (size_t i = 0; i < rows; ++i)
+        {
+            nb::sequence row = nb::cast<nb::sequence>(nb::borrow<nb::object>(seq[i]));
+            if (size_t(nb::len(row)) != cols)
+                fail("column count mismatch");
+            for (size_t j = 0; j < cols; ++j)
+                out[i * cols + j] = nb::cast<float>(row[j]);
+        }
+        return out;
+    }
+
+    std::vector<float3> VerticesFromPython(const nb::object& vertices)
+    {
+        if (nb::hasattr(vertices, "shape"))
+        {
+            nb::object shape = vertices.attr("shape");
+            if (nb::len(shape) != 2 || nb::cast<size_t>(shape[1]) != 3)
+                throw std::runtime_error("vertices: expected array of shape (V, 3)");
+            const size_t count = nb::cast<size_t>(shape[0]);
+            const std::vector<float> flat = CopyNxK(vertices, count, 3, "vertices");
+            std::vector<float3> out(count);
+            for (size_t i = 0; i < count; ++i)
+                out[i] = float3(flat[i * 3 + 0], flat[i * 3 + 1], flat[i * 3 + 2]);
+            return out;
+        }
+        return ToFloat3Vector(vertices);
+    }
+
     nb::list Float3VectorToList(const std::vector<float3>& vertices)
     {
         nb::list result;
@@ -2913,22 +2990,124 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::arg("color") = nb::make_tuple(1.f, 1.f, 1.f),
              nb::arg("path") = std::string(), nb::arg("rotation") = 0.f, nb::arg("name") = std::string())
 
+        .def("set_world_poses",
+             [](PyEngineApp& self,
+                const std::vector<std::string>& names,
+                nb::object translations,
+                nb::object rotations,
+                nb::object scales) {
+                 const size_t count = names.size();
+                 const std::vector<float> translationData = CopyNxK(translations, count, 3, "translations");
+                 const std::vector<float> rotationData = CopyNxK(rotations, count, 4, "rotations_xyzw");
+                 std::vector<float> scaleData;
+                 const float* scalePtr = nullptr;
+                 if (!scales.is_none())
+                 {
+                     scaleData = CopyNxK(scales, count, 3, "scales");
+                     scalePtr = scaleData.data();
+                 }
+                 std::string missing;
+                 const size_t written = self.engine().setWorldPoses(
+                     names, translationData.data(), rotationData.data(), scalePtr, &missing);
+                 if (written != count)
+                 {
+                     if (!missing.empty())
+                         throw std::runtime_error("set_world_poses: entity not found: " + missing);
+                     throw std::runtime_error("set_world_poses failed");
+                 }
+             },
+             nb::arg("names"),
+             nb::arg("translations"),
+             nb::arg("rotations_xyzw"),
+             nb::arg("scales") = nb::none(),
+             "Batch-write world TRS. translations (N,3), rotations_xyzw (N,4), optional scales (N,3).")
+        .def("apply_visual_snapshot",
+             [](PyEngineApp& self, nb::dict rigids, nb::object meshes, nb::object /*cameras*/) {
+                 std::vector<std::string> names;
+                 names.reserve(rigids.size());
+                 std::vector<float> translations;
+                 std::vector<float> rotations;
+                 translations.reserve(rigids.size() * 3);
+                 rotations.reserve(rigids.size() * 4);
+                 for (auto item : rigids)
+                 {
+                     names.push_back(nb::cast<std::string>(item.first));
+                     nb::sequence pose = nb::cast<nb::sequence>(nb::borrow<nb::object>(item.second));
+                     if (nb::len(pose) < 2)
+                         throw std::runtime_error("apply_visual_snapshot: rigid pose must be (translation, rotation_xyzw)");
+                     const float3 t = ToFloat3(nb::borrow<nb::object>(pose[0]));
+                     translations.push_back(t.x);
+                     translations.push_back(t.y);
+                     translations.push_back(t.z);
+                     const scene::EntityPose parsed = EntityPoseFromPython(
+                         nb::borrow<nb::object>(pose[0]),
+                         nb::borrow<nb::object>(pose[1]),
+                         nb::make_tuple(1.0, 1.0, 1.0));
+                     const math::float4 xyzw = math::float4(
+                         float(parsed.rotation.x),
+                         float(parsed.rotation.y),
+                         float(parsed.rotation.z),
+                         float(parsed.rotation.w));
+                     rotations.push_back(xyzw.x);
+                     rotations.push_back(xyzw.y);
+                     rotations.push_back(xyzw.z);
+                     rotations.push_back(xyzw.w);
+                 }
+                 if (!names.empty())
+                 {
+                     std::string missing;
+                     const size_t written = self.engine().setWorldPoses(
+                         names, translations.data(), rotations.data(), nullptr, &missing);
+                     if (written != names.size())
+                     {
+                         if (!missing.empty())
+                             throw std::runtime_error("apply_visual_snapshot: entity not found: " + missing);
+                         throw std::runtime_error("apply_visual_snapshot failed");
+                     }
+                 }
+                 if (!meshes.is_none())
+                 {
+                     nb::dict meshDict = nb::cast<nb::dict>(meshes);
+                     std::shared_ptr<Scene> scene = RequirePyScene(self);
+                     for (auto item : meshDict)
+                     {
+                         const std::string name = nb::cast<std::string>(item.first);
+                         auto entity = FindSceneEntity(scene, self.context(), name);
+                         if (!entity)
+                             throw std::runtime_error("apply_visual_snapshot: mesh entity not found: " + name);
+                         self.engine().setMeshVertices(
+                             EntityFromPy(entity),
+                             VerticesFromPython(nb::borrow<nb::object>(item.second)));
+                     }
+                 }
+             },
+             nb::arg("rigids"),
+             nb::arg("meshes") = nb::none(),
+             nb::arg("cameras") = nb::none(),
+             "Apply a host visual snapshot. rigids maps name -> (translation, rotation_xyzw).")
         .def("get_mesh_vertices", [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity) {
                 RequireEntityForApp(self, entity);
                 return Float3VectorToList(self.engine().getMeshVertices(EntityFromPy(entity)));
             }, nb::arg("entity"))
         .def("set_mesh_vertices",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object vertices,
-                bool recomputeNormals, bool rebuildAccelerationStructure) {
+                bool recomputeNormals, bool rebuildAccelerationStructure, const std::string& space) {
                  RequireEntityForApp(self, entity);
-                 self.engine().setMeshVertices(
-                     EntityFromPy(entity),
-                     ToFloat3Vector(vertices),
-                     { .recomputeNormals = recomputeNormals,
-                       .rebuildAccelerationStructure = rebuildAccelerationStructure });
+                 MeshDeformOptions options;
+                 options.recomputeNormals = recomputeNormals;
+                 options.rebuildAccelerationStructure = rebuildAccelerationStructure;
+                 auto positions = VerticesFromPython(vertices);
+                 if (space == "world")
+                     self.engine().setMeshVerticesWorld(EntityFromPy(entity), positions, options);
+                 else if (space == "object")
+                     self.engine().setMeshVertices(EntityFromPy(entity), positions, options);
+                 else
+                     throw std::runtime_error("set_mesh_vertices: space must be 'object' or 'world'");
              },
              nb::arg("entity"), nb::arg("vertices"), nb::arg("recompute_normals") = true,
-             nb::arg("rebuild_acceleration_structure") = true)
+             nb::arg("rebuild_acceleration_structure") = true,
+             nb::arg("space") = "object",
+             "Write unique object-space (or world) positions. vertices may be a list of triples or a NumPy (V, 3) array.")
         .def("deform_mesh",
              [](PyEngineApp& self, const std::shared_ptr<PySceneEntity>& entity, nb::object callback,
                 bool recomputeNormals, bool rebuildAccelerationStructure) {
@@ -2959,7 +3138,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                  RequireEntityForApp(self, entity);
                  self.engine().setMeshVerticesWorld(
                      EntityFromPy(entity),
-                     ToFloat3Vector(vertices),
+                     VerticesFromPython(vertices),
                      { .recomputeNormals = recomputeNormals,
                        .rebuildAccelerationStructure = rebuildAccelerationStructure });
              },

@@ -4,6 +4,8 @@
 #include <math/math.h>
 #include <scene/SceneEcs.h>
 
+#include <cstddef>
+
 namespace caustica::scene
 {
 
@@ -23,5 +25,12 @@ struct EntityPose
     const SceneEntityWorld& world, ecs::Entity entity, EntityPose& out);
 bool setEntityLocalPose(SceneEntityWorld& world, ecs::Entity entity, const EntityPose& pose);
 bool setEntityWorldPose(SceneEntityWorld& world, ecs::Entity entity, const EntityPose& pose);
+// Write many world poses then refresh the hierarchy once. Parents in the batch
+// are applied before children so FK-style world snapshots stay consistent.
+bool setEntityWorldPoses(
+    SceneEntityWorld& world,
+    const ecs::Entity* entities,
+    const EntityPose* poses,
+    size_t count);
 
 } // namespace caustica::scene
