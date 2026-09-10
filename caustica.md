@@ -1046,6 +1046,8 @@ wrist.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
 | `spawnSpotLight(...)` | `spawn_spot_light(..., inner_angle=180.0, outer_angle=180.0, name="")` | entity | Angles in **degrees**. |
 | `spawnRectLight(...)` | `spawn_rect_light(color=(1,1,1), intensity=1.0, width=1.0, height=1.0, name="")` | entity | Faces local −Z. |
 | `spawnEnvironmentLight(...)` | `spawn_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | entity | |
+| `spawnCamera(desc)` | `spawn_camera(name="", parent=None, local_translation=(0,0,0), local_rotation=(0,0,0,1), local_scaling=(1,1,1), vertical_fov=0.7, z_near=0.001, intrinsics=None)` | entity | Perspective camera. `parent=None` attaches under the scene root. Rotation is xyzw. With a parent, aim with `local_pose`, not `look_to`. |
+| `setParent(entity, parent)` | `SceneEntity.set_parent(entity_or_path)` | `bool` / `None` | `NullEntity` / `None` attaches under the scene root. |
 | `loadGaussianSplatFile(path, convertRdfToRub=true)` | `load_gaussian_splat_file(file_name, convert_rdf_to_rub=True)` | `bool` | Append a `.ply` node. |
 | `gaussianSplatCount()` | `.gaussian_splat_count` | `int` | |
 | `gaussianSplatObjectCount()` | `.gaussian_splat_object_count` | `int` | |
@@ -1133,6 +1135,8 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | --- | --- | --- |
 | `name` | `str` | Read-only. |
 | `path` | `str` | Read-only. |
+| `parent` | `SceneEntity \| None` | `None` when attached to the scene root / world. |
+| `set_parent(entity_or_path)` | `None` | `None` / missing path attaches under the scene root. |
 | `mesh_handle` | `MeshHandle` | Asset identity. |
 | `is_mesh` | `bool` | Has a mesh instance. |
 | `is_camera` | `bool` | Has a `CameraComponent`. |
@@ -1145,7 +1149,7 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | `rotation` | `(x,y,z,w)` | Local quaternion (XYZW, matching scene JSON). |
 | `euler` | `(x,y,z)` | Local XYZ **radians**. Assigning converts to the stored quaternion. |
 | `scaling` | `(x,y,z)` | |
-| `local_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Read-only local TRS. Write with `set_local_pose`. |
+| `local_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Local TRS. Writable. With a parented camera, write this instead of `look_to`. |
 | `world_pose` | `((x,y,z), (x,y,z,w), (sx,sy,sz))` | Entity world TRS, **no** camera Z-flip. |
 | `set_local_pose(position, rotation, scaling=(1,1,1))` | `None` | One hierarchy refresh. |
 | `set_world_pose(position, rotation, scaling=(1,1,1))` | `None` | Entity TRS through the parent. Do not use this to aim a camera. |
@@ -1159,7 +1163,7 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | `z_far` | `float \| None` | Camera far clip. |
 | `aspect_ratio` | `float \| None` | Camera. `None` uses the render target. |
 | `intrinsics` | `(fx,fy,cx,cy,w,h) \| None` | Camera pinhole, or `None` when using symmetric FOV. |
-| `look_to(position, direction, up=(0,1,0))` | `None` | Camera view-space pose (Z-flip). Use this to aim a camera, not `world_pose`. |
+| `look_to(position, direction, up=(0,1,0))` | `None` | Camera **world** look-to (Z-flip). Do not mix with a parented `local_pose`. |
 | `set_intrinsics(fx, fy, cx, cy, width, height)` | `None` | Camera off-center pinhole. |
 | `clear_intrinsics()` | `None` | Restore symmetric FOV on this camera. |
 | `activate()` | `None` | Make this the rendered / main camera. |

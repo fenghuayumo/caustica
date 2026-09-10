@@ -30,6 +30,7 @@
 #include <assets/loader/ShaderMacro.h>
 #include <core/PathUtils.h>
 #include <backend/GpuDevice.h>
+#include <cmath>
 
 using namespace caustica::render;
 
@@ -403,6 +404,50 @@ ecs::Entity spawnEnvironmentLight(App& app, scene::EnvironmentLightComponent com
 {
     auto scene = activeScene(app);
     return scene ? scene->attachEnvironmentLightToRoot(std::move(component), name) : ecs::NullEntity;
+}
+
+ecs::Entity spawnCamera(App& app, SpawnCameraDesc desc)
+{
+    auto scene = activeScene(app);
+    scene::SceneEntityWorld* world = scene ? scene->getEntityWorld() : nullptr;
+    if (!world || !ecs::isValid(world->root()))
+        return ecs::NullEntity;
+
+    ecs::Entity parent = ecs::isValid(desc.parent) ? desc.parent : world->root();
+    if (!world->world().isAlive(parent))
+        return ecs::NullEntity;
+
+    if (!std::isfinite(desc.verticalFov) || desc.verticalFov <= 0.f)
+        return ecs::NullEntity;
+    if (!std::isfinite(desc.zNear) || desc.zNear <= 0.f)
+        return ecs::NullEntity;
+    if (!math::all(math::isfinite(desc.localTranslation))
+        || !math::all(math::isfinite(desc.localScaling)))
+        return ecs::NullEntity;
+    const double rotationNorm = math::length(desc.localRotation);
+    if (!std::isfinite(rotationNorm) || rotationNorm <= 1e-12)
+        return ecs::NullEntity;
+    desc.localRotation /= rotationNorm;
+
+    ecs::Entity entity = world->createEntity(desc.name, parent);
+
+    scene::PerspectiveCameraData perspective;
+    perspective.verticalFov = desc.verticalFov;
+    perspective.zNear = desc.zNear;
+    perspective.enableAutoExposure = false;
+    if (desc.intrinsics)
+        perspective.intrinsics = desc.intrinsics;
+
+    scene::CameraComponent camera;
+    camera.data = std::move(perspective);
+    world->setCamera(entity, std::move(camera));
+    world->setLocalTransform(
+        entity, &desc.localTranslation, &desc.localRotation, &desc.localScaling);
+    world->rebuildPathsFromRoot();
+    world->refreshHierarchy();
+    world->ensureSceneResourcesSynced();
+    world->discardStructureDirtyIfGeometryUnchanged();
+    return entity;
 }
 
 void ensureRectLightVisual(App& app, ecs::Entity entity)

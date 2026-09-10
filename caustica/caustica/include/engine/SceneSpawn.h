@@ -3,10 +3,12 @@
 #include <assets/Handle.h>
 #include <assets/TypedAssets.h>
 #include <ecs/Entity.h>
+#include <math/math.h>
 #include <scene/SceneApply.h>
 #include <scene/SceneEcs.h>
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 namespace caustica
@@ -41,6 +43,21 @@ class App;
     App& app, scene::RectLightComponent component, const std::string& name = {});
 [[nodiscard]] ecs::Entity spawnEnvironmentLight(
     App& app, scene::EnvironmentLightComponent component, const std::string& name = {});
+
+struct SpawnCameraDesc
+{
+    std::string name;
+    ecs::Entity parent = ecs::NullEntity;
+    math::double3 localTranslation = { 0.0, 0.0, 0.0 };
+    math::dquat localRotation = math::dquat::identity();
+    math::double3 localScaling = { 1.0, 1.0, 1.0 };
+    float verticalFov = 0.7f;
+    float zNear = 0.001f;
+    std::optional<scene::CameraIntrinsics> intrinsics;
+};
+
+[[nodiscard]] ecs::Entity spawnCamera(App& app, SpawnCameraDesc desc);
+
 void ensureRectLightVisual(App& app, ecs::Entity entity);
 void syncRectLightVisual(App& app, ecs::Entity entity);
 

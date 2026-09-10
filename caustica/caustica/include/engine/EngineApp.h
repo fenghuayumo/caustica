@@ -226,6 +226,8 @@ public:
         scene::RectLightComponent component, const std::string& name = {});
     ecs::Entity spawnEnvironmentLight(
         scene::EnvironmentLightComponent component, const std::string& name = {});
+    ecs::Entity spawnCamera(SpawnCameraDesc desc);
+    bool setParent(ecs::Entity entity, ecs::Entity parent);
 
     bool loadGaussianSplatFile(
         const std::filesystem::path& fileName, bool convertRdfToRub = true);

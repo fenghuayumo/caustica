@@ -20,5 +20,7 @@ bool setEntityLocalTransform(
     const std::optional<math::double3>& scaling = std::nullopt);
 bool setEntityTranslation(App& app, ecs::Entity entity, const math::double3& translation);
 bool setEntityVisible(App& app, ecs::Entity entity, bool visible);
+// Null parent attaches under the scene root (world).
+bool setParent(App& app, ecs::Entity entity, ecs::Entity parent);
 
 } // namespace caustica

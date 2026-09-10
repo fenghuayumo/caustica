@@ -752,6 +752,16 @@ ecs::Entity EngineApp::spawnEnvironmentLight(scene::EnvironmentLightComponent co
     return m_app ? caustica::spawnEnvironmentLight(*m_app, std::move(component), name) : ecs::NullEntity;
 }
 
+ecs::Entity EngineApp::spawnCamera(SpawnCameraDesc desc)
+{
+    return m_app ? caustica::spawnCamera(*m_app, std::move(desc)) : ecs::NullEntity;
+}
+
+bool EngineApp::setParent(ecs::Entity entity, ecs::Entity parent)
+{
+    return m_app && caustica::setParent(*m_app, entity, parent);
+}
+
 bool EngineApp::loadGaussianSplatFile(const std::filesystem::path& fileName, bool convertRdfToRub)
 {
     return m_app && caustica::loadGaussianSplatFile(*m_app, fileName, convertRdfToRub);

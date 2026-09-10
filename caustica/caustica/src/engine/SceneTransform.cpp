@@ -56,4 +56,19 @@ bool setEntityVisible(App& app, ecs::Entity entity, bool visible)
     return true;
 }
 
+bool setParent(App& app, ecs::Entity entity, ecs::Entity parent)
+{
+    scene::SceneEntityWorld* ew = logicEntityWorld(app);
+    if (!ew || !ecs::isValid(entity) || !ew->world().isAlive(entity))
+        return false;
+
+    const ecs::Entity resolvedParent = ecs::isValid(parent) ? parent : ew->root();
+    if (!ew->setParent(entity, resolvedParent))
+        return false;
+
+    ew->rebuildPathsFromRoot();
+    ew->refreshHierarchy();
+    return true;
+}
+
 } // namespace caustica

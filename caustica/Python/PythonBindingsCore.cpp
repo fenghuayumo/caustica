@@ -663,6 +663,46 @@ namespace
         return entity->entity;
     }
 
+    ecs::Entity ResolveParentEntity(
+        const std::shared_ptr<Scene>& scene,
+        const std::shared_ptr<caustica_py::PyEngineAppContext>& owner,
+        const nb::object& parent)
+    {
+        if (parent.is_none())
+            return ecs::NullEntity;
+
+        std::shared_ptr<PySceneEntity> asEntity;
+        if (nb::try_cast(parent, asEntity))
+            return EntityFromPy(asEntity);
+
+        if (nb::isinstance<nb::str>(parent))
+        {
+            auto found = FindSceneEntity(scene, owner, nb::cast<std::string>(parent));
+            if (!found)
+                throw std::runtime_error("parent path was not found");
+            return found->entity;
+        }
+
+        throw std::runtime_error("parent must be a SceneEntity, str path, or None");
+    }
+
+    std::optional<scene::CameraIntrinsics> ParseCameraIntrinsics(const nb::object& value)
+    {
+        if (value.is_none())
+            return std::nullopt;
+        nb::sequence seq = nb::cast<nb::sequence>(value);
+        if (nb::len(seq) != 6)
+            throw std::runtime_error("intrinsics must be (fx, fy, cx, cy, width, height)");
+        scene::CameraIntrinsics intrinsics;
+        intrinsics.fx = nb::cast<float>(seq[0]);
+        intrinsics.fy = nb::cast<float>(seq[1]);
+        intrinsics.cx = nb::cast<float>(seq[2]);
+        intrinsics.cy = nb::cast<float>(seq[3]);
+        intrinsics.width = nb::cast<float>(seq[4]);
+        intrinsics.height = nb::cast<float>(seq[5]);
+        return intrinsics;
+    }
+
     std::vector<float3> ToFloat3Vector(const nb::object& src)
     {
         nb::sequence seq = nb::cast<nb::sequence>(src);
@@ -1623,6 +1663,28 @@ void RegisterCoreBindings(nb::module_& m)
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
                 return entityWorld ? entityWorld->getEntityPath(self.entity).generic_string() : std::string{};
             })
+        .def_prop_ro("parent",
+            [](PySceneEntity& self) -> nb::object {
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld)
+                    return nb::none();
+                const auto* parent = entityWorld->world().tryGet<scene::ParentComponent>(self.entity);
+                if (!parent || !ecs::isValid(parent->parent) || parent->parent == entityWorld->root())
+                    return nb::none();
+                auto pyParent = PyEntityFromEntity(self.scene, self.owner, parent->parent);
+                if (!pyParent)
+                    return nb::none();
+                return nb::cast(pyParent);
+            },
+            "Parent SceneEntity, or None when attached to the scene root / world.")
+        .def("set_parent",
+            [](PySceneEntity& self, nb::object parent) {
+                const ecs::Entity parentEntity = ResolveParentEntity(self.scene, self.owner, parent);
+                if (!setParent(RequireEntityApp(self), self.entity, parentEntity))
+                    throw std::runtime_error("set_parent failed");
+            },
+            nb::arg("parent").none() = nb::none(),
+            "Reparent this entity. None attaches it under the scene root (world).")
         .def_prop_ro("mesh_handle", [](PySceneEntity& self) -> MeshHandle {
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
                 if (!entityWorld || !ecs::isValid(self.entity))
@@ -1904,13 +1966,25 @@ void RegisterCoreBindings(nb::module_& m)
                     throw std::runtime_error("scaling setter failed");
             },
             "Local non-uniform scaling.")
-        .def_prop_ro("local_pose",
+        .def_prop_rw("local_pose",
             [](PySceneEntity& self) {
                 scene::EntityPose pose;
                 scene::SceneEntityWorld* entityWorld = self.entityWorld();
                 if (!entityWorld || !scene::getEntityLocalPose(*entityWorld, self.entity, pose))
                     throw std::runtime_error("local_pose unavailable for stale or invalid SceneEntity");
                 return EntityPoseToTuple(pose);
+            },
+            [](PySceneEntity& self, nb::object value) {
+                nb::sequence pose = nb::cast<nb::sequence>(value);
+                if (nb::len(pose) != 3)
+                    throw std::runtime_error("local_pose must be (position, rotation, scaling)");
+                const scene::EntityPose parsed = EntityPoseFromPython(
+                    nb::borrow<nb::object>(pose[0]),
+                    nb::borrow<nb::object>(pose[1]),
+                    nb::borrow<nb::object>(pose[2]));
+                scene::SceneEntityWorld* entityWorld = self.entityWorld();
+                if (!entityWorld || !scene::setEntityLocalPose(*entityWorld, self.entity, parsed))
+                    throw std::runtime_error("local_pose setter failed");
             },
             "Local entity TRS: ((x,y,z), (x,y,z,w), (sx,sy,sz)). Prefer this over assigning translation/rotation/scaling separately.")
         .def_prop_rw("world_pose",
@@ -2729,6 +2803,45 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
                 RequireEntityForApp(self, entity);
                 return self.engine().despawn(EntityFromPy(entity));
             }, nb::arg("entity"))
+        .def("spawn_camera",
+             [](PyEngineApp& self,
+                const std::string& name,
+                nb::object parent,
+                nb::object localTranslation,
+                nb::object localRotation,
+                nb::object localScaling,
+                float verticalFov,
+                float zNear,
+                nb::object intrinsics,
+                nb::object /*aovs*/) {
+                 std::shared_ptr<Scene> scene = RequirePyScene(self);
+                 SpawnCameraDesc desc;
+                 desc.name = name;
+                 desc.parent = ResolveParentEntity(scene, self.context(), parent);
+                 const scene::EntityPose pose = EntityPoseFromPython(
+                     localTranslation, localRotation, localScaling);
+                 desc.localTranslation = pose.position;
+                 desc.localRotation = pose.rotation;
+                 desc.localScaling = pose.scaling;
+                 desc.verticalFov = verticalFov;
+                 desc.zNear = zNear;
+                 desc.intrinsics = ParseCameraIntrinsics(intrinsics);
+                 ecs::Entity entity = self.engine().spawnCamera(std::move(desc));
+                 if (!ecs::isValid(entity))
+                     throw std::runtime_error("spawn_camera failed");
+                 return PyEntityFromEntity(scene, self.context(), entity);
+             },
+             nb::arg("name") = std::string(),
+             nb::arg("parent").none() = nb::none(),
+             nb::arg("local_translation") = nb::make_tuple(0.0, 0.0, 0.0),
+             nb::arg("local_rotation") = nb::make_tuple(0.0, 0.0, 0.0, 1.0),
+             nb::arg("local_scaling") = nb::make_tuple(1.0, 1.0, 1.0),
+             nb::arg("vertical_fov") = 0.7f,
+             nb::arg("z_near") = 0.001f,
+             nb::arg("intrinsics") = nb::none(),
+             nb::arg("aovs") = nb::none(),
+             "Spawn a perspective camera. parent=None attaches under the scene root. "
+             "local_rotation is xyzw. look_to writes world look-to; with a parent prefer local_pose.")
 
         .def("spawn_directional_light",
              [](PyEngineApp& self, nb::object color, float irradiance, float angularSize, const std::string& name) {
