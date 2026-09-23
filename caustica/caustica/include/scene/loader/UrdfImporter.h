@@ -12,7 +12,10 @@ namespace caustica
 
     // Imports a URDF robot as a visual link tree. Movable joints are stored on the
     // robot root (RobotComponent) for engine visual FK. Collision / drive / effort
-    // are ignored. Visual meshes: STL (ASCII/binary) and box/cylinder/sphere primitives.
+    // are ignored. Visual meshes: STL (ASCII/binary), COLLADA 1.4 (.dae), and
+    // box/cylinder/sphere primitives. COLLADA profile_COMMON materials stay on
+    // each triangle set. A URDF material color is the fallback for STL, primitives,
+    // and COLLADA primitives that do not bind a material.
     class UrdfImporter
     {
     protected:

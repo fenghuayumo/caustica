@@ -489,6 +489,13 @@ if (BUILD_TESTING)
     endif()
     add_test(NAME causSceneEcsTests COMMAND causSceneEcsTests)
 
+    add_executable(causColladaLoaderTests tests/ColladaLoaderTests.cpp)
+    target_link_libraries(causColladaLoaderTests PRIVATE causScene causEngine)
+    if (MSVC)
+        target_compile_options(causColladaLoaderTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causColladaLoaderTests COMMAND causColladaLoaderTests)
+
     add_executable(causSceneSerializerTests tests/SceneSerializerTests.cpp)
     target_link_libraries(causSceneSerializerTests PRIVATE causScene causEngine)
     if (MSVC)

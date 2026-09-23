@@ -1,5 +1,6 @@
 #include <scene/loader/UrdfImporter.h>
 
+#include <scene/loader/ColladaLoader.h>
 #include <scene/loader/StlLoader.h>
 #include <scene/SceneImport.h>
 #include <scene/SceneEcs.h>
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <fstream>
 #include <optional>
@@ -735,7 +737,7 @@ namespace
         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
         if (ext != ".stl")
         {
-            caustica::warning("URDF visual mesh '%s' uses unsupported format '%s' (only .stl is supported).",
+            caustica::warning("URDF visual mesh '%s' uses unsupported format '%s' (supported: .stl, .dae).",
                 visual.meshFilename.c_str(), ext.c_str());
             return false;
         }
@@ -809,6 +811,238 @@ namespace
         mesh->totalIndices = geometry->numIndices;
         return mesh;
     }
+
+    math::float3 SafeNormalize(math::float3 n, math::float3 fallback = math::float3(0.f, 0.f, 1.f))
+    {
+        const float len = math::length(n);
+        return len > 1e-20f ? n / len : fallback;
+    }
+
+    void ApplyColladaScale(ColladaMeshData& mesh, const math::float3& scale)
+    {
+        if (std::abs(scale.x - 1.f) < 1e-8f && std::abs(scale.y - 1.f) < 1e-8f && std::abs(scale.z - 1.f) < 1e-8f)
+            return;
+
+        const math::float3 invScale(
+            scale.x != 0.f ? 1.f / scale.x : 1.f,
+            scale.y != 0.f ? 1.f / scale.y : 1.f,
+            scale.z != 0.f ? 1.f / scale.z : 1.f);
+        for (ColladaPrimitive& primitive : mesh.primitives)
+        {
+            primitive.bounds = math::box3::empty();
+            for (math::float3& position : primitive.positions)
+            {
+                position = position * scale;
+                primitive.bounds |= position;
+            }
+            for (math::float3& normal : primitive.normals)
+                normal = SafeNormalize(math::float3(normal.x * invScale.x, normal.y * invScale.y, normal.z * invScale.z));
+        }
+    }
+
+    void AppendTangents(
+        const std::vector<math::float3>& positions,
+        const std::vector<math::float3>& normals,
+        const std::vector<math::float2>& texcoords,
+        const std::vector<uint32_t>& indices,
+        std::vector<uint32_t>& outTangents)
+    {
+        const size_t count = positions.size();
+        std::vector<math::float3> tangents(count, math::float3(0.f));
+        std::vector<math::float3> bitangents(count, math::float3(0.f));
+        const bool hasTexcoords = texcoords.size() == count;
+
+        if (hasTexcoords)
+        {
+            for (size_t i = 0; i + 2 < indices.size(); i += 3)
+            {
+                const uint32_t i0 = indices[i];
+                const uint32_t i1 = indices[i + 1];
+                const uint32_t i2 = indices[i + 2];
+                if (i0 >= count || i1 >= count || i2 >= count)
+                    continue;
+                const math::float3 edge1 = positions[i1] - positions[i0];
+                const math::float3 edge2 = positions[i2] - positions[i0];
+                const math::float2 deltaUv1 = texcoords[i1] - texcoords[i0];
+                const math::float2 deltaUv2 = texcoords[i2] - texcoords[i0];
+                const float determinant = deltaUv1.x * deltaUv2.y - deltaUv2.x * deltaUv1.y;
+                if (std::abs(determinant) <= 1e-20f)
+                    continue;
+                const float invDeterminant = 1.f / determinant;
+                const math::float3 tangent = (edge1 * deltaUv2.y - edge2 * deltaUv1.y) * invDeterminant;
+                const math::float3 bitangent = (edge2 * deltaUv1.x - edge1 * deltaUv2.x) * invDeterminant;
+                tangents[i0] += tangent;
+                tangents[i1] += tangent;
+                tangents[i2] += tangent;
+                bitangents[i0] += bitangent;
+                bitangents[i1] += bitangent;
+                bitangents[i2] += bitangent;
+            }
+        }
+
+        outTangents.resize(count);
+        for (size_t i = 0; i < count; ++i)
+        {
+            const math::float3 normal = i < normals.size() ? normals[i] : math::float3(0.f, 0.f, 1.f);
+            math::float3 tangent = tangents[i] - normal * math::dot(normal, tangents[i]);
+            const float tangentLength = math::length(tangent);
+            if (tangentLength <= 1e-20f)
+            {
+                const math::float3 axis = std::abs(normal.z) < 0.999f ? math::float3(0.f, 0.f, 1.f) : math::float3(0.f, 1.f, 0.f);
+                tangent = SafeNormalize(math::cross(axis, normal), math::float3(1.f, 0.f, 0.f));
+                outTangents[i] = math::vectorToSnorm8(math::float4(tangent, 1.f));
+                continue;
+            }
+            tangent = tangent / tangentLength;
+            const float handedness = math::dot(math::cross(normal, tangent), bitangents[i]) < 0.f ? -1.f : 1.f;
+            outTangents[i] = math::vectorToSnorm8(math::float4(tangent, handedness));
+        }
+    }
+
+    Handle<ImageAsset> LoadColladaTexture(TextureLoader& textureCache, const std::filesystem::path& path, bool sRGB)
+    {
+        if (path.empty())
+            return nullptr;
+        std::error_code error;
+        if (!std::filesystem::exists(path, error))
+        {
+            caustica::warning("COLLADA texture '%s' was not found.", path.string().c_str());
+            return nullptr;
+        }
+        return textureCache.loadTextureFromFileDeferred(path, sRGB);
+    }
+
+    std::shared_ptr<MeshInfo> BuildMeshFromCollada(
+        SceneTypeFactory& factory,
+        const std::string& name,
+        const ColladaMeshData& data,
+        const math::float4& fallbackRgba,
+        const std::filesystem::path& sourcePath,
+        TextureLoader& textureCache)
+    {
+        auto mesh = std::static_pointer_cast<MeshInfo>(factory.createMesh());
+        mesh->name = name;
+        mesh->type = MeshType::Triangles;
+        mesh->buffers = std::make_shared<BufferGroup>();
+        mesh->objectSpaceBounds = math::box3::empty();
+        auto& buffers = *mesh->buffers;
+
+        int primitiveIndex = 0;
+        for (const ColladaPrimitive& primitive : data.primitives)
+        {
+            if (primitive.positions.empty() || primitive.indices.size() < 3)
+                continue;
+
+            const uint32_t vertexOffset = static_cast<uint32_t>(buffers.positionData.size());
+            const uint32_t indexOffset = static_cast<uint32_t>(buffers.indexData.size());
+            const size_t vertexCount = primitive.positions.size();
+
+            buffers.positionData.insert(buffers.positionData.end(), primitive.positions.begin(), primitive.positions.end());
+            buffers.indexData.insert(buffers.indexData.end(), primitive.indices.begin(), primitive.indices.end());
+            if (primitive.texcoords.size() == vertexCount)
+                buffers.texcoord1Data.insert(buffers.texcoord1Data.end(), primitive.texcoords.begin(), primitive.texcoords.end());
+            else
+                buffers.texcoord1Data.insert(buffers.texcoord1Data.end(), vertexCount, math::float2(0.f));
+
+            std::vector<math::float3> normals(vertexCount, math::float3(0.f, 0.f, 1.f));
+            for (size_t i = 0; i < vertexCount && i < primitive.normals.size(); ++i)
+                normals[i] = primitive.normals[i];
+            for (const math::float3& normal : normals)
+                buffers.normalData.push_back(math::vectorToSnorm8(normal));
+
+            const std::vector<math::float2> texcoords(
+                buffers.texcoord1Data.end() - std::ptrdiff_t(vertexCount),
+                buffers.texcoord1Data.end());
+            std::vector<uint32_t> tangents;
+            AppendTangents(primitive.positions, normals, texcoords, primitive.indices, tangents);
+            buffers.tangentData.insert(buffers.tangentData.end(), tangents.begin(), tangents.end());
+
+            const ColladaMaterialInfo* info = nullptr;
+            if (!primitive.materialId.empty())
+            {
+                if (auto found = data.materials.find(primitive.materialId); found != data.materials.end())
+                    info = &found->second;
+            }
+
+            auto material = std::dynamic_pointer_cast<Material>(factory.createMaterial());
+            material->modelFileName = sourcePath.string();
+            material->materialIndexInModel = primitiveIndex;
+            if (info)
+            {
+                material->name = info->name.empty() ? info->id : info->name;
+                material->baseOrDiffuseColor = info->baseColor;
+                material->emissiveColor = info->emission;
+                material->opacity = info->opacity;
+                material->roughness = info->roughness;
+                material->metalness = info->metalness;
+                material->doubleSided = info->doubleSided;
+                material->domain = info->opacity < 0.999f ? MaterialDomain::AlphaBlended : MaterialDomain::Opaque;
+                material->baseOrDiffuseTexture = LoadColladaTexture(textureCache, info->diffuseTexture, true);
+                material->emissiveTexture = LoadColladaTexture(textureCache, info->emissiveTexture, true);
+                material->normalTexture = LoadColladaTexture(textureCache, info->normalTexture, false);
+            }
+            else
+            {
+                material->name = name + "_mat" + std::to_string(primitiveIndex);
+                material->baseOrDiffuseColor = math::float3(fallbackRgba.x, fallbackRgba.y, fallbackRgba.z);
+                material->opacity = fallbackRgba.w;
+                material->roughness = 0.45f;
+                material->metalness = 0.05f;
+                material->domain = fallbackRgba.w < 0.999f ? MaterialDomain::AlphaBlended : MaterialDomain::Opaque;
+            }
+
+            auto geometry = std::static_pointer_cast<MeshGeometry>(factory.createMeshGeometry());
+            geometry->material = material;
+            geometry->objectSpaceBounds = primitive.bounds;
+            geometry->indexOffsetInMesh = indexOffset;
+            geometry->vertexOffsetInMesh = vertexOffset;
+            geometry->numIndices = static_cast<uint32_t>(primitive.indices.size());
+            geometry->numVertices = static_cast<uint32_t>(vertexCount);
+            mesh->objectSpaceBounds |= primitive.bounds;
+            mesh->geometries.push_back(geometry);
+            ++primitiveIndex;
+        }
+
+        if (mesh->geometries.empty())
+            return nullptr;
+        mesh->totalVertices = static_cast<uint32_t>(buffers.positionData.size());
+        mesh->totalIndices = static_cast<uint32_t>(buffers.indexData.size());
+        return mesh;
+    }
+
+    std::shared_ptr<MeshInfo> TryLoadColladaVisual(
+        SceneTypeFactory& factory,
+        const UrdfVisual& visual,
+        const std::filesystem::path& urdfPath,
+        const std::filesystem::path& meshDirHint,
+        const std::string& meshName,
+        std::unordered_map<std::string, ColladaMeshData>& cache,
+        TextureLoader& textureCache)
+    {
+        const std::filesystem::path resolved = ResolveUrdfMeshPath(urdfPath, visual.meshFilename, meshDirHint);
+        const std::string cacheKey = resolved.lexically_normal().string();
+        auto found = cache.find(cacheKey);
+        if (found == cache.end())
+        {
+            ColladaMeshData loaded;
+            if (!loadColladaFile(resolved, loaded))
+                return nullptr;
+            found = cache.emplace(cacheKey, std::move(loaded)).first;
+        }
+
+        ColladaMeshData scaled = found->second;
+        ApplyColladaScale(scaled, visual.meshScale);
+        if (scaled.empty())
+            return nullptr;
+        return BuildMeshFromCollada(factory, meshName, scaled, visual.rgba, resolved, textureCache);
+    }
+
+    std::string LowerExtension(const std::filesystem::path& path)
+    {
+        std::string ext = path.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        return ext;
+    }
 } // namespace
 
 UrdfImporter::UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
@@ -818,7 +1052,7 @@ UrdfImporter::UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
 
 bool UrdfImporter::load(
     const std::filesystem::path& fileName,
-    TextureLoader&,
+    TextureLoader& textureCache,
     SceneLoadingStats&,
     bool /*asyncTextures*/,
     SceneImportResult& result,
@@ -925,6 +1159,7 @@ bool UrdfImporter::load(
     world.world().emplace<scene::RobotComponent>(rootEntity, std::move(robotComponent));
 
     std::unordered_map<std::string, StlMeshData> stlCache;
+    std::unordered_map<std::string, ColladaMeshData> daeCache;
     size_t visualCount = 0;
     size_t failedVisuals = 0;
 
@@ -937,15 +1172,26 @@ bool UrdfImporter::load(
         for (size_t visualIndex = 0; visualIndex < link.visuals.size(); ++visualIndex)
         {
             const UrdfVisual& visual = link.visuals[visualIndex];
-            StlMeshData meshData;
-            if (!BuildVisualMeshData(visual, fileName, meshDirHint, stlCache, meshData))
+            const std::string meshName = link.name + "_visual" + std::to_string(visualIndex);
+            std::shared_ptr<MeshInfo> mesh;
+            const bool collada = visual.geomType == UrdfVisual::GeomType::Mesh
+                && LowerExtension(ResolveUrdfMeshPath(fileName, visual.meshFilename, meshDirHint)) == ".dae";
+            if (collada)
+            {
+                mesh = TryLoadColladaVisual(
+                    *m_SceneTypeFactory, visual, fileName, meshDirHint, meshName, daeCache, textureCache);
+            }
+            else
+            {
+                StlMeshData meshData;
+                if (BuildVisualMeshData(visual, fileName, meshDirHint, stlCache, meshData))
+                    mesh = BuildMeshFromStl(*m_SceneTypeFactory, meshName, meshData, visual.rgba, fileName);
+            }
+            if (!mesh)
             {
                 ++failedVisuals;
                 continue;
             }
-
-            const std::string meshName = link.name + "_visual" + std::to_string(visualIndex);
-            auto mesh = BuildMeshFromStl(*m_SceneTypeFactory, meshName, meshData, visual.rgba, fileName);
 
             // Always attach under a dedicated visual child so URDF visual origins are preserved.
             const ecs::Entity visualEntity = world.createEntity(meshName, linkIt->second);
@@ -966,15 +1212,16 @@ bool UrdfImporter::load(
         return false;
     }
 
+    const size_t cachedMeshes = stlCache.size() + daeCache.size();
     if (failedVisuals > 0)
     {
         caustica::info("URDF '%s': loaded %zu links, %zu joints, %zu visuals (%zu mesh files cached, %zu visuals skipped).",
-            fileName.string().c_str(), links.size(), joints.size(), visualCount, stlCache.size(), failedVisuals);
+            fileName.string().c_str(), links.size(), joints.size(), visualCount, cachedMeshes, failedVisuals);
     }
     else
     {
         caustica::info("URDF '%s': loaded %zu links, %zu joints, %zu visuals (%zu mesh files cached).",
-            fileName.string().c_str(), links.size(), joints.size(), visualCount, stlCache.size());
+            fileName.string().c_str(), links.size(), joints.size(), visualCount, cachedMeshes);
     }
 
     return true;

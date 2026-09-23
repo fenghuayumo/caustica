@@ -833,6 +833,8 @@ engine->despawn(entity);
 
 URDF import builds a visual link tree. **Scheme A**: the engine stores movable joints on the robot root and applies FK. Contact, effort, and joint drive stay on the host. `joint_names` is `revolute` / `continuous` / `prismatic` in URDF order. `q` is radians or metres. Host-side FK can still use `set_world_poses` (scheme B).
 
+Visual meshes are STL, COLLADA (`.dae`), and box, cylinder, or sphere primitives. A COLLADA visual keeps the file's `profile_COMMON` materials per triangle set: diffuse color and texture, emission, transparency, and Phong/Blinn shininess. Shininess is the Phong exponent and becomes roughness `sqrt(2 / (shininess + 2))`. A dark diffuse paired with a strong specular color is stored as metal; other materials keep the diffuse color as albedo. Vertices stay in the URDF link frame (`Z_UP` is unchanged; `Y_UP` and `X_UP` are rotated so Z is up). The URDF `<material>` color applies to STL, primitives, and COLLADA primitives that do not bind a material.
+
 ```python
 import math
 import numpy as np
@@ -1601,7 +1603,7 @@ See [Cookbook](#edit-lights). Environment tweaks also live on `settings.environm
 
 ## Spawn / despawn
 
-Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`. Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously. URDF robots expose visual FK on the spawned root (`joint_names` / `set_joint_positions`); see [URDF visual FK](#urdf-visual-fk).
+Supported extensions: `.gltf`, `.glb`, `.obj`, `.urdf`, `.usd` / `.usda` / `.usdc`, `.prefab.json`. Extract publishes a new proxy generation; GPU mesh/AS/SBT work is built on the render thread asynchronously. URDF robots expose visual FK on the spawned root (`joint_names` / `set_joint_positions`); see [URDF visual FK](#urdf-visual-fk). URDF visuals accept STL and COLLADA (`.dae`) meshes; COLLADA materials are kept per triangle set.
 
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
