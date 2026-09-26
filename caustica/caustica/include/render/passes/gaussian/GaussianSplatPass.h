@@ -4,7 +4,6 @@
 #include <rhi/rhi.h>
 
 #include "GaussianSplatAccelBuilder.h"
-#include "GaussianSplatEmissionProxy.h"
 #include "GaussianSplatSorter.h"
 
 #include <scene/GaussianSplatData.h>
@@ -129,10 +128,6 @@ public:
         std::shared_ptr<caustica::ShaderFactory> shaderFactory);
 
     void setGpuSort(std::shared_ptr<GPUSort> gpuSort);
-    // Shared Hybrid-RT resource used by secondary-ray reflection/refraction.
-    // This is intentionally independent of the removed 3DGRT primary renderer.
-    void setRayTracingRadianceResourcesEnabled(bool enabled);
-
     bool loadFromFile(const std::filesystem::path& fileName, bool convertRdfToRub);
 
     void createPipeline(const RenderTargets& renderTargets);
@@ -145,13 +140,6 @@ public:
         uint32_t kernelDegree,
         bool adaptiveClamp);
     void releaseAccelerationStructures();
-    void buildEmissionProxies(
-        uint32_t maxProxyCount,
-        float splatScale,
-        uint32_t kernelDegree,
-        bool adaptiveClamp,
-        caustica::math::float3 tintColor,
-        float alphaCullThreshold);
 
     void prepareGraphResources(const GaussianSplatRenderSettings& settings);
     [[nodiscard]] GaussianSplatGraphResources graphResources(const GaussianSplatRenderSettings& settings) const;
@@ -179,11 +167,17 @@ public:
     }
     [[nodiscard]] caustica::rhi::rt::AccelStruct* getTopLevelAS() const { return m_accelBuilder.getTopLevelAS(); }
     [[nodiscard]] caustica::rhi::Buffer* getSplatBuffer() const { return m_splatBuffer.Get(); }
-    [[nodiscard]] caustica::rhi::Buffer* getRayTracingShBuffer() const { return m_rayTracingShBuffer.Get(); }
+    // Secondary rays reuse the packed raster SH buffer instead of retaining a
+    // second float32 copy.
+    [[nodiscard]] caustica::rhi::Buffer* getRayTracingShBuffer() const { return m_shBuffer.Get(); }
+    [[nodiscard]] bool isRayTracingRadianceReady() const
+    {
+        return m_shBuffer != nullptr && !m_formatUploadPending;
+    }
     [[nodiscard]] uint32_t getShDegree() const { return m_shDegree; }
+    [[nodiscard]] GaussianSplatStorageFormat getShFormat() const { return m_currentShFormat; }
     [[nodiscard]] uint32_t getShadowPrimitiveCountPerSplat() const { return m_accelBuilder.getShadowPrimitiveCountPerSplat(); }
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
-    [[nodiscard]] const std::vector<GaussianSplatEmissionProxy>& getEmissionProxies() const { return m_emissionProxies; }
 
 private:
     void createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS);
@@ -199,7 +193,6 @@ private:
 
     caustica::rhi::BufferHandle m_constantBuffer;
     caustica::rhi::BufferHandle m_splatBuffer;
-    caustica::rhi::BufferHandle m_rayTracingShBuffer;
     caustica::rhi::BufferHandle m_colorBuffer;
     caustica::rhi::BufferHandle m_shBuffer;
     caustica::rhi::BufferHandle m_indexBuffer;
@@ -258,7 +251,6 @@ private:
     std::vector<caustica::GaussianSplatData> m_splats;
     std::vector<caustica::math::float4> m_colorOpacity;
     std::vector<caustica::math::float4> m_shCoefficients;
-    std::vector<GaussianSplatEmissionProxy> m_emissionProxies;
     std::vector<uint8_t> m_packedColorOpacity;
     std::vector<uint8_t> m_packedShCoefficients;
     caustica::math::box3 m_localBounds = caustica::math::box3::empty();
@@ -266,19 +258,10 @@ private:
     uint32_t m_splatCount = 0;
     uint32_t m_shDegree = 0;
     bool m_splatUploadPending = false;
-    bool m_rayTracingShUploadPending = false;
     bool m_formatUploadPending = true;
     uint64_t m_splatUploadOffset = 0;
-    uint64_t m_rayTracingShUploadOffset = 0;
     uint64_t m_colorUploadOffset = 0;
     uint64_t m_shUploadOffset = 0;
-    uint32_t m_cachedEmissionProxyMaxCount = 0;
-    float m_cachedEmissionProxySplatScale = 1.0f;
-    uint32_t m_cachedEmissionProxyKernelDegree = 0;
-    bool m_cachedEmissionProxyAdaptiveClamp = true;
-    caustica::math::float3 m_cachedEmissionProxyTintColor = caustica::math::float3(1.0f);
-    float m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
-    bool m_emissionProxyBuildPending = true;
     GaussianSplatStorageFormat m_currentShFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatStorageFormat m_currentRgbaFormat = GaussianSplatStorageFormat::Float32;
     GaussianSplatRenderSettings m_frameRenderSettings;

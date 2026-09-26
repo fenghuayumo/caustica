@@ -116,9 +116,6 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx)
         PathTracingContext* const pathTracingContext = ctx.pathTracingContext;
         LightSamplingCache* const lightSampling = ctx.lightSampling;
         const uint64_t frameIndex = ctx.frameIndex;
-        const std::vector<GaussianSplatEmissionProxy>* const gaussianEmissionProxies =
-            ctx.gaussianSplatEmissionProxies;
-
         if (radianceImportance.isValid() || lightBuffer.isValid() || lightProxies.isValid())
         {
             previous = ctx.graph->addPass(
@@ -131,16 +128,14 @@ rg::PassHandle registerLightingGraphPasses(FrameGraphContext ctx)
                     if (lightProxies.isValid())
                         setup.write(lightProxies, rg::BufferAccess::UnorderedAccess);
                 },
-                [pathTracingContext, lightSampling, frameIndex,
-                 gaussianEmissionProxies](rg::RenderPassContext& passCtx) {
+                [pathTracingContext, lightSampling, frameIndex](rg::RenderPassContext& passCtx) {
                     if (passCtx.commandList() == nullptr || pathTracingContext == nullptr
                         || lightSampling == nullptr)
                         return;
                     updateLightSamplingBeginFrame(
                         *pathTracingContext,
                         passCtx.commandList(),
-                        frameIndex,
-                        gaussianEmissionProxies);
+                        frameIndex);
                 },
                 rg::PassOptions{ .queue = caustica::rhi::CommandQueue::Compute });
         }

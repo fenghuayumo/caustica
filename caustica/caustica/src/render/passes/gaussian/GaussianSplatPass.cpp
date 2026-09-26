@@ -194,30 +194,6 @@ void GaussianSplatPass::setGpuSort(std::shared_ptr<GPUSort> gpuSort)
     m_gpuSort = std::move(gpuSort);
 }
 
-void GaussianSplatPass::setRayTracingRadianceResourcesEnabled(bool enabled)
-{
-    if (!enabled)
-    {
-        m_rayTracingShBuffer = nullptr;
-        m_rayTracingShUploadPending = false;
-        m_rayTracingShUploadOffset = 0;
-        return;
-    }
-
-    if (m_rayTracingShBuffer || m_shCoefficients.empty())
-        return;
-
-    caustica::rhi::BufferDesc desc;
-    desc.byteSize = uint64_t(m_shCoefficients.size()) * sizeof(float4);
-    desc.structStride = sizeof(float4);
-    desc.debugName = "GaussianSplatRayTracingSHBuffer";
-    desc.initialState = caustica::rhi::ResourceStates::ShaderResource;
-    desc.keepInitialState = true;
-    m_rayTracingShBuffer = m_device->createBuffer(desc);
-    m_rayTracingShUploadPending = m_rayTracingShBuffer != nullptr;
-    m_rayTracingShUploadOffset = 0;
-}
-
 caustica::render::GaussianSplatSortResources GaussianSplatPass::makeSortResources() const
 {
     caustica::render::GaussianSplatSortResources resources;
@@ -240,7 +216,6 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
 
     m_splats = std::move(dataset.splats);
     m_shCoefficients = std::move(dataset.shCoefficients);
-    m_emissionProxies.clear();
     m_splatCount = uint32_t(m_splats.size());
     m_shDegree = dataset.shDegree;
     m_colorOpacity.clear();
@@ -271,13 +246,6 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     splatBufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
     splatBufferDesc.keepInitialState = true;
     m_splatBuffer = m_device->createBuffer(splatBufferDesc);
-
-    // Secondary-ray Gaussian radiance is an optional Hybrid-RT feature. Keep
-    // its large uncompressed SH copy lazy, but preserve the resource path even
-    // though 3DGRT is no longer exposed as a primary rendering method.
-    m_rayTracingShBuffer = nullptr;
-    m_rayTracingShUploadPending = false;
-    m_rayTracingShUploadOffset = 0;
 
     m_colorBuffer = nullptr;
     m_shBuffer = nullptr;
@@ -335,111 +303,10 @@ bool GaussianSplatPass::loadFromFile(const std::filesystem::path& fileName, bool
     m_splatUploadOffset = 0;
     m_colorUploadOffset = 0;
     m_shUploadOffset = 0;
-    m_cachedEmissionProxyMaxCount = 0;
-    m_cachedEmissionProxySplatScale = 1.0f;
-    m_cachedEmissionProxyKernelDegree = 0;
-    m_cachedEmissionProxyAdaptiveClamp = true;
-    m_cachedEmissionProxyTintColor = float3(1.0f);
-    m_cachedEmissionProxyAlphaCullThreshold = 0.0f;
-    m_emissionProxyBuildPending = true;
     m_accelBuilder.release();
     m_sorter.onSplatCountChanged(m_splatCount);
 
     return true;
-}
-
-void GaussianSplatPass::buildEmissionProxies(
-    uint32_t maxProxyCount,
-    float splatScale,
-    uint32_t kernelDegree,
-    bool adaptiveClamp,
-    float3 tintColor,
-    float alphaCullThreshold)
-{
-    kernelDegree = std::min(kernelDegree, 5u);
-    tintColor = float3(
-        std::max(tintColor.x, 0.0f),
-        std::max(tintColor.y, 0.0f),
-        std::max(tintColor.z, 0.0f));
-    alphaCullThreshold = std::max(alphaCullThreshold, 0.0f);
-
-    if (!hasSplats() || maxProxyCount == 0)
-    {
-        m_emissionProxies.clear();
-        m_cachedEmissionProxyMaxCount = maxProxyCount;
-        m_cachedEmissionProxySplatScale = splatScale;
-        m_cachedEmissionProxyKernelDegree = kernelDegree;
-        m_cachedEmissionProxyAdaptiveClamp = adaptiveClamp;
-        m_cachedEmissionProxyTintColor = tintColor;
-        m_cachedEmissionProxyAlphaCullThreshold = alphaCullThreshold;
-        m_emissionProxyBuildPending = false;
-        return;
-    }
-
-    const bool tintChanged =
-        std::abs(m_cachedEmissionProxyTintColor.x - tintColor.x) >= 1e-4f ||
-        std::abs(m_cachedEmissionProxyTintColor.y - tintColor.y) >= 1e-4f ||
-        std::abs(m_cachedEmissionProxyTintColor.z - tintColor.z) >= 1e-4f;
-
-    if (!m_emissionProxyBuildPending
-        && m_cachedEmissionProxyMaxCount == maxProxyCount
-        && std::abs(m_cachedEmissionProxySplatScale - splatScale) < 1e-4f
-        && m_cachedEmissionProxyKernelDegree == kernelDegree
-        && m_cachedEmissionProxyAdaptiveClamp == adaptiveClamp
-        && !tintChanged
-        && std::abs(m_cachedEmissionProxyAlphaCullThreshold - alphaCullThreshold) < 1e-6f)
-    {
-        return;
-    }
-
-    std::vector<GaussianSplatEmissionProxy> candidates;
-    candidates.reserve(m_splats.size());
-
-    for (const caustica::GaussianSplatData& splat : m_splats)
-    {
-        const float opacity = std::max(splat.centerOpacity.w, 0.0f);
-        if (opacity <= alphaCullThreshold)
-            continue;
-
-        const float3 extent = caustica::render::gaussianAabbExtent(splat, splatScale, kernelDegree, adaptiveClamp);
-        const float radius = std::max(1e-4f, std::max(extent.x, std::max(extent.y, extent.z)));
-        const float3 linearSh0 = caustica::render::srgbToLinear(float3(
-            std::max(splat.color.x, 0.0f),
-            std::max(splat.color.y, 0.0f),
-            std::max(splat.color.z, 0.0f)) * tintColor);
-        const float3 radiance = linearSh0 * opacity;
-        const float weight = std::max(0.0f, caustica::render::luminance(radiance)) * radius * radius;
-        if (weight <= 0.0f)
-            continue;
-
-        GaussianSplatEmissionProxy proxy;
-        proxy.center = splat.centerOpacity.xyz();
-        proxy.radius = radius;
-        proxy.radiance = radiance;
-        proxy.weight = weight;
-        candidates.push_back(proxy);
-    }
-
-    if (candidates.size() > maxProxyCount)
-    {
-        auto byDescendingWeight = [](const GaussianSplatEmissionProxy& lhs, const GaussianSplatEmissionProxy& rhs)
-        {
-            return lhs.weight > rhs.weight;
-        };
-
-        std::nth_element(candidates.begin(), candidates.begin() + maxProxyCount, candidates.end(), byDescendingWeight);
-        candidates.resize(maxProxyCount);
-        std::sort(candidates.begin(), candidates.end(), byDescendingWeight);
-    }
-
-    m_emissionProxies = std::move(candidates);
-    m_cachedEmissionProxyMaxCount = maxProxyCount;
-    m_cachedEmissionProxySplatScale = splatScale;
-    m_cachedEmissionProxyKernelDegree = kernelDegree;
-    m_cachedEmissionProxyAdaptiveClamp = adaptiveClamp;
-    m_cachedEmissionProxyTintColor = tintColor;
-    m_cachedEmissionProxyAlphaCullThreshold = alphaCullThreshold;
-    m_emissionProxyBuildPending = false;
 }
 
 void GaussianSplatPass::buildAccelerationStructures(
@@ -737,17 +604,7 @@ bool GaussianSplatPass::uploadSplatDataIfNeeded(caustica::rhi::CommandList* comm
             m_splatUploadOffset);
     }
 
-    if (m_rayTracingShUploadPending && m_rayTracingShBuffer && !m_shCoefficients.empty())
-    {
-        m_rayTracingShUploadPending = !UploadBufferChunk(
-            commandList,
-            m_rayTracingShBuffer,
-            m_shCoefficients.data(),
-            uint64_t(m_shCoefficients.size()) * sizeof(float4),
-            m_rayTracingShUploadOffset);
-    }
-
-    return !m_splatUploadPending && !m_rayTracingShUploadPending;
+    return !m_splatUploadPending;
 }
 
 void GaussianSplatPass::ensureFormatBuffers(
@@ -778,7 +635,10 @@ void GaussianSplatPass::ensureFormatBuffers(
     m_colorBuffer = m_device->createBuffer(colorDesc);
 
     constexpr uint32_t kShScalarStride = 45;
-    const uint64_t shByteSize = AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat));
+    const uint64_t shScalarCount = m_shDegree > 0
+        ? uint64_t(m_splatCount) * kShScalarStride
+        : 1u;
+    const uint64_t shByteSize = AlignRawBufferSize(shScalarCount * FormatElementSize(shFormat));
     caustica::rhi::BufferDesc shDesc;
     shDesc.byteSize = shByteSize;
     shDesc.canHaveRawViews = true;
@@ -821,8 +681,12 @@ bool GaussianSplatPass::uploadFormatDataIfNeeded(
         }
 
         constexpr uint32_t kShScalarStride = 45;
-        m_packedShCoefficients.assign(size_t(AlignRawBufferSize(uint64_t(m_splatCount) * kShScalarStride * FormatElementSize(shFormat))), 0u);
-        for (uint32_t splatIndex = 0; splatIndex < m_splatCount; ++splatIndex)
+        const uint64_t shScalarCount = m_shDegree > 0
+            ? uint64_t(m_splatCount) * kShScalarStride
+            : 1u;
+        m_packedShCoefficients.assign(
+            size_t(AlignRawBufferSize(shScalarCount * FormatElementSize(shFormat))), 0u);
+        for (uint32_t splatIndex = 0; m_shDegree > 0 && splatIndex < m_splatCount; ++splatIndex)
         {
             for (uint32_t scalarIndex = 0; scalarIndex < kShScalarStride; ++scalarIndex)
             {

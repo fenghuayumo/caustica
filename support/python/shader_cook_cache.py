@@ -92,6 +92,24 @@ class DependencyManifest:
         self.closures: dict[str, set[str]] = {}
         self.bins: dict[str, tuple[str, str]] = {}
 
+    @classmethod
+    def load(cls, path: Path) -> "DependencyManifest":
+        """Load an existing manifest so a targeted cook remains additive."""
+        manifest = cls()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return manifest
+        if not lines or lines[0] != MANIFEST_MAGIC:
+            return manifest
+        for line in lines[1:]:
+            parts = line.split(" ", 3)
+            if len(parts) == 3 and parts[0] == "D":
+                manifest.add_closure(parts[1], {parts[2]})
+            elif len(parts) == 4 and parts[0] == "B":
+                manifest.add_bin(parts[1], parts[2], parts[3])
+        return manifest
+
     def add_closure(self, source: str, includes: tuple[str, ...] | set[str]) -> None:
         # Union across variants keeps the closure macro-independent: a superset can
         # only cause an extra recompile, never a missed one.

@@ -30,7 +30,6 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/pathTrace/PathTracePass.h>
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/debug/ShaderDebug.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/core/FramebufferFactory.h>
 #include <render/core/GraphicsQueueFence.h>
 #include <assets/loader/ShaderFactory.h>
@@ -128,9 +127,6 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
         .renderTargets = m_renderTargets.get(),
         .settings = &m_context->activeSettings(),
         .frameConstants = &m_frameConstants,
-        .gaussianSplatEmissionProxies = m_gaussianSplatEmissionProxies.empty()
-            ? nullptr
-            : &m_gaussianSplatEmissionProxies,
         .targetFramebuffer = ctx.frame.framebuffer,
         .extractedView = &ctx.view,
         .bindingCache = &m_context->bindingCache,
@@ -842,9 +838,55 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     caustica::rhi::Buffer* const currentGaussianBuffer = currentGaussianPass != nullptr
         ? currentGaussianPass->getSplatBuffer()
         : nullptr;
-    if (!m_sceneBindings.matchesGaussianResources(currentGaussianAS, currentGaussianBuffer))
+    caustica::rhi::Buffer* const currentGaussianShBuffer = currentGaussianPass != nullptr
+        ? currentGaussianPass->getRayTracingShBuffer()
+        : nullptr;
+    const bool gaussianResourcesChanged = !m_sceneBindings.matchesGaussianResources(
+            currentGaussianAS,
+            currentGaussianBuffer,
+            currentGaussianShBuffer);
+    if (gaussianResourcesChanged)
     {
         ctx.needNewBindings = true;
+    }
+
+    const PathTracerSettings& gaussianSettings = m_context->activeSettings();
+    const uint32_t requestedShFormat = uint32_t(std::clamp(
+        gaussianSettings.GaussianSplatSHFormat, 0, 2));
+    const bool gaussianRadianceReady = gaussianSettings.EnableGaussianSplats
+        && gaussianSettings.GaussianSplatSecondaryRays
+        && currentGaussianPass != nullptr
+        && currentGaussianAS != nullptr
+        && currentGaussianBuffer != nullptr
+        && currentGaussianPass->isRayTracingRadianceReady()
+        && uint32_t(currentGaussianPass->getShFormat()) == requestedShFormat;
+    const bool gaussianRadianceReadinessChanged =
+        gaussianRadianceReady != m_gaussianSplatRadianceReady;
+    if (gaussianRadianceReadinessChanged)
+    {
+        caustica::info(
+            "Gaussian secondary radiance %s (splats=%u, AS=%s, SH=%s, degree=%u, format=%u)",
+            gaussianRadianceReady ? "ready" : "not ready",
+            currentGaussianPass != nullptr ? currentGaussianPass->getSplatCount() : 0u,
+            currentGaussianAS != nullptr ? "ready" : "missing",
+            currentGaussianPass != nullptr && currentGaussianPass->isRayTracingRadianceReady()
+                ? "ready" : "uploading",
+            currentGaussianPass != nullptr ? currentGaussianPass->getShDegree() : 0u,
+            currentGaussianPass != nullptr ? uint32_t(currentGaussianPass->getShFormat()) : 0u);
+    }
+    m_gaussianSplatRadianceReady = gaussianRadianceReady;
+
+    // Gaussian BLAS/TLAS and packed SH become available asynchronously,
+    // usually a few frames after the primary raster splats are already
+    // visible. Pointer creation also precedes the completion of chunked SH
+    // upload, so descriptor comparison alone cannot detect the actual
+    // false->true radiance-ready transition. Stable-plane/specular history
+    // captured before it contains no Gaussian reflections and must be rebuilt.
+    if (gaussianRadianceReadinessChanged
+        || (gaussianResourcesChanged && gaussianSettings.GaussianSplatSecondaryRays))
+    {
+        m_context->activeSettings().ResetAccumulation = true;
+        m_context->activeSettings().ResetRealtimeCaches = true;
     }
 
     preUpdateLightingFrame(*m_context, m_frameCommands->primaryHandle(), ctx.needNewBindings);
@@ -856,8 +898,6 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     {
         if (ctx.needNewPasses || ctx.needNewBindings || !m_sceneBindings.ready())
             m_rtxdiPass->reset();
-
-        buildGaussianSplatEmissionProxies();
 
         const bool envMapPresent =
             m_context->scenePasses.lighting.envMapSceneParams().Enabled != 0.f;
@@ -886,14 +926,6 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
         rtxdiParams.usingReGIR = m_context->activeSettings().actualUseReSTIRDI();
         rtxdiParams.environmentMapImportanceSampling = envMapPresent;
         rtxdiParams.resetRealtimeCaches = m_context->activeSettings().ResetRealtimeCaches;
-        if (!m_gaussianSplatEmissionProxies.empty()
-            && isGaussianSplatEmissionEnabled(m_context->activeSettings()))
-        {
-            rtxdiParams.gaussianSplatEmissionProxies = &m_gaussianSplatEmissionProxies;
-            rtxdiParams.gaussianSplatEmissionObjectToWorld = float4x4::identity();
-            rtxdiParams.gaussianSplatEmissionIntensity =
-                m_context->activeSettings().GaussianSplatEmissionIntensity;
-        }
         m_rtxdiPass->setupFrame(rtxdiParams);
         abortIfSubmitFailed(ctx, "rtxdiSetupFrame");
         if (ctx.aborted)
@@ -1061,7 +1093,8 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
             m_context->frameGaussianSplats(),
             m_context->scenePasses.gaussianSplats),
         uint32_t(m_frameIndex & 0xffffffffu),
-        resolveGaussianSplatShadowDirection(m_context->frameLights()));
+        resolveGaussianSplatShadowDirection(m_context->frameLights()),
+        m_context->frameLights());
 
     constants.envMapSceneParams = lighting.envMapSceneParams();
     constants.envMapImportanceSamplingParams =
@@ -1131,7 +1164,6 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     };
 
     // FrameConstants / EnvMap / LightSampling / SubInstance / OIDN / AA are graph-owned.
-    buildGaussianSplatEmissionProxies();
 }
 
 void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameContext& ctx)

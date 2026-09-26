@@ -103,6 +103,13 @@ namespace Bridge
         out TriangleHit triangleHit, out float hitT);
 
     static void traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug);
+    static void traceSecondaryGaussianRadiance(
+        const PathState path,
+        const float2 tMinMax,
+        const float segmentTMax,
+        out float3 radiance,
+        out float transmittance,
+        out float hitT);
 
 #if PT_USE_RESTIR_GI
     static void StoreSecondarySurfacePositionAndNormal(uint2 pixelCoordinate, float3 worldPos, float3 normal);

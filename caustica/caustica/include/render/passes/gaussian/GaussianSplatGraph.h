@@ -31,15 +31,13 @@ struct GaussianSplatFrameInputs
 
 uint32_t resolveGaussianSplatShadowMode(const PathTracerSettings& settings);
 uint32_t clampGaussianSplatSoftShadowSamples(int sampleCount);
-uint32_t clampGaussianSplatEmissionProxyCount(int proxyCount);
-
-bool isGaussianSplatEmissionEnabled(const PathTracerSettings& settings);
 void fillGaussianSplatShadowConstants(
     FrameConstants& constants,
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex,
-    const math::float3& shadowDirectionToLight);
+    const math::float3& shadowDirectionToLight,
+    std::span<const scene::LightRenderProxy> lights);
 
 bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings);
 bool needsTemporalGaussianSplatsBeforeAA(const PathTracerSettings& settings);

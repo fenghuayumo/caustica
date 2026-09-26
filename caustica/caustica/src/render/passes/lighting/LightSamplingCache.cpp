@@ -570,45 +570,6 @@ static PolymorphicLightInfoFull ConvertLightProxy(
     return PolymorphicLightInfoFull::make(polymorphic, polymorphicEx);
 }
 
-static float3 TransformPoint(const float3& point, const float4x4& transform)
-{
-    const float4 transformed = float4(point, 1.0f) * transform;
-    const float invW = std::abs(transformed.w) > 1e-6f ? 1.0f / transformed.w : 1.0f;
-    return transformed.xyz() * invW;
-}
-
-static float TransformRadiusScale(const float4x4& transform)
-{
-    const float3 row0 = float3(transform.row0.x, transform.row0.y, transform.row0.z);
-    const float3 row1 = float3(transform.row1.x, transform.row1.y, transform.row1.z);
-    const float3 row2 = float3(transform.row2.x, transform.row2.y, transform.row2.z);
-    return std::max(1e-4f, std::max(math::length(row0), std::max(math::length(row1), math::length(row2))));
-}
-
-static PolymorphicLightInfoFull ConvertGaussianSplatEmissionProxy(
-    const GaussianSplatEmissionProxy& proxy,
-    const float4x4& objectToWorld,
-    float emissionIntensity,
-    uint32_t proxyIndex)
-{
-    PolymorphicLightInfo polymorphic; memset(&polymorphic, 0, sizeof(polymorphic));
-    PolymorphicLightInfoEx polymorphicEx; memset(&polymorphicEx, 0, sizeof(polymorphicEx));
-
-    const float3 radiance = float3(
-        std::max(proxy.radiance.x * emissionIntensity, 0.0f),
-        std::max(proxy.radiance.y * emissionIntensity, 0.0f),
-        std::max(proxy.radiance.z * emissionIntensity, 0.0f));
-    const float radius = std::max(proxy.radius * TransformRadiusScale(objectToWorld), 1e-4f);
-
-    polymorphic.ColorTypeAndFlags = (uint32_t)PolymorphicLightType::kSphere << kPolymorphicLightTypeShift;
-    packLightColor(radiance, polymorphic);
-    polymorphic.Center = TransformPoint(proxy.center, objectToWorld);
-    polymorphic.Scalars = fp32ToFp16(radius);
-    polymorphicEx.UniqueID = Hash32Combine(0x3D650000u, proxyIndex);
-
-    return PolymorphicLightInfoFull::make(polymorphic, polymorphicEx);
-}
-
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
 // #endif
@@ -704,46 +665,6 @@ bool LightSamplingCache::collectAnalyticLightsCPU(const UpdateSettings & setting
     assert(outLightBuffer.size() == outLightHistoryRemapCurrentToPastBuffer.size());
     return allGood;
 };
-
-bool LightSamplingCache::collectGaussianSplatEmissionProxies(
-    const UpdateSettings& settings,
-    LightingControlData& ctrlBuff,
-    std::vector<PolymorphicLightInfo>& outLightBuffer,
-    std::vector<PolymorphicLightInfoEx>& outLightExBuffer,
-    std::vector<uint>& outLightHistoryRemapCurrentToPast,
-    std::vector<uint>& outLightHistoryRemapPastToCurrent)
-{
-    if (settings.GaussianSplatEmissionProxies == nullptr || settings.GaussianSplatEmissionIntensity <= 0.0f)
-        return true;
-
-    bool allGood = true;
-    const std::vector<GaussianSplatEmissionProxy>& proxies = *settings.GaussianSplatEmissionProxies;
-
-    for (uint32_t proxyIndex = 0; proxyIndex < proxies.size(); ++proxyIndex)
-    {
-        if (outLightBuffer.size() >= CAUSTICA_LIGHTING_MAX_LIGHTS)
-        {
-            allGood = false;
-            break;
-        }
-
-        const PolymorphicLightInfoFull lightPackedFull = ConvertGaussianSplatEmissionProxy(
-            proxies[proxyIndex],
-            settings.GaussianSplatEmissionObjectToWorld,
-            settings.GaussianSplatEmissionIntensity,
-            proxyIndex);
-
-        outLightBuffer.push_back(lightPackedFull.Base);
-        outLightExBuffer.push_back(lightPackedFull.Extended);
-        outLightHistoryRemapCurrentToPast.push_back(CAUSTICA_INVALID_LIGHT_INDEX);
-        outLightHistoryRemapPastToCurrent.push_back(CAUSTICA_INVALID_LIGHT_INDEX);
-
-        ctrlBuff.AnalyticLightCount++;
-        ctrlBuff.TotalLightCount++;
-    }
-
-    return allGood;
-}
 
 // #ifdef _DEBUG
 // #pragma optimize("gt", on)
@@ -1148,8 +1069,6 @@ void LightSamplingCache::updateBegin(caustica::rhi::CommandList* commandList, ca
     m_noOverflow &= collectEnvmapLightPlaceholders( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all analytic lights
     m_noOverflow &= collectAnalyticLightsCPU( m_currentSettings, *sceneData, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
-    // inject 3DGS SH0/DC emission proxies as analytic sphere lights
-    m_noOverflow &= collectGaussianSplatEmissionProxies( m_currentSettings, ctrlBuff, m_scratchLightBuffer, m_scratchLightExBuffer, m_scratchLightHistoryRemapCurrentToPastBuffer, m_scratchLightHistoryRemapPastToCurrentBuffer );
     // collect all emissive triangles and other geometry specific work - this builds batch jobs on the CPU that are executed on the GPU later, but at the end of this step we know the exact number of added emissive triangles (even though some might be black)
     m_noOverflow &= processEmissiveGeometry(m_currentSettings, *sceneData, *materialGpuCache, subInstanceData, ctrlBuff, *m_scratchTaskBuffer);
     cacheConsts.TriangleLightTaskCount = (int)(*m_scratchTaskBuffer).size();

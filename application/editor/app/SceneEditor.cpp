@@ -889,8 +889,6 @@ SceneSettings BuildSceneLookSettings(
     splat.brightness = cfg.GaussianSplatBrightness;
     splat.tintColor = cfg.GaussianSplatTintColor;
     splat.applyToneMapping = cfg.GaussianSplatApplyToneMapping;
-    splat.asEmitter = cfg.GaussianSplatAsEmitter;
-    splat.emissionIntensity = cfg.GaussianSplatEmissionIntensity;
     splat.alphaCullThreshold = cfg.GaussianSplatAlphaCullThreshold;
     splat.shadowStrength = cfg.GaussianSplatShadowStrength;
     look.gaussianSplat = std::move(splat);

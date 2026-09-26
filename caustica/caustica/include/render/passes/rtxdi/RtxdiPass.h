@@ -13,7 +13,6 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 
 class RenderTargets;
 class PrepareLightsPass;
@@ -48,9 +47,6 @@ struct RtxdiBridgeParameters
     bool usingLightSampling;
     bool usingReGIR;
 
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
-    caustica::math::float4x4 gaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
-    float gaussianSplatEmissionIntensity = 0.0f;
 };
 
 class RtxdiPass
@@ -90,9 +86,6 @@ public:
 		bool environmentMapImportanceSampling = false;
 		bool resetRealtimeCaches = false;
 
-		const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
-		caustica::math::float4x4 gaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
-		float gaussianSplatEmissionIntensity = 0.0f;
 	};
 
 	void setupFrame(const SetupParams& params);
@@ -217,4 +210,3 @@ private:
 	uint32_t m_CurrentReservoirIndex;
 	uint32_t m_PreviousReservoirIndex;
 };
-

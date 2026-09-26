@@ -1423,6 +1423,77 @@ bool Bridge::traceSubsurfaceRay(RayDesc ray, const bool cullBackFaces,
     return true;
 }
 
+void Bridge::traceSecondaryGaussianRadiance(
+    const PathState path,
+    const float2 tMinMax,
+    const float segmentTMax,
+    out float3 radiance,
+    out float transmittance,
+    out float hitT)
+{
+    radiance = 0.0f;
+    transmittance = 1.0f;
+    hitT = segmentTMax;
+
+    // Primary visibility is still owned by the sorted/stochastic raster pass.
+    // This query supplies radiance only to rays spawned by a mesh interaction.
+    if (g_Const.GaussianSplatRadianceEnabled == 0
+        || g_Const.GaussianSplatRadianceCount == 0
+        || path.getVertexIndex() == 0)
+    {
+        return;
+    }
+
+    // Bit 1 enables illumination on paths containing a diffuse interaction.
+    // Specular reflection/refraction remains available with bit 0 alone.
+    if ((g_Const.GaussianSplatRadianceEnabled & 2u) == 0u
+        && path.getCounter(PackedCounters::DiffuseBounces) != 0u)
+        return;
+
+    RayDesc ray = path.getScatterRay().toRayDesc();
+    ray.TMin = max(tMinMax.x, 0.0f);
+    ray.TMax = min(tMinMax.y, segmentTMax);
+    if (ray.TMax <= ray.TMin)
+        return;
+
+    ray = HybridGaussian_TransformRay(
+        ray,
+        g_Const.GaussianSplatRadianceWorldToObject);
+    HybridGaussianRadianceResult result = HybridGaussian_TraceRadiance(
+        GaussianSplatBVH,
+        SceneBVH,
+        t_GaussianShadowSplats,
+        t_GaussianRadianceSH,
+        g_Const.GaussianSplatRadianceCount,
+        g_Const.GaussianSplatRadianceShDegree,
+        g_Const.GaussianSplatRadianceShFormat,
+        ray,
+        g_Const.GaussianSplatShadowScale,
+        g_Const.GaussianSplatShadowAlphaThreshold,
+        g_Const.GaussianSplatShadowAlphaScale,
+        g_Const.GaussianSplatShadowKernelMinResponse,
+        g_Const.GaussianSplatShadowKernelDegree,
+        g_Const.GaussianSplatShadowUseTLASInstances,
+        g_Const.GaussianSplatShadowPrimitiveCountPerSplat,
+        g_Const.GaussianSplatRadianceMaxPassCount,
+        g_Const.GaussianSplatRadianceMinimumTransmittance,
+        g_Const.GaussianSplatRadianceAlphaClamp,
+        g_Const.GaussianSplatRadianceBrightness,
+        g_Const.GaussianSplatRadianceTintColor,
+        g_Const.GaussianSplatRadianceObjectToWorld,
+        g_Const.GaussianSplatRadianceReceiverShadowLightCount,
+        g_Const.GaussianSplatRadianceReceiverShadowLight,
+        g_Const.GaussianSplatShadowMode,
+        g_Const.GaussianSplatShadowStrength,
+        g_Const.GaussianSplatShadowRayOffset,
+        g_Const.GaussianSplatShadowSoftRadius,
+        g_Const.GaussianSplatShadowFrameIndex);
+
+    radiance = max(result.radiance, 0.0f);
+    transmittance = saturate(result.transmittance);
+    hitT = result.firstHitT;
+}
+
 void Bridge::traceScatterRay(const PathState path, inout CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery, const float2 tMinMax, DebugContext debug)
 {
     RayDesc ray = path.getScatterRay().toRayDesc();

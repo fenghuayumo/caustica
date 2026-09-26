@@ -59,8 +59,6 @@ namespace caustica
         std::optional<float> brightness;
         std::optional<math::float3> tintColor;
         std::optional<bool> applyToneMapping;
-        std::optional<bool> asEmitter;
-        std::optional<float> emissionIntensity;
         std::optional<float> alphaCullThreshold;
         std::optional<float> shadowStrength;
     };

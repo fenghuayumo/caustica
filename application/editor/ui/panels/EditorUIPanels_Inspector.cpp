@@ -519,13 +519,48 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ImGui::Spacing();
             if (InspectorDragFloat("Footprint Scale", &m_settings.GaussianSplatScale, 0.01f, 0.01f, 10.0f, "%.2f"))
             {
-                if (ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
+                if (m_settings.GaussianSplatSecondaryRays
+                    || ResolveGaussianSplatShadowMode(m_ui) != GAUSSIAN_SPLAT_SHADOWS_DISABLED)
                     m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
                 m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
             }
-            RESET_ON_CHANGE(InspectorDragFloat("Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f"));
-            RESET_ON_CHANGE(InspectorDragFloat("Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f"));
-            RESET_ON_CHANGE(InspectorColorEdit3("Tint Color", &m_settings.GaussianSplatTintColor.x));
+            bool radianceAppearanceChanged = false;
+            radianceAppearanceChanged |= InspectorDragFloat(
+                "Alpha", &m_settings.GaussianSplatAlphaScale, 0.01f, 0.0f, 4.0f, "%.2f");
+            radianceAppearanceChanged |= InspectorDragFloat(
+                "Brightness", &m_settings.GaussianSplatBrightness, 0.01f, 0.0f, 16.0f, "%.2f");
+            radianceAppearanceChanged |= InspectorColorEdit3(
+                "Tint Color", &m_settings.GaussianSplatTintColor.x);
+            if (radianceAppearanceChanged)
+            {
+                m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
+            }
+            if (InspectorCheckbox("Secondary Ray Radiance", &m_settings.GaussianSplatSecondaryRays))
+            {
+                m_runtime.Invalidation.AccelerationStructRebuildRequested = true;
+                m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
+            }
+            ImGui::BeginDisabled(!m_settings.GaussianSplatSecondaryRays);
+            if (InspectorCheckbox("Illuminate Meshes", &m_settings.GaussianSplatIlluminateMeshes))
+            {
+                m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Use trained Gaussian radiance as incident lighting on diffuse mesh paths. Requires path bounces; no point-light proxies.");
+            const bool secondaryIntegrationChanged = InspectorDragFloat(
+                "Secondary Alpha Clamp",
+                &m_settings.GaussianSplatRadianceAlphaClamp,
+                0.01f, 0.0f, 1.0f, "%.2f");
+            if (secondaryIntegrationChanged)
+            {
+                m_settings.ResetAccumulation = true;
+                m_settings.ResetRealtimeCaches = true;
+            }
+            ImGui::EndDisabled();
             RESET_ON_CHANGE(InspectorCheckbox("Apply Tone Mapping", &m_settings.GaussianSplatApplyToneMapping));
             if (ImGui::IsItemHovered())
             {
@@ -538,18 +573,6 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ImGui::Separator();
             ImGui::Spacing();
 
-            RESET_ON_CHANGE(InspectorCheckbox("As Emitter", &m_settings.GaussianSplatAsEmitter));
-            ImGui::BeginDisabled(!m_settings.GaussianSplatAsEmitter);
-            RESET_ON_CHANGE(InspectorDragFloat(
-                "Emission Intensity", &m_settings.GaussianSplatEmissionIntensity, 0.01f, 0.0f, 100.0f, "%.2f"));
-            if (InspectorDragInt(
-                    "Proxy Limit", &m_settings.GaussianSplatEmissionMaxProxyCount, 256.f, 0, 262144))
-            {
-                m_settings.GaussianSplatEmissionMaxProxyCount =
-                    math::clamp(m_settings.GaussianSplatEmissionMaxProxyCount, 0, 262144);
-                m_settings.ResetAccumulation = true;
-            }
-            ImGui::EndDisabled();
 
             ImGui::Spacing();
             ImGui::Separator();

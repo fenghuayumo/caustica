@@ -239,14 +239,6 @@ def add_gaussian_shadow_args(parser: argparse.ArgumentParser) -> None:
         "--shadow-adaptive-clamp", action=argparse.BooleanOptionalAction, default=True
     )
     group.add_argument("--shadow-ray-offset", type=float, default=0.01)
-    group.add_argument(
-        "--emission-intensity",
-        type=float,
-        default=1.0,
-        help="Treat splat radiance as emissive proxy lights at this intensity. 0 disables.",
-    )
-    group.add_argument("--emission-max-proxies", type=int, default=8192)
-
 
 def apply_gaussian_settings(caustica, settings, args: argparse.Namespace) -> None:
     """Push the 3DGS flags onto ``settings``.
@@ -262,6 +254,7 @@ def apply_gaussian_settings(caustica, settings, args: argparse.Namespace) -> Non
     settings.gaussian_splat_brightness = args.brightness
     settings.gaussian_splat_alpha_cull_threshold = args.alpha_cull
     settings.gaussian_splat_mip_antialiasing = args.mip_antialiasing
+    settings.gaussian_splat_secondary_rays = True
 
     settings.gaussian_splat_sorting_mode = int(
         caustica.GaussianSplatSortMode.StochasticSplats
@@ -312,15 +305,12 @@ def _apply_shadow_settings(caustica, settings, args: argparse.Namespace, shadow_
         settings.gaussian_splat_shadow_kernel_degree = args.shadow_kernel_degree
         settings.gaussian_splat_shadow_adaptive_clamp = args.shadow_adaptive_clamp
         settings.gaussian_splat_shadow_ray_offset = args.shadow_ray_offset
-        # Ray-traced Gaussian shadows need splat acceleration structures.
-        settings.gaussian_splat_use_tlas_instances = True
+        # One object-space BLAS containing all AABBs is substantially smaller
+        # than one TLAS instance per splat and is the fast path for large sets.
+        settings.gaussian_splat_use_aabbs = True
+        settings.gaussian_splat_use_tlas_instances = False
         settings.gaussian_splat_blas_compaction = True
 
-    intensity = getattr(args, "emission_intensity", 0.0)
-    settings.gaussian_splat_as_emitter = intensity > 0.0
-    if intensity > 0.0:
-        settings.gaussian_splat_emission_intensity = intensity
-        settings.gaussian_splat_emission_max_proxy_count = args.emission_max_proxies
 
 
 def rebuild_acceleration_structures(engine, warmup_frames: int = 8) -> None:

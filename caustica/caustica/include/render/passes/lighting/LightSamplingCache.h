@@ -16,7 +16,6 @@
 #include <render/core/ComputePass.h>
 
 #include <shaders/SubInstanceData.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/SceneRenderData.h>
 
 #include <filesystem>
@@ -66,10 +65,6 @@ public:
         // environment map parameters
         LightSamplingCacheEnvMapParams EnvMapParams        = {};
         float DistantVsLocalImportanceScale         = 1.0f;
-
-        const std::vector<GaussianSplatEmissionProxy>* GaussianSplatEmissionProxies = nullptr;
-        float4x4    GaussianSplatEmissionObjectToWorld = float4x4::identity();
-        float       GaussianSplatEmissionIntensity = 0.0f;
 
         int64_t     FrameIndex                      = -1;
     };
@@ -147,8 +142,6 @@ private:
     // output goes into m_scratchLightBuffer and 
     static bool                     collectEnvmapLightPlaceholders(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPastBuffer, std::vector<uint> & outLightHistoryRemapPastToCurrent);
     bool                            collectAnalyticLightsCPU(const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
-    bool                            collectGaussianSplatEmissionProxies(const UpdateSettings & settings, LightingControlData & ctrlBuff, std::vector<PolymorphicLightInfo> & outLightBuffer, std::vector<PolymorphicLightInfoEx> & outLightExBuffer, std::vector<uint> & outLightHistoryRemapCurrentToPast, std::vector<uint> & outLightHistoryRemapPastToCurrent);
-
     // this creates emissive triangle proc tasks and also does any required geometry instance (subInstance) processing such as analyt light proxies; has to happen AFTER collectAnalyticLightsCPU
     bool                            processEmissiveGeometry( const UpdateSettings & settings, const caustica::scene::SceneRenderData& sceneData, MaterialGpuCache& materialGpuCache, std::vector<SubInstanceData> & subInstanceData, LightingControlData & ctrlBuff, std::vector<struct EmissiveTrianglesProcTask> & tasks );
 

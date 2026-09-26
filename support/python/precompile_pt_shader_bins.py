@@ -729,7 +729,15 @@ def cook(
         f"{stats.jobs} variants, {worker_count(stats.jobs)} parallel jobs"
     )
 
-    manifests = {api: DependencyManifest() for api in apis}
+    # Named presets are also useful for quick iteration. Preserve records from
+    # previous presets so one targeted cook cannot make the other loose bins look
+    # absent/stale to the runtime dependency index.
+    manifests = {
+        api: DependencyManifest.load(
+            BIN_DIR / "ShaderBin" / runtime_bin_folder(api) / "deps.manifest"
+        )
+        for api in apis
+    }
     started = time.perf_counter()
     jobs = _resolve_l2_keys(dxc_for_api, jobs, stats, manifests, debug_info=debug_info)
     preprocess_seconds = time.perf_counter() - started

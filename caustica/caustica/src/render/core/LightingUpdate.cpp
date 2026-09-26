@@ -7,7 +7,6 @@
 #include <render/passes/lighting/LightSamplingCache.h>
 #include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/SceneRenderData.h>
 #include <scene/SceneLightAccess.h>
 #include <core/scope.h>
@@ -18,19 +17,6 @@ using namespace caustica::math;
 
 namespace caustica
 {
-
-namespace
-{
-
-bool gaussianSplatEmissionEnabled(const PathTracerSettings& settings)
-{
-    return settings.EnableGaussianSplats
-        && settings.GaussianSplatAsEmitter
-        && settings.GaussianSplatEmissionIntensity > 0.0f
-        && settings.GaussianSplatEmissionMaxProxyCount > 0;
-}
-
-} // namespace
 
 void preUpdateLighting(PreUpdateLightingParams& params)
 {
@@ -146,15 +132,6 @@ void updateLightSamplingBegin(
         .Enabled = params.envMapSceneParams.Enabled,
     };
     settings.FrameIndex = params.frameIndex;
-
-    if (params.gaussianSplatEmissionProxies != nullptr
-        && !params.gaussianSplatEmissionProxies->empty()
-        && gaussianSplatEmissionEnabled(params.settings))
-    {
-        settings.GaussianSplatEmissionProxies = params.gaussianSplatEmissionProxies;
-        settings.GaussianSplatEmissionObjectToWorld = float4x4::identity();
-        settings.GaussianSplatEmissionIntensity = params.settings.GaussianSplatEmissionIntensity;
-    }
 
     params.lightSampling->updateBegin(
         commandList,

@@ -239,9 +239,6 @@ void RtxdiPass::setupFrame(const SetupParams& params)
 	bridgeParameters.usingReGIR = params.usingReGIR;
 	bridgeParameters.userSettings.restirDI.initialSamplingParams.environmentMapImportanceSampling =
 		params.environmentMapImportanceSampling;
-	bridgeParameters.gaussianSplatEmissionProxies = params.gaussianSplatEmissionProxies;
-	bridgeParameters.gaussianSplatEmissionObjectToWorld = params.gaussianSplatEmissionObjectToWorld;
-	bridgeParameters.gaussianSplatEmissionIntensity = params.gaussianSplatEmissionIntensity;
 
 	if (params.resetRealtimeCaches)
 		reset();
@@ -324,11 +321,6 @@ void RtxdiPass::prepareResources(
 
     m_PrepareLightsPass->setFrameInputs(
         renderData, geometryInstanceCount, descriptorTable, gpuHandles, envMap, envMapSceneParams);
-    m_PrepareLightsPass->setGaussianSplatEmissionProxies(
-        m_BridgeParameters.gaussianSplatEmissionProxies,
-        m_BridgeParameters.gaussianSplatEmissionObjectToWorld,
-        m_BridgeParameters.gaussianSplatEmissionIntensity);
-
     //Check if resources have changed
     bool envMapPresent = envMap != nullptr;
     uint32_t numEmissiveMeshes, numEmissiveTriangles = 0;
@@ -342,8 +334,6 @@ void RtxdiPass::prepareResources(
                 ++numPrimitiveLights;
         }
     }
-    if (m_BridgeParameters.gaussianSplatEmissionProxies != nullptr && m_BridgeParameters.gaussianSplatEmissionIntensity > 0.0f)
-        numPrimitiveLights += uint32_t(m_BridgeParameters.gaussianSplatEmissionProxies->size());
     uint32_t numGeometryInstances = uint32_t(geometryInstanceCount);
 
     if (m_rtxdiResources && (

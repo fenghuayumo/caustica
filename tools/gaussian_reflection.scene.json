@@ -1,0 +1,45 @@
+{
+  "format": "caustica.scene",
+  "version": 2,
+  "name": "gaussian-reflection-regression",
+  "entities": [
+    {
+      "id": "GroundPlane",
+      "name": "GroundPlane",
+      "components": {
+        "Transform": {
+          "translation": [0.0, 0.0, 0.0],
+          "rotation": [0.0, 0.0, 0.0, 1.0],
+          "scale": [4.0, 1.0, 4.0]
+        },
+        "PrefabInstance": { "source": "builtin:plane" }
+      }
+    },
+    {
+      "id": "Sky",
+      "name": "Sky",
+      "components": {
+        "EnvironmentLight": {
+          "radianceScale": [1.0, 1.0, 1.0],
+          "source": "env/20060807_wells6_hd.hdr"
+        }
+      }
+    },
+    {
+      "id": "Default",
+      "name": "Default",
+      "components": {
+        "Transform": {
+          "translation": [0.0, 2.1, -4.8],
+          "rotation": [0.0, 0.0, 0.0, 1.0]
+        },
+        "PerspectiveCameraEx": {
+          "enableAutoExposure": false,
+          "exposureCompensation": 1.0,
+          "verticalFov": 0.733038,
+          "zNear": 0.001
+        }
+      }
+    }
+  ]
+}

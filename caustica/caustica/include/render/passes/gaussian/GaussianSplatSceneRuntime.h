@@ -2,7 +2,6 @@
 
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <scene/SceneRenderData.h>
 
 #include <memory>
@@ -46,12 +45,6 @@ void prepareGaussianSplatScenePass(
     GaussianSplatPass& pass,
     const GaussianSplatPrepareContext& context,
     RenderTargets& renderTargets);
-void buildGaussianSplatEmissionProxies(
-    std::vector<GaussianSplatEmissionProxy>& out,
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
-    SceneGaussianSplatPasses& scenePasses,
-    const PathTracerSettings& settings);
-
 [[nodiscard]] bool uploadGaussianSplatScene(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,

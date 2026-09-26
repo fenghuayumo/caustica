@@ -24,7 +24,6 @@ class PTPipelineVariant;
 class RenderTargets;
 class RtxdiPass;
 class ToneMappingPass;
-struct GaussianSplatEmissionProxy;
 
 namespace caustica
 {
@@ -64,7 +63,6 @@ struct FrameGraphContext
     RenderTargets* renderTargets = nullptr;
     PathTracerSettings* settings = nullptr;
     FrameConstants* frameConstants = nullptr;
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies = nullptr;
     caustica::rhi::Framebuffer* targetFramebuffer = nullptr;
     const ExtractedFrameView* extractedView = nullptr;
 

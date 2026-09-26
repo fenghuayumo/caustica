@@ -156,7 +156,6 @@ bool HybridGaussian_IntersectSplat(
 
     const float a = dot(localDir, localDir);
     const float b = 2.0f * dot(localDir, localOrigin);
-    const float c = dot(localOrigin, localOrigin);
     if (a <= 0.0f || !isfinite(a))
         return false;
 
@@ -164,7 +163,10 @@ bool HybridGaussian_IntersectSplat(
     if (t <= ray.TMin || t >= ray.TMax)
         return false;
 
-    float grayDist = max(a * t * t + b * t + c, 0.0f);
+    // Avoid subtracting huge squared terms for tiny splats far from the ray
+    // origin. The residual vector retains the transverse distance accurately.
+    const float3 closestPoint = mad(localDir, t, localOrigin);
+    float grayDist = dot(closestPoint, closestPoint);
     float maxResponse = HybridGaussian_ParticleRayMaxKernelResponse(grayDist, kernelDegree);
     alpha = saturate(maxResponse * splat.centerOpacity.w * max(alphaScale, 0.0f));
 
@@ -192,34 +194,45 @@ float3 HybridGaussian_SrgbToLinear(float3 color)
     return lerp(high, low, color <= 0.04045f);
 }
 
-float HybridGaussian_LoadShScalar(StructuredBuffer<float4> shCoefficients, uint scalarIndex)
+float HybridGaussian_LoadShScalar(
+    ByteAddressBuffer shCoefficients,
+    uint scalarIndex,
+    uint shFormat)
 {
-    float4 packed = shCoefficients[scalarIndex >> 2u];
-    switch (scalarIndex & 3u)
+    const uint scalarSize = shFormat == 0u ? 4u : (shFormat == 1u ? 2u : 1u);
+    const uint byteOffset = scalarIndex * scalarSize;
+    if (shFormat == 0u)
+        return asfloat(shCoefficients.Load(byteOffset));
+    if (shFormat == 1u)
     {
-    case 0u: return packed.x;
-    case 1u: return packed.y;
-    case 2u: return packed.z;
-    default: return packed.w;
+        const uint packed = shCoefficients.Load(byteOffset & ~3u);
+        const uint halfBits = (packed >> ((byteOffset & 2u) * 8u)) & 0xffffu;
+        return f16tof32(halfBits);
     }
+
+    const uint packed = shCoefficients.Load(byteOffset & ~3u);
+    const float value = float((packed >> ((byteOffset & 3u) * 8u)) & 0xffu) / 255.0f;
+    return value * 2.0f - 1.0f;
 }
 
 float3 HybridGaussian_LoadSh(
-    StructuredBuffer<float4> shCoefficients,
+    ByteAddressBuffer shCoefficients,
     uint splatIndex,
-    uint coefficientIndex)
+    uint coefficientIndex,
+    uint shFormat)
 {
-    const uint base = splatIndex * 48u + coefficientIndex * 3u;
+    const uint base = splatIndex * 45u + coefficientIndex * 3u;
     return float3(
-        HybridGaussian_LoadShScalar(shCoefficients, base + 0u),
-        HybridGaussian_LoadShScalar(shCoefficients, base + 1u),
-        HybridGaussian_LoadShScalar(shCoefficients, base + 2u));
+        HybridGaussian_LoadShScalar(shCoefficients, base + 0u, shFormat),
+        HybridGaussian_LoadShScalar(shCoefficients, base + 1u, shFormat),
+        HybridGaussian_LoadShScalar(shCoefficients, base + 2u, shFormat));
 }
 
 float3 HybridGaussian_EvaluateViewDependentSh(
-    StructuredBuffer<float4> shCoefficients,
+    ByteAddressBuffer shCoefficients,
     uint splatIndex,
     uint shDegree,
+    uint shFormat,
     float3 objectViewDirection)
 {
     const uint degree = min(shDegree, 3u);
@@ -240,9 +253,9 @@ float3 HybridGaussian_EvaluateViewDependentSh(
     const float y = objectViewDirection.y;
     const float z = objectViewDirection.z;
     float3 radiance = SH_C1 * (
-        -HybridGaussian_LoadSh(shCoefficients, splatIndex, 0u) * y
-        + HybridGaussian_LoadSh(shCoefficients, splatIndex, 1u) * z
-        - HybridGaussian_LoadSh(shCoefficients, splatIndex, 2u) * x);
+        -HybridGaussian_LoadSh(shCoefficients, splatIndex, 0u, shFormat) * y
+        + HybridGaussian_LoadSh(shCoefficients, splatIndex, 1u, shFormat) * z
+        - HybridGaussian_LoadSh(shCoefficients, splatIndex, 2u, shFormat) * x);
 
     if (degree >= 2u)
     {
@@ -252,112 +265,53 @@ float3 HybridGaussian_EvaluateViewDependentSh(
         const float xy = x * y;
         const float yz = y * z;
         const float xz = x * z;
-        radiance += (SH_C2[0] * xy) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 3u)
-            + (SH_C2[1] * yz) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 4u)
-            + (SH_C2[2] * (2.0f * zz - xx - yy)) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 5u)
-            + (SH_C2[3] * xz) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 6u)
-            + (SH_C2[4] * (xx - yy)) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 7u);
+        radiance += (SH_C2[0] * xy) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 3u, shFormat)
+            + (SH_C2[1] * yz) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 4u, shFormat)
+            + (SH_C2[2] * (2.0f * zz - xx - yy)) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 5u, shFormat)
+            + (SH_C2[3] * xz) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 6u, shFormat)
+            + (SH_C2[4] * (xx - yy)) * HybridGaussian_LoadSh(shCoefficients, splatIndex, 7u, shFormat);
 
         if (degree >= 3u)
         {
-            radiance += SH_C3[0] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 8u) * (3.0f * xx - yy) * y
-                + SH_C3[1] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 9u) * x * y * z
-                + SH_C3[2] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 10u) * (4.0f * zz - xx - yy) * y
-                + SH_C3[3] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 11u) * z * (2.0f * zz - 3.0f * xx - 3.0f * yy)
-                + SH_C3[4] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 12u) * x * (4.0f * zz - xx - yy)
-                + SH_C3[5] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 13u) * (xx - yy) * z
-                + SH_C3[6] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 14u) * x * (xx - 3.0f * yy);
+            radiance += SH_C3[0] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 8u, shFormat) * (3.0f * xx - yy) * y
+                + SH_C3[1] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 9u, shFormat) * x * y * z
+                + SH_C3[2] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 10u, shFormat) * (4.0f * zz - xx - yy) * y
+                + SH_C3[3] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 11u, shFormat) * z * (2.0f * zz - 3.0f * xx - 3.0f * yy)
+                + SH_C3[4] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 12u, shFormat) * x * (4.0f * zz - xx - yy)
+                + SH_C3[5] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 13u, shFormat) * (xx - yy) * z
+                + SH_C3[6] * HybridGaussian_LoadSh(shCoefficients, splatIndex, 14u, shFormat) * x * (xx - 3.0f * yy);
         }
     }
 
     return radiance;
 }
 
-bool HybridGaussian_TraceClosestRadianceSplat(
-    RaytracingAccelerationStructure gaussianBVH,
-    StructuredBuffer<GaussianSplatData> splats,
-    uint splatCount,
+bool HybridGaussian_BuildReceiverShadowRay(
+    GaussianSplatReceiverShadowLight light,
+    float3 worldPosition,
+    float rayOffset,
+    float defaultRayTMax,
+    float defaultSoftRadius,
+    out RayDesc ray,
+    out float lightWeight,
+    out float lightSoftRadius);
+
+float HybridGaussian_TraceMeshShadowVisibility(
+    RaytracingAccelerationStructure meshBVH,
     RayDesc ray,
-    float splatScale,
-    float alphaThreshold,
-    float alphaScale,
-    float kernelMinResponse,
-    uint kernelDegree,
-    uint useTlasInstances,
-    uint primitiveCountPerSplat,
-    out uint closestSplatIndex,
-    out float closestHitT,
-    out float closestAlpha)
-{
-    closestSplatIndex = 0xffffffffu;
-    closestHitT = ray.TMax;
-    closestAlpha = 0.0f;
-    if (splatCount == 0 || ray.TMin >= ray.TMax)
-        return false;
-
-    RayQuery<RAY_FLAG_NONE> rayQuery;
-    rayQuery.TraceRayInline(gaussianBVH, RAY_FLAG_NONE, 0xff, ray);
-
-    while (rayQuery.Proceed())
-    {
-        if (rayQuery.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE)
-        {
-            uint splatIndex = useTlasInstances != 0
-                ? rayQuery.CandidateInstanceID()
-                : rayQuery.CandidatePrimitiveIndex();
-            float hitT = 0.0f;
-            float alpha = 0.0f;
-            if (splatIndex < splatCount
-                && HybridGaussian_IntersectSplat(
-                    ray, splats[splatIndex], splatScale, alphaThreshold,
-                    alphaScale, kernelMinResponse, kernelDegree, hitT, alpha))
-            {
-                rayQuery.CommitProceduralPrimitiveHit(hitT);
-            }
-        }
-        else if (rayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
-        {
-            // Compatibility fallback for the icosahedron proxy path.
-            uint primitiveDivisor = max(primitiveCountPerSplat, 1u);
-            uint splatIndex = useTlasInstances != 0
-                ? rayQuery.CandidateInstanceID()
-                : rayQuery.CandidatePrimitiveIndex() / primitiveDivisor;
-            float hitT = 0.0f;
-            float alpha = 0.0f;
-            if (splatIndex < splatCount
-                && HybridGaussian_IntersectSplat(
-                    ray, splats[splatIndex], splatScale, alphaThreshold,
-                    alphaScale, kernelMinResponse, kernelDegree, hitT, alpha))
-            {
-                rayQuery.CommitNonOpaqueTriangleHit();
-            }
-        }
-    }
-
-    if (rayQuery.CommittedStatus() != COMMITTED_PROCEDURAL_PRIMITIVE_HIT
-        && rayQuery.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
-        return false;
-
-    uint primitiveDivisor = max(primitiveCountPerSplat, 1u);
-    closestSplatIndex = useTlasInstances != 0
-        ? rayQuery.CommittedInstanceID()
-        : (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT
-            ? rayQuery.CommittedPrimitiveIndex() / primitiveDivisor
-            : rayQuery.CommittedPrimitiveIndex());
-    if (closestSplatIndex >= splatCount)
-        return false;
-
-    return HybridGaussian_IntersectSplat(
-        ray, splats[closestSplatIndex], splatScale, alphaThreshold,
-        alphaScale, kernelMinResponse, kernelDegree, closestHitT, closestAlpha);
-}
+    uint shadowMode,
+    float softRadius,
+    uint softSampleCount,
+    uint seed);
 
 HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
     RaytracingAccelerationStructure gaussianBVH,
+    RaytracingAccelerationStructure meshBVH,
     StructuredBuffer<GaussianSplatData> splats,
-    StructuredBuffer<float4> shCoefficients,
+    ByteAddressBuffer shCoefficients,
     uint splatCount,
     uint shDegree,
+    uint shFormat,
     RayDesc ray,
     float splatScale,
     float alphaThreshold,
@@ -370,7 +324,15 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
     float minimumTransmittance,
     float alphaClamp,
     float brightness,
-    float3 tintColor)
+    float3 tintColor,
+    float4x4 objectToWorld,
+    uint receiverShadowLightCount,
+    GaussianSplatReceiverShadowLight receiverShadowLight,
+    uint receiverShadowMode,
+    float receiverShadowStrength,
+    float receiverShadowRayOffset,
+    float receiverShadowSoftRadius,
+    uint receiverShadowFrameIndex)
 {
     HybridGaussianRadianceResult result;
     result.radiance = 0.0f;
@@ -378,42 +340,129 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
     result.firstHitT = ray.TMax;
     result.hitCount = 0u;
 
-    float nextT = ray.TMin;
-    const float3 objectViewDirection = normalize(ray.Direction);
-    const uint passLimit = min(max(maximumPassCount, 1u), 256u);
-    [loop]
-    for (uint passIndex = 0u; passIndex < passLimit; ++passIndex)
+    // Stochastic opacity is the Monte-Carlo form of front-to-back alpha
+    // compositing: accept each splat with probability alpha and return the
+    // nearest accepted one. Its expectation is exactly
+    //   sum(T_i * alpha_i * radiance_i),
+    // but it needs one BVH traversal, one SH fetch and at most one shadow ray.
+    // This avoids truncating dense models after an arbitrary number of hits and
+    // removes the large fixed arrays/register pressure from the path tracer.
+    uint acceptedSplatIndex = 0xffffffffu;
+    float acceptedHitT = ray.TMax;
+    RayQuery<RAY_FLAG_NONE> rayQuery;
+    rayQuery.TraceRayInline(gaussianBVH, RAY_FLAG_NONE, 0xff, ray);
+    while (rayQuery.Proceed())
     {
-        if (result.transmittance <= minimumTransmittance || nextT >= ray.TMax)
-            break;
-
-        RayDesc remainingRay = ray;
-        remainingRay.TMin = nextT;
-
         uint splatIndex = 0xffffffffu;
-        float hitT = remainingRay.TMax;
-        float alpha = 0.0f;
-        if (!HybridGaussian_TraceClosestRadianceSplat(
-                gaussianBVH, splats, splatCount, remainingRay, splatScale,
-                alphaThreshold, alphaScale, kernelMinResponse, kernelDegree,
-                useTlasInstances, primitiveCountPerSplat,
-                splatIndex, hitT, alpha))
-            break;
+        bool proceduralProxy = false;
+        bool triangleProxy = false;
+        if (rayQuery.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE)
+        {
+            proceduralProxy = true;
+            splatIndex = useTlasInstances != 0
+                ? rayQuery.CandidateInstanceID()
+                : rayQuery.CandidatePrimitiveIndex();
+        }
+        else if (rayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            triangleProxy = true;
+            const uint primitiveDivisor = max(primitiveCountPerSplat, 1u);
+            splatIndex = useTlasInstances != 0
+                ? rayQuery.CandidateInstanceID()
+                : rayQuery.CandidatePrimitiveIndex() / primitiveDivisor;
+        }
 
-        GaussianSplatData splat = splats[splatIndex];
+        if (splatIndex >= splatCount)
+            continue;
+
+        float hitT = acceptedHitT;
+        float alpha = 0.0f;
+        if (!HybridGaussian_IntersectSplat(
+                ray, splats[splatIndex], splatScale,
+                alphaThreshold, alphaScale, kernelMinResponse,
+                kernelDegree, hitT, alpha)
+            || hitT >= acceptedHitT)
+        {
+            continue;
+        }
+
+        alpha = min(saturate(alpha), saturate(alphaClamp));
+        const uint opacitySeed = HybridGaussian_MakeShadowSeed(
+            ray,
+            uint2(splatIndex, asuint(hitT)),
+            receiverShadowFrameIndex,
+            0x47535254u);
+        if (HybridGaussian_HashToFloat(HybridGaussian_Hash32(opacitySeed)) >= alpha)
+            continue;
+
+        acceptedSplatIndex = splatIndex;
+        acceptedHitT = hitT;
+        if (proceduralProxy)
+        {
+            // Committing the corrected maximum-density-plane distance shortens
+            // traversal while still allowing a subsequently found nearer
+            // accepted splat to replace this one.
+            rayQuery.CommitProceduralPrimitiveHit(hitT);
+        }
+        else if (triangleProxy)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+        }
+    }
+
+    if (acceptedSplatIndex != 0xffffffffu)
+    {
+        const GaussianSplatData splat = splats[acceptedSplatIndex];
+        float receiverShadow = 1.0f;
+        if (receiverShadowLightCount != 0u
+            && receiverShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
+            && receiverShadowStrength > 0.0f)
+        {
+            const float3 worldCenter = mul(
+                float4(splat.centerOpacity.xyz, 1.0f), objectToWorld).xyz;
+            RayDesc shadowRay;
+            float lightWeight;
+            float lightSoftRadius;
+            if (HybridGaussian_BuildReceiverShadowRay(
+                    receiverShadowLight,
+                    worldCenter,
+                    receiverShadowRayOffset,
+                    1.0e6f,
+                    receiverShadowSoftRadius,
+                    shadowRay,
+                    lightWeight,
+                    lightSoftRadius))
+            {
+                const uint shadowSeed = HybridGaussian_MakeShadowSeed(
+                    shadowRay,
+                    uint2(acceptedSplatIndex, asuint(acceptedHitT)),
+                    receiverShadowFrameIndex,
+                    0u);
+                const float visibility = HybridGaussian_TraceMeshShadowVisibility(
+                    meshBVH,
+                    shadowRay,
+                    receiverShadowMode,
+                    lightSoftRadius,
+                    1u,
+                    shadowSeed);
+                receiverShadow = lerp(
+                    1.0f - saturate(receiverShadowStrength),
+                    1.0f,
+                    visibility);
+            }
+        }
+
+        // Match vk_gaussian_splatting: SH is evaluated from the ray origin
+        // toward the accepted particle center in object space.
+        const float3 objectViewDirection = normalize(splat.centerOpacity.xyz - ray.Origin);
         float3 displayRadiance = splat.color.rgb * max(tintColor, 0.0f);
         displayRadiance += HybridGaussian_EvaluateViewDependentSh(
-            shCoefficients, splatIndex, shDegree, objectViewDirection);
-        float3 particleRadiance = HybridGaussian_SrgbToLinear(max(displayRadiance, 0.0f));
-        particleRadiance *= max(brightness, 0.0f);
-        alpha = min(saturate(alpha), saturate(alphaClamp));
-
-        if (result.hitCount == 0u)
-            result.firstHitT = hitT;
-        result.radiance += result.transmittance * alpha * particleRadiance;
-        result.transmittance *= 1.0f - alpha;
-        result.hitCount++;
-        nextT = hitT + max(1e-4f, abs(hitT) * 1e-5f);
+            shCoefficients, acceptedSplatIndex, shDegree, shFormat, objectViewDirection);
+        result.radiance = HybridGaussian_SrgbToLinear(max(displayRadiance, 0.0f));
+        result.radiance *= max(brightness, 0.0f) * receiverShadow;
+        result.transmittance = 0.0f;
+        result.firstHitT = acceptedHitT;
+        result.hitCount = 1u;
     }
 
     return result;

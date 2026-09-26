@@ -1,7 +1,6 @@
 #pragma once
 
 #include <math/math.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <rhi/rhi.h>
 
@@ -53,10 +52,6 @@ public:
     void bindFrame(const FrameGraphContext& ctx);
 
     void prepareScenePasses(const std::shared_ptr<ShaderDebug>& shaderDebug);
-
-    void buildEmissionProxies(
-        std::vector<GaussianSplatEmissionProxy>& outProxies,
-        const PathTracerSettings& settings) const;
 
     [[nodiscard]] bool hasActiveSplats() const;
     [[nodiscard]] std::vector<GaussianSplatGraphResources> prepareGraphResources(GaussianSplatRenderTarget renderTarget);

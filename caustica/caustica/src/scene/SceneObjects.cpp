@@ -82,8 +82,6 @@ void SceneSettings::load(const Json::Value& node)
         loadIfPresent(src, "brightness", splat.brightness);
         loadIfPresent(src, "tintColor", splat.tintColor);
         loadIfPresent(src, "applyToneMapping", splat.applyToneMapping);
-        loadIfPresent(src, "asEmitter", splat.asEmitter);
-        loadIfPresent(src, "emissionIntensity", splat.emissionIntensity);
         loadIfPresent(src, "alphaCullThreshold", splat.alphaCullThreshold);
         loadIfPresent(src, "shadowStrength", splat.shadowStrength);
         gaussianSplat = std::move(splat);
@@ -133,10 +131,6 @@ void SceneSettings::writeLook(Json::Value& settingsNode) const
             splat["tintColor"] << *src.tintColor;
         if (src.applyToneMapping)
             splat["applyToneMapping"] << *src.applyToneMapping;
-        if (src.asEmitter)
-            splat["asEmitter"] << *src.asEmitter;
-        if (src.emissionIntensity)
-            splat["emissionIntensity"] << *src.emissionIntensity;
         if (src.alphaCullThreshold)
             splat["alphaCullThreshold"] << *src.alphaCullThreshold;
         if (src.shadowStrength)

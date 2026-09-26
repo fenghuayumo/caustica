@@ -410,12 +410,22 @@ struct PathTracerSettings
     int                                 GaussianSplatPrimaryMethod = 0; // 0 = 3DGS, 1 = 3DGUT; legacy values fall back to 3DGUT
     bool                                GaussianSplatShadows = false;
     int                                 GaussianSplatShadowsMode = 0; // 0 = off, 1 = hard, 2 = soft
+    bool                                GaussianSplatSecondaryRays = true;
+    bool                                GaussianSplatIlluminateMeshes = false;
+    int                                 GaussianSplatRadianceMaxPasses = 200;
+    float                               GaussianSplatRadianceMinTransmittance = 0.01f;
+    float                               GaussianSplatRadianceAlphaClamp = 0.99f;
     int                                 GaussianSplatSortingMode = 0; // 0 = GPU sort, 1 = stochastic splats
     // Float16 is the quality default (Uint8 quantizes SH to [-1,1] and crushes view-dependent color).
     int                                 GaussianSplatSHFormat = 1;
     int                                 GaussianSplatRGBAFormat = 2; // Uint8
-    bool                                GaussianSplatUseAABBs = false;
-    bool                                GaussianSplatUseTLASInstances = true;
+    // Procedural AABBs commit the Gaussian's actual maximum-density-plane hit.
+    // Triangle proxies commit their proxy-surface hit and are not reliable for
+    // ordered secondary-ray radiance integration.
+    bool                                GaussianSplatUseAABBs = true;
+    // A single BLAS containing all AABBs avoids one TLAS instance per splat,
+    // substantially reducing AS memory for large static Gaussian sets.
+    bool                                GaussianSplatUseTLASInstances = false;
     bool                                GaussianSplatBlasCompaction = true;
     int                                 GaussianSplatShadowKernelDegree = 0;
     bool                                GaussianSplatShadowAdaptiveClamp = true;
@@ -444,9 +454,6 @@ struct PathTracerSettings
     float                               GaussianSplatAlphaScale = 1.0f;
     float                               GaussianSplatBrightness = 1.0f;
     math::float3                          GaussianSplatTintColor = math::float3(1.0f);
-    bool                                GaussianSplatAsEmitter = false;
-    float                               GaussianSplatEmissionIntensity = 1.0f;
-    int                                 GaussianSplatEmissionMaxProxyCount = 8192;
     float                               GaussianSplatAlphaCullThreshold = 1.0f / 255.0f;
     float                               GaussianSplatShadowStrength = 0.75f;
     float                               GaussianSplatShadowSoftRadius = 0.08f;

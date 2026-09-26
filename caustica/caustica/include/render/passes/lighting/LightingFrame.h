@@ -8,7 +8,6 @@
 #include <vector>
 
 class ShaderDebug;
-struct GaussianSplatEmissionProxy;
 
 namespace caustica::render
 {
@@ -37,7 +36,6 @@ void updateEnvMapFrame(
 void updateLightSamplingBeginFrame(
     PathTracingContext& context,
     caustica::rhi::CommandListHandle commandList,
-    uint64_t frameIndex,
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies);
+    uint64_t frameIndex);
 
 } // namespace caustica::render

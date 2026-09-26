@@ -133,6 +133,18 @@ PathTraceScheduleInputs importPathTraceScheduleInputs(const FrameGraphContext& c
                 binding.splatPass->getTopLevelAS(),
                 rg::AccelStructAccess::ShaderResource);
         }
+        if (binding.splatPass != nullptr && binding.splatPass->getSplatBuffer() != nullptr)
+        {
+            inputs.gaussianSplats = ctx.graph->importBuffer(
+                binding.splatPass->getSplatBuffer(),
+                rg::BufferAccess::ShaderResource);
+        }
+        if (binding.splatPass != nullptr && binding.splatPass->getRayTracingShBuffer() != nullptr)
+        {
+            inputs.gaussianSH = ctx.graph->importBuffer(
+                binding.splatPass->getRayTracingShBuffer(),
+                rg::BufferAccess::ShaderResource);
+        }
     }
     return inputs;
 }
@@ -155,6 +167,10 @@ void declarePathTraceScheduleReads(rg::PassBuilder& setup, const PathTraceSchedu
         setup.read(inputs.sceneAS, rg::AccelStructAccess::ShaderResource);
     if (inputs.gaussianAS.isValid())
         setup.read(inputs.gaussianAS, rg::AccelStructAccess::ShaderResource);
+    if (inputs.gaussianSplats.isValid())
+        setup.read(inputs.gaussianSplats, rg::BufferAccess::ShaderResource);
+    if (inputs.gaussianSH.isValid())
+        setup.read(inputs.gaussianSH, rg::BufferAccess::ShaderResource);
 }
 
 void declarePathTraceOutputWrites(rg::PassBuilder& setup, const PathTraceGraphTargets& handles)

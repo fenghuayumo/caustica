@@ -10,7 +10,6 @@
 
 #include <shaders/PathTracer/Lighting/LightingTypes.hlsli>
 #include <shaders/PathTracer/Lighting/EnvMap.hlsli>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/SceneGpuResources.h>
 
 namespace caustica
@@ -61,9 +60,6 @@ private:
     std::shared_ptr<class MaterialGpuCache> m_materialGpuCache;
     std::shared_ptr<class OpacityMicromapBuilder> m_opacityMicromapBuilder;
     caustica::rhi::BufferHandle m_subInstanceData;
-    const std::vector<GaussianSplatEmissionProxy>* m_GaussianSplatEmissionProxies = nullptr;
-    caustica::math::float4x4 m_GaussianSplatEmissionObjectToWorld = caustica::math::float4x4::identity();
-    float m_GaussianSplatEmissionIntensity = 0.0f;
 
     std::unordered_map<size_t, uint32_t> m_InstanceLightBufferOffsets; // hash(instance*, geometryIndex) -> bufferOffset
     std::unordered_map<caustica::ecs::Entity, uint32_t> m_PrimitiveLightBufferOffsets;
@@ -89,7 +85,6 @@ public:
         const caustica::render::SceneGpuFrameHandles& gpuHandles,
         EnvMapProcessor* environmentMap = nullptr,
         EnvMapSceneParams envMapSceneParams = {});
-    void setGaussianSplatEmissionProxies(const std::vector<GaussianSplatEmissionProxy>* proxies, caustica::math::float4x4 objectToWorld, float emissionIntensity);
     void createPipeline();
     void createBindingSet(RtxdiResources& resources, const RenderTargets& renderTargets);
     void countLightsInScene(uint32_t& numEmissiveMeshes, uint32_t& numEmissiveTriangles);

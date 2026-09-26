@@ -76,56 +76,6 @@ void prepareGaussianSplatScenePasses(
     }
 }
 
-void buildGaussianSplatEmissionProxies(
-    std::vector<GaussianSplatEmissionProxy>& out,
-    std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,
-    SceneGaussianSplatPasses& scenePasses,
-    const PathTracerSettings& settings)
-{
-    out.clear();
-
-    if (!isGaussianSplatEmissionEnabled(settings))
-        return;
-
-    const uint32_t maxProxyCount = clampGaussianSplatEmissionProxyCount(settings.GaussianSplatEmissionMaxProxyCount);
-    for (const scene::GaussianSplatRenderProxy& proxy : gaussianSplats)
-    {
-        GaussianSplatPass* pass = scenePasses.findPass(proxy.entity);
-        if (!proxy.enabled || pass == nullptr || !pass->hasSplats())
-            continue;
-
-        const uint32_t remainingProxyCount = maxProxyCount > out.size()
-            ? maxProxyCount - uint32_t(out.size())
-            : 0u;
-        if (remainingProxyCount == 0)
-            break;
-
-        pass->buildEmissionProxies(
-            remainingProxyCount,
-            settings.GaussianSplatScale,
-            uint32_t(std::clamp(settings.GaussianSplatShadowKernelDegree, 0, 5)),
-            settings.GaussianSplatShadowAdaptiveClamp,
-            settings.GaussianSplatTintColor,
-            settings.GaussianSplatAlphaCullThreshold);
-
-        const math::affine3& objectToWorldTransform = proxy.objectToWorld;
-        const float radiusScale = std::max({
-            length(objectToWorldTransform.transformVector(math::float3(1.0f, 0.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(math::float3(0.0f, 1.0f, 0.0f))),
-            length(objectToWorldTransform.transformVector(math::float3(0.0f, 0.0f, 1.0f))) });
-
-        const auto& proxies = pass->getEmissionProxies();
-        out.reserve(out.size() + proxies.size());
-        for (const GaussianSplatEmissionProxy& proxy : proxies)
-        {
-            GaussianSplatEmissionProxy transformed = proxy;
-            transformed.center = objectToWorldTransform.transformPoint(proxy.center);
-            transformed.radius = proxy.radius * radiusScale;
-            out.push_back(transformed);
-        }
-    }
-}
-
 bool uploadGaussianSplatScene(
     caustica::rhi::CommandList* commandList,
     std::span<const scene::GaussianSplatRenderProxy> gaussianSplats,

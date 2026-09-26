@@ -4,7 +4,6 @@
 #include <render/core/LightingUpdate.h>
 #include <render/core/PathTracerSettings.h>
 #include <render/passes/debug/ShaderDebug.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/passes/lighting/LightSamplingCache.h>
 #include <render/passes/lighting/distant/EnvMapImportanceSamplingCache.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
@@ -25,8 +24,7 @@ namespace
     UpdateLightingParams makeUpdateLightingParams(
         PathTracingContext& context,
         caustica::rhi::CommandListHandle commandList,
-        uint64_t frameIndex,
-        const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
+        uint64_t frameIndex)
     {
         UpdateLightingParams params{
             .settings = context.activeSettings(),
@@ -47,8 +45,6 @@ namespace
             .frameIndex = frameIndex,
             .envMapRadianceScale = c_envMapRadianceScale,
         };
-        if (gaussianSplatEmissionProxies && !gaussianSplatEmissionProxies->empty())
-            params.gaussianSplatEmissionProxies = gaussianSplatEmissionProxies;
         return params;
     }
 }
@@ -116,17 +112,15 @@ void caustica::render::updateEnvMapFrame(
     caustica::rhi::CommandListHandle commandList,
     uint64_t frameIndex)
 {
-    UpdateLightingParams params = makeUpdateLightingParams(context, commandList, frameIndex, nullptr);
+    UpdateLightingParams params = makeUpdateLightingParams(context, commandList, frameIndex);
     caustica::updateEnvMapLighting(params);
 }
 
 void caustica::render::updateLightSamplingBeginFrame(
     PathTracingContext& context,
     caustica::rhi::CommandListHandle commandList,
-    uint64_t frameIndex,
-    const std::vector<GaussianSplatEmissionProxy>* gaussianSplatEmissionProxies)
+    uint64_t frameIndex)
 {
-    UpdateLightingParams params =
-        makeUpdateLightingParams(context, commandList, frameIndex, gaussianSplatEmissionProxies);
+    UpdateLightingParams params = makeUpdateLightingParams(context, commandList, frameIndex);
     caustica::updateLightSamplingBegin(context.camera, context.accelStructs, params);
 }

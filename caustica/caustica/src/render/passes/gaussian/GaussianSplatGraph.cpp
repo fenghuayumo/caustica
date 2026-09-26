@@ -6,8 +6,8 @@
 #include <shaders/FrameConstantBuffer.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
-#include <vector>
 
 namespace caustica::render
 {
@@ -28,19 +28,6 @@ uint32_t clampGaussianSplatSoftShadowSamples(int sampleCount)
     return uint32_t(std::clamp(sampleCount, 1, 16));
 }
 
-uint32_t clampGaussianSplatEmissionProxyCount(int proxyCount)
-{
-    return uint32_t(std::clamp(proxyCount, 0, 262144));
-}
-
-bool isGaussianSplatEmissionEnabled(const PathTracerSettings& settings)
-{
-    return settings.EnableGaussianSplats
-        && settings.GaussianSplatAsEmitter
-        && settings.GaussianSplatEmissionIntensity > 0.0f
-        && settings.GaussianSplatEmissionMaxProxyCount > 0;
-}
-
 namespace
 {
     constexpr float kGaussianSplatShadowKernelMinResponse = 0.0113f;
@@ -50,9 +37,9 @@ namespace
         return std::max(0.0f, color.x * 0.2126f + color.y * 0.7152f + color.z * 0.0722f);
     }
 
-    void fillGaussianSplatReceiverShadowLights(
+    uint32_t selectGaussianSplatReceiverShadowLights(
         std::span<const scene::LightRenderProxy> lights,
-        GaussianSplatRenderSettings& settings)
+        std::span<GaussianSplatReceiverShadowLight> selectedLights)
     {
         struct Candidate
         {
@@ -60,8 +47,13 @@ namespace
             float importance = 0.0f;
         };
 
-        std::vector<Candidate> candidates;
-        candidates.reserve(lights.size());
+        const uint32_t candidateLimit = uint32_t(std::min<size_t>(
+            selectedLights.size(), GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS));
+        if (candidateLimit == 0u)
+            return 0u;
+
+        std::array<Candidate, GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS> candidates{};
+        uint32_t candidateCount = 0u;
 
         for (const scene::LightRenderProxy& proxy : lights)
         {
@@ -139,18 +131,36 @@ namespace
                 candidate.importance = shadowLightLuminance(color) * lightConstants.intensity;
             }
 
-            if (candidate.importance > 0.0f)
-                candidates.push_back(candidate);
+            if (candidate.importance <= 0.0f)
+                continue;
+
+            uint32_t insertIndex = 0u;
+            while (insertIndex < candidateCount
+                && candidates[insertIndex].importance >= candidate.importance)
+            {
+                ++insertIndex;
+            }
+            if (insertIndex >= candidateLimit)
+                continue;
+
+            const uint32_t newCount = std::min(candidateCount + 1u, candidateLimit);
+            for (uint32_t moveIndex = newCount - 1u; moveIndex > insertIndex; --moveIndex)
+                candidates[moveIndex] = candidates[moveIndex - 1u];
+            candidates[insertIndex] = candidate;
+            candidateCount = newCount;
         }
 
-        std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
-            return a.importance > b.importance;
-        });
+        for (uint32_t i = 0; i < candidateCount; ++i)
+            selectedLights[i] = candidates[i].light;
+        return candidateCount;
+    }
 
-        settings.shadowLightCount = uint32_t(std::min<size_t>(
-            candidates.size(), GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS));
-        for (uint32_t i = 0; i < settings.shadowLightCount; ++i)
-            settings.shadowLights[i] = candidates[i].light;
+    void fillGaussianSplatReceiverShadowLights(
+        std::span<const scene::LightRenderProxy> lights,
+        GaussianSplatRenderSettings& settings)
+    {
+        settings.shadowLightCount = selectGaussianSplatReceiverShadowLights(
+            lights, std::span(settings.shadowLights));
     }
 }
 
@@ -159,7 +169,8 @@ void fillGaussianSplatShadowConstants(
     const PathTracerSettings& settings,
     const GaussianSplatBinding& primaryBinding,
     uint32_t frameIndex,
-    const math::float3& shadowDirectionToLight)
+    const math::float3& shadowDirectionToLight,
+    std::span<const scene::LightRenderProxy> lights)
 {
     const uint32_t gaussianSplatShadowMode = resolveGaussianSplatShadowMode(settings);
     const GaussianSplatPass* primaryGaussianSplatPass = primaryBinding.splatPass;
@@ -195,6 +206,54 @@ void fillGaussianSplatShadowConstants(
     constants.GaussianSplatShadowWorldToObject = primaryBinding.splatPass != nullptr
         ? inverse(primaryBinding.objectToWorld)
         : math::float4x4::identity();
+
+    const uint32_t radianceShFormat = uint32_t(std::clamp(settings.GaussianSplatSHFormat, 0, 2));
+    const bool radianceBaseResourcesReady = settings.EnableGaussianSplats
+        && settings.GaussianSplatSecondaryRays
+        && primaryGaussianSplatPass != nullptr
+        && primaryGaussianSplatPass->getTopLevelAS() != nullptr
+        && primaryGaussianSplatPass->getSplatBuffer() != nullptr;
+    const bool radianceShResourcesReady = radianceBaseResourcesReady
+        && primaryGaussianSplatPass->isRayTracingRadianceReady()
+        && uint32_t(primaryGaussianSplatPass->getShFormat()) == radianceShFormat;
+    constants.GaussianSplatRadianceCount = radianceBaseResourcesReady
+        ? primaryGaussianSplatPass->getSplatCount()
+        : 0u;
+    constants.GaussianSplatRadianceEnabled = constants.GaussianSplatRadianceCount > 0
+        ? (1u | (settings.GaussianSplatIlluminateMeshes ? 2u : 0u)) : 0u;
+    // Base/DC radiance lives in the splat buffer and is valid as soon as the
+    // AS is built. Do not suppress the entire reflection while the much larger
+    // packed SH buffer is still uploading; upgrade to view-dependent SH only
+    // when its format and contents are ready.
+    constants.GaussianSplatRadianceShDegree = radianceShResourcesReady
+        ? primaryGaussianSplatPass->getShDegree()
+        : 0u;
+    constants.GaussianSplatRadianceShFormat = radianceShFormat;
+    constants.GaussianSplatRadianceMaxPassCount = uint32_t(std::clamp(
+        settings.GaussianSplatRadianceMaxPasses, 1, 256));
+    constants.GaussianSplatRadianceMinimumTransmittance = std::clamp(
+        settings.GaussianSplatRadianceMinTransmittance, 0.0001f, 1.0f);
+    constants.GaussianSplatRadianceAlphaClamp = std::clamp(
+        settings.GaussianSplatRadianceAlphaClamp, 0.0f, 1.0f);
+    constants.GaussianSplatRadianceBrightness = std::max(settings.GaussianSplatBrightness, 0.0f);
+    constants.GaussianSplatRadianceTintColor = settings.GaussianSplatTintColor;
+    constants.GaussianSplatRadianceWorldToObject = primaryGaussianSplatPass != nullptr
+        ? inverse(primaryBinding.objectToWorld)
+        : math::float4x4::identity();
+    constants.GaussianSplatRadianceObjectToWorld = primaryGaussianSplatPass != nullptr
+        ? primaryBinding.objectToWorld
+        : math::float4x4::identity();
+
+    constants.GaussianSplatRadianceReceiverShadowLightCount = 0u;
+    if (constants.GaussianSplatRadianceEnabled != 0
+        && constants.GaussianSplatShadowsEnabled != 0
+        && constants.GaussianSplatShadowStrength > 0.0f)
+    {
+        constants.GaussianSplatRadianceReceiverShadowLightCount =
+            selectGaussianSplatReceiverShadowLights(
+                lights,
+                std::span(&constants.GaussianSplatRadianceReceiverShadowLight, size_t(1)));
+    }
 }
 
 bool hasTemporalGaussianSplatNoise(const PathTracerSettings& settings)
@@ -237,7 +296,8 @@ bool needsGaussianSplatTemporalAccumulate(const PathTracerSettings& settings)
 bool needsGaussianSplatAccelBuild(const PathTracerSettings& settings)
 {
     return settings.EnableGaussianSplats
-        && resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED;
+        && (settings.GaussianSplatSecondaryRays
+            || resolveGaussianSplatShadowMode(settings) != GAUSSIAN_SPLAT_SHADOWS_DISABLED);
 }
 
 GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplatFrameInputs& inputs)

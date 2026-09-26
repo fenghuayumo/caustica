@@ -135,19 +135,6 @@ void GaussianSplatFramePass::prepareScenePasses(const std::shared_ptr<ShaderDebu
     m_gpuSort = context.gpuSort;
 }
 
-void GaussianSplatFramePass::buildEmissionProxies(
-    std::vector<GaussianSplatEmissionProxy>& outProxies,
-    const PathTracerSettings& settings) const
-{
-    assert(m_context);
-    assert(m_scenePasses);
-    caustica::render::buildGaussianSplatEmissionProxies(
-        outProxies,
-        m_context->frameGaussianSplats(),
-        *m_scenePasses,
-        settings);
-}
-
 bool GaussianSplatFramePass::hasActiveSplats() const
 {
     assert(m_context);

@@ -345,7 +345,7 @@ void InitializeEntries()
     constexpr Invalidation resetCaches =
         Invalidation::Accumulation | Invalidation::RealtimeCaches;
     constexpr Invalidation rebuildAS =
-        Invalidation::Accumulation | Invalidation::AccelerationStructure;
+        Invalidation::Accumulation | Invalidation::RealtimeCaches | Invalidation::AccelerationStructure;
 
 #define SETTING_ACCESS(field) [](EditorUIData& ui) -> auto& { return ui.render.settings.field; }
 
@@ -510,6 +510,12 @@ void InitializeEntries()
             ui.render.settings.GaussianSplatShadows =
                 ui.render.settings.GaussianSplatShadowsMode != 0;
         });
+    AddScalar("r.Gaussian.SecondaryRays", "Evaluate stochastic Gaussian radiance on secondary path-tracing rays.",
+        SETTING_ACCESS(GaussianSplatSecondaryRays), rebuildAS);
+    AddScalar("r.Gaussian.IlluminateMeshes", "Receive Gaussian radiance along diffuse BSDF paths (requires SecondaryRays).",
+        SETTING_ACCESS(GaussianSplatIlluminateMeshes), resetCaches);
+    AddScalar("r.Gaussian.Radiance.AlphaClamp", "Maximum stochastic acceptance probability for one secondary Gaussian intersection.",
+        SETTING_ACCESS(GaussianSplatRadianceAlphaClamp), resetCaches, 0, 1);
     AddEnum("r.Gaussian.Sorting", "Gaussian raster sorting method.",
         SETTING_ACCESS(GaussianSplatSortingMode), { "gpu", "stochastic" }, reset);
     AddScalar("r.Gaussian.MipAntialiasing", "Enable mip-splatting antialiasing.",

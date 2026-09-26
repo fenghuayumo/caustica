@@ -70,10 +70,6 @@ void applySceneLookAfterLightingReset(
             settings.GaussianSplatTintColor = *splat.tintColor;
         if (splat.applyToneMapping)
             settings.GaussianSplatApplyToneMapping = *splat.applyToneMapping;
-        if (splat.asEmitter)
-            settings.GaussianSplatAsEmitter = *splat.asEmitter;
-        if (splat.emissionIntensity)
-            settings.GaussianSplatEmissionIntensity = *splat.emissionIntensity;
         if (splat.alphaCullThreshold)
             settings.GaussianSplatAlphaCullThreshold = *splat.alphaCullThreshold;
         if (splat.shadowStrength)

@@ -21,7 +21,6 @@
 #include <render/passes/rtxdi/RtxdiPass.h>
 #include <render/passes/pathTrace/PathTracePass.h>
 #include <render/passes/debug/ShaderDebug.h>
-#include <render/passes/gaussian/GaussianSplatEmissionProxy.h>
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 
 #include <render/ecs/RenderFrameContext.h>
@@ -120,7 +119,6 @@ public:
     void render(caustica::rhi::Framebuffer* framebuffer);
 
     void prepareGaussianSplatPasses();
-    void buildGaussianSplatEmissionProxies();
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
     void createGraphScratchFallbacks();
     void publishGraphScratchBindings(rg::GraphBuilder& graph);
@@ -257,6 +255,7 @@ private:
     caustica::rhi::TextureHandle                m_scratchFloat1Fallback;
     caustica::rhi::TextureHandle                m_avgLayerFallback;
     caustica::rhi::TextureHandle                m_ldrColorScratchFallback;
+    caustica::rhi::BufferHandle                 m_gaussianShFallback;
     caustica::rhi::BindingLayoutHandle                  m_bindingLayout;
     caustica::rhi::BindingLayoutHandle                  m_bindlessLayout;
 
@@ -293,9 +292,9 @@ private:
     bool                                        m_lastRealtimeMode = true;
     int                                         m_lastScheduledRealtimeAA = -1;
 
-    std::vector<GaussianSplatEmissionProxy>     m_gaussianSplatEmissionProxies;
     int                                         m_gaussianSplatTemporalSampleIndex = 0;
     bool                                        m_gaussianSplatTemporalReset = true;
+    bool                                        m_gaussianSplatRadianceReady = false;
 
     // Per-frame copies from SceneRenderData (filled at render() begin).
     // During an asynchronous structure rebuild this packet combines the committed,

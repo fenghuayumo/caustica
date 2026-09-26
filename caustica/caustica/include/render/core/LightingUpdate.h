@@ -15,7 +15,6 @@ class LightSamplingCache;
 class MaterialGpuCache;
 class OpacityMicromapBuilder;
 struct EnvMapSceneParams;
-struct GaussianSplatEmissionProxy;
 
 namespace caustica
 {
@@ -59,7 +58,6 @@ struct UpdateLightingParams
 
     float                                          envMapRadianceScale = 0.25f;
 
-    const std::vector<GaussianSplatEmissionProxy>*   gaussianSplatEmissionProxies = nullptr;
 };
 
 struct UpdateLightingEndParams

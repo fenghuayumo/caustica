@@ -76,6 +76,8 @@ struct PathTraceScheduleInputs
     rg::TextureHandle feedbackCandidates;
     rg::AccelStructHandle sceneAS;
     rg::AccelStructHandle gaussianAS;
+    rg::BufferHandle gaussianSplats;
+    rg::BufferHandle gaussianSH;
 };
 
 inline constexpr const char* kScratchFloat1Name = "scratchFloat1";

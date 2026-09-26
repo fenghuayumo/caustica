@@ -88,6 +88,26 @@ struct FrameConstants
     float3 GaussianSplatShadowDirectionToLight;
 
     float4x4 GaussianSplatShadowWorldToObject;
+
+    uint GaussianSplatRadianceCount;
+    uint GaussianSplatRadianceEnabled; // bit 0: secondary visibility, bit 1: diffuse illumination
+    uint GaussianSplatRadianceShDegree;
+    uint GaussianSplatRadianceMaxPassCount;
+
+    float GaussianSplatRadianceMinimumTransmittance;
+    float GaussianSplatRadianceAlphaClamp;
+    float GaussianSplatRadianceBrightness;
+    uint GaussianSplatRadianceShFormat;
+
+    float3 GaussianSplatRadianceTintColor;
+    uint GaussianSplatRadianceReceiverShadowLightCount;
+
+    float4x4 GaussianSplatRadianceWorldToObject;
+    float4x4 GaussianSplatRadianceObjectToWorld;
+
+    // Secondary rays use the single most important receiver light. One
+    // visibility query is shared by each fixed-size radiance batch.
+    GaussianSplatReceiverShadowLight GaussianSplatRadianceReceiverShadowLight;
 };
 
 // Used in a couple of places like multipass postprocess where you want to keep FrameConstants the same for all passes, but send just a few additional per-pass parameters 

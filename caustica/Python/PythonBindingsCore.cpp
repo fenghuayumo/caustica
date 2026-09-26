@@ -2675,6 +2675,12 @@ void RegisterCoreBindings(nb::module_& m)
         .def_rw("gaussian_splat_shadows",        &PathTracerSettings::GaussianSplatShadows)
         .def_rw("gaussian_splat_shadows_mode",   &PathTracerSettings::GaussianSplatShadowsMode,
                 "Mesh shadow mode (caustica.GaussianSplatShadowMode). Orthogonal to primary 3DGS/3DGUT.")
+        .def_rw("gaussian_splat_secondary_rays", &PathTracerSettings::GaussianSplatSecondaryRays,
+                "Expose pretrained Gaussian radiance to mesh reflection/refraction rays.")
+        .def_rw("gaussian_splat_illuminate_meshes", &PathTracerSettings::GaussianSplatIlluminateMeshes,
+                "Allow diffuse BSDF paths to receive Gaussian radiance; requires secondary rays.")
+        .def_rw("gaussian_splat_radiance_alpha_clamp", &PathTracerSettings::GaussianSplatRadianceAlphaClamp,
+                "Maximum stochastic opacity probability for secondary Gaussian hits.")
         .def_rw("gaussian_splat_sorting_mode",   &PathTracerSettings::GaussianSplatSortingMode,
                 "3DGS sort mode (caustica.GaussianSplatSortMode).")
         .def_rw("gaussian_splat_sh_format",      &PathTracerSettings::GaussianSplatSHFormat,
@@ -2714,9 +2720,6 @@ void RegisterCoreBindings(nb::module_& m)
         .def_prop_rw("gaussian_splat_tint_color",
             [](PathTracerSettings& s) { return Float3ToTuple(s.GaussianSplatTintColor); },
             [](PathTracerSettings& s, nb::object v) { s.GaussianSplatTintColor = ToFloat3(v); })
-        .def_rw("gaussian_splat_as_emitter",     &PathTracerSettings::GaussianSplatAsEmitter)
-        .def_rw("gaussian_splat_emission_intensity", &PathTracerSettings::GaussianSplatEmissionIntensity)
-        .def_rw("gaussian_splat_emission_max_proxy_count", &PathTracerSettings::GaussianSplatEmissionMaxProxyCount)
         .def_rw("gaussian_splat_alpha_cull_threshold", &PathTracerSettings::GaussianSplatAlphaCullThreshold)
         .def_rw("gaussian_splat_shadow_strength", &PathTracerSettings::GaussianSplatShadowStrength)
         .def_rw("gaussian_splat_shadow_soft_radius", &PathTracerSettings::GaussianSplatShadowSoftRadius)

@@ -219,13 +219,11 @@ int ResolveGaussianSplatShadowMode(const EditorUIData& ui)
             &particleFormat,
             "Icosahedron\0AABB + parametric\0\0");
         if (changed)
-        {
             ui.render.settings.GaussianSplatUseAABBs = particleFormat == 1;
-            if (ui.render.settings.GaussianSplatUseAABBs)
-                ui.render.settings.GaussianSplatUseTLASInstances = true;
-        }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Gaussian shadow acceleration proxy format. AABB + parametric forces TLAS instances.");
+            ImGui::SetTooltip(
+                "Gaussian ray-tracing proxy format. AABB + parametric is the accurate path; "
+                "all splats share one compact BLAS by default.");
         return changed;
     }
 

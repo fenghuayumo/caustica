@@ -202,6 +202,7 @@ void caustica::render::WorldRenderer::createBindingLayouts(caustica::rhi::Bindin
         caustica::rhi::BindingLayoutItem::Texture_SRV(6),
         caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(7),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(8),
+        caustica::rhi::BindingLayoutItem::RawBuffer_SRV(9),
         caustica::rhi::BindingLayoutItem::Texture_SRV(10),
         caustica::rhi::BindingLayoutItem::Texture_SRV(11),
         caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(12),
@@ -469,7 +470,6 @@ void caustica::render::WorldRenderer::onSceneUnloading()
     if (m_frameCommands)
         m_frameCommands->abort();
     m_gaussianSplatTemporalReset = true;
-    m_gaussianSplatEmissionProxies.clear();
     if (m_rtxdiPass != nullptr)
         m_rtxdiPass->reset();
 
@@ -646,23 +646,6 @@ void caustica::render::WorldRenderer::prepareGaussianSplatPasses()
         &m_accelStructs,
         &m_context->scenePasses.gaussianSplats);
     m_gaussianFramePass->prepareScenePasses(m_shaderDebug);
-}
-
-void caustica::render::WorldRenderer::buildGaussianSplatEmissionProxies()
-{
-    if (!m_gaussianFramePass)
-    {
-        m_gaussianSplatEmissionProxies.clear();
-        return;
-    }
-    m_gaussianFramePass->bindStable(
-        m_context,
-        device(),
-        &m_accelStructs,
-        &m_context->scenePasses.gaussianSplats);
-    m_gaussianFramePass->buildEmissionProxies(
-        m_gaussianSplatEmissionProxies,
-        m_context->activeSettings());
 }
 
 void caustica::render::WorldRenderer::preRender()
@@ -897,6 +880,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
 
     caustica::rhi::rt::AccelStruct* gaussianSplatAS = m_context->accelStructs.getTopLevelAS();
     caustica::rhi::Buffer* gaussianSplatBuffer = materialDataBuffer;
+    caustica::rhi::Buffer* gaussianSplatShBuffer = m_gaussianShFallback;
     // Prefer the explicit published pointer (GPU setup); else frameScene under beginGpuReadFrame.
     const std::span<const caustica::scene::GaussianSplatRenderProxy> gaussianSplats =
         renderData
@@ -911,6 +895,8 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
     {
         gaussianSplatAS = primaryGaussianSplatPass->getTopLevelAS();
         gaussianSplatBuffer = primaryGaussianSplatPass->getSplatBuffer();
+        if (primaryGaussianSplatPass->getRayTracingShBuffer() != nullptr)
+            gaussianSplatShBuffer = primaryGaussianSplatPass->getRayTracingShBuffer();
     }
 
     auto scratchOrFallback = [this](const caustica::rhi::TextureHandle& published,
@@ -933,6 +919,7 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
         caustica::rhi::BindingSetItem::Texture_SRV(6,  scratchOrFallback(m_renderTargets->ldrColorScratch, m_ldrColorScratchFallback), caustica::rhi::Format::SRGBA8_UNORM),
         caustica::rhi::BindingSetItem::RayTracingAccelStruct(7, gaussianSplatAS),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(8, gaussianSplatBuffer),
+        caustica::rhi::BindingSetItem::RawBuffer_SRV(9, gaussianSplatShBuffer),
         caustica::rhi::BindingSetItem::Texture_SRV(10, environment->getEnvMapCube()),
         caustica::rhi::BindingSetItem::Texture_SRV(11, importanceSampling->getImportanceMapOnly()),
         caustica::rhi::BindingSetItem::StructuredBuffer_SRV(12, lightSampling->getControlBuffer()),
@@ -1043,6 +1030,9 @@ void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRende
                     : nullptr,
                 primaryGaussianSplatPass != nullptr
                     ? primaryGaussianSplatPass->getSplatBuffer()
+                    : nullptr,
+                primaryGaussianSplatPass != nullptr
+                    ? primaryGaussianSplatPass->getRayTracingShBuffer()
                     : nullptr);
         }
     }
@@ -1074,6 +1064,14 @@ void caustica::render::WorldRenderer::createGraphScratchFallbacks()
     desc.isTypeless = true;
     desc.debugName = "ldrColorScratchFallback";
     m_ldrColorScratchFallback = device->createTexture(desc);
+
+    caustica::rhi::BufferDesc bufferDesc;
+    bufferDesc.byteSize = 4;
+    bufferDesc.canHaveRawViews = true;
+    bufferDesc.keepInitialState = true;
+    bufferDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
+    bufferDesc.debugName = "GaussianSplatSHFallback";
+    m_gaussianShFallback = device->createBuffer(bufferDesc);
 }
 
 void caustica::render::WorldRenderer::publishGraphScratchBindings(rg::GraphBuilder& graph)

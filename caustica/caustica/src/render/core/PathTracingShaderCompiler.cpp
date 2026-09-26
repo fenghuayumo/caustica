@@ -553,6 +553,15 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::Device* devi
     const std::filesystem::path shaderPackPath = getRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_PTShaderBinariesRoot);
     const bool shaderPackHasDynamicBins = shaderPackFS->hasShaderBinLayout();
+    // Offline PT cooking publishes deps.manifest only after all loose bins are
+    // complete. An older distribution pack must not hide that rebuilt set.
+    std::error_code looseTimeError;
+    std::error_code packTimeError;
+    const auto looseTime = std::filesystem::last_write_time(
+        m_compilerConfig.ShaderBinariesPath / "deps.manifest", looseTimeError);
+    const auto packTime = std::filesystem::last_write_time(shaderPackPath, packTimeError);
+    const bool looseShadersAreNewer = !looseTimeError
+        && (packTimeError || looseTime > packTime);
     if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
     {
         caustica::warning(
@@ -561,7 +570,7 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::Device* devi
             m_compilerConfig.ShaderBinariesPath.string().c_str());
     }
 
-    if (shaderPackHasDynamicBins)
+    if (shaderPackHasDynamicBins && !looseShadersAreNewer)
     {
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, shaderPackFS);
         m_compilerConfig.RuntimeCompilationAvailable = false;
@@ -571,6 +580,9 @@ PathTracingShaderCompiler::PathTracingShaderCompiler(caustica::rhi::Device* devi
     }
     else
     {
+        if (shaderPackHasDynamicBins && looseShadersAreNewer)
+            caustica::info("PathTracingShaderCompiler: rebuilt loose PT shaders supersede '%s'.",
+                shaderPackPath.string().c_str());
         m_shadersFS->mount("/" + c_PTShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
         if (m_compilerConfig.canCompile())
         {

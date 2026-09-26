@@ -102,11 +102,67 @@ void postProcessHit(inout PathState path, const PathTracer::WorkingContext worki
 #endif
 }
 
+bool integrateSecondaryGaussianRadiance(
+    inout PathState path,
+    const float2 tMinMax,
+    const float segmentTMax,
+    const PathTracer::WorkingContext workingContext)
+{
+    float3 gaussianRadiance;
+    float gaussianTransmittance;
+    float gaussianHitT;
+    Bridge::traceSecondaryGaussianRadiance(
+        path, tMinMax, segmentTMax,
+        gaussianRadiance, gaussianTransmittance, gaussianHitT);
+
+    const float3 weightedRadiance = path.GetThp() * gaussianRadiance;
+    if (any(weightedRadiance > 0.0f))
+    {
+        const float specularRadianceAvg = path.hasFlag(PathFlags::stablePlaneBaseScatterDiff)
+            ? 0.0f
+            : Average(weightedRadiance);
+        PathTracer::AccumulatePathRadiance(
+            workingContext,
+            path,
+            weightedRadiance,
+            specularRadianceAvg,
+            path.hasFlag(PathFlags::stablePlaneOnBranch),
+            PathTracer::ShouldCollectGISecondaryRadiance(path));
+    }
+
+    path.SetThp(path.GetThp() * gaussianTransmittance);
+    if (gaussianTransmittance <= g_Const.GaussianSplatRadianceMinimumTransmittance)
+    {
+        // A Gaussian is a real terminal path vertex, not an environment miss.
+        // Advancing the travelled distance before termination supplies correct
+        // mirror-path SpecHitT/motion guidance to realtime denoisers.
+        const Ray gaussianRay = path.getScatterRay();
+        PathTracer::UpdatePathTravelled(
+            path, gaussianRay.origin, gaussianRay.dir, gaussianHitT, workingContext);
+#if PATH_TRACER_MODE==PATH_TRACER_MODE_FILL_STABLE_PLANES
+        if (path.hasFlag(PathFlags::exportSpecHitTQueued))
+        {
+            Bridge::ExportSpecHitTStop(path);
+            path.setFlag(PathFlags::exportSpecHitTQueued, false);
+        }
+#endif
+        path.terminate();
+        return false;
+    }
+    return true;
+}
+
 void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::WorkingContext workingContext)
 {
 #if defined(SER_HIT_OBJECT) || defined(__INTELLISENSE__)
     CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) rayQuery;
     Bridge::traceScatterRay(path, rayQuery, tMinMax, workingContext.Debug);   // this outputs ray and rayQuery; if there was a hit, ray.TMax is rayQuery.ComittedRayT
+
+    const float gaussianSegmentTMax = rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT
+        ? rayQuery.CommittedRayT()
+        : tMinMax.y;
+    if (!integrateSecondaryGaussianRadiance(path, tMinMax, gaussianSegmentTMax, workingContext))
+        return;
 
     SER_HIT_OBJECT hit;
     if (rayQuery.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
@@ -141,6 +197,16 @@ void nextHit(inout PathState path, inout float2 tMinMax, const PathTracer::Worki
     SER_INVOKE_HIT(hit, payload);
     path = PathPayload::unpack(payload);
 #else
+    // The fallback TraceRay path cannot expose its closest hit before invoking
+    // the shader, so use an inline mesh query to delimit the Gaussian segment.
+    CAUSTICA_RayQuery(RAY_FLAG_NONE, CAUSTICA_FLAG_ALLOW_OPACITY_MICROMAPS) gaussianLimitQuery;
+    Bridge::traceScatterRay(path, gaussianLimitQuery, tMinMax, workingContext.Debug);
+    const float gaussianSegmentTMax = gaussianLimitQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT
+        ? gaussianLimitQuery.CommittedRayT()
+        : tMinMax.y;
+    if (!integrateSecondaryGaussianRadiance(path, tMinMax, gaussianSegmentTMax, workingContext))
+        return;
+
     RayDesc ray = path.getScatterRay().toRayDesc();
     ray.TMin = tMinMax.x;
     ray.TMax = tMinMax.y;
