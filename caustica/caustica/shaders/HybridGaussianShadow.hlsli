@@ -1,6 +1,9 @@
 #ifndef __HYBRID_GAUSSIAN_SHADOW_HLSLI__
 #define __HYBRID_GAUSSIAN_SHADOW_HLSLI__
 
+#include <shaders/SubInstanceData.h>
+#include <shaders/PathTracer/Materials/StandardMaterial.h>
+
 #ifndef GAUSSIAN_SPLAT_SHADOWS_DISABLED
 #define GAUSSIAN_SPLAT_SHADOWS_DISABLED 0
 #define GAUSSIAN_SPLAT_SHADOWS_HARD 1
@@ -296,8 +299,11 @@ bool HybridGaussian_BuildReceiverShadowRay(
     out float lightWeight,
     out float lightSoftRadius);
 
-float HybridGaussian_TraceMeshShadowVisibility(
+float3 HybridGaussian_TraceMeshShadowVisibility(
     RaytracingAccelerationStructure meshBVH,
+    StructuredBuffer<SubInstanceData> subInstances,
+    StructuredBuffer<StandardMaterialData> materials,
+    uint materialCount,
     RayDesc ray,
     uint shadowMode,
     float softRadius,
@@ -307,6 +313,9 @@ float HybridGaussian_TraceMeshShadowVisibility(
 HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
     RaytracingAccelerationStructure gaussianBVH,
     RaytracingAccelerationStructure meshBVH,
+    StructuredBuffer<SubInstanceData> subInstances,
+    StructuredBuffer<StandardMaterialData> materials,
+    uint materialCount,
     StructuredBuffer<GaussianSplatData> splats,
     ByteAddressBuffer shCoefficients,
     uint splatCount,
@@ -413,7 +422,7 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
     if (acceptedSplatIndex != 0xffffffffu)
     {
         const GaussianSplatData splat = splats[acceptedSplatIndex];
-        float receiverShadow = 1.0f;
+        float3 receiverShadow = 1.0f;
         if (receiverShadowLightCount != 0u
             && receiverShadowMode != GAUSSIAN_SPLAT_SHADOWS_DISABLED
             && receiverShadowStrength > 0.0f)
@@ -438,17 +447,17 @@ HybridGaussianRadianceResult HybridGaussian_TraceRadiance(
                     uint2(acceptedSplatIndex, asuint(acceptedHitT)),
                     receiverShadowFrameIndex,
                     0u);
-                const float visibility = HybridGaussian_TraceMeshShadowVisibility(
+                const float3 visibility = HybridGaussian_TraceMeshShadowVisibility(
                     meshBVH,
+                    subInstances,
+                    materials,
+                    materialCount,
                     shadowRay,
                     receiverShadowMode,
                     lightSoftRadius,
                     1u,
                     shadowSeed);
-                receiverShadow = lerp(
-                    1.0f - saturate(receiverShadowStrength),
-                    1.0f,
-                    visibility);
+                receiverShadow = lerp(1.0f - saturate(receiverShadowStrength), 1.0f, visibility);
             }
         }
 
@@ -637,16 +646,75 @@ bool HybridGaussian_TraceGaussianShadowMode(
         seed);
 }
 
-bool HybridGaussian_TraceMeshShadow(RaytracingAccelerationStructure meshBVH, RayDesc ray)
+float3 HybridGaussian_TraceMeshShadow(
+    RaytracingAccelerationStructure meshBVH,
+    StructuredBuffer<SubInstanceData> subInstances,
+    StructuredBuffer<StandardMaterialData> materials,
+    uint materialCount,
+    RayDesc ray)
 {
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> rayQuery;
-    rayQuery.TraceRayInline(meshBVH, RAY_FLAG_FORCE_OPAQUE, 0xff, ray);
+    RayQuery<RAY_FLAG_NONE> rayQuery;
+    rayQuery.TraceRayInline(meshBVH, RAY_FLAG_NONE, 0xff, ray);
+
+    float3 transmittance = 1.0f;
+    uint subInstanceCount;
+    uint subInstanceStride;
+    subInstances.GetDimensions(subInstanceCount, subInstanceStride);
 
     while (rayQuery.Proceed())
     {
+        if (rayQuery.CandidateType() != CANDIDATE_NON_OPAQUE_TRIANGLE)
+            continue;
+
+        if (materialCount == 0u)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const uint subInstanceIndex = rayQuery.CandidateInstanceID() + rayQuery.CandidateGeometryIndex();
+        if (subInstanceIndex >= subInstanceCount)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const SubInstanceData subInstance = subInstances[subInstanceIndex];
+        if ((subInstance.FlagsAndAlphaInfo & SubInstanceData::Flags_ExcludeFromNEE) != 0)
+            continue;
+        if ((subInstance.FlagsAndAlphaInfo & SubInstanceData::Flags_CullVisibilityBackface) != 0
+            && !rayQuery.CandidateTriangleFrontFace())
+            continue;
+
+        const uint materialIndex = subInstance.GlobalGeometryIndex_StandardMaterialDataIndex & 0xffffu;
+        if (materialIndex >= materialCount)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const StandardMaterialData material = materials[materialIndex];
+        const float transmission = saturate(max(material.TransmissionFactor, material.DiffuseTransmissionFactor));
+        if (transmission <= 0.0f)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        // An ordinary closed glass shell contributes at both entry and exit.
+        // Split its total material transmission across the two interfaces.
+        float3 surfaceTransmission = saturate(material.BaseOrDiffuseColor.rgb * transmission);
+        if ((material.Flags & StandardMaterialFlags_ThinSurface) == 0)
+            surfaceTransmission = sqrt(surfaceTransmission);
+        const float fresnelRatio = (material.IoR - 1.0f) / max(material.IoR + 1.0f, 1.0e-4f);
+        const float fresnelF0 = fresnelRatio * fresnelRatio;
+        surfaceTransmission *= 1.0f - saturate(fresnelF0 * transmission);
+        transmittance *= surfaceTransmission;
+        if (max(transmittance.r, max(transmittance.g, transmittance.b)) <= 1.0e-4f)
+            return 0.0f;
     }
 
-    return rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+    return rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT ? 0.0f : transmittance;
 }
 
 float HybridGaussian_ShadowLuminance(float3 color)
@@ -731,8 +799,11 @@ bool HybridGaussian_BuildReceiverShadowRay(
     return true;
 }
 
-float HybridGaussian_TraceMeshShadowVisibility(
+float3 HybridGaussian_TraceMeshShadowVisibility(
     RaytracingAccelerationStructure meshBVH,
+    StructuredBuffer<SubInstanceData> subInstances,
+    StructuredBuffer<StandardMaterialData> materials,
+    uint materialCount,
     RayDesc ray,
     uint shadowMode,
     float softRadius,
@@ -743,10 +814,10 @@ float HybridGaussian_TraceMeshShadowVisibility(
         return 1.0f;
 
     if (shadowMode != GAUSSIAN_SPLAT_SHADOWS_SOFT)
-        return HybridGaussian_TraceMeshShadow(meshBVH, ray) ? 0.0f : 1.0f;
+        return HybridGaussian_TraceMeshShadow(meshBVH, subInstances, materials, materialCount, ray);
 
     uint sampleCount = min(max(softSampleCount, 1u), 16u);
-    float visibleSamples = 0.0f;
+    float3 visibleSamples = 0.0f;
 
     [loop]
     for (uint sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex)
@@ -755,7 +826,7 @@ float HybridGaussian_TraceMeshShadowVisibility(
             ray,
             softRadius,
             HybridGaussian_HashCombine(seed, sampleIndex));
-        visibleSamples += HybridGaussian_TraceMeshShadow(meshBVH, sampleRay) ? 0.0f : 1.0f;
+        visibleSamples += HybridGaussian_TraceMeshShadow(meshBVH, subInstances, materials, materialCount, sampleRay);
     }
 
     return visibleSamples / float(sampleCount);

@@ -82,6 +82,9 @@ bool uploadGaussianSplatScene(
     SceneGaussianSplatPasses& scenePasses,
     const caustica::ViewInfo& splatView,
     caustica::rhi::rt::AccelStruct* meshTopLevelAS,
+    caustica::rhi::Buffer* shadowSubInstances,
+    caustica::rhi::Buffer* shadowMaterials,
+    uint32_t shadowMaterialCount,
     RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
@@ -98,6 +101,9 @@ bool uploadGaussianSplatScene(
             commandList,
             splatView,
             meshTopLevelAS,
+            shadowSubInstances,
+            shadowMaterials,
+            shadowMaterialCount,
             renderTargets,
             objectSettings);
     }

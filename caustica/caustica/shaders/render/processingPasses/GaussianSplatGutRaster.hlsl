@@ -19,6 +19,8 @@ Texture2D<float> t_Depth : register(t4);
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
 RaytracingAccelerationStructure t_MeshBVH : register(t5);
 #include <shaders/HybridGaussianShadow.hlsli>
+StructuredBuffer<SubInstanceData> t_ShadowSubInstances : register(t6);
+StructuredBuffer<StandardMaterialData> t_ShadowMaterials : register(t7);
 #endif
 
 static const uint kGaussianSplatFrustumCullingAtRaster = 2;
@@ -576,11 +578,11 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
     }
 
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
-    float shadow = 1.0f;
+    float3 shadow = 1.0f;
     if (g_Const.shadowsEnabled != 0 && g_Const.shadowStrength > 0.0f && g_Const.shadowLightCount > 0)
     {
         uint2 pixel = uint2(input.position.xy);
-        float weightedVisibility = 0.0f;
+        float3 weightedVisibility = 0.0f;
         float totalLightWeight = 0.0f;
 
         [loop]
@@ -605,8 +607,11 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
                 pixel,
                 g_Const.shadowFrameIndex,
                 primitiveId ^ (lightIndex * 0x9e3779b9u));
-            float lightVisibility = HybridGaussian_TraceMeshShadowVisibility(
+            float3 lightVisibility = HybridGaussian_TraceMeshShadowVisibility(
                 t_MeshBVH,
+                t_ShadowSubInstances,
+                t_ShadowMaterials,
+                g_Const.shadowMaterialCount,
                 shadowRay,
                 g_Const.shadowMode,
                 lightSoftRadius,
@@ -616,7 +621,7 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
             totalLightWeight += lightWeight;
         }
 
-        float visibility = totalLightWeight > 0.0f ? weightedVisibility / totalLightWeight : 1.0f;
+        float3 visibility = totalLightWeight > 0.0f ? weightedVisibility / totalLightWeight : 1.0f;
         shadow = lerp(1.0f - saturate(g_Const.shadowStrength), 1.0f, visibility);
     }
 

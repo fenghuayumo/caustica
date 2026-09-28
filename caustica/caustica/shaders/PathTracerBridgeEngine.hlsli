@@ -1462,6 +1462,9 @@ void Bridge::traceSecondaryGaussianRadiance(
     HybridGaussianRadianceResult result = HybridGaussian_TraceRadiance(
         GaussianSplatBVH,
         SceneBVH,
+        t_SubInstanceData,
+        t_StandardMaterialData,
+        g_Const.MaterialCount,
         t_GaussianShadowSplats,
         t_GaussianRadianceSH,
         g_Const.GaussianSplatRadianceCount,

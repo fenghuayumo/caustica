@@ -158,7 +158,7 @@ struct GaussianSplatConstants
     uint frustumCulling;
 
     uint shadowLightCount;
-    uint shadowLightPadding0;
+    uint shadowMaterialCount;
     uint shadowLightPadding1;
     uint shadowLightPadding2;
 

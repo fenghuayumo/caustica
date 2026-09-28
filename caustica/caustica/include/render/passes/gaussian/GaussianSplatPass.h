@@ -148,6 +148,9 @@ public:
         caustica::rhi::CommandList* commandList,
         const caustica::ViewInfo& view,
         caustica::rhi::rt::AccelStruct* meshTopLevelAS,
+        caustica::rhi::Buffer* shadowSubInstances,
+        caustica::rhi::Buffer* shadowMaterials,
+        uint32_t shadowMaterialCount,
         const RenderTargets& renderTargets,
         const GaussianSplatRenderSettings& settings);
     void sort(caustica::rhi::CommandList* commandList);
@@ -180,7 +183,8 @@ public:
     [[nodiscard]] bool getShadowUsesTLASInstances() const { return m_accelBuilder.getShadowUsesTLASInstances(); }
 
 private:
-    void createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS);
+    void createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS,
+        caustica::rhi::Buffer* shadowSubInstances, caustica::rhi::Buffer* shadowMaterials);
     void createStochasticFramebuffer(const RenderTargets& renderTargets);
     void ensureFormatBuffers(GaussianSplatStorageFormat shFormat, GaussianSplatStorageFormat rgbaFormat);
     [[nodiscard]] bool uploadSplatDataIfNeeded(caustica::rhi::CommandList* commandList);
@@ -244,6 +248,8 @@ private:
     caustica::render::GaussianSplatAccelBuilder m_accelBuilder;
     caustica::render::GaussianSplatSorter m_sorter;
     caustica::rhi::rt::AccelStruct* m_hybridRenderMeshTopLevelAS = nullptr;
+    caustica::rhi::Buffer* m_hybridShadowSubInstances = nullptr;
+    caustica::rhi::Buffer* m_hybridShadowMaterials = nullptr;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticProcessedFramebuffer;
     std::shared_ptr<caustica::FramebufferFactory> m_stochasticLdrFramebuffer;

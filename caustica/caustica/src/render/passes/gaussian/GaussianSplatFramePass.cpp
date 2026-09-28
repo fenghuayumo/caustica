@@ -10,6 +10,7 @@
 #include <render/gpuSort/GPUSort.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
 #include <render/passes/gaussian/GaussianSplatSceneRuntime.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/passes/postProcess/AccumulationPass.h>
 #include <scene/View.h>
 #include <scene/SceneLightAccess.h>
@@ -287,12 +288,16 @@ void GaussianSplatFramePass::executeUpload(
     }
     splatView.updateCache();
 
+    const auto materials = m_context->scenePasses.lighting.materials();
     (void)uploadGaussianSplatScene(
         commandList,
         m_context->frameGaussianSplats(),
         *m_scenePasses,
         splatView,
         m_accelStructs->getTopLevelAS().Get(),
+        m_accelStructs->getSubInstanceBuffer().Get(),
+        materials ? materials->getMaterialDataBuffer().Get() : nullptr,
+        materials ? materials->getMaterialDataCount() : 0u,
         *m_renderTargets,
         settings);
 }

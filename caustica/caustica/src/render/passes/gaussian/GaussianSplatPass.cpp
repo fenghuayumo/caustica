@@ -174,6 +174,8 @@ GaussianSplatPass::GaussianSplatPass(
 
     caustica::rhi::BindingLayoutDesc hybridRenderLayoutDesc = rasterRenderLayoutDesc;
     hybridRenderLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::RayTracingAccelStruct(5));
+    hybridRenderLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(6));
+    hybridRenderLayoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::StructuredBuffer_SRV(7));
     m_hybridRenderBindingLayout = m_device->createBindingLayout(hybridRenderLayoutDesc);
 
     caustica::rhi::BindingLayoutDesc sortLayoutDesc;
@@ -340,7 +342,8 @@ void GaussianSplatPass::releaseAccelerationStructures()
     m_accelBuilder.release(hasSplats());
 }
 
-void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS)
+void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, caustica::rhi::rt::AccelStruct* meshTopLevelAS,
+    caustica::rhi::Buffer* shadowSubInstances, caustica::rhi::Buffer* shadowMaterials)
 {
     if (!m_splatBuffer || !m_colorBuffer || !m_shBuffer || !m_indexBuffer || !m_sortKeyBuffer || !m_sortControlBuffer || !m_drawIndirectBuffer)
         return;
@@ -360,13 +363,21 @@ void GaussianSplatPass::createBindingSets(const RenderTargets& renderTargets, ca
     {
         caustica::rhi::BindingSetDesc hybridRenderBindingSetDesc = rasterRenderBindingSetDesc;
         hybridRenderBindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::RayTracingAccelStruct(5, meshTopLevelAS));
+        hybridRenderBindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::StructuredBuffer_SRV(6,
+            shadowSubInstances != nullptr ? shadowSubInstances : m_splatBuffer.Get()));
+        hybridRenderBindingSetDesc.bindings.push_back(caustica::rhi::BindingSetItem::StructuredBuffer_SRV(7,
+            shadowMaterials != nullptr ? shadowMaterials : m_splatBuffer.Get()));
         m_hybridRenderBindingSet = m_device->createBindingSet(hybridRenderBindingSetDesc, m_hybridRenderBindingLayout);
         m_hybridRenderMeshTopLevelAS = meshTopLevelAS;
+        m_hybridShadowSubInstances = shadowSubInstances;
+        m_hybridShadowMaterials = shadowMaterials;
     }
     else
     {
         m_hybridRenderBindingSet = nullptr;
         m_hybridRenderMeshTopLevelAS = nullptr;
+        m_hybridShadowSubInstances = nullptr;
+        m_hybridShadowMaterials = nullptr;
     }
 
     caustica::rhi::BindingSetDesc sortKeyBindingSetDesc;
@@ -749,6 +760,9 @@ bool GaussianSplatPass::upload(
     caustica::rhi::CommandList* commandList,
     const caustica::ViewInfo& view,
     caustica::rhi::rt::AccelStruct* meshTopLevelAS,
+    caustica::rhi::Buffer* shadowSubInstances,
+    caustica::rhi::Buffer* shadowMaterials,
+    uint32_t shadowMaterialCount,
     const RenderTargets& renderTargets,
     const GaussianSplatRenderSettings& settings)
 {
@@ -797,8 +811,12 @@ bool GaussianSplatPass::upload(
         && meshTopLevelAS != nullptr
         && m_hybridRenderPipeline;
 
-    if (!m_rasterRenderBindingSet || (useHybridShadows && (!m_hybridRenderBindingSet || m_hybridRenderMeshTopLevelAS != meshTopLevelAS)))
-        createBindingSets(renderTargets, useHybridShadows ? meshTopLevelAS : nullptr);
+    if (!m_rasterRenderBindingSet || (useHybridShadows && (!m_hybridRenderBindingSet
+        || m_hybridRenderMeshTopLevelAS != meshTopLevelAS
+        || m_hybridShadowSubInstances != shadowSubInstances
+        || m_hybridShadowMaterials != shadowMaterials)))
+        createBindingSets(renderTargets, useHybridShadows ? meshTopLevelAS : nullptr,
+            shadowSubInstances, shadowMaterials);
 
     caustica::rhi::BindingSetHandle renderBindingSet = useHybridShadows ? m_hybridRenderBindingSet : m_rasterRenderBindingSet;
     if (!renderBindingSet)
@@ -850,6 +868,8 @@ bool GaussianSplatPass::upload(
     constants.shadowLightCount = useHybridShadows
         ? std::min(settings.shadowLightCount, uint32_t(GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS))
         : 0u;
+    constants.shadowMaterialCount = shadowSubInstances != nullptr && shadowMaterials != nullptr
+        ? shadowMaterialCount : 0u;
     for (uint32_t lightIndex = 0; lightIndex < constants.shadowLightCount; ++lightIndex)
         constants.shadowLights[lightIndex] = settings.shadowLights[lightIndex];
     constants.sortMode = uint32_t(settings.sortingMode);

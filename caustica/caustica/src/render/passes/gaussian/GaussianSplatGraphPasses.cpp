@@ -1,10 +1,12 @@
 #include <render/FrameGraphPasses.h>
 
 #include <render/FrameGraphContext.h>
+#include <render/PathTracingContext.h>
 #include <render/core/RenderTargets.h>
 #include <render/graph/GraphBuilder.h>
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/gaussian/GaussianSplatGraph.h>
+#include <render/passes/lighting/MaterialGpuCache.h>
 #include <render/pipeline/FrameGraphPassNames.h>
 
 #include <cassert>
@@ -98,6 +100,16 @@ namespace
         if (resources.empty())
             return {};
         GaussianSplatFramePass* const gaussian = ctx.gaussian;
+        rg::BufferHandle shadowSubInstances;
+        rg::BufferHandle shadowMaterials;
+        if (ctx.subInstanceDataBuffer)
+            shadowSubInstances = ctx.graph->importBuffer(ctx.subInstanceDataBuffer, rg::BufferAccess::ShaderResource);
+        if (ctx.pathTracingContext != nullptr)
+        {
+            const auto materials = ctx.pathTracingContext->scenePasses.lighting.materials();
+            if (materials && materials->getMaterialDataBuffer())
+                shadowMaterials = ctx.graph->importBuffer(materials->getMaterialDataBuffer(), rg::BufferAccess::ShaderResource);
+        }
 
         ctx.graph->addPass(
             uploadPassName,
@@ -161,8 +173,12 @@ namespace
 
         const rg::PassHandle rasterPass = ctx.graph->addPass(
             rasterPassName,
-            [resources, colorTarget, sceneDepth](rg::PassBuilder& setup) {
+            [resources, colorTarget, sceneDepth, shadowSubInstances, shadowMaterials](rg::PassBuilder& setup) {
                 setup.read(sceneDepth, rg::TextureAccess::ShaderResource);
+                if (shadowSubInstances.isValid())
+                    setup.read(shadowSubInstances, rg::BufferAccess::ShaderResource);
+                if (shadowMaterials.isValid())
+                    setup.read(shadowMaterials, rg::BufferAccess::ShaderResource);
                 setup.write(colorTarget, rg::TextureAccess::RenderTarget);
                 for (const GaussianSplatGraphHandles& item : resources)
                 {
