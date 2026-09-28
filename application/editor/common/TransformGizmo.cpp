@@ -38,6 +38,8 @@ struct GizmoDragState
 {
     ecs::Entity entity = ecs::NullEntity;
     float matrix[16] = {};
+    math::daffine3 initialPivot = math::daffine3::identity();
+    std::vector<std::pair<ecs::Entity, math::daffine3>> initialWorlds;
     bool active = false;
     // After CancelTransformGizmoEdit, ignore writeback until ImGuizmo releases.
     bool suppressUntilRelease = false;
@@ -48,7 +50,7 @@ struct GizmoUndoState
     bool tracking = false;
     bool changed = false;
     ecs::Entity entity = ecs::NullEntity;
-    LocalTransformSnapshot before;
+    std::vector<TransformEdit> edits;
 };
 
 GizmoDragState g_drag;
@@ -62,6 +64,42 @@ void ResetGizmoUndoState()
 void ResetGizmoDragState()
 {
     g_drag = {};
+}
+
+std::vector<ecs::Entity> SelectedTransformRoots(
+    const EditorSelectionState& selection, const scene::SceneEntityWorld& world)
+{
+    std::vector<ecs::Entity> roots;
+    for (ecs::Entity entity : selection.SelectedEntities)
+    {
+        if (!world.world().isAlive(entity)
+            || !world.world().tryGet<scene::LocalTransformComponent>(entity)
+            || !world.world().tryGet<scene::GlobalTransformComponent>(entity))
+            continue;
+        bool selectedAncestor = false;
+        auto* parent = world.world().tryGet<scene::ParentComponent>(entity);
+        while (parent && ecs::isValid(parent->parent))
+        {
+            if (selection.isSelected(parent->parent))
+            {
+                selectedAncestor = true;
+                break;
+            }
+            parent = world.world().tryGet<scene::ParentComponent>(parent->parent);
+        }
+        if (!selectedAncestor)
+            roots.push_back(entity);
+    }
+    return roots;
+}
+
+void CommitGizmoUndo(SceneEditor& editor, const scene::SceneEntityWorld& world)
+{
+    if (!g_undo.tracking || !g_undo.changed)
+        return;
+    for (TransformEdit& edit : g_undo.edits)
+        edit.after = captureLocalTransform(world, edit.entity);
+    editor.commitTransformEdits(g_undo.edits);
 }
 
 // Match the layout that worked before DockSpace: caustica/ImGuizmo both consume
@@ -648,7 +686,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
 
     auto style = [&](ecs::Entity entity, ImU32 idle) -> std::pair<ImU32, float>
     {
-        const bool selected = ctx.editorUI.SelectedEntity == entity;
+        const bool selected = ctx.editorUI.isSelected(entity);
         return {
             selected ? IM_COL32(255, 230, 120, 255) : idle,
             selected ? 2.2f : 1.35f
@@ -668,7 +706,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
             dir = math::normalize(dir);
             math::float3 tangent, bitangent;
             BasisFromAxis(dir, tangent, bitangent);
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             if (selected)
             {
                 circle(origin, tangent, bitangent, 0.22f, col, thickness);
@@ -689,7 +727,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
         {
             if (!light.enabled)
                 return;
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             const auto [col, thickness] = style(entity, IM_COL32(255, 176, 82, 210));
             const math::float3 origin = global.transformFloat.m_translation;
             const float coreRadius = std::max(light.radius, 0.18f);
@@ -707,7 +745,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
         {
             if (!light.enabled)
                 return;
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             const auto [col, thickness] = style(entity, IM_COL32(255, 158, 72, 210));
             const math::float3 origin = global.transformFloat.m_translation;
             math::float3 dir = math::float3(scene::getLightDirection(global.transform));
@@ -730,7 +768,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
         {
             if (!light.enabled)
                 return;
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             const auto [col, thickness] = style(entity, IM_COL32(186, 158, 255, 210));
 
             math::float3 local[4] = {
@@ -768,7 +806,7 @@ void caustica::editor::DrawLightHelpers(const TransformGizmoContext& ctx)
         {
             if (!light.enabled)
                 return;
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             const ImU32 col = selected ? IM_COL32(255, 230, 120, 255) : IM_COL32(110, 176, 255, 210);
             queueIcon(global.transformFloat.m_translation, EditorGlyphIcon::EnvironmentLight, col, selected);
         });
@@ -880,7 +918,7 @@ void caustica::editor::DrawColliderHelpers(const TransformGizmoContext& ctx)
     ew->world().each<physics::ColliderComponent, scene::GlobalTransformComponent>(
         [&](ecs::Entity entity, physics::ColliderComponent& collider, scene::GlobalTransformComponent& global)
         {
-            const bool selected = ctx.editorUI.SelectedEntity == entity;
+            const bool selected = ctx.editorUI.isSelected(entity);
             if (!ctx.editorUI.ShowAllColliderHelpers && !selected)
                 return;
 
@@ -970,8 +1008,11 @@ bool caustica::editor::CancelTransformGizmoEdit(SceneEditor& sceneEditor)
     if (!g_undo.tracking && !g_drag.active && !g_drag.suppressUntilRelease && !ImGuizmo::IsUsing())
         return false;
 
-    if (g_undo.tracking && ecs::isValid(g_undo.entity))
-        applyLocalTransform(sceneEditor, g_undo.entity, g_undo.before);
+    if (g_undo.tracking)
+    {
+        for (const TransformEdit& edit : g_undo.edits)
+            applyLocalTransform(sceneEditor, edit.entity, edit.before);
+    }
 
     ResetGizmoUndoState();
     g_drag.active = false;
@@ -987,19 +1028,9 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
 
     if (!ctx.editorUI.ShowTransformGizmo || !ctx.editorUI.ShowUI)
     {
-        if (g_undo.tracking && g_undo.changed)
-        {
-            if (App* app = ctx.sceneEditor.app())
-            {
-                if (auto* ew = caustica::entityWorld(*app))
-                {
-                    ctx.sceneEditor.commitTransformEdit(
-                        g_undo.entity,
-                        g_undo.before,
-                        captureLocalTransform(*ew, g_undo.entity));
-                }
-            }
-        }
+        if (App* app = ctx.sceneEditor.app())
+            if (auto* ew = caustica::entityWorld(*app))
+                CommitGizmoUndo(ctx.sceneEditor, *ew);
         ResetGizmoUndoState();
         ResetGizmoDragState();
         return false;
@@ -1036,13 +1067,7 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
     // Select tool: do not draw the inactive gray gizmo at all.
     if (!ctx.editorUI.GizmoEnabled)
     {
-        if (g_undo.tracking && g_undo.changed)
-        {
-            ctx.sceneEditor.commitTransformEdit(
-                g_undo.entity,
-                g_undo.before,
-                captureLocalTransform(*entityWorld, g_undo.entity));
-        }
+        CommitGizmoUndo(ctx.sceneEditor, *entityWorld);
         ResetGizmoUndoState();
         return false;
     }
@@ -1162,12 +1187,41 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         g_undo.tracking = true;
         g_undo.changed = false;
         g_undo.entity = entity;
-        g_undo.before = captureLocalTransform(*localTransform);
+        g_undo.edits.clear();
+        g_drag.initialWorlds.clear();
+        g_drag.initialPivot = globalTransform->transform;
+        for (ecs::Entity selected : SelectedTransformRoots(ctx.editorUI, *entityWorld))
+        {
+            g_undo.edits.push_back({ selected, captureLocalTransform(*entityWorld, selected), {} });
+            const auto* global = entityWorld->world().tryGet<scene::GlobalTransformComponent>(selected);
+            g_drag.initialWorlds.emplace_back(selected, global->transform);
+        }
+        if (g_undo.edits.empty())
+        {
+            g_undo.edits.push_back({ entity, captureLocalTransform(*localTransform), {} });
+            g_drag.initialWorlds.emplace_back(entity, globalTransform->transform);
+        }
     }
 
     if (manipulated && !editingUi && !g_drag.suppressUntilRelease)
     {
-        ApplyWorldMatrixToLocalTransform(*entityWorld, entity, g_drag.matrix);
+        if (!g_drag.initialWorlds.empty()
+            && (g_drag.initialWorlds.size() > 1 || g_drag.initialWorlds.front().first != entity))
+        {
+            const math::daffine3 pivotNow(math::affine3(ImGuizmoMatrixToAffine3(g_drag.matrix)));
+            const math::daffine3 delta = inverse(g_drag.initialPivot) * pivotNow;
+            for (const auto& [selected, initialWorld] : g_drag.initialWorlds)
+            {
+                const math::daffine3 transformed = initialWorld * delta;
+                float worldMatrix[16];
+                Affine3ToImGuizmoMatrix(math::affine3(transformed), worldMatrix);
+                ApplyWorldMatrixToLocalTransform(*entityWorld, selected, worldMatrix);
+            }
+        }
+        else
+        {
+            ApplyWorldMatrixToLocalTransform(*entityWorld, entity, g_drag.matrix);
+        }
         if (g_undo.tracking && g_undo.entity == entity)
             g_undo.changed = true;
 
@@ -1176,19 +1230,18 @@ bool caustica::editor::DrawTransformGizmo(const TransformGizmoContext& ctx)
         // PT must drop history while the pose changes. CaptureCurrent keeps motion
         // vectors on the per-frame delta so temporal denoise does not thrash.
         ctx.settings.ResetAccumulation = true;
-        if (caustica::scene::hasAnyLightComponent(entityWorld->world(), entity))
-            ctx.settings.ResetRealtimeCaches = true;
+        for (const TransformEdit& edit : g_undo.edits)
+        {
+            const auto* content = entityWorld->world().tryGet<scene::SceneContentComponent>(edit.entity);
+            if (caustica::scene::hasAnyLightComponent(entityWorld->world(), edit.entity)
+                || (content && (content->subgraphContent & SceneContentFlags::Lights) != 0))
+                ctx.settings.ResetRealtimeCaches = true;
+        }
     }
 
     if (!usingGizmo && wasTracking && !g_drag.suppressUntilRelease)
     {
-        if (g_undo.changed)
-        {
-            ctx.sceneEditor.commitTransformEdit(
-                g_undo.entity,
-                g_undo.before,
-                captureLocalTransform(*entityWorld, g_undo.entity));
-        }
+        CommitGizmoUndo(ctx.sceneEditor, *entityWorld);
         ResetGizmoUndoState();
     }
     else if (g_undo.tracking && g_undo.entity != entity)

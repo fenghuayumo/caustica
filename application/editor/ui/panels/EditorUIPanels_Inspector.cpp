@@ -112,6 +112,17 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
         return;
     }
 
+    if (m_editorUI.SelectedEntities.size() > 1)
+    {
+        s_transformUndo = {};
+        drawPhysicsSimulateToggle();
+        ImGui::Text("%zu entities selected", m_editorUI.SelectedEntities.size());
+        ImGui::Spacing();
+        ImGui::TextWrapped("Use the viewport transform gizmo (T: move, R: rotate, S: scale) to transform the selection together. The last selected entity is the pivot. Selecting a parent group lets you edit its Transform here and move its entire subtree.");
+        ImGui::End();
+        return;
+    }
+
     const ecs::Entity entity = m_editorUI.SelectedEntity;
     std::string entityName = ew->getEntityName(entity);
     if (entityName.empty())
@@ -125,7 +136,9 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
     auto* spotLightComp = caustica::scene::tryGetSpotLight(ew->world(), entity);
     auto* pointLightComp = caustica::scene::tryGetPointLight(ew->world(), entity);
     auto* rectLightComp = caustica::scene::tryGetRectLight(ew->world(), entity);
-    const bool isLight = envLightComp || dirLightComp || spotLightComp || pointLightComp || rectLightComp;
+    const auto* sceneContent = ew->world().tryGet<caustica::scene::SceneContentComponent>(entity);
+    const bool affectsLight = envLightComp || dirLightComp || spotLightComp || pointLightComp || rectLightComp
+        || (sceneContent && (sceneContent->subgraphContent & caustica::SceneContentFlags::Lights) != 0);
     auto markLightingEdited = [&](bool changed) {
         if (changed)
         {
@@ -244,7 +257,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
-            if (isLight)
+            if (affectsLight)
                 m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(posEdit);
@@ -278,7 +291,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
-            if (isLight)
+            if (affectsLight)
                 m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(rotEdit);
@@ -294,7 +307,7 @@ void EditorUI::BuildInspectorPanel(const PanelLayout& layout)
             ew->refreshHierarchy(caustica::scene::PreviousTransformPolicy::PreserveExisting);
             markTransformDirty();
             m_settings.ResetAccumulation = true;
-            if (isLight)
+            if (affectsLight)
                 m_settings.ResetRealtimeCaches = true;
         }
         beginTransformEdit(sclEdit);

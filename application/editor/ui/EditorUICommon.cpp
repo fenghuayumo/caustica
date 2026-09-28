@@ -72,22 +72,9 @@ namespace
         return IsEnvironmentLightEntity(ew, entity) || IsLocalLightEntity(ew, entity);
     }
 
-    // Entities that appear as selectable leaves in Hierarchy (Blender Outliner style).
-    bool IsHierarchyLeafEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
-    {
-        return IsMeshInstanceEntity(ew, entity)
-            || IsGaussianSplatEntity(ew, entity)
-            || IsCameraEntity(ew, entity)
-            || IsLightEntity(ew, entity);
-    }
-
     bool HasHierarchyEntity(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
     {
-        if (entity == ecs::NullEntity) return false;
-        if (IsHierarchyLeafEntity(ew, entity)) return true;
-        for (ecs::Entity child : ew.getEntityChildren(entity))
-            if (HasHierarchyEntity(ew, child)) return true;
-        return false;
+        return entity != ecs::NullEntity && ew.world().isAlive(entity);
     }
 
     HierarchyTypeIcon ResolveHierarchyTypeIcon(caustica::scene::SceneEntityWorld& ew, ecs::Entity entity)
@@ -331,7 +318,8 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& e
     const bool isGaussianSplatEntity = IsGaussianSplatEntity(ew, entity);
     const bool isLightEntity = IsLightEntity(ew, entity);
     const bool isEnvironmentLightEntity = IsEnvironmentLightEntity(ew, entity);
-    const bool isSelectable = IsHierarchyLeafEntity(ew, entity);
+    // Group nodes also own local transforms; selecting one edits its subtree.
+    const bool isSelectable = true;
     const bool showVisibilityToggle = isMeshEntity || isGaussianSplatEntity || isLightEntity;
     const auto& children = ew.getEntityChildren(entity);
 
@@ -349,7 +337,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& e
         | ImGuiTreeNodeFlags_AllowOverlap;
     if (!hasVisibleChildren)
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    if (ui.editor.SelectedEntity == entity)
+    if (ui.editor.isSelected(entity))
         flags |= ImGuiTreeNodeFlags_Selected;
 
     // Only expand the scene root by default. Expanding every imported group
@@ -434,7 +422,7 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& e
     {
         if (isSelectable)
         {
-            ui.editor.SelectedEntity = entity;
+            ui.editor.selectOnly(entity);
             ui.editor.SelectedGaussianSplat = isGaussianSplatEntity;
         }
         ui.editor.OpenSceneCreatePopup = true;
@@ -442,8 +430,12 @@ void BuildHierarchyNodeUI(EditorUIData& ui, caustica::scene::SceneEntityWorld& e
 
     if (isSelectable && treeClicked && !eyeClicked)
     {
-        ui.editor.SelectedEntity = entity;
-        ui.editor.SelectedGaussianSplat = isGaussianSplatEntity;
+        if (ImGui::GetIO().KeyCtrl)
+            ui.editor.toggleSelection(entity);
+        else
+            ui.editor.selectOnly(entity);
+        ui.editor.SelectedGaussianSplat = ui.editor.SelectedEntity != ecs::NullEntity
+            && IsGaussianSplatEntity(ew, ui.editor.SelectedEntity);
     }
 
     if (open && hasVisibleChildren)

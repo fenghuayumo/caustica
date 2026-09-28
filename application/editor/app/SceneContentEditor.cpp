@@ -333,7 +333,7 @@ void SceneContentEditor::placeInFrontOfCamera(caustica::ecs::Entity entity, bool
 void SceneContentEditor::selectCreatedEntity(caustica::ecs::Entity entity, bool isLight)
 {
     auto& editor = m_sceneEditor.editorUIState();
-    editor.SelectedEntity = entity;
+    editor.selectOnly(entity);
     editor.SelectedGaussianSplat = false;
     editor.SelectedMaterial = nullptr;
     editor.InspectorRotationEntity = caustica::ecs::NullEntity;

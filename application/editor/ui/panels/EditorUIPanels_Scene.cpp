@@ -24,6 +24,7 @@
 #include <render/passes/debug/ZoomTool.h>
 #include <common/CaptureScriptManager.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -159,6 +160,15 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
 
         if (ew && ew->root() != ecs::NullEntity)
         {
+            auto& selectedEntities = m_editorUI.SelectedEntities;
+            selectedEntities.erase(
+                std::remove_if(selectedEntities.begin(), selectedEntities.end(),
+                    [&](ecs::Entity entity) { return !ew->world().isAlive(entity); }),
+                selectedEntities.end());
+            if (!ew->world().isAlive(m_editorUI.SelectedEntity))
+                m_editorUI.SelectedEntity = selectedEntities.empty()
+                    ? ecs::NullEntity : selectedEntities.back();
+
             bool deleteSelectedEntity = false;
 
             const float addBtn = ImGui::GetFrameHeight();
@@ -210,7 +220,7 @@ void EditorUI::BuildHierarchyPanel(const PanelLayout& layout)
                 // Defer destruction to the main thread. Mutating the scene from the UI/render
                 // thread races with pipelined main-thread update/Extract and can crash.
                 m_editorUI.PendingDeleteEntity = selected;
-                m_editorUI.SelectedEntity = ecs::NullEntity;
+                m_editorUI.selectOnly(ecs::NullEntity);
                 m_editorUI.SelectedMaterial = nullptr;
                 m_editorUI.InspectorRotationEntity = ecs::NullEntity;
                 m_editorUI.InspectorRotationEulerValid = false;

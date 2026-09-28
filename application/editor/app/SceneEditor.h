@@ -171,6 +171,7 @@ public:
         ecs::Entity entity,
         const LocalTransformSnapshot& before,
         const LocalTransformSnapshot& after);
+    void commitTransformEdits(const std::vector<TransformEdit>& edits);
 
     void setSceneTime(double sceneTime);
     double sceneTime() const;
@@ -209,6 +210,7 @@ public:
 #endif
 
 private:
+    void trackUnauthoredTransformEdit(ecs::Entity entity);
     void consumeCompletedMaterialPickFeedback();
     void consumeCompletedInstancePickFeedback();
     void onSceneLoadedEarly();

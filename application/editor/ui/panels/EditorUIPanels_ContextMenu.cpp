@@ -233,7 +233,7 @@ void BuildSceneCreatePopup(SceneEditor& sceneEditor, EditorUIData& ui, const cha
     if (MenuRow("delete", ICON_MS_DELETE, "Delete", "Del", canDelete))
     {
         ui.editor.PendingDeleteEntity = selected;
-        ui.editor.SelectedEntity = ecs::NullEntity;
+        ui.editor.selectOnly(ecs::NullEntity);
         ui.editor.SelectedMaterial = nullptr;
         ui.editor.InspectorRotationEntity = ecs::NullEntity;
         ui.editor.InspectorRotationEulerValid = false;

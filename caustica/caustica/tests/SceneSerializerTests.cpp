@@ -540,6 +540,32 @@ int main()
     {
         caustica::scene::SceneEntityWorld world;
         const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity group = world.createEntity("Group", root);
+        const caustica::ecs::Entity child = world.createEntity("Child", group);
+        world.setTranslation(child, caustica::math::double3(1.0, 0.0, 0.0));
+        world.setTranslation(group, caustica::math::double3(2.0, 3.0, 4.0));
+        world.refreshHierarchy(caustica::scene::PreviousTransformPolicy::CaptureCurrent);
+        passed &= expect(world.world().get<caustica::scene::GlobalTransformComponent>(child)->transform.m_translation.x == 3.0,
+            "moving a group did not move its child");
+        world.rebuildPathsFromRoot();
+        const std::string path = world.getEntityPath(group).generic_string();
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::patchEntityOverrides(document, world, { path });
+        passed &= expect(document["entityOverrides"][0]["Transform"]["translation"][0].asDouble() == 2.0,
+            "unauthored group transform was not saved");
+        world.setTranslation(group, caustica::math::double3(0.0));
+        caustica::scene::applyEntityOverrides(world, document["entityOverrides"]);
+        passed &= expect(world.world().get<caustica::scene::LocalTransformComponent>(group)->translation.x == 2.0,
+            "unauthored group transform was not restored");
+        caustica::scene::patchEntityOverrides(document, world);
+        passed &= expect(document["entityOverrides"].size() == 1,
+            "saved group transform override was lost on second save");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
         const caustica::ecs::Entity cube = world.createEntity("Cube", root);
         world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
             cube, caustica::scene::SceneAuthoringIdComponent{ "Cube" });

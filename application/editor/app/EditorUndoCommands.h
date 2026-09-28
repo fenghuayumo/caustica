@@ -27,6 +27,13 @@ struct LocalTransformSnapshot
     math::double3 scaling = 1.0;
 };
 
+struct TransformEdit
+{
+    ecs::Entity entity = ecs::NullEntity;
+    LocalTransformSnapshot before;
+    LocalTransformSnapshot after;
+};
+
 [[nodiscard]] LocalTransformSnapshot captureLocalTransform(const caustica::scene::LocalTransformComponent& local);
 [[nodiscard]] LocalTransformSnapshot captureLocalTransform(
     const caustica::scene::SceneEntityWorld& entityWorld,

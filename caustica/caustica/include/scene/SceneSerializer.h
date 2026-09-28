@@ -33,7 +33,8 @@ void patchEntityTransforms(
 // Prefab-internal lights/cameras (no SceneAuthoringId) written by path.
 void patchEntityOverrides(
     Json::Value& document,
-    SceneEntityWorld& world);
+    SceneEntityWorld& world,
+    const std::vector<std::string>& editedTransformPaths = {});
 
 // Insert or refresh a scene-JSON entity for an authored ECS node (editor create / save).
 void upsertAuthoredEntityNode(

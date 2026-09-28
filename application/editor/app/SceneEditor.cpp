@@ -489,7 +489,7 @@ void SceneEditor::consumeCompletedInstancePickFeedback()
         picked = pickGaussianSplatAtPixel(pickPixel);
         pickedGaussian = (picked != ecs::NullEntity);
     }
-    editorUIState().SelectedEntity = picked;
+    editorUIState().selectOnly(picked);
     editorUIState().SelectedGaussianSplat = pickedGaussian;
     picking.completeInstancePick(completedRequestId);
 }
@@ -507,7 +507,7 @@ void SceneEditor::onSceneUnloading()
     m_editorAnimationEntity = ecs::NullEntity;
     editorUIState().TogglableNodes = nullptr;
     editorUIState().SelectedMaterial = nullptr;
-    editorUIState().SelectedEntity = caustica::ecs::NullEntity;
+    editorUIState().selectOnly(caustica::ecs::NullEntity);
     editorUIState().PendingDeleteEntity = caustica::ecs::NullEntity;
     editorUIState().InspectorRotationEntity = caustica::ecs::NullEntity;
     editorUIState().InspectorRotationEulerValid = false;
@@ -516,6 +516,7 @@ void SceneEditor::onSceneUnloading()
     m_editorState.sceneDocumentPath.clear();
     m_editorState.sceneDocumentValid = false;
     m_editorState.saveAsRequired = false;
+    m_editorState.editedTransformPaths.clear();
     m_editorState.loadedSceneName.clear();
 
     if (m_game != nullptr)
@@ -641,7 +642,60 @@ void SceneEditor::commitTransformEdit(
     const LocalTransformSnapshot& after)
 {
     if (auto command = makeTransformUndoCommand(*this, entity, before, after))
+    {
+        trackUnauthoredTransformEdit(entity);
         m_undoStack.push(std::move(command));
+    }
+}
+
+void SceneEditor::trackUnauthoredTransformEdit(ecs::Entity entity)
+{
+    if (!m_app)
+        return;
+    auto* ew = caustica::entityWorld(*m_app);
+    if (!ew || !ew->world().isAlive(entity)
+        || ew->world().tryGet<scene::SceneAuthoringIdComponent>(entity))
+        return;
+    const std::string path = ew->getEntityPath(entity).generic_string();
+    if (!path.empty())
+        m_editorState.editedTransformPaths.insert(path);
+}
+
+void SceneEditor::commitTransformEdits(const std::vector<TransformEdit>& edits)
+{
+    class BatchTransformUndoCommand final : public IEditorUndoCommand
+    {
+    public:
+        explicit BatchTransformUndoCommand(std::vector<std::unique_ptr<TransformUndoCommand>> commands)
+            : m_commands(std::move(commands)) {}
+        void undo() override
+        {
+            for (auto it = m_commands.rbegin(); it != m_commands.rend(); ++it)
+                (*it)->undo();
+        }
+        void redo() override
+        {
+            for (const auto& command : m_commands)
+                command->redo();
+        }
+        const char* label() const override { return "Transform Selection"; }
+    private:
+        std::vector<std::unique_ptr<TransformUndoCommand>> m_commands;
+    };
+
+    std::vector<std::unique_ptr<TransformUndoCommand>> commands;
+    for (const TransformEdit& edit : edits)
+    {
+        if (auto command = makeTransformUndoCommand(*this, edit.entity, edit.before, edit.after))
+        {
+            trackUnauthoredTransformEdit(edit.entity);
+            commands.push_back(std::move(command));
+        }
+    }
+    if (commands.size() == 1)
+        m_undoStack.push(std::move(commands.front()));
+    else if (!commands.empty())
+        m_undoStack.push(std::make_unique<BatchTransformUndoCommand>(std::move(commands)));
 }
 
 void SceneEditor::onSceneLoadedEarly()
@@ -712,6 +766,7 @@ void SceneEditor::syncLoadedSceneSystems()
     m_editorState.sceneDocumentValid = false;
     m_editorState.sceneDocumentPath.clear();
     m_editorState.saveAsRequired = true;
+    m_editorState.editedTransformPaths.clear();
 
     const std::filesystem::path scenePath = caustica::currentScenePath(*m_app);
     if (scenePath.empty())
@@ -978,7 +1033,10 @@ bool SaveSceneDocumentToPath(
     caustica::scene::syncAuthoredEntitiesToDocument(editorState.sceneDocument, *ew);
     if (editorState.sceneDocument.isMember("entities"))
         caustica::scene::patchEntityTransforms(editorState.sceneDocument["entities"], *ew);
-    caustica::scene::patchEntityOverrides(editorState.sceneDocument, *ew);
+    caustica::scene::patchEntityOverrides(
+        editorState.sceneDocument, *ew,
+        std::vector<std::string>(
+            editorState.editedTransformPaths.begin(), editorState.editedTransformPaths.end()));
     PatchEditorAnimations(editorState.sceneDocument, *ew);
 
     if (const PathTracerSettings* cfg = caustica::settings(app))

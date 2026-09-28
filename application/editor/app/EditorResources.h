@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace caustica::editor
 {
@@ -24,6 +25,7 @@ struct EditorState
     std::filesystem::path sceneDocumentPath;
     bool sceneDocumentValid = false;
     bool saveAsRequired = false;
+    std::unordered_set<std::string> editedTransformPaths;
 };
 
 struct CaptureScriptState

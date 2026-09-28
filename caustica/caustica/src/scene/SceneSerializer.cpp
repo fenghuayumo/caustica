@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <functional>
+#include <set>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -524,9 +525,17 @@ void patchEntityTransforms(
 
 void patchEntityOverrides(
     Json::Value& document,
-    SceneEntityWorld& world)
+    SceneEntityWorld& world,
+    const std::vector<std::string>& editedTransformPaths)
 {
     Json::Value overrides(Json::arrayValue);
+
+    // Keep existing prefab-internal transform overrides on subsequent saves.
+    std::set<std::string> transformPaths(editedTransformPaths.begin(), editedTransformPaths.end());
+    if (document["entityOverrides"].isArray())
+        for (const Json::Value& existing : document["entityOverrides"])
+            if (existing["path"].isString() && existing["Transform"].isObject())
+                transformPaths.insert(existing["path"].asString());
 
     world.world().each<DirectionalLightComponent>(
         [&](ecs::Entity entity, const DirectionalLightComponent& light)
@@ -571,6 +580,20 @@ void patchEntityOverrides(
             WriteCameraIntoComponents(EnsureObject(patch), camera);
             overrides.append(std::move(patch));
         });
+
+    for (const std::string& path : transformPaths)
+    {
+        const ecs::Entity entity = world.entityForPath(path);
+        if (!ecs::isValid(entity) || HasAuthoringId(world, entity))
+            continue;
+        const auto* local = world.world().tryGet<LocalTransformComponent>(entity);
+        if (!local || !local->hasLocalTransform)
+            continue;
+        Json::Value patch(Json::objectValue);
+        patch["path"] = path;
+        WriteTransformComponent(patch["Transform"], *local);
+        overrides.append(std::move(patch));
+    }
 
     if (overrides.empty())
         document.removeMember("entityOverrides");
@@ -759,6 +782,8 @@ void applyEntityOverrides(
             if (auto component = makeCameraComponentFromJson(cameraType, patch[cameraType]))
                 world.setCamera(entity, std::move(*component));
         }
+        if (patch["Transform"].isObject())
+            applyAuthoringTransform(world, entity, patch["Transform"]);
     }
 }
 

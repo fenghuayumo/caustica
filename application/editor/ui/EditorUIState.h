@@ -3,6 +3,7 @@
 #include <math/math.h>
 #include <scene/Scene.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -88,6 +89,35 @@ struct EditorSelectionState
 {
     std::shared_ptr<caustica::Material> SelectedMaterial;
     caustica::ecs::Entity SelectedEntity = caustica::ecs::NullEntity;
+    // The active entity is the gizmo pivot; the list contains every selected row.
+    std::vector<caustica::ecs::Entity> SelectedEntities;
+    [[nodiscard]] bool isSelected(caustica::ecs::Entity entity) const
+    {
+        return std::find(SelectedEntities.begin(), SelectedEntities.end(), entity)
+            != SelectedEntities.end();
+    }
+    void selectOnly(caustica::ecs::Entity entity)
+    {
+        SelectedEntity = entity;
+        SelectedEntities.clear();
+        if (entity != caustica::ecs::NullEntity)
+            SelectedEntities.push_back(entity);
+    }
+    void toggleSelection(caustica::ecs::Entity entity)
+    {
+        const auto it = std::find(SelectedEntities.begin(), SelectedEntities.end(), entity);
+        if (it == SelectedEntities.end())
+        {
+            SelectedEntities.push_back(entity);
+            SelectedEntity = entity;
+        }
+        else
+        {
+            SelectedEntities.erase(it);
+            SelectedEntity = SelectedEntities.empty()
+                ? caustica::ecs::NullEntity : SelectedEntities.back();
+        }
+    }
     // Queued on the UI/render thread; applied on the main thread before scene animate.
     caustica::ecs::Entity PendingDeleteEntity = caustica::ecs::NullEntity;
     caustica::ecs::Entity InspectorRotationEntity = caustica::ecs::NullEntity;
