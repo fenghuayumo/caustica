@@ -19,6 +19,8 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/ScenePlugins.h>
+#include <assets/AssetSystem.h>
+#include <core/format.h>
 #include <core/PathUtils.h>
 #include <core/json.h>
 #include <core/log.h>
@@ -35,6 +37,7 @@
 #include "game/GameScene.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 
@@ -545,12 +548,30 @@ void SceneEditor::requestNewScene()
 
 void SceneEditor::requestSaveScene()
 {
+    // Set before the queued action runs (after ImGui::Render) so the frame
+    // that triggers the save already presents the busy state; a slow save keeps
+    // it on screen until the terminal message replaces it.
+    setStatusMessage(EditorStatusKind::Busy, "Saving scene...");
     m_pendingEditAction = PendingEditAction::SaveScene;
 }
 
 void SceneEditor::requestSaveSceneAsFromDialog()
 {
+    setStatusMessage(EditorStatusKind::Busy, "Saving scene as...");
     m_pendingEditAction = PendingEditAction::SaveSceneAs;
+}
+
+void SceneEditor::setStatusMessage(EditorStatusKind kind, std::string text, float lingerSeconds)
+{
+    m_statusMessage.kind = kind;
+    m_statusMessage.text = std::move(text);
+    m_statusMessage.setAt = std::chrono::steady_clock::now();
+    m_statusMessage.lingerSeconds = lingerSeconds;
+}
+
+void SceneEditor::clearStatusMessage()
+{
+    m_statusMessage = EditorStatusMessage{};
 }
 
 void SceneEditor::processPendingEditActions()
@@ -751,6 +772,76 @@ void SceneEditor::onSceneLoadedFromLoader()
     onSceneLoadedComplete();
 }
 
+namespace
+{
+
+std::string FormatElapsedSeconds(std::chrono::steady_clock::duration elapsed)
+{
+    const long long milliseconds =
+        std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+    if (milliseconds < 1000)
+        return caustica::stringFormat("%lld ms", milliseconds);
+    return caustica::stringFormat("%.2f s", static_cast<double>(milliseconds) / 1000.0);
+}
+
+Json::Value CameraVector(const math::float3& value)
+{
+    Json::Value result(Json::arrayValue);
+    result.append(value.x);
+    result.append(value.y);
+    result.append(value.z);
+    return result;
+}
+
+bool ReadCameraVector(const Json::Value& value, math::float3& result)
+{
+    if (!value.isArray() || value.size() != 3
+        || !value[0].isNumeric() || !value[1].isNumeric() || !value[2].isNumeric())
+        return false;
+    result = math::float3(value[0].asFloat(), value[1].asFloat(), value[2].asFloat());
+    return math::all(math::isfinite(result));
+}
+
+void WriteEditorCamera(Json::Value& document, const App& app)
+{
+    const caustica::CameraPose pose = caustica::currentCameraPose(app);
+    Json::Value& camera = document["settings"]["editorCamera"];
+    camera["position"] = CameraVector(pose.position);
+    camera["direction"] = CameraVector(pose.direction);
+    camera["up"] = CameraVector(pose.up);
+    camera["verticalFov"] = caustica::cameraVerticalFOV(app);
+    const std::string activePath = caustica::activeCameraPath(app);
+    if (activePath.empty())
+        camera.removeMember("sceneCameraPath");
+    else
+        camera["sceneCameraPath"] = activePath;
+}
+
+void RestoreEditorCamera(App& app, const Json::Value& document)
+{
+    const Json::Value& camera = document["settings"]["editorCamera"];
+    if (!camera.isObject())
+        return;
+
+    if (camera["sceneCameraPath"].isString()
+        && caustica::setActiveCameraByPath(app, camera["sceneCameraPath"].asString()))
+        return;
+
+    caustica::CameraPose pose;
+    if (!ReadCameraVector(camera["position"], pose.position)
+        || !ReadCameraVector(camera["direction"], pose.direction)
+        || !ReadCameraVector(camera["up"], pose.up))
+        return;
+
+    if (!caustica::setSelectedCameraIndex(app, 0)
+        || !caustica::setCurrentCameraPose(app, pose))
+        return;
+    if (camera["verticalFov"].isNumeric())
+        caustica::setCameraVerticalFOV(app, camera["verticalFov"].asFloat());
+}
+
+} // namespace
+
 void SceneEditor::syncLoadedSceneSystems()
 {
     if (!m_app || !caustica::isSceneLoaded(*m_app))
@@ -787,6 +878,7 @@ void SceneEditor::syncLoadedSceneSystems()
         m_editorState.sceneDocument = std::move(document);
         m_editorState.sceneDocumentPath = scenePath;
         m_editorState.sceneDocumentValid = true;
+        RestoreEditorCamera(*m_app, m_editorState.sceneDocument);
         // The bundled startup scene is a template. Ctrl+S should create a user
         // file instead of silently overwriting the shipped example.
         m_editorState.saveAsRequired = scenePath.filename() == "default.scene.json"
@@ -1046,7 +1138,25 @@ bool SaveSceneDocumentToPath(
         look.writeLook(editorState.sceneDocument["settings"]);
     }
 
-    if (!caustica::json::saveToFile(path, editorState.sceneDocument))
+    WriteEditorCamera(editorState.sceneDocument, app);
+
+    // Mark the scene JSON write as editor-owned so HotReloadTracker does not
+    // mistake Save Scene for an external source edit and force a full reload.
+    auto* assets = app.tryResource<caustica::AssetSystem>();
+    struct OwnedWriteGuard
+    {
+        caustica::AssetSystem* assets;
+        const std::filesystem::path& path;
+        ~OwnedWriteGuard()
+        {
+            if (assets)
+                assets->hotReload().endOwnedWrite(path);
+        }
+    } ownedWrite{ assets, path };
+    if (assets)
+        assets->hotReload().beginOwnedWrite(path);
+    const bool saved = caustica::json::saveToFile(path, editorState.sceneDocument);
+    if (!saved)
         return false;
 
     editorState.sceneDocumentPath = path;
@@ -1144,12 +1254,24 @@ bool SceneEditor::saveScene()
     if (!canSaveScene())
         return saveSceneAsFromDialog();
 
+    const auto saveStarted = std::chrono::steady_clock::now();
     if (!SaveSceneDocumentToPath(*m_app, m_editorState, m_editorState.sceneDocumentPath))
     {
         caustica::error("Failed to save scene '%s'", m_editorState.sceneDocumentPath.generic_string().c_str());
+        setStatusMessage(
+            EditorStatusKind::Error,
+            caustica::stringFormat(
+                "Failed to save scene '%s' (see log)",
+                m_editorState.sceneDocumentPath.filename().generic_string().c_str()));
         return false;
     }
 
+    setStatusMessage(
+        EditorStatusKind::Success,
+        caustica::stringFormat(
+            "Saved scene '%s' (%s)",
+            m_editorState.sceneDocumentPath.filename().generic_string().c_str(),
+            FormatElapsedSeconds(std::chrono::steady_clock::now() - saveStarted).c_str()));
     caustica::info("Saved scene '%s'", m_editorState.sceneDocumentPath.generic_string().c_str());
     return true;
 }
@@ -1172,15 +1294,29 @@ bool SceneEditor::saveSceneAsFromDialog()
             "Scene files (*.scene.json)\0*.scene.json\0JSON files (*.json)\0*.json\0All files\0*.*\0",
             picked,
             initialDir.empty() ? nullptr : initialDir.c_str()))
+    {
+        clearStatusMessage();
         return false;
+    }
 
     std::filesystem::path path(picked);
     if (path.extension().empty())
         path += ".scene.json";
 
+    setStatusMessage(
+        EditorStatusKind::Busy,
+        caustica::stringFormat(
+            "Saving scene as '%s'...",
+            path.filename().generic_string().c_str()));
+    const auto saveStarted = std::chrono::steady_clock::now();
     if (!SaveSceneDocumentToPath(*m_app, m_editorState, path))
     {
         caustica::error("Failed to save scene '%s'", path.generic_string().c_str());
+        setStatusMessage(
+            EditorStatusKind::Error,
+            caustica::stringFormat(
+                "Failed to save scene '%s' (see log)",
+                path.filename().generic_string().c_str()));
         return false;
     }
 
@@ -1190,6 +1326,12 @@ bool SceneEditor::saveSceneAsFromDialog()
 
     m_editorState.loadedSceneName = sceneName;
     m_editorState.saveAsRequired = false;
+    setStatusMessage(
+        EditorStatusKind::Success,
+        caustica::stringFormat(
+            "Saved scene as '%s' (%s)",
+            path.filename().generic_string().c_str(),
+            FormatElapsedSeconds(std::chrono::steady_clock::now() - saveStarted).c_str()));
     caustica::info("Saved scene as '%s'", path.generic_string().c_str());
     return true;
 }

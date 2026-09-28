@@ -97,6 +97,11 @@ public:
     [[nodiscard]] EditorCameraState& editorCameraState() { return m_editorCameraState; }
     [[nodiscard]] const EditorCameraState& editorCameraState() const { return m_editorCameraState; }
 
+    // Status-bar feedback for user-triggered operations (save started/finished).
+    void setStatusMessage(EditorStatusKind kind, std::string text, float lingerSeconds = 6.f);
+    void clearStatusMessage();
+    [[nodiscard]] const EditorStatusMessage& statusMessage() const { return m_statusMessage; }
+
     void handleDroppedFiles();
     bool loadMeshFile(const std::filesystem::path& filePath);
     bool loadGltfMeshFile(const std::filesystem::path& filePath);
@@ -228,6 +233,7 @@ private:
     EditorState m_editorState;
     SelectionState m_selectionState;
     EditorCameraState m_editorCameraState;
+    EditorStatusMessage m_statusMessage;
 
     std::unique_ptr<CaptureScriptManager> m_captureScriptManager;
     CaptureScriptState m_captureScriptState;

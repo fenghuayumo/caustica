@@ -9,6 +9,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/SceneLifecycle.h>
 #include <engine/SceneQuery.h>
+#include <core/format.h>
 #include <render/AppDiagnostics.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -567,6 +568,37 @@ void EditorUI::BuildStatusBar()
                 ImGui::SameLine();
                 ImGui::Text("Viewport %ux%u", m_editorUI.Viewport.DesiredWidth, m_editorUI.Viewport.DesiredHeight);
             }
+        }
+
+        // Right-aligned transient operation feedback (save started/finished/failed).
+        // The Busy message is published by the request path before the action runs
+        // after ImGui::Render, so it stays on screen for the whole blocking save.
+        const EditorStatusMessage& status = m_sceneEditor.statusMessage();
+        if (status.visible())
+        {
+            const char* icon = ICON_MS_AUTORENEW;
+            ImVec4 color = GetEditorColors().TextWarning;
+            switch (status.kind)
+            {
+            case EditorStatusKind::Success:
+                icon = ICON_MS_SAVE;
+                color = ImVec4(0.44f, 0.80f, 0.46f, 1.0f);
+                break;
+            case EditorStatusKind::Error:
+                icon = ICON_MS_ERROR;
+                color = ImVec4(0.94f, 0.38f, 0.38f, 1.0f);
+                break;
+            case EditorStatusKind::Busy:
+            case EditorStatusKind::None:
+                break;
+            }
+
+            const std::string label = caustica::stringFormat("%s %s", icon, status.text.c_str());
+            const float textWidth = ImGui::CalcTextSize(label.c_str()).x;
+            const float available = ImGui::GetContentRegionAvail().x;
+            if (available > textWidth)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + available - textWidth);
+            ImGui::TextColored(color, "%s", label.c_str());
         }
     }
     ImGui::End();

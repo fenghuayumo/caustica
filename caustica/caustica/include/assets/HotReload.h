@@ -22,6 +22,9 @@ public:
     void watch(AssetId asset, const std::filesystem::path& path);
     void unwatch(AssetId asset);
     [[nodiscard]] std::vector<HotReloadChange> pollChangedFiles();
+    // Ignore changes while the editor writes a source, then advance its timestamp.
+    void beginOwnedWrite(const std::filesystem::path& path);
+    void endOwnedWrite(const std::filesystem::path& path);
     void clear();
 
 private:
@@ -34,6 +37,7 @@ private:
 
     mutable std::shared_mutex m_Mutex;
     std::unordered_map<AssetId, WatchedFile, AssetId::Hash> m_WatchedFiles;
+    std::unordered_map<std::filesystem::path, size_t> m_OwnedWrites;
 };
 
 } // namespace caustica
