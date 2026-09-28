@@ -192,10 +192,31 @@ void WriteCameraIntoComponents(Json::Value& components, const CameraComponent& c
         cam.removeMember("cy");
         cam.removeMember("width");
         cam.removeMember("height");
+        // Exposure / tone-map metadata: the active scene camera re-applies
+        // these to PathTracerSettings every frame, so editor edits mirrored
+        // into the camera must round-trip or Post Process changes are lost.
+        cam.removeMember("enableAutoExposure");
+        cam.removeMember("toneMapOperator");
+        cam.removeMember("exposureCompensation");
+        cam.removeMember("exposureValue");
+        cam.removeMember("exposureValueMin");
+        cam.removeMember("exposureValueMax");
         if (pers->zFar)
             cam["zFar"] << *pers->zFar;
         if (pers->aspectRatio)
             cam["aspectRatio"] << *pers->aspectRatio;
+        if (pers->enableAutoExposure)
+            cam["enableAutoExposure"] << *pers->enableAutoExposure;
+        if (pers->toneMapOperator)
+            cam["toneMapOperator"] << *pers->toneMapOperator;
+        if (pers->exposureCompensation)
+            cam["exposureCompensation"] << *pers->exposureCompensation;
+        if (pers->exposureValue)
+            cam["exposureValue"] << *pers->exposureValue;
+        if (pers->exposureValueMin)
+            cam["exposureValueMin"] << *pers->exposureValueMin;
+        if (pers->exposureValueMax)
+            cam["exposureValueMax"] << *pers->exposureValueMax;
         if (pers->intrinsics)
         {
             cam["fx"] << pers->intrinsics->fx;

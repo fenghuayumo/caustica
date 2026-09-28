@@ -84,8 +84,89 @@ void SceneSettings::load(const Json::Value& node)
         loadIfPresent(src, "applyToneMapping", splat.applyToneMapping);
         loadIfPresent(src, "alphaCullThreshold", splat.alphaCullThreshold);
         loadIfPresent(src, "shadowStrength", splat.shadowStrength);
+        loadIfPresent(src, "secondaryRays", splat.secondaryRays);
+        loadIfPresent(src, "illuminateMeshes", splat.illuminateMeshes);
+        loadIfPresent(src, "radianceAlphaClamp", splat.radianceAlphaClamp);
         gaussianSplat = std::move(splat);
     }
+
+    if (node.isMember("renderSettings") && node["renderSettings"].isObject())
+    {
+        RenderSettingsLook render;
+        const Json::Value& src = node["renderSettings"];
+        loadIfPresent(src, "realtimeSamplesPerPixel", render.realtimeSamplesPerPixel);
+        loadIfPresent(src, "accumulationTarget", render.accumulationTarget);
+        loadIfPresent(src, "realtimeAA", render.realtimeAA);
+        loadIfPresent(src, "dlssMode", render.dlssMode);
+        loadIfPresent(src, "standaloneDenoiser", render.standaloneDenoiser);
+        loadIfPresent(src, "referenceOidnDenoiser", render.referenceOidnDenoiser);
+        loadIfPresent(src, "referenceOidnUseGpu", render.referenceOidnUseGpu);
+        loadIfPresent(src, "useNEE", render.useNEE);
+        loadIfPresent(src, "neeType", render.neeType);
+        loadIfPresent(src, "neeCandidateSamples", render.neeCandidateSamples);
+        loadIfPresent(src, "neeFullSamples", render.neeFullSamples);
+        loadIfPresent(src, "useRestirDI", render.useRestirDI);
+        loadIfPresent(src, "useRestirGI", render.useRestirGI);
+        loadIfPresent(src, "useRestirPT", render.useRestirPT);
+        loadIfPresent(src, "restirPreset", render.restirPreset);
+        loadIfPresent(src, "restirPTPreset", render.restirPTPreset);
+        loadIfPresent(src, "realtimeFireflyEnabled", render.realtimeFireflyEnabled);
+        loadIfPresent(src, "realtimeFireflyThreshold", render.realtimeFireflyThreshold);
+        loadIfPresent(src, "referenceFireflyEnabled", render.referenceFireflyEnabled);
+        loadIfPresent(src, "referenceFireflyThreshold", render.referenceFireflyThreshold);
+        loadIfPresent(src, "nestedDielectricsQuality", render.nestedDielectricsQuality);
+        loadIfPresent(src, "neeMISType", render.neeMISType);
+        loadIfPresent(src, "environmentMapDiffuseSampleMIPLevel", render.environmentMapDiffuseSampleMIPLevel);
+        loadIfPresent(src, "stablePlanesActiveCount", render.stablePlanesActiveCount);
+        loadIfPresent(src, "allowPrimarySurfaceReplacement", render.allowPrimarySurfaceReplacement);
+        loadIfPresent(src, "enableLDSamplerForBSDF", render.enableLDSamplerForBSDF);
+        loadIfPresent(src, "gaussianSplatPrimaryMethod", render.gaussianSplatPrimaryMethod);
+        loadIfPresent(src, "gaussianSplatShadowsMode", render.gaussianSplatShadowsMode);
+        loadIfPresent(src, "gaussianSplatSortingMode", render.gaussianSplatSortingMode);
+        loadIfPresent(src, "gaussianSplatSHFormat", render.gaussianSplatSHFormat);
+        loadIfPresent(src, "gaussianSplatQuantizeNormals", render.gaussianSplatQuantizeNormals);
+        loadIfPresent(src, "gaussianSplatMipAntialiasing", render.gaussianSplatMipAntialiasing);
+        loadIfPresent(src, "gaussianSplatFrustumCulling", render.gaussianSplatFrustumCulling);
+        loadIfPresent(src, "gaussianSplatScreenSizeCulling", render.gaussianSplatScreenSizeCulling);
+        loadIfPresent(src, "gaussianSplatMinPixelCoverage", render.gaussianSplatMinPixelCoverage);
+        renderSettings = std::move(render);
+    }
+    else
+        renderSettings.reset();
+
+    if (node.isMember("postProcess") && node["postProcess"].isObject())
+    {
+        PostProcessLook post;
+        const Json::Value& src = node["postProcess"];
+        loadIfPresent(src, "bloomEnabled", post.bloomEnabled);
+        loadIfPresent(src, "bloomRadius", post.bloomRadius);
+        loadIfPresent(src, "bloomIntensity", post.bloomIntensity);
+        loadIfPresent(src, "toneMappingEnabled", post.toneMappingEnabled);
+        loadIfPresent(src, "toneMapOperator", post.toneMapOperator);
+        loadIfPresent(src, "autoExposure", post.autoExposure);
+        loadIfPresent(src, "exposureMode", post.exposureMode);
+        loadIfPresent(src, "exposureCompensation", post.exposureCompensation);
+        loadIfPresent(src, "exposureValue", post.exposureValue);
+        loadIfPresent(src, "exposureValueMin", post.exposureValueMin);
+        loadIfPresent(src, "exposureValueMax", post.exposureValueMax);
+        loadIfPresent(src, "filmSpeed", post.filmSpeed);
+        loadIfPresent(src, "fNumber", post.fNumber);
+        loadIfPresent(src, "shutter", post.shutter);
+        loadIfPresent(src, "whiteBalance", post.whiteBalance);
+        loadIfPresent(src, "whitePoint", post.whitePoint);
+        loadIfPresent(src, "whiteMaxLuminance", post.whiteMaxLuminance);
+        loadIfPresent(src, "whiteScale", post.whiteScale);
+        loadIfPresent(src, "whiteClamped", post.whiteClamped);
+        loadIfPresent(src, "cameraLutEnabled", post.cameraLutEnabled);
+        loadIfPresent(src, "cameraLutAfterToneMap", post.cameraLutAfterToneMap);
+        loadIfPresent(src, "cameraLutPreset", post.cameraLutPreset);
+        loadIfPresent(src, "cameraLutPath", post.cameraLutPath);
+        loadIfPresent(src, "edgeDetection", post.edgeDetection);
+        loadIfPresent(src, "edgeDetectionThreshold", post.edgeDetectionThreshold);
+        postProcess = std::move(post);
+    }
+    else
+        postProcess.reset();
 
     if (node.isMember("hiddenEntities") && node["hiddenEntities"].isArray())
         hiddenEntities = caustica::json::readStringArray(node["hiddenEntities"]);
@@ -135,10 +216,154 @@ void SceneSettings::writeLook(Json::Value& settingsNode) const
             splat["alphaCullThreshold"] << *src.alphaCullThreshold;
         if (src.shadowStrength)
             splat["shadowStrength"] << *src.shadowStrength;
+        if (src.secondaryRays)
+            splat["secondaryRays"] << *src.secondaryRays;
+        if (src.illuminateMeshes)
+            splat["illuminateMeshes"] << *src.illuminateMeshes;
+        if (src.radianceAlphaClamp)
+            splat["radianceAlphaClamp"] << *src.radianceAlphaClamp;
         settingsNode["gaussianSplat"] = std::move(splat);
     }
     else
         settingsNode.removeMember("gaussianSplat");
+
+    if (renderSettings)
+    {
+        Json::Value render(Json::objectValue);
+        const RenderSettingsLook& src = *renderSettings;
+        if (src.realtimeSamplesPerPixel)
+            render["realtimeSamplesPerPixel"] << *src.realtimeSamplesPerPixel;
+        if (src.accumulationTarget)
+            render["accumulationTarget"] << *src.accumulationTarget;
+        if (src.realtimeAA)
+            render["realtimeAA"] << *src.realtimeAA;
+        if (src.dlssMode)
+            render["dlssMode"] << *src.dlssMode;
+        if (src.standaloneDenoiser)
+            render["standaloneDenoiser"] << *src.standaloneDenoiser;
+        if (src.referenceOidnDenoiser)
+            render["referenceOidnDenoiser"] << *src.referenceOidnDenoiser;
+        if (src.referenceOidnUseGpu)
+            render["referenceOidnUseGpu"] << *src.referenceOidnUseGpu;
+        if (src.useNEE)
+            render["useNEE"] << *src.useNEE;
+        if (src.neeType)
+            render["neeType"] << *src.neeType;
+        if (src.neeCandidateSamples)
+            render["neeCandidateSamples"] << *src.neeCandidateSamples;
+        if (src.neeFullSamples)
+            render["neeFullSamples"] << *src.neeFullSamples;
+        if (src.useRestirDI)
+            render["useRestirDI"] << *src.useRestirDI;
+        if (src.useRestirGI)
+            render["useRestirGI"] << *src.useRestirGI;
+        if (src.useRestirPT)
+            render["useRestirPT"] << *src.useRestirPT;
+        if (src.restirPreset)
+            render["restirPreset"] << *src.restirPreset;
+        if (src.restirPTPreset)
+            render["restirPTPreset"] << *src.restirPTPreset;
+        if (src.realtimeFireflyEnabled)
+            render["realtimeFireflyEnabled"] << *src.realtimeFireflyEnabled;
+        if (src.realtimeFireflyThreshold)
+            render["realtimeFireflyThreshold"] << *src.realtimeFireflyThreshold;
+        if (src.referenceFireflyEnabled)
+            render["referenceFireflyEnabled"] << *src.referenceFireflyEnabled;
+        if (src.referenceFireflyThreshold)
+            render["referenceFireflyThreshold"] << *src.referenceFireflyThreshold;
+        if (src.nestedDielectricsQuality)
+            render["nestedDielectricsQuality"] << *src.nestedDielectricsQuality;
+        if (src.neeMISType)
+            render["neeMISType"] << *src.neeMISType;
+        if (src.environmentMapDiffuseSampleMIPLevel)
+            render["environmentMapDiffuseSampleMIPLevel"] << *src.environmentMapDiffuseSampleMIPLevel;
+        if (src.stablePlanesActiveCount)
+            render["stablePlanesActiveCount"] << *src.stablePlanesActiveCount;
+        if (src.allowPrimarySurfaceReplacement)
+            render["allowPrimarySurfaceReplacement"] << *src.allowPrimarySurfaceReplacement;
+        if (src.enableLDSamplerForBSDF)
+            render["enableLDSamplerForBSDF"] << *src.enableLDSamplerForBSDF;
+        if (src.gaussianSplatPrimaryMethod)
+            render["gaussianSplatPrimaryMethod"] << *src.gaussianSplatPrimaryMethod;
+        if (src.gaussianSplatShadowsMode)
+            render["gaussianSplatShadowsMode"] << *src.gaussianSplatShadowsMode;
+        if (src.gaussianSplatSortingMode)
+            render["gaussianSplatSortingMode"] << *src.gaussianSplatSortingMode;
+        if (src.gaussianSplatSHFormat)
+            render["gaussianSplatSHFormat"] << *src.gaussianSplatSHFormat;
+        if (src.gaussianSplatQuantizeNormals)
+            render["gaussianSplatQuantizeNormals"] << *src.gaussianSplatQuantizeNormals;
+        if (src.gaussianSplatMipAntialiasing)
+            render["gaussianSplatMipAntialiasing"] << *src.gaussianSplatMipAntialiasing;
+        if (src.gaussianSplatFrustumCulling)
+            render["gaussianSplatFrustumCulling"] << *src.gaussianSplatFrustumCulling;
+        if (src.gaussianSplatScreenSizeCulling)
+            render["gaussianSplatScreenSizeCulling"] << *src.gaussianSplatScreenSizeCulling;
+        if (src.gaussianSplatMinPixelCoverage)
+            render["gaussianSplatMinPixelCoverage"] << *src.gaussianSplatMinPixelCoverage;
+        settingsNode["renderSettings"] = std::move(render);
+    }
+    else
+        settingsNode.removeMember("renderSettings");
+
+    if (postProcess)
+    {
+        Json::Value post(Json::objectValue);
+        const PostProcessLook& src = *postProcess;
+        if (src.bloomEnabled)
+            post["bloomEnabled"] << *src.bloomEnabled;
+        if (src.bloomRadius)
+            post["bloomRadius"] << *src.bloomRadius;
+        if (src.bloomIntensity)
+            post["bloomIntensity"] << *src.bloomIntensity;
+        if (src.toneMappingEnabled)
+            post["toneMappingEnabled"] << *src.toneMappingEnabled;
+        if (src.toneMapOperator)
+            post["toneMapOperator"] << *src.toneMapOperator;
+        if (src.autoExposure)
+            post["autoExposure"] << *src.autoExposure;
+        if (src.exposureMode)
+            post["exposureMode"] << *src.exposureMode;
+        if (src.exposureCompensation)
+            post["exposureCompensation"] << *src.exposureCompensation;
+        if (src.exposureValue)
+            post["exposureValue"] << *src.exposureValue;
+        if (src.exposureValueMin)
+            post["exposureValueMin"] << *src.exposureValueMin;
+        if (src.exposureValueMax)
+            post["exposureValueMax"] << *src.exposureValueMax;
+        if (src.filmSpeed)
+            post["filmSpeed"] << *src.filmSpeed;
+        if (src.fNumber)
+            post["fNumber"] << *src.fNumber;
+        if (src.shutter)
+            post["shutter"] << *src.shutter;
+        if (src.whiteBalance)
+            post["whiteBalance"] << *src.whiteBalance;
+        if (src.whitePoint)
+            post["whitePoint"] << *src.whitePoint;
+        if (src.whiteMaxLuminance)
+            post["whiteMaxLuminance"] << *src.whiteMaxLuminance;
+        if (src.whiteScale)
+            post["whiteScale"] << *src.whiteScale;
+        if (src.whiteClamped)
+            post["whiteClamped"] << *src.whiteClamped;
+        if (src.cameraLutEnabled)
+            post["cameraLutEnabled"] << *src.cameraLutEnabled;
+        if (src.cameraLutAfterToneMap)
+            post["cameraLutAfterToneMap"] << *src.cameraLutAfterToneMap;
+        if (src.cameraLutPreset)
+            post["cameraLutPreset"] << *src.cameraLutPreset;
+        if (src.cameraLutPath)
+            post["cameraLutPath"] << *src.cameraLutPath;
+        if (src.edgeDetection)
+            post["edgeDetection"] << *src.edgeDetection;
+        if (src.edgeDetectionThreshold)
+            post["edgeDetectionThreshold"] << *src.edgeDetectionThreshold;
+        settingsNode["postProcess"] = std::move(post);
+    }
+    else
+        settingsNode.removeMember("postProcess");
 
     if (hiddenEntities.empty())
         settingsNode.removeMember("hiddenEntities");

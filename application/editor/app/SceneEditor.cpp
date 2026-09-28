@@ -1044,6 +1044,85 @@ SceneSettings BuildSceneLookSettings(
 {
     SceneSettings look;
 
+    // Render settings panel (mirrors the fields applySceneSettingsFromScene
+    // restores on load).
+    look.realtimeMode = cfg.RealtimeMode;
+    look.enableAnimations = cfg.EnableAnimations;
+    look.enableKeyframes = cfg.EnableKeyframes;
+    look.maxBounces = cfg.BounceCount;
+    look.maxDiffuseBounces = cfg.DiffuseBounceCount;
+    look.textureMIPBias = cfg.TexLODBias;
+    look.realtimeFireflyFilter = cfg.RealtimeFireflyFilterEnabled
+        ? std::optional<float>(cfg.RealtimeFireflyFilterThreshold)
+        : std::nullopt;
+
+    RenderSettingsLook render;
+    render.realtimeSamplesPerPixel = cfg.RealtimeSamplesPerPixel;
+    render.accumulationTarget = cfg.AccumulationTarget;
+    render.realtimeAA = cfg.RealtimeAA;
+    render.dlssMode = static_cast<int>(cfg.DLSSMode);
+    render.standaloneDenoiser = cfg.StandaloneDenoiser;
+    render.referenceOidnDenoiser = cfg.ReferenceOIDNDenoiser;
+    render.referenceOidnUseGpu = cfg.ReferenceOIDNUseGPU;
+    render.useNEE = cfg.UseNEE;
+    render.neeType = cfg.NEEType;
+    render.neeCandidateSamples = cfg.NEECandidateSamples;
+    render.neeFullSamples = cfg.NEEFullSamples;
+    render.useRestirDI = cfg.UseReSTIRDI;
+    render.useRestirGI = cfg.UseReSTIRGI;
+    render.useRestirPT = cfg.UseReSTIRPT;
+    render.restirPreset = static_cast<int>(cfg.RTXDIRestirPreset);
+    render.restirPTPreset = static_cast<int>(cfg.RTXDIRestirPTPreset);
+    render.realtimeFireflyEnabled = cfg.RealtimeFireflyFilterEnabled;
+    render.realtimeFireflyThreshold = cfg.RealtimeFireflyFilterThreshold;
+    render.referenceFireflyEnabled = cfg.ReferenceFireflyFilterEnabled;
+    render.referenceFireflyThreshold = cfg.ReferenceFireflyFilterThreshold;
+    render.nestedDielectricsQuality = cfg.NestedDielectricsQuality;
+    render.neeMISType = cfg.NEEMISType;
+    render.environmentMapDiffuseSampleMIPLevel = cfg.EnvironmentMapDiffuseSampleMIPLevel;
+    render.stablePlanesActiveCount = cfg.StablePlanesActiveCount;
+    render.allowPrimarySurfaceReplacement = cfg.AllowPrimarySurfaceReplacement;
+    render.enableLDSamplerForBSDF = cfg.EnableLDSamplerForBSDF;
+    render.gaussianSplatPrimaryMethod = cfg.GaussianSplatPrimaryMethod;
+    render.gaussianSplatShadowsMode = cfg.GaussianSplatShadowsMode;
+    render.gaussianSplatSortingMode = cfg.GaussianSplatSortingMode;
+    render.gaussianSplatSHFormat = cfg.GaussianSplatSHFormat;
+    render.gaussianSplatQuantizeNormals = cfg.GaussianSplatQuantizeNormals;
+    render.gaussianSplatMipAntialiasing = cfg.GaussianSplatMipAntialiasing;
+    render.gaussianSplatFrustumCulling = cfg.GaussianSplatFrustumCulling;
+    render.gaussianSplatScreenSizeCulling = cfg.GaussianSplatScreenSizeCulling;
+    render.gaussianSplatMinPixelCoverage = cfg.GaussianSplatMinPixelCoverage;
+    look.renderSettings = std::move(render);
+
+    // Post process panel.
+    PostProcessLook post;
+    post.bloomEnabled = cfg.EnableBloom;
+    post.bloomRadius = cfg.BloomRadius;
+    post.bloomIntensity = cfg.BloomIntensity;
+    post.toneMappingEnabled = cfg.EnableToneMapping;
+    post.toneMapOperator = static_cast<int>(cfg.ToneMappingParams.toneMapOperator);
+    post.autoExposure = cfg.ToneMappingParams.autoExposure;
+    post.exposureMode = static_cast<int>(cfg.ToneMappingParams.exposureMode);
+    post.exposureCompensation = cfg.ToneMappingParams.exposureCompensation;
+    post.exposureValue = cfg.ToneMappingParams.exposureValue;
+    post.exposureValueMin = cfg.ToneMappingParams.exposureValueMin;
+    post.exposureValueMax = cfg.ToneMappingParams.exposureValueMax;
+    post.filmSpeed = cfg.ToneMappingParams.filmSpeed;
+    post.fNumber = cfg.ToneMappingParams.fNumber;
+    post.shutter = cfg.ToneMappingParams.shutter;
+    post.whiteBalance = cfg.ToneMappingParams.whiteBalance;
+    post.whitePoint = cfg.ToneMappingParams.whitePoint;
+    post.whiteMaxLuminance = cfg.ToneMappingParams.whiteMaxLuminance;
+    post.whiteScale = cfg.ToneMappingParams.whiteScale;
+    post.whiteClamped = cfg.ToneMappingParams.clamped;
+    post.cameraLutEnabled = cfg.ToneMappingParams.cameraLutEnabled;
+    post.cameraLutAfterToneMap = cfg.ToneMappingParams.cameraLutAfterToneMap;
+    post.cameraLutPreset = static_cast<int>(cfg.ToneMappingParams.cameraLutPreset);
+    post.cameraLutPath = cfg.ToneMappingParams.cameraLutPath;
+    post.edgeDetection = cfg.PostProcessEdgeDetection;
+    post.edgeDetectionThreshold = cfg.PostProcessEdgeDetectionThreshold;
+    look.postProcess = std::move(post);
+
     EnvironmentLookSettings env;
     env.tintColor = cfg.EnvironmentMapParams.TintColor;
     env.intensity = cfg.EnvironmentMapParams.Intensity;
@@ -1061,6 +1140,9 @@ SceneSettings BuildSceneLookSettings(
     splat.applyToneMapping = cfg.GaussianSplatApplyToneMapping;
     splat.alphaCullThreshold = cfg.GaussianSplatAlphaCullThreshold;
     splat.shadowStrength = cfg.GaussianSplatShadowStrength;
+    splat.secondaryRays = cfg.GaussianSplatSecondaryRays;
+    splat.illuminateMeshes = cfg.GaussianSplatIlluminateMeshes;
+    splat.radianceAlphaClamp = cfg.GaussianSplatRadianceAlphaClamp;
     look.gaussianSplat = std::move(splat);
 
     auto addHidden = [&](ecs::Entity entity, bool enabled)

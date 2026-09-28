@@ -61,6 +61,82 @@ namespace caustica
         std::optional<bool> applyToneMapping;
         std::optional<float> alphaCullThreshold;
         std::optional<float> shadowStrength;
+        std::optional<bool> secondaryRays;
+        std::optional<bool> illuminateMeshes;
+        std::optional<float> radianceAlphaClamp;
+    };
+
+    // RenderSettings panel fields beyond the SceneSettings top-level scalars.
+    // Each field is optional so load applies only keys that were authored.
+    struct RenderSettingsLook
+    {
+        std::optional<int>  realtimeSamplesPerPixel;
+        std::optional<int>  accumulationTarget;
+        std::optional<int>  realtimeAA;
+        std::optional<int>  dlssMode;
+        std::optional<bool> standaloneDenoiser;
+        std::optional<bool> referenceOidnDenoiser;
+        std::optional<bool> referenceOidnUseGpu;
+        std::optional<bool> useNEE;
+        std::optional<int>  neeType;
+        std::optional<int>  neeCandidateSamples;
+        std::optional<int>  neeFullSamples;
+        std::optional<bool> useRestirDI;
+        std::optional<bool> useRestirGI;
+        std::optional<bool> useRestirPT;
+        std::optional<int>  restirPreset;    // RTXDIRestirQualityPreset as int
+        std::optional<int>  restirPTPreset;  // RTXDIRestirPTQualityPreset as int
+        std::optional<bool> realtimeFireflyEnabled;
+        std::optional<float> realtimeFireflyThreshold;
+        std::optional<bool> referenceFireflyEnabled;
+        std::optional<float> referenceFireflyThreshold;
+        std::optional<int>  nestedDielectricsQuality;
+        // Quality-performance preset side effects (no direct UI control).
+        std::optional<int>  neeMISType;
+        std::optional<int>  environmentMapDiffuseSampleMIPLevel;
+        std::optional<int>  stablePlanesActiveCount;
+        std::optional<bool> allowPrimarySurfaceReplacement;
+        std::optional<bool> enableLDSamplerForBSDF;
+        // Advanced Gaussian Splats section.
+        std::optional<int>  gaussianSplatPrimaryMethod;
+        std::optional<int>  gaussianSplatShadowsMode;
+        std::optional<int>  gaussianSplatSortingMode;
+        std::optional<int>  gaussianSplatSHFormat;
+        std::optional<bool> gaussianSplatQuantizeNormals;
+        std::optional<bool> gaussianSplatMipAntialiasing;
+        std::optional<int>  gaussianSplatFrustumCulling;
+        std::optional<bool> gaussianSplatScreenSizeCulling;
+        std::optional<float> gaussianSplatMinPixelCoverage;
+    };
+
+    // Post Process panel fields (bloom / tone mapping / late LDR).
+    struct PostProcessLook
+    {
+        std::optional<bool>  bloomEnabled;
+        std::optional<float> bloomRadius;
+        std::optional<float> bloomIntensity;
+        std::optional<bool>  toneMappingEnabled;
+        std::optional<int>   toneMapOperator;   // ToneMapperOperator as int
+        std::optional<bool>  autoExposure;
+        std::optional<int>   exposureMode;      // ExposureMode as int
+        std::optional<float> exposureCompensation;
+        std::optional<float> exposureValue;
+        std::optional<float> exposureValueMin;
+        std::optional<float> exposureValueMax;
+        std::optional<float> filmSpeed;
+        std::optional<float> fNumber;
+        std::optional<float> shutter;
+        std::optional<bool>  whiteBalance;
+        std::optional<float> whitePoint;
+        std::optional<float> whiteMaxLuminance;
+        std::optional<float> whiteScale;
+        std::optional<bool>  whiteClamped;
+        std::optional<bool>  cameraLutEnabled;
+        std::optional<bool>  cameraLutAfterToneMap;
+        std::optional<int>   cameraLutPreset;   // CameraLutPreset as int
+        std::optional<std::string> cameraLutPath;
+        std::optional<bool>  edgeDetection;
+        std::optional<float> edgeDetectionThreshold;
     };
 
     struct SceneSettings
@@ -77,6 +153,8 @@ namespace caustica
         std::optional<float> textureMIPBias;
         std::optional<EnvironmentLookSettings> environment;
         std::optional<GaussianSplatLookSettings> gaussianSplat;
+        std::optional<RenderSettingsLook> renderSettings;
+        std::optional<PostProcessLook> postProcess;
         // Paths of currently hidden mesh / splat / light entities. Absent or empty
         // means "do not change visibility" — never hide the rest of the scene.
         std::vector<std::string> hiddenEntities;

@@ -74,6 +74,12 @@ void applySceneLookAfterLightingReset(
             settings.GaussianSplatAlphaCullThreshold = *splat.alphaCullThreshold;
         if (splat.shadowStrength)
             settings.GaussianSplatShadowStrength = *splat.shadowStrength;
+        if (splat.secondaryRays)
+            settings.GaussianSplatSecondaryRays = *splat.secondaryRays;
+        if (splat.illuminateMeshes)
+            settings.GaussianSplatIlluminateMeshes = *splat.illuminateMeshes;
+        if (splat.radianceAlphaClamp)
+            settings.GaussianSplatRadianceAlphaClamp = *splat.radianceAlphaClamp;
     }
 }
 

@@ -276,6 +276,98 @@ int main()
     }
 
     {
+        caustica::SceneSettings settings;
+        settings.load(parse(R"({
+            "renderSettings": {
+                "useNEE": false,
+                "realtimeAA": 2,
+                "realtimeFireflyEnabled": true,
+                "realtimeFireflyThreshold": 0.25,
+                "gaussianSplatShadowsMode": 2
+            },
+            "postProcess": {
+                "bloomEnabled": false,
+                "toneMapOperator": 3,
+                "exposureCompensation": 1.5,
+                "edgeDetection": true
+            },
+            "gaussianSplat": {
+                "secondaryRays": true,
+                "illuminateMeshes": true,
+                "radianceAlphaClamp": 0.5
+            }
+        })"));
+        passed &= expect(
+            settings.renderSettings && settings.renderSettings->useNEE
+                && !*settings.renderSettings->useNEE,
+            "renderSettings.useNEE not loaded");
+        passed &= expect(
+            settings.renderSettings && settings.renderSettings->realtimeAA
+                && *settings.renderSettings->realtimeAA == 2,
+            "renderSettings.realtimeAA not loaded");
+        passed &= expect(
+            settings.renderSettings && settings.renderSettings->realtimeFireflyThreshold
+                && std::abs(*settings.renderSettings->realtimeFireflyThreshold - 0.25f) < 1e-5f,
+            "renderSettings.realtimeFireflyThreshold not loaded");
+        passed &= expect(
+            settings.renderSettings && settings.renderSettings->gaussianSplatShadowsMode
+                && *settings.renderSettings->gaussianSplatShadowsMode == 2,
+            "renderSettings.gaussianSplatShadowsMode not loaded");
+        passed &= expect(
+            settings.postProcess && settings.postProcess->bloomEnabled
+                && !*settings.postProcess->bloomEnabled,
+            "postProcess.bloomEnabled not loaded");
+        passed &= expect(
+            settings.postProcess && settings.postProcess->exposureCompensation
+                && std::abs(*settings.postProcess->exposureCompensation - 1.5f) < 1e-5f,
+            "postProcess.exposureCompensation not loaded");
+        passed &= expect(
+            settings.postProcess && settings.postProcess->toneMapOperator
+                && *settings.postProcess->toneMapOperator == 3,
+            "postProcess.toneMapOperator not loaded");
+        passed &= expect(
+            settings.postProcess && settings.postProcess->edgeDetection
+                && *settings.postProcess->edgeDetection,
+            "postProcess.edgeDetection not loaded");
+        passed &= expect(
+            settings.gaussianSplat && settings.gaussianSplat->secondaryRays
+                && *settings.gaussianSplat->secondaryRays,
+            "gaussianSplat.secondaryRays not loaded");
+        passed &= expect(
+            settings.gaussianSplat && settings.gaussianSplat->illuminateMeshes
+                && *settings.gaussianSplat->illuminateMeshes,
+            "gaussianSplat.illuminateMeshes not loaded");
+        passed &= expect(
+            settings.gaussianSplat && settings.gaussianSplat->radianceAlphaClamp
+                && std::abs(*settings.gaussianSplat->radianceAlphaClamp - 0.5f) < 1e-5f,
+            "gaussianSplat.radianceAlphaClamp not loaded");
+
+        Json::Value node(Json::objectValue);
+        settings.writeLook(node);
+        passed &= expect(
+            node["renderSettings"]["useNEE"].isBool() && !node["renderSettings"]["useNEE"].asBool(),
+            "writeLook dropped renderSettings.useNEE");
+        passed &= expect(
+            std::abs(node["postProcess"]["exposureCompensation"].asFloat() - 1.5f) < 1e-5f,
+            "writeLook dropped postProcess.exposureCompensation");
+        passed &= expect(
+            node["gaussianSplat"]["secondaryRays"].asBool(),
+            "writeLook dropped gaussianSplat.secondaryRays");
+    }
+
+    {
+        // Missing groups must not be invented by load or writeLook.
+        caustica::SceneSettings settings;
+        settings.load(parse(R"({ "realtimeMode": true })"));
+        passed &= expect(!settings.renderSettings.has_value(), "missing renderSettings key invented");
+        passed &= expect(!settings.postProcess.has_value(), "missing postProcess key invented");
+        Json::Value node(Json::objectValue);
+        settings.writeLook(node);
+        passed &= expect(!node.isMember("renderSettings"), "writeLook invented renderSettings");
+        passed &= expect(!node.isMember("postProcess"), "writeLook invented postProcess");
+    }
+
+    {
         caustica::scene::SceneEntityWorld world;
         const caustica::ecs::Entity root = world.createEntity("Root");
         const caustica::ecs::Entity sun = world.createEntity("Sun", root);
@@ -292,6 +384,12 @@ int main()
         pers.verticalFov = 0.9f;
         pers.zNear = 0.05f;
         pers.zFar = 500.f;
+        pers.enableAutoExposure = false;
+        pers.toneMapOperator = "AgX";
+        pers.exposureCompensation = 1.25f;
+        pers.exposureValue = -0.5f;
+        pers.exposureValueMin = -8.f;
+        pers.exposureValueMax = 8.f;
         camera.data = pers;
         const caustica::ecs::Entity cam = world.createEntity("Camera", root);
         world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
@@ -315,6 +413,19 @@ int main()
         passed &= expect(
             std::abs(entities[1]["components"]["PerspectiveCameraEx"]["zNear"].asFloat() - 0.05f) < 1e-5f,
             "save patch did not write PerspectiveCameraEx.zNear");
+        passed &= expect(
+            entities[1]["components"]["PerspectiveCameraEx"]["enableAutoExposure"].isBool()
+                && !entities[1]["components"]["PerspectiveCameraEx"]["enableAutoExposure"].asBool(),
+            "save patch did not write camera enableAutoExposure (engaged false)");
+        passed &= expect(
+            entities[1]["components"]["PerspectiveCameraEx"]["toneMapOperator"].asString() == "AgX",
+            "save patch did not write camera toneMapOperator");
+        passed &= expect(
+            std::abs(entities[1]["components"]["PerspectiveCameraEx"]["exposureCompensation"].asFloat() - 1.25f) < 1e-5f,
+            "save patch did not write camera exposureCompensation");
+        passed &= expect(
+            std::abs(entities[1]["components"]["PerspectiveCameraEx"]["exposureValue"].asFloat() + 0.5f) < 1e-5f,
+            "save patch did not write camera exposureValue");
     }
 
     {

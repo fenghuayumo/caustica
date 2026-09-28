@@ -361,6 +361,211 @@ void applySceneSettingsFromScene(App& app, ::SceneManager& manager)
         cfg->BounceCount = sceneSettings->maxBounces.value_or(cfg->BounceCount);
         cfg->DiffuseBounceCount = sceneSettings->maxDiffuseBounces.value_or(cfg->DiffuseBounceCount);
         cfg->TexLODBias = sceneSettings->textureMIPBias.value_or(cfg->TexLODBias);
+
+        if (const RenderSettingsLook* render =
+            sceneSettings->renderSettings ? &*sceneSettings->renderSettings : nullptr)
+        {
+            // ReSTIR presets configure many internal RTXDI.* resampling
+            // parameters that are not serialized individually. Rebuild the
+            // preset baseline first, then let the saved explicit fields
+            // (which capture any hand tuning) override it.
+            if (render->restirPreset)
+            {
+                const auto preset = static_cast<RTXDIRestirQualityPreset>(
+                    math::clamp(*render->restirPreset,
+                        static_cast<int>(RTXDIRestirQualityPreset::Custom),
+                        static_cast<int>(RTXDIRestirQualityPreset::Reference)));
+                cfg->RTXDIRestirPreset = preset;
+                cfg->applyRTXDIRestirPreset();
+            }
+            if (render->restirPTPreset)
+            {
+                const auto preset = static_cast<RTXDIRestirPTQualityPreset>(
+                    math::clamp(*render->restirPTPreset,
+                        static_cast<int>(RTXDIRestirPTQualityPreset::Custom),
+                        static_cast<int>(RTXDIRestirPTQualityPreset::Ultra)));
+                cfg->RTXDIRestirPTPreset = preset;
+                cfg->applyRTXDIRestirPTPreset();
+            }
+            if (render->realtimeSamplesPerPixel)
+                cfg->RealtimeSamplesPerPixel = *render->realtimeSamplesPerPixel;
+            if (render->accumulationTarget)
+                cfg->AccumulationTarget = *render->accumulationTarget;
+            if (render->realtimeAA)
+                cfg->RealtimeAA = math::clamp(*render->realtimeAA, 0, 3);
+            if (render->dlssMode)
+            {
+                cfg->DLSSMode = static_cast<SI::DLSSMode>(math::clamp(
+                    *render->dlssMode, 0,
+                    static_cast<int>(SI::DLSSMode::eCount) - 1));
+            }
+            if (render->standaloneDenoiser)
+                cfg->StandaloneDenoiser = *render->standaloneDenoiser;
+            if (render->referenceOidnDenoiser)
+                cfg->ReferenceOIDNDenoiser = *render->referenceOidnDenoiser;
+            if (render->referenceOidnUseGpu)
+                cfg->ReferenceOIDNUseGPU = *render->referenceOidnUseGpu;
+            if (render->useNEE)
+                cfg->UseNEE = *render->useNEE;
+            if (render->neeType)
+                cfg->NEEType = math::clamp(*render->neeType, 0, 2);
+            if (render->neeCandidateSamples)
+                cfg->NEECandidateSamples = math::clamp(*render->neeCandidateSamples, 1, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
+            if (render->neeFullSamples)
+                cfg->NEEFullSamples = math::clamp(*render->neeFullSamples, 0, CAUSTICA_LIGHTING_MAX_SAMPLE_COUNT);
+            if (render->useRestirDI)
+                cfg->UseReSTIRDI = *render->useRestirDI;
+            if (render->useRestirGI)
+                cfg->UseReSTIRGI = *render->useRestirGI;
+            if (render->useRestirPT)
+                cfg->UseReSTIRPT = *render->useRestirPT;
+            if (render->realtimeFireflyEnabled)
+                cfg->RealtimeFireflyFilterEnabled = *render->realtimeFireflyEnabled;
+            if (render->realtimeFireflyThreshold)
+                cfg->RealtimeFireflyFilterThreshold = *render->realtimeFireflyThreshold;
+            if (render->referenceFireflyEnabled)
+                cfg->ReferenceFireflyFilterEnabled = *render->referenceFireflyEnabled;
+            if (render->referenceFireflyThreshold)
+                cfg->ReferenceFireflyFilterThreshold = *render->referenceFireflyThreshold;
+            if (render->nestedDielectricsQuality)
+                cfg->NestedDielectricsQuality = math::clamp(*render->nestedDielectricsQuality, 0, 2);
+            if (render->neeMISType)
+                cfg->NEEMISType = *render->neeMISType;
+            if (render->environmentMapDiffuseSampleMIPLevel)
+                cfg->EnvironmentMapDiffuseSampleMIPLevel = *render->environmentMapDiffuseSampleMIPLevel;
+            if (render->stablePlanesActiveCount)
+                cfg->StablePlanesActiveCount = *render->stablePlanesActiveCount;
+            if (render->allowPrimarySurfaceReplacement)
+                cfg->AllowPrimarySurfaceReplacement = *render->allowPrimarySurfaceReplacement;
+            if (render->enableLDSamplerForBSDF)
+                cfg->EnableLDSamplerForBSDF = *render->enableLDSamplerForBSDF;
+            if (render->gaussianSplatPrimaryMethod)
+                cfg->GaussianSplatPrimaryMethod = math::clamp(*render->gaussianSplatPrimaryMethod, 0, 1);
+            if (render->gaussianSplatShadowsMode)
+            {
+                const int shadowMode = math::clamp(*render->gaussianSplatShadowsMode, 0, 2);
+                cfg->GaussianSplatShadowsMode = shadowMode;
+                cfg->GaussianSplatShadows = shadowMode != 0; // 0 = off
+            }
+            if (render->gaussianSplatSortingMode)
+                cfg->GaussianSplatSortingMode = math::clamp(*render->gaussianSplatSortingMode, 0, 1);
+            if (render->gaussianSplatSHFormat)
+                cfg->GaussianSplatSHFormat = math::clamp(*render->gaussianSplatSHFormat, 0, 2);
+            if (render->gaussianSplatQuantizeNormals)
+                cfg->GaussianSplatQuantizeNormals = *render->gaussianSplatQuantizeNormals;
+            if (render->gaussianSplatMipAntialiasing)
+                cfg->GaussianSplatMipAntialiasing = *render->gaussianSplatMipAntialiasing;
+            if (render->gaussianSplatFrustumCulling)
+                cfg->GaussianSplatFrustumCulling = math::clamp(*render->gaussianSplatFrustumCulling, 0, 2);
+            if (render->gaussianSplatScreenSizeCulling)
+                cfg->GaussianSplatScreenSizeCulling = *render->gaussianSplatScreenSizeCulling;
+            if (render->gaussianSplatMinPixelCoverage)
+                cfg->GaussianSplatMinPixelCoverage = *render->gaussianSplatMinPixelCoverage;
+        }
+
+        if (const PostProcessLook* post =
+            sceneSettings->postProcess ? &*sceneSettings->postProcess : nullptr)
+        {
+            if (post->bloomEnabled)
+                cfg->EnableBloom = *post->bloomEnabled;
+            if (post->bloomRadius)
+                cfg->BloomRadius = *post->bloomRadius;
+            if (post->bloomIntensity)
+                cfg->BloomIntensity = *post->bloomIntensity;
+            if (post->toneMappingEnabled)
+                cfg->EnableToneMapping = *post->toneMappingEnabled;
+            if (post->toneMapOperator)
+                cfg->ToneMappingParams.toneMapOperator =
+                    static_cast<ToneMapperOperator>(math::clamp(
+                        *post->toneMapOperator,
+                        static_cast<int>(ToneMapperOperator::Linear),
+                        static_cast<int>(ToneMapperOperator::CameraLut)));
+            if (post->autoExposure)
+                cfg->ToneMappingParams.autoExposure = *post->autoExposure;
+            if (post->exposureMode)
+                cfg->ToneMappingParams.exposureMode =
+                    static_cast<ExposureMode>(math::clamp(
+                        *post->exposureMode,
+                        static_cast<int>(ExposureMode::AperturePriority),
+                        static_cast<int>(ExposureMode::ShutterPriority)));
+            if (post->exposureCompensation)
+                cfg->ToneMappingParams.exposureCompensation = *post->exposureCompensation;
+            if (post->exposureValue)
+                cfg->ToneMappingParams.exposureValue = *post->exposureValue;
+            if (post->exposureValueMin)
+                cfg->ToneMappingParams.exposureValueMin = *post->exposureValueMin;
+            if (post->exposureValueMax)
+                cfg->ToneMappingParams.exposureValueMax = *post->exposureValueMax;
+            if (post->filmSpeed)
+                cfg->ToneMappingParams.filmSpeed = *post->filmSpeed;
+            if (post->fNumber)
+                cfg->ToneMappingParams.fNumber = *post->fNumber;
+            if (post->shutter)
+                cfg->ToneMappingParams.shutter = *post->shutter;
+            if (post->whiteBalance)
+                cfg->ToneMappingParams.whiteBalance = *post->whiteBalance;
+            if (post->whitePoint)
+                cfg->ToneMappingParams.whitePoint = *post->whitePoint;
+            if (post->whiteMaxLuminance)
+                cfg->ToneMappingParams.whiteMaxLuminance = *post->whiteMaxLuminance;
+            if (post->whiteScale)
+                cfg->ToneMappingParams.whiteScale = *post->whiteScale;
+            if (post->whiteClamped)
+                cfg->ToneMappingParams.clamped = *post->whiteClamped;
+            if (post->cameraLutEnabled)
+                cfg->ToneMappingParams.cameraLutEnabled = *post->cameraLutEnabled;
+            if (post->cameraLutAfterToneMap)
+                cfg->ToneMappingParams.cameraLutAfterToneMap = *post->cameraLutAfterToneMap;
+            if (post->cameraLutPath && !post->cameraLutPath->empty())
+            {
+                std::string lutError;
+                if (!cfg->ToneMappingParams.loadCameraLut(*post->cameraLutPath, &lutError))
+                    caustica::warning("Scene postProcess.cameraLutPath failed to load '%s': %s",
+                        post->cameraLutPath->c_str(), lutError.c_str());
+            }
+            else if (post->cameraLutPreset)
+            {
+                const auto preset = static_cast<CameraLutPreset>(math::clamp(
+                    *post->cameraLutPreset,
+                    static_cast<int>(CameraLutPreset::None),
+                    static_cast<int>(CameraLutPreset::CustomFile)));
+                if (preset != CameraLutPreset::None && preset != CameraLutPreset::CustomFile)
+                    cfg->ToneMappingParams.applyCameraLutPreset(preset);
+            }
+            if (post->edgeDetection)
+                cfg->PostProcessEdgeDetection = *post->edgeDetection;
+            if (post->edgeDetectionThreshold)
+                cfg->PostProcessEdgeDetectionThreshold = *post->edgeDetectionThreshold;
+        }
+
+        // Apply the 3DGS look on the logic thread too: GaussianSplatSecondaryRays
+        // selects AABB vs triangle-proxies, so the BLAS must be built from the
+        // saved values. The render thread re-applies after its lighting reset
+        // (idempotent) where EnvironmentMapParams are restored.
+        if (const GaussianSplatLookSettings* splatLook =
+            sceneSettings->gaussianSplat ? &*sceneSettings->gaussianSplat : nullptr)
+        {
+            if (splatLook->footprintScale)
+                cfg->GaussianSplatScale = *splatLook->footprintScale;
+            if (splatLook->alphaScale)
+                cfg->GaussianSplatAlphaScale = *splatLook->alphaScale;
+            if (splatLook->brightness)
+                cfg->GaussianSplatBrightness = *splatLook->brightness;
+            if (splatLook->tintColor)
+                cfg->GaussianSplatTintColor = *splatLook->tintColor;
+            if (splatLook->applyToneMapping)
+                cfg->GaussianSplatApplyToneMapping = *splatLook->applyToneMapping;
+            if (splatLook->alphaCullThreshold)
+                cfg->GaussianSplatAlphaCullThreshold = *splatLook->alphaCullThreshold;
+            if (splatLook->shadowStrength)
+                cfg->GaussianSplatShadowStrength = *splatLook->shadowStrength;
+            if (splatLook->secondaryRays)
+                cfg->GaussianSplatSecondaryRays = *splatLook->secondaryRays;
+            if (splatLook->illuminateMeshes)
+                cfg->GaussianSplatIlluminateMeshes = *splatLook->illuminateMeshes;
+            if (splatLook->radianceAlphaClamp)
+                cfg->GaussianSplatRadianceAlphaClamp = *splatLook->radianceAlphaClamp;
+        }
     }
 }
 
@@ -376,6 +581,9 @@ void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const Com
     cfg->EnableAnimations = false;
     cfg->EnableKeyframes = false;
     cfg->RealtimeMode = false;
+    // Defaults first so saved scene settings (applied below) win.
+    cfg->ToneMappingParams.exposureCompensation = 2.0f;
+    cfg->ToneMappingParams.exposureValue = 0.0f;
 
     applySceneSettingsFromScene(app, manager);
 
@@ -388,9 +596,6 @@ void applyLogicThreadSceneLoadSetup(App& app, ::SceneManager& manager, const Com
         cfg->RealtimeMode = true;
     if (cmd.OverrideToReferenceMode)
         cfg->RealtimeMode = false;
-
-    cfg->ToneMappingParams.exposureCompensation = 2.0f;
-    cfg->ToneMappingParams.exposureValue = 0.0f;
 
     // Logic-thread hierarchy snapshot before RT exclusive GPU upload.
     if (auto scene = manager.getScene())
