@@ -338,6 +338,8 @@ The pip build assembles a local binary wheel from `bin/`, including the native e
 | `CAUSTICA_WHEEL_SHADER_PACK` | `true` | `true`, `false` |
 
 By default, wheel builds **cook the coverage PT feature-preset matrix**, verify bins, and package them into `caustica.shaders.<api>.pack` (load-only runtime; no DXC beside the binary).
+The shader cook reuses unchanged compiled binaries. Before packing, the build removes ShaderMake objects absent from the current `manifest.bin` and PT binaries from earlier source revisions; runtime compute binaries are retained because they do not have a complete usage manifest. Packaging does not need to recompile unchanged shaders.
+Shader pack version 3 compresses each distinct binary once and shares it across entries with identical contents. Version 3 packs require a rebuilt executable or Python extension; the new runtime can still read older version 1 and 2 packs.
 
 You can also build a wheel explicitly:
 

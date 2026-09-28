@@ -6,11 +6,13 @@ Also provides write_shader_pack() for cook_shaders.py / package_shaders.py.
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import struct
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 from typing import Iterable
 
@@ -22,7 +24,7 @@ DIST_DIR = ROOT / "dist"
 PROJECT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 SHADER_PACK_MAGIC = b"CAUSSHD1"
-SHADER_PACK_VERSION = 1
+SHADER_PACK_VERSION = 3
 FNV_OFFSET = 14695981039346656037
 FNV_PRIME = 1099511628211
 PACK_SEED0 = 0x243F6A8885A308D3
@@ -125,10 +127,89 @@ def encode_payload(data: bytes, key: tuple[int, int]) -> bytes:
     return bytes(encoded)
 
 
+def prune_stale_shader_objects(shader_type: str) -> tuple[int, int]:
+    """Remove old ShaderMake objects no longer referenced by manifest.bin.
+
+    ShaderMake objects are named by the SHA-256 of their contents. PT and compute
+    cache objects are named by command hashes, so they are deliberately left alone.
+    """
+    root = BIN_DIR / "ShaderBin" / shader_type
+    manifest_path = root / "manifest.bin"
+    manifest = manifest_path.read_bytes()
+    if len(manifest) < 12 or manifest[:8] != b"CAUSSMF1":
+        raise ValueError(f"Invalid shader manifest: {manifest_path}")
+    count = struct.unpack_from("<I", manifest, 8)[0]
+    if len(manifest) != 12 + count * 64:
+        raise ValueError(f"Truncated shader manifest: {manifest_path}")
+    active = {
+        manifest[12 + index * 64 + 32 : 12 + (index + 1) * 64].hex()
+        for index in range(count)
+    }
+    missing = [digest for digest in active if not (root / digest[:2] / f"{digest[2:]}.bin").is_file()]
+    if missing:
+        raise FileNotFoundError(f"{len(missing)} current shader objects are missing under {root}")
+
+    removed = removed_bytes = 0
+    for path in root.glob("*/*.bin"):
+        digest = path.parent.name + path.stem
+        if len(digest) != 64 or digest in active:
+            continue
+        if hashlib.sha256(path.read_bytes()).hexdigest() == digest:
+            removed_bytes += path.stat().st_size
+            path.unlink()
+            removed += 1
+    if removed:
+        print(f"[caustica] pruned {removed} unreferenced ShaderMake objects ({removed_bytes} bytes) from {root}")
+    return removed, removed_bytes
+
+
+def prune_stale_pt_shaders(shader_type: str) -> tuple[int, int]:
+    """Drop PT cache entries from prior source revisions and their old blobs."""
+    manifest_path = BIN_DIR / "ShaderBin" / shader_type / "deps.manifest"
+    if not manifest_path.is_file():
+        return 0, 0
+    lines = manifest_path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] != "CAUSDEP1":
+        raise ValueError(f"Invalid PT dependency manifest: {manifest_path}")
+
+    from precompile_pt_shader_bins import build_hash_command, build_jobs, hash_hex
+
+    api = "d3d12" if shader_type == "dxil" else "vulkan"
+    debug_modes = (False, True) if api == "d3d12" else (False,)
+    jobs = build_jobs("coverage")
+    current = {
+        hash_hex(build_hash_command(job["logical"], job["macros"], api=api, debug_info=debug))
+        for job in jobs for debug in debug_modes
+    }
+    retained = [lines[0]]
+    removed = removed_bytes = 0
+    for line in lines[1:]:
+        parts = line.split(" ", 3)
+        if len(parts) == 4 and parts[0] == "B" and parts[1] not in current:
+            digest = parts[1]
+            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise ValueError(f"Invalid PT shader hash in {manifest_path}: {digest}")
+            path = manifest_path.parent / digest[:2] / f"{digest[2:]}.bin"
+            if path.is_file():
+                removed_bytes += path.stat().st_size
+                path.unlink()
+                removed += 1
+            continue
+        retained.append(line)
+    if len(retained) != len(lines):
+        staging = manifest_path.with_name(manifest_path.name + ".tmp")
+        staging.write_text("\n".join(retained) + "\n", encoding="utf-8")
+        os.replace(staging, manifest_path)
+        print(f"[caustica] pruned {removed} obsolete PT bins ({removed_bytes} bytes) from {manifest_path.parent}")
+    return removed, removed_bytes
+
+
 def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) -> Path:
     source_root = BIN_DIR / "ShaderBin" / shader_type
     if not source_root.is_dir():
         raise FileNotFoundError(f"{source_root} does not exist. Build ShaderBinManifest first.")
+    prune_stale_shader_objects(shader_type)
+    prune_stale_pt_shaders(shader_type)
 
     files: list[tuple[str, Path]] = []
     for path in source_root.rglob("*"):
@@ -148,28 +229,68 @@ def write_shader_pack(shader_type: str, dynamic_shaders: str, output_dir: Path) 
     output_dir.mkdir(parents=True, exist_ok=True)
     pack_path = output_dir / f"caustica.shaders.{shader_type}.pack"
 
-    encoded_entries: list[tuple[int, int, bytes]] = []
+    encoded_entries: list[tuple[int, int, int, int, bytes]] = []
+    unique_blobs: dict[bytes, bytes] = {}
     for logical, path in files:
         key = pack_key(logical)
-        encoded_entries.append((key[0], key[1], encode_payload(path.read_bytes(), key)))
+        shader = path.read_bytes()
+        digest = hashlib.sha256(shader).digest()
+        content_key = struct.unpack_from("<QQ", digest)
+        if digest not in unique_blobs:
+            compressed = struct.pack("<Q", len(shader)) + zlib.compress(shader, level=6)
+            unique_blobs[digest] = encode_payload(compressed, content_key)
+        encoded_entries.append((key[0], key[1], content_key[0], content_key[1], digest))
 
     header_size = 16
-    table_size = 32 * len(encoded_entries)
+    table_size = 48 * len(encoded_entries)
     cursor = header_size + table_size
     table = bytearray()
     payload = bytearray()
-    for hash0, hash1, blob in encoded_entries:
-        table.extend(struct.pack("<QQQQ", hash0, hash1, cursor, len(blob)))
-        payload.extend(blob)
-        cursor += len(blob)
+    offsets: dict[bytes, int] = {}
+    for hash0, hash1, content0, content1, digest in encoded_entries:
+        blob = unique_blobs[digest]
+        if digest not in offsets:
+            offsets[digest] = cursor
+            payload.extend(blob)
+            cursor += len(blob)
+        table.extend(struct.pack("<QQQQQQ", hash0, hash1, content0, content1, offsets[digest], len(blob)))
 
-    pack_path.write_bytes(
+    staging = pack_path.with_name(pack_path.name + f".tmp{os.getpid()}")
+    staging.write_bytes(
         SHADER_PACK_MAGIC
         + struct.pack("<II", SHADER_PACK_VERSION, len(encoded_entries))
         + table
         + payload
     )
-    print(f"[caustica] wrote {pack_path} ({len(encoded_entries)} entries, {pack_path.stat().st_size} bytes)")
+    os.replace(staging, pack_path)
+    print(f"[caustica] wrote {pack_path} ({len(encoded_entries)} entries, {len(unique_blobs)} unique blobs, {pack_path.stat().st_size} bytes)")
+    return pack_path
+
+
+def ensure_shader_pack(shader_type: str, output_dir: Path) -> Path:
+    """Rebuild a distribution pack when any included loose shader has changed."""
+    source_root = BIN_DIR / "ShaderBin" / shader_type
+    if not source_root.is_dir():
+        raise FileNotFoundError(f"{source_root} does not exist. Build ShaderBinManifest first.")
+    manifest = source_root / "manifest.bin"
+    if not manifest.is_file():
+        raise FileNotFoundError(f"{manifest} does not exist. Build ShaderBinManifest first.")
+
+    removed_static, _ = prune_stale_shader_objects(shader_type)
+    removed_pt, _ = prune_stale_pt_shaders(shader_type)
+
+    pack_path = output_dir / f"caustica.shaders.{shader_type}.pack"
+    pack_time = -1
+    if pack_path.is_file() and not (removed_static or removed_pt):
+        with pack_path.open("rb") as handle:
+            header = handle.read(12)
+        if header == SHADER_PACK_MAGIC + struct.pack("<I", SHADER_PACK_VERSION):
+            pack_time = pack_path.stat().st_mtime_ns
+    for path in source_root.rglob("*"):
+        if path.is_file() and path.suffix.lower() not in {".pdb", ".ildb"}:
+            if path.stat().st_mtime_ns > pack_time:
+                print(f"[caustica] shader pack is older than {path}; rebuilding")
+                return write_shader_pack(shader_type, "bin", output_dir)
     return pack_path
 
 
@@ -282,9 +403,7 @@ def copy_runtime_files(
     types = shader_types_for_api(shader_api)
     if shader_pack:
         for shader_type in types:
-            pack_src = BIN_DIR / f"caustica.shaders.{shader_type}.pack"
-            if not pack_src.is_file():
-                pack_src = write_shader_pack(shader_type, "bin", BIN_DIR)
+            pack_src = ensure_shader_pack(shader_type, BIN_DIR)
             _copy_file(pack_src, package_dir / pack_src.name)
 
     if dynamic_shaders != "none":

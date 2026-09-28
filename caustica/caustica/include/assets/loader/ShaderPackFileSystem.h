@@ -61,6 +61,7 @@ private:
     {
         uint64_t offset = 0;
         uint64_t size = 0;
+        PackKey contentKey;
     };
 
     static PackKey hashPath(const std::string& logicalPath);
@@ -72,6 +73,7 @@ private:
     std::filesystem::path m_packPath;
     std::filesystem::path m_virtualRoot;
     FILE* m_packFile = nullptr;
+    uint32_t m_packVersion = 0;
     std::mutex m_mutex;
     std::unordered_map<PackKey, FileEntry, PackKeyHash> m_entries;
 };

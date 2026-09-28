@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstring>
 #include <limits>
+#include <stb_image.h>
 #include <vector>
 
 #ifdef WIN32
@@ -16,7 +17,7 @@
 namespace
 {
     constexpr std::array<char, 8> c_ShaderPackMagic = { 'C', 'A', 'U', 'S', 'S', 'H', 'D', '1' };
-    constexpr uint32_t c_ShaderPackVersion = 1;
+    constexpr uint32_t c_ShaderPackVersion = 3;
 
 #pragma pack(push, 1)
     struct ShaderPackHeader
@@ -30,6 +31,16 @@ namespace
     {
         uint64_t hash0;
         uint64_t hash1;
+        uint64_t offset;
+        uint64_t size;
+    };
+
+    struct ShaderPackEntryV3
+    {
+        uint64_t hash0;
+        uint64_t hash1;
+        uint64_t contentHash0;
+        uint64_t contentHash1;
         uint64_t offset;
         uint64_t size;
     };
@@ -85,29 +96,48 @@ ShaderPackFileSystem::ShaderPackFileSystem(
     }
 
     if (std::memcmp(header.magic, c_ShaderPackMagic.data(), c_ShaderPackMagic.size()) != 0 ||
-        header.version != c_ShaderPackVersion)
+        (header.version != 1 && header.version != 2 && header.version != c_ShaderPackVersion))
     {
         caustica::warning("Shader pack '%s' has an unsupported format", m_packPath.string().c_str());
         fclose(m_packFile);
         m_packFile = nullptr;
         return;
     }
+    m_packVersion = header.version;
 
     m_entries.reserve(header.entryCount);
     for (uint32_t index = 0; index < header.entryCount; ++index)
     {
-        ShaderPackEntry diskEntry{};
-        if (fread(&diskEntry, sizeof(diskEntry), 1, m_packFile) != 1)
+        ShaderPackEntryV3 diskEntry{};
+        if (header.version == 3)
         {
-            caustica::warning("Shader pack '%s' has a truncated entry table", m_packPath.string().c_str());
-            fclose(m_packFile);
-            m_packFile = nullptr;
-            m_entries.clear();
-            return;
+            if (fread(&diskEntry, sizeof(diskEntry), 1, m_packFile) != 1)
+            {
+                caustica::warning("Shader pack '%s' has a truncated entry table", m_packPath.string().c_str());
+                fclose(m_packFile);
+                m_packFile = nullptr;
+                m_entries.clear();
+                return;
+            }
+        }
+        else
+        {
+            ShaderPackEntry oldEntry{};
+            if (fread(&oldEntry, sizeof(oldEntry), 1, m_packFile) != 1)
+            {
+                caustica::warning("Shader pack '%s' has a truncated entry table", m_packPath.string().c_str());
+                fclose(m_packFile);
+                m_packFile = nullptr;
+                m_entries.clear();
+                return;
+            }
+            diskEntry = { oldEntry.hash0, oldEntry.hash1, oldEntry.hash0, oldEntry.hash1,
+                oldEntry.offset, oldEntry.size };
         }
 
         PackKey key{ diskEntry.hash0, diskEntry.hash1 };
-        m_entries[key] = FileEntry{ diskEntry.offset, diskEntry.size };
+        m_entries[key] = FileEntry{ diskEntry.offset, diskEntry.size,
+            PackKey{ diskEntry.contentHash0, diskEntry.contentHash1 } };
     }
 
     caustica::info("Mounted shader pack '%s' at virtual root '%s' (%d entries)",
@@ -223,7 +253,35 @@ std::shared_ptr<caustica::IBlob> ShaderPackFileSystem::readFile(const std::files
         }
     }
 
-    decodePayload(encodedData.data(), encodedData.size(), key);
+    decodePayload(encodedData.data(), encodedData.size(), entryIt->second.contentKey);
+
+    if (m_packVersion >= 2)
+    {
+        if (encodedData.size() < sizeof(uint64_t))
+            return nullptr;
+        uint64_t decodedSize = 0;
+        std::memcpy(&decodedSize, encodedData.data(), sizeof(decodedSize));
+        if (decodedSize > uint64_t(std::numeric_limits<int>::max()) ||
+            encodedData.size() - sizeof(uint64_t) > size_t(std::numeric_limits<int>::max()))
+        {
+            caustica::warning("Compressed shader pack entry '%s' is too large", logicalPath.c_str());
+            return nullptr;
+        }
+        void* blobData = malloc(size_t(std::max<uint64_t>(decodedSize, 1)));
+        if (!blobData)
+            return nullptr;
+        const int decoded = stbi_zlib_decode_buffer(
+            static_cast<char*>(blobData), int(decodedSize),
+            reinterpret_cast<const char*>(encodedData.data() + sizeof(uint64_t)),
+            int(encodedData.size() - sizeof(uint64_t)));
+        if (decoded < 0 || uint64_t(decoded) != decodedSize)
+        {
+            free(blobData);
+            caustica::warning("Unable to decompress shader pack entry '%s'", logicalPath.c_str());
+            return nullptr;
+        }
+        return std::make_shared<caustica::Blob>(blobData, size_t(decodedSize));
+    }
 
     void* blobData = malloc(encodedData.size());
     if (!blobData)

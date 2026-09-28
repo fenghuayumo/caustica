@@ -18,8 +18,8 @@ from build_wheel import (
     _copy_tree,
     _runtime_libs_to_copy,
     directory_size,
+    ensure_shader_pack,
     shader_types_for_api,
-    write_shader_pack,
 )
 
 
@@ -127,9 +127,7 @@ def assemble_package(
 
     for shader_type in shader_types_for_api(shader_api):
         if shader_pack:
-            pack_src = BIN_DIR / f"caustica.shaders.{shader_type}.pack"
-            if not pack_src.is_file():
-                pack_src = write_shader_pack(shader_type, "bin", BIN_DIR)
+            pack_src = ensure_shader_pack(shader_type, BIN_DIR)
             _copy_file(pack_src, stage_dir / pack_src.name)
 
         if dynamic_shaders != "none":
