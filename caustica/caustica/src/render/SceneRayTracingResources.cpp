@@ -11,6 +11,7 @@
 #include <render/core/PathTracingShaderCompiler.h>
 #include <render/core/RtPipelineCache.h>
 #include <render/core/AccelStructManager.h>
+#include <render/core/GraphicsQueueFence.h>
 #include <render/passes/omm/OpacityMicromapBuilder.h>
 #include <scene/Scene.h>
 #include <scene/internal/RenderResourceAccess.h>
@@ -251,15 +252,23 @@ bool SceneRayTracingResources::recreateAccelStructs(
     if (!m_invalidation->AccelerationStructRebuildRequested)
         return true;
 
-    m_invalidation->AccelerationStructRebuildRequested = false;
-    m_invalidation->AccumulationResetRequested = true;
-
     assert(renderData && "recreateAccelStructs requires published SceneRenderData");
 
-    // Double-buffered rebuild: keep the previous TLAS/BLAS generation alive in
-    // AccelStructManager retired lists so in-flight DispatchRays can finish while
-    // this CL builds the new generation. No device-wide waitForIdle — previous
-    // frame GPU work overlaps with the AS build on the graphics queue.
+    // A second structure edit can arrive before the GPU has finished frames using
+    // the generation retired by the first edit. Fence the graphics queue before
+    // releasing those handles; the new generation can still build asynchronously.
+    caustica::rhi::Device* rhiDevice = m_gpuDevice ? m_gpuDevice->getDevice() : nullptr;
+    if (!rhiDevice || !rhiDevice->isDeviceHealthy())
+        return false;
+    if (m_accelStructs->hasRetiredAccelStructs())
+    {
+        caustica::rhi::EventQueryHandle retirementFence;
+        if (!syncGraphicsQueueFence(rhiDevice, retirementFence, false, "retire acceleration structures"))
+            return false;
+    }
+
+    m_invalidation->AccelerationStructRebuildRequested = false;
+    m_invalidation->AccumulationResetRequested = true;
     m_accelStructs->clearRetiredAccelStructs();
     m_sceneBindings->invalidate();
 
@@ -275,7 +284,6 @@ bool SceneRayTracingResources::recreateAccelStructs(
         return false;
     }
     commandList->close();
-    caustica::rhi::Device* rhiDevice = m_gpuDevice->getDevice();
     const uint64_t submission = rhiDevice->executeCommandList(commandList);
     if ((rhiDevice->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
         || !rhiDevice->isDeviceHealthy())

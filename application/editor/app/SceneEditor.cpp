@@ -515,6 +515,7 @@ void SceneEditor::onSceneUnloading()
     m_editorState.sceneDocument = Json::Value();
     m_editorState.sceneDocumentPath.clear();
     m_editorState.sceneDocumentValid = false;
+    m_editorState.saveAsRequired = false;
     m_editorState.loadedSceneName.clear();
 
     if (m_game != nullptr)
@@ -534,6 +535,11 @@ void SceneEditor::requestRedo()
 void SceneEditor::requestOpenSceneFromDialog()
 {
     m_pendingEditAction = PendingEditAction::OpenScene;
+}
+
+void SceneEditor::requestNewScene()
+{
+    m_pendingEditAction = PendingEditAction::NewScene;
 }
 
 void SceneEditor::requestSaveScene()
@@ -560,6 +566,11 @@ void SceneEditor::processPendingEditActions()
     if (action == PendingEditAction::OpenScene)
     {
         openSceneFromDialog();
+        return;
+    }
+    if (action == PendingEditAction::NewScene)
+    {
+        newScene();
         return;
     }
     if (action == PendingEditAction::SaveScene)
@@ -700,10 +711,18 @@ void SceneEditor::syncLoadedSceneSystems()
     m_editorState.sceneDocument = Json::Value();
     m_editorState.sceneDocumentValid = false;
     m_editorState.sceneDocumentPath.clear();
+    m_editorState.saveAsRequired = true;
 
     const std::filesystem::path scenePath = caustica::currentScenePath(*m_app);
-    if (scenePath.empty() || caustica::isInlineScenePath(scenePath))
+    if (scenePath.empty())
         return;
+
+    if (caustica::isInlineScenePath(scenePath))
+    {
+        if (caustica::json::fromString(loadedSceneName, m_editorState.sceneDocument))
+            m_editorState.sceneDocumentValid = true;
+        return;
+    }
 
     addRecentScene(scenePath);
 
@@ -713,6 +732,10 @@ void SceneEditor::syncLoadedSceneSystems()
         m_editorState.sceneDocument = std::move(document);
         m_editorState.sceneDocumentPath = scenePath;
         m_editorState.sceneDocumentValid = true;
+        // The bundled startup scene is a template. Ctrl+S should create a user
+        // file instead of silently overwriting the shipped example.
+        m_editorState.saveAsRequired = scenePath.filename() == "default.scene.json"
+            && scenePath.parent_path().filename() == "default";
     }
     else
     {
@@ -980,6 +1003,7 @@ bool SceneEditor::canSaveScene() const
     return m_app
         && caustica::isSceneLoaded(*m_app)
         && m_editorState.sceneDocumentValid
+        && !m_editorState.saveAsRequired
         && !m_editorState.sceneDocumentPath.empty()
         && !caustica::isInlineScenePath(m_editorState.sceneDocumentPath);
 }
@@ -1023,6 +1047,40 @@ bool SceneEditor::openSceneFromDialog()
     return true;
 }
 
+bool SceneEditor::newScene()
+{
+    if (!m_app || caustica::isSceneSwitchBusy(*m_app))
+        return false;
+
+    Json::Value document(Json::objectValue);
+    document["format"] = "caustica.scene";
+    document["version"] = 2;
+    document["name"] = "untitled";
+    document["entities"] = Json::Value(Json::arrayValue);
+
+    Json::Value sky(Json::objectValue);
+    sky["id"] = "Sky";
+    sky["name"] = "Sky";
+    sky["components"]["EnvironmentLight"]["source"] = "procedural:sky";
+    sky["components"]["EnvironmentLight"]["radianceScale"] = Json::Value(Json::arrayValue);
+    sky["components"]["EnvironmentLight"]["radianceScale"].append(1.0f);
+    sky["components"]["EnvironmentLight"]["radianceScale"].append(1.0f);
+    sky["components"]["EnvironmentLight"]["radianceScale"].append(1.0f);
+    document["entities"].append(std::move(sky));
+
+    Json::Value cube(Json::objectValue);
+    cube["id"] = "Cube";
+    cube["name"] = "Cube";
+    cube["components"]["PrefabInstance"]["source"] = "builtin:cube";
+    document["entities"].append(std::move(cube));
+
+    document["settings"]["realtimeMode"] = true;
+    document["settings"]["environment"]["enabled"] = true;
+    document["settings"]["environment"]["visibleToCamera"] = true;
+    caustica::setCurrentScene(*m_app, caustica::json::toString(document));
+    return true;
+}
+
 bool SceneEditor::saveScene()
 {
     if (!canSaveScene())
@@ -1043,11 +1101,19 @@ bool SceneEditor::saveSceneAsFromDialog()
     if (!m_app || !m_editorState.sceneDocumentValid || !caustica::isSceneLoaded(*m_app))
         return false;
 
-    std::string picked = m_editorState.sceneDocumentPath.generic_string();
+    std::string picked = canSaveScene()
+        ? m_editorState.sceneDocumentPath.generic_string()
+        : std::string("untitled.scene.json");
+    const std::filesystem::path scenesDir =
+        caustica::getAssetPackRoot() / caustica::kScenesSubFolder;
+    const std::string initialDir = std::filesystem::is_directory(scenesDir)
+        ? scenesDir.string()
+        : std::string();
     if (!caustica::FileDialog(
             false,
             "Scene files (*.scene.json)\0*.scene.json\0JSON files (*.json)\0*.json\0All files\0*.*\0",
-            picked))
+            picked,
+            initialDir.empty() ? nullptr : initialDir.c_str()))
         return false;
 
     std::filesystem::path path(picked);
@@ -1065,6 +1131,7 @@ bool SceneEditor::saveSceneAsFromDialog()
     addRecentScene(path);
 
     m_editorState.loadedSceneName = sceneName;
+    m_editorState.saveAsRequired = false;
     caustica::info("Saved scene as '%s'", path.generic_string().c_str());
     return true;
 }

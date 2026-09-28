@@ -232,7 +232,12 @@ void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, 
     if (const CameraComponent* camera = tryGetCamera(world.world(), entity))
         WriteCameraIntoComponents(EnsureObject(entityNode["components"]), *camera);
     if (const GaussianSplatComponent* splat = world.world().tryGet<GaussianSplatComponent>(entity))
-        EnsureComponent(entityNode, "GaussianSplat")["enabled"] << splat->splat.enabled;
+    {
+        Json::Value& node = EnsureComponent(entityNode, "GaussianSplat");
+        node["path"] = splat->splat.path;
+        node["convertRdfToRub"] = splat->splat.convertRdfToRub;
+        node["enabled"] = splat->splat.enabled;
+    }
     if (const auto* label = world.world().tryGet<SemanticLabelComponent>(entity))
     {
         Json::Value& node = EnsureComponent(entityNode, "SemanticLabel");

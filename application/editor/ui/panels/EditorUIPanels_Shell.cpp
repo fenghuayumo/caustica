@@ -306,6 +306,8 @@ void EditorUI::BuildMainMenuBar()
     {
         const bool sceneBusy = m_sceneEditor.app()
             && caustica::isSceneSwitchBusy(*m_sceneEditor.app());
+        if (ImGui::MenuItem("New Scene", "Ctrl+N", false, !sceneBusy))
+            m_sceneEditor.requestNewScene();
         if (ImGui::MenuItem("Open Scene...", "Ctrl+O", false, !sceneBusy))
             m_sceneEditor.requestOpenSceneFromDialog();
 

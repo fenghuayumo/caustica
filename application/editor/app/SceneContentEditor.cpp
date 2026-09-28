@@ -14,6 +14,7 @@
 #include <engine/MeshDeformApi.h>
 #include <engine/RenderSessionApi.h>
 #include <scene/SceneEcs.h>
+#include <scene/SceneObjects.h>
 #include <scene/SceneSerializer.h>
 #include <json/json.h>
 
@@ -115,8 +116,27 @@ void SceneContentEditor::handleDroppedFiles(std::vector<std::string>& pendingFil
         if (ext == ".ply")
         {
             caustica::info("Drag-drop: loading Gaussian Splat file '%s'", filePath.c_str());
+            const std::string id = makeUniqueAuthoringId(path.stem().string());
             if (caustica::loadGaussianSplatFile(*m_sceneEditor.app(), path))
             {
+                if (auto* ew = caustica::entityWorld(*m_sceneEditor.app()))
+                {
+                    const auto source = std::filesystem::absolute(path).lexically_normal();
+                    ecs::Entity imported = ecs::NullEntity;
+                    ew->world().each<caustica::scene::GaussianSplatComponent>(
+                        [&](ecs::Entity entity, caustica::scene::GaussianSplatComponent& component) {
+                            if (!ew->world().tryGet<caustica::scene::SceneAuthoringIdComponent>(entity)
+                                && std::filesystem::path(component.splat.path).lexically_normal() == source)
+                                imported = entity;
+                        });
+                    if (ecs::isValid(imported))
+                    {
+                        ew->world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+                            imported, caustica::scene::SceneAuthoringIdComponent{ id });
+                        ew->rebuildPathsFromRoot();
+                        registerAuthoredEntity(imported);
+                    }
+                }
                 caustica::info("Gaussian Splat loaded successfully: %d splats across %d objects",
                     int(caustica::gaussianSplatCount(*m_sceneEditor.app())),
                     int(caustica::gaussianSplatObjectCount(*m_sceneEditor.app())));
@@ -146,9 +166,35 @@ bool SceneContentEditor::importMeshFile(const std::filesystem::path& filePath)
     if (!app)
         return false;
 
-    // assets.load + spawn ??one path for editor and future apps.
+    // Preserve the imported root as a prefab instance so Save Scene can recreate
+    // it. Without an authoring id the serializer silently omits dropped models.
     const auto root = caustica::spawnFromFile(*app, filePath, makeApplyCallbacks());
-    return root != caustica::ecs::NullEntity;
+    if (!ecs::isValid(root))
+        return false;
+
+    auto* ew = caustica::entityWorld(*app);
+    if (!ew)
+        return false;
+
+    const std::string id = makeUniqueAuthoringId(filePath.stem().string());
+    if (auto* name = ew->world().tryGet<caustica::scene::NameComponent>(root))
+        name->value = id;
+    else
+        ew->world().emplace<caustica::scene::NameComponent>(root, caustica::scene::NameComponent{ id });
+    if (auto* authoring = ew->world().tryGet<caustica::scene::SceneAuthoringIdComponent>(root))
+        authoring->id = id;
+    else
+        ew->world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            root, caustica::scene::SceneAuthoringIdComponent{ id });
+    const std::string source = std::filesystem::absolute(filePath).lexically_normal().generic_string();
+    if (auto* prefab = ew->world().tryGet<caustica::scene::PrefabInstanceComponent>(root))
+        prefab->source = source;
+    else
+        ew->world().emplace<caustica::scene::PrefabInstanceComponent>(
+            root, caustica::scene::PrefabInstanceComponent{ source, {} });
+    ew->rebuildPathsFromRoot();
+    registerAuthoredEntity(root);
+    return true;
 }
 
 bool SceneContentEditor::loadMeshFile(const std::filesystem::path& filePath)

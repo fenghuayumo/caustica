@@ -520,6 +520,26 @@ int main()
     {
         caustica::scene::SceneEntityWorld world;
         const caustica::ecs::Entity root = world.createEntity("Root");
+        const caustica::ecs::Entity splatEntity = world.createEntity("Cloud", root);
+        world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
+            splatEntity, caustica::scene::SceneAuthoringIdComponent{ "Cloud" });
+        caustica::GaussianSplat splat;
+        splat.path = "C:/models/cloud.ply";
+        splat.convertRdfToRub = false;
+        world.setGaussianSplat(splatEntity, splat);
+
+        Json::Value document(Json::objectValue);
+        caustica::scene::syncAuthoredEntitiesToDocument(document, world);
+        const Json::Value& saved = document["entities"][0]["components"]["GaussianSplat"];
+        passed &= expect(saved["path"].asString() == splat.path,
+            "authored Gaussian splat source was not saved");
+        passed &= expect(!saved["convertRdfToRub"].asBool(),
+            "authored Gaussian splat coordinate conversion was not saved");
+    }
+
+    {
+        caustica::scene::SceneEntityWorld world;
+        const caustica::ecs::Entity root = world.createEntity("Root");
         const caustica::ecs::Entity cube = world.createEntity("Cube", root);
         world.world().emplace<caustica::scene::SceneAuthoringIdComponent>(
             cube, caustica::scene::SceneAuthoringIdComponent{ "Cube" });

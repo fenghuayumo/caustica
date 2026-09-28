@@ -136,6 +136,7 @@ public:
 
     // File menu: open/save scene JSON (Save patches transforms into cached document).
     bool openSceneFromDialog();
+    bool newScene();
     bool saveScene();
     bool saveSceneAsFromDialog();
     [[nodiscard]] bool canSaveScene() const;
@@ -159,6 +160,7 @@ public:
     void requestUndo();
     void requestRedo();
     void requestOpenSceneFromDialog();
+    void requestNewScene();
     void requestSaveScene();
     void requestSaveSceneAsFromDialog();
     void processPendingEditActions();
@@ -239,6 +241,7 @@ private:
         None,
         Undo,
         Redo,
+        NewScene,
         OpenScene,
         SaveScene,
         SaveSceneAs,

@@ -786,6 +786,12 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
         m_frameGaussianSplatTemporalReset = false;
     }
 
+    // Keep the normal frame pipeline running so scene-switch GPU transactions
+    // complete even when the newly loaded scene contains no renderable objects.
+    const bool emptyScene = scene
+        && scene->getRenderData().meshInstances.empty()
+        && scene->getRenderData().gaussianSplats.empty();
+
     populateRenderFrameContext(framebuffer, m_renderFrameCtx);
     runFramePipeline(m_renderFrameCtx);
 
@@ -830,6 +836,28 @@ void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebu
         if (m_frameCommands)
             m_frameCommands->abort();
         postUpdatePathTracing();
+    }
+
+    // An empty scene cannot produce path-traced pixels, and persistent targets
+    // may still hold the previous scene. Clear the presented image after the
+    // normal pipeline, including frames that aborted before its final blit.
+    if (emptyScene && m_frameCommands && !m_context->gpuDevice.isShuttingDown())
+    {
+        if (caustica::rhi::CommandList* commandList = m_frameCommands->beginPrimary())
+        {
+            caustica::rhi::utils::ClearColorAttachment(
+                commandList, framebuffer, 0,
+                caustica::rhi::Color(0.08f, 0.09f, 0.11f, 1.0f));
+            const uint64_t submission = m_frameCommands->endFrame();
+            if ((device()->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12
+                    && submission == 0)
+                || !device()->isDeviceHealthy())
+                m_context->gpuDevice.setShuttingDown(true);
+        }
+        else
+        {
+            m_context->gpuDevice.setShuttingDown(true);
+        }
     }
 }
 void caustica::render::WorldRenderer::recreateBindingSet(const scene::SceneRenderData* renderData)

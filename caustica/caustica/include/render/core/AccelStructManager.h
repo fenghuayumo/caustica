@@ -94,9 +94,13 @@ public:
 
     void releaseGpuResources();
 
-    // Drop AS handles retired by the previous double-buffered rebuild. Safe once
-    // no in-flight frame still references that generation (next structure edit).
+    // Caller must fence all GPU work referencing the retired generation first.
     void clearRetiredAccelStructs();
+    [[nodiscard]] bool hasRetiredAccelStructs() const
+    {
+        return !m_retiredTopLevelAS.empty() || !m_retiredSubInstanceBuffers.empty()
+            || !m_retiredBlas.empty();
+    }
 
     [[nodiscard]] caustica::rhi::rt::AccelStructHandle getTopLevelAS() const { return m_topLevelAS; }
     [[nodiscard]] caustica::rhi::BufferHandle          getSubInstanceBuffer() const { return m_subInstanceBuffer; }

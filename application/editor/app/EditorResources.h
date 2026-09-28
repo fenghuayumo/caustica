@@ -23,6 +23,7 @@ struct EditorState
     Json::Value sceneDocument;
     std::filesystem::path sceneDocumentPath;
     bool sceneDocumentValid = false;
+    bool saveAsRequired = false;
 };
 
 struct CaptureScriptState

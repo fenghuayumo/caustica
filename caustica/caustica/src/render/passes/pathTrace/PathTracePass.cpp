@@ -397,12 +397,18 @@ rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx)
             declareMainPathTraceAccess(setup, handles);
             declarePathTraceScheduleReads(setup, schedule);
         },
-        [pathTrace, pipeline, sceneBindings, descriptorTable, renderSize,
+        [pathTrace, pipeline, sceneBindings, descriptorTable, renderSize, handles,
          samplesPerPixel](rg::RenderPassContext& passCtx) {
             const caustica::rhi::BindingSetHandle bindingSet =
                 sceneBindings ? sceneBindings->bindingSet() : caustica::rhi::BindingSetHandle{};
             if (!pipeline || !bindingSet || !descriptorTable)
+            {
+                passCtx.commandList()->clearTextureFloat(
+                    passCtx.texture(handles.outputColor),
+                    caustica::rhi::AllSubresources,
+                    caustica::rhi::Color(0.0f));
                 return;
+            }
             pathTrace->mainPass(
                 passCtx.commandList(),
                 bindingSet,
