@@ -89,6 +89,7 @@ struct VertexOutput
     nointerpolation float4 color : COLOR0;
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
     nointerpolation float3 worldCenter : TEXCOORD1;
+    nointerpolation float3 receiverNormal : TEXCOORD2;
 #endif
 };
 
@@ -405,6 +406,8 @@ VertexOutput vs_main(uint vertexId : SV_VertexID)
     output.color = float4(compositingColor * g_Const.brightness, opacity);
 #if GAUSSIAN_SPLAT_HYBRID_SHADOWS
     output.worldCenter = worldCenter.xyz;
+    output.receiverNormal = HybridGaussian_ReceiverNormal(
+        splat, (float3x3)g_Const.worldToObject, worldCenter.xyz, g_Const.cameraPosition.xyz);
 #endif
 
     return output;
@@ -520,6 +523,14 @@ float4 ps_main(VertexOutput input, uint primitiveId : SV_PrimitiveID) : SV_Targe
 
         float3 visibility = totalLightWeight > 0.0f ? weightedVisibility / totalLightWeight : 1.0f;
         shadow = lerp(1.0f - saturate(g_Const.shadowStrength), 1.0f, visibility);
+    }
+    if (g_Const.shadowsEnabled != 0)
+    {
+        const float contact = HybridGaussian_TraceMeshContact(
+            t_MeshBVH, t_ShadowSubInstances, t_ShadowMaterials,
+            g_Const.shadowMaterialCount, input.worldCenter, input.receiverNormal,
+            g_Const.shadowContactRadius, g_Const.shadowContactStrength);
+        shadow *= 1.0f - contact;
     }
 
     return float4(input.color.rgb * shadow, saturate(opacity));

@@ -458,6 +458,8 @@ struct PathTracerSettings
     float                               GaussianSplatShadowStrength = 0.75f;
     float                               GaussianSplatShadowSoftRadius = 0.08f;
     int                                 GaussianSplatShadowSoftSampleCount = 1;
+    float                               GaussianSplatShadowContactRadius = 0.03f;
+    float                               GaussianSplatShadowContactStrength = 0.30f;
     math::float3                          GaussianSplatTranslation = math::float3(0.0f);
     math::float3                          GaussianSplatRotationEulerDeg = math::float3(0.0f);
     math::float3                          GaussianSplatObjectScale = math::float3(1.0f);

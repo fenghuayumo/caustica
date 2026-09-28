@@ -146,6 +146,8 @@ void EditorUI::BuildScenePanel(const PanelLayout& layout)
             }
 
             RESET_ON_CHANGE(ImGui::DragFloat("Ray offset", &m_settings.GaussianSplatShadowRayOffset, 0.01f, 0.0f, 1.0f, "%.2f"));
+            RESET_ON_CHANGE(ImGui::DragFloat("Contact radius", &m_settings.GaussianSplatShadowContactRadius, 0.005f, 0.0f, 0.5f, "%.3f"));
+            RESET_ON_CHANGE(ImGui::DragFloat("Contact strength", &m_settings.GaussianSplatShadowContactStrength, 0.01f, 0.0f, 1.0f, "%.2f"));
         }
     }
 }

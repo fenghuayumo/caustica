@@ -93,6 +93,8 @@ struct GaussianSplatRenderSettings
     uint32_t shadowMode = GAUSSIAN_SPLAT_SHADOWS_DISABLED;
     float shadowSoftRadius = 0.08f;
     uint32_t shadowSoftSampleCount = 1;
+    float shadowContactRadius = 0.03f;
+    float shadowContactStrength = 0.30f;
     uint32_t shadowFrameIndex = 0;
     uint32_t shadowLightCount = 0;
     std::array<GaussianSplatReceiverShadowLight, GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS> shadowLights{};

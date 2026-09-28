@@ -544,6 +544,10 @@ void InitializeEntries()
         SETTING_ACCESS(GaussianSplatShadowAdaptiveClamp), rebuildAS);
     AddScalar("r.Gaussian.Shadow.RayOffset", "Gaussian shadow-ray offset.",
         SETTING_ACCESS(GaussianSplatShadowRayOffset), reset, 0, 1);
+    AddScalar("r.Gaussian.Shadow.ContactRadius", "Mesh contact-shadow radius on Gaussian receivers.",
+        SETTING_ACCESS(GaussianSplatShadowContactRadius), reset, 0, 0.5);
+    AddScalar("r.Gaussian.Shadow.ContactStrength", "Mesh contact-shadow strength on Gaussian receivers.",
+        SETTING_ACCESS(GaussianSplatShadowContactStrength), reset, 0, 1);
 
     AddScalar("r.AS.ForceOpaque", "Force ray-tracing instances opaque.",
         [](EditorUIData& ui) -> auto& { return ui.render.settings.AS.ForceOpaque; }, reset);

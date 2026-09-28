@@ -870,6 +870,8 @@ bool GaussianSplatPass::upload(
         : 0u;
     constants.shadowMaterialCount = shadowSubInstances != nullptr && shadowMaterials != nullptr
         ? shadowMaterialCount : 0u;
+    constants.shadowContactRadius = std::max(settings.shadowContactRadius, 0.0f);
+    constants.shadowContactStrength = std::clamp(settings.shadowContactStrength, 0.0f, 1.0f);
     for (uint32_t lightIndex = 0; lightIndex < constants.shadowLightCount; ++lightIndex)
         constants.shadowLights[lightIndex] = settings.shadowLights[lightIndex];
     constants.sortMode = uint32_t(settings.sortingMode);

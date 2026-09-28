@@ -717,6 +717,112 @@ float3 HybridGaussian_TraceMeshShadow(
     return rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT ? 0.0f : transmittance;
 }
 
+// The shortest Gaussian axis approximates the receiver surface normal. Only
+// sufficiently flat splats participate, since an isotropic splat has no stable normal.
+float3 HybridGaussian_ReceiverNormal(
+    GaussianSplatData splat,
+    float3x3 worldToObject,
+    float3 worldCenter,
+    float3 cameraPosition)
+{
+    const float3 scale = max(splat.scale.xyz, 1.0e-8f);
+    const float largestScale = max(scale.x, max(scale.y, scale.z));
+    const float smallestScale = min(scale.x, min(scale.y, scale.z));
+    if (smallestScale > largestScale * 0.85f)
+        return 0.0f;
+
+    const float3 axis = scale.x <= scale.y && scale.x <= scale.z ? float3(1.0f, 0.0f, 0.0f)
+        : scale.y <= scale.z ? float3(0.0f, 1.0f, 0.0f) : float3(0.0f, 0.0f, 1.0f);
+    const float3 q = splat.rotation.yzw;
+    const float3 objectNormal = axis + 2.0f * cross(q, cross(q, axis) + splat.rotation.x * axis);
+    float3 worldNormal = normalize(mul(worldToObject, objectNormal));
+    if (dot(worldNormal, cameraPosition - worldCenter) < 0.0f)
+        worldNormal = -worldNormal;
+    return worldNormal;
+}
+
+float HybridGaussian_TraceMeshContact(
+    RaytracingAccelerationStructure meshBVH,
+    StructuredBuffer<SubInstanceData> subInstances,
+    StructuredBuffer<StandardMaterialData> materials,
+    uint materialCount,
+    float3 worldCenter,
+    float3 receiverNormal,
+    float radius,
+    float strength)
+{
+    if (radius <= 0.0f || strength <= 0.0f || dot(receiverNormal, receiverNormal) < 0.5f)
+        return 0.0f;
+
+    RayDesc ray;
+    ray.Origin = worldCenter + receiverNormal * min(radius * 0.03f, 0.002f);
+    ray.Direction = receiverNormal;
+    ray.TMin = 0.0f;
+    ray.TMax = radius;
+
+    RayQuery<RAY_FLAG_NONE> rayQuery;
+    rayQuery.TraceRayInline(meshBVH, RAY_FLAG_NONE, 0xff, ray);
+
+    float nearestDistance = radius;
+    float nearestOpacity = 0.0f;
+    uint subInstanceCount;
+    uint subInstanceStride;
+    subInstances.GetDimensions(subInstanceCount, subInstanceStride);
+
+    while (rayQuery.Proceed())
+    {
+        if (rayQuery.CandidateType() != CANDIDATE_NON_OPAQUE_TRIANGLE)
+            continue;
+
+        const uint subInstanceIndex = rayQuery.CandidateInstanceID() + rayQuery.CandidateGeometryIndex();
+        if (subInstanceIndex >= subInstanceCount || materialCount == 0u)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const SubInstanceData subInstance = subInstances[subInstanceIndex];
+        if ((subInstance.FlagsAndAlphaInfo & SubInstanceData::Flags_ExcludeFromNEE) != 0)
+            continue;
+        if ((subInstance.FlagsAndAlphaInfo & SubInstanceData::Flags_CullVisibilityBackface) != 0
+            && !rayQuery.CandidateTriangleFrontFace())
+            continue;
+
+        const uint materialIndex = subInstance.GlobalGeometryIndex_StandardMaterialDataIndex & 0xffffu;
+        if (materialIndex >= materialCount)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const StandardMaterialData material = materials[materialIndex];
+        const float transmission = saturate(max(material.TransmissionFactor, material.DiffuseTransmissionFactor));
+        if (transmission <= 0.0f)
+        {
+            rayQuery.CommitNonOpaqueTriangleHit();
+            continue;
+        }
+
+        const float distance = rayQuery.CandidateTriangleRayT();
+        if (distance < nearestDistance)
+        {
+            nearestDistance = distance;
+            // Glass attenuates local ambient light without turning the contact black.
+            nearestOpacity = lerp(1.0f, 0.65f, transmission);
+        }
+    }
+
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT
+        && rayQuery.CommittedRayT() < nearestDistance)
+    {
+        nearestDistance = rayQuery.CommittedRayT();
+        nearestOpacity = 1.0f;
+    }
+
+    const float proximity = 1.0f - smoothstep(0.0f, radius, nearestDistance);
+    return saturate(strength) * nearestOpacity * proximity;
+}
+
 float HybridGaussian_ShadowLuminance(float3 color)
 {
     return max(dot(max(color, 0.0f), float3(0.2126f, 0.7152f, 0.0722f)), 0.0f);

@@ -344,6 +344,8 @@ GaussianSplatRenderSettings buildGaussianSplatRenderSettings(const GaussianSplat
     renderSettings.shadowRayOffset = settings.GaussianSplatShadowRayOffset;
     renderSettings.shadowSoftRadius = settings.GaussianSplatShadowSoftRadius;
     renderSettings.shadowSoftSampleCount = clampGaussianSplatSoftShadowSamples(settings.GaussianSplatShadowSoftSampleCount);
+    renderSettings.shadowContactRadius = settings.GaussianSplatShadowContactRadius;
+    renderSettings.shadowContactStrength = settings.GaussianSplatShadowContactStrength;
     renderSettings.shadowFrameIndex = uint32_t(inputs.frameIndex & 0xffffffffu);
     renderSettings.frustumDilation = settings.GaussianSplatFrustumDilation;
     renderSettings.minPixelCoverage = settings.GaussianSplatMinPixelCoverage;

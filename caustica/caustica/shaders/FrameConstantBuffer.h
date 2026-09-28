@@ -159,8 +159,8 @@ struct GaussianSplatConstants
 
     uint shadowLightCount;
     uint shadowMaterialCount;
-    uint shadowLightPadding1;
-    uint shadowLightPadding2;
+    float shadowContactRadius;
+    float shadowContactStrength;
 
     GaussianSplatReceiverShadowLight shadowLights[GAUSSIAN_SPLAT_MAX_RECEIVER_SHADOW_LIGHTS];
 
