@@ -32,6 +32,7 @@ namespace caustica
 
         void setMoveSpeed(float value) { m_moveSpeed = value; }
         void setRotateSpeed(float value) { m_rotateSpeed = value; }
+        void setPanSpeed(float value) { m_panSpeed = value; }
 
         [[nodiscard]] const math::affine3& getWorldToViewMatrix() const { return m_matWorldToView; }
         [[nodiscard]] const math::affine3& getTranslatedWorldToViewMatrix() const { return m_matTranslatedWorldToView; }
@@ -55,6 +56,7 @@ namespace caustica
 
         float m_moveSpeed = 1.f;      // movement speed in units/second
         float m_rotateSpeed = .005f;  // mouse sensitivity in radians/pixel
+        float m_panSpeed = .02f;      // middle-mouse pan in world units per mouse pixel
     };
 
     class FirstPersonCamera : public BaseCamera

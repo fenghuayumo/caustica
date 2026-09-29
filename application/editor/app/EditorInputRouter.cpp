@@ -52,7 +52,11 @@ bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
     const double cursorX = input ? input->cursor.x : 0.0;
     const double cursorY = input ? input->cursor.y : 0.0;
 
-    if (mouseInViewportCanvas(sceneEditor, cursorX, cursorY) && !vp.OverlayHovered)
+    // Bare canvas: only the viewport's own window may be under the cursor.
+    // WindowHovered is a real ImGui hit-test, so floating windows that cover
+    // the canvas (Preferences, undocked panels) still capture below.
+    if (mouseInViewportCanvas(sceneEditor, cursorX, cursorY)
+        && !vp.OverlayHovered && vp.WindowHovered)
         return false;
 
     if (!ImGui::GetIO().WantCaptureMouse)
@@ -75,7 +79,7 @@ bool altHeld(int mods)
 bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
 {
     const auto& vp = sceneEditor.editorUIState().Viewport;
-    if (vp.OverlayHovered)
+    if (vp.OverlayHovered || !vp.WindowHovered)
         return false;
 
     const InputState* input = editorInput(sceneEditor);
@@ -441,7 +445,7 @@ bool onMouseScrolled(SceneEditor& sceneEditor, caustica::MouseScrolledEvent& e)
     // Alt + wheel: change fly speed. Plain wheel is dolly (CameraPlugin).
     if (ImGui::GetIO().KeyAlt || (input && input->alt()))
     {
-        float& speed = sceneEditor.renderAppState().settings.CameraMoveSpeed;
+        float& speed = sceneEditor.editorCameraSettings().MoveSpeed;
         speed = std::clamp(speed * (1.0f + static_cast<float>(e.getYOffset()) * 0.1f), 0.01f, 100.f);
     }
     return true;
@@ -477,9 +481,27 @@ void updateEditorCameraInputGate(SceneEditor& sceneEditor, App& app)
     const bool rmb = input && input->mouse.pressed(Mouse::Right);
     const bool lmb = input && input->mouse.pressed(Mouse::Left);
     const bool mmb = input && input->mouse.pressed(Mouse::Middle);
-    const bool looking = alt && lmb;
-    const bool panning = mmb;
-    const bool flying = rmb;
+
+    // Latch where each button press started. Chords begun over UI never arm the
+    // camera (even while held), while canvas-started presses keep working when
+    // the cursor drags across floating panels (drag-through).
+    EditorCameraState& cameraState = sceneEditor.editorCameraState();
+    if (input && input->mouse.justPressed(Mouse::Middle))
+        cameraState.PanPressOnUI = uiBlocks;
+    else if (!mmb)
+        cameraState.PanPressOnUI = false;
+    if (input && input->mouse.justPressed(Mouse::Left))
+        cameraState.LookPressOnUI = uiBlocks;
+    else if (!lmb)
+        cameraState.LookPressOnUI = false;
+    if (input && input->mouse.justPressed(Mouse::Right))
+        cameraState.FlyPressOnUI = uiBlocks;
+    else if (!rmb)
+        cameraState.FlyPressOnUI = false;
+
+    const bool looking = alt && lmb && !cameraState.LookPressOnUI;
+    const bool panning = mmb && !cameraState.PanPressOnUI;
+    const bool flying = rmb && !cameraState.FlyPressOnUI;
     const bool flyKey = input && (input->keyDown(Key::W) || input->keyDown(Key::A)
         || input->keyDown(Key::S) || input->keyDown(Key::D)
         || input->keyDown(Key::Q) || input->keyDown(Key::E)

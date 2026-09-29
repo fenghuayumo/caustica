@@ -79,6 +79,16 @@ struct SelectionState
     }
 };
 
+// Editor-owned free-camera tuning. Deliberately kept out of
+// PathTracerSettings: these are navigation controls, not render parameters.
+struct EditorCameraSettings
+{
+    // Units/second for WASD/QE fly (wheel dolly scales from it as well).
+    float MoveSpeed = 1.0f;
+    // Middle-mouse pan: world units per mouse pixel, independent of MoveSpeed.
+    float MousePanSpeed = 0.02f;
+};
+
 struct EditorCameraState
 {
     EditorCameraState() = default;
@@ -88,6 +98,14 @@ struct EditorCameraState
     }
 
     SceneViewState* viewState = nullptr;
+
+    // Press-origin latches, sampled at button-press time. A camera chord that
+    // started over ImGui UI (floating dialog, panel) must not drive the camera
+    // for the rest of the press, while a press that started on the viewport
+    // canvas keeps working when the drag crosses over UI (drag-through).
+    bool LookPressOnUI = false;
+    bool PanPressOnUI = false;
+    bool FlyPressOnUI = false;
 };
 
 using EditorUiData = EditorUIData;

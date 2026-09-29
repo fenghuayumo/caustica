@@ -252,7 +252,6 @@ struct PathTracerSettings
     int                                 RealtimeAA /*Defaults in CommandLine >*/;           // 0 - no AA, 1 - TAA, 2 - DLSS, 3 - DLSS-RR (if available)
     float                               CameraAperture = 0.0f;
     float                               CameraFocalDistance = 10000.0f;
-    float                               CameraMoveSpeed = 1.0f;
     float                               CameraAntiRRSleepJitter = 0.0f;
     float                               TexLODBias = -2.0f;                 // matches RTXPT's textured-background antialiasing behavior.
     int                                 NestedDielectricsQuality    = 1;    // 0 - off; 1 - fast; 2 - quality

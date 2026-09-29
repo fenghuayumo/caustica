@@ -96,6 +96,8 @@ public:
     [[nodiscard]] const SelectionState& selectionState() const { return m_selectionState; }
     [[nodiscard]] EditorCameraState& editorCameraState() { return m_editorCameraState; }
     [[nodiscard]] const EditorCameraState& editorCameraState() const { return m_editorCameraState; }
+    [[nodiscard]] EditorCameraSettings& editorCameraSettings() { return m_editorCameraSettings; }
+    [[nodiscard]] const EditorCameraSettings& editorCameraSettings() const { return m_editorCameraSettings; }
 
     // Status-bar feedback for user-triggered operations (save started/finished).
     void setStatusMessage(EditorStatusKind kind, std::string text, float lingerSeconds = 6.f);
@@ -233,6 +235,7 @@ private:
     EditorState m_editorState;
     SelectionState m_selectionState;
     EditorCameraState m_editorCameraState;
+    EditorCameraSettings m_editorCameraSettings;
     EditorStatusMessage m_statusMessage;
 
     std::unique_ptr<CaptureScriptManager> m_captureScriptManager;

@@ -77,6 +77,31 @@ void EditorUI::BuildPreferencesPanel(const PanelLayout& layout)
             ImGui::SetTooltip("Editor color theme. Choice is saved for next launch.");
     }
 
+    if (ImGui::CollapsingHeader("Viewport Navigation", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        RAII_SCOPE(ImGui::Indent(layout.indent);, ImGui::Unindent(layout.indent););
+
+        // EditorPlugin applies both to the free camera before the next camera
+        // update; Alt+Wheel in the viewport adjusts the fly value.
+        EditorCameraSettings& cameraSettings = m_sceneEditor.editorCameraSettings();
+        SettingsSliderFloat("Move Speed", &cameraSettings.MoveSpeed, 0.01f, 100.f,
+            "%.2f", ImGuiSliderFlags_Logarithmic);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "WASD/QE fly speed in units per second.\n"
+                "Alt + Wheel over the viewport adjusts the same value.");
+        }
+        SettingsSliderFloat("Pan Speed", &cameraSettings.MousePanSpeed, 0.001f, 1.f,
+            "%.3f", ImGuiSliderFlags_Logarithmic);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Middle-mouse pan speed in world units per mouse pixel.\n"
+                "Independent of fly speed.");
+        }
+    }
+
     BuildDisplayPerformancePanel(layout);
     BuildSystemPanel(layout);
 

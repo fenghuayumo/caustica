@@ -223,8 +223,7 @@ void FirstPersonCamera::animate(float deltaT)
     // Middle-mouse drag: screen-space pan (truck / pedestal).
     if (panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
     {
-        const float panScale = m_moveSpeed * 0.02f;
-        cameraMoveVec += (-mouseMove.x * m_cameraRight + mouseMove.y * m_cameraUp) * panScale;
+        cameraMoveVec += (-mouseMove.x * m_cameraRight + mouseMove.y * m_cameraUp) * m_panSpeed;
         cameraDirty = true;
     }
 

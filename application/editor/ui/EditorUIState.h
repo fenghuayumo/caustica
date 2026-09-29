@@ -44,6 +44,11 @@ struct EditorViewportState
     bool Hovered = false;
     bool Focused = false;
     bool RectValid = false;
+    // True when the Viewport window itself (or one of its overlay children) is
+    // the top-most ImGui window under the cursor. Floating windows that cover
+    // the canvas (Preferences, undocked panels) clear this so editor input
+    // routing cannot leak through them into the viewport.
+    bool WindowHovered = false;
     // Toolbar / viewport popup ate the last UI hit-test. Input routing uses this
     // with the canvas rect so a leftover ImGui hover window cannot steal picks.
     bool OverlayHovered = false;

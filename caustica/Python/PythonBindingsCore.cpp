@@ -2642,7 +2642,6 @@ void RegisterCoreBindings(nb::module_& m)
 
         .def_rw("camera_aperture",               &PathTracerSettings::CameraAperture)
         .def_rw("camera_focal_distance",         &PathTracerSettings::CameraFocalDistance)
-        .def_rw("camera_move_speed",             &PathTracerSettings::CameraMoveSpeed)
 
         .def_rw("realtime_firefly_filter_enabled", &PathTracerSettings::RealtimeFireflyFilterEnabled)
         .def_rw("realtime_firefly_filter_threshold", &PathTracerSettings::RealtimeFireflyFilterThreshold)

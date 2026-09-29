@@ -1393,7 +1393,7 @@ Signatures: [EngineApp → Active camera](#active-camera).
 
 Declare cameras in the scene file (`PerspectiveCameraEx` is the usual type). Optional `fx, fy, cx, cy, width, height` override symmetric FOV. `settings.startingCamera` is a **scene-camera** index (`-1` = free flight, `0` = first scene camera), which is **not** the same numbering as `engine.selected_camera_index`. Field list: [docs/scene-json.md](docs/scene-json.md#perspectivecamera--perspectivecameraex).
 
-Depth of field and fly-camera speed are **session** settings, not per-entity optics: `settings.camera_aperture`, `settings.camera_focal_distance`, `settings.camera_move_speed`. A `PerspectiveCameraEx` can override tone-mapping / exposure when it becomes active — see [Camera / firefly / tone map / bloom](#camera--firefly--tone-map--bloom).
+Depth of field is a **session** setting, not per-entity optics: `settings.camera_aperture`, `settings.camera_focal_distance`. Editor fly-camera speed lives in the editor's `EditorCameraSettings` (Preferences → Viewport Navigation, or Alt+Wheel in the viewport). A `PerspectiveCameraEx` can override tone-mapping / exposure when it becomes active — see [Camera / firefly / tone map / bloom](#camera--firefly--tone-map--bloom).
 
 There is no public spawn-camera helper yet. Add cameras in scene JSON (or spawn a JSON snippet that contains a camera entity).
 
@@ -1742,7 +1742,6 @@ C++ members are PascalCase on `PathTracerSettings` (`EnableGaussianSplats`, …)
 | --- | --- | --- |
 | `CameraAperture` | `camera_aperture` | `float` |
 | `CameraFocalDistance` | `camera_focal_distance` | `float` |
-| `CameraMoveSpeed` | `camera_move_speed` | `float` |
 | `RealtimeFireflyFilterEnabled` | `realtime_firefly_filter_enabled` | `bool` |
 | `RealtimeFireflyFilterThreshold` | `realtime_firefly_filter_threshold` | `float` |
 | `ReferenceFireflyFilterEnabled` | `reference_firefly_filter_enabled` | `bool` |

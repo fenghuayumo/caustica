@@ -31,8 +31,6 @@ void updateCamera(App& app, float elapsedTimeSeconds)
     if (!cfg || !cam)
         return;
 
-    cam->camera().setMoveSpeed(cfg->CameraMoveSpeed);
-
     const std::shared_ptr<Scene> scene = activeScene(app);
     const auto* ew = scene ? scene->getEntityWorld() : nullptr;
     const auto* cameraEntities = ew ? &ew->cameraEntitiesInRegistrationOrder() : nullptr;

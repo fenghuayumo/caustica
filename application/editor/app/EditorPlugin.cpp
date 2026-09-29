@@ -4,6 +4,7 @@
 #include "common/CaptureScriptManager.h"
 
 #include <engine/App.h>
+#include <engine/AppResources.h>
 #include <engine/Input.h>
 #include <engine/SceneQuery.h>
 #include <events/event.h>
@@ -11,6 +12,7 @@
 #include <engine/RenderSessionApi.h>
 #include <engine/SystemLabels.h>
 #include <backend/GpuSurface.h>
+#include <render/core/CameraController.h>
 
 namespace caustica::editor
 {
@@ -22,6 +24,7 @@ void EditorPlugin::build(App& app)
     app.insertResourceRef(m_sceneEditor.captureScriptState());
     app.insertResourceRef(m_sceneEditor.selectionState());
     app.insertResourceRef(m_sceneEditor.editorCameraState());
+    app.insertResourceRef(m_sceneEditor.editorCameraSettings());
     app.insertResourceRef(m_sceneEditor.uiData());
 
     if (auto* cameraConfig = app.tryResource<CameraInputConfig>())
@@ -60,6 +63,15 @@ void EditorPlugin::configureLateSchedules(App& app)
     app.addSystemAfter<system_label::EditorCameraInputGate, caustica::system_label::PrepareSimulation>(
         AppSchedule::preUpdate,
         [this](SystemContext& ctx) {
+            // Editor-owned camera tuning lives outside PathTracerSettings. Push
+            // it here (preUpdate, before SceneUpdateCamera) so the free camera
+            // always matches the current EditorCameraSettings value.
+            if (auto* controller = caustica::cameraController(ctx.app))
+            {
+                const EditorCameraSettings& settings = m_sceneEditor.editorCameraSettings();
+                controller->camera().setMoveSpeed(settings.MoveSpeed);
+                controller->camera().setPanSpeed(settings.MousePanSpeed);
+            }
             updateEditorCameraInputGate(m_sceneEditor, ctx.app);
         });
 

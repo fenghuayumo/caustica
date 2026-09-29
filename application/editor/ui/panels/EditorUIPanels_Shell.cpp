@@ -650,8 +650,12 @@ void EditorUI::BuildViewportPanel(const PanelLayout& layout)
     const bool mouseInCanvas =
         mouse.x >= canvasPos.x && mouse.x < canvasPos.x + canvasSize.x
         && mouse.y >= canvasPos.y && mouse.y < canvasPos.y + canvasSize.y;
+    // IsWindowHovered() is a real ImGui hit-test: false whenever another window
+    // (Preferences dialog, undocked panel, popup) sits above the canvas under
+    // the cursor. The geometric rect alone cannot tell those apart.
+    vp.WindowHovered = ImGui::IsWindowHovered();
     vp.OverlayHovered = false;
-    vp.Hovered = mouseInCanvas;
+    vp.Hovered = mouseInCanvas && vp.WindowHovered;
     vp.Focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
