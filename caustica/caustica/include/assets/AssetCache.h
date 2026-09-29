@@ -25,38 +25,38 @@ class AssetCache
 public:
     [[nodiscard]] std::shared_ptr<AssetType> getAny(const AssetId& id)
     {
-        std::shared_lock lock(m_Mutex);
-        if (auto it = m_Entries.find(id); it != m_Entries.end())
+        std::shared_lock lock(m_mutex);
+        if (auto it = m_entries.find(id); it != m_entries.end())
             return it->second.asset;
         return nullptr;
     }
 
     void insert(const AssetId& id, std::shared_ptr<AssetType> asset)
     {
-        std::unique_lock lock(m_Mutex);
-        Entry& entry = m_Entries[id];
+        std::unique_lock lock(m_mutex);
+        Entry& entry = m_entries[id];
         entry.asset = std::move(asset);
         entry.state = CacheState::Loaded;
     }
 
     void remove(const AssetId& id)
     {
-        std::unique_lock lock(m_Mutex);
-        m_Entries.erase(id);
+        std::unique_lock lock(m_mutex);
+        m_entries.erase(id);
     }
 
     template <typename F>
     void forEach(F&& func) const
     {
-        std::shared_lock lock(m_Mutex);
-        for (const auto& [id, entry] : m_Entries)
+        std::shared_lock lock(m_mutex);
+        for (const auto& [id, entry] : m_entries)
             func(id, entry.asset, entry.state);
     }
 
     void clear()
     {
-        std::unique_lock lock(m_Mutex);
-        m_Entries.clear();
+        std::unique_lock lock(m_mutex);
+        m_entries.clear();
     }
 
 private:
@@ -66,8 +66,8 @@ private:
         CacheState state = CacheState::Unloaded;
     };
 
-    mutable std::shared_mutex m_Mutex;
-    std::unordered_map<AssetId, Entry, AssetId::Hash> m_Entries;
+    mutable std::shared_mutex m_mutex;
+    std::unordered_map<AssetId, Entry, AssetId::Hash> m_entries;
 };
 
 } // namespace caustica

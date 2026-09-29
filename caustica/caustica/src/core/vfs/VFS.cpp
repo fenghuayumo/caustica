@@ -244,39 +244,39 @@ int NativeFileSystem::enumerateDirectories(const std::filesystem::path& path, en
 }
 
 RelativeFileSystem::RelativeFileSystem(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& basePath)
-    : m_UnderlyingFS(std::move(fs))
-    , m_BasePath(basePath.lexically_normal())
+    : m_underlyingFS(std::move(fs))
+    , m_basePath(basePath.lexically_normal())
 {
 }
 
 bool RelativeFileSystem::folderExists(const std::filesystem::path& name)
 {
-	return m_UnderlyingFS->folderExists(m_BasePath / name.relative_path());
+	return m_underlyingFS->folderExists(m_basePath / name.relative_path());
 }
 
 bool RelativeFileSystem::fileExists(const std::filesystem::path& name)
 {
-    return m_UnderlyingFS->fileExists(m_BasePath / name.relative_path());
+    return m_underlyingFS->fileExists(m_basePath / name.relative_path());
 }
 
 std::shared_ptr<IBlob> RelativeFileSystem::readFile(const std::filesystem::path& name)
 {
-    return m_UnderlyingFS->readFile(m_BasePath / name.relative_path());
+    return m_underlyingFS->readFile(m_basePath / name.relative_path());
 }
 
 bool RelativeFileSystem::writeFile(const std::filesystem::path& name, const void* data, size_t size)
 {
-    return m_UnderlyingFS->writeFile(m_BasePath / name.relative_path(), data, size);
+    return m_underlyingFS->writeFile(m_basePath / name.relative_path(), data, size);
 }
 
 int RelativeFileSystem::enumerateFiles(const std::filesystem::path& path, const std::vector<std::string>& extensions, enumerate_callback_t callback, bool allowDuplicates)
 {
-    return m_UnderlyingFS->enumerateFiles(m_BasePath / path.relative_path(), extensions, callback, allowDuplicates);
+    return m_underlyingFS->enumerateFiles(m_basePath / path.relative_path(), extensions, callback, allowDuplicates);
 }
 
 int RelativeFileSystem::enumerateDirectories(const std::filesystem::path& path, enumerate_callback_t callback, bool allowDuplicates)
 {
-    return m_UnderlyingFS->enumerateDirectories(m_BasePath / path.relative_path(), callback, allowDuplicates);
+    return m_underlyingFS->enumerateDirectories(m_basePath / path.relative_path(), callback, allowDuplicates);
 }
 
 void RootFileSystem::mount(const std::filesystem::path& path, std::shared_ptr<IFileSystem> fs)
@@ -287,7 +287,7 @@ void RootFileSystem::mount(const std::filesystem::path& path, std::shared_ptr<IF
         return;
     }
 
-    m_MountPoints.push_back(std::make_pair(path.lexically_normal().generic_string(), fs));
+    m_mountPoints.push_back(std::make_pair(path.lexically_normal().generic_string(), fs));
 }
 
 void caustica::RootFileSystem::mount(const std::filesystem::path& path, const std::filesystem::path& nativePath)
@@ -299,11 +299,11 @@ bool RootFileSystem::unmount(const std::filesystem::path& path)
 {
     std::string spath = path.lexically_normal().generic_string();
 
-    for (size_t index = 0; index < m_MountPoints.size(); index++)
+    for (size_t index = 0; index < m_mountPoints.size(); index++)
     {
-        if (string_utils::caseInsensitiveEquals(m_MountPoints[index].first, spath))
+        if (string_utils::caseInsensitiveEquals(m_mountPoints[index].first, spath))
         {
-            m_MountPoints.erase(m_MountPoints.begin() + index);
+            m_mountPoints.erase(m_mountPoints.begin() + index);
             return true;
         }
     }
@@ -315,7 +315,7 @@ bool RootFileSystem::findMountPoint(const std::filesystem::path& path, std::file
 {
     std::string spath = path.lexically_normal().generic_string();
 
-    for (auto it : m_MountPoints)
+    for (auto it : m_mountPoints)
     {
         if (string_utils::caseInsensitivePrefixEquals(spath, it.first, it.first.size()) && ((spath.length() == it.first.length()) || (spath[it.first.length()] == '/')))
         {

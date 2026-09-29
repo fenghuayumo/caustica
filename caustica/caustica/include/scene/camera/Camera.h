@@ -30,14 +30,14 @@ namespace caustica
         virtual void animate(float deltaT) { }
         virtual ~BaseCamera() = default;
 
-        void setMoveSpeed(float value) { m_MoveSpeed = value; }
-        void setRotateSpeed(float value) { m_RotateSpeed = value; }
+        void setMoveSpeed(float value) { m_moveSpeed = value; }
+        void setRotateSpeed(float value) { m_rotateSpeed = value; }
 
-        [[nodiscard]] const math::affine3& getWorldToViewMatrix() const { return m_MatWorldToView; }
-        [[nodiscard]] const math::affine3& getTranslatedWorldToViewMatrix() const { return m_MatTranslatedWorldToView; }
-        [[nodiscard]] const math::float3& getPosition() const { return m_CameraPos; }
-        [[nodiscard]] const math::float3& getDir() const { return m_CameraDir; }
-        [[nodiscard]] const math::float3& getUp() const { return m_CameraUp; }
+        [[nodiscard]] const math::affine3& getWorldToViewMatrix() const { return m_matWorldToView; }
+        [[nodiscard]] const math::affine3& getTranslatedWorldToViewMatrix() const { return m_matTranslatedWorldToView; }
+        [[nodiscard]] const math::float3& getPosition() const { return m_cameraPos; }
+        [[nodiscard]] const math::float3& getDir() const { return m_cameraDir; }
+        [[nodiscard]] const math::float3& getUp() const { return m_cameraUp; }
 
     protected:
         // This can be useful for derived classes while not necessarily public, i.e., in a third person
@@ -45,16 +45,16 @@ namespace caustica
         void baseLookAt(math::float3 cameraPos, math::float3 cameraTarget, math::float3 cameraUp = math::float3{ 0.f, 1.f, 0.f });
         void updateWorldToView();
 
-        math::affine3 m_MatWorldToView = math::affine3::identity();
-        math::affine3 m_MatTranslatedWorldToView = math::affine3::identity();
+        math::affine3 m_matWorldToView = math::affine3::identity();
+        math::affine3 m_matTranslatedWorldToView = math::affine3::identity();
 
-        math::float3 m_CameraPos   = 0.f;   // in worldspace
-        math::float3 m_CameraDir   = math::float3(1.f, 0.f, 0.f); // normalized
-        math::float3 m_CameraUp    = math::float3(0.f, 1.f, 0.f); // normalized
-        math::float3 m_CameraRight = math::float3(0.f, 0.f, 1.f); // normalized
+        math::float3 m_cameraPos   = 0.f;   // in worldspace
+        math::float3 m_cameraDir   = math::float3(1.f, 0.f, 0.f); // normalized
+        math::float3 m_cameraUp    = math::float3(0.f, 1.f, 0.f); // normalized
+        math::float3 m_cameraRight = math::float3(0.f, 0.f, 1.f); // normalized
 
-        float m_MoveSpeed = 1.f;      // movement speed in units/second
-        float m_RotateSpeed = .005f;  // mouse sensitivity in radians/pixel
+        float m_moveSpeed = 1.f;      // movement speed in units/second
+        float m_rotateSpeed = .005f;  // mouse sensitivity in radians/pixel
     };
 
     class FirstPersonCamera : public BaseCamera
@@ -78,13 +78,13 @@ namespace caustica
         std::pair<bool, math::float3> animateTranslation(float deltaT);
         void updateCamera(math::float3 cameraMoveVec, math::affine3 cameraRotation);
 
-        math::float2 m_MousePos = 0.f;
-        math::float2 m_MousePosPrev = 0.f;
-        math::float2 m_MouseMotionAccumulator = 0.f;
-        math::float3 m_CameraMovePrev = 0.f;
-        math::float3 m_CameraMoveDamp = 0.f;
-        bool m_IsDragging = false;
-        bool m_IsPanning = false;
+        math::float2 m_mousePos = 0.f;
+        math::float2 m_mousePosPrev = 0.f;
+        math::float2 m_mouseMotionAccumulator = 0.f;
+        math::float3 m_cameraMovePrev = 0.f;
+        math::float3 m_cameraMoveDamp = 0.f;
+        bool m_isDragging = false;
+        bool m_isPanning = false;
 
         typedef enum
         {
@@ -118,7 +118,7 @@ namespace caustica
             MouseButtonFirst = Left,
         } MouseButtons;
 
-        const std::unordered_map<int, int> m_KeyboardMap = {
+        const std::unordered_map<int, int> m_keyboardMap = {
             { GLFW_KEY_Q, KeyboardControls::MoveDown },
             { GLFW_KEY_E, KeyboardControls::MoveUp },
             { GLFW_KEY_A, KeyboardControls::MoveLeft },
@@ -137,14 +137,14 @@ namespace caustica
             { GLFW_KEY_RIGHT_CONTROL, KeyboardControls::SlowDown },
         };
 
-        const std::unordered_map<int, int> m_MouseButtonMap = {
+        const std::unordered_map<int, int> m_mouseButtonMap = {
             { GLFW_MOUSE_BUTTON_LEFT, MouseButtons::Left },
             { GLFW_MOUSE_BUTTON_MIDDLE, MouseButtons::Middle },
             { GLFW_MOUSE_BUTTON_RIGHT, MouseButtons::Right },
         };
 
-        std::array<bool, KeyboardControls::KeyboardControlCount> m_KeyboardState = { false };
-        std::array<bool, MouseButtons::MouseButtonCount> m_MouseButtonState = { false };
+        std::array<bool, KeyboardControls::KeyboardControlCount> m_keyboardState = { false };
+        std::array<bool, MouseButtons::MouseButtonCount> m_mouseButtonState = { false };
     };
 
     class ThirdPersonCamera : public BaseCamera
@@ -158,18 +158,18 @@ namespace caustica
         void joystickUpdate(int axis, float value) override;
         void animate(float deltaT) override;
 
-        math::float3 getTargetPosition() const { return m_TargetPos; }
-        void setTargetPosition(math::float3 position) { m_TargetPos = position; }
+        math::float3 getTargetPosition() const { return m_targetPos; }
+        void setTargetPosition(math::float3 position) { m_targetPos = position; }
 
-        float getDistance() const { return m_Distance; }
-        void setDistance(float distance) { m_Distance = distance; }
+        float getDistance() const { return m_distance; }
+        void setDistance(float distance) { m_distance = distance; }
         
-        float getRotationYaw() const { return m_Yaw; }
-        float getRotationPitch() const { return m_Pitch; }
+        float getRotationYaw() const { return m_yaw; }
+        float getRotationPitch() const { return m_pitch; }
         void setRotation(float yaw, float pitch);
 
-        float getMaxDistance() const { return m_MaxDistance; }
-        void setMaxDistance(float value) { m_MaxDistance = value; }
+        float getMaxDistance() const { return m_maxDistance; }
+        void setMaxDistance(float value) { m_maxDistance = value; }
 
         void setView(const ViewInfo& view);
 
@@ -182,12 +182,12 @@ namespace caustica
         void animateTranslation(const math::float3x3& viewMatrix);
 
         // View parameters to derive translation amounts
-        math::float4x4 m_ProjectionMatrix = math::float4x4::identity();
-        math::float4x4 m_InverseProjectionMatrix = math::float4x4::identity();
-        math::float2 m_ViewportSize = math::float2::zero();
+        math::float4x4 m_projectionMatrix = math::float4x4::identity();
+        math::float4x4 m_inverseProjectionMatrix = math::float4x4::identity();
+        math::float2 m_viewportSize = math::float2::zero();
 
-        math::float2 m_MousePos = 0.f;
-        math::float2 m_MousePosPrev = 0.f;
+        math::float2 m_mousePos = 0.f;
+        math::float2 m_mousePosPrev = 0.f;
         
         enum class MouseState {
             Idle,
@@ -195,20 +195,20 @@ namespace caustica
             Panning
         };
         
-        MouseState m_MouseState = MouseState::Idle;
+        MouseState m_mouseState = MouseState::Idle;
 
-        math::float3 m_TargetPos = 0.f;
-        float m_Distance = 30.f;
+        math::float3 m_targetPos = 0.f;
+        float m_distance = 30.f;
         
-        float m_MinDistance = 0.f;
-        float m_MaxDistance = std::numeric_limits<float>::max();
+        float m_minDistance = 0.f;
+        float m_maxDistance = std::numeric_limits<float>::max();
         
-        float m_Yaw = 0.f;
-        float m_Pitch = 0.f;
+        float m_yaw = 0.f;
+        float m_pitch = 0.f;
         
-        float m_DeltaYaw = 0.f;
-        float m_DeltaPitch = 0.f;
-        float m_DeltaDistance = 0.f;
+        float m_deltaYaw = 0.f;
+        float m_deltaPitch = 0.f;
+        float m_deltaDistance = 0.f;
 
         typedef enum
         {
@@ -217,10 +217,10 @@ namespace caustica
             KeyboardControlCount,
         } KeyboardControls;
 
-        const std::unordered_map<int, int> m_KeyboardMap = {
+        const std::unordered_map<int, int> m_keyboardMap = {
             { GLFW_KEY_LEFT_ALT, KeyboardControls::HorizontalPan },
         };
 
-        std::array<bool, KeyboardControls::KeyboardControlCount> m_KeyboardState = { false };
+        std::array<bool, KeyboardControls::KeyboardControlCount> m_keyboardState = { false };
     };
 }

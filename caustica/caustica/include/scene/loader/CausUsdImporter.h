@@ -14,7 +14,7 @@ namespace caustica
     class CausUsdImporter
     {
     protected:
-        std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
+        std::shared_ptr<SceneTypeFactory> m_sceneTypeFactory;
 
     public:
         explicit CausUsdImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory);

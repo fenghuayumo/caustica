@@ -30,8 +30,8 @@ public:
 private:
     static std::string makeCacheKey(AssetId sourceAsset, const std::string& kind, const std::string& key);
 
-    mutable std::shared_mutex m_Mutex;
-    std::unordered_map<std::string, ArtifactRecord> m_Records;
+    mutable std::shared_mutex m_mutex;
+    std::unordered_map<std::string, ArtifactRecord> m_records;
 };
 
 } // namespace caustica

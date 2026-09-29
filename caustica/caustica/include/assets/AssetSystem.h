@@ -40,27 +40,27 @@ public:
     // Idempotent; safe if never initialized or already shut down.
     void shutdown();
 
-    AssetRegistry& getRegistry() { return m_Registry; }
-    const AssetRegistry& getRegistry() const { return m_Registry; }
-    AssetStore<ImageAsset>& images() { return m_Images; }
-    const AssetStore<ImageAsset>& images() const { return m_Images; }
-    AssetStore<MeshAsset>& meshes() { return m_Meshes; }
-    const AssetStore<MeshAsset>& meshes() const { return m_Meshes; }
-    AssetStore<MaterialAsset>& materials() { return m_Materials; }
-    const AssetStore<MaterialAsset>& materials() const { return m_Materials; }
-    AssetStore<SceneAsset>& scenes() { return m_Scenes; }
-    const AssetStore<SceneAsset>& scenes() const { return m_Scenes; }
-    AssetStore<ScenePrefabAsset>& prefabs() { return m_Prefabs; }
-    const AssetStore<ScenePrefabAsset>& prefabs() const { return m_Prefabs; }
-    DependencyGraph& dependencies() { return m_Dependencies; }
-    const DependencyGraph& dependencies() const { return m_Dependencies; }
-    HotReloadTracker& hotReload() { return m_HotReload; }
-    const HotReloadTracker& hotReload() const { return m_HotReload; }
-    ArtifactCache& artifactCache() { return m_ArtifactCache; }
-    const ArtifactCache& artifactCache() const { return m_ArtifactCache; }
+    AssetRegistry& getRegistry() { return m_registry; }
+    const AssetRegistry& getRegistry() const { return m_registry; }
+    AssetStore<ImageAsset>& images() { return m_images; }
+    const AssetStore<ImageAsset>& images() const { return m_images; }
+    AssetStore<MeshAsset>& meshes() { return m_meshes; }
+    const AssetStore<MeshAsset>& meshes() const { return m_meshes; }
+    AssetStore<MaterialAsset>& materials() { return m_materials; }
+    const AssetStore<MaterialAsset>& materials() const { return m_materials; }
+    AssetStore<SceneAsset>& scenes() { return m_scenes; }
+    const AssetStore<SceneAsset>& scenes() const { return m_scenes; }
+    AssetStore<ScenePrefabAsset>& prefabs() { return m_prefabs; }
+    const AssetStore<ScenePrefabAsset>& prefabs() const { return m_prefabs; }
+    DependencyGraph& dependencies() { return m_dependencies; }
+    const DependencyGraph& dependencies() const { return m_dependencies; }
+    HotReloadTracker& hotReload() { return m_hotReload; }
+    const HotReloadTracker& hotReload() const { return m_hotReload; }
+    ArtifactCache& artifactCache() { return m_artifactCache; }
+    const ArtifactCache& artifactCache() const { return m_artifactCache; }
 
-    [[nodiscard]] std::shared_ptr<TextureLoader> getTextureLoader() { return m_TextureLoader; }
-    [[nodiscard]] bool isInitialized() const { return m_Initialized; }
+    [[nodiscard]] std::shared_ptr<TextureLoader> getTextureLoader() { return m_textureLoader; }
+    [[nodiscard]] bool isInitialized() const { return m_initialized; }
 
     Handle<ImageAsset> loadTextureFromFile(
         const std::filesystem::path& path,
@@ -125,17 +125,17 @@ public:
     void loadingFinished();
 
 private:
-    AssetRegistry m_Registry;
-    AssetStore<ImageAsset> m_Images;
-    AssetStore<MeshAsset> m_Meshes;
-    AssetStore<MaterialAsset> m_Materials;
-    AssetStore<SceneAsset> m_Scenes;
-    AssetStore<ScenePrefabAsset> m_Prefabs;
-    DependencyGraph m_Dependencies;
-    HotReloadTracker m_HotReload;
-    ArtifactCache m_ArtifactCache;
-    std::shared_ptr<TextureLoader> m_TextureLoader;
-    bool m_Initialized = false;
+    AssetRegistry m_registry;
+    AssetStore<ImageAsset> m_images;
+    AssetStore<MeshAsset> m_meshes;
+    AssetStore<MaterialAsset> m_materials;
+    AssetStore<SceneAsset> m_scenes;
+    AssetStore<ScenePrefabAsset> m_prefabs;
+    DependencyGraph m_dependencies;
+    HotReloadTracker m_hotReload;
+    ArtifactCache m_artifactCache;
+    std::shared_ptr<TextureLoader> m_textureLoader;
+    bool m_initialized = false;
 };
 
 } // namespace caustica

@@ -15,7 +15,7 @@ using namespace caustica;
 ShaderFactory::ShaderFactory(caustica::rhi::DeviceHandle rendererInterface,
 	std::shared_ptr<IFileSystem> fs,
 	const std::filesystem::path& basePath)
-	: m_Device(rendererInterface)
+	: m_device(rendererInterface)
 	, m_compilerService(std::make_shared<shader::ShaderCompilerService>(shader::ShaderCompilerService::Config{
 		.fileSystem = fs,
 		.shaderBinBasePath = basePath,
@@ -24,16 +24,16 @@ ShaderFactory::ShaderFactory(caustica::rhi::DeviceHandle rendererInterface,
 	, m_basePath(basePath)
 {
 #if CAUSTICA_WITH_AFTERMATH
-    if (m_Device->isAftermathEnabled())
-        m_Device->getAftermathCrashDumpHelper().registerShaderBinaryLookupCallback(this, std::bind(&ShaderFactory::findShaderFromHash, this, std::placeholders::_1, std::placeholders::_2));
+    if (m_device->isAftermathEnabled())
+        m_device->getAftermathCrashDumpHelper().registerShaderBinaryLookupCallback(this, std::bind(&ShaderFactory::findShaderFromHash, this, std::placeholders::_1, std::placeholders::_2));
 #endif
 }
 
 ShaderFactory::~ShaderFactory()
 {
 #if CAUSTICA_WITH_AFTERMATH
-    if (m_Device->isAftermathEnabled())
-        m_Device->getAftermathCrashDumpHelper().unRegisterShaderBinaryLookupCallback(this);
+    if (m_device->isAftermathEnabled())
+        m_device->getAftermathCrashDumpHelper().unRegisterShaderBinaryLookupCallback(this);
 #endif
 }
 
@@ -99,7 +99,7 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticShader(StaticShader shade
         return nullptr;
     }
 
-    return m_Device->createShader(desc, permutationBytecode, permutationSize);
+    return m_device->createShader(desc, permutationBytecode, permutationSize);
 }
 
 caustica::rhi::ShaderHandle ShaderFactory::createStaticShader(StaticShader shader, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType)
@@ -110,7 +110,7 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticShader(StaticShader shade
 caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc)
 {
     StaticShader shader;
-    switch(m_Device->getGraphicsAPI())
+    switch(m_device->getGraphicsAPI())
     {
         case caustica::rhi::GraphicsAPI::D3D12:
             shader = dxil;
@@ -150,13 +150,13 @@ caustica::rhi::ShaderLibraryHandle ShaderFactory::createStaticShaderLibrary(Stat
         return nullptr;
     }
 
-    return m_Device->createShaderLibrary(permutationBytecode, permutationSize);
+    return m_device->createShaderLibrary(permutationBytecode, permutationSize);
 }
 
 caustica::rhi::ShaderLibraryHandle ShaderFactory::createStaticPlatformShaderLibrary(StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines)
 {
     StaticShader shader;
-    switch(m_Device->getGraphicsAPI())
+    switch(m_device->getGraphicsAPI())
     {
         case caustica::rhi::GraphicsAPI::D3D12:
             shader = dxil;
@@ -238,7 +238,7 @@ std::pair<const void*, size_t> caustica::ShaderFactory::findShaderFromHash(uint6
                 if (ShaderMake::FindPermutationInBlob(shaderBytes, shaderSize, permutationConstants.data(),
                     uint32_t(permutationConstants.size()), &permutationBytecode, &permutationSize))
                 {
-                    uint64_t entryHash = hashGenerator(std::make_pair(permutationBytecode, permutationSize), m_Device->getGraphicsAPI());
+                    uint64_t entryHash = hashGenerator(std::make_pair(permutationBytecode, permutationSize), m_device->getGraphicsAPI());
                     if (entryHash == hash)
                     {
                         result = std::make_pair(permutationBytecode, permutationSize);
@@ -249,7 +249,7 @@ std::pair<const void*, size_t> caustica::ShaderFactory::findShaderFromHash(uint6
         }
         else
         {
-            uint64_t entryHash = hashGenerator(std::make_pair(shaderBytes, shaderSize), m_Device->getGraphicsAPI());
+            uint64_t entryHash = hashGenerator(std::make_pair(shaderBytes, shaderSize), m_device->getGraphicsAPI());
             if (entryHash == hash)
             {
                 result = std::make_pair(shaderBytes, shaderSize);

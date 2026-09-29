@@ -174,19 +174,19 @@ private:
 
     bool getState() const;
     void setState(bool state);
-    bool getLedStatus() const { return m_LedStatus;  }
-    void setLedStatus(bool status) { m_LedStatus = status; }
-    int getPage() const { return m_Page; }
-    ButtonMode getMode() const { return m_Mode; }
+    bool getLedStatus() const { return m_ledStatus;  }
+    void setLedStatus(bool status) { m_ledStatus = status; }
+    int getPage() const { return m_page; }
+    ButtonMode getMode() const { return m_mode; }
 
-    ButtonMode m_Mode;
+    ButtonMode m_mode;
     void* m_pValue;
-    int m_OffValue;
-    int m_OnValue;
-    bool m_LocalState; // If pValue initialised as nullptr
-    bool m_PreviousState;
-    bool m_LedStatus;
-    int m_Page;
+    int m_offValue;
+    int m_onValue;
+    bool m_localState; // If pValue initialised as nullptr
+    bool m_previousState;
+    bool m_ledStatus;
+    int m_page;
 #else
     Button(int, Control, ButtonMode, bool* pValue = nullptr)
     {
@@ -206,14 +206,14 @@ private:
 
     void setValue(const float newRawValue)
     {
-        *m_pValue = m_MinValue * (1.f - newRawValue) + m_MaxValue * newRawValue;
+        *m_pValue = m_minValue * (1.f - newRawValue) + m_maxValue * newRawValue;
     }
-    int getPage() const { return m_Page; }
+    int getPage() const { return m_page; }
 
     float* m_pValue;
-    float m_MinValue;
-    float m_MaxValue;
-    int m_Page;
+    float m_minValue;
+    float m_maxValue;
+    int m_page;
 #else
     Knob(int page, Control, float*, float mi = 0.0f, float ma = 1.0f)
     {

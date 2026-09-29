@@ -38,8 +38,8 @@ namespace caustica::animation
     class Sampler
     {
     protected:
-        std::vector<Keyframe> m_Keyframes;
-        InterpolationMode m_Mode = InterpolationMode::Step;
+        std::vector<Keyframe> m_keyframes;
+        InterpolationMode m_mode = InterpolationMode::Step;
 
     public:
         Sampler() = default;
@@ -47,15 +47,15 @@ namespace caustica::animation
 
         std::optional<math::float4> evaluate(float time, bool extrapolateLastValues = false) const;
 
-        [[nodiscard]] std::vector<Keyframe>& getKeyframes() { return m_Keyframes; }
-        [[nodiscard]] const std::vector<Keyframe>& getKeyframes() const { return m_Keyframes; }
+        [[nodiscard]] std::vector<Keyframe>& getKeyframes() { return m_keyframes; }
+        [[nodiscard]] const std::vector<Keyframe>& getKeyframes() const { return m_keyframes; }
         void addKeyframe(const Keyframe keyframe);
         bool upsertKeyframe(const Keyframe& keyframe, float timeEpsilon = 1e-4f);
         bool removeKeyframe(float time, float timeEpsilon = 1e-4f);
         [[nodiscard]] bool hasKeyframe(float time, float timeEpsilon = 1e-4f) const;
 
-        [[nodiscard]] InterpolationMode getMode() const { return m_Mode; }
-        void setInterpolationMode(InterpolationMode mode) { m_Mode = mode; }
+        [[nodiscard]] InterpolationMode getMode() const { return m_mode; }
+        void setInterpolationMode(InterpolationMode mode) { m_mode = mode; }
 
         [[nodiscard]] float getStartTime() const;
         [[nodiscard]] float getEndTime() const;
@@ -66,8 +66,8 @@ namespace caustica::animation
     class Sequence
     {
     protected:
-        std::unordered_map<std::string, std::shared_ptr<Sampler>> m_Tracks;
-        float m_Duration = 0.f;
+        std::unordered_map<std::string, std::shared_ptr<Sampler>> m_tracks;
+        float m_duration = 0.f;
 
     public:
         Sequence() = default;
@@ -75,14 +75,14 @@ namespace caustica::animation
 
         std::shared_ptr<Sampler> getTrack(const std::string& name)
         {
-            return m_Tracks[name];
+            return m_tracks[name];
         }
 
         std::optional<math::float4> evaluate(const std::string& name, float time, bool extrapolateLastValues = false);
 
         void addTrack(const std::string& name, const std::shared_ptr<Sampler>& track);
 
-        [[nodiscard]] float getDuration() const { return m_Duration; }
+        [[nodiscard]] float getDuration() const { return m_duration; }
 
         void load(Json::Value& node);
     };

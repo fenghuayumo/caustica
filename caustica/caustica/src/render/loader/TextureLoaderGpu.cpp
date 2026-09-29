@@ -67,18 +67,18 @@ bool TextureLoader::finalizeTexture(
     uint32_t scaledWidth = originalWidth;
     uint32_t scaledHeight = originalHeight;
 
-    if (m_MaxTextureSize > 0 && int(std::max(originalWidth, originalHeight)) > m_MaxTextureSize &&
+    if (m_maxTextureSize > 0 && int(std::max(originalWidth, originalHeight)) > m_maxTextureSize &&
         texture->isRenderTarget && texture->dimension == caustica::rhi::TextureDimension::Texture2D)
     {
         if (originalWidth >= originalHeight)
         {
-            scaledHeight = originalHeight * m_MaxTextureSize / originalWidth;
-            scaledWidth = m_MaxTextureSize;
+            scaledHeight = originalHeight * m_maxTextureSize / originalWidth;
+            scaledWidth = m_maxTextureSize;
         }
         else
         {
-            scaledWidth = originalWidth * m_MaxTextureSize / originalHeight;
-            scaledHeight = m_MaxTextureSize;
+            scaledWidth = originalWidth * m_maxTextureSize / originalHeight;
+            scaledHeight = m_maxTextureSize;
         }
     }
 
@@ -91,12 +91,12 @@ bool TextureLoader::finalizeTexture(
     textureDesc.depth = texture->depth;
     textureDesc.arraySize = texture->arraySize;
     textureDesc.dimension = texture->dimension;
-    textureDesc.mipLevels = m_GenerateMipmaps && texture->isRenderTarget && renderDevice
+    textureDesc.mipLevels = m_generateMipmaps && texture->isRenderTarget && renderDevice
         ? GetMipLevelsNum(textureDesc.width, textureDesc.height)
         : texture->mipLevels;
     textureDesc.debugName = texture->path;
     textureDesc.isRenderTarget = texture->isRenderTarget;
-    texture->gpu.texture = m_Device->createTexture(textureDesc);
+    texture->gpu.texture = m_device->createTexture(textureDesc);
     if (!texture->gpu.texture)
     {
         caustica::error(
@@ -112,8 +112,8 @@ bool TextureLoader::finalizeTexture(
 
     commandList->beginTrackingTextureState(texture->gpu.texture, caustica::rhi::AllSubresources, caustica::rhi::ResourceStates::Common);
 
-    if (m_DescriptorTable)
-        texture->gpu.bindlessDescriptor = m_DescriptorTable->createDescriptorHandle(
+    if (m_descriptorTable)
+        texture->gpu.bindlessDescriptor = m_descriptorTable->createDescriptorHandle(
             caustica::rhi::BindingSetItem::Texture_SRV(0, texture->gpu.texture));
 
     if (scaledWidth != originalWidth || scaledHeight != originalHeight)
@@ -127,7 +127,7 @@ bool TextureLoader::finalizeTexture(
         tempTextureDesc.mipLevels = 1;
         tempTextureDesc.dimension = textureDesc.dimension;
 
-        caustica::rhi::TextureHandle tempTexture = m_Device->createTexture(tempTextureDesc);
+        caustica::rhi::TextureHandle tempTexture = m_device->createTexture(tempTextureDesc);
         if (!tempTexture)
         {
             caustica::error(
@@ -146,7 +146,7 @@ bool TextureLoader::finalizeTexture(
                 layout.rowPitch, layout.depthPitch);
         }
 
-        caustica::rhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(
+        caustica::rhi::FramebufferHandle framebuffer = m_device->createFramebuffer(
             caustica::rhi::FramebufferDesc().addColorAttachment(texture->gpu.texture));
         if (!framebuffer)
         {
@@ -176,7 +176,7 @@ bool TextureLoader::finalizeTexture(
 
     for (uint32_t mipLevel = texture->mipLevels; mipLevel < textureDesc.mipLevels; mipLevel++)
     {
-        caustica::rhi::FramebufferHandle framebuffer = m_Device->createFramebuffer(caustica::rhi::FramebufferDesc()
+        caustica::rhi::FramebufferHandle framebuffer = m_device->createFramebuffer(caustica::rhi::FramebufferDesc()
             .addColorAttachment(caustica::rhi::FramebufferAttachment()
                 .setTexture(texture->gpu.texture)
                 .setArraySlice(0)
@@ -198,7 +198,7 @@ bool TextureLoader::finalizeTexture(
     commandList->setPermanentTextureState(texture->gpu.texture, caustica::rhi::ResourceStates::ShaderResource);
     commandList->commitBarriers();
 
-    ++m_TexturesFinalized;
+    ++m_texturesFinalized;
     return true;
 }
 
@@ -222,13 +222,13 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
         }
 
         {
-            std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
+            std::lock_guard<std::mutex> guard(m_texturesToFinalizeMutex);
 
-            if (m_TexturesToFinalize.empty())
+            if (m_texturesToFinalize.empty())
                 break;
 
-            pTexture = m_TexturesToFinalize.front();
-            m_TexturesToFinalize.pop();
+            pTexture = m_texturesToFinalize.front();
+            m_texturesToFinalize.pop();
         }
 
         if (pTexture->data)
@@ -252,43 +252,43 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
             uploadBytes = std::max(uploadBytes, size_t(64 * 1024));
 
             auto& budget = render::streamingUploadBudget();
-            if (!budget.waitForBudget(m_Device, uploadBytes))
+            if (!budget.waitForBudget(m_device, uploadBytes))
             {
-                m_GpuFinalizeFailed.store(true, std::memory_order_release);
+                m_gpuFinalizeFailed.store(true, std::memory_order_release);
                 break;
             }
 
-            if (!m_CommandList)
+            if (!m_commandList)
             {
                 // Long-lived CL: UploadManager fences+reuses UPLOAD under uploadMaxMemory.
                 caustica::rhi::CommandListParameters params;
                 params.uploadChunkSize = 4 * 1024 * 1024;
                 params.uploadMaxMemory = 256 * 1024 * 1024;
-                m_CommandList = m_Device->createCommandList(params);
+                m_commandList = m_device->createCommandList(params);
             }
 
-            if (!m_CommandList || !m_CommandList->open())
+            if (!m_commandList || !m_commandList->open())
             {
                 caustica::error("TextureLoader: failed to open the GPU upload command list");
-                m_GpuFinalizeFailed.store(true, std::memory_order_release);
-                m_CommandList = nullptr;
+                m_gpuFinalizeFailed.store(true, std::memory_order_release);
+                m_commandList = nullptr;
                 break;
             }
-            const bool finalized = finalizeTexture(pTexture, &renderDevice, m_CommandList);
-            m_CommandList->close();
+            const bool finalized = finalizeTexture(pTexture, &renderDevice, m_commandList);
+            m_commandList->close();
             if (!finalized)
             {
-                m_GpuFinalizeFailed.store(true, std::memory_order_release);
-                m_CommandList = nullptr;
+                m_gpuFinalizeFailed.store(true, std::memory_order_release);
+                m_commandList = nullptr;
                 break;
             }
-            const uint64_t submission = m_Device->executeCommandList(m_CommandList);
-            if ((m_Device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
-                || !m_Device->isDeviceHealthy())
+            const uint64_t submission = m_device->executeCommandList(m_commandList);
+            if ((m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::D3D12 && submission == 0)
+                || !m_device->isDeviceHealthy())
             {
                 caustica::error("TextureLoader: GPU upload submission failed");
-                m_GpuFinalizeFailed.store(true, std::memory_order_release);
-                m_CommandList = nullptr;
+                m_gpuFinalizeFailed.store(true, std::memory_order_release);
+                m_commandList = nullptr;
                 break;
             }
             // Keep uploads pipelined. StreamingUploadBudget retires completed event
@@ -296,7 +296,7 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
             // loadingFinished() performs the single required drain before mesh/AS
             // consumers run. Waiting here serialized every texture and dominated
             // cold-load time even though the queue and UploadManager support reuse.
-            budget.trackSubmit(m_Device, uploadBytes);
+            budget.trackSubmit(m_device, uploadBytes);
         }
     }
 
@@ -305,15 +305,15 @@ bool TextureLoader::processRenderingThreadCommands(render::RenderDevice& renderD
 
 void TextureLoader::loadingFinished()
 {
-    if (m_Device && !render::streamingUploadBudget().waitAll(m_Device))
-        m_GpuFinalizeFailed.store(true, std::memory_order_release);
-    m_CommandList = nullptr;
+    if (m_device && !render::streamingUploadBudget().waitAll(m_device))
+        m_gpuFinalizeFailed.store(true, std::memory_order_release);
+    m_commandList = nullptr;
 }
 
 size_t TextureLoader::pendingFinalizeCount()
 {
-    std::lock_guard<std::mutex> guard(m_TexturesToFinalizeMutex);
-    return m_TexturesToFinalize.size();
+    std::lock_guard<std::mutex> guard(m_texturesToFinalizeMutex);
+    return m_texturesToFinalize.size();
 }
 
 bool saveTextureToFile(

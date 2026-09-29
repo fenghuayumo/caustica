@@ -332,10 +332,10 @@ box3 Scene::getSceneBounds() const
 {
     assertLogicThread();
 
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return box3::empty();
 
-    const auto* bounds = m_EntityWorld->world().get<scene::BoundsComponent>(m_EntityWorld->root());
+    const auto* bounds = m_entityWorld->world().get<scene::BoundsComponent>(m_entityWorld->root());
     if (!bounds)
         return box3::empty();
 
@@ -348,12 +348,12 @@ void Scene::prepareForUnload()
 {
     assertLogicThread();
 
-    m_LogicExtractCache.clear();
-    m_LogicExtractCacheValid = false;
-    m_RenderSnapshot.clear();
-    m_Models.clear();
+    m_logicExtractCache.clear();
+    m_logicExtractCacheValid = false;
+    m_renderSnapshot.clear();
+    m_models.clear();
 
-    if (m_EntityWorld)
+    if (m_entityWorld)
     {
         auto releaseMeshCpu = [](const std::shared_ptr<MeshInfo>& mesh) {
             if (!mesh)
@@ -362,30 +362,30 @@ void Scene::prepareForUnload()
             mesh->buffers.reset();
         };
 
-        for (const std::shared_ptr<MeshInfo>& mesh : m_EntityWorld->getMeshes())
+        for (const std::shared_ptr<MeshInfo>& mesh : m_entityWorld->getMeshes())
         {
             releaseMeshCpu(mesh);
             if (mesh)
                 releaseMeshCpu(mesh->skinPrototype);
         }
-        for (const std::shared_ptr<Material>& material : m_EntityWorld->getMaterials())
+        for (const std::shared_ptr<Material>& material : m_entityWorld->getMaterials())
         {
             if (material)
                 material->asset = nullptr;
         }
     }
 
-    m_Asset = nullptr;
+    m_asset = nullptr;
 }
 
 const ResourceTracker<Material>& Scene::getMaterials() const
 {
     assertLogicThread();
 
-    if (m_EntityWorld)
+    if (m_entityWorld)
     {
-        m_EntityWorld->ensureSceneResourcesSynced();
-        return m_EntityWorld->getMaterials();
+        m_entityWorld->ensureSceneResourcesSynced();
+        return m_entityWorld->getMaterials();
     }
 
     static const ResourceTracker<Material> s_empty;
@@ -396,10 +396,10 @@ const ResourceTracker<MeshInfo>& Scene::getMeshes() const
 {
     assertLogicThread();
 
-    if (m_EntityWorld)
+    if (m_entityWorld)
     {
-        m_EntityWorld->ensureSceneResourcesSynced();
-        return m_EntityWorld->getMeshes();
+        m_entityWorld->ensureSceneResourcesSynced();
+        return m_entityWorld->getMeshes();
     }
 
     static const ResourceTracker<MeshInfo> s_empty;
@@ -409,19 +409,19 @@ const ResourceTracker<MeshInfo>& Scene::getMeshes() const
 size_t Scene::getGeometryCount() const
 {
     assertLogicThread();
-    return m_EntityWorld ? m_EntityWorld->getGeometryCount() : 0;
+    return m_entityWorld ? m_entityWorld->getGeometryCount() : 0;
 }
 
 size_t Scene::getMaxGeometryCountPerMesh() const
 {
     assertLogicThread();
-    return m_EntityWorld ? m_EntityWorld->getMaxGeometryCountPerMesh() : 0;
+    return m_entityWorld ? m_entityWorld->getMaxGeometryCountPerMesh() : 0;
 }
 
 size_t Scene::getGeometryInstancesCount() const
 {
     assertLogicThread();
-    return m_EntityWorld ? m_EntityWorld->getGeometryInstancesCount() : 0;
+    return m_entityWorld ? m_entityWorld->getGeometryInstancesCount() : 0;
 }
 
 namespace
@@ -445,128 +445,128 @@ const scene::SceneRenderData* publishedEntityListSource(const scene::SceneRender
 const std::vector<ecs::Entity>& Scene::getMeshInstances() const
 {
     if (const auto* published = publishedEntityListSource(
-            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+            m_renderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
     {
         return published->meshInstanceEntities;
     }
 
     assertLogicThread();
-    m_LogicQueryMeshInstances.clear();
-    if (m_EntityWorld)
+    m_logicQueryMeshInstances.clear();
+    if (m_entityWorld)
     {
         // Match Extract / refreshInstanceIndices: entity-id order for pick/index lookups.
-        m_EntityWorld->world().each<scene::MeshInstanceComponent, scene::GlobalTransformComponent,
+        m_entityWorld->world().each<scene::MeshInstanceComponent, scene::GlobalTransformComponent,
             scene::BoundsComponent, scene::SceneContentComponent>(
             [&](ecs::Entity entity, scene::MeshInstanceComponent&, scene::GlobalTransformComponent&,
                 scene::BoundsComponent&, scene::SceneContentComponent&)
             {
-                m_LogicQueryMeshInstances.push_back(entity);
+                m_logicQueryMeshInstances.push_back(entity);
             });
-        std::sort(m_LogicQueryMeshInstances.begin(), m_LogicQueryMeshInstances.end(),
+        std::sort(m_logicQueryMeshInstances.begin(), m_logicQueryMeshInstances.end(),
             [](ecs::Entity a, ecs::Entity b) {
                 return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
             });
     }
-    return m_LogicQueryMeshInstances;
+    return m_logicQueryMeshInstances;
 }
 
 const std::vector<ecs::Entity>& Scene::getSkinnedMeshInstances() const
 {
     if (const auto* published = publishedEntityListSource(
-            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+            m_renderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
     {
         return published->skinnedMeshInstanceEntities;
     }
 
     assertLogicThread();
-    m_LogicQuerySkinnedMeshInstances.clear();
-    if (m_EntityWorld)
+    m_logicQuerySkinnedMeshInstances.clear();
+    if (m_entityWorld)
     {
         // Match ExtractSkinnedMeshes: EnTT iteration order (no sort).
-        m_EntityWorld->world().each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent,
+        m_entityWorld->world().each<scene::SkinnedMeshComponent, scene::MeshInstanceComponent,
             scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::SkinnedMeshComponent&, scene::MeshInstanceComponent&,
                 scene::GlobalTransformComponent&)
             {
-                m_LogicQuerySkinnedMeshInstances.push_back(entity);
+                m_logicQuerySkinnedMeshInstances.push_back(entity);
             });
     }
-    return m_LogicQuerySkinnedMeshInstances;
+    return m_logicQuerySkinnedMeshInstances;
 }
 
 const std::vector<ecs::Entity>& Scene::getLightEntities() const
 {
     if (const auto* published = publishedEntityListSource(
-            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+            m_renderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
     {
         return published->lightEntities;
     }
 
     assertLogicThread();
-    m_LogicQueryLightEntities.clear();
-    if (m_EntityWorld)
+    m_logicQueryLightEntities.clear();
+    if (m_entityWorld)
     {
         // Match ExtractLightsFull: lights without GlobalTransform are not renderable.
-        auto& world = m_EntityWorld->world();
+        auto& world = m_entityWorld->world();
         world.each<scene::DirectionalLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::DirectionalLightComponent&, scene::GlobalTransformComponent&) {
-                m_LogicQueryLightEntities.push_back(entity);
+                m_logicQueryLightEntities.push_back(entity);
             });
         world.each<scene::SpotLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::SpotLightComponent&, scene::GlobalTransformComponent&) {
-                m_LogicQueryLightEntities.push_back(entity);
+                m_logicQueryLightEntities.push_back(entity);
             });
         world.each<scene::PointLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::PointLightComponent&, scene::GlobalTransformComponent&) {
-                m_LogicQueryLightEntities.push_back(entity);
+                m_logicQueryLightEntities.push_back(entity);
             });
         world.each<scene::RectLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::RectLightComponent&, scene::GlobalTransformComponent&) {
-                m_LogicQueryLightEntities.push_back(entity);
+                m_logicQueryLightEntities.push_back(entity);
             });
         world.each<scene::EnvironmentLightComponent, scene::GlobalTransformComponent>(
             [&](ecs::Entity entity, scene::EnvironmentLightComponent&, scene::GlobalTransformComponent&) {
-                m_LogicQueryLightEntities.push_back(entity);
+                m_logicQueryLightEntities.push_back(entity);
             });
     }
-    return m_LogicQueryLightEntities;
+    return m_logicQueryLightEntities;
 }
 
 const std::vector<ecs::Entity>& Scene::getCameraEntities() const
 {
     if (const auto* published = publishedEntityListSource(
-            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+            m_renderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
     {
         return published->cameraEntities;
     }
 
     assertLogicThread();
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
     {
         static const std::vector<ecs::Entity> empty;
         return empty;
     }
-    return m_EntityWorld->cameraEntitiesInRegistrationOrder();
+    return m_entityWorld->cameraEntitiesInRegistrationOrder();
 }
 
 const std::vector<ecs::Entity>& Scene::getAnimationEntities() const
 {
     if (const auto* published = publishedEntityListSource(
-            m_RenderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
+            m_renderSnapshot, m_gpuReadFrameIndex.load(std::memory_order_acquire)))
     {
         return published->animationEntities;
     }
 
     assertLogicThread();
-    m_LogicQueryAnimationEntities.clear();
-    if (m_EntityWorld)
+    m_logicQueryAnimationEntities.clear();
+    if (m_entityWorld)
     {
-        m_EntityWorld->world().each<scene::AnimationComponent>(
+        m_entityWorld->world().each<scene::AnimationComponent>(
             [&](ecs::Entity entity, scene::AnimationComponent&) {
-                m_LogicQueryAnimationEntities.push_back(entity);
+                m_logicQueryAnimationEntities.push_back(entity);
             });
     }
-    return m_LogicQueryAnimationEntities;
+    return m_logicQueryAnimationEntities;
 }
 
 const scene::SceneRenderData& Scene::getRenderData() const
@@ -576,7 +576,7 @@ const scene::SceneRenderData& Scene::getRenderData() const
 
 const scene::SceneRenderData& Scene::getRenderDataForFrame(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.readBufferForFrame(frameIndex);
+    return m_renderSnapshot.readBufferForFrame(frameIndex);
 }
 
 const scene::SceneRenderData& Scene::getRenderSnapshotForRead() const
@@ -584,7 +584,7 @@ const scene::SceneRenderData& Scene::getRenderSnapshotForRead() const
     const uint32_t gpuFrameIndex = m_gpuReadFrameIndex.load(std::memory_order_acquire);
     assert(gpuFrameIndex != UINT32_MAX &&
         "Scene::getRenderData requires beginGpuReadFrame, or use getRenderDataForFrame");
-    return m_RenderSnapshot.readBufferForFrameOrLatest(gpuFrameIndex);
+    return m_renderSnapshot.readBufferForFrameOrLatest(gpuFrameIndex);
 }
 
 void Scene::beginGpuReadFrame(uint32_t frameIndex)
@@ -599,32 +599,32 @@ void Scene::endGpuReadFrame()
 
 bool Scene::hasSceneTransformsChanged(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
+    return m_renderSnapshot.publishedStateForFrame(frameIndex).transformsChanged;
 }
 
 bool Scene::hasSceneLightsChanged(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.publishedStateForFrame(frameIndex).lightsChanged;
+    return m_renderSnapshot.publishedStateForFrame(frameIndex).lightsChanged;
 }
 
 bool Scene::hasSceneStructureChanged(uint32_t frameIndex) const
 {
-    const scene::SceneRenderPublishState& state = m_RenderSnapshot.publishedStateForFrame(frameIndex);
+    const scene::SceneRenderPublishState& state = m_renderSnapshot.publishedStateForFrame(frameIndex);
     return state.structureGeneration > m_structureGpu.consumedGeneration();
 }
 
 void Scene::acknowledgeGpuStructureConsumed(uint32_t frameIndex)
 {
     const uint64_t generation =
-        m_RenderSnapshot.publishedStateForFrame(frameIndex).structureGeneration;
+        m_renderSnapshot.publishedStateForFrame(frameIndex).structureGeneration;
     m_structureGpu.acknowledgeGpuStructureConsumed(generation);
 }
 
 void Scene::freezeCommittedFromLogicCache()
 {
-    if (!m_LogicExtractCacheValid)
+    if (!m_logicExtractCacheValid)
         return;
-    m_structureGpu.freezeCommittedFromLogicCache(m_LogicExtractCache);
+    m_structureGpu.freezeCommittedFromLogicCache(m_logicExtractCache);
 }
 
 void Scene::finishStructureGpuBuild(
@@ -636,68 +636,68 @@ void Scene::finishStructureGpuBuild(
 
 ecs::Entity Scene::attachDirectionalLightToRoot(scene::DirectionalLightComponent component, const std::string& name)
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setDirectionalLight(entity, std::move(component));
-    m_EntityWorld->rebuildPathsFromRoot();
-    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
+    ecs::Entity entity = m_entityWorld->createEntity(name, m_entityWorld->root());
+    m_entityWorld->setDirectionalLight(entity, std::move(component));
+    m_entityWorld->rebuildPathsFromRoot();
+    m_entityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
 ecs::Entity Scene::attachSpotLightToRoot(scene::SpotLightComponent component, const std::string& name)
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setSpotLight(entity, std::move(component));
-    m_EntityWorld->rebuildPathsFromRoot();
-    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
+    ecs::Entity entity = m_entityWorld->createEntity(name, m_entityWorld->root());
+    m_entityWorld->setSpotLight(entity, std::move(component));
+    m_entityWorld->rebuildPathsFromRoot();
+    m_entityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
 ecs::Entity Scene::attachPointLightToRoot(scene::PointLightComponent component, const std::string& name)
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setPointLight(entity, std::move(component));
-    m_EntityWorld->rebuildPathsFromRoot();
-    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
+    ecs::Entity entity = m_entityWorld->createEntity(name, m_entityWorld->root());
+    m_entityWorld->setPointLight(entity, std::move(component));
+    m_entityWorld->rebuildPathsFromRoot();
+    m_entityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
 ecs::Entity Scene::attachRectLightToRoot(scene::RectLightComponent component, const std::string& name)
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setRectLight(entity, std::move(component));
+    ecs::Entity entity = m_entityWorld->createEntity(name, m_entityWorld->root());
+    m_entityWorld->setRectLight(entity, std::move(component));
     ensureRectLightVisual(entity);
     // Panel is local XY facing -Z. Rotate -90° about X so emit is world -Y
     // (ceiling light); identity would shine along -Z and miss the ground.
-    m_EntityWorld->setRotation(entity, rotationQuat(double3(-PI_d * 0.5, 0.0, 0.0)));
-    m_EntityWorld->rebuildPathsFromRoot();
-    m_EntityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
+    m_entityWorld->setRotation(entity, rotationQuat(double3(-PI_d * 0.5, 0.0, 0.0)));
+    m_entityWorld->rebuildPathsFromRoot();
+    m_entityWorld->refreshHierarchy(scene::PreviousTransformPolicy::CaptureCurrent);
     requestGpuStructureSync();
-    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
+    m_entityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
 void Scene::ensureRectLightVisual(ecs::Entity entity)
 {
-    if (m_EntityWorld)
-        ensureRectLightVisual(*m_EntityWorld, entity);
+    if (m_entityWorld)
+        ensureRectLightVisual(*m_entityWorld, entity);
 }
 
 void Scene::syncRectLightVisualFromComponent(ecs::Entity entity)
 {
-    if (m_EntityWorld)
-        syncRectLightVisualFromComponent(*m_EntityWorld, entity);
+    if (m_entityWorld)
+        syncRectLightVisualFromComponent(*m_entityWorld, entity);
 }
 
 void Scene::syncRectLightVisualFromComponent(scene::SceneEntityWorld& world, ecs::Entity entity)
@@ -726,7 +726,7 @@ void Scene::syncRectLightVisualFromComponent(scene::SceneEntityWorld& world, ecs
 
 void Scene::ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity entity)
 {
-    if (!m_SceneTypeFactory || !world.world().isAlive(entity))
+    if (!m_sceneTypeFactory || !world.world().isAlive(entity))
         return;
     const auto* rect = scene::tryGetRectLight(world.world(), entity);
     if (!rect)
@@ -741,11 +741,11 @@ void Scene::ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity en
 
     const BuiltinMeshData src = MakeRectLightPanelMesh();
     auto buffers = std::make_shared<BufferGroup>();
-    auto mesh = m_SceneTypeFactory->createMesh();
+    auto mesh = m_sceneTypeFactory->createMesh();
     mesh->name = src.name;
     mesh->buffers = buffers;
 
-    auto material = m_SceneTypeFactory->createMaterial();
+    auto material = m_sceneTypeFactory->createMaterial();
     material->name = src.materialName + "_" + std::to_string(uint32_t(entity));
     material->modelFileName = "builtin:rect_light";
     material->baseOrDiffuseColor = src.baseColor;
@@ -757,7 +757,7 @@ void Scene::ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity en
 
     AppendMeshToBuffers(src, *buffers);
 
-    auto geometry = m_SceneTypeFactory->createMeshGeometry();
+    auto geometry = m_sceneTypeFactory->createMeshGeometry();
     geometry->material = material;
     geometry->indexOffsetInMesh = 0;
     geometry->vertexOffsetInMesh = 0;
@@ -780,13 +780,13 @@ void Scene::ensureRectLightVisual(scene::SceneEntityWorld& world, ecs::Entity en
 
 ecs::Entity Scene::attachEnvironmentLightToRoot(scene::EnvironmentLightComponent component, const std::string& name)
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return ecs::NullEntity;
 
-    ecs::Entity entity = m_EntityWorld->createEntity(name, m_EntityWorld->root());
-    m_EntityWorld->setEnvironmentLight(entity, std::move(component));
-    m_EntityWorld->rebuildPathsFromRoot();
-    m_EntityWorld->discardStructureDirtyIfGeometryUnchanged();
+    ecs::Entity entity = m_entityWorld->createEntity(name, m_entityWorld->root());
+    m_entityWorld->setEnvironmentLight(entity, std::move(component));
+    m_entityWorld->rebuildPathsFromRoot();
+    m_entityWorld->discardStructureDirtyIfGeometryUnchanged();
     return entity;
 }
 
@@ -797,33 +797,33 @@ Scene::Scene(
     std::shared_ptr<TextureLoader> textureCache,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
-    , m_SceneTypeFactory(std::move(sceneTypeFactory))
-    , m_TextureLoader(std::move(textureCache))
+    , m_sceneTypeFactory(std::move(sceneTypeFactory))
+    , m_textureLoader(std::move(textureCache))
 {
-    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    m_entityWorld = std::make_unique<scene::SceneEntityWorld>();
 
-    if (!m_SceneTypeFactory)
-        m_SceneTypeFactory = std::make_shared<SceneTypeFactory>();
+    if (!m_sceneTypeFactory)
+        m_sceneTypeFactory = std::make_shared<SceneTypeFactory>();
 
-    m_GltfImporter = std::make_shared<GltfImporter>(m_fs, m_SceneTypeFactory);
-    m_ObjImporter = std::make_shared<ObjImporter>(m_fs, m_SceneTypeFactory);
-    m_CausUsdImporter = std::make_shared<CausUsdImporter>(m_SceneTypeFactory);
-    m_UrdfImporter = std::make_shared<UrdfImporter>(m_fs, m_SceneTypeFactory);
+    m_gltfImporter = std::make_shared<GltfImporter>(m_fs, m_sceneTypeFactory);
+    m_objImporter = std::make_shared<ObjImporter>(m_fs, m_sceneTypeFactory);
+    m_causUsdImporter = std::make_shared<CausUsdImporter>(m_sceneTypeFactory);
+    m_urdfImporter = std::make_shared<UrdfImporter>(m_fs, m_sceneTypeFactory);
 
 }
 
 void Scene::resetToOwnedScratchRegistry()
 {
-    if (m_EntityWorld && !m_EntityWorld->ownsRegistry())
-        m_EntityWorld->resetScene();
-    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    if (m_entityWorld && !m_entityWorld->ownsRegistry())
+        m_entityWorld->resetScene();
+    m_entityWorld = std::make_unique<scene::SceneEntityWorld>();
 }
 
 void Scene::adoptLiveEcs(ecs::World& liveWorld)
 {
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
         return;
-    m_EntityWorld->adoptInto(liveWorld, m_SceneTypeFactory.get());
+    m_entityWorld->adoptInto(liveWorld, m_sceneTypeFactory.get());
 }
 
 void Scene::detachLiveEcs()
@@ -832,11 +832,11 @@ void Scene::detachLiveEcs()
     // resetScene() detaches the graph from the live registry; replacing the
     // entity world afterwards guarantees the destructor never touches the
     // borrowed world again even if this Scene outlives the App.
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
         return;
-    if (!m_EntityWorld->ownsRegistry())
-        m_EntityWorld->resetScene();
-    m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    if (!m_entityWorld->ownsRegistry())
+        m_entityWorld->resetScene();
+    m_entityWorld = std::make_unique<scene::SceneEntityWorld>();
 }
 
 bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
@@ -847,22 +847,22 @@ bool Scene::load(const std::filesystem::path& sceneFileName, bool asyncTextures)
     g_LoadingStats.ObjectsTotal = 0;
 
     resetToOwnedScratchRegistry();
-    m_LogicExtractCache.clear();
-    m_LogicExtractCacheValid = false;
+    m_logicExtractCache.clear();
+    m_logicExtractCacheValid = false;
 
     if (isDirectMeshSceneFile(sceneFileName))
     {
         m_textureSearchDirectory = sceneFileName.parent_path();
         ++g_LoadingStats.ObjectsTotal;
-        m_Models.resize(1);
+        m_models.resize(1);
         loadModelAsync(0, sceneFileName, asyncTextures);
 
-        const auto& modelResult = m_Models[0];
+        const auto& modelResult = m_models[0];
         if (!modelResult.entityWorld || !ecs::isValid(modelResult.rootEntity))
             return false;
 
-        m_EntityWorld->importSubtree(ecs::NullEntity, *modelResult.entityWorld, modelResult.rootEntity, m_SceneTypeFactory.get());
-        m_EntityWorld->rebuildPathsFromRoot();
+        m_entityWorld->importSubtree(ecs::NullEntity, *modelResult.entityWorld, modelResult.rootEntity, m_sceneTypeFactory.get());
+        m_entityWorld->rebuildPathsFromRoot();
     }
     else
     {
@@ -885,8 +885,8 @@ bool Scene::loadFromJsonString(const std::string& sceneJson, const std::filesyst
     g_LoadingStats.ObjectsTotal = 0;
 
     resetToOwnedScratchRegistry();
-    m_LogicExtractCache.clear();
-    m_LogicExtractCacheValid = false;
+    m_logicExtractCache.clear();
+    m_logicExtractCacheValid = false;
 
     Json::CharReaderBuilder readerBuilder;
     Json::Value documentRoot;
@@ -905,10 +905,10 @@ bool Scene::loadJsonDocument(Json::Value documentRoot, const std::filesystem::pa
 {
     m_textureSearchDirectory = scenePath;
 
-    if (!m_EntityWorld)
-        m_EntityWorld = std::make_unique<scene::SceneEntityWorld>();
+    if (!m_entityWorld)
+        m_entityWorld = std::make_unique<scene::SceneEntityWorld>();
 
-    m_EntityWorld->createEntity("SceneRoot");
+    m_entityWorld->createEntity("SceneRoot");
 
     if (!documentRoot.isObject())
     {
@@ -927,7 +927,7 @@ void Scene::loadModelAsync(
     SceneImportResult result;
     loadModelFile(fileName, asyncTextures, result);
     ++g_LoadingStats.ObjectsLoaded;
-    m_Models[index] = result;
+    m_models[index] = result;
 }
 
 bool Scene::loadModelFile(
@@ -938,13 +938,13 @@ bool Scene::loadModelFile(
     std::string ext = fileName.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (ext == ".obj")
-        return m_ObjImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
+        return m_objImporter->load(fileName, *m_textureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
     if (ext == ".usd" || ext == ".usda" || ext == ".usdc")
-        return m_CausUsdImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
+        return m_causUsdImporter->load(fileName, *m_textureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
     if (ext == ".urdf")
-        return m_UrdfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
+        return m_urdfImporter->load(fileName, *m_textureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
 
-    return m_GltfImporter->load(fileName, *m_TextureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
+    return m_gltfImporter->load(fileName, *m_textureLoader, g_LoadingStats, asyncTextures, result, m_textureSearchDirectory);
 }
 
 SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTextures)
@@ -952,7 +952,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
     if (source.empty())
         return {};
 
-    for (const auto& loaded : m_Models)
+    for (const auto& loaded : m_models)
     {
         if (loaded.source == source)
         {
@@ -967,7 +967,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
 
     SceneImportResult result;
     result.source = source;
-    m_Models.push_back(result);
+    m_models.push_back(result);
     ++g_LoadingStats.ObjectsTotal;
 
     if (IsBuiltinModelReference(source))
@@ -988,7 +988,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
         if (!loaded || !document.isObject())
         {
             caustica::error("Failed to load prefab '%s'.", fileName.generic_string().c_str());
-            m_Models.pop_back();
+            m_models.pop_back();
             return {};
         }
 
@@ -1005,7 +1005,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
         result.rootEntity = result.entityWorld->createEntity(prefabName);
         if (!instantiateEntities(*result.entityWorld, result.rootEntity, document, asyncTextures))
         {
-            m_Models.pop_back();
+            m_models.pop_back();
             return {};
         }
         result.entityWorld->rebuildPathsFromRoot();
@@ -1020,7 +1020,7 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
         ++g_LoadingStats.ObjectsLoaded;
     }
 
-    m_Models.back() = result;
+    m_models.back() = result;
     return result;
 }
 
@@ -1036,9 +1036,9 @@ ecs::Entity Scene::instantiatePrefab(
     if (!loaded.entityWorld || !ecs::isValid(loaded.rootEntity))
         return ecs::NullEntity;
 
-    scene::SceneEntityWorld& world = destWorld ? *destWorld : *m_EntityWorld;
+    scene::SceneEntityWorld& world = destWorld ? *destWorld : *m_entityWorld;
     ecs::Entity entity = world.importSubtree(
-        parent, *loaded.entityWorld, loaded.rootEntity, m_SceneTypeFactory.get());
+        parent, *loaded.entityWorld, loaded.rootEntity, m_sceneTypeFactory.get());
     if (!ecs::isValid(entity))
         return ecs::NullEntity;
 
@@ -1104,13 +1104,13 @@ SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
         return result;
 
     auto buffers = std::make_shared<BufferGroup>();
-    auto mesh = m_SceneTypeFactory->createMesh();
+    auto mesh = m_sceneTypeFactory->createMesh();
     mesh->name = NormalizeBuiltinModelName(builtinName);
     mesh->buffers = buffers;
 
     for (const BuiltinMeshData& builtinMesh : builtinMeshes)
     {
-        auto material = m_SceneTypeFactory->createMaterial();
+        auto material = m_sceneTypeFactory->createMaterial();
         material->name = builtinMesh.materialName;
         material->modelFileName = std::string("builtin:") + NormalizeBuiltinModelName(builtinName);
         material->baseOrDiffuseColor = builtinMesh.baseColor;
@@ -1123,7 +1123,7 @@ SceneImportResult Scene::loadBuiltinModel(const std::string& builtinName)
 
         AppendMeshToBuffers(builtinMesh, *buffers);
 
-        auto geometry = m_SceneTypeFactory->createMeshGeometry();
+        auto geometry = m_sceneTypeFactory->createMeshGeometry();
         geometry->material = material;
         geometry->indexOffsetInMesh = indexOffset;
         geometry->vertexOffsetInMesh = vertexOffset;
@@ -1239,7 +1239,7 @@ void Scene::attachLeafFromJson(
         return;
     }
 
-    auto leaf = m_SceneTypeFactory->createLeaf(type);
+    auto leaf = m_sceneTypeFactory->createLeaf(type);
     if (!leaf)
     {
         caustica::warning("Unknown leaf type '%s', skipping.", type.c_str());
@@ -1397,7 +1397,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                         targetName = targetName.substr(9);
 
                         std::shared_ptr<Material> material;
-                        for (const auto& it : m_EntityWorld->getMaterials())
+                        for (const auto& it : m_entityWorld->getMaterials())
                         {
                             if (it->name == targetName)
                             {
@@ -1423,7 +1423,7 @@ void Scene::loadAnimations(const Json::Value& nodeList)
                     }
                     else
                     {
-                        ecs::Entity target = m_EntityWorld->findEntity(targetNode.asString());
+                        ecs::Entity target = m_entityWorld->findEntity(targetNode.asString());
                         if (ecs::isValid(target))
                         {
                             scene::AnimationChannelData channelData;
@@ -1456,10 +1456,10 @@ void Scene::loadAnimations(const Json::Value& nodeList)
         if (!component.channels.empty())
         {
             if (!ecs::isValid(animationContainer))
-                animationContainer = m_EntityWorld->createEntity("Animations", m_EntityWorld->root());
+                animationContainer = m_entityWorld->createEntity("Animations", m_entityWorld->root());
 
-            ecs::Entity animEntity = m_EntityWorld->createEntity(animationName, animationContainer);
-            m_EntityWorld->setAnimation(animEntity, std::move(component));
+            ecs::Entity animEntity = m_entityWorld->createEntity(animationName, animationContainer);
+            m_entityWorld->setAnimation(animEntity, std::move(component));
         }
         else
         {
@@ -1479,25 +1479,25 @@ void Scene::refreshEntityWorldForFrame(uint32_t frameIndex)
 {
     assertLogicThread();
 
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
         return;
 
-    if (!m_EntityWorld->hasPendingStructureChanges()
-        && !m_EntityWorld->hasPendingTransformChanges()
-        && !m_EntityWorld->hasPendingLightChanges())
+    if (!m_entityWorld->hasPendingStructureChanges()
+        && !m_entityWorld->hasPendingTransformChanges()
+        && !m_entityWorld->hasPendingLightChanges())
         return;
 
-    scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
-    pending.structureChanged = m_EntityWorld->hasPendingStructureChanges();
-    pending.transformsChanged = m_EntityWorld->hasPendingTransformChanges();
-    pending.lightsChanged = m_EntityWorld->hasPendingLightChanges();
+    scene::SceneRenderPublishState& pending = m_renderSnapshot.pendingState();
+    pending.structureChanged = m_entityWorld->hasPendingStructureChanges();
+    pending.transformsChanged = m_entityWorld->hasPendingTransformChanges();
+    pending.lightsChanged = m_entityWorld->hasPendingLightChanges();
     pending.frameIndex = frameIndex;
     if (pending.structureChanged)
         pending.structureGeneration = m_structureGpu.bumpPublishedGeneration();
     else
         pending.structureGeneration = m_structureGpu.publishedGeneration();
 
-    m_EntityWorld->refresh(frameIndex);
+    m_entityWorld->refresh(frameIndex);
 }
 
 const scene::SceneRenderData& Scene::extractAndPublishForGpuSetup(
@@ -1505,34 +1505,34 @@ const scene::SceneRenderData& Scene::extractAndPublishForGpuSetup(
     const scene::FrameExtractInputs* frameInputs)
 {
     extractAndPublishRenderSnapshot(frameIndex, frameInputs);
-    return m_RenderSnapshot.readBufferForFrame(frameIndex);
+    return m_renderSnapshot.readBufferForFrame(frameIndex);
 }
 
 void Scene::extractLogicRenderCache(uint32_t frameIndex)
 {
     assertLogicThread();
 
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
         return;
 
-    scene::SceneRenderPublishState& pending = m_RenderSnapshot.pendingState();
+    scene::SceneRenderPublishState& pending = m_renderSnapshot.pendingState();
     const bool hasPendingChanges =
-        m_EntityWorld->hasPendingStructureChanges()
-        || m_EntityWorld->hasPendingTransformChanges()
-        || m_EntityWorld->hasPendingLightChanges();
+        m_entityWorld->hasPendingStructureChanges()
+        || m_entityWorld->hasPendingTransformChanges()
+        || m_entityWorld->hasPendingLightChanges();
 
     scene::SceneRenderExtractFlags flags{
-        .structureChanged = !m_LogicExtractCacheValid,
-        .transformsChanged = !m_LogicExtractCacheValid,
-        .lightsChanged = !m_LogicExtractCacheValid,
+        .structureChanged = !m_logicExtractCacheValid,
+        .transformsChanged = !m_logicExtractCacheValid,
+        .lightsChanged = !m_logicExtractCacheValid,
     };
 
     if (hasPendingChanges)
     {
         refreshEntityWorldForFrame(frameIndex);
-        flags.structureChanged = pending.structureChanged || !m_LogicExtractCacheValid;
-        flags.transformsChanged = pending.transformsChanged || !m_LogicExtractCacheValid;
-        flags.lightsChanged = pending.lightsChanged || !m_LogicExtractCacheValid;
+        flags.structureChanged = pending.structureChanged || !m_logicExtractCacheValid;
+        flags.transformsChanged = pending.transformsChanged || !m_logicExtractCacheValid;
+        flags.lightsChanged = pending.lightsChanged || !m_logicExtractCacheValid;
     }
     else if (pending.frameIndex != frameIndex)
     {
@@ -1545,14 +1545,14 @@ void Scene::extractLogicRenderCache(uint32_t frameIndex)
         pending.frameIndex = frameIndex;
     }
 
-    scene::extractSceneRenderData(*m_EntityWorld, m_LogicExtractCache, frameIndex, flags);
-    m_LogicExtractCacheValid = true;
+    scene::extractSceneRenderData(*m_entityWorld, m_logicExtractCache, frameIndex, flags);
+    m_logicExtractCacheValid = true;
 }
 
 scene::SceneRenderData* Scene::logicExtractCache()
 {
     assertLogicThread();
-    return m_EntityWorld ? &m_LogicExtractCache : nullptr;
+    return m_entityWorld ? &m_logicExtractCache : nullptr;
 }
 
 void Scene::publishRenderSnapshot(
@@ -1560,37 +1560,37 @@ void Scene::publishRenderSnapshot(
 {
     assertLogicThread();
 
-    if (!m_EntityWorld)
+    if (!m_entityWorld)
         return;
 
-    scene::SceneRenderData& writeBuffer = m_RenderSnapshot.writeBufferForFrame(frameIndex);
-    writeBuffer = m_LogicExtractCache;
+    scene::SceneRenderData& writeBuffer = m_renderSnapshot.writeBufferForFrame(frameIndex);
+    writeBuffer = m_logicExtractCache;
     if (frameInputs)
         scene::extractFrameRenderState(*frameInputs, writeBuffer);
 
-    m_RenderSnapshot.publish(frameIndex);
+    m_renderSnapshot.publish(frameIndex);
 
     // ChangeDetection contract: mutate -> hierarchy refresh -> Extract(Changed<>) -> end tick.
-    m_EntityWorld->endChangeDetectionFrame();
+    m_entityWorld->endChangeDetectionFrame();
 }
 
 void Scene::extractAndPublishRenderSnapshot(
     uint32_t frameIndex, const scene::FrameExtractInputs* frameInputs)
 {
     extractLogicRenderCache(frameIndex);
-    if (m_EntityWorld)
-        scene::extractGaussianSplatProxies(*m_EntityWorld, m_LogicExtractCache);
+    if (m_entityWorld)
+        scene::extractGaussianSplatProxies(*m_entityWorld, m_logicExtractCache);
     publishRenderSnapshot(frameIndex, frameInputs);
 }
 
 bool Scene::wasRenderSnapshotExtractedOnLogicThread(uint32_t frameIndex) const
 {
-    return m_RenderSnapshot.wasExtractedForFrame(frameIndex);
+    return m_renderSnapshot.wasExtractedForFrame(frameIndex);
 }
 
 uint32_t Scene::latestPublishedRenderFrameIndex() const
 {
-    return m_RenderSnapshot.latestExtractedFrameIndex();
+    return m_renderSnapshot.latestExtractedFrameIndex();
 }
 
 void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)
@@ -1606,10 +1606,10 @@ void Scene::syncRenderSnapshotGpuIndices(uint32_t /*frameIndex*/)
 
 void Scene::processNodesRecursive()
 {
-    if (!m_EntityWorld || !ecs::isValid(m_EntityWorld->root()))
+    if (!m_entityWorld || !ecs::isValid(m_entityWorld->root()))
         return;
 
-    auto& world = m_EntityWorld->world();
+    auto& world = m_entityWorld->world();
 
     world.each<scene::SceneSettingsComponent>([this](ecs::Entity, scene::SceneSettingsComponent& component)
     {
@@ -1619,10 +1619,10 @@ void Scene::processNodesRecursive()
     if (m_loadedSettings && m_loadedSettings->startingCameraId && !m_loadedSettings->startingCameraId->empty())
     {
         const std::string wanted = *m_loadedSettings->startingCameraId;
-        const auto& cameras = m_EntityWorld->cameraEntitiesInRegistrationOrder();
+        const auto& cameras = m_entityWorld->cameraEntitiesInRegistrationOrder();
         for (size_t i = 0; i < cameras.size(); ++i)
         {
-            bool match = m_EntityWorld->getEntityName(cameras[i]) == wanted;
+            bool match = m_entityWorld->getEntityName(cameras[i]) == wanted;
             if (!match)
             {
                 if (const auto* authoring = world.tryGet<scene::SceneAuthoringIdComponent>(cameras[i]))
@@ -1630,7 +1630,7 @@ void Scene::processNodesRecursive()
             }
             if (!match)
             {
-                const std::string path = m_EntityWorld->getEntityPath(cameras[i]).generic_string();
+                const std::string path = m_entityWorld->getEntityPath(cameras[i]).generic_string();
                 match = path == wanted || path.ends_with("/" + wanted);
             }
             if (match)
@@ -1653,9 +1653,9 @@ void Scene::processNodesRecursive()
 
         for (const auto& proxyPath : proxies)
         {
-            ecs::Entity proxyEntity = m_EntityWorld->entityForPath(proxyPath);
+            ecs::Entity proxyEntity = m_entityWorld->entityForPath(proxyPath);
             if (!ecs::isValid(proxyEntity))
-                proxyEntity = m_EntityWorld->entityForPath(std::filesystem::path("/") / proxyPath);
+                proxyEntity = m_entityWorld->entityForPath(std::filesystem::path("/") / proxyPath);
 
             if (ecs::isValid(proxyEntity))
             {

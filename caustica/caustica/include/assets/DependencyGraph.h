@@ -21,9 +21,9 @@ public:
     [[nodiscard]] std::vector<AssetId> dependentsOf(AssetId dependency) const;
 
 private:
-    mutable std::shared_mutex m_Mutex;
-    std::unordered_map<AssetId, std::unordered_set<AssetId, AssetId::Hash>, AssetId::Hash> m_Dependencies;
-    std::unordered_map<AssetId, std::unordered_set<AssetId, AssetId::Hash>, AssetId::Hash> m_Dependents;
+    mutable std::shared_mutex m_mutex;
+    std::unordered_map<AssetId, std::unordered_set<AssetId, AssetId::Hash>, AssetId::Hash> m_dependencies;
+    std::unordered_map<AssetId, std::unordered_set<AssetId, AssetId::Hash>, AssetId::Hash> m_dependents;
 };
 
 } // namespace caustica

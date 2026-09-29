@@ -21,7 +21,7 @@ namespace caustica
     {
     protected:
         std::shared_ptr<IFileSystem> m_fs;
-        std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
+        std::shared_ptr<SceneTypeFactory> m_sceneTypeFactory;
 
     public:
         UrdfImporter(

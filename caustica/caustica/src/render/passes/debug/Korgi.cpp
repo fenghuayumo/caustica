@@ -53,9 +53,9 @@ struct Controller
     void update()
     {
         int currentPage = (s_PageBit0 ? 1 : 0) | (s_PageBit1 ? 2 : 0);
-        if(currentPage != m_CurrentPage)
+        if(currentPage != m_currentPage)
         {
-            m_CurrentPage = currentPage;
+            m_currentPage = currentPage;
             SetAllLeds();
         }
         else
@@ -66,7 +66,7 @@ struct Controller
                 int cc = it0.first;
                 for(Button* pButton : it0.second)
                 {
-                    if(((pButton->getPage() == -1) || (pButton->getPage() == m_CurrentPage))
+                    if(((pButton->getPage() == -1) || (pButton->getPage() == m_currentPage))
                         && (pButton->getLedStatus() != pButton->getState()))
                     {
                         setLedStatus((unsigned char) cc, pButton);
@@ -112,7 +112,7 @@ private:
         {
             for (auto b : button->second)
             {
-                if((b->getPage() == -1) || (b->getPage() == m_CurrentPage))
+                if((b->getPage() == -1) || (b->getPage() == m_currentPage))
                 {
                     bool isPressed = (midiValue > 0);
                     switch(b->getMode())
@@ -152,7 +152,7 @@ private:
 
             for (auto k : knob->second)
             {
-                if((k->getPage() == -1) || (k->getPage() == m_CurrentPage))
+                if((k->getPage() == -1) || (k->getPage() == m_currentPage))
                 {
                     k->setValue(fvalue);
                 }
@@ -162,12 +162,12 @@ private:
 
     bool OpenMidiDevice()
     {
-        if (midiInOpen(&m_MidiInHandle, m_deviceIdx, (DWORD_PTR)MidiInCallback, 0, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
+        if (midiInOpen(&m_midiInHandle, m_deviceIdx, (DWORD_PTR)MidiInCallback, 0, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
         {
             return false;
         }
 
-        midiInStart(m_MidiInHandle);
+        midiInStart(m_midiInHandle);
 
         // Try to open the nanoKONTROL2 as an output device
         uint32_t numOutputDevices = midiOutGetNumDevs();
@@ -178,7 +178,7 @@ private:
             printf(caps.szPname);
             if(strncmp(caps.szPname, "nanoKONTROL2", strlen("nanoKONTROL2")) == 0)
             {
-                if(midiOutOpen(&m_MidiOutHandle, i, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR)
+                if(midiOutOpen(&m_midiOutHandle, i, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR)
                 {
                     // Set the initial status of the LEDs
                     SetAllLeds();
@@ -196,10 +196,10 @@ private:
 
     void CloseMidiDevice()
     {
-        if (m_MidiInHandle)
+        if (m_midiInHandle)
         {
-            midiInClose(m_MidiInHandle);
-            m_MidiInHandle = 0;
+            midiInClose(m_midiInHandle);
+            m_midiInHandle = 0;
         }
     }
 
@@ -221,7 +221,7 @@ private:
             int cc = it0.first;
             for(Button* pButton : it0.second)
             {
-                if((pButton->getPage() == -1) || (pButton->getPage() == m_CurrentPage))
+                if((pButton->getPage() == -1) || (pButton->getPage() == m_currentPage))
                 {
                     setLedStatus((unsigned char) cc, pButton);
                 }
@@ -231,7 +231,7 @@ private:
 
     void setLedStatus(unsigned char controlChannel, Button* pButton)
     {
-        if(m_MidiOutHandle)
+        if(m_midiOutHandle)
         {
             union {
                 DWORD dwData;
@@ -242,7 +242,7 @@ private:
             u.bData[1] = controlChannel;  // first MIDI data byte  : CC number
             u.bData[2] = (pButton && pButton->getState()) ? 127 : 0; // second MIDI data byte : Value
             u.bData[3] = 0;
-            midiOutShortMsg(m_MidiOutHandle, u.dwData);
+            midiOutShortMsg(m_midiOutHandle, u.dwData);
             if (pButton)
             {
                 pButton->setLedStatus(pButton->getState());
@@ -252,10 +252,10 @@ private:
 
     //static const string device_name = "nanoKONTROL2";
     static Controller* s_pController;
-    HMIDIIN  m_MidiInHandle = {};
-    HMIDIOUT m_MidiOutHandle = {};
+    HMIDIIN  m_midiInHandle = {};
+    HMIDIOUT m_midiOutHandle = {};
     int m_deviceIdx = 0;
-    int m_CurrentPage = 0;
+    int m_currentPage = 0;
 
     // Maps indexed by control channel
     unordered_map<int, std::vector<Knob*>>   knobs;
@@ -278,28 +278,28 @@ void update()
 }
 
 Button::Button(int page, Control controlChannel, ButtonMode mode, bool* pValue)
-    : m_Mode(mode)
-    , m_pValue(pValue ? (void*) pValue : (void*) &m_LocalState)
-    , m_PreviousState(false)
-    , m_LocalState(false)
-    , m_OffValue((int)false)
-    , m_OnValue((int)true)
-    , m_Page(page)
+    : m_mode(mode)
+    , m_pValue(pValue ? (void*) pValue : (void*) &m_localState)
+    , m_previousState(false)
+    , m_localState(false)
+    , m_offValue((int)false)
+    , m_onValue((int)true)
+    , m_page(page)
 {
-    m_LedStatus = getState();
+    m_ledStatus = getState();
     Controller::Get()->AddHook((unsigned char)controlChannel, this);
 }
 
 Button::Button(int page, Control controlChannel, int* pValue, int offValue, int onValue)
-    : m_Mode(ButtonMode::IntToggle)
+    : m_mode(ButtonMode::IntToggle)
     , m_pValue((void*)pValue)
-    , m_PreviousState(false)
-    , m_LocalState(false)
-    , m_OffValue(offValue)
-    , m_OnValue(onValue)
-    , m_Page(page)
+    , m_previousState(false)
+    , m_localState(false)
+    , m_offValue(offValue)
+    , m_onValue(onValue)
+    , m_page(page)
 {
-    m_LedStatus = getState();
+    m_ledStatus = getState();
     Controller::Get()->AddHook((unsigned char)controlChannel, this);
 }
 
@@ -307,7 +307,7 @@ bool Button::getState() const
 {
     if(getMode() == ButtonMode::IntToggle)
     {
-        return *reinterpret_cast<const int*>(m_pValue) == m_OnValue;
+        return *reinterpret_cast<const int*>(m_pValue) == m_onValue;
     }
     return *reinterpret_cast<const bool*>(m_pValue);
 }
@@ -316,7 +316,7 @@ void Button::setState(bool state)
 {
     if (getMode() == ButtonMode::IntToggle)
     {
-        *reinterpret_cast<int*>(m_pValue) = (state ? m_OnValue : m_OffValue);
+        *reinterpret_cast<int*>(m_pValue) = (state ? m_onValue : m_offValue);
         return;
     }
     *reinterpret_cast<bool*>(m_pValue) = state;
@@ -326,17 +326,17 @@ bool Button::wasMomentarilyPressed()
 {
     bool retVal = false;
     const bool state = getState();
-    if (state && !m_PreviousState)
+    if (state && !m_previousState)
     {
         retVal = true;
     }
     // clear the previous value, so this function only returns true once.
-    m_PreviousState = state;
+    m_previousState = state;
     return retVal;
 }
 
 Knob::Knob(int page, Control controlChannel, float* pValue, float mi, float ma)
-    : m_pValue(pValue), m_MinValue(mi), m_MaxValue(ma), m_Page(page)
+    : m_pValue(pValue), m_minValue(mi), m_maxValue(ma), m_page(page)
 {
     Controller::Get()->AddHook((unsigned char)controlChannel, this);
 }

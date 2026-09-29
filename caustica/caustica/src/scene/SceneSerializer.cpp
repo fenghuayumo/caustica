@@ -897,7 +897,7 @@ const Json::Value& ComponentNode(const Json::Value& components, const char* name
 
 void Scene::applyTopLevelSettings(const Json::Value& settingsNode)
 {
-    if (!settingsNode.isObject() || !m_EntityWorld)
+    if (!settingsNode.isObject() || !m_entityWorld)
         return;
 
     SceneSettings settings;
@@ -905,15 +905,15 @@ void Scene::applyTopLevelSettings(const Json::Value& settingsNode)
     settings.load(settingsNode);
 
     ecs::Entity settingsEntity = ecs::NullEntity;
-    m_EntityWorld->world().each<scene::SceneSettingsComponent>(
+    m_entityWorld->world().each<scene::SceneSettingsComponent>(
         [&](ecs::Entity entity, scene::SceneSettingsComponent&)
         {
             if (!ecs::isValid(settingsEntity))
                 settingsEntity = entity;
         });
     if (!ecs::isValid(settingsEntity))
-        settingsEntity = m_EntityWorld->createEntity("SceneSettings", m_EntityWorld->root());
-    m_EntityWorld->setSceneSettings(settingsEntity, settings);
+        settingsEntity = m_entityWorld->createEntity("SceneSettings", m_entityWorld->root());
+    m_entityWorld->setSceneSettings(settingsEntity, settings);
 }
 
 bool Scene::instantiateEntities(
@@ -1091,20 +1091,20 @@ bool Scene::loadEntities(
     if (!loadCustomData(documentRoot, asyncTextures))
         return false;
 
-    if (!instantiateEntities(*m_EntityWorld, m_EntityWorld->root(), documentRoot, asyncTextures))
+    if (!instantiateEntities(*m_entityWorld, m_entityWorld->root(), documentRoot, asyncTextures))
         return false;
 
     if (documentRoot.isMember("settings"))
         applyTopLevelSettings(documentRoot["settings"]);
 
     loadAnimations(documentRoot["animations"]);
-    m_EntityWorld->rebuildPathsFromRoot();
-    scene::applyEntityOverrides(*m_EntityWorld, documentRoot["entityOverrides"]);
+    m_entityWorld->rebuildPathsFromRoot();
+    scene::applyEntityOverrides(*m_entityWorld, documentRoot["entityOverrides"]);
     if (documentRoot.isMember("settings") && documentRoot["settings"].isObject())
     {
         SceneSettings look;
         look.load(documentRoot["settings"]);
-        scene::applyHiddenEntities(*m_EntityWorld, look.hiddenEntities);
+        scene::applyHiddenEntities(*m_entityWorld, look.hiddenEntities);
     }
     return true;
 }

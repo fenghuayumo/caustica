@@ -22,9 +22,9 @@ public:
     void setState(const AssetId& id, AssetState state);
 
 private:
-    mutable std::shared_mutex m_Mutex;
-    std::unordered_map<std::string, AssetId> m_PathToId;
-    std::unordered_map<AssetId, std::shared_ptr<AssetMetadata>, AssetId::Hash> m_Metadata;
+    mutable std::shared_mutex m_mutex;
+    std::unordered_map<std::string, AssetId> m_pathToId;
+    std::unordered_map<AssetId, std::shared_ptr<AssetMetadata>, AssetId::Hash> m_metadata;
 };
 
 } // namespace caustica

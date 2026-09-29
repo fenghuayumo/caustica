@@ -1051,7 +1051,7 @@ UrdfImporter::UrdfImporter(
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
-    , m_SceneTypeFactory(std::move(sceneTypeFactory))
+    , m_sceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 
@@ -1063,7 +1063,7 @@ bool UrdfImporter::load(
     SceneImportResult& result,
     const std::filesystem::path&) const
 {
-    if (!m_SceneTypeFactory)
+    if (!m_sceneTypeFactory)
     {
         caustica::error("UrdfImporter: scene type factory is null.");
         return false;
@@ -1184,13 +1184,13 @@ bool UrdfImporter::load(
             if (collada)
             {
                 mesh = TryLoadColladaVisual(
-                    *m_SceneTypeFactory, visual, fileName, meshDirHint, m_fs, meshName, daeCache, textureCache);
+                    *m_sceneTypeFactory, visual, fileName, meshDirHint, m_fs, meshName, daeCache, textureCache);
             }
             else
             {
                 StlMeshData meshData;
                 if (BuildVisualMeshData(visual, fileName, meshDirHint, m_fs, stlCache, meshData))
-                    mesh = BuildMeshFromStl(*m_SceneTypeFactory, meshName, meshData, visual.rgba, fileName);
+                    mesh = BuildMeshFromStl(*m_sceneTypeFactory, meshName, meshData, visual.rgba, fileName);
             }
             if (!mesh)
             {

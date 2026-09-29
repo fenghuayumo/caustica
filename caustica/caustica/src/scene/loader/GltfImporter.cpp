@@ -53,7 +53,7 @@ public:
 
 GltfImporter::GltfImporter(std::shared_ptr<caustica::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
-    , m_SceneTypeFactory(std::move(sceneTypeFactory))
+    , m_sceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 
@@ -976,7 +976,7 @@ bool GltfImporter::load(
     {
         const cgltf_material& material = objects->materials[mat_idx];
         
-        std::shared_ptr<Material> matinfo = m_SceneTypeFactory->createMaterial();
+        std::shared_ptr<Material> matinfo = m_sceneTypeFactory->createMaterial();
         if (material.name)
             matinfo->name = material.name;
         matinfo->modelFileName = normalizedFileName;
@@ -1153,7 +1153,7 @@ bool GltfImporter::load(
     {
         const cgltf_mesh& mesh = objects->meshes[mesh_idx];
 
-        std::shared_ptr<MeshInfo> minfo = m_SceneTypeFactory->createMesh();
+        std::shared_ptr<MeshInfo> minfo = m_sceneTypeFactory->createMesh();
         if (mesh.name) minfo->name = mesh.name;
         minfo->buffers = buffers;
         minfo->indexOffset = (uint32_t)totalIndices;
@@ -1617,7 +1617,7 @@ bool GltfImporter::load(
                 }
             }
 
-            auto geometry = m_SceneTypeFactory->createMeshGeometry();
+            auto geometry = m_sceneTypeFactory->createMeshGeometry();
             if (prim.material)
             {
                 geometry->material = materials[prim.material];
@@ -2048,7 +2048,7 @@ bool GltfImporter::load(
             continue;
 
         const ecs::Entity skinnedEntity = dstIt->second;
-        world.setSkinnedMeshInstance(skinnedEntity, *m_SceneTypeFactory, prototypeMesh);
+        world.setSkinnedMeshInstance(skinnedEntity, *m_sceneTypeFactory, prototypeMesh);
 
         auto* skinned = world.world().get<scene::SkinnedMeshComponent>(skinnedEntity);
         if (!skinned)

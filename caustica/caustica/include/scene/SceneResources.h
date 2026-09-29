@@ -25,11 +25,11 @@ namespace caustica
         SceneResourceCallback<Material>  OnMaterialAdded;
         SceneResourceCallback<Material>  OnMaterialRemoved;
 
-        [[nodiscard]] const ResourceTracker<Material>& getMaterials()              const { return m_Materials; }
-        [[nodiscard]] const ResourceTracker<MeshInfo>& getMeshes()                 const { return m_Meshes; }
-        [[nodiscard]] size_t getGeometryCount()                                    const { return m_GeometryCount; }
-        [[nodiscard]] size_t getMaxGeometryCountPerMesh()                          const { return m_MaxGeometryCountPerMesh; }
-        [[nodiscard]] size_t getGeometryInstancesCount()                           const { return m_GeometryInstancesCount; }
+        [[nodiscard]] const ResourceTracker<Material>& getMaterials()              const { return m_materials; }
+        [[nodiscard]] const ResourceTracker<MeshInfo>& getMeshes()                 const { return m_meshes; }
+        [[nodiscard]] size_t getGeometryCount()                                    const { return m_geometryCount; }
+        [[nodiscard]] size_t getMaxGeometryCountPerMesh()                          const { return m_maxGeometryCountPerMesh; }
+        [[nodiscard]] size_t getGeometryInstancesCount()                           const { return m_geometryInstancesCount; }
 
         void registerMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
         void unregisterMeshInstanceEntity(ecs::Entity entity, const std::shared_ptr<MeshInfo>& mesh, bool skinned);
@@ -38,11 +38,11 @@ namespace caustica
         SceneResources& operator=(const SceneResources&) = delete;
 
     protected:
-        ResourceTracker<Material>  m_Materials;
-        ResourceTracker<MeshInfo>  m_Meshes;
-        size_t m_GeometryCount = 0;
-        size_t m_MaxGeometryCountPerMesh = 0;
-        size_t m_GeometryInstancesCount = 0;
+        ResourceTracker<Material>  m_materials;
+        ResourceTracker<MeshInfo>  m_meshes;
+        size_t m_geometryCount = 0;
+        size_t m_maxGeometryCountPerMesh = 0;
+        size_t m_geometryInstancesCount = 0;
     };
 
 } // namespace caustica

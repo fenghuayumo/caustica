@@ -23,7 +23,7 @@ namespace caustica
     {   
     protected:
         std::shared_ptr<caustica::IFileSystem> m_fs;
-        std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
+        std::shared_ptr<SceneTypeFactory> m_sceneTypeFactory;
         
     public:
         explicit GltfImporter(std::shared_ptr<caustica::IFileSystem> fs, std::shared_ptr<SceneTypeFactory> sceneTypeFactory);

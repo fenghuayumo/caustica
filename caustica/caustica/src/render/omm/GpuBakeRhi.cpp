@@ -138,13 +138,13 @@ namespace
 	class BindingCache
 	{
 	private:
-		caustica::rhi::DeviceHandle m_Device;
-		std::unordered_map<size_t, caustica::rhi::BindingSetHandle> m_BindingSets;
-		std::shared_mutex m_Mutex;
+		caustica::rhi::DeviceHandle m_device;
+		std::unordered_map<size_t, caustica::rhi::BindingSetHandle> m_bindingSets;
+		std::shared_mutex m_mutex;
 
 	public:
 		BindingCache(caustica::rhi::Device* device)
-			: m_Device(device)
+			: m_device(device)
 		{ }
 
 		caustica::rhi::BindingSetHandle GetCachedBindingSet(const caustica::rhi::BindingSetDesc& desc, caustica::rhi::BindingLayout* layout)
@@ -153,14 +153,14 @@ namespace
 			caustica::rhi::hash_combine(hash, desc);
 			caustica::rhi::hash_combine(hash, layout);
 
-			m_Mutex.lock_shared();
+			m_mutex.lock_shared();
 
 			caustica::rhi::BindingSetHandle result = nullptr;
-			auto it = m_BindingSets.find(hash);
-			if (it != m_BindingSets.end())
+			auto it = m_bindingSets.find(hash);
+			if (it != m_bindingSets.end())
 				result = it->second;
 
-			m_Mutex.unlock_shared();
+			m_mutex.unlock_shared();
 
 			if (result)
 			{
@@ -176,29 +176,29 @@ namespace
 			caustica::rhi::hash_combine(hash, desc);
 			caustica::rhi::hash_combine(hash, layout);
 
-			m_Mutex.lock_shared();
+			m_mutex.lock_shared();
 
 			caustica::rhi::BindingSetHandle result;
-			auto it = m_BindingSets.find(hash);
-			if (it != m_BindingSets.end())
+			auto it = m_bindingSets.find(hash);
+			if (it != m_bindingSets.end())
 				result = it->second;
 
-			m_Mutex.unlock_shared();
+			m_mutex.unlock_shared();
 
 			if (!result)
 			{
-				m_Mutex.lock();
+				m_mutex.lock();
 
-				caustica::rhi::BindingSetHandle& entry = m_BindingSets[hash];
+				caustica::rhi::BindingSetHandle& entry = m_bindingSets[hash];
 				if (!entry)
 				{
-					result = m_Device->createBindingSet(desc, layout);
+					result = m_device->createBindingSet(desc, layout);
 					entry = result;
 				}
 				else
 					result = entry;
 
-				m_Mutex.unlock();
+				m_mutex.unlock();
 			}
 
 			if (result)
@@ -212,9 +212,9 @@ namespace
 
 		void Clear()
 		{
-			m_Mutex.lock();
-			m_BindingSets.clear();
-			m_Mutex.unlock();
+			m_mutex.lock();
+			m_bindingSets.clear();
+			m_mutex.unlock();
 		}
 	};
 }

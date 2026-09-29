@@ -22,24 +22,24 @@ void HotReloadTracker::watch(AssetId asset, const std::filesystem::path& path)
         watched.hasTimestamp = true;
     }
 
-    std::unique_lock lock(m_Mutex);
-    m_WatchedFiles[asset] = std::move(watched);
+    std::unique_lock lock(m_mutex);
+    m_watchedFiles[asset] = std::move(watched);
 }
 
 void HotReloadTracker::unwatch(AssetId asset)
 {
-    std::unique_lock lock(m_Mutex);
-    m_WatchedFiles.erase(asset);
+    std::unique_lock lock(m_mutex);
+    m_watchedFiles.erase(asset);
 }
 
 std::vector<HotReloadChange> HotReloadTracker::pollChangedFiles()
 {
     std::vector<HotReloadChange> changes;
 
-    std::unique_lock lock(m_Mutex);
-    for (auto& [asset, watched] : m_WatchedFiles)
+    std::unique_lock lock(m_mutex);
+    for (auto& [asset, watched] : m_watchedFiles)
     {
-        if (m_OwnedWrites.contains(watched.key))
+        if (m_ownedWrites.contains(watched.key))
             continue;
         if (!std::filesystem::exists(watched.path))
             continue;
@@ -67,8 +67,8 @@ void HotReloadTracker::beginOwnedWrite(const std::filesystem::path& path)
     if (path.empty())
         return;
     const std::string key = canonicalAssetKey(path);
-    std::unique_lock lock(m_Mutex);
-    ++m_OwnedWrites[key];
+    std::unique_lock lock(m_mutex);
+    ++m_ownedWrites[key];
 }
 
 void HotReloadTracker::endOwnedWrite(const std::filesystem::path& path)
@@ -76,9 +76,9 @@ void HotReloadTracker::endOwnedWrite(const std::filesystem::path& path)
     if (path.empty())
         return;
     const std::string key = canonicalAssetKey(path);
-    std::unique_lock lock(m_Mutex);
-    auto owned = m_OwnedWrites.find(key);
-    if (owned == m_OwnedWrites.end())
+    std::unique_lock lock(m_mutex);
+    auto owned = m_ownedWrites.find(key);
+    if (owned == m_ownedWrites.end())
         return;
     if (--owned->second != 0)
         return;
@@ -86,7 +86,7 @@ void HotReloadTracker::endOwnedWrite(const std::filesystem::path& path)
     const bool exists = std::filesystem::exists(path);
     const auto writeTime = exists ? std::filesystem::last_write_time(path)
                                   : std::filesystem::file_time_type{};
-    for (auto& [asset, watched] : m_WatchedFiles)
+    for (auto& [asset, watched] : m_watchedFiles)
     {
         (void)asset;
         if (watched.key != key)
@@ -94,14 +94,14 @@ void HotReloadTracker::endOwnedWrite(const std::filesystem::path& path)
         watched.lastWriteTime = writeTime;
         watched.hasTimestamp = exists;
     }
-    m_OwnedWrites.erase(owned);
+    m_ownedWrites.erase(owned);
 }
 
 void HotReloadTracker::clear()
 {
-    std::unique_lock lock(m_Mutex);
-    m_WatchedFiles.clear();
-    m_OwnedWrites.clear();
+    std::unique_lock lock(m_mutex);
+    m_watchedFiles.clear();
+    m_ownedWrites.clear();
 }
 
 } // namespace caustica

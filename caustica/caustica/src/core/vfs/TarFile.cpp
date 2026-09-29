@@ -36,24 +36,24 @@ static_assert(sizeof(header_posix_ustar) == 512);
 
 TarFile::TarFile(const std::filesystem::path& archivePath)
 {
-    m_ArchivePath = archivePath.lexically_normal().generic_string();
-    m_ArchiveFile = fopen(m_ArchivePath.c_str(), "rb");
+    m_archivePath = archivePath.lexically_normal().generic_string();
+    m_archiveFile = fopen(m_archivePath.c_str(), "rb");
 
-    if (m_ArchiveFile)
+    if (m_archiveFile)
     {
         bool errors = false;
 
-        fseek(m_ArchiveFile, 0, SEEK_END);
-        size_t archiveSize = ftello(m_ArchiveFile);
+        fseek(m_archiveFile, 0, SEEK_END);
+        size_t archiveSize = ftello(m_archiveFile);
         
         size_t currentPosition = 0;
 
         while (currentPosition + sizeof(header_posix_ustar) <= archiveSize)
         {
-            fseeko(m_ArchiveFile, currentPosition, SEEK_SET);
+            fseeko(m_archiveFile, currentPosition, SEEK_SET);
 
             header_posix_ustar header{};
-            if (fread(&header, sizeof(header), 1, m_ArchiveFile) != 1)
+            if (fread(&header, sizeof(header), 1, m_archiveFile) != 1)
                 break;
 
             currentPosition += sizeof(header);
@@ -98,7 +98,7 @@ TarFile::TarFile(const std::filesystem::path& archivePath)
             if (currentPosition + fileSize > archiveSize)
             {
                 caustica::warning("Malformed tar archive '%s': file '%s' size (%ull bytes) exceeds the archive range",
-                    m_ArchivePath.c_str(), fileName, fileSize);
+                    m_archivePath.c_str(), fileName, fileSize);
                 errors = true;
                 break;
             }
@@ -107,11 +107,11 @@ TarFile::TarFile(const std::filesystem::path& archivePath)
             FileEntry entry;
             entry.offset = currentPosition;
             entry.size = fileSize;
-            m_Files[fileName] = entry;
+            m_files[fileName] = entry;
 
             std::filesystem::path filePath = fileName;
             if (filePath.has_parent_path())
-                m_Directories.insert(filePath.parent_path().generic_string());
+                m_directories.insert(filePath.parent_path().generic_string());
 
             // advance to the next file
             currentPosition += (fileSize + 511) & ~511;
@@ -119,10 +119,10 @@ TarFile::TarFile(const std::filesystem::path& archivePath)
 
         if (errors)
         {
-            fclose(m_ArchiveFile);
-            m_ArchiveFile = nullptr;
-            m_Files.clear();
-            m_Directories.clear();
+            fclose(m_archiveFile);
+            m_archiveFile = nullptr;
+            m_files.clear();
+            m_directories.clear();
         }
     }
 }
@@ -130,32 +130,32 @@ TarFile::TarFile(const std::filesystem::path& archivePath)
 TarFile::~TarFile()
 {
     // make sure we're not closing the file while some other thread is reading from it
-    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (m_ArchiveFile)
+    if (m_archiveFile)
     {
-        fclose(m_ArchiveFile);
-        m_ArchiveFile = nullptr;
+        fclose(m_archiveFile);
+        m_archiveFile = nullptr;
     }
 }
 
 bool TarFile::isOpen() const
 {
-    return m_ArchiveFile != nullptr;
+    return m_archiveFile != nullptr;
 }
 
 bool TarFile::folderExists(const std::filesystem::path& name)
 {
     std::string normalizedName = name.lexically_normal().relative_path().generic_string();
 
-    return m_Directories.find(normalizedName) != m_Directories.end();
+    return m_directories.find(normalizedName) != m_directories.end();
 }
 
 bool TarFile::fileExists(const std::filesystem::path& name)
 {
     std::string normalizedName = name.lexically_normal().relative_path().generic_string();
 
-    return m_Files.find(normalizedName) != m_Files.end();
+    return m_files.find(normalizedName) != m_files.end();
 }
 
 std::shared_ptr<IBlob> TarFile::readFile(const std::filesystem::path& name)
@@ -165,18 +165,18 @@ std::shared_ptr<IBlob> TarFile::readFile(const std::filesystem::path& name)
     if (normalizedName.empty())
         return nullptr;
     
-    auto entry = m_Files.find(normalizedName);
+    auto entry = m_files.find(normalizedName);
 
-    if (entry == m_Files.end())
+    if (entry == m_files.end())
         return nullptr;
 
     // prevent concurrent file operations from multiple threads from this point on
-    std::lock_guard<std::mutex> lockGuard(m_Mutex);
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
     
-    if (fseeko(m_ArchiveFile, entry->second.offset, SEEK_SET) != 0)
+    if (fseeko(m_archiveFile, entry->second.offset, SEEK_SET) != 0)
     {
         caustica::warning("Error seeking to offset %ull for file '%s' in tar archive '%s'",
-            entry->second.offset, normalizedName.c_str(), m_ArchivePath.c_str());
+            entry->second.offset, normalizedName.c_str(), m_archivePath.c_str());
         return nullptr;
     }
 
@@ -185,12 +185,12 @@ std::shared_ptr<IBlob> TarFile::readFile(const std::filesystem::path& name)
     if (!data)
         return nullptr;
 
-    size_t sizeRead = fread(data, 1, entry->second.size, m_ArchiveFile);
+    size_t sizeRead = fread(data, 1, entry->second.size, m_archiveFile);
 
     if (sizeRead != entry->second.size)
     {
         caustica::warning("Error reading file '%s' (%ull bytes) from tar archive '%s'", 
-            entry->second.size, normalizedName.c_str(), m_ArchivePath.c_str());
+            entry->second.size, normalizedName.c_str(), m_archivePath.c_str());
         free(data);
         return nullptr;
     }
@@ -212,7 +212,7 @@ int TarFile::enumerateFiles(const std::filesystem::path& path, const std::vector
     std::basic_regex<char> regex(getFileSearchRegex(path.relative_path(), extensions));
 
     int numEntries = 0;
-    for (const auto& [name, record] : m_Files)
+    for (const auto& [name, record] : m_files)
     {
         if (std::regex_match(name, regex))
         {
@@ -231,7 +231,7 @@ int TarFile::enumerateDirectories(const std::filesystem::path& path, enumerate_c
     std::filesystem::path normalizedPath = path.relative_path().lexically_normal();
 
     int numEntries = 0;
-    for (const auto& name : m_Directories)
+    for (const auto& name : m_directories)
     {
         std::filesystem::path dirPath = name;
         if (dirPath.parent_path() == normalizedPath)

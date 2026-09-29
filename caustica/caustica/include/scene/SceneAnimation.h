@@ -26,35 +26,35 @@ namespace caustica
     class SceneAnimationChannel
     {
     private:
-        std::shared_ptr<animation::Sampler> m_Sampler;
-        ecs::Entity m_TargetEntity = ecs::NullEntity;
-        std::weak_ptr<Material> m_TargetMaterial;
-        AnimationAttribute m_Attribute;
-        std::string m_LeafPropertyName;
+        std::shared_ptr<animation::Sampler> m_sampler;
+        ecs::Entity m_targetEntity = ecs::NullEntity;
+        std::weak_ptr<Material> m_targetMaterial;
+        AnimationAttribute m_attribute;
+        std::string m_leafPropertyName;
 
     public:
         // Constructor for transform-targeting channels.
         SceneAnimationChannel(std::shared_ptr<animation::Sampler> sampler, ecs::Entity targetEntity, AnimationAttribute attribute)
-            : m_Sampler(std::move(sampler))
-            , m_TargetEntity(targetEntity)
-            , m_Attribute(attribute)
+            : m_sampler(std::move(sampler))
+            , m_targetEntity(targetEntity)
+            , m_attribute(attribute)
         { }
 
         // Constructor for material property channels.
         SceneAnimationChannel(std::shared_ptr<animation::Sampler> sampler, const std::shared_ptr<Material>& targetMaterial)
-            : m_Sampler(std::move(sampler))
-            , m_TargetMaterial(targetMaterial)
-            , m_Attribute(AnimationAttribute::LeafProperty)
+            : m_sampler(std::move(sampler))
+            , m_targetMaterial(targetMaterial)
+            , m_attribute(AnimationAttribute::LeafProperty)
         { }
 
         [[nodiscard]] bool isValid() const;
-        [[nodiscard]] const std::shared_ptr<animation::Sampler>& getSampler() const { return m_Sampler; }
-        [[nodiscard]] AnimationAttribute getAttribute() const { return m_Attribute; }
-        [[nodiscard]] ecs::Entity getTargetEntity() const { return m_TargetEntity; }
-        [[nodiscard]] std::shared_ptr<Material> getTargetMaterial() const { return m_TargetMaterial.lock(); }
-        [[nodiscard]] const std::string& getLeafPropertyName() const { return m_LeafPropertyName; }
-        void setTargetEntity(ecs::Entity entity) { m_TargetEntity = entity; }
-        void setLeafPropertyName(const std::string& name) { m_LeafPropertyName = name; }
+        [[nodiscard]] const std::shared_ptr<animation::Sampler>& getSampler() const { return m_sampler; }
+        [[nodiscard]] AnimationAttribute getAttribute() const { return m_attribute; }
+        [[nodiscard]] ecs::Entity getTargetEntity() const { return m_targetEntity; }
+        [[nodiscard]] std::shared_ptr<Material> getTargetMaterial() const { return m_targetMaterial.lock(); }
+        [[nodiscard]] const std::string& getLeafPropertyName() const { return m_leafPropertyName; }
+        void setTargetEntity(ecs::Entity entity) { m_targetEntity = entity; }
+        void setLeafPropertyName(const std::string& name) { m_leafPropertyName = name; }
 
         // apply the sampled value for `time` to the target entity/material via `world`.
         // Returns false if the channel has no valid target or the sampler has no data at `time`.
@@ -64,8 +64,8 @@ namespace caustica
     class SceneAnimation
     {
     private:
-        std::vector<std::shared_ptr<SceneAnimationChannel>> m_Channels;
-        float m_Duration = 0.f;
+        std::vector<std::shared_ptr<SceneAnimationChannel>> m_channels;
+        float m_duration = 0.f;
 
     public:
         std::string name;
@@ -74,8 +74,8 @@ namespace caustica
 
         [[nodiscard]] std::shared_ptr<SceneAnimation> clone();
         [[nodiscard]] SceneContentFlags getContentFlags() const { return SceneContentFlags::Animations; }
-        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimationChannel>>& getChannels() const { return m_Channels; }
-        [[nodiscard]] float getDuration() const { return m_Duration; }
+        [[nodiscard]] const std::vector<std::shared_ptr<SceneAnimationChannel>>& getChannels() const { return m_channels; }
+        [[nodiscard]] float getDuration() const { return m_duration; }
         [[nodiscard]] bool isVald() const;  // note: preserves original typo
         bool apply(float time, scene::SceneEntityWorld& world) const;  // NOLINT(modernize-use-nodiscard)
         void addChannel(const std::shared_ptr<SceneAnimationChannel>& channel);

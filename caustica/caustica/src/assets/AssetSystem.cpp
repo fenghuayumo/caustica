@@ -34,36 +34,36 @@ void AssetSystem::initialize(
     std::shared_ptr<IFileSystem> fileSystem,
     std::shared_ptr<IDescriptorTableManager> descriptorTable)
 {
-    m_TextureLoader = std::make_shared<TextureLoader>(
+    m_textureLoader = std::make_shared<TextureLoader>(
         device,
         std::move(fileSystem),
         std::move(descriptorTable),
-        m_Registry,
-        m_Images);
-    m_Initialized = true;
+        m_registry,
+        m_images);
+    m_initialized = true;
     caustica::info("AssetSystem initialized");
 }
 
 void AssetSystem::shutdown()
 {
-    if (!m_Initialized)
+    if (!m_initialized)
         return;
 
     // Detach before clearing stores / dropping the shared_ptr so any leftover
-    // Scene/shared holders cannot UAF m_Registry/m_Images in ~TextureLoader.
-    if (m_TextureLoader)
-        m_TextureLoader->detachFromStores();
+    // Scene/shared holders cannot UAF m_registry/m_images in ~TextureLoader.
+    if (m_textureLoader)
+        m_textureLoader->detachFromStores();
 
-    m_ArtifactCache.clear();
-    m_HotReload.clear();
-    m_Dependencies.clear();
-    m_Scenes.clear();
-    m_Prefabs.clear();
-    m_Materials.clear();
-    m_Meshes.clear();
-    m_Images.clear();
-    m_TextureLoader.reset();
-    m_Initialized = false;
+    m_artifactCache.clear();
+    m_hotReload.clear();
+    m_dependencies.clear();
+    m_scenes.clear();
+    m_prefabs.clear();
+    m_materials.clear();
+    m_meshes.clear();
+    m_images.clear();
+    m_textureLoader.reset();
+    m_initialized = false;
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromFile(
@@ -72,21 +72,21 @@ Handle<ImageAsset> AssetSystem::loadTextureFromFile(
     render::RenderDevice* renderDevice,
     caustica::rhi::CommandList* commandList)
 {
-    return m_TextureLoader->loadTextureFromFile(path, sRGB, renderDevice, commandList);
+    return m_textureLoader->loadTextureFromFile(path, sRGB, renderDevice, commandList);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromFileDeferred(
     const std::filesystem::path& path,
     bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromFileDeferred(path, sRGB);
+    return m_textureLoader->loadTextureFromFileDeferred(path, sRGB);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromFileAsync(
     const std::filesystem::path& path,
     bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromFileAsync(path, sRGB);
+    return m_textureLoader->loadTextureFromFileAsync(path, sRGB);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromMemory(
@@ -97,7 +97,7 @@ Handle<ImageAsset> AssetSystem::loadTextureFromMemory(
     render::RenderDevice* renderDevice,
     caustica::rhi::CommandList* commandList)
 {
-    return m_TextureLoader->loadTextureFromMemory(data, name, mimeType, sRGB, renderDevice, commandList);
+    return m_textureLoader->loadTextureFromMemory(data, name, mimeType, sRGB, renderDevice, commandList);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromMemoryDeferred(
@@ -106,7 +106,7 @@ Handle<ImageAsset> AssetSystem::loadTextureFromMemoryDeferred(
     const std::string& mimeType,
     bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromMemoryDeferred(data, name, mimeType, sRGB);
+    return m_textureLoader->loadTextureFromMemoryDeferred(data, name, mimeType, sRGB);
 }
 
 Handle<ImageAsset> AssetSystem::loadTextureFromMemoryAsync(
@@ -115,17 +115,17 @@ Handle<ImageAsset> AssetSystem::loadTextureFromMemoryAsync(
     const std::string& mimeType,
     bool sRGB)
 {
-    return m_TextureLoader->loadTextureFromMemoryAsync(data, name, mimeType, sRGB);
+    return m_textureLoader->loadTextureFromMemoryAsync(data, name, mimeType, sRGB);
 }
 
 std::shared_ptr<ImageAsset> AssetSystem::getLoadedTexture(const std::filesystem::path& path)
 {
-    return m_TextureLoader->getLoadedTexture(path);
+    return m_textureLoader->getLoadedTexture(path);
 }
 
 bool AssetSystem::unloadTexture(const Handle<ImageAsset>& texture)
 {
-    return m_TextureLoader->unloadTexture(texture);
+    return m_textureLoader->unloadTexture(texture);
 }
 
 Handle<MeshAsset> AssetSystem::registerMeshAsset(
@@ -137,7 +137,7 @@ Handle<MeshAsset> AssetSystem::registerMeshAsset(
         return {};
 
     const std::filesystem::path assetPath = MakeTypedAssetPath(sourcePath, "mesh", name, mesh.get());
-    AssetId id = m_Registry.registerAsset(assetPath, AssetType::Mesh);
+    AssetId id = m_registry.registerAsset(assetPath, AssetType::Mesh);
 
     auto asset = std::make_shared<MeshAsset>();
     asset->id = id;
@@ -146,9 +146,9 @@ Handle<MeshAsset> AssetSystem::registerMeshAsset(
     asset->mesh = mesh;
 
     if (!sourcePath.empty() && std::filesystem::exists(sourcePath))
-        m_HotReload.watch(id, sourcePath);
+        m_hotReload.watch(id, sourcePath);
 
-    return m_Meshes.insert(id, std::move(asset));
+    return m_meshes.insert(id, std::move(asset));
 }
 
 Handle<MaterialAsset> AssetSystem::registerMaterialAsset(
@@ -160,7 +160,7 @@ Handle<MaterialAsset> AssetSystem::registerMaterialAsset(
         return {};
 
     const std::filesystem::path assetPath = MakeTypedAssetPath(sourcePath, "material", name, material.get());
-    AssetId id = m_Registry.registerAsset(assetPath, AssetType::Material);
+    AssetId id = m_registry.registerAsset(assetPath, AssetType::Material);
 
     auto asset = std::make_shared<MaterialAsset>();
     asset->id = id;
@@ -169,9 +169,9 @@ Handle<MaterialAsset> AssetSystem::registerMaterialAsset(
     asset->material = material;
 
     if (!sourcePath.empty() && std::filesystem::exists(sourcePath))
-        m_HotReload.watch(id, sourcePath);
+        m_hotReload.watch(id, sourcePath);
 
-    return m_Materials.insert(id, std::move(asset));
+    return m_materials.insert(id, std::move(asset));
 }
 
 Handle<SceneAsset> AssetSystem::registerSceneAsset(
@@ -183,7 +183,7 @@ Handle<SceneAsset> AssetSystem::registerSceneAsset(
         return {};
 
     const std::filesystem::path assetPath = MakeTypedAssetPath(sourcePath, "scene", name, scene.get());
-    AssetId id = m_Registry.registerAsset(assetPath, AssetType::Scene);
+    AssetId id = m_registry.registerAsset(assetPath, AssetType::Scene);
 
     auto asset = std::make_shared<SceneAsset>();
     asset->id = id;
@@ -192,9 +192,9 @@ Handle<SceneAsset> AssetSystem::registerSceneAsset(
     asset->scene = scene;
 
     if (!sourcePath.empty() && std::filesystem::exists(sourcePath))
-        m_HotReload.watch(id, sourcePath);
+        m_hotReload.watch(id, sourcePath);
 
-    return m_Scenes.insert(id, std::move(asset));
+    return m_scenes.insert(id, std::move(asset));
 }
 
 Handle<ScenePrefabAsset> AssetSystem::registerScenePrefab(
@@ -211,7 +211,7 @@ Handle<ScenePrefabAsset> AssetSystem::registerScenePrefab(
     const std::filesystem::path assetPath = sourcePath.empty()
         ? MakeTypedAssetPath({}, "prefab", name, importResult.get())
         : sourcePath;
-    AssetId id = m_Registry.registerAsset(assetPath, AssetType::Prefab);
+    AssetId id = m_registry.registerAsset(assetPath, AssetType::Prefab);
 
     auto asset = std::make_shared<ScenePrefabAsset>();
     asset->id = id;
@@ -220,50 +220,50 @@ Handle<ScenePrefabAsset> AssetSystem::registerScenePrefab(
     asset->import = importResult;
 
     if (!sourcePath.empty() && std::filesystem::exists(sourcePath))
-        m_HotReload.watch(id, sourcePath);
+        m_hotReload.watch(id, sourcePath);
 
-    m_Registry.setState(id, AssetState::Loaded);
-    return m_Prefabs.insert(id, std::move(asset));
+    m_registry.setState(id, AssetState::Loaded);
+    return m_prefabs.insert(id, std::move(asset));
 }
 
 Handle<ScenePrefabAsset> AssetSystem::findScenePrefab(const std::filesystem::path& sourcePath) const
 {
     if (sourcePath.empty())
         return {};
-    const AssetId id = m_Registry.findByPath(sourcePath);
+    const AssetId id = m_registry.findByPath(sourcePath);
     if (!id)
         return {};
-    return m_Prefabs.handle(id);
+    return m_prefabs.handle(id);
 }
 
 void AssetSystem::clearSceneAssets()
 {
-    m_HotReload.clear();
-    m_Dependencies.clear();
-    m_Scenes.clear();
-    m_Prefabs.clear();
-    m_Materials.clear();
-    m_Meshes.clear();
+    m_hotReload.clear();
+    m_dependencies.clear();
+    m_scenes.clear();
+    m_prefabs.clear();
+    m_materials.clear();
+    m_meshes.clear();
 }
 
 void AssetSystem::addDependency(AssetId asset, AssetId dependency)
 {
-    m_Dependencies.addDependency(asset, dependency);
+    m_dependencies.addDependency(asset, dependency);
 }
 
 std::vector<HotReloadChange> AssetSystem::pollHotReloadChanges()
 {
-    return m_HotReload.pollChangedFiles();
+    return m_hotReload.pollChangedFiles();
 }
 
 bool AssetSystem::processRenderingThreadCommands(render::RenderDevice& renderDevice, float timeLimitMilliseconds)
 {
-    return m_TextureLoader->processRenderingThreadCommands(renderDevice, timeLimitMilliseconds);
+    return m_textureLoader->processRenderingThreadCommands(renderDevice, timeLimitMilliseconds);
 }
 
 void AssetSystem::loadingFinished()
 {
-    m_TextureLoader->loadingFinished();
+    m_textureLoader->loadingFinished();
 }
 
 } // namespace caustica

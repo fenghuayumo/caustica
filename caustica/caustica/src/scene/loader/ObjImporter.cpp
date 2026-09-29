@@ -843,7 +843,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
 
     ObjGroup* currentGroup = &getGroup("default");
 
-    auto mesh = std::static_pointer_cast<MeshInfo>(m_SceneTypeFactory->createMesh());
+    auto mesh = std::static_pointer_cast<MeshInfo>(m_sceneTypeFactory->createMesh());
     mesh->name = filePath.stem().string();
     mesh->type = MeshType::Triangles;
     mesh->buffers = std::make_shared<BufferGroup>();
@@ -1070,7 +1070,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
             ? materials[group.materialName]
             : materials["default"];
 
-        auto material = std::dynamic_pointer_cast<Material>(m_SceneTypeFactory->createMaterial());
+        auto material = std::dynamic_pointer_cast<Material>(m_sceneTypeFactory->createMaterial());
         material->name = objMaterial.name;
         material->modelFileName = filePath.string();
         const bool hasPbrRoughnessTexture = !objMaterial.roughnessTexture.empty() || !objMaterial.packedMetalRoughTexture.empty();
@@ -1130,7 +1130,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         else
             material->domain = objMaterial.opacity < 0.999f ? MaterialDomain::AlphaBlended : MaterialDomain::Opaque;
 
-        auto geometry = std::static_pointer_cast<MeshGeometry>(m_SceneTypeFactory->createMeshGeometry());
+        auto geometry = std::static_pointer_cast<MeshGeometry>(m_sceneTypeFactory->createMeshGeometry());
         geometry->material = material;
         geometry->indexOffsetInMesh = static_cast<uint32_t>(mesh->buffers->indexData.size());
         geometry->vertexOffsetInMesh = 0;
@@ -1163,7 +1163,7 @@ ObjImporter::ObjImporter(
     std::shared_ptr<IFileSystem> fs,
     std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
     : m_fs(std::move(fs))
-    , m_SceneTypeFactory(std::move(sceneTypeFactory))
+    , m_sceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 

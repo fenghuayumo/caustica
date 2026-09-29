@@ -16,8 +16,8 @@ void ArtifactCache::put(AssetId sourceAsset, std::string kind, std::string key, 
     record.key = std::move(key);
     record.path = std::move(path);
 
-    std::unique_lock lock(m_Mutex);
-    m_Records[makeCacheKey(record.sourceAsset, record.kind, record.key)] = std::move(record);
+    std::unique_lock lock(m_mutex);
+    m_records[makeCacheKey(record.sourceAsset, record.kind, record.key)] = std::move(record);
 }
 
 std::optional<ArtifactRecord> ArtifactCache::find(
@@ -25,19 +25,19 @@ std::optional<ArtifactRecord> ArtifactCache::find(
     const std::string& kind,
     const std::string& key) const
 {
-    std::shared_lock lock(m_Mutex);
-    if (auto it = m_Records.find(makeCacheKey(sourceAsset, kind, key)); it != m_Records.end())
+    std::shared_lock lock(m_mutex);
+    if (auto it = m_records.find(makeCacheKey(sourceAsset, kind, key)); it != m_records.end())
         return it->second;
     return std::nullopt;
 }
 
 void ArtifactCache::removeAsset(AssetId sourceAsset)
 {
-    std::unique_lock lock(m_Mutex);
-    for (auto it = m_Records.begin(); it != m_Records.end();)
+    std::unique_lock lock(m_mutex);
+    for (auto it = m_records.begin(); it != m_records.end();)
     {
         if (it->second.sourceAsset == sourceAsset)
-            it = m_Records.erase(it);
+            it = m_records.erase(it);
         else
             ++it;
     }
@@ -45,8 +45,8 @@ void ArtifactCache::removeAsset(AssetId sourceAsset)
 
 void ArtifactCache::clear()
 {
-    std::unique_lock lock(m_Mutex);
-    m_Records.clear();
+    std::unique_lock lock(m_mutex);
+    m_records.clear();
 }
 
 std::string ArtifactCache::makeCacheKey(AssetId sourceAsset, const std::string& kind, const std::string& key)

@@ -32,8 +32,8 @@ namespace caustica
 
 			std::string const& getName() const;
 
-			std::string const& getDescription() const { return m_Description; }
-			void setDescription(std::string const& description) { m_Description = description; }
+			std::string const& getDescription() const { return m_description; }
+			void setDescription(std::string const& description) { m_description = description; }
 
 			virtual Variable* asVariable() { return nullptr; }
 			virtual Command* asCommand() { return nullptr; }
@@ -41,9 +41,9 @@ namespace caustica
 		protected:
 			friend class ObjectDictionary;
 			
-			Object(char const* description) : m_Description(description) { }
+			Object(char const* description) : m_description(description) { }
 
-			std::string m_Description;
+			std::string m_description;
 		};
 
 		//
@@ -81,8 +81,8 @@ namespace caustica
 
 			Command(char const* description, OnExecuteFunction on_exec, OnSuggestFunction on_suggest);
 
-			OnExecuteFunction m_OnExecute;
-			OnSuggestFunction m_OnSuggest;
+			OnExecuteFunction m_onExecute;
+			OnSuggestFunction m_onSuggest;
 		};
 
 		//
@@ -199,14 +199,14 @@ namespace caustica
 
 			typedef VariableState::SetBy SetBy;
 
-			VariableState getState() const { return m_State; }
-			VariableFlags getFlags() const { return m_Flags; }
-			std::string const& getDefaultValueAsString() const { return m_DefaultValue; }
-			std::vector<std::string> const& getValueSuggestions() const { return m_ValueSuggestions; }
+			VariableState getState() const { return m_state; }
+			VariableFlags getFlags() const { return m_flags; }
+			std::string const& getDefaultValueAsString() const { return m_defaultValue; }
+			std::vector<std::string> const& getValueSuggestions() const { return m_valueSuggestions; }
 
-			void setReadOnly(bool ronly) { m_State.read_only = ronly; }
+			void setReadOnly(bool ronly) { m_state.read_only = ronly; }
 
-			void setCheat() { m_State.cheat = true; }	
+			void setCheat() { m_state.cheat = true; }	
 
 		public:
 
@@ -259,13 +259,13 @@ namespace caustica
 
 			friend class ObjectDictionary;
 
-			Variable(char const* description, VariableState state) : Object(description), m_State(state) {}
+			Variable(char const* description, VariableState state) : Object(description), m_state(state) {}
 
-			Callback m_OnChange;
-			VariableState m_State;
-			VariableFlags m_Flags = VariableFlags::NONE;
-			std::string m_DefaultValue;
-			std::vector<std::string> m_ValueSuggestions;
+			Callback m_onChange;
+			VariableState m_state;
+			VariableFlags m_flags = VariableFlags::NONE;
+			std::string m_defaultValue;
+			std::vector<std::string> m_valueSuggestions;
 		};
 
 		template <typename TVar> class VariableImpl;
@@ -302,7 +302,7 @@ namespace caustica
 		private:
 			friend class VariableImpl<T>;
 			
-			VariableImpl<T>& m_Variable;
+			VariableImpl<T>& m_variable;
 		};
 
 		//

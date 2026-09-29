@@ -29,22 +29,22 @@ scene::AnimationComponent makeAnimationComponent(const SceneAnimation& animation
 bool SceneAnimationChannel::isValid() const
 {
     scene::AnimationChannelData data;
-    data.sampler = m_Sampler;
-    data.targetEntity = m_TargetEntity;
-    data.targetMaterial = m_TargetMaterial.lock();
-    data.attribute = m_Attribute;
-    data.leafPropertyName = m_LeafPropertyName;
+    data.sampler = m_sampler;
+    data.targetEntity = m_targetEntity;
+    data.targetMaterial = m_targetMaterial.lock();
+    data.attribute = m_attribute;
+    data.leafPropertyName = m_leafPropertyName;
     return scene::isAnimationChannelValid(data);
 }
 
 bool SceneAnimationChannel::apply(float time, scene::SceneEntityWorld& world) const
 {
     scene::AnimationChannelData data;
-    data.sampler = m_Sampler;
-    data.targetEntity = m_TargetEntity;
-    data.targetMaterial = m_TargetMaterial.lock();
-    data.attribute = m_Attribute;
-    data.leafPropertyName = m_LeafPropertyName;
+    data.sampler = m_sampler;
+    data.targetEntity = m_targetEntity;
+    data.targetMaterial = m_targetMaterial.lock();
+    data.attribute = m_attribute;
+    data.leafPropertyName = m_leafPropertyName;
     return scene::applyAnimationChannel(data, time, world);
 }
 
@@ -52,7 +52,7 @@ std::shared_ptr<SceneAnimation> SceneAnimation::clone()
 {
     auto copy = std::make_shared<SceneAnimation>();
     copy->name = name;
-    for (const auto& channel : m_Channels)
+    for (const auto& channel : m_channels)
     {
         std::shared_ptr<SceneAnimationChannel> channelCopy;
 
@@ -81,8 +81,8 @@ bool SceneAnimation::apply(float time, scene::SceneEntityWorld& world) const
 
 void SceneAnimation::addChannel(const std::shared_ptr<SceneAnimationChannel>& channel)
 {
-    m_Channels.push_back(channel);
-    m_Duration = std::max(m_Duration, channel->getSampler()->getEndTime());
+    m_channels.push_back(channel);
+    m_duration = std::max(m_duration, channel->getSampler()->getEndTime());
 }
 
 bool SceneAnimation::isVald() const

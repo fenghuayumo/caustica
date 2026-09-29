@@ -8,70 +8,70 @@ using namespace caustica;
 
 void BaseCamera::updateWorldToView()
 {
-    m_MatTranslatedWorldToView = affine3::from_cols(m_CameraRight, m_CameraUp, m_CameraDir, 0.f);
-    m_MatWorldToView = translation(-m_CameraPos) * m_MatTranslatedWorldToView;
+    m_matTranslatedWorldToView = affine3::from_cols(m_cameraRight, m_cameraUp, m_cameraDir, 0.f);
+    m_matWorldToView = translation(-m_cameraPos) * m_matTranslatedWorldToView;
 }
 
 void BaseCamera::baseLookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
 {
-    this->m_CameraPos = cameraPos;
-    this->m_CameraDir = normalize(cameraTarget - cameraPos);
-    this->m_CameraUp = normalize(cameraUp);
-    this->m_CameraRight = normalize(cross(this->m_CameraDir, this->m_CameraUp));
-    this->m_CameraUp = normalize(cross(this->m_CameraRight, this->m_CameraDir));
+    this->m_cameraPos = cameraPos;
+    this->m_cameraDir = normalize(cameraTarget - cameraPos);
+    this->m_cameraUp = normalize(cameraUp);
+    this->m_cameraRight = normalize(cross(this->m_cameraDir, this->m_cameraUp));
+    this->m_cameraUp = normalize(cross(this->m_cameraRight, this->m_cameraDir));
 
     updateWorldToView();
 }
 
 void FirstPersonCamera::keyboardUpdate(int key, int scancode, int action, int mods)
 {
-    if (m_KeyboardMap.find(key) == m_KeyboardMap.end())
+    if (m_keyboardMap.find(key) == m_keyboardMap.end())
     {
         return;
     }
 
-    auto cameraKey = m_KeyboardMap.at(key);
+    auto cameraKey = m_keyboardMap.at(key);
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
-        m_KeyboardState[cameraKey] = true;
+        m_keyboardState[cameraKey] = true;
     }
     else {
-        m_KeyboardState[cameraKey] = false;
+        m_keyboardState[cameraKey] = false;
     }
 }
 
 void FirstPersonCamera::mousePosUpdate(double xpos, double ypos)
 {
-    m_MousePos = { float(xpos), float(ypos) };
+    m_mousePos = { float(xpos), float(ypos) };
 }
 
 void FirstPersonCamera::mouseButtonUpdate(int button, int action, int mods)
 {
-    if (m_MouseButtonMap.find(button) == m_MouseButtonMap.end())
+    if (m_mouseButtonMap.find(button) == m_mouseButtonMap.end())
     {
         return;
     }
 
-    auto cameraButton = m_MouseButtonMap.at(button);
+    auto cameraButton = m_mouseButtonMap.at(button);
     if (action == GLFW_PRESS)
     {
-        m_MouseButtonState[cameraButton] = true;
+        m_mouseButtonState[cameraButton] = true;
     }
     else {
-        m_MouseButtonState[cameraButton] = false;
+        m_mouseButtonState[cameraButton] = false;
     }
 }
 
 void FirstPersonCamera::clearFlyKeyboardState()
 {
-    m_KeyboardState[KeyboardControls::MoveUp] = false;
-    m_KeyboardState[KeyboardControls::MoveDown] = false;
-    m_KeyboardState[KeyboardControls::MoveLeft] = false;
-    m_KeyboardState[KeyboardControls::MoveRight] = false;
-    m_KeyboardState[KeyboardControls::MoveForward] = false;
-    m_KeyboardState[KeyboardControls::MoveBackward] = false;
-    m_KeyboardState[KeyboardControls::RollLeft] = false;
-    m_KeyboardState[KeyboardControls::RollRight] = false;
+    m_keyboardState[KeyboardControls::MoveUp] = false;
+    m_keyboardState[KeyboardControls::MoveDown] = false;
+    m_keyboardState[KeyboardControls::MoveLeft] = false;
+    m_keyboardState[KeyboardControls::MoveRight] = false;
+    m_keyboardState[KeyboardControls::MoveForward] = false;
+    m_keyboardState[KeyboardControls::MoveBackward] = false;
+    m_keyboardState[KeyboardControls::RollLeft] = false;
+    m_keyboardState[KeyboardControls::RollRight] = false;
 }
 
 void FirstPersonCamera::mouseScrollUpdate(double /*xoffset*/, double yoffset)
@@ -80,95 +80,95 @@ void FirstPersonCamera::mouseScrollUpdate(double /*xoffset*/, double yoffset)
         return;
 
     // Dolly along look direction; step scales with move speed.
-    const float step = m_MoveSpeed * 0.35f * static_cast<float>(yoffset);
-    updateCamera(m_CameraDir * step, affine3::identity());
+    const float step = m_moveSpeed * 0.35f * static_cast<float>(yoffset);
+    updateCamera(m_cameraDir * step, affine3::identity());
 }
 
 void FirstPersonCamera::lookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
 {
     // make the base method public.
     baseLookAt(cameraPos, cameraTarget, cameraUp);
-    m_MouseMotionAccumulator = 0.f;
-    m_CameraMoveDamp = 0.f;
-    m_CameraMovePrev = 0.f;
+    m_mouseMotionAccumulator = 0.f;
+    m_cameraMoveDamp = 0.f;
+    m_cameraMovePrev = 0.f;
 }
 
 void FirstPersonCamera::lookTo(math::float3 cameraPos, math::float3 cameraDir, math::float3 cameraUp)
 {
     baseLookAt(cameraPos, cameraPos + cameraDir, cameraUp);
-    m_MouseMotionAccumulator = 0.f;
-    m_CameraMoveDamp = 0.f;
-    m_CameraMovePrev = 0.f;
+    m_mouseMotionAccumulator = 0.f;
+    m_cameraMoveDamp = 0.f;
+    m_cameraMovePrev = 0.f;
 }
 
 std::pair<bool, float3> FirstPersonCamera::animateTranslation(float deltaT)
 {
     bool cameraDirty = false;
-    float moveStep = deltaT * m_MoveSpeed;
+    float moveStep = deltaT * m_moveSpeed;
     float3 cameraMoveVec = 0.f;
 
-    if (m_KeyboardState[KeyboardControls::SpeedUp])
+    if (m_keyboardState[KeyboardControls::SpeedUp])
         moveStep *= 3.f;
 
-    if (m_KeyboardState[KeyboardControls::SlowDown])
+    if (m_keyboardState[KeyboardControls::SlowDown])
         moveStep *= .1f;
 
-    if (m_KeyboardState[KeyboardControls::MoveForward])
+    if (m_keyboardState[KeyboardControls::MoveForward])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraDir * moveStep;
+        cameraMoveVec += m_cameraDir * moveStep;
     }
 
-    if (m_KeyboardState[KeyboardControls::MoveBackward])
+    if (m_keyboardState[KeyboardControls::MoveBackward])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraDir * moveStep;
+        cameraMoveVec += -m_cameraDir * moveStep;
     }
 
-    if (m_KeyboardState[KeyboardControls::MoveLeft])
+    if (m_keyboardState[KeyboardControls::MoveLeft])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraRight * moveStep;
+        cameraMoveVec += -m_cameraRight * moveStep;
     }
 
-    if (m_KeyboardState[KeyboardControls::MoveRight])
+    if (m_keyboardState[KeyboardControls::MoveRight])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraRight * moveStep;
+        cameraMoveVec += m_cameraRight * moveStep;
     }
 
-    if (m_KeyboardState[KeyboardControls::MoveUp])
+    if (m_keyboardState[KeyboardControls::MoveUp])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraUp * moveStep;
+        cameraMoveVec += m_cameraUp * moveStep;
     }
 
-    if (m_KeyboardState[KeyboardControls::MoveDown])
+    if (m_keyboardState[KeyboardControls::MoveDown])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraUp * moveStep;
+        cameraMoveVec += -m_cameraUp * moveStep;
     }
 
     // Arrow keys: screen-aligned pan (always available; no conflict with WASD fly).
-    if (m_KeyboardState[KeyboardControls::YawLeft])
+    if (m_keyboardState[KeyboardControls::YawLeft])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraRight * moveStep;
+        cameraMoveVec += -m_cameraRight * moveStep;
     }
-    if (m_KeyboardState[KeyboardControls::YawRight])
+    if (m_keyboardState[KeyboardControls::YawRight])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraRight * moveStep;
+        cameraMoveVec += m_cameraRight * moveStep;
     }
-    if (m_KeyboardState[KeyboardControls::PitchUp])
+    if (m_keyboardState[KeyboardControls::PitchUp])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraUp * moveStep;
+        cameraMoveVec += m_cameraUp * moveStep;
     }
-    if (m_KeyboardState[KeyboardControls::PitchDown])
+    if (m_keyboardState[KeyboardControls::PitchDown])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraUp * moveStep;
+        cameraMoveVec += -m_cameraUp * moveStep;
     }
 
     return std::make_pair(cameraDirty, cameraMoveVec);
@@ -176,10 +176,10 @@ std::pair<bool, float3> FirstPersonCamera::animateTranslation(float deltaT)
 
 void FirstPersonCamera::updateCamera(math::float3 cameraMoveVec, math::affine3 cameraRotation)
 {
-    m_CameraPos += cameraMoveVec;
-    m_CameraDir = normalize(cameraRotation.transformVector(m_CameraDir));
-    m_CameraUp = normalize(cameraRotation.transformVector(m_CameraUp));
-    m_CameraRight = normalize(cross(m_CameraDir, m_CameraUp));
+    m_cameraPos += cameraMoveVec;
+    m_cameraDir = normalize(cameraRotation.transformVector(m_cameraDir));
+    m_cameraUp = normalize(cameraRotation.transformVector(m_cameraUp));
+    m_cameraRight = normalize(cross(m_cameraDir, m_cameraUp));
 
     updateWorldToView();
 }
@@ -188,13 +188,13 @@ std::pair<bool, affine3> FirstPersonCamera::animateRoll(affine3 initialRotation)
 {
     bool cameraDirty = false;
     affine3 cameraRotation = initialRotation;
-    if (m_KeyboardState[KeyboardControls::RollLeft] ||
-        m_KeyboardState[KeyboardControls::RollRight])
+    if (m_keyboardState[KeyboardControls::RollLeft] ||
+        m_keyboardState[KeyboardControls::RollRight])
     {
-        float roll = float(m_KeyboardState[KeyboardControls::RollLeft]) * -m_RotateSpeed * 2.0f +
-            float(m_KeyboardState[KeyboardControls::RollRight]) * m_RotateSpeed * 2.0f;
+        float roll = float(m_keyboardState[KeyboardControls::RollLeft]) * -m_rotateSpeed * 2.0f +
+            float(m_keyboardState[KeyboardControls::RollRight]) * m_rotateSpeed * 2.0f;
 
-        cameraRotation = rotation(m_CameraDir, roll) * cameraRotation;
+        cameraRotation = rotation(m_cameraDir, roll) * cameraRotation;
         cameraDirty = true;
     }
     return std::make_pair(cameraDirty, cameraRotation);
@@ -203,18 +203,18 @@ std::pair<bool, affine3> FirstPersonCamera::animateRoll(affine3 initialRotation)
 void FirstPersonCamera::animate(float deltaT)
 {
     // Track mouse delta.
-    // Use m_IsDragging / m_IsPanning to avoid jumps on the first frame of a press.
-    const bool lookHeld = m_MouseButtonState[MouseButtons::Left]
-        || m_MouseButtonState[MouseButtons::Right];
-    const bool panHeld = m_MouseButtonState[MouseButtons::Middle];
+    // Use m_isDragging / m_isPanning to avoid jumps on the first frame of a press.
+    const bool lookHeld = m_mouseButtonState[MouseButtons::Left]
+        || m_mouseButtonState[MouseButtons::Right];
+    const bool panHeld = m_mouseButtonState[MouseButtons::Middle];
 
     float2 mouseMove = 0.f;
-    if ((lookHeld && m_IsDragging) || (panHeld && m_IsPanning))
-        mouseMove = m_MousePos - m_MousePosPrev;
+    if ((lookHeld && m_isDragging) || (panHeld && m_isPanning))
+        mouseMove = m_mousePos - m_mousePosPrev;
 
-    m_IsDragging = lookHeld;
-    m_IsPanning = panHeld;
-    m_MousePosPrev = m_MousePos;
+    m_isDragging = lookHeld;
+    m_isPanning = panHeld;
+    m_mousePosPrev = m_mousePos;
 
     bool cameraDirty = false;
     affine3 cameraRotation = affine3::identity();
@@ -223,8 +223,8 @@ void FirstPersonCamera::animate(float deltaT)
     // Middle-mouse drag: screen-space pan (truck / pedestal).
     if (panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
     {
-        const float panScale = m_MoveSpeed * 0.02f;
-        cameraMoveVec += (-mouseMove.x * m_CameraRight + mouseMove.y * m_CameraUp) * panScale;
+        const float panScale = m_moveSpeed * 0.02f;
+        cameraMoveVec += (-mouseMove.x * m_cameraRight + mouseMove.y * m_cameraUp) * panScale;
         cameraDirty = true;
     }
 
@@ -232,11 +232,11 @@ void FirstPersonCamera::animate(float deltaT)
     // transform-gizmo drags do not tumble the camera. RMB is fly, not look.
     if (lookHeld && !panHeld && (mouseMove.x != 0.f || mouseMove.y != 0.f))
     {
-        float yaw = m_RotateSpeed * mouseMove.x;
-        float pitch = m_RotateSpeed * mouseMove.y;
+        float yaw = m_rotateSpeed * mouseMove.x;
+        float pitch = m_rotateSpeed * mouseMove.y;
 
         cameraRotation = rotation(float3(0.f, 1.f, 0.f), -yaw);
-        cameraRotation = rotation(m_CameraRight, -pitch) * cameraRotation;
+        cameraRotation = rotation(m_cameraRight, -pitch) * cameraRotation;
 
         cameraDirty = true;
     }
@@ -263,25 +263,25 @@ void FirstPersonCamera::animateSmooth(float deltaT)
     float dampenWeight = exp(-c_DampeningRate * deltaT);
 
     // Track mouse delta.
-    // Use m_IsDragging to avoid random camera rotations when clicking inside an inactive window.
-    if (m_MouseButtonState[MouseButtons::Left])
+    // Use m_isDragging to avoid random camera rotations when clicking inside an inactive window.
+    if (m_mouseButtonState[MouseButtons::Left])
     {
-        if (m_IsDragging)
+        if (m_isDragging)
         {
             // Use an accumulator to keep the camera animating after mouse button has been released.
-            m_MouseMotionAccumulator += m_MousePos - m_MousePosPrev;
+            m_mouseMotionAccumulator += m_mousePos - m_mousePosPrev;
         }
 
-        m_IsDragging = true;
+        m_isDragging = true;
     }
     else
     {
-        m_IsDragging = false;
+        m_isDragging = false;
     }
-    m_MousePosPrev = m_MousePos;
+    m_mousePosPrev = m_mousePos;
 
-    float2 mouseMove = m_MouseMotionAccumulator * (1.f - dampenWeight);
-    m_MouseMotionAccumulator *= dampenWeight;
+    float2 mouseMove = m_mouseMotionAccumulator * (1.f - dampenWeight);
+    m_mouseMotionAccumulator *= dampenWeight;
 
     affine3 cameraRotation = affine3::identity();
 
@@ -289,11 +289,11 @@ void FirstPersonCamera::animateSmooth(float deltaT)
     // this will affect the movement vectors in the world matrix, which we use below
     if (mouseMove.x || mouseMove.y)
     {
-        float yaw = m_RotateSpeed * mouseMove.x;
-        float pitch = m_RotateSpeed * mouseMove.y;
+        float yaw = m_rotateSpeed * mouseMove.x;
+        float pitch = m_rotateSpeed * mouseMove.y;
 
         cameraRotation = rotation(float3(0.f, 1.f, 0.f), -yaw);
-        cameraRotation = rotation(m_CameraRight, -pitch) * cameraRotation;
+        cameraRotation = rotation(m_cameraRight, -pitch) * cameraRotation;
     }
 
     // handle keyboard roll next
@@ -304,59 +304,59 @@ void FirstPersonCamera::animateSmooth(float deltaT)
     auto translateResult = animateTranslation(deltaT);
     const float3& cameraMoveVec = translateResult.second;
 
-    m_CameraMoveDamp = lerp(cameraMoveVec, m_CameraMovePrev, dampenWeight);
-    m_CameraMovePrev = m_CameraMoveDamp;
+    m_cameraMoveDamp = lerp(cameraMoveVec, m_cameraMovePrev, dampenWeight);
+    m_cameraMovePrev = m_cameraMoveDamp;
 
-    updateCamera(m_CameraMoveDamp, cameraRotation);
+    updateCamera(m_cameraMoveDamp, cameraRotation);
 }
 
 void ThirdPersonCamera::keyboardUpdate(int key, int scancode, int action, int mods)
 {
-    if (m_KeyboardMap.find(key) == m_KeyboardMap.end())
+    if (m_keyboardMap.find(key) == m_keyboardMap.end())
     {
         return;
     }
 
-    auto cameraKey = m_KeyboardMap.at(key);
+    auto cameraKey = m_keyboardMap.at(key);
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
-        m_KeyboardState[cameraKey] = true;
+        m_keyboardState[cameraKey] = true;
     }
     else {
-        m_KeyboardState[cameraKey] = false;
+        m_keyboardState[cameraKey] = false;
     }
 }
 
 void ThirdPersonCamera::mousePosUpdate(double xpos, double ypos)
 {
-    m_MousePos = float2(float(xpos), float(ypos));
+    m_mousePos = float2(float(xpos), float(ypos));
 }
 
 void ThirdPersonCamera::mouseButtonUpdate(int button, int action, int mods)
 {
     const bool pressed = (action == GLFW_PRESS);
 
-    switch(m_MouseState)
+    switch(m_mouseState)
     {
     case MouseState::Idle:
         if (pressed)
         {
             if (button == GLFW_MOUSE_BUTTON_LEFT)
-                m_MouseState = MouseState::Orbiting;
+                m_mouseState = MouseState::Orbiting;
             else if (button == GLFW_MOUSE_BUTTON_MIDDLE)
-                m_MouseState = MouseState::Panning;
-            m_MousePosPrev = m_MousePos;
+                m_mouseState = MouseState::Panning;
+            m_mousePosPrev = m_mousePos;
         }
         break;
 
     case MouseState::Orbiting:
         if (!pressed && button == GLFW_MOUSE_BUTTON_LEFT)
-            m_MouseState = MouseState::Idle;
+            m_mouseState = MouseState::Idle;
         break;
 
     case MouseState::Panning:
         if (!pressed && button == GLFW_MOUSE_BUTTON_MIDDLE)
-            m_MouseState = MouseState::Idle;
+            m_mouseState = MouseState::Idle;
         break;
     }
 }
@@ -364,15 +364,15 @@ void ThirdPersonCamera::mouseButtonUpdate(int button, int action, int mods)
 void ThirdPersonCamera::mouseScrollUpdate(double xoffset, double yoffset)
 {
     const float scrollFactor = 1.15f;
-    m_Distance = clamp(m_Distance * (yoffset < 0 ? scrollFactor : 1.0f / scrollFactor), m_MinDistance,  m_MaxDistance);
+    m_distance = clamp(m_distance * (yoffset < 0 ? scrollFactor : 1.0f / scrollFactor), m_minDistance,  m_maxDistance);
 }
 
 void ThirdPersonCamera::joystickUpdate(int axis, float value)
 {
     switch (axis)
     {
-    case GLFW_GAMEPAD_AXIS_RIGHT_X: m_DeltaYaw = value; break;
-    case GLFW_GAMEPAD_AXIS_RIGHT_Y: m_DeltaPitch = value; break;
+    case GLFW_GAMEPAD_AXIS_RIGHT_X: m_deltaYaw = value; break;
+    case GLFW_GAMEPAD_AXIS_RIGHT_Y: m_deltaPitch = value; break;
     default: break;
     }
 }
@@ -381,95 +381,95 @@ void ThirdPersonCamera::joystickButtonUpdate(int button, bool pressed)
 {
     switch (button)
     {
-    case GLFW_GAMEPAD_BUTTON_B: if (pressed) m_DeltaDistance -= 1; break;
-    case GLFW_GAMEPAD_BUTTON_A: if (pressed) m_DeltaDistance += 1; break;
+    case GLFW_GAMEPAD_BUTTON_B: if (pressed) m_deltaDistance -= 1; break;
+    case GLFW_GAMEPAD_BUTTON_A: if (pressed) m_deltaDistance += 1; break;
     default: break;
     }
 }
 
 void ThirdPersonCamera::setRotation(float yaw, float pitch)
 {
-    m_Yaw = yaw;
-    m_Pitch = pitch;
+    m_yaw = yaw;
+    m_pitch = pitch;
 }
 
 void ThirdPersonCamera::setView(const caustica::ViewInfo& view)
 {
-    m_ProjectionMatrix = view.getProjectionMatrix(false);
-    m_InverseProjectionMatrix = view.getInverseProjectionMatrix(false);
+    m_projectionMatrix = view.getProjectionMatrix(false);
+    m_inverseProjectionMatrix = view.getInverseProjectionMatrix(false);
     auto viewport = view.getViewport();
-    m_ViewportSize = float2(viewport.width(), viewport.height());
+    m_viewportSize = float2(viewport.width(), viewport.height());
 }
 
 void ThirdPersonCamera::animateOrbit(float deltaT, float2 mouseMove)
 {
-    m_Yaw -= m_RotateSpeed * mouseMove.x;
-    m_Pitch += m_RotateSpeed * mouseMove.y;
+    m_yaw -= m_rotateSpeed * mouseMove.x;
+    m_pitch += m_rotateSpeed * mouseMove.y;
 
     const float ORBIT_SENSITIVITY = 1.5f;
     const float ZOOM_SENSITIVITY = 40.f;
-    m_Distance += ZOOM_SENSITIVITY * deltaT * m_DeltaDistance;
-    m_Yaw += ORBIT_SENSITIVITY * deltaT * m_DeltaYaw;
-    m_Pitch += ORBIT_SENSITIVITY * deltaT * m_DeltaPitch;
+    m_distance += ZOOM_SENSITIVITY * deltaT * m_deltaDistance;
+    m_yaw += ORBIT_SENSITIVITY * deltaT * m_deltaYaw;
+    m_pitch += ORBIT_SENSITIVITY * deltaT * m_deltaPitch;
 
-    m_Distance = clamp(m_Distance, m_MinDistance, m_MaxDistance);
+    m_distance = clamp(m_distance, m_minDistance, m_maxDistance);
     
-    m_Pitch = clamp(m_Pitch, PI_f * -0.5f, PI_f * 0.5f);
+    m_pitch = clamp(m_pitch, PI_f * -0.5f, PI_f * 0.5f);
     
-    m_DeltaDistance = 0;
-    m_DeltaYaw = 0;
-    m_DeltaPitch = 0;
+    m_deltaDistance = 0;
+    m_deltaYaw = 0;
+    m_deltaPitch = 0;
 }
 
 void ThirdPersonCamera::animateTranslation(const math::float3x3& viewMatrix)
 {
     // If the view parameters have never been set, we can't translate
-    if (m_ViewportSize.x <= 0.f || m_ViewportSize.y <= 0.f)
+    if (m_viewportSize.x <= 0.f || m_viewportSize.y <= 0.f)
         return;
 
-    if (all(m_MousePos == m_MousePosPrev))
+    if (all(m_mousePos == m_mousePosPrev))
         return;
 
-    float4 oldClipPos = float4(0.f, 0.f, m_Distance, 1.f) * m_ProjectionMatrix;
+    float4 oldClipPos = float4(0.f, 0.f, m_distance, 1.f) * m_projectionMatrix;
     oldClipPos /= oldClipPos.w;
-    oldClipPos.x = 2.f * (m_MousePosPrev.x) / m_ViewportSize.x - 1.f;
-    oldClipPos.y = 1.f - 2.f * (m_MousePosPrev.y) / m_ViewportSize.y;
+    oldClipPos.x = 2.f * (m_mousePosPrev.x) / m_viewportSize.x - 1.f;
+    oldClipPos.y = 1.f - 2.f * (m_mousePosPrev.y) / m_viewportSize.y;
     float4 newClipPos = oldClipPos;
-    newClipPos.x = 2.f * (m_MousePos.x) / m_ViewportSize.x - 1.f;
-    newClipPos.y = 1.f - 2.f * (m_MousePos.y) / m_ViewportSize.y;
+    newClipPos.x = 2.f * (m_mousePos.x) / m_viewportSize.x - 1.f;
+    newClipPos.y = 1.f - 2.f * (m_mousePos.y) / m_viewportSize.y;
 
-    float4 oldViewPos = oldClipPos * m_InverseProjectionMatrix;
+    float4 oldViewPos = oldClipPos * m_inverseProjectionMatrix;
     oldViewPos /= oldViewPos.w;
-    float4 newViewPos = newClipPos * m_InverseProjectionMatrix;
+    float4 newViewPos = newClipPos * m_inverseProjectionMatrix;
     newViewPos /= newViewPos.w;
 
     float2 viewMotion = oldViewPos.xy() - newViewPos.xy();
 
-    m_TargetPos -= viewMotion.x * viewMatrix.row0;
+    m_targetPos -= viewMotion.x * viewMatrix.row0;
 
-    if (m_KeyboardState[KeyboardControls::HorizontalPan])
+    if (m_keyboardState[KeyboardControls::HorizontalPan])
     {
         float3 horizontalForward = float3(viewMatrix.row2.x, 0.f, viewMatrix.row2.z);
         float horizontalLength = length(horizontalForward);
         if (horizontalLength == 0.f)
             horizontalForward = float3(viewMatrix.row1.x, 0.f, viewMatrix.row1.z);
         horizontalForward = normalize(horizontalForward);
-        m_TargetPos += viewMotion.y * horizontalForward * 1.5f;
+        m_targetPos += viewMotion.y * horizontalForward * 1.5f;
     }
     else
-        m_TargetPos += viewMotion.y * viewMatrix.row1;
+        m_targetPos += viewMotion.y * viewMatrix.row1;
 }
 
 void ThirdPersonCamera::animate(float deltaT)
 {
-    quat orbit = rotationQuat(float3(m_Pitch, m_Yaw, 0));
+    quat orbit = rotationQuat(float3(m_pitch, m_yaw, 0));
     const auto targetRotation = orbit.toMatrix();
 
-    switch(m_MouseState)
+    switch(m_mouseState)
     {
     case MouseState::Orbiting:
         {
-            float2 mouseMove = m_MousePos - m_MousePosPrev;
+            float2 mouseMove = m_mousePos - m_mousePosPrev;
             animateOrbit(deltaT, mouseMove);
             break;
         }
@@ -480,16 +480,16 @@ void ThirdPersonCamera::animate(float deltaT)
         break;
     }
 
-    const float3 vectorToCamera = -m_Distance * targetRotation.row2;
-    const float3 camPos = m_TargetPos + vectorToCamera;
+    const float3 vectorToCamera = -m_distance * targetRotation.row2;
+    const float3 camPos = m_targetPos + vectorToCamera;
 
-    m_CameraPos = camPos;
-    m_CameraRight = -targetRotation.row0;
-    m_CameraUp = targetRotation.row1;
-    m_CameraDir = targetRotation.row2;
+    m_cameraPos = camPos;
+    m_cameraRight = -targetRotation.row0;
+    m_cameraUp = targetRotation.row1;
+    m_cameraDir = targetRotation.row2;
     updateWorldToView();
     
-    m_MousePosPrev = m_MousePos;
+    m_mousePosPrev = m_mousePos;
 }
 
 void ThirdPersonCamera::lookAt(math::float3 cameraPos, math::float3 cameraTarget)

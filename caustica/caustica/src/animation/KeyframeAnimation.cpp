@@ -55,18 +55,18 @@ float4 caustica::animation::interpolate(const InterpolationMode mode,
 
 std::optional<math::float4> Sampler::evaluate(float time, bool extrapolateLastValues) const
 {
-    const size_t count = m_Keyframes.size();
+    const size_t count = m_keyframes.size();
 
     if (count == 0)
         return std::optional<float4>();
 
-    if (time <= m_Keyframes[0].time)
-        return std::optional(m_Keyframes[0].value);
+    if (time <= m_keyframes[0].time)
+        return std::optional(m_keyframes[0].value);
 
-    if (count == 1 || time >= m_Keyframes[count - 1].time)
+    if (count == 1 || time >= m_keyframes[count - 1].time)
     {
         if (extrapolateLastValues)
-            return std::optional(m_Keyframes[count - 1].value);
+            return std::optional(m_keyframes[count - 1].value);
         else
             return std::optional<float4>();
     }
@@ -80,8 +80,8 @@ std::optional<math::float4> Sampler::evaluate(float time, bool extrapolateLastVa
     {
         size_t const middle = (left + right) / 2;
 
-        const float tb = m_Keyframes[middle].time;
-        const float tc = m_Keyframes[middle + 1].time;
+        const float tb = m_keyframes[middle].time;
+        const float tc = m_keyframes[middle + 1].time;
 
         if (time < tb)
             right = middle - 1;
@@ -98,10 +98,10 @@ std::optional<math::float4> Sampler::evaluate(float time, bool extrapolateLastVa
     // load 4 keyframes around the required time.
     // The outside keyframes (a) and (d) are needed for higher-order interpolation.
     size_t const offset = left;
-    const Keyframe& b = m_Keyframes[offset];
-    const Keyframe& c = m_Keyframes[offset + 1];
-    const Keyframe& a = (offset > 0) ? m_Keyframes[offset - 1] : b;
-    const Keyframe& d = (offset < count - 2) ? m_Keyframes[offset + 2] : c;
+    const Keyframe& b = m_keyframes[offset];
+    const Keyframe& c = m_keyframes[offset + 1];
+    const Keyframe& a = (offset > 0) ? m_keyframes[offset - 1] : b;
+    const Keyframe& d = (offset < count - 2) ? m_keyframes[offset + 2] : c;
     
     // Validate that the (b, c) keyframes indeed contain the required time.
     if (time < b.time || time >= c.time)
@@ -113,32 +113,32 @@ std::optional<math::float4> Sampler::evaluate(float time, bool extrapolateLastVa
     const float dt = c.time - b.time;
     const float u = (time - b.time) / dt;
 
-    float4 y = interpolate(m_Mode, a, b, c, d, u, dt);
+    float4 y = interpolate(m_mode, a, b, c, d, u, dt);
     
     return std::optional(y);
 }
 
 void Sampler::addKeyframe(const Keyframe keyframe)
 {
-    m_Keyframes.push_back(keyframe);
+    m_keyframes.push_back(keyframe);
 }
 
 bool Sampler::upsertKeyframe(const Keyframe& keyframe, float timeEpsilon)
 {
     auto it = std::lower_bound(
-        m_Keyframes.begin(),
-        m_Keyframes.end(),
+        m_keyframes.begin(),
+        m_keyframes.end(),
         keyframe.time,
         [](const Keyframe& candidate, float time) { return candidate.time < time; });
 
-    if (it != m_Keyframes.end() && std::fabs(it->time - keyframe.time) <= timeEpsilon)
+    if (it != m_keyframes.end() && std::fabs(it->time - keyframe.time) <= timeEpsilon)
     {
         it->value = keyframe.value;
         it->inTangent = keyframe.inTangent;
         it->outTangent = keyframe.outTangent;
         return false;
     }
-    if (it != m_Keyframes.begin())
+    if (it != m_keyframes.begin())
     {
         auto previous = std::prev(it);
         if (std::fabs(previous->time - keyframe.time) <= timeEpsilon)
@@ -150,43 +150,43 @@ bool Sampler::upsertKeyframe(const Keyframe& keyframe, float timeEpsilon)
         }
     }
 
-    m_Keyframes.insert(it, keyframe);
+    m_keyframes.insert(it, keyframe);
     return true;
 }
 
 bool Sampler::removeKeyframe(float time, float timeEpsilon)
 {
-    const auto oldSize = m_Keyframes.size();
-    std::erase_if(m_Keyframes, [time, timeEpsilon](const Keyframe& keyframe) {
+    const auto oldSize = m_keyframes.size();
+    std::erase_if(m_keyframes, [time, timeEpsilon](const Keyframe& keyframe) {
         return std::fabs(keyframe.time - time) <= timeEpsilon;
     });
-    return m_Keyframes.size() != oldSize;
+    return m_keyframes.size() != oldSize;
 }
 
 bool Sampler::hasKeyframe(float time, float timeEpsilon) const
 {
     const auto it = std::lower_bound(
-        m_Keyframes.begin(),
-        m_Keyframes.end(),
+        m_keyframes.begin(),
+        m_keyframes.end(),
         time,
         [](const Keyframe& candidate, float candidateTime) { return candidate.time < candidateTime; });
-    if (it != m_Keyframes.end() && std::fabs(it->time - time) <= timeEpsilon)
+    if (it != m_keyframes.end() && std::fabs(it->time - time) <= timeEpsilon)
         return true;
-    return it != m_Keyframes.begin() && std::fabs(std::prev(it)->time - time) <= timeEpsilon;
+    return it != m_keyframes.begin() && std::fabs(std::prev(it)->time - time) <= timeEpsilon;
 }
 
 float Sampler::getStartTime() const
 {
-    if (!m_Keyframes.empty())
-        return m_Keyframes[0].time;
+    if (!m_keyframes.empty())
+        return m_keyframes[0].time;
 
     return 0.f;
 }
 
 float Sampler::getEndTime() const
 {
-    if (!m_Keyframes.empty())
-        return m_Keyframes[m_Keyframes.size() - 1].time;
+    if (!m_keyframes.empty())
+        return m_keyframes[m_keyframes.size() - 1].time;
 
     return 0.f;
 }
@@ -233,7 +233,7 @@ void Sampler::load(Json::Value& node)
             addKeyframe(keyframe);
         }
         
-        std::sort(m_Keyframes.begin(), m_Keyframes.end(),
+        std::sort(m_keyframes.begin(), m_keyframes.end(),
             [](const Keyframe& a, const Keyframe& b) { return a.time < b.time; });
     }
 }
@@ -249,8 +249,8 @@ std::optional<math::float4> Sequence::evaluate(const std::string& name, float ti
 
 void Sequence::addTrack(const std::string& name, const std::shared_ptr<Sampler>& track)
 {
-    m_Tracks[name] = track;
-    m_Duration = std::max(m_Duration, track->getEndTime());
+    m_tracks[name] = track;
+    m_duration = std::max(m_duration, track->getEndTime());
 }
 
 void Sequence::load(Json::Value& node)

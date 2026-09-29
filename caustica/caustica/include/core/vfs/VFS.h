@@ -153,12 +153,12 @@ namespace caustica
     class RelativeFileSystem : public IFileSystem
     {
     private:
-        std::shared_ptr<IFileSystem> m_UnderlyingFS;
-        std::filesystem::path m_BasePath;
+        std::shared_ptr<IFileSystem> m_underlyingFS;
+        std::filesystem::path m_basePath;
     public:
         RelativeFileSystem(std::shared_ptr<IFileSystem> fs, const std::filesystem::path& basePath);
 
-        [[nodiscard]] std::filesystem::path const& getBasePath() const { return m_BasePath; }
+        [[nodiscard]] std::filesystem::path const& getBasePath() const { return m_basePath; }
 
         bool folderExists(const std::filesystem::path& name) override;
         bool fileExists(const std::filesystem::path& name) override;
@@ -173,7 +173,7 @@ namespace caustica
     class RootFileSystem : public IFileSystem
     {
     private:
-        std::vector<std::pair<std::string, std::shared_ptr<IFileSystem>>> m_MountPoints;
+        std::vector<std::pair<std::string, std::shared_ptr<IFileSystem>>> m_mountPoints;
 
         bool findMountPoint(const std::filesystem::path& path, std::filesystem::path* pRelativePath, IFileSystem** ppFS);
     public:

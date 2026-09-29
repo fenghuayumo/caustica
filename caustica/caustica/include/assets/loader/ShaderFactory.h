@@ -50,7 +50,7 @@ struct StaticShader
 class ShaderFactory
 {
 private:
-    caustica::rhi::DeviceHandle m_Device;
+    caustica::rhi::DeviceHandle m_device;
     std::shared_ptr<shader::ShaderCompilerService> m_compilerService;
     std::shared_ptr<IFileSystem> m_fs;
     std::filesystem::path m_basePath;

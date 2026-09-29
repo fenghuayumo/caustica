@@ -309,14 +309,14 @@ void SceneEntityWorld::resetScene()
         destroyEntity(m_root);
 
     m_root = ecs::NullEntity;
-    m_CameraEntities.clear();
+    m_cameraEntities.clear();
     m_pathToEntity.clear();
     m_registeredMeshByEntity.clear();
-    m_Materials = {};
-    m_Meshes = {};
-    m_GeometryCount = 0;
-    m_MaxGeometryCountPerMesh = 0;
-    m_GeometryInstancesCount = 0;
+    m_materials = {};
+    m_meshes = {};
+    m_geometryCount = 0;
+    m_maxGeometryCountPerMesh = 0;
+    m_geometryInstancesCount = 0;
     m_structureDirty = true;
     m_transformDirty = true;
     m_lightDirty = true;
@@ -340,17 +340,17 @@ void SceneEntityWorld::adoptInto(ecs::World& liveWorld, SceneTypeFactory* factor
         dest.importSubtree(ecs::NullEntity, *this, sourceRoot, factory);
 
     m_root = dest.m_root;
-    m_CameraEntities = std::move(dest.m_CameraEntities);
+    m_cameraEntities = std::move(dest.m_cameraEntities);
     m_pathToEntity = std::move(dest.m_pathToEntity);
     m_registeredMeshByEntity = std::move(dest.m_registeredMeshByEntity);
-    m_Materials = std::move(dest.m_Materials);
-    m_Meshes = std::move(dest.m_Meshes);
-    m_GeometryCount = dest.m_GeometryCount;
-    m_MaxGeometryCountPerMesh = dest.m_MaxGeometryCountPerMesh;
-    m_GeometryInstancesCount = dest.m_GeometryInstancesCount;
-    dest.m_GeometryCount = 0;
-    dest.m_MaxGeometryCountPerMesh = 0;
-    dest.m_GeometryInstancesCount = 0;
+    m_materials = std::move(dest.m_materials);
+    m_meshes = std::move(dest.m_meshes);
+    m_geometryCount = dest.m_geometryCount;
+    m_maxGeometryCountPerMesh = dest.m_maxGeometryCountPerMesh;
+    m_geometryInstancesCount = dest.m_geometryInstancesCount;
+    dest.m_geometryCount = 0;
+    dest.m_maxGeometryCountPerMesh = 0;
+    dest.m_geometryInstancesCount = 0;
     liveWorld.removeBorrowObserver(&dest);
     dest.m_root = ecs::NullEntity;
     dest.m_world = nullptr;
@@ -370,17 +370,17 @@ void SceneEntityWorld::registerCameraEntity(ecs::Entity entity)
     if (!m_world->isAlive(entity) || !m_world->has<CameraComponent>(entity))
         return;
 
-    if (std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity) != m_CameraEntities.end())
+    if (std::find(m_cameraEntities.begin(), m_cameraEntities.end(), entity) != m_cameraEntities.end())
         return;
 
-    m_CameraEntities.push_back(entity);
+    m_cameraEntities.push_back(entity);
 }
 
 void SceneEntityWorld::unregisterCameraEntity(ecs::Entity entity)
 {
-    const auto it = std::find(m_CameraEntities.begin(), m_CameraEntities.end(), entity);
-    if (it != m_CameraEntities.end())
-        m_CameraEntities.erase(it);
+    const auto it = std::find(m_cameraEntities.begin(), m_cameraEntities.end(), entity);
+    if (it != m_cameraEntities.end())
+        m_cameraEntities.erase(it);
 }
 
 void SceneEntityWorld::clear()
@@ -393,14 +393,14 @@ void SceneEntityWorld::clear()
     if (m_owned)
     {
         m_root = ecs::NullEntity;
-        m_CameraEntities.clear();
+        m_cameraEntities.clear();
         m_pathToEntity.clear();
         m_registeredMeshByEntity.clear();
-        m_Materials = {};
-        m_Meshes = {};
-        m_GeometryCount = 0;
-        m_MaxGeometryCountPerMesh = 0;
-        m_GeometryInstancesCount = 0;
+        m_materials = {};
+        m_meshes = {};
+        m_geometryCount = 0;
+        m_maxGeometryCountPerMesh = 0;
+        m_geometryInstancesCount = 0;
         m_structureDirty = true;
         m_transformDirty = true;
         m_lightDirty = true;
@@ -498,7 +498,7 @@ void SceneEntityWorld::ensureSceneResourcesSynced()
 const std::vector<ecs::Entity>& SceneEntityWorld::cameraEntitiesInRegistrationOrder() const
 {
     const_cast<SceneEntityWorld*>(this)->syncSceneResourcesFromEcs();
-    return m_CameraEntities;
+    return m_cameraEntities;
 }
 
 void SceneEntityWorld::syncSceneResourcesFromEcs()
@@ -605,14 +605,14 @@ void SceneEntityWorld::syncSceneResourcesFromEcs()
             }
         });
 
-        m_CameraEntities.erase(
+        m_cameraEntities.erase(
             std::remove_if(
-                m_CameraEntities.begin(),
-                m_CameraEntities.end(),
+                m_cameraEntities.begin(),
+                m_cameraEntities.end(),
                 [this](ecs::Entity entity) {
                     return !m_world->isAlive(entity) || !m_world->has<CameraComponent>(entity);
                 }),
-            m_CameraEntities.end());
+            m_cameraEntities.end());
     }
 
     if (leafDirty)
@@ -906,14 +906,14 @@ void SceneEntityWorld::refreshInstanceIndices()
             geometryInstanceIndex += static_cast<int>(entry.mesh->mesh->geometries.size());
     }
 
-    m_GeometryInstancesCount = static_cast<size_t>(geometryInstanceIndex);
+    m_geometryInstancesCount = static_cast<size_t>(geometryInstanceIndex);
 }
 
 void SceneEntityWorld::assignGlobalResourceIndices()
 {
     int meshIndex = 0;
     int geometryIndex = 0;
-    for (const auto& mesh : m_Meshes)
+    for (const auto& mesh : m_meshes)
     {
         for (const auto& geometry : mesh->geometries)
         {
@@ -925,7 +925,7 @@ void SceneEntityWorld::assignGlobalResourceIndices()
     }
 
     int materialIndex = 0;
-    for (const auto& material : m_Materials)
+    for (const auto& material : m_materials)
     {
         material->materialID = materialIndex;
         ++materialIndex;

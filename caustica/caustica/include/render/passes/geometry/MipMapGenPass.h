@@ -49,18 +49,18 @@ namespace caustica::render
     private:
 
         caustica::rhi::DeviceHandle m_device;
-        caustica::rhi::ShaderHandle m_Shader;
-        caustica::rhi::TextureHandle m_Texture;
-        caustica::rhi::BufferHandle m_ConstantBuffer;
-        caustica::rhi::BindingLayoutHandle m_BindingLayout;
-        std::vector<caustica::rhi::BindingSetHandle> m_BindingSets;
-        caustica::rhi::ComputePipelineHandle m_Pso;
+        caustica::rhi::ShaderHandle m_shader;
+        caustica::rhi::TextureHandle m_texture;
+        caustica::rhi::BufferHandle m_constantBuffer;
+        caustica::rhi::BindingLayoutHandle m_bindingLayout;
+        std::vector<caustica::rhi::BindingSetHandle> m_bindingSets;
+        caustica::rhi::ComputePipelineHandle m_pso;
 
         // Set of unique dummy textures - see details in class implementation
         struct NullTextures;
-        std::shared_ptr<NullTextures> m_NullTextures;
+        std::shared_ptr<NullTextures> m_nullTextures;
 
-        caustica::BindingCache m_BindingCache;
+        caustica::BindingCache m_bindingCache;
 
     };
 

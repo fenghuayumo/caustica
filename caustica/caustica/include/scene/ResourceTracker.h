@@ -14,21 +14,21 @@ namespace caustica
     class ResourceTracker
     {
     private:
-        std::unordered_map<std::shared_ptr<T>, uint32_t> m_Map;
+        std::unordered_map<std::shared_ptr<T>, uint32_t> m_map;
         using UnderlyingConstIterator = typename std::unordered_map<std::shared_ptr<T>, uint32_t>::const_iterator;
 
     public:
         class ConstIterator
         {
         private:
-            UnderlyingConstIterator m_Iter;
+            UnderlyingConstIterator m_iter;
         public:
-            ConstIterator(UnderlyingConstIterator iter) : m_Iter(std::move(iter)) {}
-            ConstIterator& operator++() { ++m_Iter; return *this; }
-            ConstIterator operator++(int) { ConstIterator res = *this; ++m_Iter; return res; }
-            bool operator==(ConstIterator other) const { return m_Iter == other.m_Iter; }
+            ConstIterator(UnderlyingConstIterator iter) : m_iter(std::move(iter)) {}
+            ConstIterator& operator++() { ++m_iter; return *this; }
+            ConstIterator operator++(int) { ConstIterator res = *this; ++m_iter; return res; }
+            bool operator==(ConstIterator other) const { return m_iter == other.m_iter; }
             bool operator!=(ConstIterator other) const { return !(*this == other); }
-            const std::shared_ptr<T>& operator*() { return m_Iter->first; }
+            const std::shared_ptr<T>& operator*() { return m_iter->first; }
         };
 
         // Adds a reference to the specified resource.
@@ -36,7 +36,7 @@ namespace caustica
         bool addRef(const std::shared_ptr<T>& resource)
         {
             if (!resource) return false;
-            uint32_t refCount = ++m_Map[resource];
+            uint32_t refCount = ++m_map[resource];
             return (refCount == 1);
         }
 
@@ -45,8 +45,8 @@ namespace caustica
         bool release(const std::shared_ptr<T>& resource)
         {
             if (!resource) return false;
-            auto it = m_Map.find(resource);
-            if (it == m_Map.end())
+            auto it = m_map.find(resource);
+            if (it == m_map.end())
             {
                 assert(false); // trying to release an object not owned by this tracker
                 return false;
@@ -59,15 +59,15 @@ namespace caustica
 
             if (it->second == 0)
             {
-                m_Map.erase(it);
+                m_map.erase(it);
                 return true;
             }
             return false;
         }
 
-        [[nodiscard]] ConstIterator begin() const { return ConstIterator(m_Map.cbegin()); }
-        [[nodiscard]] ConstIterator end() const { return ConstIterator(m_Map.cend()); }
-        [[nodiscard]] bool empty() const { return m_Map.empty(); }
-        [[nodiscard]] size_t size() const { return m_Map.size(); }
+        [[nodiscard]] ConstIterator begin() const { return ConstIterator(m_map.cbegin()); }
+        [[nodiscard]] ConstIterator end() const { return ConstIterator(m_map.cend()); }
+        [[nodiscard]] bool empty() const { return m_map.empty(); }
+        [[nodiscard]] size_t size() const { return m_map.size(); }
     };
 }

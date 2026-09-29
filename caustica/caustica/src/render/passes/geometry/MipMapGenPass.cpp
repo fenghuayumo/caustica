@@ -78,21 +78,21 @@ MipMapGenPass::MipMapGenPass(
     caustica::rhi::TextureHandle input, 
     Mode mode)
     : m_device(device)
-    , m_Texture(input)
-    , m_BindingSets(MAX_PASSES)
-    , m_BindingCache(device)
+    , m_texture(input)
+    , m_bindingSets(MAX_PASSES)
+    , m_bindingCache(device)
 {
-    assert(m_Texture);
+    assert(m_texture);
 
-    m_NullTextures = NullTextures::get(m_device);
+    m_nullTextures = NullTextures::get(m_device);
 
-    uint nmipLevels = m_Texture->getDesc().mipLevels;
+    uint nmipLevels = m_texture->getDesc().mipLevels;
 
     // Shader
     assert(mode>=0 && mode <= MODE_MINMAX);
 
     std::vector<ShaderMacro> macros = { {"MODE", std::to_string(mode)} };
-    m_Shader = shaderFactory->createAutoShader(
+    m_shader = shaderFactory->createAutoShader(
         "engine/passes/mipmapgen_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_mipmapgen_cs), &macros, caustica::rhi::ShaderType::Compute);
 
     // Constants
@@ -102,7 +102,7 @@ MipMapGenPass::MipMapGenPass(
     constantBufferDesc.isVolatile = true;
     constantBufferDesc.debugName = "MipMapGenPass/Constants";
     constantBufferDesc.maxVersions = c_MaxRenderPassConstantBufferVersions;
-    m_ConstantBuffer = m_device->createBuffer(constantBufferDesc);
+    m_constantBuffer = m_device->createBuffer(constantBufferDesc);
 
     // BindingLayout
     caustica::rhi::BindingLayoutDesc layoutDesc;
@@ -110,58 +110,58 @@ MipMapGenPass::MipMapGenPass(
     layoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::VolatileConstantBuffer(0));
     layoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_SRV(0));
     layoutDesc.bindings.push_back(caustica::rhi::BindingLayoutItem::Texture_UAV(0).setSize(NUM_LODS));
-    m_BindingLayout = m_device->createBindingLayout(layoutDesc);
+    m_bindingLayout = m_device->createBindingLayout(layoutDesc);
 
     // BindingSets
-    m_BindingSets.resize(MAX_PASSES);
+    m_bindingSets.resize(MAX_PASSES);
     caustica::rhi::BindingSetDesc setDesc;
-    for (uint i = 0; i < (uint)m_BindingSets.size(); ++i)
+    for (uint i = 0; i < (uint)m_bindingSets.size(); ++i)
     {
         // create a unique binding set for each compute pass
         if (i * NUM_LODS >= nmipLevels)
             break;
 
-        caustica::rhi::BindingSetHandle & set = m_BindingSets[i];
+        caustica::rhi::BindingSetHandle & set = m_bindingSets[i];
 
         caustica::rhi::BindingSetDesc setDesc;
-        setDesc.bindings.push_back(caustica::rhi::BindingSetItem::ConstantBuffer(0, m_ConstantBuffer));
-        setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(0, m_Texture, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i*NUM_LODS, 1, 0, 1)));
+        setDesc.bindings.push_back(caustica::rhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer));
+        setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_SRV(0, m_texture, caustica::rhi::Format::UNKNOWN, caustica::rhi::TextureSubresourceSet(i*NUM_LODS, 1, 0, 1)));
         for (uint mipLevel = 1; mipLevel <= NUM_LODS; ++mipLevel)
         {   // output UAVs start after the mip-level UAV that was computed last
             if (i * NUM_LODS + mipLevel < nmipLevels)
             {
-                setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(0, m_Texture)
+                setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(0, m_texture)
                     .setArrayElement(mipLevel - 1)
                     .setSubresources(caustica::rhi::TextureSubresourceSet(i*NUM_LODS + mipLevel, 1, 0, 1)));
             }
             else
             {
-                setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(0, m_NullTextures->lod[mipLevel-1])
+                setDesc.bindings.push_back(caustica::rhi::BindingSetItem::Texture_UAV(0, m_nullTextures->lod[mipLevel-1])
                     .setArrayElement(mipLevel - 1));
             }
         }
-        set = m_device->createBindingSet(setDesc, m_BindingLayout);
+        set = m_device->createBindingSet(setDesc, m_bindingLayout);
     }
 
     caustica::rhi::ComputePipelineDesc computePipelineDesc;
-    computePipelineDesc.CS = m_Shader;
-    computePipelineDesc.bindingLayouts = { m_BindingLayout };
+    computePipelineDesc.CS = m_shader;
+    computePipelineDesc.bindingLayouts = { m_bindingLayout };
 
-    m_Pso = device->createComputePipeline(computePipelineDesc);
+    m_pso = device->createComputePipeline(computePipelineDesc);
 }
 
 void MipMapGenPass::dispatch(caustica::rhi::CommandList* commandList, int maxLOD) 
 {
-    assert(m_Texture);
+    assert(m_texture);
 
     commandList->beginMarker("MipMapGen::dispatch");
 
-    uint nmipLevels = m_Texture->getDesc().mipLevels;
+    uint nmipLevels = m_texture->getDesc().mipLevels;
     if (maxLOD > 0 && maxLOD < (int)nmipLevels)
         nmipLevels = maxLOD+1;
 
-    uint width = m_Texture->getDesc().width,
-         height = m_Texture->getDesc().height;
+    uint width = m_texture->getDesc().width,
+         height = m_texture->getDesc().height;
 
     width = (width + GROUP_SIZE - 1) / GROUP_SIZE;
     height = (height + GROUP_SIZE - 1) / GROUP_SIZE;
@@ -174,11 +174,11 @@ void MipMapGenPass::dispatch(caustica::rhi::CommandList* commandList, int maxLOD
         MipmmapGenConstants constants = {};
         constants.numLODs = std::min(nmipLevels - i*NUM_LODS -1, (uint32_t)NUM_LODS);
         constants.dispatch = i;
-        commandList->writeBuffer(m_ConstantBuffer, &constants, sizeof(constants));
+        commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
         caustica::rhi::ComputeState state;
-        state.pipeline = m_Pso;
-        state.bindings = { m_BindingSets[i] };
+        state.pipeline = m_pso;
+        state.bindings = { m_bindingSets[i] };
         commandList->setComputeState(state);
         commandList->dispatch(width, height);
     }
@@ -189,20 +189,20 @@ void MipMapGenPass::dispatch(caustica::rhi::CommandList* commandList, int maxLOD
 
 void MipMapGenPass::display(caustica::render::RenderDevice& renderDevice, caustica::rhi::CommandList* commandList, caustica::rhi::Framebuffer* target)
 {
-    assert(m_Texture);
+    assert(m_texture);
     
     commandList->beginMarker("MipMapGen::display");
     
     caustica::rhi::Viewport viewport = caustica::rhi::Viewport((float)target->getFramebufferInfo().width, (float)target->getFramebufferInfo().height);
 
-    float2 size = { m_Texture->getDesc().width / 2.f, m_Texture->getDesc().height / 2.f };
+    float2 size = { m_texture->getDesc().width / 2.f, m_texture->getDesc().height / 2.f };
     float2 corner = { 10.f, uint(viewport.maxY) - 10.f };
  
-    for (uint level = 0; level < m_Texture->getDesc().mipLevels-1; ++level)
+    for (uint level = 0; level < m_texture->getDesc().mipLevels-1; ++level)
     {
         caustica::render::BlitParameters blitParams;
         blitParams.targetFramebuffer = target;
-        blitParams.sourceTexture = m_Texture;
+        blitParams.sourceTexture = m_texture;
         blitParams.sourceMip = level + 1;
         blitParams.targetViewport = caustica::rhi::Viewport(
             corner.x,
@@ -211,7 +211,7 @@ void MipMapGenPass::display(caustica::render::RenderDevice& renderDevice, causti
             corner.y, 0.f, 1.f
         );
 
-        renderDevice.blit().blitTexture(commandList, blitParams, &m_BindingCache);
+        renderDevice.blit().blitTexture(commandList, blitParams, &m_bindingCache);
 
         // spiral pattern
         switch (level % 4)

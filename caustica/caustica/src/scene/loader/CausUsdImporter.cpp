@@ -14,7 +14,7 @@ namespace caustica
 {
 
 CausUsdImporter::CausUsdImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
-    : m_SceneTypeFactory(std::move(sceneTypeFactory))
+    : m_sceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 
@@ -39,7 +39,7 @@ bool CausUsdImporter::load(
 
 #if CAUSTICA_WITH_OPENUSD
         std::string error;
-        if (!LoadSceneFromOpenUsd(fileName, *m_SceneTypeFactory, result, &error))
+        if (!LoadSceneFromOpenUsd(fileName, *m_sceneTypeFactory, result, &error))
         {
             caustica::error("OpenUSD load failed for '%s': %s", fileName.string().c_str(), error.c_str());
             return false;

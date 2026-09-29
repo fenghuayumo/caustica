@@ -18,13 +18,13 @@ namespace caustica::render
     {
     private:
         caustica::rhi::DeviceHandle m_device;
-        caustica::rhi::ShaderHandle m_Shader;
-        caustica::rhi::ComputePipelineHandle m_Pipeline;
-        caustica::rhi::BindingLayoutHandle m_BindingLayout;
-        caustica::rhi::BindingSetHandle m_BindingSet;
-        caustica::rhi::BufferHandle m_ConstantBuffer;
-        caustica::rhi::BufferHandle m_IntermediateBuffer;
-        caustica::rhi::BufferHandle m_ReadbackBuffer;
+        caustica::rhi::ShaderHandle m_shader;
+        caustica::rhi::ComputePipelineHandle m_pipeline;
+        caustica::rhi::BindingLayoutHandle m_bindingLayout;
+        caustica::rhi::BindingSetHandle m_bindingSet;
+        caustica::rhi::BufferHandle m_constantBuffer;
+        caustica::rhi::BufferHandle m_intermediateBuffer;
+        caustica::rhi::BufferHandle m_readbackBuffer;
 
     public:
         PixelReadbackPass(

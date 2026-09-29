@@ -37,9 +37,9 @@ private:
         bool hasTimestamp = false;
     };
 
-    mutable std::shared_mutex m_Mutex;
-    std::unordered_map<AssetId, WatchedFile, AssetId::Hash> m_WatchedFiles;
-    std::unordered_map<std::string, size_t> m_OwnedWrites;
+    mutable std::shared_mutex m_mutex;
+    std::unordered_map<AssetId, WatchedFile, AssetId::Hash> m_watchedFiles;
+    std::unordered_map<std::string, size_t> m_ownedWrites;
 };
 
 } // namespace caustica

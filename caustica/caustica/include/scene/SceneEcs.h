@@ -601,7 +601,7 @@ private:
     bool m_frameTransformDirty = false;   // per-frame snapshot of m_transformDirty for systems
     bool m_frameLightDirty = false;       // survives refresh until Extract publishes the light list
     ecs::Entity m_root = ecs::NullEntity;
-    std::vector<ecs::Entity> m_CameraEntities;
+    std::vector<ecs::Entity> m_cameraEntities;
     std::unordered_map<std::string, ecs::Entity> m_pathToEntity;
     // Shadow of ResourceTracker registrations keyed by entity (for Changed mesh swaps).
     std::unordered_map<ecs::Entity, std::shared_ptr<MeshInfo>> m_registeredMeshByEntity;

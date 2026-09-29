@@ -117,11 +117,11 @@ namespace caustica::console
 					caustica::fatal("attempting to register console command '%s' with no execution function", desc.name);
 				}
 
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				if (auto it = m_Dictionary.find(desc.name); it == m_Dictionary.end())
+				std::lock_guard<std::mutex> lock(m_mutex);
+				if (auto it = m_dictionary.find(desc.name); it == m_dictionary.end())
 				{
 					auto* cmd = new Command(desc.description, desc.on_execute, desc.on_suggest);
-					m_Dictionary[desc.name] = cmd;
+					m_dictionary[desc.name] = cmd;
 					return cmd;
 				}
 				else
@@ -134,12 +134,12 @@ namespace caustica::console
 
 		bool unregisterCommand(std::string_view name)
 		{
-			std::lock_guard<std::mutex> lock(m_Mutex);
-			if (auto it = m_Dictionary.find(name); it != m_Dictionary.end())
+			std::lock_guard<std::mutex> lock(m_mutex);
+			if (auto it = m_dictionary.find(name); it != m_dictionary.end())
 			{
 				if (it->second->asCommand())
 				{
-					m_Dictionary.erase(it);
+					m_dictionary.erase(it);
 					return true;
 				}
 				else
@@ -163,16 +163,16 @@ namespace caustica::console
 
 			if (IsValidName(name))
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				if (auto it = m_Dictionary.find(name); it != m_Dictionary.end())
+				std::lock_guard<std::mutex> lock(m_mutex);
+				if (auto it = m_dictionary.find(name); it != m_dictionary.end())
 				{
 					if (VariableImpl<T>* cvar = (VariableImpl<T>*)it->second->asVariable())
 					{
 						if (cvar->getState().type == VariableType::isA<T>())
 						{
 							// cvar may have been referenced elsewhere but not be initialized yet
-							if (cvar->m_Description.empty() && IsValidName(description))
-								cvar->m_Description = description;
+							if (cvar->m_description.empty() && IsValidName(description))
+								cvar->m_description = description;
 
 							// override the value
 							cvar->setData(value, (SetBy)state.setby);
@@ -191,7 +191,7 @@ namespace caustica::console
 					state.type = VariableType::isA<T>(); // force type to be correct
 
 					VariableImpl<T>* cvar = new VariableImpl<T>(value, description, state);
-					m_Dictionary[name] = cvar;
+					m_dictionary[name] = cvar;
 					return cvar;
 				}
 			}
@@ -208,8 +208,8 @@ namespace caustica::console
 				return nullptr;
 			}
 
-			std::lock_guard<std::mutex> lock(m_Mutex);
-			if (auto it = m_Dictionary.find(desc.name); it != m_Dictionary.end())
+			std::lock_guard<std::mutex> lock(m_mutex);
+			if (auto it = m_dictionary.find(desc.name); it != m_dictionary.end())
 			{
 				auto* variable = dynamic_cast<VariableImpl<T>*>(it->second->asVariable());
 				if (!variable)
@@ -228,7 +228,7 @@ namespace caustica::console
 				VariableState::CODE);
 			auto* variable = new VariableImpl<T>(desc.defaultValue, desc.description, state);
 			variable->configureBinding(desc);
-			m_Dictionary[desc.name] = variable;
+			m_dictionary[desc.name] = variable;
 			return variable;
 		}
 
@@ -236,9 +236,9 @@ namespace caustica::console
 		{
 			if (!name.empty())
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				auto it = m_Dictionary.find(name);
-				if (it != m_Dictionary.end())
+				std::lock_guard<std::mutex> lock(m_mutex);
+				auto it = m_dictionary.find(name);
+				if (it != m_dictionary.end())
 					return it->second;
 			}
 			return nullptr;
@@ -249,8 +249,8 @@ namespace caustica::console
 			std::vector<std::string_view> matches;
 			if (auto rx = regex_from_char(regex))
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				for (auto& it : m_Dictionary)
+				std::lock_guard<std::mutex> lock(m_mutex);
+				for (auto& it : m_dictionary)
 					if (std::regex_match(it.first, *rx))
 						matches.push_back(std::string_view(it.first));
 			}
@@ -262,8 +262,8 @@ namespace caustica::console
 			std::vector<Object*> matches;
 			if (auto rx = regex_from_char(regex))
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				for (auto& it : m_Dictionary)
+				std::lock_guard<std::mutex> lock(m_mutex);
+				for (auto& it : m_dictionary)
 					if (std::regex_match(it.first, *rx))
 						matches.push_back(it.second);
 			}
@@ -275,8 +275,8 @@ namespace caustica::console
 			// slow linear search under the assumption that this is only called very rarely
 			if (cobj)
 			{
-				std::lock_guard<std::mutex> lock(m_Mutex);
-				for (auto const& it : m_Dictionary)
+				std::lock_guard<std::mutex> lock(m_mutex);
+				for (auto const& it : m_dictionary)
 				{
 					if (it.second == cobj)
 						return it.first;
@@ -288,8 +288,8 @@ namespace caustica::console
 
 		void reset()
 		{
-			std::lock_guard<std::mutex> lock(m_Mutex);
-			m_Dictionary.clear();
+			std::lock_guard<std::mutex> lock(m_mutex);
+			m_dictionary.clear();
 		}
 
 	private:
@@ -299,8 +299,8 @@ namespace caustica::console
 		// application shuts down and implicit destructors are invoked. The "correct"
 		// implementation would to own lifespan with shared/weak_ptr, but this adds
 		// a lot of atomic & error checking burdens which were not deemed to be worth it.
-		std::mutex m_Mutex;
-		std::map<std::string, Object*, std::less<>> m_Dictionary;
+		std::mutex m_mutex;
+		std::map<std::string, Object*, std::less<>> m_dictionary;
 
 	} objectsDictionary;
 
@@ -323,13 +323,13 @@ namespace caustica::console
 	//
 
 	Command::Command(char const* description, OnExecuteFunction onexec, OnSuggestFunction onsuggest)
-		: Object(description), m_OnExecute(onexec), m_OnSuggest(onsuggest)
+		: Object(description), m_onExecute(onexec), m_onSuggest(onsuggest)
 	{ }
 
 	Command::Result Command::execute(Args const& args)
 	{
-		if (m_OnExecute)
-			return m_OnExecute(args);
+		if (m_onExecute)
+			return m_onExecute(args);
 		else
 			caustica::error("console command '%s' has no function", this->getName().c_str());
 		return Result();
@@ -337,8 +337,8 @@ namespace caustica::console
 
 	std::vector<std::string> Command::suggest(std::string_view cmdline, size_t cursor_pos)
 	{
-		if (m_OnSuggest)
-			return m_OnSuggest(cmdline, cursor_pos);
+		if (m_onSuggest)
+			return m_onSuggest(cmdline, cursor_pos);
 		else
 			return {};
 	}
@@ -349,13 +349,13 @@ namespace caustica::console
 
 	void Variable::setOnChangeCallback(Callback onChange)
 	{
-		m_OnChange = onChange;
+		m_onChange = onChange;
 	}
 
 	void Variable::executeOnChangeCallback()
 	{
-		if (m_OnChange)
-			m_OnChange(*this);
+		if (m_onChange)
+			m_onChange(*this);
 		else
 			caustica::error("no callback set for CVar '%s'", this->getName().c_str());
 	}
@@ -387,42 +387,42 @@ namespace caustica::console
 	public:
 
 		VariableImpl(T const& data, char const* description, VariableState state)
-			: Variable(description ? description : "", state), m_Data(data), m_DefaultData(data) { }
+			: Variable(description ? description : "", state), m_data(data), m_defaultData(data) { }
 
 		virtual Variable* asVariable() override { return this; }
 
 		inline T getData() const
 		{
-			if (m_Getter)
-				m_Data = m_Getter();
-			return m_Data;
+			if (m_getter)
+				m_data = m_getter();
+			return m_data;
 		}
 
 		inline T const& getDataRef() const
 		{
-			if (m_Getter)
-				m_Data = m_Getter();
-			return m_Data;
+			if (m_getter)
+				m_data = m_getter();
+			return m_data;
 		}
 
 		void configureBinding(BoundVariableDesc<T> const& desc)
 		{
-			m_DefaultData = desc.defaultValue;
-			m_Data = desc.defaultValue;
-			m_Getter = {};
-			m_Setter = desc.setter;
-			m_Validator = desc.validator;
-			m_Choices = desc.choices;
-			m_Flags = desc.flags;
-			m_Description = desc.description ? desc.description : "";
-			m_State.read_only = desc.readOnly || !desc.setter;
-			m_State.cheat = desc.cheat;
-			m_ValueSuggestions.clear();
-			for (auto const& choice : m_Choices)
-				m_ValueSuggestions.push_back(choice.first);
-			m_DefaultValue = getValueAsString();
-			m_Getter = desc.getter;
-			m_OnChange = desc.onChanged
+			m_defaultData = desc.defaultValue;
+			m_data = desc.defaultValue;
+			m_getter = {};
+			m_setter = desc.setter;
+			m_validator = desc.validator;
+			m_choices = desc.choices;
+			m_flags = desc.flags;
+			m_description = desc.description ? desc.description : "";
+			m_state.read_only = desc.readOnly || !desc.setter;
+			m_state.cheat = desc.cheat;
+			m_valueSuggestions.clear();
+			for (auto const& choice : m_choices)
+				m_valueSuggestions.push_back(choice.first);
+			m_defaultValue = getValueAsString();
+			m_getter = desc.getter;
+			m_onChange = desc.onChanged
 				? [callback = desc.onChanged](Variable&) { callback(); }
 				: Callback{};
 		}
@@ -430,7 +430,7 @@ namespace caustica::console
 		inline bool setData(T const& value, SetBy setby)
 		{
 			VariableState flags = this->getState();
-			if (hasFlag(m_Flags, VariableFlags::STARTUP_ONLY)
+			if (hasFlag(m_flags, VariableFlags::STARTUP_ONLY)
 				&& g_StartupVariablesLocked.load(std::memory_order_acquire)
 				&& setby > SetBy::CODE)
 			{
@@ -441,10 +441,10 @@ namespace caustica::console
 			{
 				T const previous = getData();
 				T validated = value;
-				if (m_Validator)
+				if (m_validator)
 				{
 					std::string error;
-					if (!m_Validator(validated, error))
+					if (!m_validator(validated, error))
 					{
 						caustica::error("cvar '%s' rejected value: %s",
 							this->getName().c_str(), error.c_str());
@@ -452,13 +452,13 @@ namespace caustica::console
 					}
 				}
 
-				if (m_Setter)
-					m_Setter(validated);
-				m_Data = validated;
-				this->m_State.setby = setby;
+				if (m_setter)
+					m_setter(validated);
+				m_data = validated;
+				this->m_state.setby = setby;
 
-				if (m_OnChange && !valuesEqual(previous, validated))
-					m_OnChange(*this);
+				if (m_onChange && !valuesEqual(previous, validated))
+					m_onChange(*this);
 				return true;
 			}
 			else
@@ -477,7 +477,7 @@ namespace caustica::console
 		{
 			if (!s.empty())
 			{
-				for (auto const& choice : m_Choices)
+				for (auto const& choice : m_choices)
 				{
 					if (ds::caseInsensitiveEquals(std::string(s), choice.first))
 						return this->setData(choice.second, setby);
@@ -487,7 +487,7 @@ namespace caustica::console
 			}
 
 			caustica::error("cvar '%s' failed parsing value string '%s' (expected a %s) - value not set",
-				this->getName().c_str(), std::string(s).c_str(), asString((VariableType::Type)m_State.type));
+				this->getName().c_str(), std::string(s).c_str(), asString((VariableType::Type)m_state.type));
 			return false;
 		}
 
@@ -498,8 +498,8 @@ namespace caustica::console
 
 		virtual std::string getValueAsString() const override
 		{
-			T const value = m_Getter ? m_Getter() : m_Data;
-			for (auto const& choice : m_Choices)
+			T const value = m_getter ? m_getter() : m_data;
+			for (auto const& choice : m_choices)
 				if (valuesEqual(choice.second, value))
 					return choice.first;
 			char buff[16] = { 0 };
@@ -510,7 +510,7 @@ namespace caustica::console
 
 		virtual bool resetToDefault(SetBy setby) override
 		{
-			return setData(m_DefaultData, setby);
+			return setData(m_defaultData, setby);
 		}
 
 		// default accessors
@@ -550,12 +550,12 @@ namespace caustica::console
 	private:
 		friend class AutoVariable<T>;
 
-		mutable T m_Data;
-		T m_DefaultData{};
-		std::function<T()> m_Getter;
-		std::function<void(T const&)> m_Setter;
-		std::function<bool(T&, std::string&)> m_Validator;
-		std::vector<std::pair<std::string, T>> m_Choices;
+		mutable T m_data;
+		T m_defaultData{};
+		std::function<T()> m_getter;
+		std::function<void(T const&)> m_setter;
+		std::function<bool(T&, std::string&)> m_validator;
+		std::vector<std::pair<std::string, T>> m_choices;
 	};
 
 	// specialisations
@@ -655,7 +655,7 @@ namespace caustica::console
 	template <> std::string VariableImpl<bool>::getValueAsString() const
 	{
 		bool const value = getData();
-		for (auto const& choice : m_Choices)
+		for (auto const& choice : m_choices)
 			if (choice.second == value)
 				return choice.first;
 		return value ? "true" : "false";
@@ -674,18 +674,18 @@ namespace caustica::console
 
 #define DEFINE_CVARREF_IMPLEMENTATION(type) \
 	template <> AutoVariable<type>::AutoVariable(char const* name, char const* description, type const& value, bool ronly, bool cheat) \
-	: m_Variable(*(VariableImpl<type>*)objectsDictionary.RegisterVariable<type>( \
+	: m_variable(*(VariableImpl<type>*)objectsDictionary.RegisterVariable<type>( \
 	    name, description, value, VariableState(ronly, cheat, VariableType::isA<type>(), VariableState::CODE))) { } \
     \
-	template <> std::string const& AutoVariable<type>::getName() const { return objectsDictionary.GetObjectName(&m_Variable); } \
-	template <> std::string const& AutoVariable<type>::getDescription() const { return m_Variable.getDescription(); } \
-	template <> void AutoVariable<type>::setDescription(std::string const& description) { m_Variable.setDescription(description); } \
-	template <> VariableState AutoVariable<type>::getState() const { return m_Variable.getState(); } \
-	template <> type AutoVariable<type>::getValue() const { return m_Variable.getData(); } \
-	template <> void AutoVariable<type>::setValue(type const& value) { m_Variable.setData(value, VariableState::CODE); } \
-    template <> void AutoVariable<type>::setOnChangeCallback(Variable::Callback onChange) { m_Variable.setOnChangeCallback(onChange); } \
-	template <> void AutoVariable<type>::executeOnChangeCallback() { m_Variable.executeOnChangeCallback(); } \
-	template <> Variable* AutoVariable<type>::operator &() { return &m_Variable; } \
+	template <> std::string const& AutoVariable<type>::getName() const { return objectsDictionary.GetObjectName(&m_variable); } \
+	template <> std::string const& AutoVariable<type>::getDescription() const { return m_variable.getDescription(); } \
+	template <> void AutoVariable<type>::setDescription(std::string const& description) { m_variable.setDescription(description); } \
+	template <> VariableState AutoVariable<type>::getState() const { return m_variable.getState(); } \
+	template <> type AutoVariable<type>::getValue() const { return m_variable.getData(); } \
+	template <> void AutoVariable<type>::setValue(type const& value) { m_variable.setData(value, VariableState::CODE); } \
+    template <> void AutoVariable<type>::setOnChangeCallback(Variable::Callback onChange) { m_variable.setOnChangeCallback(onChange); } \
+	template <> void AutoVariable<type>::executeOnChangeCallback() { m_variable.executeOnChangeCallback(); } \
+	template <> Variable* AutoVariable<type>::operator &() { return &m_variable; } \
 	template <> AutoVariable<type>::operator type() const { return getValue(); } \
 	template <> AutoVariable<type>& AutoVariable<type>::operator=(const type& value) { setValue(value); return *this; }
 

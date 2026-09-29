@@ -82,21 +82,21 @@ public:
     [[nodiscard]] size_t pendingFinalizeCount();
     [[nodiscard]] bool gpuFinalizeFailed() const noexcept
     {
-        return m_GpuFinalizeFailed.load(std::memory_order_acquire);
+        return m_gpuFinalizeFailed.load(std::memory_order_acquire);
     }
     void clearGpuFinalizeFailure() noexcept
     {
-        m_GpuFinalizeFailed.store(false, std::memory_order_release);
+        m_gpuFinalizeFailed.store(false, std::memory_order_release);
     }
 
     void setMaxTextureSize(uint32_t size);
     void setGenerateMipmaps(bool generateMipmaps);
-    void setInfoLogSeverity(Severity value) { m_InfoLogSeverity = value; }
-    void setErrorLogSeverity(Severity value) { m_ErrorLogSeverity = value; }
+    void setInfoLogSeverity(Severity value) { m_infoLogSeverity = value; }
+    void setErrorLogSeverity(Severity value) { m_errorLogSeverity = value; }
 
-    uint32_t getNumberOfLoadedTextures() { return m_TexturesLoaded.load(); }
-    uint32_t getNumberOfRequestedTextures() { return m_TexturesRequested.load(); }
-    uint32_t getNumberOfFinalizedTextures() { return m_TexturesFinalized; }
+    uint32_t getNumberOfLoadedTextures() { return m_texturesLoaded.load(); }
+    uint32_t getNumberOfRequestedTextures() { return m_texturesRequested.load(); }
+    uint32_t getNumberOfFinalizedTextures() { return m_texturesFinalized; }
 
     std::shared_ptr<ImageAsset> getLoadedTexture(std::filesystem::path const& path);
     std::shared_ptr<ImageAsset> getImage(const Handle<ImageAsset>& image) const { return image.shared(); }
@@ -105,28 +105,28 @@ private:
     friend struct TextureDecodeFileJob;
     friend struct TextureDecodeMemoryJob;
 
-    caustica::rhi::DeviceHandle m_Device;
-    caustica::rhi::CommandListHandle m_CommandList;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::CommandListHandle m_commandList;
 
-    std::queue<std::shared_ptr<ImageAsset>> m_TexturesToFinalize;
-    std::shared_ptr<IDescriptorTableManager> m_DescriptorTable;
-    std::mutex m_TexturesToFinalizeMutex;
+    std::queue<std::shared_ptr<ImageAsset>> m_texturesToFinalize;
+    std::shared_ptr<IDescriptorTableManager> m_descriptorTable;
+    std::mutex m_texturesToFinalizeMutex;
 
     std::shared_ptr<IFileSystem> m_fs;
     // Non-owning; nulled by detachFromStores() when AssetSystem shuts down.
-    AssetRegistry* m_Registry = nullptr;
-    AssetStore<ImageAsset>* m_Images = nullptr;
+    AssetRegistry* m_registry = nullptr;
+    AssetStore<ImageAsset>* m_images = nullptr;
 
-    uint32_t m_MaxTextureSize = 0;
-    bool m_GenerateMipmaps = true;
+    uint32_t m_maxTextureSize = 0;
+    bool m_generateMipmaps = true;
 
-    Severity m_InfoLogSeverity = Severity::Info;
-    Severity m_ErrorLogSeverity = Severity::Warning;
+    Severity m_infoLogSeverity = Severity::Info;
+    Severity m_errorLogSeverity = Severity::Warning;
 
-    std::atomic<uint32_t> m_TexturesRequested = 0;
-    std::atomic<uint32_t> m_TexturesLoaded = 0;
-    uint32_t m_TexturesFinalized = 0;
-    std::atomic<bool> m_GpuFinalizeFailed{ false };
+    std::atomic<uint32_t> m_texturesRequested = 0;
+    std::atomic<uint32_t> m_texturesLoaded = 0;
+    uint32_t m_texturesFinalized = 0;
+    std::atomic<bool> m_gpuFinalizeFailed{ false };
 
     bool findTextureInCache(const std::filesystem::path& path, std::shared_ptr<ImageAsset>& texture);
     std::shared_ptr<IBlob> readTextureFile(const std::filesystem::path& path) const;

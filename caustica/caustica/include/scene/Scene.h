@@ -43,26 +43,26 @@ namespace caustica
     {
     protected:
         std::shared_ptr<caustica::IFileSystem> m_fs;
-        std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
-        std::shared_ptr<TextureLoader> m_TextureLoader;
-        std::unique_ptr<scene::SceneEntityWorld> m_EntityWorld;
-        scene::SceneRenderSnapshot m_RenderSnapshot;
+        std::shared_ptr<SceneTypeFactory> m_sceneTypeFactory;
+        std::shared_ptr<TextureLoader> m_textureLoader;
+        std::unique_ptr<scene::SceneEntityWorld> m_entityWorld;
+        scene::SceneRenderSnapshot m_renderSnapshot;
         // Private incremental extract workspace for extractAndPublishRenderSnapshot only.
         // Never returned to callers; published slots are the sole read channel.
-        scene::SceneRenderData m_LogicExtractCache;
-        bool m_LogicExtractCacheValid = false;
+        scene::SceneRenderData m_logicExtractCache;
+        bool m_logicExtractCacheValid = false;
 
         // Logic-thread ECS query scratch for getMeshInstances / getLightEntities / etc.
         // when called outside beginGpuReadFrame (not a published snapshot).
-        mutable std::vector<ecs::Entity> m_LogicQueryMeshInstances;
-        mutable std::vector<ecs::Entity> m_LogicQuerySkinnedMeshInstances;
-        mutable std::vector<ecs::Entity> m_LogicQueryLightEntities;
-        mutable std::vector<ecs::Entity> m_LogicQueryAnimationEntities;
-        std::shared_ptr<GltfImporter> m_GltfImporter;
-        std::shared_ptr<ObjImporter> m_ObjImporter;
-        std::shared_ptr<CausUsdImporter> m_CausUsdImporter;
-        std::shared_ptr<UrdfImporter> m_UrdfImporter;
-        std::vector<SceneImportResult> m_Models;
+        mutable std::vector<ecs::Entity> m_logicQueryMeshInstances;
+        mutable std::vector<ecs::Entity> m_logicQuerySkinnedMeshInstances;
+        mutable std::vector<ecs::Entity> m_logicQueryLightEntities;
+        mutable std::vector<ecs::Entity> m_logicQueryAnimationEntities;
+        std::shared_ptr<GltfImporter> m_gltfImporter;
+        std::shared_ptr<ObjImporter> m_objImporter;
+        std::shared_ptr<CausUsdImporter> m_causUsdImporter;
+        std::shared_ptr<UrdfImporter> m_urdfImporter;
+        std::vector<SceneImportResult> m_models;
 
         // Async structure GPU handoff (committed-serve while AS/SBT builds).
         SceneStructureGpuSync m_structureGpu;
@@ -71,7 +71,7 @@ namespace caustica
 
         std::filesystem::path m_textureSearchDirectory;
 
-        Handle<SceneAsset> m_Asset;
+        Handle<SceneAsset> m_asset;
 
         void loadModelAsync(
             uint32_t index,
@@ -224,7 +224,7 @@ namespace caustica
         [[nodiscard]] scene::SceneEntityWorld* getEntityWorld() const
         {
             assertLogicThread();
-            return m_EntityWorld.get();
+            return m_entityWorld.get();
         }
 
         // Bind the live scene graph to App::m_world after async load (logic thread).
@@ -235,7 +235,7 @@ namespace caustica
         // shared_ptr<Scene> (e.g. held by Python bindings) never destroys a
         // SceneEntityWorld whose borrowed world pointer has gone stale.
         void detachLiveEcs();
-        [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_SceneTypeFactory; }
+        [[nodiscard]] const std::shared_ptr<SceneTypeFactory>& getSceneTypeFactory() const { return m_sceneTypeFactory; }
         [[nodiscard]] math::box3 getSceneBounds() const;
 
         [[nodiscard]] const ResourceTracker<Material>& getMaterials() const;
@@ -278,9 +278,9 @@ namespace caustica
         {
             return m_loadedGameSettings ? &*m_loadedGameSettings : nullptr;
         }
-        [[nodiscard]] const std::vector<SceneImportResult>& getModels() const        { return m_Models; }
-        [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_Asset; }
-        void setAssetHandle(Handle<SceneAsset> asset)                                { m_Asset = std::move(asset); }
+        [[nodiscard]] const std::vector<SceneImportResult>& getModels() const        { return m_models; }
+        [[nodiscard]] const Handle<SceneAsset>& getAssetHandle() const               { return m_asset; }
+        void setAssetHandle(Handle<SceneAsset> asset)                                { m_asset = std::move(asset); }
 
         // Break MeshInfo?MeshAsset / Material?MaterialAsset / Scene?SceneAsset
         // shared_ptr cycles and drop extract-cache retained mesh refs so GPU

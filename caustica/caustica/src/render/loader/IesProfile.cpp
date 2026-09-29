@@ -22,9 +22,9 @@ IesProfileLoader::IesProfileLoader(
     caustica::rhi::Device* device, 
     std::shared_ptr<ShaderFactory> shaderFactory, 
     std::shared_ptr<IDescriptorTableManager> descriptorTableManager)
-    : m_Device(device)
-    , m_ShaderFactory(shaderFactory)
-    , m_DescriptorTableManager(descriptorTableManager)
+    : m_device(device)
+    , m_shaderFactory(shaderFactory)
+    , m_descriptorTableManager(descriptorTableManager)
 {
     caustica::rhi::BindingLayoutDesc layoutDesc;
     layoutDesc.visibility = caustica::rhi::ShaderType::Compute;
@@ -32,14 +32,14 @@ IesProfileLoader::IesProfileLoader(
         caustica::rhi::BindingLayoutItem::TypedBuffer_SRV(0),
         caustica::rhi::BindingLayoutItem::Texture_UAV(0),
     };
-    m_BindingLayout = device->createBindingLayout(layoutDesc);
+    m_bindingLayout = device->createBindingLayout(layoutDesc);
 
-    m_ComputeShader = m_ShaderFactory->createAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, caustica::rhi::ShaderType::Compute);
+    m_computeShader = m_shaderFactory->createAutoShader("engine/ies_profile_cs.hlsl", "main", CAUSTICA_MAKE_PLATFORM_SHADER(g_ies_profile_cs), nullptr, caustica::rhi::ShaderType::Compute);
 
     caustica::rhi::ComputePipelineDesc pipelineDesc;
-    pipelineDesc.bindingLayouts = { m_BindingLayout };
-    pipelineDesc.CS = m_ComputeShader;
-    m_ComputePipeline = device->createComputePipeline(pipelineDesc);
+    pipelineDesc.bindingLayouts = { m_bindingLayout };
+    pipelineDesc.CS = m_computeShader;
+    m_computePipeline = device->createComputePipeline(pipelineDesc);
 }
 
 static const char* c_SupportedProfiles[] = {
@@ -231,7 +231,7 @@ void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::Comman
     bufferDesc.keepInitialState = true;
     bufferDesc.debugName = "IesProfileData";
     bufferDesc.canHaveTypedViews = true;
-    caustica::rhi::BufferHandle buffer = m_Device->createBuffer(bufferDesc);
+    caustica::rhi::BufferHandle buffer = m_device->createBuffer(bufferDesc);
 
     caustica::rhi::TextureDesc textureDesc;
     textureDesc.dimension = caustica::rhi::TextureDimension::Texture2D;
@@ -240,14 +240,14 @@ void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::Comman
     textureDesc.debugName = profile.name;
     textureDesc.format = caustica::rhi::Format::R16_FLOAT;
     textureDesc.isUAV = true;
-    profile.texture = m_Device->createTexture(textureDesc);
+    profile.texture = m_device->createTexture(textureDesc);
 
     caustica::rhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = {
         caustica::rhi::BindingSetItem::TypedBuffer_SRV(0, buffer),
         caustica::rhi::BindingSetItem::Texture_UAV(0, profile.texture)
     };
-    caustica::rhi::BindingSetHandle bindingSet = m_Device->createBindingSet(bindingSetDesc, m_BindingLayout);
+    caustica::rhi::BindingSetHandle bindingSet = m_device->createBindingSet(bindingSetDesc, m_bindingLayout);
 
     commandList->writeBuffer(buffer, profile.rawData.data(), profile.rawData.size() * sizeof(float));
 
@@ -255,15 +255,15 @@ void IesProfileLoader::bakeIesProfile(IesProfile& profile, caustica::rhi::Comman
 
     caustica::rhi::ComputeState state;
     state.bindings = { bindingSet };
-    state.pipeline = m_ComputePipeline;
+    state.pipeline = m_computePipeline;
     commandList->setComputeState(state);
     commandList->dispatch(8, 8, 1);
 
     commandList->setPermanentTextureState(profile.texture, caustica::rhi::ResourceStates::ShaderResource);
     commandList->commitBarriers();
 
-    if (m_DescriptorTableManager)
+    if (m_descriptorTableManager)
     {
-        profile.textureIndex = m_DescriptorTableManager->createDescriptor(caustica::rhi::BindingSetItem::Texture_SRV(0, profile.texture));
+        profile.textureIndex = m_descriptorTableManager->createDescriptor(caustica::rhi::BindingSetItem::Texture_SRV(0, profile.texture));
     }
 }

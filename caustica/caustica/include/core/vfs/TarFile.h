@@ -16,9 +16,9 @@ namespace caustica
     class TarFile : public IFileSystem
     {
     private:
-        std::string m_ArchivePath;
-        std::mutex m_Mutex;
-        FILE* m_ArchiveFile = nullptr;
+        std::string m_archivePath;
+        std::mutex m_mutex;
+        FILE* m_archiveFile = nullptr;
 
         struct FileEntry
         {
@@ -26,8 +26,8 @@ namespace caustica
             size_t size = 0;
         };
 
-        std::unordered_map<std::string, FileEntry> m_Files;
-        std::unordered_set<std::string> m_Directories;
+        std::unordered_map<std::string, FileEntry> m_files;
+        std::unordered_set<std::string> m_directories;
         
     public:
         TarFile(const std::filesystem::path& archivePath);

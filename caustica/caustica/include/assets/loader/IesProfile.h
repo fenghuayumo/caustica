@@ -21,13 +21,13 @@ struct IesProfile
 
 class IesProfileLoader
 {
-    caustica::rhi::DeviceHandle m_Device;
-    caustica::rhi::ShaderHandle m_ComputeShader;
-    caustica::rhi::ComputePipelineHandle m_ComputePipeline;
-    caustica::rhi::BindingLayoutHandle m_BindingLayout;
+    caustica::rhi::DeviceHandle m_device;
+    caustica::rhi::ShaderHandle m_computeShader;
+    caustica::rhi::ComputePipelineHandle m_computePipeline;
+    caustica::rhi::BindingLayoutHandle m_bindingLayout;
 
-    std::shared_ptr<ShaderFactory> m_ShaderFactory;
-    std::shared_ptr<IDescriptorTableManager> m_DescriptorTableManager;
+    std::shared_ptr<ShaderFactory> m_shaderFactory;
+    std::shared_ptr<IDescriptorTableManager> m_descriptorTableManager;
 
 public:
     IesProfileLoader(
