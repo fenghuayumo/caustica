@@ -243,9 +243,11 @@ Handle<ScenePrefabAsset> load(App& app, const std::filesystem::path& path)
     if (!textureLoader)
         return {};
 
+    const std::shared_ptr<Scene> scenePtr = activeScene(app);
     RuntimeMeshLoadParams params{
         .TextureCache = textureLoader.get(),
         .SceneTypes = std::make_shared<render::RenderSceneTypeFactory>(),
+        .FileSystem = scenePtr ? scenePtr->fileSystem() : nullptr,
         .TextureSearchDirectory = resolved.parent_path(),
     };
 

@@ -3,6 +3,7 @@
 #include <scene/GaussianSplatData.h>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,10 +18,13 @@ struct GaussianSplatDataset
     std::string sourcePath;
 };
 
+class IFileSystem;
+
 // Loads a 3D Gaussian Splatting .ply file into CPU-side splat data.
 bool loadGaussianSplatPly(
     const std::filesystem::path& filePath,
     bool convertRdfToRub,
-    GaussianSplatDataset& outDataset);
+    GaussianSplatDataset& outDataset,
+    const std::shared_ptr<IFileSystem>& fs = nullptr);
 
 } // namespace caustica

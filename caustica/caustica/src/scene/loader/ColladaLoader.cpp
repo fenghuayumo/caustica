@@ -1,12 +1,12 @@
 #include <scene/loader/ColladaLoader.h>
 
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <math/math.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
-#include <fstream>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -483,14 +483,13 @@ namespace
         return value;
     }
 
-    std::string ReadFileText(const std::filesystem::path& path)
+    std::string ReadFileText(const std::shared_ptr<IFileSystem>& fs, const std::filesystem::path& path)
     {
-        std::ifstream file(path, std::ios::binary);
-        if (!file)
+        const std::shared_ptr<IBlob> blob = readFileOrNative(fs, path);
+        if (!blob)
             return {};
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        return ss.str();
+        const auto* bytes = static_cast<const char*>(blob->data());
+        return std::string(bytes, bytes + blob->size());
     }
 
     struct Source
@@ -1596,10 +1595,13 @@ namespace
     }
 } // namespace
 
-bool loadColladaFile(const std::filesystem::path& filePath, ColladaMeshData& outMesh)
+bool loadColladaFile(
+    const std::filesystem::path& filePath,
+    ColladaMeshData& outMesh,
+    const std::shared_ptr<IFileSystem>& fs)
 {
     outMesh = ColladaMeshData{};
-    std::string xml = ReadFileText(filePath);
+    std::string xml = ReadFileText(fs, filePath);
     if (xml.empty())
     {
         caustica::error("COLLADA file could not be opened or is empty: '%s'", filePath.string().c_str());

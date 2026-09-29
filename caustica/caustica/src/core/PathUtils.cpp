@@ -1,4 +1,5 @@
 #include "core/PathUtils.h"
+#include "core/StringUtils.h"
 #include "core/vfs/VFS.h"
 
 #include <cstdlib>
@@ -18,6 +19,42 @@
 
 namespace caustica
 {
+
+namespace
+{
+    std::string foldAssetKey(std::string key)
+    {
+#ifdef _WIN32
+        string_utils::toLower(key);
+#endif
+        return key;
+    }
+}
+
+std::filesystem::path canonicalAssetPath(const std::filesystem::path& path)
+{
+    if (path.empty())
+        return {};
+
+    std::error_code ec;
+    std::filesystem::path absolute = std::filesystem::absolute(path, ec);
+    if (ec || absolute.empty())
+        absolute = path;
+    return absolute.lexically_normal();
+}
+
+CanonicalAssetIdentity canonicalizeAssetPath(const std::filesystem::path& path)
+{
+    CanonicalAssetIdentity identity;
+    identity.path = canonicalAssetPath(path);
+    identity.key = foldAssetKey(identity.path.generic_string());
+    return identity;
+}
+
+std::string canonicalAssetKey(const std::filesystem::path& path)
+{
+    return foldAssetKey(canonicalAssetPath(path).generic_string());
+}
 
 std::filesystem::path getDirectoryWithExecutable()
 {
@@ -98,11 +135,7 @@ namespace
         const char* value = std::getenv(kAssetsEnvVar);
         if (value == nullptr || value[0] == '\0')
             return {};
-        std::error_code ec;
-        std::filesystem::path path = std::filesystem::absolute(value, ec);
-        if (ec)
-            return {};
-        return path.lexically_normal();
+        return canonicalAssetPath(value);
     }
 
 }
@@ -169,11 +202,11 @@ std::filesystem::path findAssetPackContaining(const std::filesystem::path& fileO
     while (!cursor.empty())
     {
         if (isAssetPackDirectory(cursor))
-            return cursor.lexically_normal();
+            return canonicalAssetPath(cursor);
 
         const std::filesystem::path nested = cursor / kAssetsFolder;
         if (isAssetPackDirectory(nested))
-            return std::filesystem::absolute(nested).lexically_normal();
+            return canonicalAssetPath(nested);
 
         const std::filesystem::path parent = cursor.parent_path();
         if (parent == cursor)
@@ -208,7 +241,7 @@ std::filesystem::path discoverAssetPackRoot(
             continue;
         const std::filesystem::path pack = base / kAssetsFolder;
         if (isAssetPackDirectory(pack))
-            return std::filesystem::absolute(pack).lexically_normal();
+            return canonicalAssetPath(pack);
     }
 
     for (const std::filesystem::path& base : bases)
@@ -217,7 +250,7 @@ std::filesystem::path discoverAssetPackRoot(
             continue;
         const std::filesystem::path builtin = base / kBuiltinAssetsFolder;
         if (isAssetPackDirectory(builtin))
-            return std::filesystem::absolute(builtin).lexically_normal();
+            return canonicalAssetPath(builtin);
     }
 
     if (isAssetPackDirectory(envPack))
@@ -226,7 +259,7 @@ std::filesystem::path discoverAssetPackRoot(
     const std::filesystem::path fallbackParent = !resourceRoot.empty()
         ? resourceRoot
         : (!runtimeDirectory.empty() ? runtimeDirectory : getDirectoryWithExecutable());
-    return (fallbackParent / kAssetsFolder).lexically_normal();
+    return canonicalAssetPath(fallbackParent / kAssetsFolder);
 }
 
 std::filesystem::path getAssetPackRoot()
@@ -247,7 +280,7 @@ void setAssetPackRootOverride(const std::filesystem::path& assetPackRoot)
     std::lock_guard guard(g_localPathBaseMutex);
     g_assetPackRootOverride = assetPackRoot.empty()
         ? std::filesystem::path()
-        : std::filesystem::absolute(assetPackRoot).lexically_normal();
+        : canonicalAssetPath(assetPackRoot);
 }
 
 std::filesystem::path getLocalPath(std::string subfolder)
@@ -272,7 +305,7 @@ void setLocalPathBaseOverride(const std::filesystem::path& basePath)
     std::lock_guard guard(g_localPathBaseMutex);
     g_localPathBaseOverride = basePath.empty()
         ? std::filesystem::path()
-        : std::filesystem::absolute(basePath).lexically_normal();
+        : canonicalAssetPath(basePath);
 }
 
 std::filesystem::path getRuntimeDirectory()
@@ -288,7 +321,7 @@ void setRuntimeDirectoryOverride(const std::filesystem::path& runtimeDirectory)
     std::lock_guard guard(g_localPathBaseMutex);
     g_runtimeDirectoryOverride = runtimeDirectory.empty()
         ? std::filesystem::path()
-        : std::filesystem::absolute(runtimeDirectory).lexically_normal();
+        : canonicalAssetPath(runtimeDirectory);
 }
 
 std::filesystem::path resolveMediaRelativePath(
@@ -298,11 +331,10 @@ std::filesystem::path resolveMediaRelativePath(
     if (localPath.empty())
         return {};
 
-    if (localPath.is_absolute())
-        return std::filesystem::absolute(localPath);
-
-    if (std::filesystem::exists(localPath))
-        return std::filesystem::absolute(localPath);
+    // Absolute refs resolve as-is; a CWD-relative ref that exists resolves the
+    // same way, so both cases share one return.
+    if (localPath.is_absolute() || std::filesystem::exists(localPath))
+        return canonicalAssetPath(localPath);
 
     for (const std::filesystem::path& root : searchRoots)
     {
@@ -310,16 +342,16 @@ std::filesystem::path resolveMediaRelativePath(
             continue;
         const std::filesystem::path candidate = root / localPath;
         if (std::filesystem::exists(candidate))
-            return std::filesystem::absolute(candidate);
+            return canonicalAssetPath(candidate);
     }
 
     for (const std::filesystem::path& root : searchRoots)
     {
         if (!root.empty())
-            return std::filesystem::absolute(root / localPath);
+            return canonicalAssetPath(root / localPath);
     }
 
-    return std::filesystem::absolute(localPath);
+    return canonicalAssetPath(localPath);
 }
 
 std::filesystem::path mediaRootForScene(const std::filesystem::path& sceneFileOrDir)

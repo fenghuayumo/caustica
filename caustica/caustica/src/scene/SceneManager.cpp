@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <vector>
 
+using caustica::canonicalAssetPath;
+
 namespace
 {
     bool LooksLikeInlineSceneJson(const std::string& scene)
@@ -127,20 +129,20 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
     std::filesystem::path scenePath(sceneName);
     if (scenePath.is_absolute())
     {
-        result.path = scenePath;
+        result.path = canonicalAssetPath(scenePath);
         return result;
     }
 
     if (std::filesystem::exists(scenePath))
     {
-        result.path = std::filesystem::absolute(scenePath);
+        result.path = canonicalAssetPath(scenePath);
         return result;
     }
 
     auto tryExisting = [&](const std::filesystem::path& candidate) -> bool {
         if (candidate.empty() || !std::filesystem::exists(candidate))
             return false;
-        result.path = std::filesystem::absolute(candidate);
+        result.path = canonicalAssetPath(candidate);
         return true;
     };
 
@@ -178,7 +180,7 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
     if (tryExisting(assetsPath / fileName))
         return result;
 
-    result.path = assetsPath / scenePath;
+    result.path = canonicalAssetPath(assetsPath / scenePath);
     return result;
 }
 

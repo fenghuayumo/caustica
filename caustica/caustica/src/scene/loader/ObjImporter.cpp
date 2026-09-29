@@ -192,32 +192,28 @@ namespace
         [[nodiscard]] bool valid() const { return width > 0 && height > 0 && !rgba.empty(); }
     };
 
-    bool LoadObjImageRgba8(const ObjTextureReference& texture, ObjImageRgba8& output)
+    bool LoadObjImageRgba8(
+        const ObjTextureReference& texture,
+        const std::shared_ptr<IFileSystem>& fs,
+        ObjImageRgba8& output)
     {
         if (texture.empty())
             return false;
 
-        std::ifstream file(texture.path, std::ios::binary | std::ios::ate);
-        if (!file)
+        const std::shared_ptr<IBlob> blob = readFileOrNative(fs, texture.path);
+        if (!blob)
         {
             caustica::warning("OBJ texture '%s' could not be opened for channel packing.", texture.path.string().c_str());
             return false;
         }
-
-        const std::streamsize fileSize = file.tellg();
-        if (fileSize <= 0 || fileSize > std::numeric_limits<int>::max())
+        if (blob->size() == 0 || blob->size() > size_t(std::numeric_limits<int>::max()))
         {
             caustica::warning("OBJ texture '%s' has unsupported size for channel packing.", texture.path.string().c_str());
             return false;
         }
 
-        file.seekg(0, std::ios::beg);
-        std::vector<uint8_t> encoded(static_cast<size_t>(fileSize));
-        if (!file.read(reinterpret_cast<char*>(encoded.data()), fileSize))
-        {
-            caustica::warning("OBJ texture '%s' could not be read for channel packing.", texture.path.string().c_str());
-            return false;
-        }
+        const auto* encodedBytes = static_cast<const uint8_t*>(blob->data());
+        std::vector<uint8_t> encoded(encodedBytes, encodedBytes + blob->size());
 
         int width = 0;
         int height = 0;
@@ -487,15 +483,19 @@ namespace
         ObjTextureReference transmissionTexture;
     };
 
-    std::unordered_map<std::string, ObjMaterialInfo> LoadObjMaterialLibrary(const std::filesystem::path& filePath)
+    std::unordered_map<std::string, ObjMaterialInfo> LoadObjMaterialLibrary(
+        const std::filesystem::path& filePath,
+        const std::shared_ptr<IFileSystem>& fs)
     {
         std::unordered_map<std::string, ObjMaterialInfo> materials;
-        std::ifstream file(filePath);
-        if (!file)
+        const std::shared_ptr<IBlob> blob = readFileOrNative(fs, filePath);
+        if (!blob)
         {
             caustica::warning("OBJ material library '%s' could not be opened.", filePath.string().c_str());
             return materials;
         }
+        BlobStreamBuf streamBuf(*blob);
+        std::istream file(&streamBuf);
 
         ObjMaterialInfo* current = nullptr;
         std::string line;
@@ -693,7 +693,8 @@ namespace
     Handle<ImageAsset> BuildObjMetalRoughTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
-        TextureLoader& textureCache)
+        TextureLoader& textureCache,
+        const std::shared_ptr<IFileSystem>& fs)
     {
         if (material.occlusionTexture.empty() && material.roughnessTexture.empty() && material.metalnessTexture.empty())
             return nullptr;
@@ -702,9 +703,9 @@ namespace
         ObjImageRgba8 roughnessImage;
         ObjImageRgba8 metalnessImage;
 
-        LoadObjImageRgba8(material.occlusionTexture, occlusionImage);
-        LoadObjImageRgba8(material.roughnessTexture, roughnessImage);
-        LoadObjImageRgba8(material.metalnessTexture, metalnessImage);
+        LoadObjImageRgba8(material.occlusionTexture, fs, occlusionImage);
+        LoadObjImageRgba8(material.roughnessTexture, fs, roughnessImage);
+        LoadObjImageRgba8(material.metalnessTexture, fs, metalnessImage);
 
         uint32_t width = 0;
         uint32_t height = 0;
@@ -742,7 +743,8 @@ namespace
     Handle<ImageAsset> BuildObjSpecGlossTexture(
         const ObjMaterialInfo& material,
         const std::filesystem::path& objFilePath,
-        TextureLoader& textureCache)
+        TextureLoader& textureCache,
+        const std::shared_ptr<IFileSystem>& fs)
     {
         if (material.specularTexture.empty() && material.glossinessTexture.empty())
             return nullptr;
@@ -750,8 +752,8 @@ namespace
         ObjImageRgba8 specularImage;
         ObjImageRgba8 glossinessImage;
 
-        LoadObjImageRgba8(material.specularTexture, specularImage);
-        LoadObjImageRgba8(material.glossinessTexture, glossinessImage);
+        LoadObjImageRgba8(material.specularTexture, fs, specularImage);
+        LoadObjImageRgba8(material.glossinessTexture, fs, glossinessImage);
 
         uint32_t width = 0;
         uint32_t height = 0;
@@ -802,12 +804,14 @@ namespace
 
 bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& textureCache, SceneLoadingStats&, bool /*asyncTextures*/, SceneImportResult& result, const std::filesystem::path&) const
 {
-    std::ifstream file(filePath);
-    if (!file)
+    const std::shared_ptr<IBlob> blob = readFileOrNative(m_fs, filePath);
+    if (!blob)
     {
         caustica::error("OBJ file could not be opened: '%s'", filePath.string().c_str());
         return false;
     }
+    BlobStreamBuf streamBuf(*blob);
+    std::istream file(&streamBuf);
 
     std::vector<math::float3> positions;
     std::vector<math::float2> texcoords;
@@ -906,7 +910,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         else if (keyword == "mtllib" && tokens.size() >= 2)
         {
             const std::filesystem::path materialLibrary = StripMatchingQuotes(JoinTokens(tokens, 1));
-            auto loaded = LoadObjMaterialLibrary(filePath.parent_path() / materialLibrary);
+            auto loaded = LoadObjMaterialLibrary(filePath.parent_path() / materialLibrary, m_fs);
             for (auto& [name, material] : loaded)
                 materials.insert_or_assign(name, material);
         }
@@ -1042,7 +1046,7 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         if (texturePath.empty())
             return nullptr;
 
-        if (!std::filesystem::exists(texturePath))
+        if (!(m_fs ? m_fs->fileExists(texturePath) : std::filesystem::exists(texturePath)))
         {
             caustica::warning("OBJ texture '%s' referenced by '%s' was not found.",
                 texturePath.string().c_str(), filePath.string().c_str());
@@ -1106,13 +1110,13 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
         material->baseOrDiffuseTexture = loadObjTextureReference(objMaterial.baseTexture, true);
         if (objMaterial.useSpecularGlossModel)
         {
-            material->metalRoughOrSpecularTexture = BuildObjSpecGlossTexture(objMaterial, filePath, textureCache);
+            material->metalRoughOrSpecularTexture = BuildObjSpecGlossTexture(objMaterial, filePath, textureCache, m_fs);
             if (!material->metalRoughOrSpecularTexture)
                 material->metalRoughOrSpecularTexture = loadObjTextureReference(objMaterial.specularTexture, true);
         }
         else
         {
-            material->metalRoughOrSpecularTexture = BuildObjMetalRoughTexture(objMaterial, filePath, textureCache);
+            material->metalRoughOrSpecularTexture = BuildObjMetalRoughTexture(objMaterial, filePath, textureCache, m_fs);
             if (!material->metalRoughOrSpecularTexture)
                 material->metalRoughOrSpecularTexture = loadObjTextureReference(objMaterial.packedMetalRoughTexture, false);
         }
@@ -1155,8 +1159,11 @@ bool ObjImporter::load(const std::filesystem::path& filePath, TextureLoader& tex
     return true;
 }
 
-ObjImporter::ObjImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
-    : m_SceneTypeFactory(std::move(sceneTypeFactory))
+ObjImporter::ObjImporter(
+    std::shared_ptr<IFileSystem> fs,
+    std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
+    : m_fs(std::move(fs))
+    , m_SceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 

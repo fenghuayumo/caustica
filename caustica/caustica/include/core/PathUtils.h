@@ -70,6 +70,30 @@ std::filesystem::path findDirectoryWithFile(IFileSystem& fs,
 
 // --- Asset / media path resolution ---
 
+// --- Canonical asset-path identity ---
+//
+// Single canonicalization policy for every subsystem that treats a path as an
+// asset identity (AssetRegistry, HotReloadTracker, pack mounts). Previously
+// each one used a different rule (raw absolute / lexically_normal /
+// case-insensitive), so the same file could hash to different keys.
+//
+// canonicalAssetPath: absolute (vs process CWD) + lexically normal.
+// canonicalAssetKey:  generic ('/') separators as a string, additionally
+//                    case-folded on Windows where the filesystem is
+//                    case-insensitive. POSIX keeps case.
+// Keys are for maps/comparison only; use the path form for file I/O.
+struct CanonicalAssetIdentity
+{
+    std::filesystem::path path;
+    std::string key;
+};
+
+// Single-pass form for callers that need both representations.
+[[nodiscard]] CanonicalAssetIdentity canonicalizeAssetPath(const std::filesystem::path& path);
+
+[[nodiscard]] std::filesystem::path canonicalAssetPath(const std::filesystem::path& path);
+[[nodiscard]] std::string canonicalAssetKey(const std::filesystem::path& path);
+
 // Returns a path under the resource root. getLocalPath("Assets") is the pack root.
 std::filesystem::path getLocalPath(std::string subfolder);
 

@@ -7,6 +7,7 @@
 #include <scene/SceneObjects.h>
 #include <scene/SceneTypes.h>
 #include <assets/loader/TextureLoader.h>
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <math/math.h>
 
@@ -62,14 +63,13 @@ namespace
         return text;
     }
 
-    std::string ReadFileText(const std::filesystem::path& path)
+    std::string ReadFileText(const std::shared_ptr<IFileSystem>& fs, const std::filesystem::path& path)
     {
-        std::ifstream file(path, std::ios::binary);
-        if (!file)
+        const std::shared_ptr<IBlob> blob = readFileOrNative(fs, path);
+        if (!blob)
             return {};
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        return ss.str();
+        const auto* bytes = static_cast<const char*>(blob->data());
+        return std::string(bytes, bytes + blob->size());
     }
 
     std::optional<std::string> getAttribute(const std::string& tag, const std::string& attribute)
@@ -712,6 +712,7 @@ namespace
         const UrdfVisual& visual,
         const std::filesystem::path& urdfPath,
         const std::filesystem::path& meshDirHint,
+        const std::shared_ptr<IFileSystem>& fs,
         std::unordered_map<std::string, StlMeshData>& stlCache,
         StlMeshData& outMesh)
     {
@@ -747,7 +748,7 @@ namespace
         if (found == stlCache.end())
         {
             StlMeshData loaded;
-            if (!loadStlFile(resolved, loaded))
+            if (!loadStlFile(resolved, loaded, fs))
                 return false;
             found = stlCache.emplace(cacheKey, std::move(loaded)).first;
         }
@@ -1015,6 +1016,7 @@ namespace
         const UrdfVisual& visual,
         const std::filesystem::path& urdfPath,
         const std::filesystem::path& meshDirHint,
+        const std::shared_ptr<IFileSystem>& fs,
         const std::string& meshName,
         std::unordered_map<std::string, ColladaMeshData>& cache,
         TextureLoader& textureCache)
@@ -1025,7 +1027,7 @@ namespace
         if (found == cache.end())
         {
             ColladaMeshData loaded;
-            if (!loadColladaFile(resolved, loaded))
+            if (!loadColladaFile(resolved, loaded, fs))
                 return nullptr;
             found = cache.emplace(cacheKey, std::move(loaded)).first;
         }
@@ -1045,8 +1047,11 @@ namespace
     }
 } // namespace
 
-UrdfImporter::UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
-    : m_SceneTypeFactory(std::move(sceneTypeFactory))
+UrdfImporter::UrdfImporter(
+    std::shared_ptr<IFileSystem> fs,
+    std::shared_ptr<SceneTypeFactory> sceneTypeFactory)
+    : m_fs(std::move(fs))
+    , m_SceneTypeFactory(std::move(sceneTypeFactory))
 {
 }
 
@@ -1064,7 +1069,7 @@ bool UrdfImporter::load(
         return false;
     }
 
-    std::string xml = ReadFileText(fileName);
+    std::string xml = ReadFileText(m_fs, fileName);
     if (xml.empty())
     {
         caustica::error("URDF file could not be opened or is empty: '%s'", fileName.string().c_str());
@@ -1179,12 +1184,12 @@ bool UrdfImporter::load(
             if (collada)
             {
                 mesh = TryLoadColladaVisual(
-                    *m_SceneTypeFactory, visual, fileName, meshDirHint, meshName, daeCache, textureCache);
+                    *m_SceneTypeFactory, visual, fileName, meshDirHint, m_fs, meshName, daeCache, textureCache);
             }
             else
             {
                 StlMeshData meshData;
-                if (BuildVisualMeshData(visual, fileName, meshDirHint, stlCache, meshData))
+                if (BuildVisualMeshData(visual, fileName, meshDirHint, m_fs, stlCache, meshData))
                     mesh = BuildMeshFromStl(*m_SceneTypeFactory, meshName, meshData, visual.rgba, fileName);
             }
             if (!mesh)

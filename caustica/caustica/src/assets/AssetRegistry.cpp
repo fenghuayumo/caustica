@@ -1,4 +1,5 @@
 #include <assets/AssetRegistry.h>
+#include <core/PathUtils.h>
 #include <core/log.h>
 
 namespace caustica
@@ -6,7 +7,9 @@ namespace caustica
 
 AssetId AssetRegistry::registerAsset(const std::filesystem::path& path, AssetType type)
 {
-    std::string canonical = std::filesystem::absolute(path).string();
+    // One identity policy for the whole engine: absolute + lexically normal +
+    // generic separators + case-folded on Windows (see canonicalAssetKey).
+    std::string canonical = canonicalAssetKey(path);
 
     std::unique_lock lock(m_Mutex);
 
@@ -51,7 +54,7 @@ void AssetRegistry::unregisterAsset(const AssetId& id)
 
 AssetId AssetRegistry::findByPath(const std::filesystem::path& path) const
 {
-    std::string canonical = std::filesystem::absolute(path).string();
+    std::string canonical = canonicalAssetKey(path);
 
     std::shared_lock lock(m_Mutex);
     auto it = m_PathToId.find(canonical);

@@ -14,6 +14,7 @@
 #include <scene/scene_utils.h>
 #include <core/ThreadContext.h>
 #include <core/json.h>
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <core/PathUtils.h>
 #include <core/StringUtils.h>
@@ -805,9 +806,9 @@ Scene::Scene(
         m_SceneTypeFactory = std::make_shared<SceneTypeFactory>();
 
     m_GltfImporter = std::make_shared<GltfImporter>(m_fs, m_SceneTypeFactory);
-    m_ObjImporter = std::make_shared<ObjImporter>(m_SceneTypeFactory);
+    m_ObjImporter = std::make_shared<ObjImporter>(m_fs, m_SceneTypeFactory);
     m_CausUsdImporter = std::make_shared<CausUsdImporter>(m_SceneTypeFactory);
-    m_UrdfImporter = std::make_shared<UrdfImporter>(m_SceneTypeFactory);
+    m_UrdfImporter = std::make_shared<UrdfImporter>(m_fs, m_SceneTypeFactory);
 
 }
 
@@ -979,8 +980,11 @@ SceneImportResult Scene::loadOrGetPrefab(const std::string& source, bool asyncTe
     {
         const std::filesystem::path fileName = resolveSceneMediaPath(source, m_textureSearchDirectory);
         Json::Value document;
-        const bool loaded = (m_fs && caustica::json::loadFromFile(*m_fs, fileName, document))
-            || caustica::json::loadFromFile(fileName, document);
+        // Single explicit read layer: the scene VFS when present, native otherwise.
+        // The old silent native retry could smuggle files past a future pack VFS.
+        std::shared_ptr<IFileSystem> prefabFs =
+            m_fs ? m_fs : std::make_shared<NativeFileSystem>();
+        const bool loaded = caustica::json::loadFromFile(*prefabFs, fileName, document);
         if (!loaded || !document.isObject())
         {
             caustica::error("Failed to load prefab '%s'.", fileName.generic_string().c_str());

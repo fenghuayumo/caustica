@@ -30,14 +30,16 @@ public:
 private:
     struct WatchedFile
     {
+        // canonicalAssetPath form; do FS I/O through this, compare through `key`.
         std::filesystem::path path;
+        std::string key;
         std::filesystem::file_time_type lastWriteTime{};
         bool hasTimestamp = false;
     };
 
     mutable std::shared_mutex m_Mutex;
     std::unordered_map<AssetId, WatchedFile, AssetId::Hash> m_WatchedFiles;
-    std::unordered_map<std::filesystem::path, size_t> m_OwnedWrites;
+    std::unordered_map<std::string, size_t> m_OwnedWrites;
 };
 
 } // namespace caustica

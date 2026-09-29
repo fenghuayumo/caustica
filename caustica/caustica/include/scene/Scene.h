@@ -145,6 +145,10 @@ namespace caustica
             std::shared_ptr<TextureLoader> textureCache,
             std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
+        // VFS this scene was loaded through; importers spawned from the scene
+        // (prefab / drag-drop mesh loads) must read through the same layer.
+        [[nodiscard]] std::shared_ptr<caustica::IFileSystem> fileSystem() const { return m_fs; }
+
         SceneImportResult loadOrGetPrefab(
             const std::string& source,
             bool asyncTextures);

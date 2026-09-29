@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <istream>
 #include <string>
 #include <filesystem>
 #include <functional>
@@ -59,6 +60,47 @@ namespace caustica
         ~Blob() override;
         [[nodiscard]] const void* data() const override;
         [[nodiscard]] size_t size() const override;
+    };
+
+    // Zero-copy read-only stream over an IBlob. Lets legacy istream-based
+    // parsers (PLY / OBJ / STL / ...) consume VFS blobs without copying the
+    // payload. Supports getline / read / absolute and relative seekg.
+    class BlobStreamBuf final : public std::streambuf
+    {
+    public:
+        explicit BlobStreamBuf(const IBlob& blob)
+        {
+            char* begin = const_cast<char*>(static_cast<const char*>(blob.data()));
+            setg(begin, begin, begin + blob.size());
+        }
+
+    protected:
+        pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override
+        {
+            if ((which & std::ios_base::in) == 0)
+                return pos_type(-1);
+
+            char* const begin = eback();
+            char* const end = egptr();
+            off_type target = -1;
+            switch (dir)
+            {
+            case std::ios_base::beg: target = off; break;
+            case std::ios_base::cur: target = off_type(gptr() - begin) + off; break;
+            case std::ios_base::end: target = off_type(end - begin) + off; break;
+            default: return pos_type(-1);
+            }
+            if (target < 0 || target > off_type(end - begin))
+                return pos_type(-1);
+
+            setg(begin, begin + target, end);
+            return pos_type(target);
+        }
+
+        pos_type seekpos(pos_type pos, std::ios_base::openmode which) override
+        {
+            return seekoff(off_type(pos), std::ios_base::beg, which);
+        }
     };
 
     // Basic interface for the virtual file system.
@@ -148,4 +190,11 @@ namespace caustica
     };
 
     std::string getFileSearchRegex(const std::filesystem::path& path, const std::vector<std::string>& extensions);
+
+    // Reads a whole file through `fs`; a null fs falls back to the native
+    // filesystem so legacy call sites keep working while VFS adoption is
+    // incremental.
+    [[nodiscard]] std::shared_ptr<IBlob> readFileOrNative(
+        const std::shared_ptr<IFileSystem>& fs,
+        const std::filesystem::path& path);
 }

@@ -102,7 +102,9 @@ RuntimeMeshLoadResult loadRuntimeGltfMeshFile(
     if (!params.TextureCache || !params.SceneTypes)
         return FailedRuntimeMeshLoad(filePath);
 
-    auto fs = std::make_shared<caustica::NativeFileSystem>();
+    auto fs = params.FileSystem
+        ? params.FileSystem
+        : std::make_shared<caustica::NativeFileSystem>();
     auto importer = std::make_shared<caustica::GltfImporter>(fs, params.SceneTypes);
 
     caustica::SceneLoadingStats stats;
@@ -137,7 +139,7 @@ RuntimeMeshLoadResult loadRuntimeObjMeshFile(
     if (!params.TextureCache || !params.SceneTypes)
         return FailedRuntimeMeshLoad(filePath);
 
-    caustica::ObjImporter importer(params.SceneTypes);
+    caustica::ObjImporter importer(params.FileSystem, params.SceneTypes);
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();
@@ -161,7 +163,7 @@ RuntimeMeshLoadResult loadRuntimeUrdfMeshFile(
     if (!params.TextureCache || !params.SceneTypes)
         return FailedRuntimeMeshLoad(filePath);
 
-    caustica::UrdfImporter importer(params.SceneTypes);
+    caustica::UrdfImporter importer(params.FileSystem, params.SceneTypes);
 
     caustica::SceneLoadingStats stats;
     auto importResult = std::make_shared<caustica::SceneImportResult>();

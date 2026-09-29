@@ -7,6 +7,7 @@ namespace caustica
 {
     struct SceneImportResult;
     struct SceneLoadingStats;
+    class IFileSystem;
     class TextureLoader;
     class SceneTypeFactory;
 
@@ -19,10 +20,13 @@ namespace caustica
     class UrdfImporter
     {
     protected:
+        std::shared_ptr<IFileSystem> m_fs;
         std::shared_ptr<SceneTypeFactory> m_SceneTypeFactory;
 
     public:
-        explicit UrdfImporter(std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
+        UrdfImporter(
+            std::shared_ptr<IFileSystem> fs,
+            std::shared_ptr<SceneTypeFactory> sceneTypeFactory);
 
         bool load(
             const std::filesystem::path& fileName,

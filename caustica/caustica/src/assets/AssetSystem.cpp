@@ -1,5 +1,6 @@
 #include <assets/AssetSystem.h>
 #include <assets/loader/TextureLoader.h>
+#include <core/PathUtils.h>
 #include <core/log.h>
 
 #include <cstdint>
@@ -17,7 +18,11 @@ namespace
         const void* pointer)
     {
         std::ostringstream stream;
-        stream << (sourcePath.empty() ? std::string("__memory_asset__") : sourcePath.generic_string())
+        // Canonicalize the path component so the same file referenced with
+        // different spellings (case, separators, ..) maps to one key. The
+        // pointer suffix keeps session-local registrations distinct; durable
+        // cross-session AssetIds are tracked separately.
+        stream << (sourcePath.empty() ? std::string("__memory_asset__") : canonicalAssetKey(sourcePath))
                << "::" << typeName << "::" << name << "::"
                << reinterpret_cast<std::uintptr_t>(pointer);
         return std::filesystem::path(stream.str());

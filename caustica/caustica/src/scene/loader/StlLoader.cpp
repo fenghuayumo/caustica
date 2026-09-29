@@ -1,12 +1,12 @@
 #include <scene/loader/StlLoader.h>
 
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -163,31 +163,27 @@ namespace
     }
 } // namespace
 
-bool loadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh)
+bool loadStlFile(
+    const std::filesystem::path& filePath,
+    StlMeshData& outMesh,
+    const std::shared_ptr<IFileSystem>& fs)
 {
     outMesh = StlMeshData{};
 
-    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-    if (!file)
+    const std::shared_ptr<IBlob> blob = readFileOrNative(fs, filePath);
+    if (!blob)
     {
         caustica::error("STL file could not be opened: '%s'", filePath.string().c_str());
         return false;
     }
-
-    const std::streamoff size = file.tellg();
-    if (size <= 0)
+    if (blob->size() == 0)
     {
         caustica::error("STL file is empty: '%s'", filePath.string().c_str());
         return false;
     }
 
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> data(static_cast<size_t>(size));
-    if (!file.read(reinterpret_cast<char*>(data.data()), size))
-    {
-        caustica::error("STL file could not be read: '%s'", filePath.string().c_str());
-        return false;
-    }
+    const auto* bytes = static_cast<const uint8_t*>(blob->data());
+    std::vector<uint8_t> data(bytes, bytes + blob->size());
 
     const bool ok = LooksLikeAsciiStl(data) ? LoadAsciiStl(data, outMesh) : LoadBinaryStl(data, outMesh);
     if (!ok)

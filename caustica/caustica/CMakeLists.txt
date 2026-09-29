@@ -391,6 +391,13 @@ if (BUILD_TESTING)
         target_compile_options(causShaderDependencyIndexTests PRIVATE /utf-8)
     endif()
     add_test(NAME causShaderDependencyIndexTests COMMAND causShaderDependencyIndexTests)
+
+    add_executable(causAssetPathTests tests/AssetPathTests.cpp)
+    target_link_libraries(causAssetPathTests PRIVATE causAssets)
+    if (MSVC)
+        target_compile_options(causAssetPathTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME causAssetPathTests COMMAND causAssetPathTests)
 endif()
 
 # ── causScene ─────────────────────────────────────────────────────────────

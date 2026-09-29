@@ -378,7 +378,7 @@ void testUrdfUsesColladaMaterials()
     caustica::SceneTypeFactory factory;
     caustica::SceneLoadingStats stats{};
     caustica::SceneImportResult result;
-    caustica::UrdfImporter importer(std::make_shared<caustica::SceneTypeFactory>());
+    caustica::UrdfImporter importer(nullptr, std::make_shared<caustica::SceneTypeFactory>());
     expect(importer.load(dir.path / "robot.urdf", textures, stats, false, result), "urdf import failed");
     (void)factory;
 

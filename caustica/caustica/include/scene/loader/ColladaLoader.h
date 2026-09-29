@@ -3,12 +3,15 @@
 #include <math/math.h>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace caustica
 {
+    class IFileSystem;
+
     // One profile_COMMON material authored in a COLLADA 1.4 effect.
     // `diffuse` / `specular` / `shininess` are the file values. `baseColor`,
     // `metalness`, and `roughness` are the metal-rough values used by the renderer.
@@ -59,5 +62,8 @@ namespace caustica
     // triangles / polylist / polygons / tristrips / trifans.
     // Z_UP vertices are unchanged so they match a URDF link frame. Y_UP and X_UP
     // are rotated so +Z is up. The `<unit meter>` scale is applied.
-    bool loadColladaFile(const std::filesystem::path& filePath, ColladaMeshData& outMesh);
+    bool loadColladaFile(
+        const std::filesystem::path& filePath,
+        ColladaMeshData& outMesh,
+        const std::shared_ptr<IFileSystem>& fs = nullptr);
 }

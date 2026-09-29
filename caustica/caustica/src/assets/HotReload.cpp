@@ -1,5 +1,7 @@
 #include <assets/HotReload.h>
 
+#include <core/PathUtils.h>
+
 #include <mutex>
 
 namespace caustica
@@ -11,7 +13,9 @@ void HotReloadTracker::watch(AssetId asset, const std::filesystem::path& path)
         return;
 
     WatchedFile watched;
-    watched.path = std::filesystem::absolute(path);
+    const CanonicalAssetIdentity identity = canonicalizeAssetPath(path);
+    watched.path = identity.path;
+    watched.key = identity.key;
     if (std::filesystem::exists(watched.path))
     {
         watched.lastWriteTime = std::filesystem::last_write_time(watched.path);
@@ -35,7 +39,7 @@ std::vector<HotReloadChange> HotReloadTracker::pollChangedFiles()
     std::unique_lock lock(m_Mutex);
     for (auto& [asset, watched] : m_WatchedFiles)
     {
-        if (m_OwnedWrites.contains(watched.path.lexically_normal()))
+        if (m_OwnedWrites.contains(watched.key))
             continue;
         if (!std::filesystem::exists(watched.path))
             continue;
@@ -62,30 +66,30 @@ void HotReloadTracker::beginOwnedWrite(const std::filesystem::path& path)
 {
     if (path.empty())
         return;
-    const std::filesystem::path absolutePath = std::filesystem::absolute(path).lexically_normal();
+    const std::string key = canonicalAssetKey(path);
     std::unique_lock lock(m_Mutex);
-    ++m_OwnedWrites[absolutePath];
+    ++m_OwnedWrites[key];
 }
 
 void HotReloadTracker::endOwnedWrite(const std::filesystem::path& path)
 {
     if (path.empty())
         return;
-    const std::filesystem::path absolutePath = std::filesystem::absolute(path).lexically_normal();
+    const std::string key = canonicalAssetKey(path);
     std::unique_lock lock(m_Mutex);
-    auto owned = m_OwnedWrites.find(absolutePath);
+    auto owned = m_OwnedWrites.find(key);
     if (owned == m_OwnedWrites.end())
         return;
     if (--owned->second != 0)
         return;
 
-    const bool exists = std::filesystem::exists(absolutePath);
-    const auto writeTime = exists ? std::filesystem::last_write_time(absolutePath)
+    const bool exists = std::filesystem::exists(path);
+    const auto writeTime = exists ? std::filesystem::last_write_time(path)
                                   : std::filesystem::file_time_type{};
     for (auto& [asset, watched] : m_WatchedFiles)
     {
         (void)asset;
-        if (watched.path.lexically_normal() != absolutePath)
+        if (watched.key != key)
             continue;
         watched.lastWriteTime = writeTime;
         watched.hasTimestamp = exists;

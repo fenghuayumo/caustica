@@ -1,5 +1,6 @@
 #include <scene/loader/GaussianSplatLoader.h>
 
+#include <core/vfs/VFS.h>
 #include <core/log.h>
 #include <math/math.h>
 
@@ -380,19 +381,13 @@ namespace
     }
 
     bool LoadPlyFile(
+        std::istream& file,
         const std::filesystem::path& fileName,
         bool convertRdfToRub,
         std::vector<caustica::GaussianSplatData>& splats,
         std::vector<float4>& shCoefficients,
         uint32_t& shDegree)
     {
-        std::ifstream file(fileName, std::ios::binary);
-        if (!file)
-        {
-            caustica::error("Failed to open Gaussian splat PLY file: %s", fileName.string().c_str());
-            return false;
-        }
-
         std::string line;
         if (!std::getline(file, line) || Trim(line) != "ply")
         {
@@ -702,7 +697,8 @@ namespace caustica
 bool loadGaussianSplatPly(
     const std::filesystem::path& filePath,
     bool convertRdfToRub,
-    GaussianSplatDataset& outDataset)
+    GaussianSplatDataset& outDataset,
+    const std::shared_ptr<IFileSystem>& fs)
 {
     const std::string extension = [](std::string ext) {
         std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -721,7 +717,16 @@ bool loadGaussianSplatPly(
     outDataset.shDegree = 0;
     outDataset.sourcePath = filePath.string();
 
-    if (!LoadPlyFile(filePath, convertRdfToRub, outDataset.splats, outDataset.shCoefficients, outDataset.shDegree))
+    const std::shared_ptr<IBlob> blob = readFileOrNative(fs, filePath);
+    if (!blob || IBlob::isEmpty(blob.get()))
+    {
+        error("Failed to read Gaussian splat PLY file: %s", filePath.string().c_str());
+        return false;
+    }
+
+    BlobStreamBuf streamBuf(*blob);
+    std::istream file(&streamBuf);
+    if (!LoadPlyFile(file, filePath, convertRdfToRub, outDataset.splats, outDataset.shCoefficients, outDataset.shDegree))
         return false;
 
     return !outDataset.splats.empty();

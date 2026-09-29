@@ -3,10 +3,13 @@
 #include <math/math.h>
 
 #include <filesystem>
+#include <memory>
 #include <vector>
 
 namespace caustica
 {
+    class IFileSystem;
+
     struct StlMeshData
     {
         std::vector<math::float3> positions;
@@ -18,5 +21,8 @@ namespace caustica
     };
 
     // Loads ASCII or binary STL into triangle mesh data (positions + smooth/face normals).
-    bool loadStlFile(const std::filesystem::path& filePath, StlMeshData& outMesh);
+    bool loadStlFile(
+        const std::filesystem::path& filePath,
+        StlMeshData& outMesh,
+        const std::shared_ptr<IFileSystem>& fs = nullptr);
 }

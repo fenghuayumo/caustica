@@ -17,6 +17,20 @@ extern "C" {
 
 using namespace caustica;
 
+namespace caustica
+{
+    std::shared_ptr<IBlob> readFileOrNative(
+        const std::shared_ptr<IFileSystem>& fs,
+        const std::filesystem::path& path)
+    {
+        if (fs)
+            return fs->readFile(path);
+
+        NativeFileSystem native;
+        return native.readFile(path);
+    }
+}
+
 Blob::Blob(void* data, size_t size)
     : m_data(data)
     , m_size(size)
