@@ -10,6 +10,7 @@ dist/
 Nrd.cfg
 Omm.cfg
 tests/output/*
+/generated_scene/
 .vscode/
 /External/dxc
 /External/AgilitySDK

@@ -23,6 +23,7 @@
 #include <core/command_line.h>
 #include <core/log.h>
 #include <core/PathUtils.h>
+#include <core/vfs/PackFileSystem.h>
 #include <core/vfs/VFS.h>
 #include <cstdarg>
 #include <scene/Scene.h>
@@ -334,6 +335,27 @@ void onSceneUnloading(App& app)
 
 namespace
 {
+
+// Scene import reads everything through this VFS. `.caustica` scene packs are
+// mounted read-only with a native fallback; everything else stays native.
+std::shared_ptr<caustica::IFileSystem> makeSceneImportFileSystem(const std::filesystem::path& scenePath)
+{
+    std::string extension = scenePath.extension().string();
+    std::transform(
+        extension.begin(),
+        extension.end(),
+        extension.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (extension == ".caustica")
+    {
+        auto pack = std::make_shared<caustica::PackFileSystem>(
+            scenePath,
+            std::make_shared<caustica::NativeFileSystem>());
+        if (pack->isOpen())
+            return pack;
+    }
+    return std::make_shared<caustica::NativeFileSystem>();
+}
 
 void applySceneSettingsFromScene(App& app, ::SceneManager& manager)
 {
@@ -908,7 +930,7 @@ void tickLoadSession(App& app)
                 detail::sceneSwitchTrace("LoadSession: starting deferred CPU import");
                 manager->setAsyncLoadingEnabled(true);
                 manager->beginLoadingScene(
-                    std::make_shared<caustica::NativeFileSystem>(),
+                    makeSceneImportFileSystem(manager->getCurrentScenePath()),
                     manager->getCurrentScenePath());
                 if (!manager->isSceneLoading() && manager->getScene() == nullptr)
                 {

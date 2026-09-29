@@ -490,6 +490,7 @@ Rendering overrides and capture-sequence options are listed in [the command-line
 * [Build and run](docs/build-and-run.md)
 * [C++ embedding](docs/embedding-cpp.md)
 * [Scene JSON format](docs/scene-json.md)
+* [Scene pack format (`.caustica`)](docs/scene-pack-format.md)
 * [OpenPBR materials](docs/openpbr.md)
 * [RTXCR skin integration](docs/rtxcr-skin.md)
 * [ECS + render proxies](docs/architecture-render-proxy.md)

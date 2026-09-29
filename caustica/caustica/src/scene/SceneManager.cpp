@@ -71,6 +71,8 @@ void SceneManager::discoverAvailableScenes(const std::filesystem::path& assetsPa
             return false;
         if (fileName.size() >= 11 && fileName.compare(fileName.size() - 11, 11, ".scene.json") == 0)
             return true;
+        if (path.extension() == ".caustica")
+            return true;
         return path.extension() == ".json";
     };
 
