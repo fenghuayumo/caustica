@@ -299,7 +299,7 @@ void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
 FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameContext& ctx)
 {
     assert(ctx.graph != nullptr);
-    const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    const uint32_t telemetryFrame = m_context->renderPhaseFrameIndex;
     ScopedFrameCpuTimer graphBuildTimer(
         &m_context->diagnostics.frameTelemetry,
         telemetryFrame,
@@ -330,7 +330,7 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
     assert(ctx.graph != nullptr);
 
     FrameConstants& constants = m_frameConstants;
-    const uint32_t telemetryFrame = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    const uint32_t telemetryFrame = m_context->renderPhaseFrameIndex;
     caustica::rhi::TextureHandle capturedTexture;
     std::string capturedName;
 
@@ -763,7 +763,7 @@ void caustica::render::WorldRenderer::framePassBeginCommandList(PathTracingFrame
         slot.pending = false;
     }
 
-    const uint32_t frameIndex = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    const uint32_t frameIndex = m_context->renderPhaseFrameIndex;
     GpuFrameTimerSlot& timerSlot = m_gpuFrameTimers[frameIndex % m_gpuFrameTimers.size()];
     m_activeGpuFrameTimer = -1;
     if (!timerSlot.pending)
@@ -843,7 +843,7 @@ void caustica::render::WorldRenderer::framePassSceneUpdate(PathTracingFrameConte
     geoParams.descriptorTable = m_context->descriptorTable.get();
     geoParams.materials = m_context->scenePasses.lighting.materials().get();
     geoParams.opacityMaps = m_context->scenePasses.lighting.opacityMaps().get();
-    geoParams.frameIndex = m_context->gpuDevice.getRenderPhaseFrameIndex();
+    geoParams.frameIndex = m_context->renderPhaseFrameIndex;
     geoParams.asyncLoadingInProgress = &m_context->diagnostics.asyncLoadingInProgress;
     caustica::updateSceneGeometry(m_context->accelStructs, geoParams);
     abortIfSubmitFailed(ctx, "updateSceneGeometry");

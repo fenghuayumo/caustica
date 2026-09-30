@@ -231,7 +231,7 @@ void App::registerDefaultSchedules()
 
     addSystem<system_label::SetRenderFrameIndex>(AppSchedule::Extract, [](SystemContext& ctx) {
         if (ctx.gpuDevice)
-            ctx.gpuDevice->setPreparedRenderFrameIndex(ctx.frameIndex);
+            ctx.app.setPreparedRenderFrameIndex(ctx.frameIndex);
     });
 
     m_defaultSchedulesRegistered = true;
@@ -526,7 +526,7 @@ void App::onRender()
     if (!gpuDevice || skipRenderPhase())
         return;
 
-    runGpuRenderSchedules(*gpuDevice, gpuDevice->getRenderPhaseFrameIndex());
+    runGpuRenderSchedules(*gpuDevice, renderPhaseFrameIndex());
 }
 
 void App::runGpuRenderSchedules(GpuDevice& gpuDevice, uint32_t frameIndex)
@@ -676,7 +676,7 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
     if (gpuDevice->isShuttingDown() || m_requestExit.load(std::memory_order_acquire))
         return true;
 
-    gpuDevice->setRenderPhaseFrameIndex(frameIndex);
+    setRenderPhaseFrameIndex(frameIndex);
 
     bool beganFrame = false;
     {

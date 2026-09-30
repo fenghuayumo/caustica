@@ -412,6 +412,14 @@ public:
     void requestRenderUnfocused();
     void waitForRenderThreadIdle();
 
+    // Logic-thread Extract frame. Written by SetRenderFrameIndex.
+    [[nodiscard]] uint32_t preparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
+    void setPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
+
+    // Render-thread phase frame. Written at the start of executeRenderPhase.
+    [[nodiscard]] uint32_t renderPhaseFrameIndex() const { return m_renderPhaseFrameIndex; }
+    void setRenderPhaseFrameIndex(uint32_t frameIndex) { m_renderPhaseFrameIndex = frameIndex; }
+
     void addEventObserver(std::function<void(Event&)> handler);
     // GLFW callbacks enqueue here; ProcessEventQueue in First drains the queue.
     void queueEvent(std::unique_ptr<Event> event);
@@ -501,6 +509,9 @@ private:
 
     std::vector<Plugin*> m_pluginRefs;
     std::vector<std::unique_ptr<Plugin>> m_ownedPlugins;
+
+    uint32_t m_preparedRenderFrameIndex = 0;
+    uint32_t m_renderPhaseFrameIndex = 0;
 
     RenderThread m_renderThread;
     bool m_useDedicatedRenderThread = true;

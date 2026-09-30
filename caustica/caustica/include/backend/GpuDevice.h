@@ -173,10 +173,6 @@ public:
     [[nodiscard]] GpuSurface* surface() const { return m_surface; }
 
     [[nodiscard]] uint32_t getFrameIndex() const { return m_FrameIndex; }
-    [[nodiscard]] uint32_t getRenderPhaseFrameIndex() const { return m_renderPhaseFrameIndex; }
-    void setRenderPhaseFrameIndex(uint32_t frameIndex) { m_renderPhaseFrameIndex = frameIndex; }
-    [[nodiscard]] uint32_t getPreparedRenderFrameIndex() const { return m_preparedRenderFrameIndex; }
-    void setPreparedRenderFrameIndex(uint32_t frameIndex) { m_preparedRenderFrameIndex = frameIndex; }
 
     virtual caustica::rhi::Texture* getCurrentBackBuffer() = 0;
     virtual caustica::rhi::Texture* getBackBuffer(uint32_t index) = 0;
@@ -224,8 +220,6 @@ protected:
     int m_NumberOfAccumulatedFrames = 0;
 
     uint32_t m_FrameIndex = 0;
-    uint32_t m_renderPhaseFrameIndex = 0;
-    uint32_t m_preparedRenderFrameIndex = 0;
 
     std::vector<caustica::rhi::TextureHandle> m_HeadlessBackBuffers;
     uint32_t m_HeadlessBackBufferIndex = 0;

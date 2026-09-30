@@ -71,7 +71,7 @@ void beginExtractFrame(App& app)
     if (scratch.canStartStructure && !scene->committedRenderData())
         scene->freezeCommittedFromLogicCache();
 
-    scratch.frameIndex = device->getPreparedRenderFrameIndex();
+    scratch.frameIndex = app.preparedRenderFrameIndex();
     scratch.frameInputs.activeCamera = &resolvedCamera->camera;
     if (auto* sensorProducts = app.tryResource<RenderProductRegistry>();
         sensorProducts && sensorProducts->pendingPreviousCamera)

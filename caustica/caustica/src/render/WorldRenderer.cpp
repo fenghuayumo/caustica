@@ -329,7 +329,7 @@ void caustica::render::WorldRenderer::createDeviceResources()
                 .setOffset(offsetof(DebugLineStruct, col))
                 .setElementStride(sizeof(DebugLineStruct)),
         };
-        m_linesInputLayout = device->createInputLayout(attributes, uint32_t(std::size(attributes)), m_linesVertexShader);
+        m_linesInputLayout = device->createInputLayout(attributes, uint32_t(std::size(attributes)));
 
         caustica::rhi::BindingLayoutDesc linesBindingLayoutDesc;
         linesBindingLayoutDesc.visibility = caustica::rhi::ShaderType::All;
@@ -652,13 +652,12 @@ void caustica::render::WorldRenderer::preRender()
 }
 
 
-void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebuffer)
+void caustica::render::WorldRenderer::render(caustica::rhi::Framebuffer* framebuffer, uint32_t renderPhaseFrameIndex)
 {
+    m_context->renderPhaseFrameIndex = renderPhaseFrameIndex;
     m_displaySize = m_renderSize = uint2(
         framebuffer->getFramebufferInfo().width,
         framebuffer->getFramebufferInfo().height);
-
-    const uint32_t renderPhaseFrameIndex = m_context->gpuDevice.getRenderPhaseFrameIndex();
     std::shared_ptr<Scene> scene = m_context->sessionScene;
     // Held for the frame so committed proxies stay alive if finishStructureGpuBuild swaps.
     std::shared_ptr<const scene::SceneRenderData> committedSceneHold;

@@ -63,6 +63,9 @@ struct PathTracingContext
     std::shared_ptr<Scene> sessionScene;
     std::filesystem::path sessionScenePath;
 
+    // Set at the start of WorldRenderer::render for this phase.
+    uint32_t renderPhaseFrameIndex = 0;
+
     // Per-frame: pointed at SceneRenderData / snapshot copies for the render phase.
     // Valid only between beginGpuReadFrame and endGpuReadFrame in WorldRenderer::render().
     const scene::SceneRenderData* frameScene = nullptr;

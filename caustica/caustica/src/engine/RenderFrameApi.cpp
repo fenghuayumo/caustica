@@ -122,7 +122,7 @@ void renderScene(App& app, GpuDevice& gpuDevice)
         target = overrideFb->framebuffer;
     }
 
-    wr->render(target);
+    wr->render(target, app.renderPhaseFrameIndex());
     recordFrameTiming(app, gpuDevice);
 }
 

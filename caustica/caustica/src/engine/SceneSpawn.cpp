@@ -186,7 +186,7 @@ bool enqueuePendingStructureGpu(App& app)
     if (scenePtr->structureGpuBuildInFlight())
         return false;
 
-    const uint32_t frameIndex = device->getPreparedRenderFrameIndex();
+    const uint32_t frameIndex = app.preparedRenderFrameIndex();
     assert(scenePtr->wasRenderSnapshotExtractedOnLogicThread(frameIndex));
 
     // Copy the published packet — the triple-buffer slot may be reused before RT runs.

@@ -116,7 +116,7 @@ public:
     void createDeviceResources();
     void onBackBufferResizing();
     void preRender();
-    void render(caustica::rhi::Framebuffer* framebuffer);
+    void render(caustica::rhi::Framebuffer* framebuffer, uint32_t renderPhaseFrameIndex);
 
     void prepareGaussianSplatPasses();
     void recreateBindingSet(const scene::SceneRenderData* renderData = nullptr);
