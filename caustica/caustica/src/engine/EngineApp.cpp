@@ -876,6 +876,14 @@ void EngineApp::setMeshTriangles(
         caustica::setMeshTriangles(*m_app, entity, trianglesFx3, faceCount, options);
 }
 
+bool EngineApp::applyGeometrySequence(
+    ecs::Entity entity,
+    float timeSeconds,
+    const MeshDeformOptions& options)
+{
+    return m_app && caustica::applyGeometrySequence(*m_app, entity, timeSeconds, options);
+}
+
 void EngineApp::requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation)
 {
     if (m_app)

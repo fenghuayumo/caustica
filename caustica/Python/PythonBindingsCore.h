@@ -32,6 +32,9 @@ namespace caustica_py
     nanobind::object sensorMetallicNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorThroughputNumpy(const caustica::SensorOutput& output);
     nanobind::object sensorGuideDiffuseNumpy(const caustica::SensorOutput& output);
+    nanobind::object sensorCameraEntity(
+        const caustica::SensorOutput& output,
+        const std::shared_ptr<PyEngineAppContext>& owner);
 
     void RegisterCoreBindings(nanobind::module_& m);
     void BindEngineApp(nanobind::class_<PyEngineApp>& cls);

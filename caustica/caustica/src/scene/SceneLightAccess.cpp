@@ -33,6 +33,13 @@ bool MarkLightComponentChanged(ecs::World& world, ecs::Entity entity)
     return true;
 }
 
+template<typename T>
+bool SetLightEnabled(ecs::World& world, ecs::Entity entity, T& light, float flag)
+{
+    light.enabled = flag != 0.f;
+    return MarkLightComponentChanged<T>(world, entity);
+}
+
 } // namespace
 
 int getLightType(const LightData& data)
@@ -288,6 +295,8 @@ bool setLightProperty(
 {
     if (auto* directional = tryGetDirectionalLight(world, entity))
     {
+        if (propName == "enabled")
+            return SetLightEnabled(world, entity, *directional, value.x);
         if (propName == "color")
         {
             directional->color = value.xyz();
@@ -308,6 +317,8 @@ bool setLightProperty(
 
     if (auto* spot = tryGetSpotLight(world, entity))
     {
+        if (propName == "enabled")
+            return SetLightEnabled(world, entity, *spot, value.x);
         if (propName == "color")
         {
             spot->color = value.xyz();
@@ -343,6 +354,8 @@ bool setLightProperty(
 
     if (auto* point = tryGetPointLight(world, entity))
     {
+        if (propName == "enabled")
+            return SetLightEnabled(world, entity, *point, value.x);
         if (propName == "color")
         {
             point->color = value.xyz();
@@ -369,6 +382,8 @@ bool setLightProperty(
 
     if (auto* rect = tryGetRectLight(world, entity))
     {
+        if (propName == "enabled")
+            return SetLightEnabled(world, entity, *rect, value.x);
         if (propName == "color")
         {
             rect->color = value.xyz();
@@ -394,9 +409,21 @@ bool setLightProperty(
 
     if (auto* environment = tryGetEnvironmentLight(world, entity))
     {
+        if (propName == "enabled")
+            return SetLightEnabled(world, entity, *environment, value.x);
         if (propName == "color")
         {
             environment->color = value.xyz();
+            return MarkLightComponentChanged<EnvironmentLightComponent>(world, entity);
+        }
+        if (propName == "rotation")
+        {
+            environment->rotation = value.x;
+            return MarkLightComponentChanged<EnvironmentLightComponent>(world, entity);
+        }
+        if (propName == "radianceScale")
+        {
+            environment->radianceScale = value.xyz();
             return MarkLightComponentChanged<EnvironmentLightComponent>(world, entity);
         }
         return false;

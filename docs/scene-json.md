@@ -431,7 +431,7 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 
 注意：
 
-- `gaussian_splat_scale`、`gaussian_splat_alpha_scale`、`gaussian_splat_brightness` 等会话级外观现在可以写入顶层 `settings.gaussianSplat`，Save Scene 会把 Inspector 里的 Footprint / Alpha / Brightness 等存回去。
+- 会话级外观写入顶层 `settings.gaussianSplat`。Save Scene 会把 Inspector 里的 Footprint / Alpha / Brightness，以及 Secondary Ray Radiance、Illuminate Meshes、Shadow Strength 存回去。
 - 节点 Transform 控制对象整体位置、旋转、缩放。
 - 当前 RTX/path-tracing splat shadow 资源槽仍以第一个启用的 3DGS 对象为主要 shadow source。
 
@@ -480,7 +480,11 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
     "gaussianSplat": {
       "footprintScale": 1.0,
       "alphaScale": 1.0,
-      "brightness": 1.0
+      "brightness": 1.0,
+      "secondaryRays": true,
+      "illuminateMeshes": false,
+      "radianceAlphaClamp": 0.99,
+      "shadowStrength": 0.75
     }
   }
 }
@@ -497,8 +501,23 @@ RectLight 是单面光源，默认朝实体局部 `-Z` 方向发光。渲染时�
 | `maxDiffuseBounces` | integer | 最大 diffuse 反弹次数。 |
 | `textureMIPBias` | number | 纹理 MIP bias。 |
 | `environment` | object | 可选。Inspector 环境光 Tint / Intensity / Rotation / Visible to Camera / Enabled / Override。缺少该键时不改会话环境参数。 |
-| `gaussianSplat` | object | 可选。Inspector 3DGS Footprint / Alpha / Brightness 等会话外观。缺少该键时不改。 |
+| `gaussianSplat` | object | 可选。Inspector 3DGS 会话外观。缺少该键时不改。字段都可选，只应用写了的键。 |
 | `hiddenEntities` | string[] | 可选。要隐藏的 mesh / 3DGS / light 的场景路径。只关掉列出的实体，不会隐藏其余物体。 |
+
+`settings.gaussianSplat` 字段：
+
+| 字段 | 类型 | 对应 Python |
+| --- | --- | --- |
+| `footprintScale` | number | `gaussian_splat_scale` |
+| `alphaScale` | number | `gaussian_splat_alpha_scale` |
+| `brightness` | number | `gaussian_splat_brightness` |
+| `tintColor` | `[r, g, b]` | `gaussian_splat_tint_color` |
+| `applyToneMapping` | bool | `gaussian_splat_apply_tone_mapping` |
+| `alphaCullThreshold` | number | `gaussian_splat_alpha_cull_threshold` |
+| `secondaryRays` | bool | `gaussian_splat_secondary_rays`。反射/折射采样训练好的 splat 辐射亮度。 |
+| `illuminateMeshes` | bool | `gaussian_splat_illuminate_meshes`。漫反射网格接收这路光，还需要非零 bounce。 |
+| `radianceAlphaClamp` | number | `gaussian_splat_radiance_alpha_clamp` |
+| `shadowStrength` | number | `gaussian_splat_shadow_strength`。阴影关闭时不生效。 |
 
 Save Scene 还会把已有实体上的灯光 Color / Intensity / Irradiance / Radius / Angle、相机 FOV / Near / Far、3DGS `enabled` 写回对应组件。Prefab 内部的灯光/相机写在顶层 `entityOverrides`（按 `path` 匹配，路径找不到就跳过）。
 

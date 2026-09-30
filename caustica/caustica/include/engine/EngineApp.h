@@ -274,6 +274,10 @@ public:
         const uint32_t* trianglesFx3,
         size_t faceCount,
         const MeshDeformOptions& options = {});
+    bool applyGeometrySequence(
+        ecs::Entity entity,
+        float timeSeconds,
+        const MeshDeformOptions& options = {});
     void requestMeshAccelRebuild(ecs::Entity entity, bool resetAccumulation = true);
     void requestFullAccelRebuild();
     uint32_t precacheRtFeaturePresets(bool showProgress = true);

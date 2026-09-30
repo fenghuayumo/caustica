@@ -225,7 +225,7 @@ engine.set_mesh_vertices(
 engine.apply_visual_snapshot(
     rigids: dict[str, tuple[t, q]],
     meshes: dict[str, np.ndarray] | None = None,
-    cameras: dict[str, ...] | None = None,
+    cameras: dict[str, tuple[t, d, up]] | None = None,  # world look-to
 ) -> None
 ```
 

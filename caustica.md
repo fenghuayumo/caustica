@@ -549,6 +549,10 @@ s.gaussian_splat_rgba_format = int(caustica.GaussianSplatStorageFormat.Uint8)
 s.gaussian_splat_scale = 1.0
 s.gaussian_splat_alpha_scale = 1.0
 s.gaussian_splat_brightness = 1.0
+s.gaussian_splat_secondary_rays = True
+s.gaussian_splat_illuminate_meshes = False
+s.gaussian_splat_shadows = False
+s.gaussian_splat_shadow_strength = 0.75
 
 while engine.step_frame(-1.0):
     pass
@@ -1069,7 +1073,8 @@ Methods below are on `caustica::EngineApp` and Python `EngineApp` unless marked 
 | `saveCurrentCamera()` / `loadCurrentCamera()` | `save_current_camera()` / `load_current_camera()` | `void` | Persistence path used by the host. |
 | `addRenderProduct(desc)` | `add_render_product(name, camera=None, aovs=Aov.all, width=0, height=0)` | `bool` / `None` | Register a named camera + AOV set. `camera=None` is the active camera. `width`/`height` 0 uses the session resolution; non-zero captures that product at its own size. |
 | `removeRenderProduct(name)` / `clearRenderProducts()` | `remove_render_product` / `clear_render_products` | `bool` / `void` | |
-| `readSensorOutput(aovs=Aov::All)` | `read_sensor_output(aovs=Aov.all)` | `SensorOutput` | AOVs for the camera that was just rendered. |
+| `renderProducts()` | `render_products()` | `list[RenderProduct]` | `name`, `camera` (`None` = follow the active camera), `aovs`, `width`, `height`. |
+| `readSensorOutput(aovs=Aov::All)` | `read_sensor_output(aovs=Aov.all)` | `SensorOutput` | AOVs for the camera that was just rendered. `camera` is that scene camera, or `None` for the free camera. |
 | `captureSensorOutputs()` | `capture_sensor_outputs()` | `vector` / `list[SensorOutput]` | Every registered RenderProduct at the current physical time. Extra cameras re-render without stepping simulation or advancing the device frame clock. |
 | `setEntitySemanticLabel(entity, instanceId, semanticId, label)` | `SceneEntity.instance_id` / `.semantic_id` / `.semantic_label` | `bool` / `None` | Stable ids for AOV alignment. |
 
@@ -1102,7 +1107,7 @@ wrist.camera_pose = ((0.0, 1.2, 0.15), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
 | `spawnSpotLight(...)` | `spawn_spot_light(..., inner_angle=180.0, outer_angle=180.0, name="")` | entity | Angles in **degrees**. |
 | `spawnRectLight(...)` | `spawn_rect_light(color=(1,1,1), intensity=1.0, width=1.0, height=1.0, name="")` | entity | Faces local −Z. |
 | `spawnEnvironmentLight(...)` | `spawn_environment_light(color=(1,1,1), path="", rotation=0.0, name="")` | entity | |
-| `spawnCamera(desc)` | `spawn_camera(name="", parent=None, local_translation=(0,0,0), local_rotation=(0,0,0,1), local_scaling=(1,1,1), vertical_fov=0.7, z_near=0.001, intrinsics=None)` | entity | Perspective camera. `parent=None` attaches under the scene root. Rotation is xyzw. With a parent, aim with `local_pose`, not `look_to`. |
+| `spawnCamera(desc)` | `spawn_camera(name="", parent=None, local_translation=(0,0,0), local_rotation=(0,0,0,1), local_scaling=(1,1,1), vertical_fov=0.7, z_near=0.001, intrinsics=None, aovs=None)` | entity | Perspective camera. `parent=None` attaches under the scene root. Rotation is xyzw. With a parent, aim with `local_pose`, not `look_to`. `aovs=None` does not register a product; an AOV mask registers one under the camera name (`0` means `Aov.all`). |
 | `setParent(entity, parent)` | `SceneEntity.set_parent(entity_or_path)` | `bool` / `None` | `NullEntity` / `None` attaches under the scene root. |
 | `setWorldPoses(names, translationsNx3, rotationsXyzwNx4, scalesNx3)` | `set_world_poses(names, translations, rotations_xyzw, scales=None)` | `size_t` / `None` | Batch world TRS. `translations` `(N,3)`, `rotations_xyzw` `(N,4)`, optional `scales` `(N,3)`. One hierarchy refresh. |
 | `jointNames(robot)` | `robot.joint_names` | `list[str]` | Movable URDF joints (`revolute` / `continuous` / `prismatic`) in document order. Empty if the entity is not a robot root. |
@@ -1123,11 +1128,12 @@ Empty light `name` auto-generates a unique name (`DirectionalLight`, `PointLight
 | `findEntity(path, context=NullEntity)` | `find_entity(path)` | entity / `None` | Name or path. |
 | `findMaterial(materialID)` | `find_material(material_id)` | material / `None` | Cache-backed pick id. Name lookup: `engine.scene.find_material("Floor")`. |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[(x,y,z)]` | Unique object-space positions; UV/normal splits collapsed. |
-| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | Length must match `get_mesh_vertices`. `vertices` may be a list of triples or NumPy `(V, 3)` float32/float64. |
-| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(entity, triangles, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | `triangles` is `(F, 3)` uint32 (or int32/int64) indexing `get_mesh_vertices`. Topology change rebuilds AS. |
-| `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | World space. |
-| — | `deform_mesh` / `deform_mesh_world` | `int` | Python sugar: callback per unique vertex. |
-| `requestMeshAccelRebuild(entity)` | `request_mesh_accel_rebuild(entity)` | `void` | One mesh BLAS. |
+| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object", zero_motion_history=False, reset_accumulation_on_accel_rebuild=True)` | `void` | Length must match `get_mesh_vertices`. `vertices` may be a list of triples or NumPy `(V, 3)` float32/float64. `zero_motion_history` writes PrevPosition equal to Position. |
+| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(entity, triangles, recompute_normals=True, rebuild_acceleration_structure=True, zero_motion_history=False, reset_accumulation_on_accel_rebuild=True)` | `void` | `triangles` is `(F, 3)` uint32 (or int32/int64) indexing `get_mesh_vertices`. Topology change rebuilds AS. |
+| `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | World space. Same deform flags, without `space`. |
+| `applyGeometrySequence(entity, timeSeconds, options)` | `apply_geometry_sequence(entity, time_seconds, ...)` | `bool` / `None` | Sample a `GeometrySequenceComponent`. Python raises when the entity has no sequence. Same deform flags. |
+| — | `deform_mesh` / `deform_mesh_world` | `int` | Python sugar: callback per unique vertex. Same deform flags. |
+| `requestMeshAccelRebuild(entity, resetAccumulation=true)` | `request_mesh_accel_rebuild(entity, reset_accumulation=True)` | `void` | One mesh BLAS. |
 | `requestFullAccelRebuild()` | `request_full_accel_rebuild()` | `void` | Full scene AS. |
 | `precacheRtFeaturePresets(showProgress=true)` | `precache_rt_feature_presets(show_progress=True)` | `int` | After at least one `stepFrame`. Ready-count. |
 | `setEnvMapOverrideSource(path)` | `set_env_map_override_source(path)` | `void` | Override environment map source. |
@@ -1240,6 +1246,9 @@ Python wrapper around `ecs::Entity`. Returned by spawn / find / light / camera h
 | `width` / `height` | `float` | Rect, local X/Y. |
 | `inner_angle` / `outer_angle` | `float` | Spot, **degrees**. |
 | `environment_path` | `str` | Environment light HDRI path. |
+| `enabled` | `bool` | Light only. `False` skips the light at extract. |
+| `environment_rotation` | `float` | Environment light map rotation. Same scalar as scene JSON `EnvironmentLight.rotation` and `spawn_environment_light(rotation=)`. |
+| `radiance_scale` | `(r,g,b)` | Environment light radiance multiplier. |
 
 `MeshHandle`: `valid`, `name`, truthy when valid.
 
@@ -1620,12 +1629,13 @@ See [Cookbook](#spawn--despawn-assets) and [Load OBJ meshes with materials](#loa
 | C++ | Python | Returns | Notes |
 | --- | --- | --- | --- |
 | `getMeshVertices(entity)` | `get_mesh_vertices(entity)` | `list[tuple]` | Unique object-space positions. |
-| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object")` | `void` | List of triples or NumPy `(V, 3)`. `space` is `"object"` or `"world"`. |
-| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(entity, triangles, recompute_normals=True, rebuild_acceleration_structure=True)` | `void` | `(F, 3)` indices into `get_mesh_vertices`. Rebuilds AS. |
+| `setMeshVertices(entity, vertices, options)` | `set_mesh_vertices(entity, vertices, recompute_normals=True, rebuild_acceleration_structure=True, space="object", zero_motion_history=False, reset_accumulation_on_accel_rebuild=True)` | `void` | List of triples or NumPy `(V, 3)`. `space` is `"object"` or `"world"`. |
+| `setMeshTriangles(entity, indices, faceCount, options)` | `set_mesh_triangles(..., zero_motion_history=False, reset_accumulation_on_accel_rebuild=True)` | `void` | `(F, 3)` indices into `get_mesh_vertices`. Rebuilds AS. |
+| `applyGeometrySequence(entity, time, options)` | `apply_geometry_sequence(entity, time_seconds, ...)` | `bool` / `None` | Fixed-topology point cache. Python raises if the entity has no sequence. |
 | — | `deform_mesh(entity, callback, ...)` | `int` | `callback(index, (x,y,z))` → new triple or `None`. |
 | `getMeshVerticesWorld` / `setMeshVerticesWorld` | `get_mesh_vertices_world` / `set_mesh_vertices_world` | same | Uses that entity's transform. |
 | — | `deform_mesh_world(...)` | `int` | World-space callback. |
-| `requestMeshAccelRebuild(entity)` | `request_mesh_accel_rebuild(entity)` | `void` | |
+| `requestMeshAccelRebuild(entity, resetAccumulation=true)` | `request_mesh_accel_rebuild(entity, reset_accumulation=True)` | `void` | |
 
 `set_mesh_vertices` updates object-space mesh bounds, optionally recomputes normals, refreshes GPU vertex data, resets accumulation, and requests AS rebuild by default. Keep `rebuild_acceleration_structure=True` for ray-tracing-correct geometry. Only set it `False` when batching several edits, then call `request_full_accel_rebuild()` once.
 
@@ -1639,9 +1649,11 @@ See [Cookbook](#deform-mesh-vertices).
 
 Prefer `GaussianSplat` nodes in scene JSON. `loadGaussianSplatFile` / `load_gaussian_splat_file` appends under the current root. `setScene` replaces the graph, including previously appended splat nodes.
 
-Rasterization covers all enabled 3DGS objects. Emissive proxy sampling combines them. Splat shadows currently use the first enabled object as the primary shadow source.
+Rasterization covers all enabled 3DGS objects. Trained splat radiance on reflections and refractions is `gaussian_splat_secondary_rays` (default on). Diffuse mesh lighting also needs `gaussian_splat_illuminate_meshes` (default off) and a nonzero `bounce_count` / `diffuse_bounce_count`. Splat shadows currently use the first enabled object as the primary shadow source. `gaussian_splat_shadow_strength` (default `0.75`) darkens only after shadows are on: `gaussian_splat_shadows=True` selects hard shadows when `gaussian_splat_shadows_mode` is `0`; mode `1` is hard and `2` is soft.
 
 `gaussian_splat_translation`, `gaussian_splat_rotation_euler_deg`, and `gaussian_splat_object_scale` apply when a new node is **appended** through `load_gaussian_splat_file`.
+
+C++ `PathTracerSettings` also has `GaussianSplatRadianceMaxPasses`, `GaussianSplatRadianceMinTransmittance`, `GaussianSplatShadowContactRadius`, and `GaussianSplatShadowContactStrength`. Those four are not on the Python settings object.
 
 See [Cookbook](#load-3d-gaussian-splats), [3DGS reference / realtime batch](#3dgs-reference--realtime-batch), and [COLMAP camera 3DGS alignment](#colmap-camera-3dgs-alignment).
 
@@ -1675,16 +1687,16 @@ C++ members are PascalCase on `PathTracerSettings` (`EnableGaussianSplats`, …)
 | `gaussian_splat_alpha_scale` | `float` | Opacity multiplier. |
 | `gaussian_splat_brightness` | `float` | Color multiplier. |
 | `gaussian_splat_tint_color` | `(r,g,b)` | Multiplies SH0/base color. |
-| `gaussian_splat_as_emitter` | `bool` | Emissive proxies into light sampling. |
-| `gaussian_splat_emission_intensity` | `float` | |
-| `gaussian_splat_emission_max_proxy_count` | `int` | |
+| `gaussian_splat_secondary_rays` | `bool` | Default on. Sample trained splat radiance on reflection and refraction rays. Builds the Gaussian acceleration structure. |
+| `gaussian_splat_illuminate_meshes` | `bool` | Default off. Diffuse BSDF paths receive that radiance. Requires `gaussian_splat_secondary_rays` and nonzero bounce counts. |
+| `gaussian_splat_radiance_alpha_clamp` | `float` | Default `0.99`. Maximum stochastic opacity for one secondary Gaussian hit. |
 | `gaussian_splat_alpha_cull_threshold` | `float` | |
 | `gaussian_splat_translation` | `(x,y,z)` | Initial pose for newly appended Python/C++ nodes. Resets accumulation. |
 | `gaussian_splat_rotation_euler_deg` | `(x,y,z)` | Degrees. |
 | `gaussian_splat_object_scale` | `(x,y,z)` | |
-| `gaussian_splat_shadows` | `bool` | |
-| `gaussian_splat_shadows_mode` | `int` / `GaussianSplatShadowMode` | Orthogonal to primary GS/GUT. |
-| `gaussian_splat_shadow_strength` | `float` | |
+| `gaussian_splat_shadows` | `bool` | Default off. `True` with mode `0` is hard shadows. |
+| `gaussian_splat_shadows_mode` | `int` / `GaussianSplatShadowMode` | `0` off unless `gaussian_splat_shadows` is set, `1` hard, `2` soft. Orthogonal to primary GS/GUT. |
+| `gaussian_splat_shadow_strength` | `float` | Default `0.75`, used as `0..1`. Applies only while shadows are enabled. |
 | `gaussian_splat_shadow_soft_radius` | `float` | |
 | `gaussian_splat_shadow_soft_sample_count` | `int` | |
 | `gaussian_splat_shadow_kernel_degree` | `int` | |
@@ -1861,7 +1873,7 @@ Arithmetic: `int(enum_value)` works and enum values can be assigned to int-backe
 | `OidnQuality` | `Fast=0`, `Balanced=1`, `High=2` |
 | `TextureSlot` | `Base`, `ORM` / `OcclusionRoughnessMetallic`, `Normal`, `CoatNormal`, `Emissive`, `Transmission` |
 | `LightType` | `None_=0`, `Directional`, `Spot`, `Point`, `Rect`, `Environment` |
-| `Aov` | `none`, `rgb`, `depth`, `normal`, `instance_id`, `semantic_id`, `motion_vector`, `diffuse`, `roughness`, `specular`, `metallic`, `throughput`, `guide_diffuse`, `segmentation` (= instance_id), `all` |
+| `Aov` | `none`, `rgb`, `depth`, `normal`, `instance_id`, `semantic_id`, `motion_vector`, `diffuse`, `roughness`, `specular`, `metallic`, `throughput`, `guide_diffuse`, `linear_rgb` (`hdr` alias), `segmentation` (= instance_id), `all` (`all` does not include `linear_rgb`) |
 | `GaussianSplatSortMode` | `GpuSort=0`, `StochasticSplats=1` |
 | `GaussianSplatPrimaryMethod` | `GS=0` (3DGS), `GUT=1` (3DGUT) |
 | `GaussianSplatStorageFormat` | `Float32=0`, `Float16=1`, `Uint8=2` |
@@ -1888,11 +1900,11 @@ Python-only EngineApp sugar, plus `GpuDevice` and `Frame`. Module functions are 
 | `step_until_accumulated(max_frames=0)` | Step until `accumulation_completed`. |
 | `get_pixels()` | NumPy `(H, W, 4)` uint8 RGBA. Requires NumPy. Extension. |
 | `read_ldr_framebuffer()` | `Framebuffer` (raw bytes). Extension. |
-| `render(dt=-1.0)` | `step_frame` then `Frame` (RGB + AOVs). Extension. |
-| `render_reference(spp=64, oidn=True)` | Accumulate then `Frame`. Extension. |
+| `render(dt=-1.0, aovs=Aov.all)` | `step_frame` then `Frame`. Pass `Aov.linear_rgb` in `aovs` to fill `frame.linear_rgb`. Extension. |
+| `render_reference(spp=64, oidn=True, max_frames=0, aovs=Aov.all)` | Accumulate then `Frame`. Extension. |
 | `capture_sensor_outputs()` | `list[SensorOutput]` for registered RenderProducts. |
 | `set_world_poses(...)` | Batch world TRS from NumPy / nested sequences. |
-| `apply_visual_snapshot(rigids, meshes=None)` | `rigids` maps name → `(translation, rotation_xyzw)`. |
+| `apply_visual_snapshot(rigids, meshes=None, cameras=None)` | `rigids` maps name → `(translation, rotation_xyzw)`. `cameras` maps name → `(position, direction, up)` world look-to. |
 | `render_reference_frame` / `render_realtime_frame` | Shared with embed; return a frame count, not a `Frame`. |
 | `deform_mesh` / `deform_mesh_world` | Callback `(index, (x,y,z)) -> triple or None`. |
 | `with EngineApp.create(...)` | Calls `shutdown()` on exit. |
@@ -1919,13 +1931,15 @@ The logical GPU, surface, and optional window are created on the first EngineApp
 
 ### `Frame` / `Framebuffer`
 
-LDR final color after at least one successful step. Tightly packed **RGBA8**, row-major, **top-left** origin. Same source as `save_screenshot`. HDR readback is not implemented.
+LDR final color after at least one successful step. Tightly packed **RGBA8**, row-major, **top-left** origin. Same source as `save_screenshot`. Linear HDR is `linear_rgb` / `hdr` when that AOV was requested.
 
-`Frame` (from `render` / `render_reference`):
+`Frame` (from `render` / `render_reference`) matches `SensorOutput` channels:
 
 | Field | Type |
 | --- | --- |
+| `name`, `aovs`, `camera` | Product name, mask, and scene camera (`None` = free camera) |
 | `rgb` | NumPy `(H, W, 4)` uint8 |
+| `linear_rgb` / `hdr` | NumPy `(H, W, 3)` float32, or `None` when `Aov.linear_rgb` was not requested |
 | `pixels` | `bytes` |
 | `width`, `height`, `channels` | |
 | `depth` | NumPy `(H, W)` float32 linear \|view Z\| meters; `None` if empty |
@@ -1933,6 +1947,7 @@ LDR final color after at least one successful step. Tightly packed **RGBA8**, ro
 | `instance_id` / `segmentation` | NumPy `(H, W)` uint32; `0` = miss |
 | `semantic_id` | NumPy `(H, W)` uint32; `0` = unlabeled / miss |
 | `motion_vector` | NumPy `(H, W, 2)` float32 pixels; `None` if empty |
+| `diffuse`, `roughness`, `specular`, `metallic`, `throughput`, `guide_diffuse` | Same layouts as `SensorOutput` |
 
 `Framebuffer` (from `read_ldr_framebuffer` / C++ `LdrFramebuffer`):
 

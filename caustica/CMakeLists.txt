@@ -799,6 +799,20 @@ if (CAUSTICA_WITH_PYTHON AND TARGET nanobind-static)
         )
 
         add_test(
+            NAME causBindingSurfaceRenderTests
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"
+                ${Python3_EXECUTABLE}
+                "${CMAKE_CURRENT_SOURCE_DIR}/Python/Tests/binding_surface_test.py"
+                --output-dir "${CMAKE_BINARY_DIR}/test-output/binding-surface"
+        )
+        set_tests_properties(causBindingSurfaceRenderTests PROPERTIES
+            LABELS "gpu;render;sensor"
+            RESOURCE_LOCK caustica_gpu
+            TIMEOUT 300
+        )
+
+        add_test(
             NAME causSensorRobotFkRenderTests
             COMMAND ${CMAKE_COMMAND} -E env
                 "PYTHONPATH=$<TARGET_FILE_DIR:caustica_py>"

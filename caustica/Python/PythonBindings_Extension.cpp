@@ -47,6 +47,7 @@ namespace
     struct PyFrame
     {
         caustica::SensorOutput sensor;
+        std::shared_ptr<caustica_py::PyEngineAppContext> owner;
     };
 
     std::shared_ptr<caustica_py::PythonDevice> MakePythonDevice(
@@ -205,11 +206,21 @@ NB_MODULE(caustica, m)
         .def_prop_ro("guide_width", [](const PyFrame& self) { return self.sensor.guideWidth; })
         .def_prop_ro("guide_height", [](const PyFrame& self) { return self.sensor.guideHeight; })
         .def_prop_ro("channels", [](const PyFrame&) { return 4; })
+        .def_prop_ro("name", [](const PyFrame& self) { return self.sensor.name; })
+        .def_prop_ro("aovs", [](const PyFrame& self) { return self.sensor.aovs; })
+        .def_prop_ro("camera", [](const PyFrame& self) {
+                return caustica_py::sensorCameraEntity(self.sensor, self.owner);
+            },
+            "Scene camera that produced this frame, or None for the free camera.")
         .def_prop_ro("pixels", [](const PyFrame& self) {
                 return nb::bytes(self.sensor.rgb.data(), self.sensor.rgb.size());
             })
         .def_prop_ro("rgb", [](const PyFrame& self) { return caustica_py::sensorRgbNumpy(self.sensor); },
             "NumPy (H, W, 4) uint8 RGBA. Requires NumPy.")
+        .def_prop_ro("linear_rgb", [](const PyFrame& self) { return caustica_py::sensorLinearRgbNumpy(self.sensor); },
+            "NumPy (H, W, 3) float32 linear radiance, or None. Request Aov.linear_rgb. 0 = miss.")
+        .def_prop_ro("hdr", [](const PyFrame& self) { return caustica_py::sensorLinearRgbNumpy(self.sensor); },
+            "Alias of linear_rgb.")
         .def_prop_ro("depth", [](const PyFrame& self) { return caustica_py::sensorDepthNumpy(self.sensor); },
             "NumPy (H, W) float32 linear |view Z| meters. 0 = miss.")
         .def_prop_ro("normal", [](const PyFrame& self) { return caustica_py::sensorNormalNumpy(self.sensor); },
@@ -304,26 +315,28 @@ NB_MODULE(caustica, m)
              },
              "Python sugar: LDR readback as a NumPy (H, W, 4) uint8 array.")
         .def("render",
-             [](caustica_py::PyEngineApp& self, float dt) {
+             [](caustica_py::PyEngineApp& self, float dt, uint32_t aovs) {
                  if (!self.step(dt))
                      throw std::runtime_error("EngineApp.render: step_frame failed");
-                 auto output = self.engine().readSensorOutput();
+                 auto output = self.engine().readSensorOutput(aovs);
                  if (!output)
                      throw std::runtime_error("EngineApp.render: sensor readback failed");
-                 return PyFrame{ std::move(*output) };
+                 return PyFrame{ std::move(*output), self.context() };
              },
              nb::arg("dt") = -1.0f,
-             "Python sugar: step_frame() then return a Frame with RGB and AOV buffers.")
+             nb::arg("aovs") = uint32_t(caustica::Aov::All),
+             "Python sugar: step_frame() then return a Frame. Aov.all omits linear_rgb; pass it in aovs to fill frame.linear_rgb.")
         .def("render_reference",
-             [](caustica_py::PyEngineApp& self, int spp, bool oidn, int maxFrames) {
+             [](caustica_py::PyEngineApp& self, int spp, bool oidn, int maxFrames, uint32_t aovs) {
                  if (self.renderReferenceFrame(spp, oidn, maxFrames) <= 0)
                      throw std::runtime_error("EngineApp.render_reference: accumulation failed");
-                 auto output = self.engine().readSensorOutput();
+                 auto output = self.engine().readSensorOutput(aovs);
                  if (!output)
                      throw std::runtime_error("EngineApp.render_reference: sensor readback failed");
-                 return PyFrame{ std::move(*output) };
+                 return PyFrame{ std::move(*output), self.context() };
              },
              nb::arg("spp") = 64, nb::arg("oidn") = true, nb::arg("max_frames") = 0,
+             nb::arg("aovs") = uint32_t(caustica::Aov::All),
              "Python sugar: accumulate a reference frame and return a Frame.");
 
     m.def("engine", []() -> caustica_py::PyEngineApp* {

@@ -104,6 +104,37 @@ int main()
     }
 
     {
+        caustica::scene::SceneEntityWorld entityWorld;
+        const caustica::ecs::Entity root = entityWorld.createEntity("Root");
+        const caustica::ecs::Entity light = entityWorld.createEntity("Sky", root);
+        entityWorld.setEnvironmentLight(light, caustica::scene::EnvironmentLightComponent{});
+        entityWorld.refresh(0);
+        entityWorld.endChangeDetectionFrame();
+
+        passed &= expect(
+            caustica::scene::setLightProperty(
+                entityWorld.world(), light, "enabled", math::float4(0.f)),
+            "setLightProperty rejected environment enabled");
+        const auto* sky = caustica::scene::tryGetEnvironmentLight(entityWorld.world(), light);
+        passed &= expect(sky && !sky->enabled, "environment light stayed enabled");
+        passed &= expect(
+            caustica::scene::setLightProperty(
+                entityWorld.world(), light, "rotation", math::float4(35.f, 0.f, 0.f, 0.f)),
+            "setLightProperty rejected environment rotation");
+        passed &= expect(
+            caustica::scene::setLightProperty(
+                entityWorld.world(), light, "radianceScale", math::float4(2.f, 3.f, 4.f, 0.f)),
+            "setLightProperty rejected environment radianceScale");
+        sky = caustica::scene::tryGetEnvironmentLight(entityWorld.world(), light);
+        passed &= expect(
+            sky && sky->rotation == 35.f
+                && sky->radianceScale.x == 2.f
+                && sky->radianceScale.y == 3.f
+                && sky->radianceScale.z == 4.f,
+            "environment rotation / radianceScale were not stored");
+    }
+
+    {
         caustica::scene::SceneRenderSnapshot snapshot;
         snapshot.pendingState().lightsChanged = true;
         snapshot.publish(1);
