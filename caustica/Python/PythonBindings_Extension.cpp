@@ -145,8 +145,7 @@ NB_MODULE(caustica, m)
         .def("__repr__", [](const caustica::rhi::AdapterDesc& self) {
             return std::string("<caustica.AdapterInfo index=") + std::to_string(self.index)
                 + " name='" + self.name + "' backend='"
-                + (self.api == caustica::rhi::GraphicsAPI::VULKAN ? "vulkan" :
-                   self.api == caustica::rhi::GraphicsAPI::D3D12 ? "d3d12" : "d3d11")
+                + (self.api == caustica::rhi::GraphicsAPI::VULKAN ? "vulkan" : "d3d12")
                 + "'>";
         });
 

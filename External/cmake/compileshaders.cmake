@@ -35,17 +35,15 @@ set (RHI_DEFAULT_VK_REGISTER_OFFSETS
 #                       [OUTPUT_FORMAT (HEADER|BINARY)]
 #                       [DXIL <dxil-output-path>]
 #                       [DXIL_SLANG <dxil-output-path>]
-#                       [DXBC <dxbc-output-path>]
 #                       [SPIRV_DXC <spirv-output-path>]
 #                       [SPIRV_SLANG <spirv-output-path>]
 #                       [SHADERMAKE_OPTIONS <string>]       -- arguments passed to ShaderMake
-#                       [SHADERMAKE_OPTIONS_DXBC <string>]  -- same, only DXBC specific
 #                       [SHADERMAKE_OPTIONS_DXIL <string>]  -- same, only DXIL specific
 #                       [SHADERMAKE_OPTIONS_SPIRV <string>] -- same, only SPIR-V specific
 #                       [SHADER_MODEL <string>]             -- shader model n_n format (default: 6_5)
-#                       [BYPRODUCTS_DXBC <list>]            -- list of generated files without paths,
-#                       [BYPRODUCTS_DXIL <list>]               needed to get correct incremental builds when
-#                       [BYPRODUCTS_SPIRV <list>]              using static shaders with Ninja generator
+#                       [BYPRODUCTS_DXIL <list>]            -- list of generated files without paths,
+#                       [BYPRODUCTS_SPIRV <list>]              needed to get correct incremental builds when
+#                                                              using static shaders with Ninja generator
 #                       [INCLUDES <list>]                   -- include paths
 #                       [IGNORE_INCLUDES <list>])           -- list of included files for ShaderMake to ignore (e.g. c++)
 
@@ -53,16 +51,13 @@ function(caustica_compile_shaders)
     set(options "")
     set(oneValueArgs
         SHADERMAKE_OPTIONS
-        SHADERMAKE_OPTIONS_DXBC
         SHADERMAKE_OPTIONS_DXIL
         SHADERMAKE_OPTIONS_SPIRV
         COMPILER_OPTIONS        # deprecated
-        COMPILER_OPTIONS_DXBC   # deprecated
         COMPILER_OPTIONS_DXIL   # deprecated
         COMPILER_OPTIONS_SPIRV  # deprecated
         SHADER_MODEL
         CONFIG
-        DXBC
         DXIL
         DXIL_SLANG
         FOLDER
@@ -73,7 +68,6 @@ function(caustica_compile_shaders)
         VULKAN_VERSION
         TARGET)
     set(multiValueArgs
-        BYPRODUCTS_DXBC
         BYPRODUCTS_DXIL
         BYPRODUCTS_SPIRV
         SOURCES
@@ -91,7 +85,7 @@ function(caustica_compile_shaders)
     if ((params_DXIL AND params_DXIL_SLANG) OR (params_SPIRV AND params_SPIRV_SLANG))
         message(FATAL_ERROR "caustica_compile_shaders: DXIL and DXIL_SLANG, or SPIRV and SPIRV_SLANG cannot be used together")
     endif()
-    if (params_COMPILER_OPTIONS OR params_COMPILER_OPTIONS_DXBC OR
+    if (params_COMPILER_OPTIONS OR
         params_COMPILER_OPTIONS_DXIL OR params_COMPILER_OPTIONS_SPIRV)
         message(SEND_ERROR "caustica_compile_shaders: The COMPILER_OPTIONS[_platform] arguments "
                            "are deprecated, use SHADERMAKE_OPTIONS[_platform] instead")
@@ -136,7 +130,6 @@ function(caustica_compile_shaders)
 
     separate_arguments(params_SHADERMAKE_OPTIONS       NATIVE_COMMAND "${params_SHADERMAKE_OPTIONS}")
     separate_arguments(params_SHADERMAKE_OPTIONS_DXIL  NATIVE_COMMAND "${params_SHADERMAKE_OPTIONS_DXIL}")
-    separate_arguments(params_SHADERMAKE_OPTIONS_DXBC  NATIVE_COMMAND "${params_SHADERMAKE_OPTIONS_DXBC}")
     separate_arguments(params_SHADERMAKE_OPTIONS_SPIRV NATIVE_COMMAND "${params_SHADERMAKE_OPTIONS_SPIRV}")
 
     
@@ -219,38 +212,6 @@ function(caustica_compile_shaders)
                 list(APPEND byproducts_with_paths "${params_DXIL_SLANG}/${relative_path}")
             endforeach()
             
-            add_custom_command(TARGET ${params_TARGET} PRE_BUILD COMMAND ${compilerCommand} BYPRODUCTS "${byproducts_with_paths}")
-        endif()
-    endif()
-
-    if (params_DXBC AND CAUSTICA_WITH_DX11)
-        if (NOT EXISTS "${SHADERMAKE_FXC_PATH}")
-            message(FATAL_ERROR "caustica_compile_shaders: FXC not found -- please set SHADERMAKE_FXC_PATH to the full path to the FXC binary")
-        endif()
-        
-        file(MAKE_DIRECTORY "${params_DXBC}")
-        set(compilerCommand ${SHADERMAKE_PATH}
-           --config ${params_CONFIG}
-           --out ${params_DXBC}
-           --platform DXBC
-           ${output_format_arg}
-           ${include_dirs}
-           ${ignore_includes}
-           -D TARGET_D3D11
-           --compiler "${SHADERMAKE_FXC_PATH}"
-           ${project_name_arg})
-
-        list(APPEND compilerCommand ${params_SHADERMAKE_OPTIONS})
-        list(APPEND compilerCommand ${params_SHADERMAKE_OPTIONS_DXBC})
-
-        if ("${params_BYPRODUCTS_DXBC}" STREQUAL "")
-            add_custom_command(TARGET ${params_TARGET} PRE_BUILD COMMAND ${compilerCommand})
-        else()
-            set(byproducts_with_paths "")
-            foreach(relative_path IN LISTS params_BYPRODUCTS_DXBC)
-                list(APPEND byproducts_with_paths "${params_DXBC}/${relative_path}")
-            endforeach()
-
             add_custom_command(TARGET ${params_TARGET} PRE_BUILD COMMAND ${compilerCommand} BYPRODUCTS "${byproducts_with_paths}")
         endif()
     endif()
@@ -343,7 +304,7 @@ endfunction()
 # When OUTPUT_FORMAT is BINARY or is unspecified, the shaders will be placed into subdirectories of
 # ${OUTPUT_BASE}, with names compatible with the FindDirectoryWithShaderBin framework function.
 # When OUTPUT_FORMAT is HEADER, the shaders for all platforms will be placed into OUTPUT_BASE directly,
-# with platform-specific extensions: .dxbc.h, .dxil.h, .spirv.h.
+# with platform-specific extensions: .dxil.h, .spirv.h.
 #
 # The BYPRODUCTS_NO_EXT argument lists all generated files without extensions and without base paths.
 # Similar to caustica_compile_shaders, the list of byproducts is needed to get correct incremental builds
@@ -359,7 +320,6 @@ endfunction()
 #                                     [FOLDER <folder-in-visual-studio-solution>]
 #                                     [OUTPUT_FORMAT (HEADER|BINARY)]
 #                                     [SHADERMAKE_OPTIONS <string>]       -- arguments passed to ShaderMake
-#                                     [SHADERMAKE_OPTIONS_DXBC <string>]  -- same, only DXBC specific
 #                                     [SHADERMAKE_OPTIONS_DXIL <string>]  -- same, only DXIL specific
 #                                     [SHADERMAKE_OPTIONS_SPIRV <string>] -- same, only SPIR-V specific
 #                                     [SHADER_MODEL <string>]             -- shader model n_n format (default: 6_5)
@@ -372,12 +332,10 @@ function(caustica_compile_shaders_all_platforms)
         SLANG)
     set(oneValueArgs
         SHADERMAKE_OPTIONS
-        SHADERMAKE_OPTIONS_DXBC
         SHADERMAKE_OPTIONS_DXIL
         SHADERMAKE_OPTIONS_SPIRV
         SHADER_MODEL
         COMPILER_OPTIONS        # deprecated
-        COMPILER_OPTIONS_DXBC   # deprecated
         COMPILER_OPTIONS_DXIL   # deprecated
         COMPILER_OPTIONS_SPIRV  # deprecated
         CONFIG
@@ -403,7 +361,7 @@ function(caustica_compile_shaders_all_platforms)
     if (NOT params_OUTPUT_BASE)
         message(FATAL_ERROR "caustica_compile_shaders_all_platforms: OUTPUT_BASE argument missing")
     endif()
-    if (params_COMPILER_OPTIONS OR params_COMPILER_OPTIONS_DXBC OR
+    if (params_COMPILER_OPTIONS OR
         params_COMPILER_OPTIONS_DXIL OR params_COMPILER_OPTIONS_SPIRV)
         message(SEND_ERROR "caustica_compile_shaders_all_platforms: The COMPILER_OPTIONS[_platform] arguments "
                            "are deprecated, use SHADERMAKE_OPTIONS[_platform] instead")
@@ -415,22 +373,18 @@ function(caustica_compile_shaders_all_platforms)
 
     if ("${params_OUTPUT_FORMAT}" STREQUAL "HEADER")
         # Header/static compilation puts everything into one location and differentiates between platforms
-        # using the .dxbc.h, .dxil.h, or .spirv.h extensions native to ${SHADERMAKE_PATH}
-        set(output_dxbc ${params_OUTPUT_BASE})
+        # using the .dxil.h or .spirv.h extensions native to ${SHADERMAKE_PATH}
         set(output_dxil ${params_OUTPUT_BASE})
         set(output_spirv ${params_OUTPUT_BASE})
     else()
         # Binary compilation puts shaders into per-platform folders - legacy mode compatible with various apps
-        set(output_dxbc ${params_OUTPUT_BASE}/dxbc)
         set(output_dxil ${params_OUTPUT_BASE}/dxil)
         set(output_spirv ${params_OUTPUT_BASE}/spirv)
     endif()
 
-    set(byproducts_dxbc "")
     set(byproducts_dxil "")
     set(byproducts_spirv "")
     foreach(byproduct IN LISTS params_BYPRODUCTS_NO_EXT)
-        list(APPEND byproducts_dxbc "${byproduct}.dxbc.h")
         list(APPEND byproducts_dxil "${byproduct}.dxil.h")
         list(APPEND byproducts_spirv "${byproduct}.spirv.h")
     endforeach()
@@ -456,20 +410,17 @@ function(caustica_compile_shaders_all_platforms)
         caustica_compile_shaders(TARGET ${params_TARGET}
             CONFIG ${params_CONFIG}
             FOLDER ${params_FOLDER}
-            DXBC ${output_dxbc}
             DXIL ${output_dxil}
             SPIRV_DXC ${output_spirv}
             OUTPUT_FORMAT ${params_OUTPUT_FORMAT}
             PROJECT_NAME ${params_PROJECT_NAME}
             SHADERMAKE_OPTIONS ${params_SHADERMAKE_OPTIONS}
             SHADERMAKE_OPTIONS_DXIL ${params_SHADERMAKE_OPTIONS_DXIL}
-            SHADERMAKE_OPTIONS_DXBC ${params_SHADERMAKE_OPTIONS_DXBC}
             SHADERMAKE_OPTIONS_SPIRV ${params_SHADERMAKE_OPTIONS_SPIRV}
             SHADER_MODEL ${params_SHADER_MODEL}
             SOURCES ${params_SOURCES}
             INCLUDES ${params_INCLUDES}
             IGNORE_INCLUDES ${params_IGNORE_INCLUDES}
-            BYPRODUCTS_DXBC ${byproducts_dxbc}
             BYPRODUCTS_DXIL ${byproducts_dxil}
             BYPRODUCTS_SPIRV ${byproducts_spirv})
     endif()

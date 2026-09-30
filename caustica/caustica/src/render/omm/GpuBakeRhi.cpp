@@ -638,7 +638,7 @@ void GpuBakeRhiImpl::SetupPipelines(
 				static_assert(::omm::Gpu::GraphicsPipelineInputElementDesc::inputSlot == 0);
 				desc.offset = 0;
 				static_assert(::omm::Gpu::GraphicsPipelineInputElementDesc::semanticIndex == 0);
-				inputLayout = m_device->createInputLayout(&desc, 1 /*attributeCount*/, vertex);
+				inputLayout = m_device->createInputLayout(&desc, 1 /*attributeCount*/);
 			}
 
 			caustica::rhi::GraphicsPipelineHandle pipeline;

@@ -150,8 +150,6 @@ stays on the render thread. Do not call `acquire` from a worker.
 
 - **DX12 / Vulkan:** Prefer `CommandListParameters::enableImmediateExecution = false`
   (the default). Multiple deferred lists may be open at once. The pool forces this.
-- **DX11:** Immediate only. The D3D11 backend upgrades deferred requests to
-  immediate; `executeCommandLists` is a no-op. Parallel waves do not apply.
 - Mid-frame `close → execute → waitForIdle → open` on a shared list is a
   **sync point**. Keep it rare, RT-only, and annotated
   `// THREADING: sync-point, RT-only`. Mark such graph passes
@@ -209,7 +207,7 @@ frameCtx.endFrame(); // leftover forks + close/execute primary
 `PassOptions::queue` (Copy, then Compute, then Graphics) so async work can
 submit before later graphics recording. A consumer on another queue records a
 `waitWaves` edge; `execute` turns that into
-`Device::queueWaitForCommandList`. DX11 (no compute/copy queue) falls back to
+`Device::queueWaitForCommandList`. A queue the device does not support falls back to
 Graphics. After all waves, `execute` joins leftover async queues back to
 graphics unless a graphics wait inserted during the frame already covers that
 queue's latest submitted instance (extract / present still get a join whenever

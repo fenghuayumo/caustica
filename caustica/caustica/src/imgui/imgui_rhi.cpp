@@ -93,7 +93,7 @@ bool ImGui_RHI::init(caustica::rhi::Device* device, std::shared_ptr<ShaderFactor
         { "COLOR",    caustica::rhi::Format::RGBA8_UNORM, 1, 0, offsetof(ImDrawVert,col), sizeof(ImDrawVert), false },
     };
 
-    shaderAttribLayout = m_device->createInputLayout(vertexAttribLayout, sizeof(vertexAttribLayout) / sizeof(vertexAttribLayout[0]), vertexShader);
+    shaderAttribLayout = m_device->createInputLayout(vertexAttribLayout, sizeof(vertexAttribLayout) / sizeof(vertexAttribLayout[0]));
 
     // create PSO
     {

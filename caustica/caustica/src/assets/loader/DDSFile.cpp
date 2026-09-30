@@ -10,8 +10,6 @@
 #include <assets/loader/TextureLoader.h>
 #include <core/vfs/VFS.h>
 
-#define D3D11_RESOURCE_MISC_TEXTURECUBE 0x4
-
 using namespace caustica;
 using namespace caustica::dds;
 
@@ -626,7 +624,7 @@ namespace caustica
                 break;
 
             case DDS_DIMENSION_TEXTURE2D:
-                if (d3d10ext->miscFlag & D3D11_RESOURCE_MISC_TEXTURECUBE)
+                if (d3d10ext->miscFlag & DDS_RESOURCE_MISC_TEXTURECUBE)
                 {
                     textureInfo.arraySize = d3d10ext->arraySize * 6;
                     textureInfo.dimension = d3d10ext->arraySize > 1 ? caustica::rhi::TextureDimension::TextureCubeArray : caustica::rhi::TextureDimension::TextureCube;
@@ -790,7 +788,7 @@ namespace caustica
         if (textureDesc.dimension == caustica::rhi::TextureDimension::TextureCube || textureDesc.dimension == caustica::rhi::TextureDimension::TextureCubeArray)
         {
             dx10header.arraySize /= 6;
-            dx10header.miscFlag |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+            dx10header.miscFlag |= DDS_RESOURCE_MISC_TEXTURECUBE;
         }
 
         for (const FormatMapping& mapping : g_FormatMappings)

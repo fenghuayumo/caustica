@@ -1184,7 +1184,7 @@ namespace caustica::rhi::d3d12
 
         SamplerHandle createSampler(const SamplerDesc& d) override;
 
-        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, rhi::Shader* vertexShader) override;
+        InputLayoutHandle createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount) override;
 
         EventQueryHandle createEventQuery() override;
         void setEventQuery(rhi::EventQuery* query, CommandQueue queue) override;

@@ -90,4 +90,4 @@ namespace caustica::rhi
         return info;
     }
 
-} // namespace caustica::rhi::d3d11
+} // namespace caustica::rhi

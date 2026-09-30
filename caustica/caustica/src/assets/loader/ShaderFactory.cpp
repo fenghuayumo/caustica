@@ -107,7 +107,7 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticShader(StaticShader shade
     return createStaticShader(shader, pDefines, caustica::rhi::ShaderDesc().setShaderType(shaderType));
 }
 
-caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc)
+caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc)
 {
     StaticShader shader;
     switch(m_device->getGraphicsAPI())
@@ -123,9 +123,9 @@ caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShad
     return createStaticShader(shader, pDefines, desc);
 }
 
-caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType)
+caustica::rhi::ShaderHandle ShaderFactory::createStaticPlatformShader(StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType)
 {
-    return createStaticPlatformShader(dxbc, dxil, spirv, pDefines, caustica::rhi::ShaderDesc().setShaderType(shaderType));
+    return createStaticPlatformShader(dxil, spirv, pDefines, caustica::rhi::ShaderDesc().setShaderType(shaderType));
 }
 
 caustica::rhi::ShaderLibraryHandle ShaderFactory::createStaticShaderLibrary(StaticShader shader, const std::vector<ShaderMacro>* pDefines)
@@ -171,23 +171,23 @@ caustica::rhi::ShaderLibraryHandle ShaderFactory::createStaticPlatformShaderLibr
     return createStaticShaderLibrary(shader, pDefines);
 }
 
-caustica::rhi::ShaderHandle ShaderFactory::createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc)
+caustica::rhi::ShaderHandle ShaderFactory::createAutoShader(const char* fileName, const char* entryName, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, const caustica::rhi::ShaderDesc& desc)
 {
     caustica::rhi::ShaderDesc descCopy = desc;
     descCopy.entryName = entryName;
     if (descCopy.debugName.empty())
         descCopy.debugName = fileName;
 
-    caustica::rhi::ShaderHandle shader = createStaticPlatformShader(dxbc, dxil, spirv, pDefines, descCopy);
+    caustica::rhi::ShaderHandle shader = createStaticPlatformShader(dxil, spirv, pDefines, descCopy);
     if (shader)
         return shader;
 
     return createShader(fileName, entryName, pDefines, desc);
 }
 
-caustica::rhi::ShaderHandle ShaderFactory::createAutoShader(const char* fileName, const char* entryName, StaticShader dxbc, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType)
+caustica::rhi::ShaderHandle ShaderFactory::createAutoShader(const char* fileName, const char* entryName, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines, caustica::rhi::ShaderType shaderType)
 {
-    return createAutoShader(fileName, entryName, dxbc, dxil, spirv, pDefines, caustica::rhi::ShaderDesc().setShaderType(shaderType));
+    return createAutoShader(fileName, entryName, dxil, spirv, pDefines, caustica::rhi::ShaderDesc().setShaderType(shaderType));
 }
 
 caustica::rhi::ShaderLibraryHandle ShaderFactory::createAutoShaderLibrary(const char* fileName, StaticShader dxil, StaticShader spirv, const std::vector<ShaderMacro>* pDefines)

@@ -107,7 +107,7 @@ if (CAUSTICA_WITH_RHI AND NOT TARGET glfw)
 endif()
 
 if (NOT TARGET ShaderMake)
-    option(SHADERMAKE_FIND_FXC "" "${CAUSTICA_WITH_DX11}")
+    option(SHADERMAKE_FIND_FXC "" OFF)
     if (CAUSTICA_WITH_DX12 OR CAUSTICA_WITH_VULKAN)
         option(SHADERMAKE_FIND_DXC "" ON)
     else()

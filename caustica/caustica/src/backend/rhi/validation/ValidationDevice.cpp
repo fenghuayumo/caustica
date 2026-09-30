@@ -587,9 +587,9 @@ namespace caustica::rhi::validation
         return m_device->createSampler(d);
     }
 
-    InputLayoutHandle DeviceWrapper::createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount, Shader* vertexShader)
+    InputLayoutHandle DeviceWrapper::createInputLayout(const VertexAttributeDesc* d, uint32_t attributeCount)
     {
-        return m_device->createInputLayout(d, attributeCount, vertexShader);
+        return m_device->createInputLayout(d, attributeCount);
     }
 
     EventQueryHandle DeviceWrapper::createEventQuery()

@@ -82,7 +82,7 @@ namespace caustica::rhi
         virtual unsigned long Release() = 0;
         virtual unsigned long GetRefCount() = 0;
 
-        // Returns a native object or interface, for example ID3D11Device*, or nullptr if the requested interface is unavailable.
+        // Returns a native object or interface, for example ID3D12Device* or VkDevice, or nullptr if the requested interface is unavailable.
         // Does *not* AddRef the returned interface.
         virtual Object getNativeObject(ObjectType objectType) { (void)objectType; return nullptr; }
         

@@ -5,7 +5,7 @@
 namespace caustica
 {
 
-// Returns "dxil", "dxbc", or "spirv" based on the graphics API.
+// Returns "dxil" or "spirv" based on the graphics API.
 inline const char* getShaderTypeName(caustica::rhi::GraphicsAPI api)
 {
     switch (api)

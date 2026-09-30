@@ -89,8 +89,8 @@ struct PassOptions
     // Order only when a side effect cannot be expressed as a resource access.
     PassHandle after;
     // Queue for this pass. Waves are split per queue; cross-queue resource
-    // edges become queueWaitForCommandList. Falls back to Graphics when the
-    // device has no compute/copy queue (DX11).
+    // edges become queueWaitForCommandList. A queue the device does not
+    // support falls back to Graphics.
     caustica::rhi::CommandQueue queue = caustica::rhi::CommandQueue::Graphics;
 };
 

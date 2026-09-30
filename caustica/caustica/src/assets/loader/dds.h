@@ -298,7 +298,7 @@ extern DECLSPEC_SELECTANY const DDS_PIXELFORMAT DDSPF_DX10 =
 
 #define DDS_FLAGS_VOLUME 0x00200000 // DDSCAPS2_VOLUME
 
-// Subset here matches D3D10_RESOURCE_DIMENSION and D3D11_RESOURCE_DIMENSION
+// DDS resource dimension. Values match the DX10 header.
 enum DDS_RESOURCE_DIMENSION
 {
     DDS_DIMENSION_TEXTURE1D	= 2,
@@ -306,7 +306,7 @@ enum DDS_RESOURCE_DIMENSION
     DDS_DIMENSION_TEXTURE3D	= 4,
 };
 
-// Subset here matches D3D10_RESOURCE_MISC_FLAG and D3D11_RESOURCE_MISC_FLAG
+// DDS misc flags stored in DDS_HEADER_DXT10::miscFlag.
 enum DDS_RESOURCE_MISC_FLAG
 {
     DDS_RESOURCE_MISC_TEXTURECUBE = 0x4L,
@@ -339,7 +339,7 @@ struct DDS_HEADER_DXT10
 {
     DXGI_FORMAT     dxgiFormat;
     uint32_t        resourceDimension;
-    uint32_t        miscFlag; // see D3D11_RESOURCE_MISC_FLAG
+    uint32_t        miscFlag; // see DDS_RESOURCE_MISC_FLAG
     uint32_t        arraySize;
     uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
 };
