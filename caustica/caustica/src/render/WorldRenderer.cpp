@@ -80,8 +80,6 @@ namespace { constexpr int c_SwapchainCount = 3; }
 #include <render/passes/geometry/DLSS.h>
 #endif
 
-extern FPSLimiter g_FPSLimiter;
-
 using namespace caustica;
 using namespace caustica::math;
 using namespace caustica::render;
@@ -650,10 +648,6 @@ void caustica::render::WorldRenderer::prepareGaussianSplatPasses()
 
 void caustica::render::WorldRenderer::preRender()
 {
-    // Limit FPS
-    if (m_context->activeSettings().actualFPSLimiter() > 0)
-        g_FPSLimiter.framerateLimit(m_context->activeSettings().actualFPSLimiter());
-
     korgi::update();
 }
 

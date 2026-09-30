@@ -196,6 +196,10 @@ private:
     [[nodiscard]] caustica::rhi::Device* device() const { return m_context->gpuDevice.getDevice(); }
     [[nodiscard]] FrameGraphContext beginFrameGraph(RenderFrameContext& ctx);
     void runFramePipeline(RenderFrameContext& ctx);
+    void prepareFrame(RenderFrameContext& ctx);
+    void recordGraph(RenderFrameContext& ctx);
+    void submitFrame(RenderFrameContext& ctx);
+    void ensureFrameFeatures();
     void executeFrameRenderGraph(RenderFrameContext& ctx);
 
     [[nodiscard]] CameraUpdateParams makeCameraUpdateParams() const;
@@ -214,8 +218,7 @@ private:
     void framePassBeginCommandList(PathTracingFrameContext& ctx);
     void framePassSceneUpdate(PathTracingFrameContext& ctx);
     void framePassPathTracePrepare(PathTracingFrameContext& ctx);
-    void framePassPathTrace(PathTracingFrameContext& ctx);
-    void framePassDenoiseAndAA(PathTracingFrameContext& ctx);
+    void fillFrameConstants(PathTracingFrameContext& ctx);
     void framePassFinalize(PathTracingFrameContext& ctx);
     // ADR 0002 S1: map CPU feedback after graphics-queue EventQuery (not device idle).
     void mapDebugFeedbackReadback();
@@ -236,6 +239,7 @@ private:
     PathTracingContext*          m_context = nullptr;
 
     rg::GraphBuilder             m_frameGraph;
+    std::vector<FrameFeature*>   m_frameFeatures;
     rg::RenderTargetPool         m_renderTargetPool;
     rg::RenderBufferPool         m_renderBufferPool;
     RenderFrameContext           m_renderFrameCtx{};

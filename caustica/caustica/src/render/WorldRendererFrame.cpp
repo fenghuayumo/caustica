@@ -203,11 +203,15 @@ FrameGraphContext caustica::render::WorldRenderer::makeFrameGraphContext(RenderF
     return featureCtx;
 }
 
-void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
+void caustica::render::WorldRenderer::ensureFrameFeatures()
 {
-    if (ctx.frame.aborted)
-        return;
+    m_frameFeatures.clear();
+    if (m_gaussianFramePass)
+        m_frameFeatures.push_back(m_gaussianFramePass.get());
+}
 
+void caustica::render::WorldRenderer::prepareFrame(RenderFrameContext& ctx)
+{
     framePassSetup(ctx.frame);
     if (ctx.frame.aborted)
         return;
@@ -236,23 +240,30 @@ void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
     if (ctx.frame.aborted)
         return;
 
-    framePassPathTrace(ctx.frame);
-    if (ctx.frame.aborted)
-        return;
+    fillFrameConstants(ctx.frame);
 
-    framePassDenoiseAndAA(ctx.frame);
-    if (ctx.frame.aborted)
-        return;
+    ensureFrameFeatures();
+    const FramePrepareContext prepare{};
+    for (FrameFeature* feature : m_frameFeatures)
+    {
+        if (feature)
+            feature->prepare(prepare);
+    }
+}
 
+void caustica::render::WorldRenderer::recordGraph(RenderFrameContext& ctx)
+{
+    ensureFrameFeatures();
     FrameGraphContext graphContext = beginFrameGraph(ctx);
-    registerDefaultFrameGraphPasses(graphContext);
+    registerDefaultFrameGraphPasses(graphContext, m_frameFeatures);
     if (ctx.frame.aborted)
         return;
 
     executeFrameRenderGraph(ctx);
-    if (ctx.frame.aborted)
-        return;
+}
 
+void caustica::render::WorldRenderer::submitFrame(RenderFrameContext& ctx)
+{
     // Debug overlay composites AFTER the graph's final blit, directly onto the
     // presented framebuffer (editor viewport FB or swapchain). Recording it
     // earlier gets overwritten by the graph-owned tone-mapping write to ldrColor.
@@ -267,6 +278,22 @@ void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
     }
 
     framePassFinalize(ctx.frame);
+}
+
+void caustica::render::WorldRenderer::runFramePipeline(RenderFrameContext& ctx)
+{
+    if (ctx.frame.aborted)
+        return;
+
+    prepareFrame(ctx);
+    if (ctx.frame.aborted)
+        return;
+
+    recordGraph(ctx);
+    if (ctx.frame.aborted)
+        return;
+
+    submitFrame(ctx);
 }
 
 FrameGraphContext caustica::render::WorldRenderer::beginFrameGraph(RenderFrameContext& ctx)
@@ -1052,7 +1079,7 @@ void caustica::render::WorldRenderer::mergeImmediateInstancePick()
     m_frameRuntimeSnapshot.Picking.InstanceRequested = true;
 }
 
-void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext& ctx)
+void caustica::render::WorldRenderer::fillFrameConstants(PathTracingFrameContext& ctx)
 {
     // A click can arrive after this frame's Extract snapshot was captured. Merge
     // it at the last safe point before constants and ray dispatch are recorded.
@@ -1164,12 +1191,6 @@ void caustica::render::WorldRenderer::framePassPathTrace(PathTracingFrameContext
     };
 
     // FrameConstants / EnvMap / LightSampling / SubInstance / OIDN / AA are graph-owned.
-}
-
-void caustica::render::WorldRenderer::framePassDenoiseAndAA(PathTracingFrameContext& ctx)
-{
-    // Denoise / TAA / DLSS / Accumulation / ReferenceOIDN record inside the frame graph.
-    (void)ctx;
 }
 
 void caustica::render::WorldRenderer::mapDebugFeedbackReadback()
@@ -1338,7 +1359,7 @@ rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx, FrameSlots& 
     return clearFrameTargets;
 }
 
-void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
+void registerDefaultFrameGraphPasses(FrameGraphContext ctx, std::span<FrameFeature* const> features)
 {
     assert(ctx.settings);
     assert(ctx.graph);
@@ -1347,11 +1368,19 @@ void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
     FrameSlots slots{};
     seedFrameSlots(slots, ctx);
 
+    const auto registerPhase = [&](FrameGraphPhase phase) {
+        for (FrameFeature* feature : features)
+        {
+            if (feature)
+                feature->registerPasses(phase, ctx, slots);
+        }
+    };
+
     registerClearFrameTargetsPass(ctx, slots);
     registerUploadFrameConstantsPass(ctx);
     registerLightingGraphPasses(ctx);
     registerRtxdiBeginFramePass(ctx);
-    registerGaussianSplatAccelBuildPass(ctx);
+    registerPhase(FrameGraphPhase::BeforePathTrace);
     registerPathTracePrePass(ctx);
     registerVBufferExportPass(ctx);
     registerPathTraceLightingEndPass(ctx);
@@ -1359,10 +1388,12 @@ void registerDefaultFrameGraphPasses(FrameGraphContext ctx)
     registerRtxdiExecutePass(ctx);
     registerDenoiserPreparePass(ctx);
     registerNrdPass(ctx);
-    registerGaussianSplatPreAAPass(ctx, slots);
+    registerPhase(FrameGraphPhase::BeforeAntiAlias);
     registerDenoiseAAPass(ctx, slots);
+    // Tone-mapped splats composite before post. Display-referred splats composite
+    // inside post, after tone mapping and before edge detection.
     if (ctx.settings->GaussianSplatApplyToneMapping)
-        registerGaussianSplatCompositePass(ctx, slots);
+        registerPhase(FrameGraphPhase::Composite);
     registerPostProcessGraphPasses(ctx, slots);
     registerCompositeGraphPasses(ctx, slots);
     registerDebugOverlayGraphPasses(ctx, slots);

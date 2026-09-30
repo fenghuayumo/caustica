@@ -16,7 +16,8 @@ struct SceneViewState;
 struct Time;
 
 // Schedule-facing frame helpers (also registered by scene plugins).
-void beginFrameScheduled(App& app);
+void updateFpsInfo(SceneViewState& viewState, const PathTracerSettings& settings, double frameTimeSeconds);
+void updateFpsInfo(App& app, double frameTimeSeconds);
 void animate(App& app, float elapsedTimeSeconds);
 void tickSimulationAndFrameTiming(App& app, float elapsedTimeSeconds);
 void tickSimulationAndFrameTiming(

@@ -151,12 +151,12 @@ void EditorPlugin::configureLateSchedules(App& app)
 
     app.addSystem<system_label::EditorSceneHandleDroppedFiles>(AppSchedule::PostUpdate, [this](SystemContext& ctx) {
         (void)ctx;
-        // Import before Extract so PrepareRenderFrame sees the final ECS graph and
+        // Import before Extract so PublishRenderSnapshot sees the final ECS graph and
         // the render phase does not race a mid-Extract snapshot overwrite.
         m_sceneEditor.handleDroppedFiles();
     });
 
-    app.addSystemAfter<system_label::EditorScenePrepareEditorFrame, caustica::system_label::ScenePrepareRenderFrame>(
+    app.addSystemAfter<system_label::EditorScenePrepareEditorFrame, caustica::system_label::ScenePublishRenderSnapshot>(
         AppSchedule::Extract,
         [this](SystemContext& ctx) {
             if (!ctx.gpuDevice || caustica::shouldSkipRender(*m_sceneEditor.app()))

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <render/FrameFeature.h>
 #include <render/graph/GpuTypes.h>
+
+#include <span>
 
 namespace caustica::rg
 {
@@ -24,7 +27,9 @@ struct FrameSlots
 
 void seedFrameSlots(FrameSlots& slots, FrameGraphContext ctx);
 
-void registerDefaultFrameGraphPasses(FrameGraphContext ctx);
+void registerDefaultFrameGraphPasses(
+    FrameGraphContext ctx,
+    std::span<FrameFeature* const> features);
 
 rg::PassHandle registerClearFrameTargetsPass(FrameGraphContext ctx, FrameSlots& slots);
 rg::PassHandle registerUploadFrameConstantsPass(FrameGraphContext ctx);

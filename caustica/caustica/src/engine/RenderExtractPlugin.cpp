@@ -176,14 +176,6 @@ void RenderExtractPlugin::configureSchedules(App& app)
         AppSystemOrdering{}
             .runAfter<system_label::SceneExtractGaussianSplats>()
             .inSet<system_set::Extract>());
-
-    // Legacy label kept as an alias ordering anchor after publish.
-    app.addSystem<system_label::ScenePrepareRenderFrame>(
-        AppSchedule::Extract,
-        [](SystemContext&) {},
-        AppSystemOrdering{}
-            .runAfter<system_label::ScenePublishRenderSnapshot>()
-            .inSet<system_set::Extract>());
 }
 
 } // namespace caustica

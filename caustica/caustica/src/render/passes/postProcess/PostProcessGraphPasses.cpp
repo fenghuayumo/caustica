@@ -10,6 +10,7 @@
 #include <render/passes/geometry/BloomPass.h>
 #include <render/passes/lighting/distant/EnvMapProcessor.h>
 #include <render/passes/lighting/distant/ProceduralSky.h>
+#include <render/passes/gaussian/GaussianSplatFramePass.h>
 #include <render/passes/postProcess/ToneMappingPasses.h>
 #include <shaders/FrameConstantBuffer.h>
 
@@ -173,8 +174,8 @@ void registerPostProcess(FrameGraphContext ctx, FrameSlots& slots)
 
     // Preserve the photographed/display-referred Gaussian appearance while
     // keeping mesh lighting in the normal HDR tone-mapping path.
-    if (!ctx.settings->GaussianSplatApplyToneMapping)
-        (void)registerGaussianSplatCompositePass(ctx, slots);
+    if (!ctx.settings->GaussianSplatApplyToneMapping && ctx.gaussian)
+        ctx.gaussian->registerPasses(FrameGraphPhase::Composite, ctx, slots);
 
     registerEdgeDetectionGraphPasses(
         slots.ldrColor,

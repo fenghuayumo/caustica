@@ -1,6 +1,7 @@
 #include <render/passes/gaussian/GaussianSplatFramePass.h>
 
 #include <render/FrameGraphContext.h>
+#include <render/FrameGraphPasses.h>
 #include <render/PathTracingContext.h>
 #include <render/SceneGaussianSplatPasses.h>
 #include <render/core/AccelStructManager.h>
@@ -118,6 +119,25 @@ void GaussianSplatFramePass::bindFrame(const FrameGraphContext& ctx)
     m_temporalSampleIndex = ctx.gaussianSplatTemporalSampleIndex;
     m_frameTemporalReset = ctx.gaussianSplatTemporalReset;
     m_temporalReset = ctx.gaussianSplatOwnedTemporalReset;
+}
+
+void GaussianSplatFramePass::registerPasses(
+    FrameGraphPhase phase,
+    FrameGraphContext& ctx,
+    FrameSlots& slots)
+{
+    switch (phase)
+    {
+    case FrameGraphPhase::BeforePathTrace:
+        registerGaussianSplatAccelBuildPass(ctx);
+        break;
+    case FrameGraphPhase::BeforeAntiAlias:
+        registerGaussianSplatPreAAPass(ctx, slots);
+        break;
+    case FrameGraphPhase::Composite:
+        registerGaussianSplatCompositePass(ctx, slots);
+        break;
+    }
 }
 
 void GaussianSplatFramePass::prepareScenePasses(const std::shared_ptr<ShaderDebug>& shaderDebug)

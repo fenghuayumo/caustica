@@ -270,7 +270,7 @@ struct PathTracerSettings
     bool                                DebugExploreDeltaTree = false;
     bool                                ShowDebugLines = false;
     // Display/window pixels. Converted to path-trace render pixels in
-    // WorldRenderer::framePassPathTrace after this frame's renderSize is known.
+    // WorldRenderer::fillFrameConstants after this frame's renderSize is known.
     math::uint2                  DebugPixel = { 0, 0 };
     math::uint2                  MousePos = { 0, 0 };
     float                               DebugLineScale = 0.05f;

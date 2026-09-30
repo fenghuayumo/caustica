@@ -15,6 +15,7 @@
 #include <backend/GpuDevice.h>
 #include <backend/GpuSurface.h>
 #include <core/ThreadContext.h>
+#include <core/Timer.h>
 
 #include <core/task/TaskRuntime.h>
 #include <platform/window.h>
@@ -721,6 +722,15 @@ bool App::executeRenderPhase(GpuDevice* gpuDevice, double elapsedTime, double cu
         StreamlineIntegration::Get().presentStart(*gpuDevice);
     }
 #endif
+    if (const PathTracerSettings* limiterSettings = settings(*this))
+    {
+        if (limiterSettings->actualFPSLimiter() > 0)
+        {
+            static FPSLimiter presentLimiter;
+            presentLimiter.framerateLimit(limiterSettings->actualFPSLimiter());
+        }
+    }
+
     bool ok = false;
     {
         render::ScopedFrameCpuTimer presentTimer(

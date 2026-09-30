@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math/math.h>
+#include <render/FrameFeature.h>
 #include <render/passes/gaussian/GaussianSplatPass.h>
 #include <rhi/rhi.h>
 
@@ -25,9 +26,10 @@ namespace caustica::render
 class PathTracingContext;
 class SceneGaussianSplatPasses;
 struct FrameGraphContext;
+struct FrameSlots;
 
 // Per-frame Gaussian splat graph execute surface.
-class GaussianSplatFramePass
+class GaussianSplatFramePass : public FrameFeature
 {
 public:
     GaussianSplatFramePass();
@@ -50,6 +52,8 @@ public:
 
     // Sync per-frame indices / sizes from the graph context.
     void bindFrame(const FrameGraphContext& ctx);
+
+    void registerPasses(FrameGraphPhase phase, FrameGraphContext& ctx, FrameSlots& slots) override;
 
     void prepareScenePasses(const std::shared_ptr<ShaderDebug>& shaderDebug);
 

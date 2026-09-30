@@ -25,7 +25,6 @@ struct SceneResolveActiveCamera { static constexpr const char* name = "Scene.Res
 struct SceneTickSimulation { static constexpr const char* name = "Scene.TickSimulation"; };
 struct SceneUpdateWindowTitle { static constexpr const char* name = "Scene.UpdateWindowTitle"; };
 struct SceneRefreshEntityWorld { static constexpr const char* name = "Scene.RefreshEntityWorld"; };
-struct ScenePrepareRenderFrame { static constexpr const char* name = "Scene.PrepareRenderFrame"; };
 // Bevy-style Extract schedule composition (after SetRenderFrameIndex).
 struct SceneExtractCore { static constexpr const char* name = "Scene.ExtractCore"; };
 struct SceneExtractGaussianSplats { static constexpr const char* name = "Scene.ExtractGaussianSplats"; };
