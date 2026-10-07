@@ -239,7 +239,7 @@ void WriteCameraIntoComponents(Json::Value& components, const CameraComponent& c
     }
 }
 
-void WriteInspectorComponents(Json::Value& entityNode, SceneEntityWorld& world, ecs::Entity entity)
+void WriteInspectorComponents(Json::Value& entityNode, const SceneEntityWorld& world, ecs::Entity entity)
 {
     if (const DirectionalLightComponent* light = tryGetDirectionalLight(world.world(), entity))
         WriteDirectionalLight(EnsureComponent(entityNode, "DirectionalLight"), *light);
@@ -624,7 +624,7 @@ void patchEntityOverrides(
 
 void upsertAuthoredEntityNode(
     Json::Value& document,
-    SceneEntityWorld& world,
+    const SceneEntityWorld& world,
     ecs::Entity entity)
 {
     if (!ecs::isValid(entity) || entity == world.root())

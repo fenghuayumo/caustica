@@ -40,6 +40,34 @@
 
 namespace caustica
 {
+Json::Value EngineApp::inspectScene(size_t offset, size_t limit) const
+{
+    Json::Value result(Json::objectValue);
+    if (!m_valid || !m_app)
+    {
+        result["status"] = "failed";
+        result["error"]["code"] = "engine_not_initialized";
+        result["error"]["message"] = "EngineApp is not initialized";
+        return result;
+    }
+    const auto* active = tryActiveScene(app());
+    auto* world = entityWorld();
+    if (!active || !active->isValid() || !world)
+    {
+        result["status"] = "failed";
+        result["error"]["code"] = "scene_not_loaded";
+        result["error"]["message"] = "No committed scene is available";
+        return result;
+    }
+    result = scene::inspectSceneEntities(*world, offset, limit);
+    result["status"] = "completed";
+    result["scene_generation"] = Json::UInt64(active->generation);
+    result["scene_name"] = active->name;
+    result["frame_index"] = frameIndex();
+    result["loading"] = isSceneLoading();
+    return result;
+}
+
 namespace
 {
 
