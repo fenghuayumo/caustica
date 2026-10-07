@@ -54,6 +54,7 @@ python examples/python/render.py \
 | `camera_intrinsics.py` | Drive the camera from a pinhole intrinsic matrix with an off-center principal point |
 | `environment_lighting.py` | HDRI environment maps and procedural-sky presets |
 | `embedded.py` | Scripting the running editor from inside `caustica.exe` |
+| `scene_authoring.py` | Agent-ready document editing, undo/redo, save/reload, live scene inspection and GPU preview verification |
 
 Host camera API (multiple scene cameras, `look_to`, FOV, intrinsics): [caustica.md — Camera](../../caustica.md#camera).
 

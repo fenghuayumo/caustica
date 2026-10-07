@@ -2,6 +2,7 @@
 
 #include "PythonBindingsCore.h"
 #include "PythonEngineApp.h"
+#include "SceneDocumentBindings.h"
 
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
@@ -45,6 +46,7 @@
 #include <scene/SceneSemanticIds.h>
 #include <ecs/Entity.h>
 #include <core/log.h>
+#include <core/json.h>
 #include <math/math.h>
 #include <shaders/light_types.h>
 
@@ -1366,6 +1368,7 @@ nb::object sensorCameraEntity(
 
 void RegisterCoreBindings(nb::module_& m)
 {
+    RegisterSceneDocumentBindings(m);
     // --- helpers ----------------------------------------------------------
     m.def("log_info",    [](const std::string& s) { caustica::info("[py] %s", s.c_str()); },
           nb::arg("message"), "Forward a message to the host log at INFO level.");
@@ -2955,6 +2958,11 @@ void RegisterCoreBindings(nb::module_& m)
 
 void BindEngineApp(nb::class_<PyEngineApp>& cls)
 {
+    cls.def("inspect_scene", [](PyEngineApp& self, size_t offset, size_t limit) {
+        return nb::module_::import_("json").attr("loads")(
+            caustica::json::toString(self.engine().inspectScene(offset, limit)));
+    }, nb::arg("offset") = 0, nb::arg("limit") = 100,
+        "Observe the live expanded graph; runtime ids are scoped to scene_generation.");
     auto coerceWarmupFrames = [](const nb::object& value, int fallback) {
         if (value.is_none())
             return fallback;

@@ -28,6 +28,8 @@ Caelis Sim sensor/API backlog (warmup, per-camera resolution, snapshot, URDF FK)
 | `engine/SceneTransform.h` | App-based transform / visibility |
 | `engine/SceneRobot.h` | URDF visual FK (`jointNames`, `setJointPositions`, `getLinkPose`, `attachCamera`) |
 | `scene/ScenePoseAccess.h` | Entity TRS (`EntityPose`, get/set local/world). Not camera view space. |
+| `scene/SceneDocument.h` | CPU authoring document: atomic command batches, stable IDs, revision checks, undo/redo and save. [Agent authoring](agent-authoring.md). |
+| `scene/SceneInspection.h` | Paged observation of the live expanded graph; also `EngineApp::inspectScene` / Python `inspect_scene`. |
 | `engine/SceneQuery.h` | `entityWorld`, load status, `findEntity`, materials, `sceneLoadStatus`, `gameSettings` / `importedModels` / `sceneTypeFactory` |
 | `engine/ActiveScene.h` | Name/path/generation metadata only (no `Scene*` digs) |
 | `engine/MeshDeformApi.h` | Entity + MeshHandle deform / geometry sequence |

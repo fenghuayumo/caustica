@@ -24,6 +24,7 @@
 #include <engine/SceneRobot.h>
 #include <engine/SceneTransforms.h>
 #include <scene/ScenePoseAccess.h>
+#include <scene/SceneDocument.h>
 #include <engine/Time.h>
 #include <engine/EnqueueRenderCommand.h>
 #include <engine/SystemSets.h>

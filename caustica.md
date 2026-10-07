@@ -2,6 +2,12 @@
 
 C++ `caustica::EngineApp` and Python `caustica.EngineApp` are the same operations: same argument order, same units, same effects. C++ is camelCase; Python is snake_case.
 
+Agent authoring: `caustica.SceneDocument` / C++ `scene::SceneDocument` provides
+CPU-only atomic document edits, revision checks, undo/redo and save. Publish via
+`set_scene` / `setScene` explicitly; inspect the live graph with `inspect_scene`
+/ `inspectScene`. See [Agent authoring](docs/agent-authoring.md) for contracts,
+limitations and the end-to-end `examples/python/scene_authoring.py` verification.
+
 ```cpp
 #include <caustica.h>
 

@@ -39,7 +39,7 @@ void patchEntityOverrides(
 // Insert or refresh a scene-JSON entity for an authored ECS node (editor create / save).
 void upsertAuthoredEntityNode(
     Json::Value& document,
-    SceneEntityWorld& world,
+    const SceneEntityWorld& world,
     ecs::Entity entity);
 
 void removeAuthoredEntityNode(Json::Value& document, const std::string& id);

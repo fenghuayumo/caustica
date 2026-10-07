@@ -9,6 +9,7 @@
 #include <engine/EntryPoint.h>
 #include <engine/EngineSceneCallbacks.h>
 #include <engine/SceneQuery.h>
+#include <scene/SceneInspection.h>
 #include <engine/SceneSpawn.h>
 #include <engine/SceneTransform.h>
 #include <engine/SceneRobot.h>
@@ -178,6 +179,8 @@ public:
     [[nodiscard]] std::string currentSceneName() const;
     [[nodiscard]] const std::vector<std::string>& availableScenes() const;
     [[nodiscard]] scene::SceneEntityWorld* entityWorld() const;
+    // Expanded live graph, logic thread only. No implicit render or time step.
+    [[nodiscard]] Json::Value inspectScene(size_t offset = 0, size_t limit = 100) const;
     [[nodiscard]] PathTracerSettings& settings();
     [[nodiscard]] const PathTracerSettings& settings() const;
     [[nodiscard]] render::RenderAppState& renderAppState();
