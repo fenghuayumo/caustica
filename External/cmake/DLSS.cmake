@@ -27,7 +27,7 @@ set(dlss_lib_release "nvsdk_ngx_s.lib")
 set(dlss_lib_debug "nvsdk_ngx_s_dbg.lib")
 	
 if (WIN32)
-	add_library(DLSS SHARED IMPORTED)
+	add_library(DLSS SHARED IMPORTED GLOBAL)
 
 	set_target_properties(DLSS PROPERTIES
 		IMPORTED_IMPLIB "${dlss_sdk}/lib/${dlss_platform_win}/x64/${dlss_lib_release}"
@@ -42,8 +42,8 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 	add_library(DLSS STATIC IMPORTED GLOBAL)
 
 
-	# Search for the DLSS library files, because the version number is included in the filename,
-	# and we don't know which version was pulled - that's controlled by CAUSTICA_DLSS_FETCH_TAG.
+	# Search for the DLSS library files, because the version number is included in the filename
+	# and follows the External/DLSS submodule commit.
 
 	set(dlss_lib_search_path "${dlss_sdk}/lib/${dlss_platform_lin}/rel/libnvidia-ngx-dlss.so.*")
 	file(GLOB dlss_lib_files ${dlss_lib_search_path})
@@ -78,7 +78,7 @@ endif()
 # ---- DLSS RR (Ray Reconstruction) ----
 
 if (WIN32)
-	add_library(DLSS_RR SHARED IMPORTED)
+	add_library(DLSS_RR SHARED IMPORTED GLOBAL)
 
 	set_target_properties(DLSS_RR PROPERTIES
 		IMPORTED_IMPLIB "${dlss_sdk}/lib/${dlss_platform_win}/x64/${dlss_lib_release}"
@@ -92,8 +92,8 @@ if (WIN32)
 elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 	add_library(DLSS_RR STATIC IMPORTED GLOBAL)
 
-	# Search for the DLSS_RR library files, because the version number is included in the filename,
-	# and we don't know which version was pulled - that's controlled by CAUSTICA_DLSS_FETCH_TAG.
+	# Search for the DLSS_RR library files, because the version number is included in the filename
+	# and follows the External/DLSS submodule commit.
 
 	set(dlss_lib_search_path "${dlss_sdk}/lib/${dlss_platform_lin}/rel/libnvidia-ngx-dlssd.so.*")
 	file(GLOB dlss_lib_files ${dlss_lib_search_path})

@@ -51,3 +51,6 @@
 [submodule "External/PhysX"]
 	path = External/PhysX
 	url = https://github.com/NVIDIA-Omniverse/PhysX.git
+[submodule "External/DLSS"]
+	path = External/DLSS
+	url = https://github.com/NVIDIA/DLSS.git
