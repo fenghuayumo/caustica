@@ -4,6 +4,10 @@ Each script teaches one capability. Start with `render.py`, then move to the
 specialized scripts when you need that particular camera, animation, lighting,
 or Gaussian-splat workflow.
 
+For standalone geometry authoring from calibrated photographs, see
+[COLMAP to Blender fitting](../../docs/blender-geometry-fitting.md).
+The exported model then enters the separate Caustica material/lighting Scene Fit stage.
+
 Install the extension once from the repository root:
 
 ```shell
@@ -162,6 +166,10 @@ These are not executable examples:
 the script's directory on `sys.path`, so an embedded script must stand alone.
 
 ## Further reading
+
+Reproducible multiview fitting (reference projects, private candidate snapshots,
+bounded geometry/material/light search, and provider-independent JSON requests):
+[Multiview fitting](../../docs/multiview-fitting.md).
 
 Full C++ / Python API reference: [caustica.md](../../caustica.md). To inspect
 the installed module directly:
