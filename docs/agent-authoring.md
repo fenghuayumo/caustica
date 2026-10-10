@@ -1,5 +1,16 @@
 # Agent authoring foundation
 
+Current workflow: geometry authoring entirely in Blender, file export, then
+[fixed-geometry material/lighting fitting in Caustica (Chinese)](multiview-fitting.md).
+Standalone calibrated geometry runner: [COLMAP to Blender fitting (Chinese)](blender-geometry-fitting.md).
+Live [Blender scene synchronization](blender-caustica-integration-plan.md) is optional future work.
+
+Future multiview geometry/material/lighting fitting requirements and implementation
+milestones: [AI multiview reconstruction plan (Chinese)](ai-multiview-reconstruction-plan.md).
+
+Implemented reference-project evaluation and bounded parameter-search runner:
+[Multiview fitting (Chinese)](multiview-fitting.md).
+
 Caustica now exposes a CPU-only `scene::SceneDocument` / Python `SceneDocument`
 for persistent authoring and `EngineApp::inspectScene` / `inspect_scene` for
 observing the expanded live scene. Both are provider-independent: they need no
