@@ -60,16 +60,16 @@ file(WRITE "${CAUSTICA_NRD_SHADER_INCLUDE_DIR}/NRDEncoding.hlsli"
 )
 
 # MathLib headers used by denoisers/nrd CPU sources.
-include(FetchContent)
+# Vendored source: External/MathLib (NVIDIA-RTX/MathLib, tag v7).
 if(NOT TARGET MathLib)
-    FetchContent_Declare(
-        mathlib
-        GIT_REPOSITORY https://github.com/NVIDIA-RTX/MathLib.git
-        GIT_TAG v7
-        GIT_SHALLOW 1
-    )
-    message(STATUS "Caustica denoisers/nrd: fetching MathLib")
-    FetchContent_MakeAvailable(mathlib)
+    set(CAUSTICA_MATHLIB_DIR "${CMAKE_SOURCE_DIR}/External/MathLib")
+    if(NOT EXISTS "${CAUSTICA_MATHLIB_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR
+            "Bundled MathLib source is missing at ${CAUSTICA_MATHLIB_DIR}. "
+            "Restore External/MathLib from the main repository checkout.")
+    endif()
+    message(STATUS "Caustica denoisers/nrd: using bundled MathLib ${CAUSTICA_MATHLIB_DIR}")
+    add_subdirectory("${CAUSTICA_MATHLIB_DIR}" "${CMAKE_BINARY_DIR}/external/MathLib")
 endif()
 
 # ═══════════════════════════════════════════════════════════════════════════

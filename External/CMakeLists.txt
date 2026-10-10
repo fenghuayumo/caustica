@@ -184,15 +184,14 @@ if (CAUSTICA_WITH_RHI)
 endif()
 
 if (CAUSTICA_WITH_DLSS)
-    message(STATUS "Updating DLSS from " ${CAUSTICA_DLSS_FETCH_URL} ", tag " ${CAUSTICA_DLSS_FETCH_TAG} ", into folder " ${CAUSTICA_DLSS_FETCH_DIR} " - please wait!" )
-    FetchContent_Declare(
-        DLSS
-        GIT_REPOSITORY ${CAUSTICA_DLSS_FETCH_URL}
-        GIT_TAG ${CAUSTICA_DLSS_FETCH_TAG}
-        SOURCE_DIR ${CAUSTICA_DLSS_FETCH_DIR}
-    )
-    FetchContent_MakeAvailable(DLSS)
-
+    # FetchContent used to set dlss_SOURCE_DIR. The SDK is now the External/DLSS submodule.
+    set(dlss_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/DLSS")
+    if(NOT EXISTS "${dlss_SOURCE_DIR}/include/nvsdk_ngx.h")
+        message(FATAL_ERROR
+            "DLSS submodule is missing at ${dlss_SOURCE_DIR}. "
+            "Run: git submodule update --init External/DLSS")
+    endif()
+    message(STATUS "Using DLSS SDK submodule at ${dlss_SOURCE_DIR}")
     include(cmake/DLSS.cmake)
 endif()
 

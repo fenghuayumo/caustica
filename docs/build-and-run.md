@@ -14,6 +14,10 @@ Common requirements:
 - Python 3.8 or newer, including development headers, when
   `CAUSTICA_WITH_PYTHON=ON` (the default).
 
+MathLib v7 and its ARM compatibility header are bundled in `External/MathLib`
+as ordinary repository files. They require no separate download or submodule
+initialization; upstream versions and licenses are recorded in `VENDORED.md`.
+
 Windows is the primary development platform. The normal Windows configuration
 uses Visual Studio 2022, the Windows SDK, and DirectX 12. Linux and WSL use
 Vulkan only; install a C++20 compiler, Ninja, window-system headers, and a
@@ -188,7 +192,7 @@ cmake -S . -B build-linux -G Ninja \
 
 ### Optional configurations
 
-Disable native NGX DLSS (no Git fetch of the DLSS SDK, no NGX `.so` deploy):
+Disable native NGX DLSS (the SDK still comes from the `External/DLSS` submodule; this skips the NGX `.so` deploy):
 
 ```bash
 cmake -S . -B build-linux -G Ninja \
@@ -209,6 +213,8 @@ development files.
 | --- | --- |
 | `DXC for SPIR-V was not found` | Install the Vulkan SDK or pass `-DDXC_SPIRV_PATH` |
 | Empty `External/cxxopts` / missing headers | `git submodule update --init --recursive` |
+| Missing `External/DLSS` | `git submodule update --init --recursive External/DLSS` |
+| Missing `External/MathLib` | Restore the bundled source from the main repository checkout; no submodule download is needed. |
 | Asset pack warning / missing scenes | `git lfs install && git submodule update --init Assets` |
 | `recompile with -fPIC` when linking `caustica_py` | Reconfigure with Python enabled (PIC is turned on automatically) |
 | `import caustica` → undefined symbol | Rebuild `caustica_py` after a clean configure; Linux uses `--no-undefined` |

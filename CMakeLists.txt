@@ -230,9 +230,7 @@ if (CAUSTICA_WITH_NATIVE_DLSS AND NOT CAUSTICA_WITH_VULKAN)
     set(CAUSTICA_WITH_NATIVE_DLSS OFF CACHE BOOL "Enable native NVIDIA NGX DLSS integration for Vulkan builds without Streamline" FORCE)
 endif()
 set(CAUSTICA_WITH_DLSS ${CAUSTICA_WITH_NATIVE_DLSS} CACHE BOOL "Enable the NGX DLSS integration used by caustica native DLSS" FORCE)
-set(CAUSTICA_DLSS_FETCH_URL "https://github.com/NVIDIA/DLSS.git" CACHE STRING "URL of the DLSS Git repository to fetch from")
-set(CAUSTICA_DLSS_FETCH_TAG "a8ed84e2d1cc1efa7bef63fb9394be6cb06c0d74" CACHE STRING "Git commit hash or tag for DLSS")
-set(CAUSTICA_DLSS_FETCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/DLSS" CACHE STRING "Directory to fetch DLSS to, empty uses build directory default")
+# NGX SDK lives in the External/DLSS submodule (https://github.com/NVIDIA/DLSS, SDK 310.3.0).
 #----------------------------------------------------------------------------------------------------------------------
 
 #----------------------------------------------------------------------------------------------------------------------
