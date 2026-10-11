@@ -172,6 +172,13 @@ class Project:
             raise ValueError("foreground_entities must identify authored entities")
         self.resolve_assets(self.scene, self.asset_root)
         self.render = data["render"]
+        if self.render.get("denoiser", "off") not in {"off", "oidn"}:
+            raise ValueError("Unsupported render.denoiser; choose off or oidn")
+        if self.render.get("tone_map_operator", "AgX") not in {
+            "Linear", "Reinhard", "ReinhardModified", "HejiHableAlu", "HableUc2",
+            "Aces", "PbrNeutral", "IdentitySoftShoulder", "AgX", "CameraLut",
+        }:
+            raise ValueError("Unsupported render.tone_map_operator")
         for key in ("width", "height", "spp", "bounces"):
             if type(self.render[key]) is not int or self.render[key] <= 0:
                 raise ValueError(f"render.{key} must be a positive integer")

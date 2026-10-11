@@ -83,6 +83,25 @@ class SceneFitTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.project()
 
+    def test_tone_map_choice_is_validated_and_frozen(self):
+        self.assertEqual(self.project().render.get("tone_map_operator", "AgX"), "AgX")
+        self.data["render"]["tone_map_operator"] = "PbrNeutral"
+        project = self.project()
+        frozen = project.freeze(self.root / "frozen")
+        self.assertEqual(frozen.render["tone_map_operator"], "PbrNeutral")
+        self.data["render"]["tone_map_operator"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "tone_map_operator"):
+            self.project()
+
+    def test_denoiser_choice_is_validated_and_frozen(self):
+        self.assertEqual(self.project().render.get("denoiser", "off"), "off")
+        self.data["render"]["denoiser"] = "oidn"
+        frozen = self.project().freeze(self.root / "denoised-frozen")
+        self.assertEqual(frozen.render["denoiser"], "oidn")
+        self.data["render"]["denoiser"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "denoiser"):
+            self.project()
+
     def test_asset_escape_and_unknown_alias_rejected(self):
         self.data["assets"]["blue"] = "../reference.png"
         with self.assertRaises(ValueError):

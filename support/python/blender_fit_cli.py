@@ -30,6 +30,11 @@ def main():
         p.add_argument("--blender")
         p.add_argument("--max-evaluations", type=int, default=30)
         p.add_argument("--model-rounds", type=int, default=3)
+        p.add_argument("--numeric-fields", nargs="+", choices=("size", "position", "rotation", "profile"),
+                       default=["size", "position", "rotation", "profile"],
+                       help="Fields to refine, in priority order; training silhouette plus visual review when a provider is configured")
+        p.add_argument("--point-outlier-iqr", type=float, default=3.0,
+                       help="Sparse cloud outlier fence (default 3 IQR); 0 disables it for thin/disconnected objects")
     args = parser.parse_args()
     if args.command == "validate":
         data = validate_project(args.project)
@@ -46,8 +51,11 @@ def main():
     else:
         project = args.project
     state = run(project, args.output_dir, find_blender(args.blender), provider_config=args.provider_config,
-                initial_geometry=args.geometry, max_evaluations=args.max_evaluations, model_rounds=args.model_rounds)
+                initial_geometry=args.geometry, max_evaluations=args.max_evaluations, model_rounds=args.model_rounds,
+                numeric_fields=args.numeric_fields, point_outlier_iqr=args.point_outlier_iqr or None)
     print(json.dumps(state, ensure_ascii=False, indent=2))
+    if state["quality"] != "within_geometry_tolerance":
+        parser.exit(2, "Geometry acceptance pending; inspect state.json/report.html before appearance fitting.\n")
 
 
 if __name__ == "__main__":

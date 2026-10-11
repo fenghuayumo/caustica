@@ -39,7 +39,8 @@ class CausticaRenderer:
             raise TimeoutError("Scene load did not become ready")
         check_cancel()
         engine.use_camera(None)
-        engine.set_reference_mode(spp=config["spp"], oidn=False)
+        denoiser = config.get("denoiser", "off")
+        engine.set_reference_mode(spp=config["spp"], oidn=denoiser == "oidn")
         settings = engine.settings
         settings.accumulation_prewarm_realtime_caches = False
         settings.bounce_count = config["bounces"]
@@ -50,7 +51,8 @@ class CausticaRenderer:
         settings.tone_mapping_params.auto_exposure = False
         settings.tone_mapping_params.exposure_compensation = config["exposure_compensation"]
         settings.tone_mapping_params.camera_lut_enabled = False
-        settings.tone_mapping_params.tone_map_operator = caustica.ToneMapOperator.AgX
+        tone_map = config.get("tone_map_operator", "AgX")
+        settings.tone_mapping_params.tone_map_operator = getattr(caustica.ToneMapOperator, tone_map)
         # Resolve authored roots to all expanded mesh leaves, including prefab children.
         items = []
         offset = 0
@@ -141,7 +143,7 @@ class CausticaRenderer:
                                "scene_generation": generation, "frame_index": engine.frame_index,
                                "accumulation_samples": engine.accumulation_sample_index,
                                "frames": frames, "seconds": time.monotonic() - started,
-                               "camera": camera, "render": config, "denoiser": "off", "tone_map": "AgX",
+                               "camera": camera, "render": config, "denoiser": denoiser, "tone_map": tone_map,
                                "foreground_instance_ids": foreground_instance_ids,
                                "comparison_space": "display_rgb", "caustica_version": getattr(caustica, "__version__", "unknown"),
                                "adapter": str(engine.selected_adapter), "backend": "vulkan" if self.vulkan else "d3d12",

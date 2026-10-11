@@ -14,6 +14,8 @@ from PIL import Image
 from .colmap import load
 from .common import read, write, validate_geometry, vector, finite
 from .provider import Provider
+from .refinement import FIELDS, refine
+from .review import final_quality
 
 
 def find_blender(explicit=None):
@@ -26,12 +28,12 @@ def find_blender(explicit=None):
     raise ValueError("Blender not found; pass --blender or set BLENDER_EXECUTABLE")
 
 
-def render(blender, geometry, views, output, *, export=False, probe_points=None, reference_points=None, timeout=180):
+def render(blender, geometry, views, output, *, export=False, diagnostic=False, probe_points=None, reference_points=None, timeout=180):
     validate_geometry(geometry)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     write(output / "request.json", {"geometry": geometry, "views": views, "output_dir": str(output),
-                                    "export": export, "probe_points": probe_points or [],
+                                    "export": export, "diagnostic": diagnostic, "probe_points": probe_points or [],
                                     "reference_points": reference_points or []})
     command = [blender, "--background", "--factory-startup", "--threads", "4", "--python-exit-code", "1",
                "--python", str(Path(__file__).with_name("worker.py")), "--", "--request", str(output / "request.json")]
@@ -154,7 +156,9 @@ def segment(root, views, boxes):
         Image.fromarray(preview).save(root / (view["id"] + "-segmentation.png"))
 
 
-def foreground_points(points, views, root):
+def foreground_points(points, views, root, *, diagnostics=None, outlier_iqr=3.0):
+    if outlier_iqr is not None and (not np.isfinite(outlier_iqr) or outlier_iqr <= 0):
+        raise ValueError("outlier_iqr must be positive or None")
     accepted, visible = np.zeros(len(points), int), np.zeros(len(points), int)
     for view in views:
         if view["split"] != "train":
@@ -173,7 +177,22 @@ def foreground_points(points, views, root):
         mask = np.array(Image.open(root / view["mask"])) > 127
         visible += valid
         accepted[valid] += mask[v[valid], u[valid]]
-    return points[(visible >= 2) & (accepted == visible)]
+    selected = points[(visible >= 2) & (accepted == visible)]
+    raw_count = len(selected)
+    # Mask intersection alone permits distant points visible in only two
+    # cameras. A conservative fence prevents them dominating spatial evidence.
+    # Small clouds do not provide meaningful quartiles; retain them unchanged.
+    if outlier_iqr is not None and len(selected) >= 16:
+        low, high = np.quantile(selected, [0.25, 0.75], axis=0)
+        spread = np.maximum(high - low, max(float(np.max(high - low)) * 0.01, 1e-12))
+        keep = np.all((selected >= low - outlier_iqr * spread) &
+                      (selected <= high + outlier_iqr * spread), axis=1)
+        selected = selected[keep]
+    if diagnostics is not None:
+        diagnostics.update(input_points=len(points), mask_intersection_points=raw_count,
+                           retained_points=len(selected), outliers_removed=raw_count-len(selected),
+                           outlier_iqr=outlier_iqr)
+    return selected
 
 
 def score(root, output, views, split):
@@ -188,7 +207,17 @@ def score(root, output, views, split):
             raise ValueError("Rendered/reference mask size mismatch")
         union = (reference | actual).sum()
         scores[view["id"]] = float(1 - (reference & actual).sum() / max(1, union))
-    return {"loss": float(np.mean(list(scores.values()))), "views": scores}
+    return {"loss": float(np.mean(list(scores.values()))), "worst_loss": max(scores.values()), "views": scores}
+
+
+def quality(training, validation, tolerance=0.05):
+    # One bad viewpoint must not disappear in the mean of many easy views.
+    failures = [{"split": split, "view": view, "loss": loss}
+                for split, result in (("train", training), ("validation", validation))
+                for view, loss in result["views"].items() if loss > tolerance]
+    return {"status": "needs_geometry_review" if failures else "within_silhouette_tolerance",
+            "per_view_tolerance": tolerance, "failing_views": failures,
+            "scope": "silhouette only; masks and hidden surfaces require review"}
 
 
 def report(root, state, views):
@@ -199,7 +228,10 @@ def report(root, state, views):
     for v in views:
         body += ["<section><h2>" + html.escape(v["id"] + " / " + v["split"]) + "</h2>",
                  f'<img src="input/{v["image"]}"><img src="input/{v["mask"]}">',
-                 f'<img src="{best.name}/{v["id"]}.png"></section>']
+                 f'<img src="{best.name}/{v["id"]}.png">']
+        if (best / (v["id"] + "-diagnostic.png")).exists():
+            body.append(f'<img src="{best.name}/{v["id"]}-diagnostic.png">')
+        body.append("</section>")
     (root / "report.html").write_text("\n".join(body), encoding="utf-8")
 
 
@@ -249,9 +281,13 @@ def validate_project(path):
 
 
 def run(project_path, output_dir, blender, *, provider_config=None, initial_geometry=None,
-        max_evaluations=30, model_rounds=3):
+        max_evaluations=30, model_rounds=3, numeric_fields=FIELDS, point_outlier_iqr=3.0):
     if max_evaluations < 1 or model_rounds < 0:
         raise ValueError("Invalid evaluation/model budget")
+    if not numeric_fields or len(set(numeric_fields)) != len(numeric_fields) or set(numeric_fields) - set(FIELDS):
+        raise ValueError("Invalid numeric fields; choose size, position, rotation, profile")
+    if point_outlier_iqr is not None and (not np.isfinite(point_outlier_iqr) or point_outlier_iqr <= 0):
+        raise ValueError("point_outlier_iqr must be positive or None")
     project_path = Path(project_path).resolve()
     data = validate_project(project_path)
     root = Path(output_dir).resolve()
@@ -281,7 +317,9 @@ def run(project_path, output_dir, blender, *, provider_config=None, initial_geom
                         [(v["id"], source / v["image"]) for v in missing])
             write(root / "segmentation-boxes.json", boxes)
             segment(source, views, boxes)
-        selected = foreground_points(points, views, source)
+        point_diagnostics = {}
+        selected = foreground_points(points, views, source, diagnostics=point_diagnostics, outlier_iqr=point_outlier_iqr)
+        write(root / "foreground-diagnostics.json", point_diagnostics)
         np.save(root / "foreground-points.npy", selected)
         context["foreground_sparse_bounds"] = np.quantile(selected, [0.05, 0.95], axis=0).tolist() if len(selected) else None
         context["foreground_sparse_points"] = selected[np.linspace(0, len(selected)-1, min(256, len(selected)), dtype=int)].tolist() if len(selected) else []
@@ -299,9 +337,19 @@ def run(project_path, output_dir, blender, *, provider_config=None, initial_geom
     state = {"evaluations": 0, "best_loss": None, "best_directory": None, "history": [],
              "model_calls": 1 if initial_geometry is None else 0, "segmentation_calls": 1 if missing else 0,
              "foreground_points": len(selected), "status": "running"}
+    state["numeric_fields"] = list(numeric_fields)
+    state["foreground_diagnostics"] = point_diagnostics
     if provider:
         state["provider"] = {key: provider.config[key] for key in ("base_url", "model")}
     best_geometry = None
+
+    def review_candidate(candidate, directory, selected_views, name):
+        references = [(v["id"] + " reference", source / v["image"]) for v in selected_views]
+        diagnostics = [(v["id"] + " diagnostic render", directory / (v["id"] + "-diagnostic.png")) for v in selected_views]
+        state["review_calls"] = state.get("review_calls", 0) + 1
+        result = provider.review(candidate, selected_views, references + diagnostics)
+        write(directory / name, result)
+        return result
 
     def evaluate(candidate, label):
         nonlocal best_geometry
@@ -311,38 +359,35 @@ def run(project_path, output_dir, blender, *, provider_config=None, initial_geom
             return False
         directory = root / f"candidate-{state['evaluations']:04d}"
         state["evaluations"] += 1
-        render(blender, candidate, views, directory)
+        render(blender, candidate, views, directory, diagnostic=provider is not None)
         result = score(source, directory, views, "train")
-        accepted = state["best_loss"] is None or result["loss"] < state["best_loss"]
-        state["history"].append({"directory": directory.name, "label": label, "train": result, "accepted": accepted})
+        visual = review_candidate(candidate, directory, [v for v in views if v["split"] == "train"], "review-train.json") if provider else None
+        objective = result["loss"] + (0.5 * visual["loss"] if visual else 0)
+        accepted = state.get("best_objective") is None or objective < state["best_objective"]
+        state["history"].append({"directory": directory.name, "label": label, "train": result,
+                                 "visual_review": visual, "objective": objective, "accepted": accepted})
         if accepted:
             best_geometry = copy.deepcopy(candidate)
-            state.update(best_loss=result["loss"], best_directory=directory.name)
+            state.update(best_loss=result["loss"], best_objective=objective, best_review=visual, best_directory=directory.name)
             write(root / "best-geometry.json", best_geometry)
         write(root / "state.json", state)
         report(root, state, views)
-        print(f"[{state['evaluations']}/{max_evaluations}] {label}: train={result['loss']:.6f}, best={state['best_loss']:.6f}", flush=True)
+        print(f"[{state['evaluations']}/{max_evaluations}] {label}: train={result['loss']:.6f}, objective={objective:.6f}, best_objective={state['best_objective']:.6f}, accepted={accepted}", flush=True)
         return accepted
 
     try:
         evaluate(geometry, "initial")
         for round_index in range(max(1, model_rounds+1)):
-            # Numeric refinement of each part's full dimensions. Structural revisions use the model.
+            # Geometry refinement uses training renders only. Reserve model calls.
             remaining_rounds = model_rounds + 1 - round_index if provider else 1
             quota = max(0, (max_evaluations - state["evaluations"] - max(0, remaining_rounds-1)) // max(1, remaining_rounds))
-            numeric_stop = state["evaluations"] + quota
-            part_order = [(round_index + i) % len(best_geometry["parts"]) for i in range(len(best_geometry["parts"]))]
-            for pi in part_order:
-                for axis in range(3):
-                    for direction in (-1, 1):
-                        if state["evaluations"] >= numeric_stop:
-                            break
-                        candidate = copy.deepcopy(best_geometry)
-                        candidate["parts"][pi]["size"][axis] *= 1 + direction * 0.2 / (round_index+1)
-                        evaluate(candidate, f"size/{pi}/{axis}/{direction}")
+            refine(lambda: best_geometry, evaluate, quota, fields=numeric_fields, start_level=round_index)
             if provider and round_index < model_rounds and state["evaluations"] < max_evaluations:
-                context.update(best_geometry=best_geometry, training_feedback=state["history"][-7:])
-                previews = [(v["id"] + " current render", root / state["best_directory"] / (v["id"] + ".png"))
+                feedback = [{k: h[k] for k in ("label", "train", "objective", "accepted")} for h in state["history"][-7:]]
+                context.update(best_geometry=best_geometry, training_feedback=feedback,
+                               geometry_review=state["best_review"],
+                               revision_instruction="Fix failed/uncertain geometry checks using multiple reference views. Preserve correct parts; thickness and internal walls matter even at equal silhouette score.")
+                previews = [(v["id"] + " current diagnostic render", root / state["best_directory"] / (v["id"] + "-diagnostic.png"))
                             for v in views if v["split"] == "train"]
                 state["model_calls"] += 1
                 proposal = provider.propose(context, images + previews)
@@ -357,9 +402,24 @@ def run(project_path, output_dir, blender, *, provider_config=None, initial_geom
                                                   "gltf_world_transform": "(x,y,z) -> (x,z,-y)",
                                                   "meters_confirmed": data["meters_per_unit"] is not None,
                                                   "views": views})
-        handoff(root, data)
         state["status"] = "completed"
-        state["quality"] = "within_silhouette_tolerance" if max(state["best_loss"], state["validation"]["loss"]) <= 0.05 else "needs_geometry_review"
+        training = score(source, root / state["best_directory"], views, "train")
+        silhouette_quality = quality(training, state["validation"])
+        # Held-out photographs never enter proposal, numeric selection, or training review.
+        # They enter this final audit only; a failed audit cannot silently pass to appearance fitting.
+        audit = review_candidate(best_geometry, root / state["best_directory"], views, "review-final.json") if provider else None
+        state["quality_details"] = final_quality(silhouette_quality, state["best_review"], audit,
+                                                 [v["id"] for v in views if v["split"] == "validation"])
+        if audit:
+            write(root / state["best_directory"] / "review-final.json", state["quality_details"]["visual_audit"])
+        state["quality"] = state["quality_details"]["status"]
+        handoff(root, data)
+        if state["quality"] != "within_geometry_tolerance":
+            info = read(root / "export" / "handoff.json")
+            info.update(status="needs_geometry_review", quality=state["quality_details"])
+            write(root / "export" / "handoff.json", info)
+        state["numeric_evaluations_by_field"] = {field: sum(h["label"].startswith(field + "/") for h in state["history"])
+                                                 for field in numeric_fields}
     except BaseException as error:
         state.update(status="cancelled" if isinstance(error, (InterruptedError, KeyboardInterrupt)) else "failed",
                      error=str(error))
@@ -407,7 +467,7 @@ def handoff(root, data):
     project = {"schema_version": 1, "coordinates": "caustica_y_up_meters", "comparison_space": "display_rgb",
                "asset_root": "assets", "assets": {"model": "model.glb", "object_material": "object.material.json"},
                "foreground_entities": ["object"], "views": views,
-               "render": {"width": width, "height": height, "spp": 16, "bounces": 6, "timeout_seconds": 120, "exposure_compensation": 1},
+               "render": {"width": width, "height": height, "spp": 16, "bounces": 6, "denoiser": "oidn", "timeout_seconds": 120, "exposure_compensation": 1},
                "loss_weights": {"rgb": 1, "silhouette": 1},
                "scene": {"format": "caustica.scene", "version": 2, "entities": [
                    {"id": "object", "components": {"PrefabInstance": {"source": "asset:model"}, "MaterialOverride": {"source": "asset:object_material"}}},

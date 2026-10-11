@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import colorsys
 from pathlib import Path
 
 
@@ -29,6 +30,12 @@ def vector(value, n=3):
     if not isinstance(value, list) or len(value) != n:
         raise ValueError(f"Expected vector of length {n}")
     return [finite(x) for x in value]
+
+
+def diagnostic_colors(geometry):
+    """Stable part legend in linear RGB, shared by renderer and reviewer."""
+    parts = geometry["parts"]
+    return {p["name"]: list(colorsys.hsv_to_rgb(i / len(parts), 0.35, 0.65)) for i, p in enumerate(parts)}
 
 
 def validate_geometry(value):

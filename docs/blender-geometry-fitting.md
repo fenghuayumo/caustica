@@ -9,9 +9,9 @@
 COLMAP cameras/images/points3D + 参考图 + 可选前景 mask
   → 固定标定相机，复制参考输入，缩放图像与内参
   → 视觉模型提出参数化几何与物体框
-  → Blender 生成 mesh，按每个标定相机渲染
-  → 训练视角 silhouette IoU 评分，尺寸搜索与模型结构修改
-  → 保留视角独立验证
+  → Blender 生成 mesh，按标定相机渲染轮廓与有明暗的分部件诊断图
+  → 训练轮廓评分 + 逐部件视觉审查 → 数值搜索 / 模型修正 → 重渲染与审查
+  → 保留视角轮廓验证 + 独立多视角视觉验收
   → model.blend + model.glb + 相机侧车 + Scene Fit 项目
 ```
 
@@ -20,9 +20,49 @@ COLMAP cameras/images/points3D + 参考图 + 可选前景 mask
 Blender 执行允许的几何操作；模型不能返回任意 Python 脚本。
 支持组合盒体、椭球、圆柱、旋转剖面实体和开放薄壳；每次最多 32 个部件，剖面最多 64 个采样点。
 部件有位置、XYZ 欧拉角和尺寸；旋转体还有剖面与壁厚。模型可以增删部件、修改这些字段。
-程序另外执行尺寸坐标搜索，只按训练误差保留更好的候选；预算为模型修改预留评估次数。
+程序另外执行确定性的多尺度坐标搜索，按训练目标保留更好的候选；预算为模型修改预留评估次数。
+尺寸和剖面半径初始步长为 20%，位置为部件最大实际尺度的 10%，旋转为 10 度；
+每完成一轮坐标扫描，步长减半，最多六档。位置步长按旋转体的实际剖面尺寸计算。
+剖面只改半径，保留高度顺序；违反壁厚约束的候选不启动 Blender。
+同一字段和坐标轴下交错搜索各部件，避免一个部件独占预算。
+`--numeric-fields position rotation size profile` 可指定搜索顺序或只搜索部分字段。
+
+### 自动视觉审查闭环
+
+配置 `--provider-config` 后，每个候选除原始 alpha 轮廓外，还渲染 32 spp、开启降噪的
+漫反射诊断图（`view_*-diagnostic.png`）。部件使用不同颜色，中性照明随相机移动；
+这些颜色用于识别部件，不是最终材质。原始轮廓另行渲染，不用降噪图的边缘计算 IoU。
+
+视觉模型把训练参考图与诊断图对比，对每个部件返回四项结构化检查：
+形状、比例/厚度、内部边缘/壁高、接触关系。检查必须有理由、可用视角 ID、
+`pass/fail/uncertain` 和严重度；通过至少需要两个视角的证据。响应不合法最多重试三次。
+审查保存为候选目录的 `review-train.json`，结果不是自由文本聊天。
+
+候选目标为 `mean(1-IoU) + 0.5 * visual_review_loss`。
+各检查的惩罚为：通过 0，失败为严重度，无法判断为 1。
+视觉损失取惩罚均值与最大值的平均，避免一个严重问题被大量正确部件稀释。
+因此整体轮廓相同的厚度/内部结构修正也可以被接受。修正模型收到最佳候选的结构化问题与
+诊断图，在 `--model-rounds` / `--max-evaluations` 预算内自行修正和复核。
+视觉严重度是模型判断，尚未经过真实数据标定，不等于几何测量误差。
+
+保留视角照片不进入提案、数值选择或训练审查，只在最终独立请求中验收。
+每项检查还必须引用至少一个保留视角，且训练审查、最终审查和所有轮廓都通过，
+才标为 `within_geometry_tolerance`。遮挡、模型能力不足、预算耗尽后仍有问题，
+或未配置视觉模型，均标为 `needs_geometry_review`，交接状态不会是 `ready`。
+CLI 对待复核结果退出码为 2；导出文件仍保留供检查，不能用导出成功判断几何已通过。
+`state.status=completed` 仅表示执行结束，自动化应同时检查 `state.quality`。
+
+每个候选需要一次视觉审查，最后再有一次验收，另加建模/修正请求；
+预算应同时考虑 Blender 渲染时间与模型调用费用。当前审查和建模使用同一配置服务，
+尚未提供不同模型间的独立交叉验收，也没有部件级真实 mask/关键点的数值约束。
+默认 30 次评估是小预算，并不保证扫描完全部参数；`state.json` 记录各字段实际评估次数。
+多部件、多采样剖面需要增加 `--max-evaluations`，或先分阶段优化位置/旋转，再优化尺寸/剖面。
 
 点云通过训练 mask 的多视角投影过滤背景，然后提供给模型作为空间证据。
+至少 16 个候选点时额外应用 3 IQR 的空间离群点过滤；原始点云不修改，
+`foreground-diagnostics.json` 保存交集点数、保留点数和剔除数量。
+细长结构或分离的多个物体可能被统计过滤误删，可用 `--point-outlier-iqr 0` 禁用，
+或提高该值。点云过滤是初始化辅助，不能替代物体级分割和 COLMAP 观测可靠性分析。
 导出的 `.blend` 保存最多 256 个前景点作为不参与渲染的辅助 mesh，便于检查。
 稀疏点云目前不是点到曲面的损失项；反光、透明物体的稀疏点尤其不应直接视为可靠表面。
 
@@ -86,7 +126,8 @@ python support/python/blender_fit_cli.py auto `
 需要自定义划分时先 `prepare`，再修改 `project.json` 中各 view 的 `split`，最后运行 `run`。
 
 所有输出目录须尚不存在，输入快照与运行目录不能相互嵌套。
-单次调用预算结束就导出最佳候选；`state.json` 的 `quality` 明确标记是否达到训练/验证平均轮廓误差 ≤0.05。
+单次调用预算结束就导出最佳候选；`state.json` 的 `quality` 要求训练和验证的**每一个视角**轮廓误差 ≤0.05，
+不能以平均误差掩盖失败视角。`quality_details.failing_views` 列出不合格视角。
 运行完成不等于任意真实物体已经重建准确。通过创建运行目录下的 `CANCEL` 文件可以取消 Blender 迭代，
 失败和取消保留已经评估的候选、最佳几何与日志。首版不提供原地 resume；可将 `best-geometry.json`
 作为新运行的 `--geometry` 初值继续拟合。
@@ -142,8 +183,9 @@ python support/python/scene_fit_cli.py optimize build-fit/cup-run/export/scene-f
 验证命令：
 
 ```powershell
-python -m unittest discover -s support/python/tests -p test_blender_fit.py -v
+python -m unittest discover -s support/python/tests -p 'test_blender_fit*.py' -v
 python support/python/tests/blender_fit_acceptance.py --output-dir build-fit/blender-acceptance
+python support/python/tests/blender_fit_internal_geometry.py --output-dir build-fit/internal-geometry-acceptance
 
 # 额外验证 Caustica 实际导入后的多视角轮廓，需要本机扩展与 GPU。
 $env:PYTHONPATH = (Resolve-Path bin).Path
@@ -152,8 +194,52 @@ python support/python/tests/blender_fit_handoff_test.py `
 ```
 
 验收实际启动 Blender，从 COLMAP 生成多视角合成参考，验证非中心主点和非等焦距的投影，
-执行 HTTP 模型适配器（明确使用本地 mock 服务）、真实 mesh 尺寸修改、较差模型建议回退、保留视角验证与 GLB 导出。
+执行 HTTP 模型适配器（明确使用本地 mock 服务）、诊断渲染/审查、真实 mesh 尺寸修改、较差模型建议回退、保留视角验证与 GLB 导出。
+内部几何回归使用真实 Blender：三视角合并轮廓误差均为 0，但书的错误厚度 0.02 仅为真值的十分之一，
+下表面悬空而封面位置正确；模拟审查识别厚度/接触问题，修正到 0.2 的候选仍被自动接受。
+这验证审查→修正→选择→验收的程序闭环，不证明视觉模型能从真实照片识别这些问题。
 真实外部视觉模型质量需要你配置 API key 后用真实数据验证；本机没有密钥，因此不声称已验证在线建模效果。
+
+## 鲁棒性回归与当前缺口
+
+使用已核对的真实参考 mask 与参数化几何，刻意加入不等于搜索步长的位置、旋转和剖面偏差，
+验证多尺度搜索至少恢复新增训练误差的一半，同时单独记录保留视角误差：
+
+```powershell
+python support/python/tests/blender_fit_robustness.py `
+  --project build-fit/pear-tray-20261010/pear-input/project.json `
+  --geometry build-fit/pear-tray-20261010/pear-metric.json `
+  --output-dir build-fit/pear-robustness `
+  --blender D:/SoftWare/Blender/blender.exe
+```
+
+这些真实数据文件属于本地任务产物，不打包入仓库；其他数据可提供同一协议的 project/geometry。
+输入 mask 不由测试几何重新生成。对称物体中不可观测的扰动明确标为未测试，不能计作通过。
+回归测试证明给定合理初值与 mask 时的受控误差恢复，不证明任意场景的全自动重建。
+
+2026-10-10 本机真实梨回归（Blender 5.3.0 Alpha，11 个训练视角、1 个保留视角）：
+
+| 独立初始扰动 | 扰动后训练误差 | 搜索后训练误差 | 保留视角误差 | 评估次数 |
+| --- | --- | --- | --- | --- |
+| 位置偏移最大尺寸的 7.3% | 13.856% | 3.430% | 2.013% | 37 |
+| X 旋转偏移 7.3 度 | 13.744% | 3.439% | 1.955% | 37 |
+| 中间剖面半径增大 13% | 5.654% | 3.394% | 2.490% | 103 |
+
+误差为 `1 - silhouette IoU`；已核对几何的训练基准为 3.546%。上述扰动分别测试，
+尚未覆盖联合扰动和大范围错误初值。本地产物：`build-fit/pear-robustness-offstep-20261010/verification.json`。
+
+目前定位是可复核的参数化几何拟合工具，仍有以下缺口：
+
+- GrabCut 轮廓没有自动质量保证，真实场景需要核对 mask；轮廓本身错误时 IoU 也会误导。
+- 数值轮廓仍为合并 mask；新增视觉审查提供部件反馈，但还需要独立部件级 mask/特征测量作强约束。
+- 数值阶段使用 Blender 离散坐标搜索，尚未纳入这次梨任务的快速连续轮廓距离优化。
+- 稀疏点云没有读取 track 长度/重投影误差作为置信度；统计过滤不能保证表面可靠。
+- 需要更广的数据集、联合扰动与不同初值测试；当前真实回归只有梨，不能推广到任意形状。
+- 未实现原地恢复运行、几何对称性/遮挡面置信度及自动分割验收。
+- 当前单调高度的 lathe 剖面不能完整表达带底面、翻边和外壁的任意封闭托盘截面；不支持的结构应在视觉验收中失败或标为无法判断。
+
+梨、书、托盘完整首版中的书角标注、托盘边缘提取、纹理烘焙仍是任务脚本，
+不能把那次结果当作 `auto` 命令已经独立完成整个场景的证据。
 
 本机合成验收：Blender 5.2.1 LTS，COLMAP 投影最大误差 0.0000082 像素，训练误差 0.0769 → 0，
 保留视角误差 0。独立 Caustica GPU 重新载入 GLB，三个视角轮廓 IoU 分别为 0.9744、0.9744、0.9718。
