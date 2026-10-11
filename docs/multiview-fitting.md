@@ -34,7 +34,7 @@ Caustica 导入后先检查参考投影；若轮廓不对，检查相机/坐标�
 ## 已实现与边界
 
 - 校验版本化参考项目、相机 look-to/内参、图像尺寸、前景 mask、参数范围和资源依赖。
-- 固定相机、曝光、AgX、无降噪参考模式，串行渲染多个视角，保存 RGB、实例前景 mask、深度和线性 RGB。
+- 固定相机、曝光与色调映射（默认 AgX）、无降噪参考模式，串行渲染多个视角，保存 RGB、实例前景 mask、深度和线性 RGB。
 - 使用训练视角的前景区域 RGB MAE、轮廓 IoU 和可选深度误差选择最佳候选。
 - 默认按 material/lighting 分组运行受约束坐标搜索，geometry 可显式启用；支持预算、取消与从最佳候选继续。
 - 每个候选拥有私有场景、材质和资产目录；恢复/导出覆盖外部材质文件，不依赖 SceneDocument.undo。
@@ -98,7 +98,7 @@ python support/python/tests/scene_fit_gpu_test.py --include-geometry `
 | assets | alias → asset_root 内的相对文件路径 |
 | foreground_entities | 场景顶层 authored ID 列表，包含这些节点下展开的所有 mesh leaves |
 | scene | 已解析的普通 entities[] 场景，不接受 base/overrides |
-| render | width、height、spp、bounces、timeout_seconds、exposure_compensation |
+| render | width、height、spp、bounces、timeout_seconds、exposure_compensation；可选 tone_map_operator（默认 AgX，例如 PbrNeutral）、denoiser（off / oidn，兼容旧项目默认 off） |
 | parameters | 名称、组、单位、初始值、边界、搜索步长和 binding |
 | views | 相机、参考图、mask、可选 depth，以及 train/validation 分组 |
 | loss_weights | rgb、silhouette、depth；非负，至少一个正值 |

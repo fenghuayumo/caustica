@@ -66,12 +66,26 @@ def main():
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
     calls = []
+    proposal_calls = []
     class MockModel(BaseHTTPRequestHandler):
         def do_POST(self):
             payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             calls.append(payload)
-            proposal = initial if len(calls) == 1 else {"parts": [dict(initial["parts"][0], size=[2,2,2])]}
-            response = json.dumps({"choices":[{"message":{"content":json.dumps({"geometry":proposal,"boxes":{}})}}]}).encode()
+            prompt = payload["messages"][0]["content"][0]["text"]
+            if prompt.startswith("GEOMETRY_REVIEW:"):
+                from blender_fit.review import CRITERIA
+                context = json.loads(prompt.split("\n")[-1])
+                size = context["geometry"]["parts"][0]["size"]
+                severity = min(1, max(abs(s-1) for s in size))
+                answer = {"checks": [{"part":"object", "criterion":c,
+                            "status":"pass" if severity < 1e-6 else "fail",
+                            "severity":0 if severity < 1e-6 else severity,
+                            "views":[v["id"] for v in context["views"]], "reason":"Mock geometric comparison"} for c in CRITERIA]}
+            else:
+                proposal_calls.append(payload)
+                proposal = initial if len(proposal_calls) == 1 else {"parts": [dict(initial["parts"][0], size=[2,2,2])]}
+                answer = {"geometry":proposal,"boxes":{}}
+            response = json.dumps({"choices":[{"message":{"content":json.dumps(answer)}}]}).encode()
             self.send_response(200)
             self.end_headers()
             self.wfile.write(response)
@@ -89,10 +103,14 @@ def main():
         server.shutdown()
         server.server_close()
         os.environ.pop("BLENDER_FIT_TEST_KEY", None)
-    assert len(calls) == 2 and state["model_calls"] == 2
+    assert len(proposal_calls) == 2 and state["model_calls"] == 2
+    assert state["review_calls"] == state["evaluations"] + 1
     revisions = [item for item in state["history"] if item["label"] == "model-revision"]
     assert len(revisions) == 1 and not revisions[0]["accepted"]
-    assert all("view_3" not in json.dumps(payload) for payload in calls), "Validation view leaked into geometry model"
+    assert all("view_3" not in json.dumps(payload) for payload in calls[:-1]), "Validation view leaked into geometry selection"
+    assert "view_3" in json.dumps(calls[-1]), "Final audit did not inspect held-out reference"
+    assert state["quality"] == "within_geometry_tolerance", state
+    assert (root / "run" / state["best_directory"] / "view_1-diagnostic.png").is_file()
     baseline = state["history"][0]["train"]["loss"]
     assert state["best_loss"] < baseline * 0.1, state
     assert state["validation"]["loss"] < 0.01, state

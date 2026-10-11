@@ -9,7 +9,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from blender_fit.common import read, write, validate_geometry
+from blender_fit.common import read, write, validate_geometry, diagnostic_colors
 
 
 def build(geometry):
@@ -111,6 +111,22 @@ def main():
     scene.render.image_settings.color_mode = "RGBA"
     scene.view_settings.view_transform = "Standard"
     projections = {}
+    diagnostic_materials = []
+    if request.get("diagnostic"):
+        # Distinct diffuse colors expose internal boundaries without fitting appearance.
+        palette = diagnostic_colors(request["geometry"])
+        for mesh_object in objects:
+            mat = bpy.data.materials.new("Diagnostic_" + mesh_object.name)
+            mat.use_nodes = True
+            shader = mat.node_tree.nodes.get("Principled BSDF")
+            shader.inputs["Base Color"].default_value = (*palette[mesh_object.name], 1)
+            shader.inputs["Roughness"].default_value = 1
+            shader.inputs["Specular IOR Level"].default_value = 0
+            diagnostic_materials.append(mat)
+        scene.world.use_nodes = True
+        scene.world.node_tree.nodes.get("Background").inputs["Strength"].default_value = 0.35
+        bpy.ops.object.light_add(type="AREA")
+        diagnostic_light = bpy.context.object
     from bpy_extras.object_utils import world_to_camera_view
     for view in request["views"]:
         obj = camera(view)
@@ -121,7 +137,32 @@ def main():
             projections[view["id"]].append([uv.x * view["width"], (1-uv.y) * view["height"], uv.z])
         scene.render.filepath = str(root / (view["id"] + ".png"))
         bpy.ops.render.render(write_still=True)
+        if request.get("diagnostic"):
+            for mesh_object, mat in zip(objects, diagnostic_materials):
+                mesh_object.data.materials[0] = mat
+            # Camera-relative key light, sized and powered in scene units.
+            centers = [o.location for o in objects]
+            center = sum(centers, Vector()) / len(centers)
+            extent = max((o.location - center).length + max(o.dimensions) for o in objects)
+            extent = max(extent, 1e-6)
+            right = Vector(view["camera"]["direction"]).cross(Vector(view["camera"]["up"])).normalized()
+            diagnostic_light.location = obj.location + right * extent + Vector(view["camera"]["up"]).normalized() * extent
+            diagnostic_light.rotation_euler = (center - diagnostic_light.location).to_track_quat("-Z", "Y").to_euler()
+            diagnostic_light.data.energy = 3 * (diagnostic_light.location - center).length_squared
+            diagnostic_light.data.size = extent
+            scene.cycles.samples = 32
+            scene.cycles.use_denoising = True
+            scene.render.filepath = str(root / (view["id"] + "-diagnostic.png"))
+            bpy.ops.render.render(write_still=True)
+            for mesh_object in objects:
+                mesh_object.data.materials[0] = bpy.data.materials["GeometryPreview"]
+            scene.cycles.samples = 1
+            scene.cycles.use_denoising = False
+    if request.get("diagnostic"):
+        bpy.data.objects.remove(diagnostic_light, do_unlink=True)
     if request.get("export", False):
+        scene.cycles.samples = 128
+        scene.cycles.use_denoising = True
         if request.get("reference_points"):
             cloud = bpy.data.meshes.new("SparseForegroundPoints")
             cloud.from_pydata(request["reference_points"], [], [])
