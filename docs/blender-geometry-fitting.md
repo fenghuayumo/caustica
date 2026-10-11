@@ -158,3 +158,10 @@ python support/python/tests/blender_fit_handoff_test.py `
 本机合成验收：Blender 5.2.1 LTS，COLMAP 投影最大误差 0.0000082 像素，训练误差 0.0769 → 0，
 保留视角误差 0。独立 Caustica GPU 重新载入 GLB，三个视角轮廓 IoU 分别为 0.9744、0.9744、0.9718。
 Blender alpha 与 Caustica 光线采样的边缘像素存在差异，这些数字只证明测试场景的交接投影一致。
+
+## 配准纹理阶段
+
+几何确认后可使用独立入口 `support/python/texture_fit_cli.py` 导出网格、
+进行水果 UV 配准拼接和书的按面配准，再微调接缝并应用到 Blender。
+流程记录逐物体遮挡、照片来源、补全区域及输入指纹；应用前核对几何和 UV。
+详见 [配准纹理工作流](registered-texture-fitting.md)。该阶段尚未由 `auto` 自动调用。
