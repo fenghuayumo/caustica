@@ -18,6 +18,7 @@ using namespace caustica::math;
 
 #include <cassert>
 #include <mutex>
+#include <unordered_map>
 
 using namespace caustica;
 using namespace caustica::render;
@@ -55,18 +56,24 @@ struct MipMapGenPass::NullTextures {
 
     static std::shared_ptr<NullTextures> get(caustica::rhi::DeviceHandle device)
     {
+        // Cache per device, not per process: with more than one live GpuDevice
+        // (e.g. two Python EngineApps) a process-wide singleton would hand
+        // textures owned by device A to passes on device B, and whichever
+        // device dies first leaves the survivor freeing images through a dead
+        // vkDevice handle.
         static std::mutex _mutex;
-        static std::weak_ptr<NullTextures> _nullTextures;
+        static std::unordered_map<caustica::rhi::Device*, std::weak_ptr<NullTextures>> _nullTextures;
 
         std::lock_guard<std::mutex> lock(_mutex);
 
-        std::shared_ptr<NullTextures> result = _nullTextures.lock();
+        auto& slot = _nullTextures[device.Get()];
+        std::shared_ptr<NullTextures> result = slot.lock();
         if (!result)
         {
             result = std::make_shared<NullTextures>();
             for (int i = 0; i < NUM_LODS; ++i)
                 result->lod[i] = createNullTexture(device);
-            _nullTextures = result;
+            slot = result;
         }
         return result;
     }
