@@ -59,7 +59,9 @@ bool uiCapturesMouseForEditor(const SceneEditor& sceneEditor)
         && !vp.OverlayHovered && vp.WindowHovered)
         return false;
 
-    if (!ImGui::GetIO().WantCaptureMouse)
+    // Headless runs (--noWindow) never build ImGui UI; no context means the
+    // editor can never hold the mouse.
+    if (!ImGui::GetCurrentContext() || !ImGui::GetIO().WantCaptureMouse)
         return false;
     return true;
 }
@@ -91,7 +93,8 @@ bool cursorInViewportForCamera(const SceneEditor& sceneEditor)
 bool gizmoCapturesInput(const SceneEditor& sceneEditor)
 {
     // Alt+LMB is camera look; gizmos must not swallow that chord.
-    if (ImGui::GetIO().KeyAlt)
+    // Without an ImGui context (headless) there is no keyboard state to check.
+    if (!ImGui::GetCurrentContext() || ImGui::GetIO().KeyAlt)
         return false;
 
     const auto& editor = sceneEditor.editorUIState();

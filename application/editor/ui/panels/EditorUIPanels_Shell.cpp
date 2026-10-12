@@ -136,7 +136,7 @@ void EditorUI::BuildViewportAOVSelector(const ImVec2& origin, float height)
         ICON_MS_LAYERS,
         currentLabel,
         ICON_MS_ARROW_DROP_DOWN);
-    char label[96];
+    char label[128];
     std::snprintf(label, sizeof(label), "%s##ViewportViewMode", visible);
 
     const ImVec2 textSize = ImGui::CalcTextSize(visible);
