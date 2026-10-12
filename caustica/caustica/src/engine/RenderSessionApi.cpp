@@ -171,7 +171,10 @@ bool accumulationCompleted(const App& app)
 std::string fpsInfo(const App& app)
 {
     if (SceneViewState* vs = viewState(app))
+    {
+        std::lock_guard lock(vs->fpsInfoMutex);
         return vs->fpsInfo;
+    }
     return {};
 }
 

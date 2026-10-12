@@ -48,14 +48,18 @@ void updateFpsInfo(
             presentedFrames = 1u + settings.DLSSFGNumFramesToGenerate;
 
         // Fixed-width fields avoid ImGui layout flicker in narrow docks.
-        viewState.fpsInfo = stringFormat("%6.2f ms/%u-frames* (%5.1f FPS*) *DLSS-G",
+        const std::string formatted = stringFormat("%6.2f ms/%u-frames* (%5.1f FPS*) *DLSS-G",
             frameTimeSeconds * 1e3, presentedFrames, presentedFrames / frameTimeSeconds);
+        std::lock_guard lock(viewState.fpsInfoMutex);
+        viewState.fpsInfo = std::move(formatted);
         return;
     }
 #endif
 
-    viewState.fpsInfo = stringFormat(
+    const std::string formatted = stringFormat(
         "%6.2f ms/frame (%5.1f FPS)", frameTimeSeconds * 1e3, 1.0 / frameTimeSeconds);
+    std::lock_guard lock(viewState.fpsInfoMutex);
+    viewState.fpsInfo = std::move(formatted);
 }
 
 void updateFpsInfo(App& app, double frameTimeSeconds)

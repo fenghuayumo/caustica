@@ -29,7 +29,10 @@ struct SceneViewState
 
     std::map<Handle<ImageAsset>, TextureCompressionType> uncompressedTextures;
 
+    // Written every frame on the render thread (updateFpsInfo), read by the
+    // editor UI / host on the logic thread (fpsInfo()); guard the std::string.
     std::string fpsInfo;
+    mutable std::mutex fpsInfoMutex;
 
     ProgressBar progressLoading;
 
