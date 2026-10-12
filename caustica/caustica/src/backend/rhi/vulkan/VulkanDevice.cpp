@@ -47,19 +47,21 @@ namespace caustica::rhi::vulkan
         m_context.deferredDeletion = &m_deferredDeletion;
         m_context.parentDevice = this;
 
-        if (desc.graphicsQueue)
+        // A negative family index would reach vkCreateCommandPool as 0xFFFFFFFF and
+        // crash the driver at vkAllocateCommandBuffers time; treat it as "no queue".
+        if (desc.graphicsQueue && desc.graphicsQueueIndex >= 0)
         {
             m_queues[uint32_t(CommandQueue::Graphics)] = std::make_unique<Queue>(m_context,
                 CommandQueue::Graphics, desc.graphicsQueue, desc.graphicsQueueIndex);
         }
 
-        if (desc.computeQueue)
+        if (desc.computeQueue && desc.computeQueueIndex >= 0)
         {
             m_queues[uint32_t(CommandQueue::Compute)] = std::make_unique<Queue>(m_context,
                 CommandQueue::Compute, desc.computeQueue, desc.computeQueueIndex);
         }
 
-        if (desc.transferQueue)
+        if (desc.transferQueue && desc.transferQueueIndex >= 0)
         {
             m_queues[uint32_t(CommandQueue::Copy)] = std::make_unique<Queue>(m_context,
                 CommandQueue::Copy, desc.transferQueue, desc.transferQueueIndex);

@@ -21,16 +21,16 @@ namespace caustica::rhi::vulkan
     {
         MessageCallback* errorCB = nullptr;
 
-        VkInstance instance;
-        VkPhysicalDevice physicalDevice;
-        VkDevice device;
+        VkInstance instance = VK_NULL_HANDLE;
+        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+        VkDevice device = VK_NULL_HANDLE;
 
         // any of the queues can be null if this context doesn't intend to use them
-        VkQueue graphicsQueue;
+        VkQueue graphicsQueue = VK_NULL_HANDLE;
         int graphicsQueueIndex = -1;
-        VkQueue transferQueue;
+        VkQueue transferQueue = VK_NULL_HANDLE;
         int transferQueueIndex = -1;
-        VkQueue computeQueue;
+        VkQueue computeQueue = VK_NULL_HANDLE;
         int computeQueueIndex = -1;
 
         VkAllocationCallbacks *allocationCallbacks = nullptr;
