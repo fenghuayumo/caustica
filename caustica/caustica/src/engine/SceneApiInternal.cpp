@@ -9,6 +9,8 @@
 #include <engine/LoadSession.h>
 #include <core/PathUtils.h>
 #include <core/log.h>
+#include <algorithm>
+#include <cctype>
 #include <cstdarg>
 #include <chrono>
 #include <cstdio>
@@ -25,6 +27,17 @@
 
 namespace caustica::detail
 {
+
+namespace
+{
+    bool LooksLikeInlineSceneJson(const std::string& scene)
+    {
+        auto it = std::find_if_not(scene.begin(), scene.end(), [](unsigned char ch) {
+            return std::isspace(ch);
+        });
+        return it != scene.end() && *it == '{';
+    }
+} // namespace
 
 void sceneSwitchTrace(const char* fmt, ...)
 {
@@ -69,8 +82,15 @@ void retargetAssetPackForSceneRequest(App& app, const std::string& sceneName)
     if (sceneName.empty())
         return;
 
+    // Inline scene JSON (New Scene, Python host) is content, not a path; there is
+    // no pack to retarget. Must not reach filesystem calls: a JSON document as a
+    // path is longer than PATH_MAX and the throwing overloads would abort.
+    if (LooksLikeInlineSceneJson(sceneName))
+        return;
+
     std::filesystem::path scenePath(sceneName);
-    if (!scenePath.is_absolute() && !std::filesystem::exists(scenePath))
+    std::error_code existsEc;
+    if (!scenePath.is_absolute() && !std::filesystem::exists(scenePath, existsEc))
         return;
 
     std::error_code ec;

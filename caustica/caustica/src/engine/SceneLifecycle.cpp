@@ -202,7 +202,8 @@ void initializeScene(App& app, const std::string& preferredScene)
     else
     {
         std::filesystem::path preferredScenePath(preferredScene);
-        sceneArg = (!preferredScene.empty() && (preferredScenePath.is_absolute() || std::filesystem::exists(preferredScenePath)))
+        std::error_code existsEc;
+        sceneArg = (!preferredScene.empty() && (preferredScenePath.is_absolute() || std::filesystem::exists(preferredScenePath, existsEc)))
             ? preferredScene
             : findPreferredScene(manager->getAvailableScenes(), preferredScene);
     }

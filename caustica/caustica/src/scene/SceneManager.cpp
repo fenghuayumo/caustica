@@ -135,14 +135,17 @@ SceneManager::ResolvedScenePath SceneManager::resolveScenePath(
         return result;
     }
 
-    if (std::filesystem::exists(scenePath))
+    // error_code overloads: a caller-supplied string that is not a legal path
+    // (too long, embedded NULs replaced, ...) must not throw out of here.
+    std::error_code existsEc;
+    if (std::filesystem::exists(scenePath, existsEc))
     {
         result.path = canonicalAssetPath(scenePath);
         return result;
     }
 
     auto tryExisting = [&](const std::filesystem::path& candidate) -> bool {
-        if (candidate.empty() || !std::filesystem::exists(candidate))
+        if (candidate.empty() || !std::filesystem::exists(candidate, existsEc))
             return false;
         result.path = canonicalAssetPath(candidate);
         return true;
