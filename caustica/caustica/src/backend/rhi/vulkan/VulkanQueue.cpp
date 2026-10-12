@@ -278,7 +278,17 @@ namespace caustica::rhi::vulkan
 
     uint64_t Queue::updateLastFinishedID()
     {
-        m_lastFinishedID = m_context.device.getSemaphoreCounterValue(trackingSemaphore);
+        try
+        {
+            m_lastFinishedID = m_context.device.getSemaphoreCounterValue(trackingSemaphore);
+        }
+        catch (const vk::DeviceLostError&)
+        {
+            // A lost device must not abort the host through an uncaught vulkan-hpp
+            // exception; pollers keep the last known counter and callers see the
+            // loss through the same path as submit() ("Device Removed!").
+            m_context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
+        }
 
         return m_lastFinishedID;
     }
@@ -401,7 +411,16 @@ namespace caustica::rhi::vulkan
             .setSemaphores(semaphores)
             .setValues(waitValues);
 
-        vk::Result result = m_context.device.waitSemaphores(waitInfo, timeout);
+        vk::Result result;
+        try
+        {
+            result = m_context.device.waitSemaphores(waitInfo, timeout);
+        }
+        catch (const vk::DeviceLostError&)
+        {
+            m_context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
+            return false;
+        }
 
         return (result == vk::Result::eSuccess);
     }
