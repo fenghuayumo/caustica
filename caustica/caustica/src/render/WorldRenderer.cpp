@@ -294,7 +294,10 @@ void caustica::render::WorldRenderer::createDeviceResources()
     createGraphScratchFallbacks();
 
 #if CAUSTICA_WITH_NATIVE_DLSS
-    m_nativeDLSS = caustica::render::DLSS::create(device, *m_context->shaderFactory, caustica::getDirectoryWithExecutable().string());
+    // Python host: the runtime override points at the extension module directory
+    // (wheel layout); native builds fall back to the executable directory. Passing
+    // the python executable's directory here made NGX report FeatureNotFound.
+    m_nativeDLSS = caustica::render::DLSS::create(device, *m_context->shaderFactory, caustica::getRuntimeDirectory().string());
     if (m_nativeDLSS)
     {
         m_context->activeSettings().IsDLSSSuported = m_nativeDLSS->isDlssSupported();
