@@ -234,24 +234,48 @@ namespace
 
     struct PyScene
     {
-        std::shared_ptr<Scene> scene;
+        // Weak on purpose: a strong shared_ptr<Scene> kept the scene (and its
+        // TextureLoader / descriptor tables) alive past vkDestroyDevice when a
+        // Python holder was released at interpreter shutdown — teardown then
+        // destroyed Vulkan objects through a dead device handle and segfaulted.
+        std::weak_ptr<Scene> scene;
         std::shared_ptr<caustica_py::PyEngineAppContext> owner;
+
+        [[nodiscard]] std::shared_ptr<Scene> resolveScene() const
+        {
+            if (!owner || !owner->engine || !owner->engine->isValid())
+                return nullptr;
+            const std::shared_ptr<Scene> active = caustica::activeScene(owner->engine->app());
+            const std::shared_ptr<Scene> mine = scene.lock();
+            if (!active || !mine || active.get() != mine.get())
+                return nullptr;
+            return active;
+        }
     };
 
     struct PySceneEntity
     {
-        std::shared_ptr<Scene> scene;
+        std::weak_ptr<Scene> scene;
         std::shared_ptr<caustica_py::PyEngineAppContext> owner;
         ecs::Entity entity = ecs::NullEntity;
 
+        [[nodiscard]] std::shared_ptr<Scene> resolveScene() const
+        {
+            if (!owner || !owner->engine || !owner->engine->isValid())
+                return nullptr;
+            const std::shared_ptr<Scene> active = caustica::activeScene(owner->engine->app());
+            const std::shared_ptr<Scene> mine = scene.lock();
+            if (!active || !mine || active.get() != mine.get())
+                return nullptr;
+            return active;
+        }
+
         [[nodiscard]] bool isUsable() const
         {
-            if (!scene || !owner || !owner->engine || !owner->engine->isValid())
+            const std::shared_ptr<Scene> active = resolveScene();
+            if (!active)
                 return false;
-            const std::shared_ptr<Scene> active = caustica::activeScene(owner->engine->app());
-            if (!active || active.get() != scene.get())
-                return false;
-            const scene::SceneEntityWorld* world = scene->getEntityWorld();
+            const scene::SceneEntityWorld* world = active->getEntityWorld();
             return world && world->world().isAlive(entity);
         }
 
@@ -262,7 +286,8 @@ namespace
 
         [[nodiscard]] scene::SceneEntityWorld* entityWorld() const
         {
-            return isUsable() ? scene->getEntityWorld() : nullptr;
+            const std::shared_ptr<Scene> active = isUsable() ? resolveScene() : nullptr;
+            return active ? active->getEntityWorld() : nullptr;
         }
     };
 
@@ -1926,7 +1951,7 @@ void RegisterCoreBindings(nb::module_& m)
                 const auto* parent = entityWorld->world().tryGet<scene::ParentComponent>(self.entity);
                 if (!parent || !ecs::isValid(parent->parent) || parent->parent == entityWorld->root())
                     return nb::none();
-                auto pyParent = PyEntityFromEntity(self.scene, self.owner, parent->parent);
+                auto pyParent = PyEntityFromEntity(self.resolveScene(), self.owner, parent->parent);
                 if (!pyParent)
                     return nb::none();
                 return nb::cast(pyParent);
@@ -1934,7 +1959,7 @@ void RegisterCoreBindings(nb::module_& m)
             "Parent SceneEntity, or None when attached to the scene root / world.")
         .def("set_parent",
             [](PySceneEntity& self, nb::object parent) {
-                const ecs::Entity parentEntity = ResolveParentEntity(self.scene, self.owner, parent);
+                const ecs::Entity parentEntity = ResolveParentEntity(self.resolveScene(), self.owner, parent);
                 if (!setParent(RequireEntityApp(self), self.entity, parentEntity))
                     throw std::runtime_error("set_parent failed");
             },
@@ -2369,7 +2394,7 @@ void RegisterCoreBindings(nb::module_& m)
                     app, self.entity, name, link, pose.position, pose.rotation);
                 if (!ecs::isValid(camera))
                     throw std::runtime_error("attach_camera failed for link '" + link + "'");
-                return PyEntityFromEntity(self.scene, self.owner, camera);
+                return PyEntityFromEntity(self.resolveScene(), self.owner, camera);
             },
             nb::arg("name"),
             nb::arg("link"),
@@ -2557,74 +2582,74 @@ void RegisterCoreBindings(nb::module_& m)
         "Loaded caustica scene. Materials, lights, and SceneEntity lookup live here.\n"
         "Prefer Sample.find_entity / get_mesh_entities over digging engine MeshInfo.")
         .def("get_materials", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get(), self.owner);
+                return GetSceneMaterials(self.resolveScene().get(), self.owner);
             }, "Return every StandardMaterial in this scene.")
 
         .def("find_material", [](PyScene& self, const std::string& name) {
-                return FindSceneMaterial(self.scene.get(), self.owner, name);
+                return FindSceneMaterial(self.resolveScene().get(), self.owner, name);
             }, nb::arg("name"), "Look up a material by Name or uniqueName.")
 
         .def("find_material_by_id", [](PyScene& self, int materialId) {
-                return FindSceneMaterialById(self.scene.get(), self.owner, materialId);
+                return FindSceneMaterialById(self.resolveScene().get(), self.owner, materialId);
             }, nb::arg("material_id"),
             "Look up by gpuDataIndex only. Prefer EngineApp.find_material (cache-backed).")
 
         .def("get_lights", [](PyScene& self) {
-                return GetSceneLights(self.scene, self.owner);
+                return GetSceneLights(self.resolveScene(), self.owner);
             }, "Return every light entity as SceneEntity.")
 
         .def("find_light", [](PyScene& self, const std::string& name) {
-                return FindSceneLight(self.scene, self.owner, name);
+                return FindSceneLight(self.resolveScene(), self.owner, name);
             }, nb::arg("name"), "Look up a light entity by name; returns SceneEntity or None.")
         .def("get_cameras", [](PyScene& self) {
-                return GetSceneCameras(self.scene, self.owner);
+                return GetSceneCameras(self.resolveScene(), self.owner);
             }, "Return every camera entity as SceneEntity.")
         .def("find_camera", [](PyScene& self, const std::string& name) {
-                return FindSceneCamera(self.scene, self.owner, name);
+                return FindSceneCamera(self.resolveScene(), self.owner, name);
             }, nb::arg("name"), "Look up a camera entity by name; returns SceneEntity or None.")
         .def("find_entity", [](PyScene& self, const std::string& path) {
-                return FindSceneEntity(self.scene, self.owner, path);
+                return FindSceneEntity(self.resolveScene(), self.owner, path);
             }, nb::arg("path"), "Look up a scene entity by name or path.")
         .def("get_mesh_entities", [](PyScene& self) {
-                return GetSceneMeshEntities(self.scene, self.owner);
+                return GetSceneMeshEntities(self.resolveScene(), self.owner);
             }, "Return every mesh-instance entity as SceneEntity.")
         .def("find_mesh_entity", [](PyScene& self, const std::string& name) {
-                return FindSceneMeshEntity(self.scene, self.owner, name);
+                return FindSceneMeshEntity(self.resolveScene(), self.owner, name);
             }, nb::arg("name"),
             "Look up a mesh-instance entity by MeshInfo name or entity name.")
 
         .def_prop_ro("material_count", [](PyScene& self) {
-                return GetSceneMaterials(self.scene.get(), self.owner).size();
+                return GetSceneMaterials(self.resolveScene().get(), self.owner).size();
             }, "Number of StandardMaterial instances in this scene.")
         .def_prop_ro("mesh_count", [](PyScene& self) {
-                return self.scene ? self.scene->getMeshes().size() : 0;
+                return self.resolveScene() ? self.resolveScene()->getMeshes().size() : 0;
             }, "Number of meshes in this scene.")
         .def_prop_ro("light_count", [](PyScene& self) {
-                return self.scene ? self.scene->getLightEntities().size() : 0;
+                return self.resolveScene() ? self.resolveScene()->getLightEntities().size() : 0;
             }, "Number of lights in this scene.")
         .def_prop_ro("camera_count", [](PyScene& self) {
-                return self.scene ? self.scene->getCameraEntities().size() : 0;
+                return self.resolveScene() ? self.resolveScene()->getCameraEntities().size() : 0;
             }, "Number of camera entities in this scene (does not include the free / controller camera).")
 
         .def_prop_ro("bounds", [](PyScene& self) {
-                return SceneBoundsTuple(SceneBoundsFromScene(self.scene));
+                return SceneBoundsTuple(SceneBoundsFromScene(self.resolveScene()));
             },
             "World-space axis-aligned bounding box that covers every renderable\n"
             "leaf in the scene (mesh instances, lights, splats, ...).\n"
             "Returns ``((min_x, min_y, min_z), (max_x, max_y, max_z))`` or\n"
             "``None`` when the scene is empty / not refreshed yet.")
         .def_prop_ro("bounds_center", [](PyScene& self) {
-                return SceneBoundsCenter(SceneBoundsFromScene(self.scene));
+                return SceneBoundsCenter(SceneBoundsFromScene(self.resolveScene()));
             },
             "Center point of `Scene.bounds`, or ``None`` for an empty scene.")
         .def_prop_ro("bounds_size", [](PyScene& self) {
-                return SceneBoundsSize(SceneBoundsFromScene(self.scene));
+                return SceneBoundsSize(SceneBoundsFromScene(self.resolveScene()));
             },
             "Diagonal extent (max - min) of `Scene.bounds`, or ``None`` for an empty scene.")
 
         .def("__repr__", [](PyScene& self) {
-                const auto materialCount = GetSceneMaterials(self.scene.get(), self.owner).size();
-                const auto lightCount = self.scene ? self.scene->getLightEntities().size() : 0;
+                const auto materialCount = GetSceneMaterials(self.resolveScene().get(), self.owner).size();
+                const auto lightCount = self.resolveScene() ? self.resolveScene()->getLightEntities().size() : 0;
                 return std::string("<caustica.Scene materials=") + std::to_string(materialCount)
                     + " lights=" + std::to_string(lightCount) + ">";
             });
