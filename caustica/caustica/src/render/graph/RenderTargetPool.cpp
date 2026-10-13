@@ -57,7 +57,9 @@ caustica::rhi::TextureHandle RenderTargetPool::createPooledTexture(const Texture
     nativeDesc.isRenderTarget = desc.isRenderTarget || formatInfo.isRenderTargetCompatible;
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
-    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
+    nativeDesc.initialState = m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN
+        ? caustica::rhi::ResourceStates::ShaderResource
+        : caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createTexture(nativeDesc);

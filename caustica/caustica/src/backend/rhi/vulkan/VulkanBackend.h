@@ -8,6 +8,9 @@
 #include "../common/Versioning.h"
 #include <mutex>
 #include <list>
+#include <cstdlib>
+#include <unordered_set>
+#include <atomic>
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
@@ -108,13 +111,25 @@ namespace caustica::rhi::vulkan
             , device(device)
             , allocationCallbacks(allocationCallbacks)
             , pipelineCache(nullptr)
-        { }
+        {
+#ifdef _WIN32
+            size_t environmentSize = 0;
+            getenv_s(&environmentSize, nullptr, 0, "CAUSTICA_VK_CHECKPOINTS");
+            checkpointTracing = environmentSize > 1;
+#else
+            checkpointTracing = std::getenv("CAUSTICA_VK_CHECKPOINTS") != nullptr;
+#endif
+        }
 
         vk::Instance instance;
         vk::PhysicalDevice physicalDevice;
         vk::Device device;
         vk::AllocationCallbacks *allocationCallbacks;
         vk::PipelineCache pipelineCache;
+        bool checkpointTracing = false;
+        mutable std::atomic<bool> deviceLost{ false };
+        mutable std::mutex checkpointMarkerMutex;
+        mutable std::unordered_set<std::string> checkpointMarkers;
 
         // Registry of every live TrackedCommandBuffer (also ones currently
         // held outside the queue pools, e.g. by an open CommandList). Owned by
@@ -140,8 +155,8 @@ namespace caustica::rhi::vulkan
             bool EXT_debug_utils = false;
             bool NV_cooperative_vector = false;
             bool NV_ray_tracing_linear_swept_spheres = false;
-#if CAUSTICA_RHI_WITH_AFTERMATH
             bool NV_device_diagnostic_checkpoints = false;
+#if CAUSTICA_RHI_WITH_AFTERMATH
             bool NV_device_diagnostics_config= false;
 #endif
         } extensions;

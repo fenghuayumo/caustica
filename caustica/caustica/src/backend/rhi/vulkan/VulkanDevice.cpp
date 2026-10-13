@@ -2,6 +2,8 @@
 #include <unordered_map>
 #include <sstream>
 #include <mutex>
+#include <cstdio>
+#include <cstdlib>
 
 #include <rhi/common/misc.h>
 
@@ -48,6 +50,10 @@ namespace caustica::rhi::vulkan
         m_context.parentDevice = this;
         m_context.liveTrackedCommandBuffers = &m_liveTrackedCommandBuffers;
         m_context.liveTrackedCommandBuffersMutex = &m_liveTrackedCommandBuffersMutex;
+#if CAUSTICA_RHI_WITH_AFTERMATH
+        // Aftermath owns the opaque checkpoint tokens when enabled.
+        m_context.checkpointTracing = m_context.checkpointTracing && !desc.aftermathEnabled;
+#endif
 
         // A negative family index would reach vkCreateCommandPool as 0xFFFFFFFF and
         // crash the driver at vkAllocateCommandBuffers time; treat it as "no queue".
@@ -87,8 +93,8 @@ namespace caustica::rhi::vulkan
             { VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME, &m_context.extensions.EXT_mutable_descriptor_type },
             { VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME, &m_context.extensions.NV_cooperative_vector },
             { VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME, &m_context.extensions.NV_ray_tracing_linear_swept_spheres },
-#if CAUSTICA_RHI_WITH_AFTERMATH
             { VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME, &m_context.extensions.NV_device_diagnostic_checkpoints },
+#if CAUSTICA_RHI_WITH_AFTERMATH
             { VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME, &m_context.extensions.NV_device_diagnostics_config }
 #endif
         };
@@ -334,11 +340,28 @@ namespace caustica::rhi::vulkan
     {
         // THREADING: sync-point, RT-only.
         std::lock_guard lockGuard(m_mutex);
+        if (m_context.deviceLost.load(std::memory_order_acquire))
+            return false;
         try {
             m_context.device.waitIdle();
         }
         catch (vk::DeviceLostError&)
         {
+            m_context.deviceLost.store(true, std::memory_order_release);
+            if (m_context.checkpointTracing && m_context.extensions.NV_device_diagnostic_checkpoints)
+            {
+                for (auto& queue : m_queues)
+                {
+                    if (!queue)
+                        continue;
+                    for (const auto& checkpoint : queue->getVkQueue().getCheckpointDataNV())
+                    {
+                        std::fprintf(stderr, "GPU checkpoint stage=%u: %s\n", uint32_t(checkpoint.stage),
+                            checkpoint.pCheckpointMarker ? static_cast<const char*>(checkpoint.pCheckpointMarker) : "<none>");
+                    }
+                }
+                std::fflush(stderr);
+            }
             return false;
         }
         return true;

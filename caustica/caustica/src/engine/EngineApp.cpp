@@ -1035,6 +1035,8 @@ bool ResolveLdrOutput(
     }
     if (!texture)
         return false;
+    if (texture->getDesc().keepInitialState)
+        state = texture->getDesc().initialState;
     *outTexture = texture;
     *outState = state;
     return true;
@@ -1046,6 +1048,8 @@ bool EngineApp::saveScreenshot(const std::filesystem::path& path)
 {
     if (!m_app || !m_device)
         return false;
+
+    m_app->waitForRenderThreadIdle();
 
     caustica::rhi::Texture* texture = nullptr;
     caustica::rhi::ResourceStates state = caustica::rhi::ResourceStates::Unknown;
@@ -1065,6 +1069,7 @@ bool EngineApp::saveScreenshot(const std::filesystem::path& path)
 
     if (!m_device->getDevice() || !m_device->getDevice()->waitForIdle())
     {
+        m_device->setShuttingDown(true);
         error("EngineApp: GPU device lost or removed before screenshot");
         return false;
     }
@@ -1084,6 +1089,8 @@ std::optional<LdrFramebuffer> EngineApp::readLdrFramebuffer()
 {
     if (!m_app || !m_device)
         return std::nullopt;
+
+    m_app->waitForRenderThreadIdle();
 
     caustica::rhi::Device* device = m_device->getDevice();
     if (!device)
@@ -1107,6 +1114,7 @@ std::optional<LdrFramebuffer> EngineApp::readLdrFramebuffer()
 
     if (!device->waitForIdle())
     {
+        m_device->setShuttingDown(true);
         error("EngineApp: GPU device lost or removed before framebuffer readback");
         return std::nullopt;
     }
@@ -1167,7 +1175,10 @@ std::optional<LdrFramebuffer> EngineApp::readLdrFramebuffer()
     device->executeCommandList(commandList);
 
     if (!device->waitForIdle())
+    {
+        m_device->setShuttingDown(true);
         return std::nullopt;
+    }
 
     size_t rowPitch = 0;
     const uint8_t* mapped = static_cast<const uint8_t*>(device->mapStagingTexture(

@@ -256,7 +256,7 @@ void ValidateNaNs(inout PathState path, PathTracer::WorkingContext workingContex
 [shader("raygeneration")]
 void RAYGEN_ENTRY()
 {
-    uint2 pixelPos = DispatchRaysIndex().xy;
+    uint2 pixelPos = DispatchRaysIndex().xy + g_MiniConst.params.yz;
 
     //float3 lastOrigin = float3(1e30f,1e30f,1e30f);
     PathState path;

@@ -87,7 +87,11 @@ namespace
     {
         auto fb = self.engine().readLdrFramebuffer();
         if (!fb)
+        {
+            if (auto* device = self.engine().device(); device && device->isShuttingDown())
+                throw std::runtime_error("framebuffer readback unavailable: GPU device lost or session is shutting down");
             throw std::runtime_error("no rendered LDR texture (call step_frame() first)");
+        }
         return std::move(*fb);
     }
 }

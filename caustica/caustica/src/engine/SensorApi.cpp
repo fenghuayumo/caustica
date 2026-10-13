@@ -18,6 +18,7 @@
 #include <scene/SceneRenderExtract.h>
 #include <scene/SceneSemanticIds.h>
 #include <core/log.h>
+#include <core/scope.h>
 #include <math/float.h>
 #include <math/math.h>
 #include <rhi/rhi.h>
@@ -26,6 +27,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <stdexcept>
 #include <utility>
 
 namespace caustica
@@ -191,6 +193,8 @@ caustica::rhi::Framebuffer* EnsureProductFramebuffer(App& app, ProductSize size)
 void BindProductFramebuffer(App& app, caustica::rhi::Framebuffer* framebuffer)
 {
     RenderFramebufferOverride* overrideFb = app.tryResource<RenderFramebufferOverride>();
+    if (!overrideFb && !framebuffer)
+        return;
     if (!overrideFb)
         overrideFb = &app.emplaceResource<RenderFramebufferOverride>();
     overrideFb->framebuffer = framebuffer;
@@ -238,6 +242,11 @@ bool CopyTexturePacked(
         return false;
 
     caustica::rhi::TextureDesc desc = texture->getDesc();
+    // The renderer's command lists restore keepInitialState resources on
+    // close. A readback list must start from that state, not the last graph
+    // access (e.g. ldrColor is restored to RenderTarget, not ShaderResource).
+    if (desc.keepInitialState)
+        textureState = desc.initialState;
     caustica::rhi::TextureHandle tempTexture = texture;
     caustica::rhi::FramebufferHandle tempFramebuffer;
 
@@ -866,8 +875,11 @@ SensorOutput ReadCurrentView(App& app, const RenderProductDesc& product)
         return output;
 
     app.waitForRenderThreadIdle();
-    if (!device->waitForIdle())
-        return output;
+    if (gpu->isShuttingDown() || !device->waitForIdle())
+    {
+        gpu->setShuttingDown(true);
+        throw std::runtime_error("Sensor capture failed: GPU device lost or removed");
+    }
 
     auto* caches = gpuSharedCaches(app);
     render::RenderDevice* renderDevice =
@@ -879,6 +891,11 @@ SensorOutput ReadCurrentView(App& app, const RenderProductDesc& product)
     if (hasAov(product.aovs, Aov::LinearRgb))
         FillLinearRgb(app, device, output);
     FillMaterialAovs(app, device, product.aovs, output);
+    if (!device->waitForIdle())
+    {
+        gpu->setShuttingDown(true);
+        throw std::runtime_error("Sensor readback failed: GPU device lost or removed");
+    }
     return output;
 }
 
@@ -1049,6 +1066,10 @@ std::optional<SensorOutput> readSensorOutput(App& app, uint32_t aovs)
 
 std::vector<SensorOutput> captureSensorOutputs(App& app)
 {
+    app.waitForRenderThreadIdle();
+    if (GpuDevice* gpu = app.getGpuDevice(); gpu && gpu->isShuttingDown())
+        throw std::runtime_error("Sensor capture failed: GPU device lost or removed");
+
     std::vector<RenderProductDesc> products = renderProducts(app);
     if (products.empty())
     {
@@ -1068,7 +1089,15 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
     ProductSize gpuSize = sessionSize;
     bool renderedExtra = false;
 
-    app.waitForRenderThreadIdle();
+    // Restore CPU session state even if a frozen view or readback throws.
+    // GPU restoration stays on the success path; a lost device cannot render it.
+    RAII_SCOPE(;, {
+        BindProductFramebuffer(app, nullptr);
+        if (resolved)
+            resolved->camera = savedCamera;
+        if (auto* registry = app.tryResource<RenderProductRegistry>())
+            registry->pendingPreviousCamera.reset();
+    });
 
     auto restoreSessionView = [&]() {
         BindProductFramebuffer(app, nullptr);
@@ -1089,6 +1118,7 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
                 warning("SensorApi: failed to restore the original camera/size after extra-view capture.");
                 if (auto* registry = app.tryResource<RenderProductRegistry>())
                     registry->pendingPreviousCamera.reset();
+                throw std::runtime_error("Sensor capture failed: could not restore the session view");
             }
             else if (resolved)
                 CommitSensorCameraHistory(app, savedCamera);
@@ -1141,10 +1171,8 @@ std::vector<SensorOutput> captureSensorOutputs(App& app)
                 warning("SensorApi: frozen capture failed for RenderProduct '%s'.", product.name.c_str());
                 if (auto* registry = app.tryResource<RenderProductRegistry>())
                     registry->pendingPreviousCamera.reset();
-                if (resolved)
-                    resolved->camera = savedCamera;
-                BindProductFramebuffer(app, nullptr);
-                continue;
+                throw std::runtime_error("Sensor capture failed for RenderProduct '" + product.name
+                    + "': frozen frame failed (GPU device lost or render failure)");
             }
             gpuCamera = wanted;
             gpuSize = size;

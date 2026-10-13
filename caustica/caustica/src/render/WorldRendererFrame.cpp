@@ -380,14 +380,14 @@ void caustica::render::WorldRenderer::executeFrameRenderGraph(RenderFrameContext
         {
             captureDesc.debugName = "Texture debug capture: " + captureRequest;
             captureDesc.isShaderResource = true;
-            captureDesc.initialState = caustica::rhi::ResourceStates::Common;
+            captureDesc.initialState = caustica::rhi::ResourceStates::ShaderResource;
             captureDesc.keepInitialState = true;
             capturedTexture = device()->createTexture(captureDesc);
 
             if (capturedTexture)
             {
                 const rg::TextureHandle destination = ctx.graph->importTexture(
-                    capturedTexture, caustica::rhi::ResourceStates::Common);
+                    capturedTexture, captureDesc.initialState);
                 ctx.graph->addPass(
                     "DebugTextureCapture",
                     [source, destination](rg::PassBuilder& setup) {

@@ -136,6 +136,8 @@ bool setEntitySemanticLabel(
 // Capture every registered RenderProduct at the current physical time.
 // Extra cameras re-extract + render without running simulation or advancing Time.
 // If no products are registered, returns one output for the active camera.
+// Throws std::runtime_error on a failed frozen frame or device loss. Session
+// camera/framebuffer overrides are restored before the exception reaches a host.
 [[nodiscard]] std::vector<SensorOutput> captureSensorOutputs(App& app);
 
 } // namespace caustica

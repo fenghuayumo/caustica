@@ -1166,7 +1166,8 @@ namespace caustica::rhi::vulkan
         if (!desc.isTopLevel)
             return m_context.accelStructManager->GetDeviceAddress(managedId);
 #endif
-        return getBufferAddress(dataBuffer, 0).deviceAddress;
+        return m_context.device.getAccelerationStructureAddressKHR(
+            vk::AccelerationStructureDeviceAddressInfoKHR().setAccelerationStructure(accelStruct));
     }
 
     OpacityMicromap::~OpacityMicromap()
@@ -1428,7 +1429,7 @@ namespace caustica::rhi::vulkan
         {
             RayTracingPipeline* pso = checked_cast<RayTracingPipeline*>(m_currentRayTracingState.shaderTable->getPipeline());
 
-            bindBindingSets(vk::PipelineBindPoint::eRayTracingKHR, pso->pipelineLayout, m_currentComputeState.bindings, pso->descriptorSetIdxToBindingIdx);
+            bindBindingSets(vk::PipelineBindPoint::eRayTracingKHR, pso->pipelineLayout, m_currentRayTracingState.bindings, pso->descriptorSetIdxToBindingIdx);
 
             m_anyVolatileBufferWrites = false;
         }

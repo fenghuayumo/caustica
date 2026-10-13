@@ -172,6 +172,7 @@ namespace caustica::rhi::vulkan
         }
         catch (vk::DeviceLostError&)
         {
+            m_context.deviceLost.store(true, std::memory_order_release);
             m_context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
             while (m_commandBuffersInFlight.size() > inFlightBefore)
                 m_commandBuffersInFlight.pop_back();
@@ -299,6 +300,7 @@ namespace caustica::rhi::vulkan
         }
         catch (const vk::DeviceLostError&)
         {
+            m_context.deviceLost.store(true, std::memory_order_release);
             // A lost device must not abort the host through an uncaught vulkan-hpp
             // exception; pollers keep the last known counter and callers see the
             // loss through the same path as submit() ("Device Removed!").
@@ -427,7 +429,17 @@ namespace caustica::rhi::vulkan
 
     uint64_t Device::queueGetCompletedInstance(CommandQueue queue)
     {
-        return m_context.device.getSemaphoreCounterValue(getQueueSemaphore(queue));
+        if (m_context.deviceLost.load(std::memory_order_acquire))
+            return 0;
+        try
+        {
+            return m_context.device.getSemaphoreCounterValue(getQueueSemaphore(queue));
+        }
+        catch (const vk::DeviceLostError&)
+        {
+            m_context.deviceLost.store(true, std::memory_order_release);
+            return 0;
+        }
     }
 
     bool Queue::pollCommandList(uint64_t commandListID)
@@ -465,6 +477,7 @@ namespace caustica::rhi::vulkan
         }
         catch (const vk::DeviceLostError&)
         {
+            m_context.deviceLost.store(true, std::memory_order_release);
             m_context.messageCallback->message(MessageSeverity::Error, "Device Removed!");
             return false;
         }

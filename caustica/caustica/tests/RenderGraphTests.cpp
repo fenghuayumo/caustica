@@ -42,6 +42,34 @@ int main()
 {
     bool passed = true;
     {
+        caustica::rg::GraphBuilder graph;
+        const auto registerPasses = [&](bool isolate) {
+            graph.addPass("Independent", {}, {}, caustica::rg::PassOptions{ .sideEffect = true });
+            return graph.addPass("Trace", {}, {}, caustica::rg::PassOptions{
+                .sideEffect = true, .isolateSubmission = isolate,
+                .queue = caustica::rhi::CommandQueue::Compute });
+        };
+        const auto trace = registerPasses(true);
+        graph.compile();
+        const auto& waves = graph.compiledWaves();
+        for (size_t i = 0; i < waves.size(); ++i)
+        {
+            if (std::find(waves[i].begin(), waves[i].end(), trace.index) == waves[i].end())
+                continue;
+            passed &= expect(waves[i].size() == 1, "isolated submission shared its wave");
+            passed &= expect(graph.compiledWaveQueues()[i] == caustica::rhi::CommandQueue::Graphics,
+                "isolated submission did not use the graphics primary");
+        }
+        graph.reset();
+        registerPasses(false);
+        graph.compile();
+        passed &= expect(!graph.lastCompileCacheHit(), "submission isolation missing from plan cache key");
+        graph.reset();
+        registerPasses(true);
+        graph.compile();
+        passed &= expect(graph.lastCompileCacheHit(), "isolated submission plan was not reused");
+    }
+    {
         caustica::rg::GraphBuilder setupLifetimeGraph;
         auto setupCapture = std::make_shared<int>(42);
         const std::weak_ptr<int> setupCaptureWeak = setupCapture;

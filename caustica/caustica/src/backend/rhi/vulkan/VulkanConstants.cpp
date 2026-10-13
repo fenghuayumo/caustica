@@ -306,7 +306,15 @@ namespace caustica::rhi::vulkan
 
             if (stateTmp & bit)
             {
-                const ResourceStateMapping& mapping = g_ResourceStateMap[bitIndex];
+                ResourceStateMapping mapping = g_ResourceStateMap[bitIndex];
+                if (!isImage && mapping.rhiState == ResourceStates::Common)
+                {
+                    // Buffers such as stablePlanesBuffer return to Common at
+                    // command-list close. Common is not an undefined buffer:
+                    // preserve availability/visibility across that boundary.
+                    mapping.stageFlags = vk::PipelineStageFlagBits2::eAllCommands;
+                    mapping.accessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
+                }
 
                 assert(uint32_t(mapping.rhiState) == bit);
                 if (isImage)

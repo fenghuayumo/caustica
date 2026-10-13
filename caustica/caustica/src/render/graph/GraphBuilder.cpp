@@ -427,7 +427,11 @@ caustica::rhi::TextureHandle GraphBuilder::createNativeTexture(const TextureDesc
     nativeDesc.isUAV = desc.isUAV || formatInfo.isUAVCompatible;
     nativeDesc.isTypeless = desc.isTypeless;
     nativeDesc.isVirtual = isVirtual;
-    nativeDesc.initialState = caustica::rhi::ResourceStates::Common;
+    // Common maps to UNDEFINED on Vulkan and cannot be a destination layout
+    // when close() restores the resource between graph command lists.
+    nativeDesc.initialState = m_device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN
+        ? caustica::rhi::ResourceStates::ShaderResource
+        : caustica::rhi::ResourceStates::Common;
     nativeDesc.keepInitialState = true;
 
     return m_device->createTexture(nativeDesc);
@@ -638,6 +642,7 @@ uint64_t GraphBuilder::compiledPlanKey() const
         mixValue(pass.options.enabled);
         mixValue(pass.options.sideEffect);
         mixValue(pass.options.serialOnPrimary);
+        mixValue(pass.options.isolateSubmission);
         mixValue(pass.options.recordingCost);
         mixValue(pass.options.after.index);
         mixValue(pass.options.queue);
@@ -680,7 +685,7 @@ caustica::rhi::CommandQueue GraphBuilder::passQueue(uint32_t passIndex) const
     if (passIndex >= m_passes.size())
         return caustica::rhi::CommandQueue::Graphics;
     const Pass& pass = m_passes[passIndex];
-    if (pass.options.serialOnPrimary)
+    if (pass.options.serialOnPrimary || pass.options.isolateSubmission)
         return caustica::rhi::CommandQueue::Graphics;
     return pass.options.queue;
 }
@@ -1600,7 +1605,7 @@ void GraphBuilder::buildCompiledWaves(
         {
             if (!needed[passIndex] || emitted[passIndex] || indegree[passIndex] != 0)
                 continue;
-            if (m_passes[passIndex].options.serialOnPrimary)
+            if (m_passes[passIndex].options.serialOnPrimary || m_passes[passIndex].options.isolateSubmission)
                 serialSolo.push_back(passIndex);
             else
                 byQueue[size_t(passQueue(passIndex))].push_back(passIndex);
@@ -2140,8 +2145,14 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
 
         const bool forceSerial = !params.parallelWaves || wave.size() == 1;
         bool hasSerialPass = false;
+        bool isolateSubmission = false;
         for (const uint32_t passIndex : wave)
         {
+            if (passIndex < m_passes.size() && m_passes[passIndex].options.isolateSubmission)
+            {
+                isolateSubmission = true;
+                hasSerialPass = true;
+            }
             if (passIndex < m_passes.size() && m_passes[passIndex].options.serialOnPrimary)
             {
                 hasSerialPass = true;
@@ -2151,8 +2162,19 @@ void GraphBuilder::execute(caustica::rhi::FrameCommandContext& frameCtx, Execute
 
         if (forceSerial || hasSerialPass)
         {
+            if (isolateSubmission && !m_primaryClean)
+            {
+                m_lastQueueInstance[0] = frameCtx.flushPrimary();
+                m_queueSubmitted[0] = 1;
+            }
             executeWaveSerial(frameCtx.primary(), wave);
             m_primaryClean = false;
+            if (isolateSubmission)
+            {
+                m_lastQueueInstance[0] = frameCtx.flushPrimary();
+                m_queueSubmitted[0] = 1;
+                m_primaryClean = true;
+            }
         }
         else
         {

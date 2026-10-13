@@ -1,4 +1,5 @@
 #include "VulkanBackend.h"
+#include <cstdlib>
 #include <rhi/common/misc.h>
 
 namespace caustica::rhi::vulkan
@@ -140,13 +141,24 @@ namespace caustica::rhi::vulkan
         uint32_t timestamps[2] = { 0, 0 };
 
         vk::Result res;
-        res = m_context.device.getQueryPoolResults(m_timerQueryPool,
+        res = m_context.deviceLost.load(std::memory_order_acquire)
+            ? vk::Result::eErrorDeviceLost
+            : m_context.device.getQueryPoolResults(m_timerQueryPool,
                                                  query->beginQueryIndex, 2,
                                                  sizeof(timestamps), timestamps,
                                                  sizeof(timestamps[0]), vk::QueryResultFlags());
         assert(res == vk::Result::eSuccess || res == vk::Result::eNotReady || res == vk::Result::eErrorDeviceLost);
 
-        if (res == vk::Result::eNotReady || res == vk::Result::eErrorDeviceLost)
+        if (res == vk::Result::eErrorDeviceLost)
+        {
+            // A lost device will never produce these timestamps. Mark the
+            // query resolved so getTimerQueryTime cannot spin forever.
+            m_context.deviceLost.store(true, std::memory_order_release);
+            query->time = 0.f;
+            query->resolved = true;
+            return true;
+        }
+        if (res == vk::Result::eNotReady)
         {
             return false;
         }
@@ -190,6 +202,15 @@ namespace caustica::rhi::vulkan
 
     void CommandList::beginMarker(const char* name)
     {
+        if (m_context.checkpointTracing && m_context.extensions.NV_device_diagnostic_checkpoints)
+        {
+            // The driver retains the pointer until the GPU passes the marker.
+            // Intern per device so graph resets cannot invalidate it, and
+            // repeated captures do not allocate another copy of each label.
+            std::lock_guard lock(m_context.checkpointMarkerMutex);
+            const auto marker = m_context.checkpointMarkers.emplace(name).first;
+            m_currentCmdBuf->cmdBuf.setCheckpointNV(static_cast<const void*>(marker->c_str()));
+        }
         if (m_context.extensions.EXT_debug_utils)
         {
             assert(m_currentCmdBuf);

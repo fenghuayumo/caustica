@@ -767,6 +767,18 @@ bool App::extractAndRenderFrozenFrame()
 
     waitForRenderThreadIdle();
 
+    // Frozen views reuse the device frame identity and its frame-local GPU
+    // resources. CPU render-thread completion does not make those resources
+    // safe to overwrite while the preceding view is still on the GPU.
+    caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
+    if (!rhiDevice)
+        return false;
+    if (!rhiDevice->waitForIdle())
+    {
+        gpuDevice->setShuttingDown(true);
+        return false;
+    }
+
     const double curTime = GetNow();
     SystemContext scheduleContext{
         *this,
@@ -794,13 +806,18 @@ bool App::extractAndRenderFrozenFrame()
     // A sensor product is another view of the already-simulated tick.  In
     // particular, do not advance the device frame clock here: doing so changes
     // the frame identity seen by later products even though no simulation ran.
-    return true;
+    // Drain the restored/session view too, before the host can step the same
+    // frame slot again immediately after capture_sensor_outputs returns.
+    const bool ok = rhiDevice->waitForIdle();
+    if (!ok)
+        gpuDevice->setShuttingDown(true);
+    return ok;
 }
 
 bool App::runFrame(std::optional<double> elapsedTimeOverride)
 {
     GpuDevice* gpuDevice = device();
-    if (!gpuDevice)
+    if (!gpuDevice || gpuDevice->isShuttingDown())
         return false;
 
     const double curTime = GetNow();

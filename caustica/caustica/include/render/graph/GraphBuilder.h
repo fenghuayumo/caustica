@@ -83,6 +83,9 @@ struct PassOptions
     // Force this pass onto the graphics primary (and alone in its wave). Use for
     // mid-pass close/execute sync-points (e.g. ToneMapping first-frame AE).
     bool serialOnPrimary = false;
+    // Record on the graphics primary in a separate GPU submission, without
+    // waiting on the CPU. Also forces a solo wave.
+    bool isolateSubmission = false;
     // Relative CPU recording cost. The compiler groups independent passes into
     // a bounded number of worker command lists instead of one list per pass.
     uint16_t recordingCost = 1;

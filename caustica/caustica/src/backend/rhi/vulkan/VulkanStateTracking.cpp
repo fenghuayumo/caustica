@@ -63,19 +63,18 @@ namespace caustica::rhi::vulkan
         if (bindingUpdateMask == 0)
             bindingUpdateMask = arrayDifferenceMask(newBindings, oldBindings);
 
-        if (bindingUpdateMask != 0)
+        // Unchanged UAV bindings still need a dependency between dispatches.
+        // A graph transition can also change their layout without rebinding
+        // the descriptor set, so checking only changed sets is insufficient.
+        for (size_t i = 0; i < newBindings.size(); i++)
         {
-            for (size_t i = 0; i < newBindings.size(); i++)
-            {
-                if (newBindings[i]->getDesc() == nullptr) // Ignore bindless sets
-                    continue;
+            if (!newBindings[i] || newBindings[i]->getDesc() == nullptr) // Ignore bindless sets
+                continue;
 
-                BindingSet const* bindingSet = checked_cast<BindingSet const*>(newBindings[i]);
-
-                bool const updateThisSet = (bindingUpdateMask & (1u << i)) != 0;
-                if (updateThisSet || bindingSet->hasUavBindings) // UAV bindings may place UAV barriers on the same binding set
-                    setResourceStatesForBindingSet(newBindings[i]);
-            }
+            BindingSet const* bindingSet = checked_cast<BindingSet const*>(newBindings[i]);
+            bool const updateThisSet = (bindingUpdateMask & (1u << i)) != 0;
+            if (updateThisSet || bindingSet->hasUavBindings)
+                setResourceStatesForBindingSet(newBindings[i]);
         }
     }
 
@@ -315,6 +314,7 @@ namespace caustica::rhi::vulkan
         Texture* texture = checked_cast<Texture*>(_texture);
 
         m_stateTracker.requireTextureState(texture, subresources, stateBits);
+        m_bindingStatesDirty = true;
 
         if (m_currentCmdBuf)
             m_currentCmdBuf->referencedResources.push_back(texture);
@@ -325,6 +325,7 @@ namespace caustica::rhi::vulkan
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
         m_stateTracker.requireBufferState(buffer, stateBits);
+        m_bindingStatesDirty = true;
 
         if (m_currentCmdBuf)
             m_currentCmdBuf->referencedResources.push_back(buffer);

@@ -26,6 +26,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     import caustica
+    import numpy as np
 
     failures: list[str] = []
     with caustica.EngineApp.create(
@@ -104,7 +105,10 @@ def main() -> int:
             except RuntimeError:
                 pass
 
+        before = engine.frame_index, engine.scene_time
         captured = engine.capture_sensor_outputs()
+        if before != (engine.frame_index, engine.scene_time):
+            failures.append("capture advanced the simulation frame or scene time")
         wrist_out = next((item for item in captured if item.name == "wrist"), None)
         if wrist_out is None:
             failures.append("capture did not return the wrist product")
@@ -113,6 +117,12 @@ def main() -> int:
                 failures.append("SensorOutput.camera was not the wrist camera")
             if wrist_out.linear_rgb is not None:
                 failures.append("linear_rgb was filled without Aov.linear_rgb")
+            rgb = np.asarray(wrist_out.rgb)
+            depth = np.asarray(wrist_out.depth)
+            if rgb.shape != (240, 320, 4) or depth.shape[:2] != (240, 320):
+                failures.append(f"capture returned invalid RGB/depth shapes: {rgb.shape}, {depth.shape}")
+            elif not np.isfinite(depth).all():
+                failures.append("capture returned non-finite depth")
 
     if failures:
         for failure in failures:

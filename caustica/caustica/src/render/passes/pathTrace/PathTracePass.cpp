@@ -30,6 +30,28 @@ using namespace caustica::math;
 namespace caustica::render
 {
 
+namespace
+{
+void dispatchPathTraceTiles(caustica::rhi::CommandList* commandList,
+    const caustica::rhi::rt::State& state, math::uint2 viewSize, uint32_t subSampleIndex)
+{
+    constexpr uint32_t tileSize = 64;
+    for (uint32_t y = 0; y < viewSize.y; y += tileSize)
+    {
+        for (uint32_t x = 0; x < viewSize.x; x += tileSize)
+        {
+            caustica::rhi::rt::DispatchRaysArguments args;
+            args.width = std::min(tileSize, viewSize.x - x);
+            args.height = std::min(tileSize, viewSize.y - y);
+            commandList->setRayTracingState(state);
+            FrameMiniConstants constants = { uint4(subSampleIndex, x, y, 0) };
+            commandList->setPushConstants(&constants, sizeof(constants));
+            commandList->dispatchRays(args);
+        }
+    }
+}
+}
+
 bool PathTracePass::createExportPipeline(
     caustica::rhi::Device* device,
     caustica::ShaderFactory* shaderFactory,
@@ -163,19 +185,12 @@ void PathTracePass::prePass(
         return;
 
     caustica::rhi::rt::State state;
-    caustica::rhi::rt::DispatchRaysArguments args;
-    args.width = viewSize.x;
-    args.height = viewSize.y;
-
-    FrameMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
 
     RAII_SCOPE(commandList->beginMarker("PathTracePrePass");, commandList->endMarker(););
 
     state.shaderTable = pipeline->getShaderTable();
     state.bindings = { bindingSet, descriptorTable };
-    commandList->setRayTracingState(state);
-    commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-    commandList->dispatchRays(args);
+    dispatchPathTraceTiles(commandList, state, viewSize, 0);
 }
 
 void PathTracePass::exportVBuffer(
@@ -224,9 +239,6 @@ void PathTracePass::mainPass(
         return;
 
     caustica::rhi::rt::State state;
-    caustica::rhi::rt::DispatchRaysArguments args;
-    args.width = viewSize.x;
-    args.height = viewSize.y;
 
     RAII_SCOPE(commandList->beginMarker("PathTrace");, commandList->endMarker(););
 
@@ -235,12 +247,7 @@ void PathTracePass::mainPass(
 
     for (uint32_t subSampleIndex = 0; subSampleIndex < samplesPerPixel; subSampleIndex++)
     {
-        commandList->setRayTracingState(state);
-
-        FrameMiniConstants miniConstants = { uint4(subSampleIndex, 0, 0, 0) };
-        commandList->setPushConstants(&miniConstants, sizeof(miniConstants));
-
-        commandList->dispatchRays(args);
+        dispatchPathTraceTiles(commandList, state, viewSize, subSampleIndex);
     }
 }
 
@@ -262,6 +269,9 @@ rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx)
     const math::uint2 renderSize = ctx.renderSize;
     PTPipelineVariant* const pipeline = ctx.ptBuildStablePlanes;
 
+    // Frozen multi-view captures intermittently lose NVIDIA Vulkan devices
+    // when RT and neighboring compute work share a command buffer. Isolate
+    // the RT submission (including its SBT uploads) without a CPU/GPU wait.
     const rg::PassHandle ready = ctx.graph->addPass(
         "PathTracePrePass",
         [handles, schedule](rg::PassBuilder& setup) {
@@ -279,7 +289,8 @@ rg::PassHandle registerPathTracePrePass(FrameGraphContext ctx)
                 descriptorTable,
                 renderSize,
                 pipeline);
-        });
+        }, rg::PassOptions{
+            .isolateSubmission = ctx.device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN });
     return ready;
 }
 
@@ -416,7 +427,8 @@ rg::PassHandle registerMainPathTracePass(FrameGraphContext ctx)
                 renderSize,
                 pipeline,
                 samplesPerPixel);
-        });
+        }, rg::PassOptions{
+            .isolateSubmission = ctx.device->getGraphicsAPI() == caustica::rhi::GraphicsAPI::VULKAN });
     return ready;
 }
 
