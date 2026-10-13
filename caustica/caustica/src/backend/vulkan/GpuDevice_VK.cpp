@@ -58,6 +58,23 @@ static std::vector<T> setToVector(const std::unordered_set<T>& set)
     return ret;
 }
 
+GpuDevice_VK::~GpuDevice_VK()
+{
+    // Sweep all RHI command pools while the vkDevice is still alive and idle:
+    // destroying the device with live VkCommandBuffers underneath is a spec
+    // violation (VUID-vkDestroyDevice-device-05137) with undefined driver
+    // behavior. The vk::Device / vk::Instance members then destroy the
+    // handles in their normal order (device member is declared after... see
+    // header member order: device destroyed before instance).
+    if (m_RhiDevice)
+        m_RhiDevice->destroyAllCommandBuffersForTeardown();
+
+    // The debug-report messenger is deliberately NOT destroyed here: calling
+    // through the EXT dispatch at this teardown point crashed when validation
+    // layers were active. It is reclaimed with the instance.
+    m_DebugReportCallback = vk::DebugReportCallbackEXT();
+}
+
 bool GpuDevice_VK::createInstance()
 {
     if (!m_DeviceParams.headlessDevice)
@@ -792,7 +809,16 @@ void GpuDevice_VK::destroySwapChain()
 {
     if (m_VulkanDevice)
     {
-        m_VulkanDevice.waitIdle();
+        try
+        {
+            m_VulkanDevice.waitIdle();
+        }
+        catch (const vk::DeviceLostError&)
+        {
+            // A lost device must not abort the host through an uncaught
+            // vulkan-hpp exception during teardown.
+            caustica::error("Device Removed!");
+        }
     }
 
     if (m_SwapChain)

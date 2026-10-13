@@ -1,13 +1,28 @@
 #include "VulkanBackend.h"
 #include "rhi/common/misc.h"
 
+#include <algorithm>
+
 namespace caustica::rhi::vulkan
 {
     extern vk::ImageAspectFlags guessImageAspectFlags(vk::Format format);
 
     TrackedCommandBuffer::~TrackedCommandBuffer()
     {
-        m_context.device.destroyCommandPool(cmdPool, m_context.allocationCallbacks);
+        // After teardown the pool handle has been cleared by
+        // Queue::destroyAllCommandBuffers; destroying through a dead vkDevice
+        // would crash the driver.
+        if (cmdPool)
+        {
+            m_context.device.destroyCommandPool(cmdPool, m_context.allocationCallbacks);
+            cmdPool = vk::CommandPool();
+        }
+        if (m_context.liveTrackedCommandBuffers != nullptr)
+        {
+            std::lock_guard lockGuard(*m_context.liveTrackedCommandBuffersMutex);
+            auto& registry = *m_context.liveTrackedCommandBuffers;
+            registry.erase(std::remove(registry.begin(), registry.end(), this), registry.end());
+        }
     }
 
     Queue::Queue(const VulkanContext& context, CommandQueue queueID, vk::Queue queue, uint32_t queueFamilyIndex)
@@ -291,6 +306,38 @@ namespace caustica::rhi::vulkan
         }
 
         return m_lastFinishedID;
+    }
+
+    void Queue::destroyAllCommandBuffers()
+    {
+        // Must run before vkDestroyDevice: child VkCommandBuffers/VkCommandPools
+        // still alive at device destruction are a spec violation (05137) and
+        // undefined driver behavior (observed as Xid 109 context-switch
+        // timeouts and teardown segfaults on the sensor render-product path).
+        // Pools are destroyed through the registry so buffers currently held
+        // outside the queue (e.g. by an open CommandList) are covered too, and
+        // the handle is cleared in place so their later release is a no-op
+        // instead of destroying a pool through a dead device.
+        {
+            std::lock_guard lockGuard(m_mutex);
+            m_commandBuffersPool.clear();
+            m_commandBuffersInFlight.clear();
+        }
+
+        if (m_context.liveTrackedCommandBuffers == nullptr)
+            return;
+
+        std::lock_guard lockGuard(*m_context.liveTrackedCommandBuffersMutex);
+        auto& registry = *m_context.liveTrackedCommandBuffers;
+        for (TrackedCommandBuffer* cmd : registry)
+        {
+            if (cmd->cmdPool)
+            {
+                m_context.device.destroyCommandPool(cmd->cmdPool, m_context.allocationCallbacks);
+                cmd->cmdPool = vk::CommandPool();
+            }
+        }
+        registry.clear();
     }
 
     void Queue::retireCommandBuffers()

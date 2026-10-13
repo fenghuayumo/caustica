@@ -46,6 +46,8 @@ namespace caustica::rhi::vulkan
     {
         m_context.deferredDeletion = &m_deferredDeletion;
         m_context.parentDevice = this;
+        m_context.liveTrackedCommandBuffers = &m_liveTrackedCommandBuffers;
+        m_context.liveTrackedCommandBuffersMutex = &m_liveTrackedCommandBuffersMutex;
 
         // A negative family index would reach vkCreateCommandPool as 0xFFFFFFFF and
         // crash the driver at vkAllocateCommandBuffers time; treat it as "no queue".
@@ -263,6 +265,14 @@ namespace caustica::rhi::vulkan
     Device::~Device()
     {
         waitForIdle();
+        // Retire first so completed submissions return their buffers to the
+        // pools, then destroy every command pool before the device goes away.
+        runGarbageCollection();
+        for (auto& queue : m_queues)
+        {
+            if (queue)
+                queue->destroyAllCommandBuffers();
+        }
         m_deferredDeletion.flushAllBlocking();
         m_context.deferredDeletion = nullptr;
         m_context.parentDevice = nullptr;
@@ -283,6 +293,18 @@ namespace caustica::rhi::vulkan
         {
             m_context.device.destroyDescriptorSetLayout(m_context.emptyDescriptorSetLayout);
             m_context.emptyDescriptorSetLayout = vk::DescriptorSetLayout();
+        }
+    }
+
+    void Device::destroyAllCommandBuffersForTeardown()
+    {
+        // Retire completed submissions back into the pools first so they are
+        // covered by the sweep.
+        runGarbageCollection();
+        for (auto& queue : m_queues)
+        {
+            if (queue)
+                queue->destroyAllCommandBuffers();
         }
     }
 

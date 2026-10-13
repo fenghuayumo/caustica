@@ -3660,6 +3660,12 @@ namespace caustica::rhi
         // IMPORTANT: Call this method at least once per frame.
         virtual void runGarbageCollection() = 0;
 
+        // Destroys every command pool the backend owns. The external device
+        // owner must call this right before destroying the native device:
+        // live VkCommandBuffers at device destruction violate the spec
+        // (VUID-vkDestroyDevice-device-05137) with undefined driver behavior.
+        virtual void destroyAllCommandBuffersForTeardown() {}
+
         virtual bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) = 0;
 
         virtual FormatSupport queryFormatSupport(Format format) = 0;

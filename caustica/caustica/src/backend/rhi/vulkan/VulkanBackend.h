@@ -116,6 +116,13 @@ namespace caustica::rhi::vulkan
         vk::AllocationCallbacks *allocationCallbacks;
         vk::PipelineCache pipelineCache;
 
+        // Registry of every live TrackedCommandBuffer (also ones currently
+        // held outside the queue pools, e.g. by an open CommandList). Owned by
+        // Device; lets the teardown path destroy all command pools before
+        // vkDestroyDevice (VUID-vkDestroyDevice-device-05137).
+        std::vector<class TrackedCommandBuffer*> *liveTrackedCommandBuffers = nullptr;
+        std::mutex *liveTrackedCommandBuffersMutex = nullptr;
+
         struct {
             bool EXT_debug_report = false;
             bool EXT_debug_marker = false;
@@ -193,7 +200,13 @@ namespace caustica::rhi::vulkan
 
         explicit TrackedCommandBuffer(const VulkanContext& context)
             : m_context(context)
-        { }
+        {
+            if (m_context.liveTrackedCommandBuffers != nullptr)
+            {
+                std::lock_guard lockGuard(*m_context.liveTrackedCommandBuffersMutex);
+                m_context.liveTrackedCommandBuffers->push_back(this);
+            }
+        }
 
         ~TrackedCommandBuffer();
 
@@ -227,6 +240,10 @@ namespace caustica::rhi::vulkan
 
         // retire any command buffers that have finished execution from the pending execution list
         void retireCommandBuffers();
+
+        // Destroy every tracked command pool owned by this queue. Call before
+        // the owning vkDevice is destroyed.
+        void destroyAllCommandBuffers();
 
         TrackedCommandBufferPtr getCommandBufferInFlight(uint64_t submissionID);
 
@@ -1136,6 +1153,12 @@ namespace caustica::rhi::vulkan
         void queueWaitForCommandList(CommandQueue waitQueue, CommandQueue executionQueue, uint64_t instance) override;
         bool waitForIdle() override;
         void runGarbageCollection() override;
+
+        // Destroy every command pool this device owns. The frontend device
+        // owner (GpuDevice_VK) must call this before it destroys the
+        // VkDevice: live VkCommandBuffers at vkDestroyDevice are a spec
+        // violation (05137) with undefined driver behavior.
+        void destroyAllCommandBuffersForTeardown() override;
         bool queryFeatureSupport(Feature feature, void* pInfo = nullptr, size_t infoSize = 0) override;
         FormatSupport queryFormatSupport(Format format) override;
         coopvec::DeviceFeatures queryCoopVecFeatures() override;
@@ -1162,6 +1185,10 @@ namespace caustica::rhi::vulkan
 
         VulkanContext m_context;
         VulkanAllocator m_allocator;
+
+        // Backing storage for VulkanContext::liveTrackedCommandBuffers.
+        std::vector<TrackedCommandBuffer*> m_liveTrackedCommandBuffers;
+        std::mutex m_liveTrackedCommandBuffersMutex;
 
         vk::QueryPool m_timerQueryPool = nullptr;
         utils::BitSetAllocator m_timerQueryAllocator;

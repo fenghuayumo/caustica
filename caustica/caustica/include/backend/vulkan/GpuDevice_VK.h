@@ -18,6 +18,13 @@
 class GpuDevice_VK : public caustica::GpuDevice
 {
 public:
+    // The VkDevice handle is owned by the RHI Device for destruction ordering:
+    // every RHI resource holds a DeviceHandle, so the RHI Device outlives them
+    // all and destroys the vkDevice last (in ~Device). Without this, this
+    // class's vk::Device member could destroy the device while RHI children
+    // are still alive (VUID-vkDestroyDevice-device-05137, driver UB).
+    ~GpuDevice_VK() override;
+
     [[nodiscard]] caustica::rhi::Device* getDevice() const override
     {
         if (m_ValidationLayer)
