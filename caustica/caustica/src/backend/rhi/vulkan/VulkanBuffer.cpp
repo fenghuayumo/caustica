@@ -423,24 +423,11 @@ namespace caustica::rhi::vulkan
     {
         Buffer* buffer = checked_cast<Buffer*>(_buffer);
 
-        if (buffer->desc.isVolatile)
-        {
-            assert(destOffsetBytes == 0);
-
-            // Runs for dataSize == 0 as well: a zero-sized volatile write
-            // still claims a version and marks it written, which the
-            // "bind-before-write" validation of volatile constant buffers
-            // (e.g. NrdConstantBuffer) relies on. Skipping it stalls capture
-            // waits forever; the version path never reaches
-            // vkCmdUpdateBuffer, so no invalid zero-sized update is emitted.
-            writeVolatileBuffer(buffer, data, dataSize);
-
-            return;
-        }
-
         // A zero-sized non-volatile write is a no-op; vkCmdUpdateBuffer with
-        // dataSize 0 is invalid driver input.
-        if (dataSize == 0)
+        // dataSize 0 is invalid driver input. Volatile writes must still claim
+        // a version, even for size 0, and retain the buffer until submission
+        // completes: m_volatileBufferStates only stores raw Buffer pointers.
+        if (dataSize == 0 && !buffer->desc.isVolatile)
             return;
 
         assert(dataSize <= buffer->desc.byteSize);

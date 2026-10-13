@@ -27,6 +27,8 @@ def mae_rgb(a, b) -> float:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--vulkan", action="store_true", help="Select Vulkan explicitly.")
+    parser.add_argument("--debug", action="store_true", help="Enable GPU validation.")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=192)
@@ -42,6 +44,8 @@ def main() -> int:
         width=args.width,
         height=args.height,
         headless=True,
+        vulkan=args.vulkan,
+        debug=args.debug,
         scene=make_cube_scene(),
         realtime=True,
     ) as engine:

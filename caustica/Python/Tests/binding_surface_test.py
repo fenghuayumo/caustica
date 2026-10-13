@@ -19,6 +19,8 @@ def close3(actual, expected, atol: float = 1e-3) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--vulkan", action="store_true", help="Select Vulkan explicitly.")
+    parser.add_argument("--debug", action="store_true", help="Enable GPU validation.")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -30,6 +32,8 @@ def main() -> int:
         width=320,
         height=240,
         headless=True,
+        vulkan=args.vulkan,
+        debug=args.debug,
         scene="builtin:plane_cube",
         realtime=True,
     ) as engine:
