@@ -10,5 +10,10 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#ifdef _WIN32
+// Screenshot paths arrive as UTF-8 from Python and the UI. Use wide Windows
+// file APIs instead of interpreting their bytes through the ANSI code page.
+#define STBIW_WINDOWS_UTF8
+#endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>

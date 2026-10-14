@@ -181,7 +181,7 @@ namespace caustica_py
         {
             caustica::enableOutputToMessageBox(false);
             caustica::enableOutputToConsole(true);
-            caustica::setMinSeverity(caustica::Severity::Warning);
+            caustica::setMinSeverity(cfg.debug ? caustica::Severity::Info : caustica::Severity::Warning);
             caustica::helpersSetNonInteractive();
         }
 

@@ -3666,7 +3666,7 @@ void BindEngineApp(nb::class_<PyEngineApp>& cls)
              nb::arg("dt") = 1.0f / 60.0f)
         .def("save_screenshot",
              [](PyEngineApp& self, const std::string& path) {
-                 return self.engine().saveScreenshot(path);
+                 return self.engine().saveScreenshot(std::filesystem::u8path(path));
              }, nb::arg("output_path"))
 
         .def_prop_ro("accumulation_completed", [](PyEngineApp& self) { return self.engine().accumulationCompleted(); })

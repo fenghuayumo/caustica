@@ -857,6 +857,17 @@ bool UpdateGpuSceneBuffers(
 {
     gpu.enableBindlessResources = descriptorTable != nullptr;
     std::vector<MeshGpuUploadCommand> meshUploads = gpu.takePendingMeshUploads();
+    const bool replacesVertexBuffer = std::any_of(meshUploads.begin(), meshUploads.end(),
+        [](const MeshGpuUploadCommand& upload) { return upload.recreateVertexBuffer; });
+    // A structure refresh can drop mesh buffers and immediately recycle their
+    // bindless descriptors. Submitted ray-tracing lists retain the descriptor
+    // table, not every buffer reachable through it. Drain those readers before
+    // pruning/replacing resources or rewriting the table; CPU render-thread
+    // completion alone does not retire their GPU reads. Ordinary transform
+    // updates stay ordered on the queue and do not need this synchronization.
+    if ((structureChanged || replacesVertexBuffer)
+        && (!gpu.device || !gpu.device->waitForIdle()))
+        return false;
     for (const MeshGpuUploadCommand& upload : meshUploads)
     {
         if (!upload.recreateVertexBuffer)

@@ -931,6 +931,12 @@ bool App::runFrame(std::optional<double> elapsedTimeOverride)
 
     runSchedule(AppSchedule::Last, scheduleContext);
     finalizeFrameTiming(*gpuDevice, elapsedTime, curTime);
+    if (caustica::rhi::Device* rhiDevice = gpuDevice->getDevice();
+        !rhiDevice || !rhiDevice->isDeviceHealthy())
+    {
+        gpuDevice->setShuttingDown(true);
+        return false;
+    }
     return true;
 }
 

@@ -20,9 +20,10 @@ import time
 TESTS = (
     "binding_surface", "sensor_warmup", "sensor_aov_consistency",
     "sensor_product_resolution", "sensor_camera_parent", "sensor_world_poses",
-    "sensor_robot_fk", "screenshot", "sensor_stress",
+    "sensor_robot_fk", "screenshot", "sensor_stress", "dense_sensor_stress", "engine_recreate",
 )
-GPU_FAULTS = ("device removed", "device lost", "devicelost", "gpu device lost")
+GPU_FAULTS = ("device removed", "device lost", "devicelost", "gpu device lost",
+              "vk_error_device_lost", "dxgi_error_device", "xid 109", "fence wait aborted")
 
 
 def run_case(command: list[str], output: Path, timeout: float) -> dict:
@@ -73,11 +74,18 @@ def main() -> int:
         for name in args.tests:
             for run in range(args.runs):
                 output = args.output_dir / backend / name / f"run_{run:03d}"
-                if name in ("screenshot", "sensor_stress"):
+                if name in ("screenshot", "sensor_stress", "dense_sensor_stress"):
                     command = [sys.executable, "-u", str(test_dir / "vulkan_capture_stress_test.py"),
                                "--worker", "--backend", backend,
                                "--mode", "readback" if name == "screenshot" else "sensor",
                                "--captures", str(args.captures), "--width", "333", "--height", "257"]
+                    if name == "dense_sensor_stress":
+                        command.extend(["--dense-grid", "16", "--cameras", "3",
+                                        "--width", "640", "--height", "480",
+                                        "--camera-height", "2.8",
+                                        "--churn-camera", "--check-content"])
+                    elif name == "screenshot":
+                        command.append("--check-content")
                 else:
                     command = [sys.executable, "-u", str(test_dir / f"{name}_test.py")]
                     if backend == "vulkan":

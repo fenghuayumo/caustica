@@ -40,6 +40,16 @@ ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::Device* device, 
     const std::filesystem::path shaderPackPath = getRuntimeDirectory() / (std::string("caustica.shaders.") + shaderTypeName + ".pack");
     auto shaderPackFS = std::make_shared<ShaderPackFileSystem>(shaderPackPath, c_ComputeShaderBinariesRoot);
     const bool shaderPackHasDynamicBins = shaderPackFS->hasShaderBinLayout();
+    // Compute and RT passes share frame constants and output layouts. Use the
+    // rebuilt loose set consistently; an older pack can contain compatible
+    // keys but bytecode compiled against obsolete shared shader headers.
+    std::error_code looseTimeError;
+    std::error_code packTimeError;
+    const auto looseTime = std::filesystem::last_write_time(
+        m_compilerConfig.ShaderBinariesPath / "manifest.bin", looseTimeError);
+    const auto packTime = std::filesystem::last_write_time(shaderPackPath, packTimeError);
+    const bool looseShadersAreNewer = !looseTimeError
+        && (packTimeError || looseTime > packTime);
     if (shaderPackFS->isOpen() && !shaderPackHasDynamicBins)
     {
         caustica::warning(
@@ -48,7 +58,7 @@ ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::Device* device, 
             m_compilerConfig.ShaderBinariesPath.string().c_str());
     }
 
-    if (shaderPackHasDynamicBins)
+    if (shaderPackHasDynamicBins && !looseShadersAreNewer)
     {
         m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, shaderPackFS);
         m_compilerConfig.RuntimeCompilationAvailable = false;
@@ -58,6 +68,9 @@ ComputePipelineRegistry::ComputePipelineRegistry(caustica::rhi::Device* device, 
     }
     else
     {
+        if (shaderPackHasDynamicBins && looseShadersAreNewer)
+            caustica::info("ComputePipelineRegistry: rebuilt loose shaders supersede '%s'.",
+                shaderPackPath.string().c_str());
         m_shadersFS->mount("/" + c_ComputeShaderBinariesRoot, m_compilerConfig.ShaderBinariesPath);
         if (m_compilerConfig.canCompile())
             caustica::info("ComputePipelineRegistry: dev mode — runtime DXC compilation enabled.");

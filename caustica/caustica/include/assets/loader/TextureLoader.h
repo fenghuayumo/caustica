@@ -148,6 +148,7 @@ private:
     Handle<ImageAsset> makeHandle(const std::shared_ptr<ImageAsset>& texture) const;
 };
 
+// fileName is UTF-8, including on Windows.
 bool saveTextureToFile(
     caustica::rhi::Device* device,
     render::RenderDevice& renderDevice,

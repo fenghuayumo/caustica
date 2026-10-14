@@ -1077,12 +1077,13 @@ bool EngineApp::saveScreenshot(const std::filesystem::path& path)
     if (path.has_parent_path())
         ensureDirectoryExists(path.parent_path());
 
+    const auto utf8Path = path.u8string();
     return saveTextureToFile(
         m_device->getDevice(),
         *renderDevice,
         texture,
         state,
-        path.string().c_str());
+        reinterpret_cast<const char*>(utf8Path.c_str()));
 }
 
 std::optional<LdrFramebuffer> EngineApp::readLdrFramebuffer()

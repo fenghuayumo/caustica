@@ -58,6 +58,11 @@ bool runStructureGpuBuild(
 
     if (uploadMode == StructureGpuUploadMode::UploadMeshes)
     {
+        // refreshAfterLoad can replace bindless mesh/texture resources before
+        // finalizeAfterLoad. Retaining the old TLAS alone does not protect
+        // descriptor slots and buffers used by its outstanding ray dispatches.
+        if (!rhiDevice->waitForIdle())
+            return false;
         if (caches->textureLoader && caches->renderDevice)
         {
             caches->textureLoader->processRenderingThreadCommands(*caches->renderDevice, 0.f);

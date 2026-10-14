@@ -10,6 +10,16 @@
 #define STREAMLINE_HAS_DLSS_RR (SL_VERSION_MAJOR >= 2 && (SL_VERSION_MAJOR > 2 || SL_VERSION_MINOR >= 7))
 
 // Streamline Features
+// SDK helpers cache plugin entry points in function-local statics. Python can
+// shut down and reinitialize Streamline in one process; slShutdown unloads the
+// plugins, making those cached addresses invalid for the next device session.
+// Resolve against the current session instead of retaining an unloaded DLL.
+#pragma push_macro("SL_FEATURE_FUN_IMPORT_STATIC")
+#undef SL_FEATURE_FUN_IMPORT_STATIC
+#define SL_FEATURE_FUN_IMPORT_STATIC(feature, func) \
+    PFun_##func* s_##func{}; \
+    { const sl::Result result = slGetFeatureFunction(feature, #func, (void*&)s_##func); \
+      if (result != sl::Result::eOk) return result; }
 #include <sl_dlss.h>
 #include <sl_reflex.h>
 #include <sl_nis.h>
@@ -18,6 +28,7 @@
 #if STREAMLINE_HAS_DLSS_RR
 #include <sl_dlss_d.h>
 #endif
+#pragma pop_macro("SL_FEATURE_FUN_IMPORT_STATIC")
 
 #include <core/log.h>
 #include <render/core/GraphicsQueueFence.h>

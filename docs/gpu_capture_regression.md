@@ -1,5 +1,10 @@
 # GPU capture regression, 2026-10-13
 
+Historical investigation snapshot. See [the 2026-10-14 follow-up](gpu_capture_followup_2026-10-14.md)
+for subsequent lifetime repairs, DX12 shader-source consistency, and repeated-session testing.
+The experimental artifact paths below are disposable local outputs excluded
+from source control; the follow-up contains the retained evidence summary.
+
 Status: host-side failure handling and screenshot readback synchronization have
 been repaired. The dense-scene GPU fault is still reproducible; this work does
 not establish that sensor capture is stable on this driver.

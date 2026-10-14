@@ -225,7 +225,7 @@ bool RenderSession::RenderRealtimeFrame(float dt)
 
 bool RenderSession::SaveScreenshot(const std::string& outputPath)
 {
-    return m_engine && m_engine->saveScreenshot(outputPath);
+    return m_engine && m_engine->saveScreenshot(std::filesystem::u8path(outputPath));
 }
 
 std::optional<RenderSession::FramebufferLdr> RenderSession::GetFramebufferLdr()
